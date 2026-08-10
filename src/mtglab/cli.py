@@ -120,6 +120,42 @@ def cmd_decks_build(args):
 
 # ---------------------------------------------------------------------- sim
 
+def enters_tapped(oracle_text: str) -> bool:
+    """Whether a land unconditionally enters tapped.
+
+    Scryfall retemplated this: current oracle text reads "This land enters
+    tapped", not "enters the battlefield tapped". Matching only the old
+    wording silently treated every modern tapland as untapped, which
+    overstates early mana for every deck.
+
+    Conditional lands are deliberately treated as untapped. Tier 1 cannot
+    evaluate "unless you control a Forest" or a shock land's "you may pay 2
+    life", and in practice those resolve untapped in most real games; calling
+    them tapped would systematically slow every deck instead.
+    """
+    text = (oracle_text or "").lower()
+    if "enters tapped" not in text and "enters the battlefield tapped" not in text:
+        return False
+    return not ("unless" in text or "you may pay" in text)
+
+
+def fetches_lands(oracle_text: str) -> int:
+    """How many lands a spell puts onto the battlefield from the library.
+
+    Nature's Lore, Three Visits, Skyshroud Claim and Sakura-Tribe Elder are
+    ramp that produces no mana of its own. Without this they compile to blank
+    cards, which understates the deck's acceleration and skews the land-count
+    recommendation.
+    """
+    text = (oracle_text or "").lower()
+    if "search your library" not in text or "onto the battlefield" not in text:
+        return 0
+    if not any(w in text for w in ("land", "forest", "swamp", "island",
+                                   "mountain", "plains")):
+        return 0
+    return 2 if ("two" in text or "up to two" in text) else 1
+
+
 def _sim_cards(deck: Deck, cards):
     """Compile a deck into SimCards. Requires the corpus for mana production."""
     from mtglab.mana import ManaSource, parse_mana_cost
@@ -132,20 +168,35 @@ def _sim_cards(deck: Deck, cards):
         rec = cards.get(name)
         if rec is None:
             return None
+        # Only permanents stay on the battlefield making mana. Scryfall reports
+        # produced_mana for Treasure-makers like Deadly Dispute too, and
+        # without this guard an instant compiles into a permanent mana source.
+        front = rec.type_line.split(" // ")[0]
+        is_permanent = not ("Instant" in front or "Sorcery" in front)
         produced = frozenset(p for p in rec.produced_mana if p in "WUBRGC")
-        produces = (ManaSource(produced),) if produced else ()
-        tapped = "enters the battlefield tapped" in (rec.oracle_text or "").lower()
+        produces = (ManaSource(produced),) if (produced and is_permanent) else ()
         is_creature = "Creature" in rec.type_line
+        # A fetchland sacrifices itself, so it is net-zero lands and must not
+        # count here -- only spells that add a land to the board do.
+        fetch = 0 if rec.is_land else fetches_lands(rec.oracle_text)
         return SimCard(
             name=rec.name,
             cost=parse_mana_cost(rec.mana_cost),
             is_land=rec.is_land,
-            enters_tapped=tapped and rec.is_land,
+            enters_tapped=rec.is_land and enters_tapped(rec.oracle_text),
             produces=produces,
             produce_delay=1 if (produces and is_creature and not rec.is_land) else 0,
+            fetches_lands=fetch,
         )
 
-    library = [c for c in (compile_one(e.name) for e in deck.cards) if c]
+    # Expand by qty. Basics carry qty 8-16, so ignoring it simulated a deck of
+    # ~83 cards with ~20 lands instead of 99 with 34 -- which made every
+    # mulligan rate and land-count recommendation wrong.
+    library = []
+    for entry in deck.cards:
+        compiled = compile_one(entry.name)
+        if compiled is not None:
+            library.extend([compiled] * entry.qty)
     commander = compile_one(deck.commander[0]) if deck.commander else None
     return library, commander
 
