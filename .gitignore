@@ -25,6 +25,16 @@ cookies.json
 **/session*.json
 .credentials/
 
+# --- Frontend ---------------------------------------------------------------
+# node_modules is huge and reproducible from package-lock.json.
+node_modules/
+web/dist/
+.vite/
+
+# NOTE: src/mtglab/web_dist/ is deliberately NOT ignored. It is the built app,
+# and committing it is what lets someone clone this repo and run `mtglab ui`
+# without installing Node at all. Rebuild it with `npm --prefix web run build`.
+
 # --- Python -----------------------------------------------------------------
 __pycache__/
 *.py[cod]

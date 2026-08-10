@@ -117,6 +117,34 @@ def test_lands_do_not_contribute_pip_demand():
     assert all(n.pips == 0 for n in pip_requirements(deck, corpus))
 
 
+def test_any_color_sources_do_not_invent_offidentity_colors():
+    """A Golgari deck full of Command Towers must not report white sources.
+
+    "Add one mana of any color" lists all five in produced_mana, which is true
+    of the permanent and meaningless for the deck.
+    """
+    deck = deck_of(
+        CardEntry(name="Command Tower", category="land", qty=10, why="x"),
+        CardEntry(name="Doubler", category="threat", why="x"),
+    )
+    corpus = {
+        "Gyome, Master Chef": Rec("Gyome, Master Chef", "{2}{B}{G}",
+                                  "Legendary Creature — Troll Warlock",
+                                  color_identity=frozenset("BG")),
+        "Command Tower": Rec("Command Tower", None, "Land",
+                             ("W", "U", "B", "R", "G")),
+        "Doubler": Rec("Doubler", "{B}{B}"),
+    }
+    reported = {n.color for n in pip_requirements(deck, corpus)}
+    assert reported == {"B", "G"}, reported
+
+
+def test_without_a_commander_falls_back_to_demanded_colors():
+    deck = deck_of(CardEntry(name="Doubler", category="threat", why="x"))
+    reported = {n.color for n in pip_requirements(deck, {"Doubler": Rec("Doubler", "{B}{B}")})}
+    assert reported == {"B"}
+
+
 def test_sources_per_pip_is_reported():
     deck = deck_of(
         CardEntry(name="Doubler", category="threat", why="x"),

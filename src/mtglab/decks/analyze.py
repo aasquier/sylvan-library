@@ -104,6 +104,20 @@ def color_sources(deck: Deck, cards: dict) -> dict[str, int]:
     return counts
 
 
+def commander_identity(deck: Deck, cards: dict) -> frozenset[str]:
+    """The deck's legal colors, taken from the commander's Scryfall identity.
+
+    Never derived from mana costs -- identity already accounts for back faces,
+    reminder text and land types, which a cost does not.
+    """
+    identity: set[str] = set()
+    for name in deck.commander:
+        rec = cards.get(name)
+        if rec is not None:
+            identity |= set(getattr(rec, "color_identity", ()) or ())
+    return frozenset(identity)
+
+
 def pip_requirements(deck: Deck, cards: dict) -> list[ColorNeed]:
     """Colored pip demand against colored source supply, per color.
 
@@ -115,9 +129,14 @@ def pip_requirements(deck: Deck, cards: dict) -> list[ColorNeed]:
     Hybrid pips count toward every color that can pay them, since either will
     do. That deliberately overstates supply-side pressure rather than
     understating it.
+
+    Only colors inside the commander's identity are reported. "Add one mana of
+    any color" permanents list all five in `produced_mana`, so counting them
+    naively claims a Golgari deck has ten white sources -- true of the
+    permanent, meaningless for the deck, and pure noise in the chart.
     """
     pips = dict.fromkeys(COLORS, 0)
-    carders = {c: 0 for c in COLORS}
+    carders = dict.fromkeys(COLORS, 0)
 
     for entry in deck.cards:
         rec = cards.get(entry.name)
@@ -134,10 +153,14 @@ def pip_requirements(deck: Deck, cards: dict) -> list[ColorNeed]:
             carders[color] += entry.qty
 
     sources = color_sources(deck, cards)
+    identity = commander_identity(deck, cards)
+    # Without a commander in the corpus there is no identity to filter by, so
+    # fall back to whatever the spells actually demand.
+    relevant = identity or {c for c in COLORS if pips[c]}
     return [
         ColorNeed(color=c, pips=pips[c], sources=sources.get(c, 0), cards=carders[c])
         for c in COLORS
-        if pips[c] or sources.get(c, 0)
+        if c in relevant
     ]
 
 

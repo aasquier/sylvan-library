@@ -22,6 +22,11 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+# Ship the built frontend inside the package so an install serves the UI
+# without a Node toolchain present.
+mtglab = ["web_dist/**/*"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

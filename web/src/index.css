@@ -1,0 +1,141 @@
+@import 'tailwindcss';
+
+/* Chart and surface tokens. Both modes are selected, not flipped: the dark
+   column is the same hues re-stepped for the dark surface, validated as a set
+   against it. Slots 1-4 pass every hard gate in both modes on the adjacent
+   pairlist; light-mode aqua and yellow sit below 3:1, so every chart using
+   them ships direct labels and a table view. */
+:root {
+  color-scheme: light;
+
+  --surface-1: #fcfcfb;
+  --page: #f9f9f7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --hairline: rgba(11, 11, 11, 0.1);
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+
+  --seq-200: #9ec5f4;
+  --seq-400: #3987e5;
+  --seq-450: #2a78d6;
+  --seq-600: #184f95;
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+
+  /* MTG's own identity colors. Not a categorical palette -- these are the
+     game's fixed semantics, so they follow the entity by definition. */
+  --mtg-w: #f8f6d8;
+  --mtg-u: #c1d7e9;
+  --mtg-b: #bab1ab;
+  --mtg-r: #e49977;
+  --mtg-g: #a3c095;
+  --mtg-c: #cac5c0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --hairline: rgba(255, 255, 255, 0.1);
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+
+    --seq-200: #184f95;
+    --seq-400: #3987e5;
+    --seq-450: #5598e7;
+    --seq-600: #86b6ef;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --page: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --baseline: #383835;
+  --hairline: rgba(255, 255, 255, 0.1);
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+
+  --seq-200: #184f95;
+  --seq-400: #3987e5;
+  --seq-450: #5598e7;
+  --seq-600: #86b6ef;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Columns that must align vertically get tabular figures; standalone numbers
+   keep proportional ones. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.card-surface {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+}
+
+/* Card art fades in rather than popping, since a deck view loads ~90 at once. */
+.art-fade {
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+.art-fade.loaded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .art-fade {
+    transition: none;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--baseline);
+  border-radius: 6px;
+}

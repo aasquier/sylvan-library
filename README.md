@@ -7,13 +7,56 @@ no API keys. Everything runs on this laptop.
 
 ## Setup
 
+Needs Python 3.11+. macOS ships 3.9 or older, so check before assuming:
+
+```bash
+python3 --version
+```
+
+If that is below 3.11, the quickest fix is [uv](https://docs.astral.sh/uv/),
+which installs a standalone interpreter without touching the system one:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv python install 3.12
+uv venv --python 3.12
+uv pip install -e ".[dev,api]"
+```
+
+Otherwise the usual path works:
+
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,api]"
+```
 
+Then:
+
+```bash
 mtglab data refresh          # ~15 min first run: Scryfall bulk -> DuckDB
 mtglab decks list
+mtglab ui                    # the app, at http://127.0.0.1:8765
 ```
+
+## The app
+
+`mtglab ui` serves a local web app: deck library with real card art, the
+annotated 99 with every card's rationale, deterministic deck stats, a corpus
+search over the whole printed history, and the Tier 1 simulator with live
+progress.
+
+**You do not need Node to run it.** The built frontend is committed at
+`src/mtglab/web_dist/`. Node is only required to *change* the frontend:
+
+```bash
+npm --prefix web install
+npm --prefix web run dev     # Vite on :5173, proxying /api to :8765
+mtglab ui --dev              # run the API alongside it
+npm --prefix web run build   # rebuild the committed bundle
+```
+
+Card images load in the browser directly from Scryfall's CDN; the URLs are
+already in the local corpus, so nothing is proxied or re-hosted.
 
 `data refresh` pulls Scryfall's daily bulk files (one HTTP request each, not
 per-card scraping) and loads ~35k oracle cards plus ~500k printings locally.
@@ -56,6 +99,8 @@ mtglab sim mana <slug>                # Tier 1 goldfish
 mtglab sim lands <slug> 30 40         # land-count sweep, flood-aware
 
 mtglab price deck <slug>              # cheapest non-promo printing per card
+
+mtglab ui [--port 8765] [--dev]       # the local app
 ```
 
 ## Simulation tiers
