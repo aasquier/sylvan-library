@@ -1,0 +1,42 @@
+# --- Never commit: card corpus and derived data -----------------------------
+# Scryfall bulk files are large and redistributing them is against their
+# guidelines. They are re-downloadable in one command.
+data/scryfall/
+data/cache/
+data/*.duckdb
+data/*.duckdb.wal
+
+# --- Never commit: anything that identifies what you physically own ---------
+# A public inventory of expensive cards tied to a real identity is a
+# targeting list. Keep these local, permanently.
+collection.yaml
+collection/
+wishlist.yaml
+**/inventory.*
+**/purchases.*
+**/orders.*
+
+# --- Never commit: credentials and sessions ---------------------------------
+.env
+.env.*
+*.pem
+*.key
+cookies.json
+**/session*.json
+.credentials/
+
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# --- OS / editor ------------------------------------------------------------
+.DS_Store
+.idea/
+.vscode/

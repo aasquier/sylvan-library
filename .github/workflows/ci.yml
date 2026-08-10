@@ -1,0 +1,36 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+      - run: ruff check src tests
+
+  # Guard against the two things that must never land in the repo.
+  no-secrets-or-corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject committed card data, collections, or credentials
+        run: |
+          bad=$(git ls-files | grep -Ei \
+            '(^data/.*\.(json|duckdb)$|collection|wishlist|inventory|purchases|orders|\.env$|cookies\.json)' \
+            || true)
+          if [ -n "$bad" ]; then
+            echo "These files must not be committed:"; echo "$bad"; exit 1
+          fi
+          echo "clean"

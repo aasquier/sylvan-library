@@ -1,0 +1,49 @@
+# Template deck file. Copy to decks/<slug>/deck.yaml and fill in.
+# This file is the SOURCE OF TRUTH. All five artifacts are generated from it.
+# Run `mtglab validate <slug>` before generating anything.
+
+slug: my-deck
+name: My Deck Name
+commander:
+  - Gyome, Master Chef
+# companion: Kaheera, the Orphanguard   # sits outside the 100
+bracket: 4
+
+strategy: >
+  One paragraph. What the deck is trying to do and how it wins.
+
+# Prose that only a conversation can produce. It lives here so it survives
+# regeneration -- the primers read these keys directly.
+notes:
+  commander_why: Why this commander and not the alternatives.
+  gameplan: The 30-second version for someone picking the deck up cold.
+  mulligan: >
+    Derive this from a Tier 1 sweep, do not guess.
+    e.g. "keep 2-5 lands AND lands + cheap ramp >= 3"
+  curve_plan: Turn-by-turn shape.
+  pitfalls: Three things that will kill you.
+  engine_detail: How the engine actually assembles.
+  lines: Key sequencing decisions.
+  wincons: Every way this deck closes.
+  manabase: Why this land count, why these duals.
+  matchups: Versus the archetypes you actually face.
+  politics: What to say at the table.
+  failure_modes: What going wrong looks like and how to recover.
+  swap_philosophy: When to bring in the swap board.
+  rules_corners: Interactions worth knowing cold.
+
+# Every card needs a category and a `why`. Validation FAILS without them --
+# that is deliberate. A card you cannot justify is a card to cut.
+cards:
+  - name: Command Tower
+    category: land
+    why: Perfect fixing in the command zone's colors, no downside.
+  - name: Sol Ring
+    category: ramp
+    why: The single most efficient accelerant in the format.
+
+# Cards kept just outside the 99, with the reason they are on the bubble.
+swap_board:
+  - name: Bojuka Bog
+    category: land
+    why: Graveyard hate on a land; bring in against reanimator pods.
