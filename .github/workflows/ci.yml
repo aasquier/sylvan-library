@@ -16,9 +16,55 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -e ".[dev]"
+
+      # The `api` extra is not optional here. tests/test_api.py opens with
+      # pytest.importorskip("fastapi"), so installing only [dev] skips the
+      # entire HTTP layer -- silently, and with a green check.
+      - run: pip install -e ".[dev,api]"
+
+      # Fail loudly if that ever stops being true, rather than letting the
+      # importorskip quietly disable a whole test module again.
+      - name: API test dependencies must be present
+        run: python -c "import fastapi, httpx"
+
       - run: pytest -q
       - run: ruff check src tests
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+        working-directory: web
+
+      # Run the typecheck on its own so a type error reports as a type error,
+      # not as an opaque build failure.
+      - run: npx tsc -b
+        working-directory: web
+
+      - run: npm run build
+        working-directory: web
+
+      # src/mtglab/web_dist/ is committed so the app runs without Node. That
+      # only holds if it actually matches the source -- otherwise someone
+      # edits web/src, pushes, and the app quietly serves the old bundle.
+      # Output filenames are stable and the build is byte-reproducible, so a
+      # clean diff here is the check.
+      - name: Committed bundle must match the source
+        run: |
+          if ! git diff --quiet -- src/mtglab/web_dist; then
+            echo "::error::src/mtglab/web_dist/ is stale."
+            echo "Rebuild and commit it:  npm --prefix web run build"
+            git diff --stat -- src/mtglab/web_dist
+            exit 1
+          fi
+          echo "committed bundle is current"
 
   # Guard against the two things that must never land in the repo.
   no-secrets-or-corpus:
