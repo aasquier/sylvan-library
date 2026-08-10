@@ -14,7 +14,6 @@ wrong document.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterable
 
 from mtglab.decks.model import CATEGORIES, Deck
 

@@ -19,8 +19,8 @@ Unit     : one mana of output. A source producing N mana expands into N units,
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 
 COLORS = ("W", "U", "B", "R", "G")
 COLORLESS = "C"

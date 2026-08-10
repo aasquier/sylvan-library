@@ -51,7 +51,7 @@ class CardEntry:
     tags: list[str] = field(default_factory=list)
 
     @classmethod
-    def from_obj(cls, obj: Any) -> "CardEntry":
+    def from_obj(cls, obj: Any) -> CardEntry:
         if isinstance(obj, str):
             return cls(name=obj, category="utility")
         return cls(
@@ -126,7 +126,7 @@ class Deck:
     # ---- io ------------------------------------------------------------
 
     @classmethod
-    def load(cls, path: str | Path) -> "Deck":
+    def load(cls, path: str | Path) -> Deck:
         path = Path(path)
         if path.is_dir():
             path = path / "deck.yaml"

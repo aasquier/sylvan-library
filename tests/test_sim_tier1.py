@@ -4,7 +4,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from mtglab.mana import ManaSource, parse_mana_cost
-from mtglab.sim.tier1.engine import KeepRule, SimCard, run, simulate_game, sweep_land_counts
+from mtglab.sim.tier1.engine import (
+    KeepRule,
+    SimCard,
+    run,
+    simulate_game,
+    sweep_land_counts,
+)
 
 B = frozenset({"B"})
 G = frozenset({"G"})

@@ -5,8 +5,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from mtglab.artifacts.generate import (annotated_decklist, moxfield_txt,
-                                       quick_primer, swap_list, write_all)
+from mtglab.artifacts.generate import (
+    annotated_decklist,
+    moxfield_txt,
+    quick_primer,
+    swap_list,
+    write_all,
+)
 from mtglab.decks.model import CardEntry, Deck
 from mtglab.decks.validate import validate
 

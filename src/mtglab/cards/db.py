@@ -18,9 +18,10 @@ from __future__ import annotations
 
 import json
 import urllib.request
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 BULK_INDEX = "https://api.scryfall.com/bulk-data"
 USER_AGENT = "mtg-lab/0.1 (local personal deckbuilding tool)"
@@ -160,7 +161,7 @@ def _printing_row(c: dict) -> tuple:
         c.get("released_at"), bool(c.get("digital")), bool(c.get("promo")),
         c.get("finishes") or [], img.get("normal"),
         f("usd"), f("usd_foil"), f("eur"),
-        str((c.get("tcgplayer_id") or "")) or None,
+        str(c.get("tcgplayer_id") or "") or None,
     )
 
 

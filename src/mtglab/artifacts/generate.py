@@ -15,7 +15,6 @@ instead of being retyped each time.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -107,8 +106,8 @@ def quick_primer(deck: Deck, stats: dict[str, Any] | None = None) -> str:
         for k, v in stats.items():
             lines.append(f"- **{k}:** {v}")
 
-    lines += ["", "---", f"_Generated {date.today().isoformat()} from `deck.yaml`. "
-              "Edit the deck file, not this document._"]
+    lines += ["", "---", (f"_Generated {date.today().isoformat()} from `deck.yaml`. "
+                          "Edit the deck file, not this document._")]
     return "\n".join(lines)
 
 
@@ -148,7 +147,7 @@ def annotated_decklist(deck: Deck, cards: dict | None = None) -> str:
         lines += [deck.strategy, ""]
 
     for cmd in deck.commander:
-        lines += [f"## Command Zone", "", f"**{cmd}** — "
+        lines += ["## Command Zone", "", f"**{cmd}** — "
                   + _note(deck, "commander_why", "_(set `notes.commander_why`)_"), ""]
         break
 

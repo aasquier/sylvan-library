@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import random
 from collections import Counter
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from statistics import median
-from typing import Callable, Iterable, Sequence
 
-from mtglab.mana import ManaCost, ManaSource, can_pay, expand_units, parse_mana_cost
+from mtglab.mana import ManaCost, ManaSource, can_pay, expand_units
 
 
 @dataclass(frozen=True)
