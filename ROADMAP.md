@@ -82,11 +82,12 @@ slots — is not built.
 | Atla Palani — Dinos | Naya | not migrated | `Atla-Palani-Annotated-Decklist.md` (+ `.txt`, swap list `_8`) |
 | Goreclaw — Mono-green stompy | Green, B4 | not migrated | `goreclaw-mono-green-stompy_2.md` |
 | Tivit — cEDH | Esper, B5 | not migrated | `tivit-cedh-bracket5.md` |
-| Trostani — Tokens | Selesnya | not migrated | `trostani-tokens-FINAL-decklist_2.md` |
+| Trostani, Selesnya's Voice — Tokens | Selesnya | not migrated | `trostani-tokens-FINAL-decklist_2.md` (+ `trostani-PILOT-GUIDE.md`) |
 
-**Note:** CLAUDE.md says "five curated decks" and does not mention Trostani.
-There are six sets of source files. Worth confirming whether Trostani is still
-in rotation.
+Trostani is confirmed in rotation — an older token deck retooled into this
+list. Its plan leans on token doublers multiplying rather than adding, and on
+Trostani's lifegain trigger being load-bearing for cards that check "if you
+gained life this turn."
 
 Expect the gate to find real problems in each — Gyome's migration turned up a
 97-vs-99 card discrepancy and a tool bug that rejected every double-faced card.

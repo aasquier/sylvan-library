@@ -1,6 +1,6 @@
 ---
 name: mtg-lab
-description: Use for any Magic&#58; the Gathering deckbuilding, tuning, playtesting, simulation, spoiler review, or card-shopping work in this repo. Triggers on requests to build or refactor a Commander deck, analyse a mana base, run Monte Carlo or pod simulations, check color identity, compare decks, scan a new set for inclusions, or produce shopping and swap lists. Also use when the user names one of their decks (cat/Arahbo, dino/Atla, mono-green/Goreclaw, Tivit/cEDH, Gyome/food).
+description: Use for any Magic&#58; the Gathering deckbuilding, tuning, playtesting, simulation, spoiler review, or card-shopping work in this repo. Triggers on requests to build or refactor a Commander deck, analyse a mana base, run Monte Carlo or pod simulations, check color identity, compare decks, scan a new set for inclusions, or produce shopping and swap lists. Also use when the user names one of their decks (cat/Arahbo, dino/Atla, mono-green/Goreclaw, Tivit/cEDH, Gyome/food, Trostani/tokens).
 ---
 
 # mtg-lab
