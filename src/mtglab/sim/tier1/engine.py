@@ -347,10 +347,19 @@ def run(
     turns: int = 12,
     keep_rule: KeepRule | None = None,
     seed: int | None = None,
+    progress: Callable[[int, int], None] | None = None,
 ) -> SimSummary:
-    """Run `games` independent goldfish games and summarise."""
+    """Run `games` independent goldfish games and summarise.
+
+    `progress(done, total)` is called roughly 100 times over the run, so a UI
+    can show a bar. A 20,000-game sweep takes ~30s, which is far too long to
+    leave a caller with no signal.
+    """
     rng = random.Random(seed)
     keep_rule = keep_rule or KeepRule()
+    # Report ~1% at a time: frequent enough to animate, rare enough that the
+    # callback never shows up in a profile.
+    report_every = max(1, games // 100)
 
     commander_turns: list[int] = []
     never = 0
@@ -362,7 +371,9 @@ def run(
     spells_acc = [0.0] * turns
     screw_acc = 0
 
-    for _ in range(games):
+    for game_index in range(games):
+        if progress is not None and game_index % report_every == 0:
+            progress(game_index, games)
         res = simulate_game(library, commander, turns=turns,
                             keep_rule=keep_rule, rng=rng)
         if res.commander_turn is None:
@@ -377,6 +388,9 @@ def run(
             mana_acc[i] += res.mana_by_turn[i]
             unused_acc[i] += res.unused_by_turn[i]
             spells_acc[i] += res.spells_by_turn[i]
+
+    if progress is not None:
+        progress(games, games)
 
     cum = Counter(commander_turns)
     by_turn: dict[int, float] = {}

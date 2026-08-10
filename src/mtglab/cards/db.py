@@ -326,6 +326,9 @@ class CardRecord:
     reserved: bool
     edhrec_rank: int | None
     image_normal: str | None
+    # Cropped art only, no frame or text box. The UI uses it for hero images,
+    # where a full card scan reads as clutter.
+    image_art_crop: str | None = None
 
     @property
     def is_land(self) -> bool:
@@ -341,11 +344,13 @@ def _to_record(row: Sequence[Any]) -> CardRecord:
         produced_mana=tuple(row[6] or []),
         legal_commander=legalities.get("commander") == "legal",
         reserved=bool(row[7]), edhrec_rank=row[9], image_normal=row[10],
+        image_art_crop=row[11] if len(row) > 11 else None,
     )
 
 
 _SELECT = """SELECT name, mana_cost, cmc, type_line, oracle_text, color_identity,
-                    produced_mana, reserved, legalities, edhrec_rank, image_normal
+                    produced_mana, reserved, legalities, edhrec_rank,
+                    image_normal, image_art_crop
              FROM oracle_cards"""
 
 

@@ -73,13 +73,24 @@ def cmd_data_snapshot(args):
 
 # -------------------------------------------------------------------- decks
 
+def deck_paths(decks_dir: Path = DECKS_DIR) -> list[Path]:
+    """Every real deck file, newest-name-first order aside. `_template` and any
+    other underscore-prefixed directory is scaffolding, not a deck."""
+    if not decks_dir.exists():
+        return []
+    return [p for p in sorted(decks_dir.glob("*/deck.yaml"))
+            if not p.parent.name.startswith("_")]
+
+
+def load_all_decks(decks_dir: Path = DECKS_DIR) -> list[Deck]:
+    """Shared by the CLI and the API so both see exactly the same library."""
+    return [Deck.load(p) for p in deck_paths(decks_dir)]
+
+
 def cmd_decks_list(args):
     if not DECKS_DIR.exists():
         sys.exit("no decks/ directory")
-    for path in sorted(DECKS_DIR.glob("*/deck.yaml")):
-        if path.parent.name.startswith("_"):
-            continue
-        deck = Deck.load(path)
+    for deck in load_all_decks():
         cmd = ", ".join(deck.commander) or "?"
         bracket = f"B{deck.bracket}" if deck.bracket else "B?"
         print(f"  {deck.slug:<22} {bracket:<4} {deck.total_cards:>3} cards   {cmd}")
@@ -116,6 +127,36 @@ def cmd_decks_build(args):
     written = write_all(deck, outdir, cards=cards, previous=previous)
     for path in written:
         print(f"  wrote {path}")
+
+
+# ----------------------------------------------------------------------- ui
+
+def cmd_ui(args):
+    """Serve the local app."""
+    try:
+        import uvicorn
+    except ModuleNotFoundError:
+        sys.exit("the UI needs the api extra:  pip install -e '.[api]'")
+
+    from mtglab.api.app import WEB_DIST, create_app
+
+    if not WEB_DIST.is_dir() and not args.dev:
+        print(f"warning: no built frontend at {WEB_DIST}")
+        print("         build it with `npm --prefix web run build`, or use "
+              "--dev with the Vite server running")
+
+    url = f"http://{args.host}:{args.port}"
+    print(f"sylvan-library -> {url}")
+    if not args.no_open:
+        # Open after a beat so the server is accepting connections. A browser
+        # that lands on a refused connection shows an error page and does not
+        # retry, which reads as "the app is broken".
+        import threading
+        import webbrowser
+        threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+
+    uvicorn.run(create_app(dev=args.dev), host=args.host, port=args.port,
+                log_level="info")
 
 
 # ---------------------------------------------------------------------- sim
@@ -289,6 +330,15 @@ def main(argv=None):
     ld.add_argument("--games", type=int, default=5000)
     ld.add_argument("--seed", type=int, default=7)
     ld.set_defaults(func=cmd_sim_lands)
+
+    ui = sub.add_parser("ui")
+    ui.add_argument("--port", type=int, default=8765)
+    ui.add_argument("--host", default="127.0.0.1")
+    ui.add_argument("--no-open", action="store_true")
+    ui.add_argument("--dev", action="store_true",
+                    help="allow CORS from the Vite dev server on :5173")
+    ui.add_argument("--reload", action="store_true")
+    ui.set_defaults(func=cmd_ui)
 
     price = sub.add_parser("price").add_subparsers(dest="cmd", required=True)
     pd = price.add_parser("deck"); pd.add_argument("slug")

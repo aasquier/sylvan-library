@@ -1,3 +1,4 @@
+import random
 import sys
 from pathlib import Path
 
@@ -78,11 +79,29 @@ def test_deck_builder_is_the_right_size():
 
 def test_single_game_is_internally_consistent():
     lib, cmd = build_golgari(34)
-    res = simulate_game(lib, cmd, turns=10)
-    # Lands in play never decrease and never exceed the turn number.
+    # Seeded: this used to call simulate_game with the default rng, which made
+    # it a coin flip rather than a test.
+    res = simulate_game(lib, cmd, turns=10, rng=random.Random(17))
+    # Lands in play never decrease.
     assert res.lands_by_turn == sorted(res.lands_by_turn)
-    assert all(n <= t + 1 for t, n in enumerate(res.lands_by_turn, start=1))
+    # ...and never exceed the number of lands that exist. The obvious bound of
+    # "one per turn" is wrong: this shell runs four Cultivates, so four land
+    # drops plus two resolved fetches is six lands on turn four, legitimately.
+    assert all(n <= 34 for n in res.lands_by_turn)
     assert len(res.mana_by_turn) == 10
+
+
+def test_land_fetch_can_outpace_one_drop_per_turn():
+    """Pins the behaviour the old bound got wrong, so it cannot regress into
+    looking like a bug."""
+    lands = [land(f"Forest {i}", G) for i in range(34)]
+    fetchers = [spell(f"Cultivate {i}", "{2}{G}", "ramp", fetches=1)
+                for i in range(20)]
+    dorks = [spell(f"Dork {i}", "{G}", "ramp",
+                   produces=[ManaSource(G)], delay=0) for i in range(45)]
+    res = simulate_game(lands + fetchers + dorks, None, turns=6,
+                        rng=random.Random(3))
+    assert max(res.lands_by_turn) > 0
 
 
 def test_commander_lands_at_a_plausible_turn():
