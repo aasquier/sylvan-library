@@ -136,7 +136,11 @@ manages board state, it does not enforce rules.
 
 ## The decks
 
-Five curated Commander decks: Arahbo cats (Selesnya, Kaheera companion, cats
+Six curated Commander decks: Arahbo cats (Selesnya, Kaheera companion, cats
 only), Atla Palani dinosaurs (Naya), Goreclaw mono-green stompy (bracket 4),
-Tivit (Esper cEDH, bracket 5), Gyome food (Golgari, bracket 4). None are
-migrated into `deck.yaml` yet — that is Phase 2, starting with Gyome.
+Tivit (Esper cEDH, bracket 5), Gyome food (Golgari, bracket 4), and Trostani
+tokens (Selesnya — an older token deck retooled into this list).
+
+Only Gyome is migrated into `deck.yaml` so far. Source markdown for the rest
+lives in `~/Downloads`; take the highest-numbered file per deck. `ROADMAP.md`
+tracks which is which.
