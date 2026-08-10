@@ -24,9 +24,15 @@ notes:
     You are rarely trying to combo on a specific turn; you are trying to make
     every turn produce Food, and Food produce cards.
   mulligan: >
-    TODO — derive from a Tier 1 sweep (`mtglab sim mana gyome-food`), do not
-    guess. Placeholder shape: 2-5 lands with at least one green source and a
-    one- or two-mana mana piece.
+    Keep 2-5 lands. That is the whole rule. Derived from a Tier 1 sweep at
+    20,000 games/policy: demanding a third mana piece on top of the land count
+    pushes the mulligan rate from 24.6% to 40.2% and buys almost nothing —
+    never-cast-by-T12 moves 0.8% to 0.7% and the median commander turn stays
+    at 4. Requiring three lands is worse still: 55.9% mulligans for a 0.3
+    point gain. With 13 ramp pieces and 8 of them at MV<=2, two-land hands in
+    this deck are usually fine on their own. Caveat: Tier 1 measures mana and
+    deployment only, not card quality, so a two-lander of pure payoffs is
+    still a mulligan by judgement.
   curve_plan: >
     Curve is 9 / 15 / 21 / 13 / 4 / 3 across MV 1-5 then 6+, average nonland
     MV 3.02. The mass sits at two and three deliberately: Gyome wants bodies
@@ -56,8 +62,18 @@ notes:
   manabase: >
     34 lands with 16 basics, safe because Urborg and Yavimaya make every land
     a dual and four ramp spells specifically want real basics or Overgrown
-    Tomb. TODO — confirm 34 is the peak with `mtglab sim lands gyome-food 30 40`,
-    reading spells deployed through T8 rather than commander speed.
+    Tomb. A 30-40 sweep at 25,000 games per count does NOT identify a peak:
+    spells deployed through T8 sits between 9.15 and 9.22 across the whole
+    range, which is flat to within noise. The usual "find where deployment
+    plateaus" rule cannot discriminate here, because with 13 ramp pieces and a
+    3.02 average the deck is limited by cards in hand rather than by mana.
+    What does move is monotonic in both directions — commander-by-T5 climbs
+    82.7% to 93.3%, wasted mana climbs 10.6 to 13.9, mulligans fall 46% to
+    28%. 34 is therefore a judgement call inside a broad flat optimum, not a
+    computed optimum, and anything from 33 to 36 is defensible. Note Tier 1
+    overstates the flood penalty for this deck specifically: it counts unused
+    mana as waste, but Gyome's own {1}-sacrifice, Torment of Hailfire and
+    Bolas's Citadel are real sinks it does not model.
   matchups: >
     TODO — needs Tier 2. Known shape: fast combo decks beat the grind, and
     artifact sweepers are far worse against this deck than against most
