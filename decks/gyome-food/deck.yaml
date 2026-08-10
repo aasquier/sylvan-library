@@ -1,0 +1,464 @@
+slug: gyome-food
+name: Gyome, Master Chef — Food
+commander:
+  - Gyome, Master Chef
+bracket: 4
+
+strategy: >
+  Golgari Food aristocrats. Gyome converts every nontoken creature that enters
+  into Food at end of turn; Food is simultaneously an artifact, a sacrifice
+  cost, a mana source and a lifegain trigger, so the same permanent feeds four
+  different axes. The deck grinds value out of small repeatable loops
+  (Cauldron Familiar recursion, free sacrifice outlets, token multipliers),
+  then converts a wide board into a kill through a drain payoff, Mazirek
+  counters, or Torment of Hailfire.
+
+notes:
+  commander_why: >
+    Gyome counts NONTOKEN creatures entering, which is why the deck runs 28 of
+    them at a low curve rather than a token-doubling shell. He is also a free
+    sacrifice outlet attached to indestructible protection, and he makes
+    Deadly Rollick free.
+  gameplan: >
+    Ramp on 1-3, land Gyome on 4-5, then assemble any outlet plus any payoff.
+    You are rarely trying to combo on a specific turn; you are trying to make
+    every turn produce Food, and Food produce cards.
+  mulligan: >
+    TODO — derive from a Tier 1 sweep (`mtglab sim mana gyome-food`), do not
+    guess. Placeholder shape: 2-5 lands with at least one green source and a
+    one- or two-mana mana piece.
+  curve_plan: >
+    Curve is 9 / 15 / 21 / 13 / 4 / 3 across MV 1-5 then 6+, average nonland
+    MV 3.02. The mass sits at two and three deliberately: Gyome wants bodies
+    entering every turn, not expensive ones.
+  pitfalls: >
+    (1) Ygra turns your own creatures into artifacts, so Vandalblast and Bane
+    of Progress become one-sided wraths against you. (2) Mirkwood Bats does
+    NOT trigger on a token dying in combat, only on create/sacrifice.
+    (3) Bilbo, Peregrin Took and Academy Manufactor are all replacement
+    effects that each apply once per creation event — they compound but never
+    loop.
+  engine_detail: >
+    The floor is Cauldron Familiar plus Witch's Oven: a free recurring drain
+    and, more importantly, a free recurring NONTOKEN creature ETB for Gyome's
+    end-step count. Everything above that is multiplication — Academy
+    Manufactor, Peregrin Took, Bilbo and Parallel Lives all widen the same
+    trigger.
+  lines: >
+    Sacrifice in response to removal, not before it. Phyrexian Tower and
+    Viscera Seer are free, so a creature about to be exiled should always
+    become value first. Hold Deadly Rollick for the turn an opponent tries to
+    win rather than spending it on a threat you can block.
+  wincons: >
+    Drain loops (Blood Artist / Nadier's Nightblade / Mirkwood Bats), Mazirek
+    or Pippin turning a wide board lethal, Torment of Hailfire off a Food-
+    powered X, or Bolas's Citadel emptying the library.
+  manabase: >
+    34 lands with 16 basics, safe because Urborg and Yavimaya make every land
+    a dual and four ramp spells specifically want real basics or Overgrown
+    Tomb. TODO — confirm 34 is the peak with `mtglab sim lands gyome-food 30 40`,
+    reading spells deployed through T8 rather than commander speed.
+  matchups: >
+    TODO — needs Tier 2. Known shape: fast combo decks beat the grind, and
+    artifact sweepers are far worse against this deck than against most
+    Golgari boards because of Ygra.
+  politics: >
+    The deck looks like durdle for six turns and then kills the table from a
+    board of Food. Expect to be underestimated early and targeted the moment a
+    drain payoff resolves.
+  failure_modes: >
+    Flooding without Tireless Provisioner, or holding a hand of payoffs with
+    no outlet. The deck has eleven ways to sacrifice for exactly this reason.
+  swap_philosophy: >
+    TODO — populate the swap board.
+  rules_corners: >
+    Great Arashin City's white Spirit token does not add white to its identity
+    (token colour is not a mana symbol). Jaheira is {2}{G} mono-green; the
+    Background pairing is what makes her read Selesnya. Warren Soultrader
+    costs 1 life per activation, which caps loops that do not gain life back.
+
+cards:
+  # ---------------------------------------------------------------- LANDS 34
+  # Duals and fixing (11)
+  - name: Command Tower
+    category: land
+    why: Perfect dual in the command zone's colours, no downside.
+  - name: Overgrown Tomb
+    category: land
+    why: Untapped dual for two life, and the target Nature's Lore and Skyshroud Claim want.
+  - name: Twilight Mire
+    category: land
+    why: >
+      Filter — turns any one mana into {B}{B}, {B}{G} or {G}{G}. Needs another
+      source first, so never a turn-one land.
+  - name: Darkbore Pathway
+    category: land
+    why: Modal; pick the colour you're short on. Always untapped.
+  - name: Deathcap Glade
+    category: land
+    why: Untapped while you have two or fewer other lands; a tapland later.
+  - name: Underground Mortuary
+    category: land
+    why: >
+      Enters tapped, surveils 1. The self-mill is live — Witch of the Moors,
+      Cauldron Familiar and Hazel's Brewmaster all want a graveyard.
+  - name: Undergrowth Stadium
+    category: land
+    why: Enters untapped with two or more opponents, so it is an untapped dual in a pod.
+  - name: Great Arashin City
+    category: land
+    why: >
+      With 8 Forests it is effectively a black dual. Identity is mono-black
+      despite the white Spirit token — token colour is not a mana symbol.
+  - name: Kishla Village
+    category: land
+    why: With 8 Swamps it is effectively a green dual.
+  - name: Verdant Catacombs
+    category: land
+    why: Fetch — fixes, thins, and shuffles away a bad Imperial Seal top.
+  - name: Fabled Passage
+    category: land
+    why: Same job as Verdant Catacombs for basics.
+
+  # Land-base engines (2)
+  - name: Urborg, Tomb of Yawgmoth
+    category: land
+    why: Every land is a Swamp.
+  - name: Yavimaya, Cradle of Growth
+    category: land
+    why: >
+      Every land is a Forest. With Urborg out, every land is a dual — this is
+      what makes an 8/8 basic split safe.
+
+  # Utility lands (5)
+  - name: Phyrexian Tower
+    category: land
+    why: >
+      Free sacrifice outlet on a land that also makes {B}{B}. Sacrifice
+      Cauldron Familiar or Sakura-Tribe Elder in response to removal.
+  - name: Grim Backwoods
+    category: land
+    why: >
+      {2}, {T}, sacrifice a creature: draw a card. Slow, but an outlet that
+      survives artifact wipes.
+  - name: Gingerbread Cabin
+    category: land
+    why: A Forest that hands you a Food when it enters untapped.
+  - name: The Shire
+    category: land
+    why: On-theme Halfling and Food utility land.
+  - name: Castle Garenbrig
+    category: land
+    why: >
+      Untapped green source most games; the four-green mode can pay most of
+      Ygra or Pizza Face in a pinch.
+
+  # Basics (16)
+  - name: Forest
+    category: land
+    qty: 8
+    why: >
+      Basic, fetchable by Nature's Lore, Three Visits and Skyshroud Claim, and
+      turned into a dual by Urborg.
+  - name: Swamp
+    category: land
+    qty: 8
+    why: Basic, and turned into a dual by Yavimaya.
+
+  # -------------------------------------------------------- RAMP AND MANA 13
+  - name: Sol Ring
+    category: ramp
+    why: The single most efficient accelerant in the format.
+  - name: Arcane Signet
+    category: ramp
+    why: Two-mana perfect fixing.
+  - name: Golgari Signet
+    category: ramp
+    why: Second two-mana rock. Its whole job is turning turn-5 Gyomes into turn-4 Gyomes.
+  - name: Gilded Goose
+    category: ramp
+    why: >
+      One mana, Food on entry, turns Foods into any colour, and is itself a
+      nontoken creature for Gyome's count.
+  - name: Delighted Halfling
+    category: ramp
+    why: >
+      Ramps and makes legendary spells uncounterable — there are ten legendary
+      spells in the 99 plus the commander, so this matters more than it looks.
+  - name: Jaheira, Friend of the Forest
+    category: ramp
+    why: >
+      Tokens you control tap for {G}. Every Food, Rat, Squirrel, Clue and
+      Treasure becomes a land; often 4-8 mana in the mid-game. Mono-green
+      identity despite reading as Selesnya.
+  - name: Ninja Pizza
+    category: ramp
+    why: >
+      Foods sacrifice for any colour, plus a Food each second main phase.
+      Mana, fixing and Food density on one three-drop.
+  - name: Night of the Sweets' Revenge
+    category: ramp
+    why: >
+      Redundant copy of Jaheira's mana ability that is also a finisher — the
+      sacrifice mode pumps the team by your Food count.
+  - name: Tireless Provisioner
+    category: ramp
+    why: Landfall into Food or Treasure. The reason flooding is not a disaster.
+  - name: Nature's Lore
+    category: ramp
+    why: Fetches Overgrown Tomb untapped.
+  - name: Three Visits
+    category: ramp
+    why: Functional second copy of Nature's Lore.
+  - name: Skyshroud Claim
+    category: ramp
+    why: Two lands untapped, and it can grab Overgrown Tomb.
+  - name: Sakura-Tribe Elder
+    category: ramp
+    why: >
+      Ramps, blocks anything once, counts as a nontoken creature for Gyome,
+      then becomes sacrifice fodder.
+
+  # ---------------------------------------------------------- FOOD ENGINES 11
+  - name: Academy Manufactor
+    category: engine
+    why: >
+      Every Food becomes Food plus Clue plus Treasure. Triples every token
+      trigger and is a piece in two infinite loops.
+  - name: Peregrin Took
+    category: engine
+    why: >
+      Token multiplier, free sacrifice outlet and draw engine on one card
+      (sacrifice three Foods: draw). The best non-commander card in the deck.
+  - name: Pippin, Warden of Isengard
+    category: engine
+    why: >
+      Repeatable Food maker whose second mode is a genuine Overrun for four
+      Foods.
+  - name: Elanor Gardner
+    category: engine
+    why: >
+      End-step payoff that ramps if you sacrificed a Food that turn, and
+      another nontoken creature for the count.
+  - name: Greta, Sweettooth Scourge
+    category: engine
+    why: Food on entry, then converts Foods into +1/+1 counters or cards. Exactly on colour.
+  - name: Experimental Confectioner
+    category: engine
+    why: >
+      Food on entry, then a Rat every time you sacrifice a Food. Half the best
+      two-card combo and a Skullclamp factory on its own.
+  - name: Hazel's Brewmaster
+    category: engine
+    why: >
+      Food and graveyard exile on entry or attack, and it grants your Foods the
+      activated abilities of creatures it exiled. Doubles as light graveyard hate.
+  - name: Nuka-Cola Vending Machine
+    category: engine
+    why: >
+      Repeatable Food, plus a Treasure every time you sacrifice one. A one-card
+      mana engine and a two-card infinite with Peregrin Took.
+  - name: Bilbo, Fellow Conspirator
+    category: engine
+    why: >
+      Every Food arrives with a Treasure, turning Gyome's end step into Food
+      and mana. A replacement effect, so it applies once per creation event.
+  - name: Pitiless Plunderer
+    category: engine
+    why: >
+      Treasure on every other creature death — real mana in a deck that kills
+      its own creatures constantly, and it makes Chatterfang a two-card engine.
+  - name: Pizza Face, Gastromancer
+    category: engine
+    why: >
+      Food on entry, then three +1/+1 counters every turn you sacrificed
+      something, which is every turn. It is itself a Food.
+
+  # ------------------------------------------------------- SACRIFICE OUTLETS 7
+  - name: Witch's Oven
+    category: sac-outlet
+    why: >
+      The Cauldron Familiar partner: free repeatable drain plus a repeatable
+      nontoken creature ETB for Gyome.
+  - name: Viscera Seer
+    category: sac-outlet
+    why: One mana, free, and it scries. Makes Ygra plus Experimental Confectioner a real combo.
+  - name: Ashnod's Altar
+    category: sac-outlet
+    why: Free outlet that produces {C}{C}. Combo enabler and mana engine.
+  - name: Savvy Hunter
+    category: sac-outlet
+    why: >
+      Food on attack or block, and sacrifice two Foods to draw for no mana — a
+      free outlet stapled to a draw engine.
+  - name: Dockside Chef
+    category: sac-outlet
+    why: Converts spare creatures and artifacts into cards.
+  - name: Krark-Clan Ironworks
+    category: sac-outlet
+    why: >
+      Sacrifice an artifact for {C}{C}, and every Food is an artifact. Infinite
+      with Academy Manufactor plus Nuka-Cola Vending Machine.
+  - name: Warren Soultrader
+    category: sac-outlet
+    why: >
+      Free outlet that makes Treasure. The 1 life per activation is the cap on
+      loops that do not gain life back.
+
+  # ------------------------------------------------------ DRAIN AND PAYOFFS 5
+  - name: Mirkwood Bats
+    category: payoff
+    why: >
+      Drains on create OR sacrifice of a token. Note a token dying in combat
+      does not trigger it. The fastest conversion of a token loop into a kill.
+  - name: Nadier's Nightblade
+    category: payoff
+    why: >
+      Drains and gains when a token leaves the battlefield. The lifegain is
+      what makes the Warren Soultrader loop truly infinite.
+  - name: Blood Artist
+    category: payoff
+    why: Same role as Nadier's Nightblade on a different trigger — any creature dying.
+  - name: Marionette Apprentice
+    category: payoff
+    why: Artifacts dying drain, catching Food-sacrifice loops with no creatures involved.
+  - name: Syr Ginger, the Meal Ender
+    category: payoff
+    why: >
+      Grows off your own artifacts leaving, is awkward to interact with, and
+      cashes itself in for cards. A resilient clock rather than a drain.
+
+  # --------------------------------------------------------- SCALING THREATS 5
+  - name: Ygra, Eater of All
+    category: threat
+    why: >
+      Turns the whole table's creatures into Food and grows on every Food that
+      dies. Honest downside: your creatures become artifacts too, so
+      Vandalblast or Bane of Progress wipes your board.
+  - name: Chatterfang, Squirrel General
+    category: threat
+    why: Every token comes with a Squirrel. Stacks multiplicatively with Peregrin Took and Academy Manufactor.
+  - name: Mazirek, Kraul Death Priest
+    category: threat
+    why: >
+      Every sacrifice, including every Food, counters up the whole board. In a
+      deck that sacrifices six things a turn this ends games in two swings.
+  - name: Ravenous Squirrel
+    category: threat
+    why: Two mana, grows on every artifact or creature sacrificed, and a fine Skullclamp target while small.
+  - name: Witch of the Moors
+    category: threat
+    why: >
+      Recursion tied to lifegain, which happens constantly. Rebuying a nontoken
+      creature is also another Gyome trigger.
+
+  # -------------------------------------------------------- TOKEN MULTIPLIER 1
+  - name: Parallel Lives
+    category: engine
+    why: >
+      Doubles every Food, Rat, Squirrel, Clue and Treasure. Does NOT increase
+      Gyome's count — he counts nontoken creatures entering, so this doubles
+      the output, never the input.
+
+  # ----------------------------------------------------------- CARD ADVANTAGE 9
+  - name: The Great Henge
+    category: card-advantage
+    why: >
+      With Ygra or any large creature it costs 2-4, then draws and ramps every
+      turn. Effectively infinite draw with Ashnod's Altar.
+  - name: Guardian Project
+    category: card-advantage
+    why: Every nontoken creature draws a card — identical trigger condition to Gyome.
+  - name: Idol of Oblivion
+    category: card-advantage
+    why: Draws off token creation, which never stops.
+  - name: Phyrexian Arena
+    category: card-advantage
+    why: Boring and reliable; the life cost is irrelevant next to Food.
+  - name: Trail of Crumbs
+    category: card-advantage
+    why: Card selection every time a Food is sacrificed, requiring no outlet of its own.
+  - name: Skullclamp
+    category: card-advantage
+    why: Every 1/1 Rat and Squirrel becomes "pay {1}, draw two."
+  - name: Deadly Dispute
+    category: card-advantage
+    why: Sacrifice a Food or a spent creature, draw two, make a Treasure. Instant speed.
+  - name: Reckoner's Bargain
+    category: card-advantage
+    why: Same idea as Deadly Dispute with lifegain instead of Treasure; often close to free.
+  - name: Bolas's Citadel
+    category: card-advantage
+    why: >
+      Foods gain life, the curve is low, and Ninja Pizza turns Foods into mana.
+      This deck can genuinely empty its library off one Citadel.
+
+  # ------------------------------------------------------------------ TUTORS 3
+  - name: Demonic Tutor
+    category: tutor
+    why: Anything, two mana.
+  - name: Imperial Seal
+    category: tutor
+    why: Anything for one mana onto the next draw. Fetch the piece a turn before you need it.
+  - name: Worldly Tutor
+    category: tutor
+    why: >
+      Instant-speed creature tutor for Experimental Confectioner, Ygra, or the
+      drain payoff that converts a loop into a kill.
+
+  # ------------------------------------------------ INTERACTION AND PROTECTION 9
+  - name: Beast Within
+    category: interaction
+    why: Answers anything. The 3/3 is a real cost, usually worth paying.
+  - name: Go for the Throat
+    category: interaction
+    why: Two-mana creature removal.
+  - name: Baleful Mastery
+    category: interaction
+    why: >
+      Exiles a creature or planeswalker; the {1}{B} mode that lets an opponent
+      draw is where it earns its slot.
+  - name: Deadly Rollick
+    category: interaction
+    why: >
+      Free with Gyome on the battlefield — the only instant-speed answer that
+      costs no tempo. Hold it for the turn someone tries to win.
+  - name: Binding the Old Gods
+    category: interaction
+    why: Removal plus ramp plus a lasting deathtouch buff. A slow three-for-one.
+  - name: Toxic Deluge
+    category: interaction
+    why: >
+      Scalable wrath that gets under indestructible, ward and hexproof, and
+      this deck rebuilds fastest.
+  - name: Virtue of Persistence
+    category: interaction
+    why: >
+      Removal early on the Adventure side, then a repeatable reanimation
+      engine — and everything it steals is another nontoken creature entering.
+  - name: Heroic Intervention
+    category: protection
+    why: Protects the board from a wrath or a Vandalblast, very relevant with Ygra out.
+  - name: Torment of Hailfire
+    category: win-con
+    why: >
+      The mana sink. Jaheira, Ninja Pizza and Night of the Sweets' Revenge turn
+      a board of Foods into a large X.
+
+  # ------------------------------------------------------ RECURSION/FINISHER 2
+  - name: Cauldron Familiar
+    category: recursion
+    why: >
+      "Sacrifice a Food: Return this card from your graveyard to the
+      battlefield", and it drains 1 on every entry. With Witch's Oven this is a
+      free repeating drain, and — the part that matters here — a free repeating
+      NONTOKEN creature ETB, which is the number Gyome actually counts.
+  - name: Bag End Banquet
+    category: ramp
+    why: >
+      Three Foods on entry, then taps for {C} per Food you control. Colorless,
+      so it costs no identity. FLAGGED: at {6} it is the fourth card at MV 6+ in
+      a deck averaging 3.02, and it is a slower rerun of Jaheira / Ninja Pizza /
+      Night of the Sweets' Revenge. Kept to reach 99; revisit this slot.
+
+swap_board: []

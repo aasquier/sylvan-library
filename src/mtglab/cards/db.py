@@ -16,6 +16,7 @@ Bulk types we care about:
 
 from __future__ import annotations
 
+import gzip
 import json
 import urllib.request
 from collections.abc import Iterable, Sequence
@@ -103,29 +104,58 @@ def _fetch_json(url: str) -> Any:
         return json.load(resp)
 
 
+def bulk_download_url(entry: dict) -> str:
+    """The download URL for a bulk-data index entry.
+
+    Scryfall retired the plain-JSON `download_uri` in favour of gzipped JSONL
+    under `jsonl_download_uri`. Prefer the current key, fall back to the old
+    one so an archived index still loads, and fail loudly rather than with a
+    bare KeyError if both ever disappear.
+    """
+    url = entry.get("jsonl_download_uri") or entry.get("download_uri")
+    if not url:
+        raise ValueError(
+            f"bulk entry {entry.get('type')!r} has no download URL; Scryfall's "
+            f"index format may have changed again (keys: {sorted(entry)})")
+    return url
+
+
 def download_bulk(kind: str, dest_dir: str | Path = "data/scryfall") -> Path:
     """Download a Scryfall bulk file. `kind` is 'oracle_cards' or 'default_cards'.
 
     Returns the local path. Skips the download if the local copy is already
     at or newer than Scryfall's published `updated_at`.
+
+    The file is stored exactly as served, compression included -- `_iter_cards`
+    decompresses on the fly. `default_cards` is ~2GB expanded but well under
+    500MB gzipped, and it is only ever read as a stream.
     """
     index = _fetch_json(BULK_INDEX)
     entry = next((e for e in index["data"] if e["type"] == kind), None)
     if entry is None:
         raise ValueError(f"unknown bulk type {kind!r}")
 
+    url = bulk_download_url(entry)
+    # Preserve the served extension so the reader can dispatch on it.
+    suffix = ".jsonl.gz" if url.endswith(".jsonl.gz") else \
+        ".jsonl" if url.endswith(".jsonl") else \
+        ".json.gz" if url.endswith(".json.gz") else ".json"
+
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
     stamp = entry["updated_at"][:10]
-    target = dest_dir / f"{kind}-{stamp}.json"
+    target = dest_dir / f"{kind}-{stamp}{suffix}"
     if target.exists():
         return target
 
-    req = urllib.request.Request(entry["download_uri"],
-                                 headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=600) as resp, target.open("wb") as fh:
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    tmp = target.with_suffix(target.suffix + ".part")
+    with urllib.request.urlopen(req, timeout=600) as resp, tmp.open("wb") as fh:
         while chunk := resp.read(1 << 20):
             fh.write(chunk)
+    # Rename only once complete, so an interrupted download is never mistaken
+    # for a valid cached copy on the next run.
+    tmp.replace(target)
     return target
 
 
@@ -165,39 +195,64 @@ def _printing_row(c: dict) -> tuple:
     )
 
 
+def _iter_json_array(fh):
+    """Yield objects from a JSON array whose opening '[' is already consumed.
+
+    Kept for the legacy `download_uri` files, which were single arrays up to
+    ~2GB -- too big to hand to json.load().
+    """
+    buf, depth, in_str, esc = "", 0, False, False
+    while chunk := fh.read(1 << 20):
+        for ch in chunk:
+            if depth:
+                buf += ch
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            if ch == '"':
+                in_str = True
+            elif ch == "{":
+                if not depth:
+                    buf = "{"
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if not depth:
+                    yield json.loads(buf)
+                    buf = ""
+
+
 def _iter_cards(path: Path):
-    """Stream a bulk file. These are single JSON arrays up to ~2GB, so we
-    parse incrementally rather than loading the whole thing."""
-    with path.open("r", encoding="utf-8") as fh:
+    """Stream a bulk file, one card object at a time.
+
+    Handles both formats Scryfall has served: newline-delimited JSONL (current)
+    and a single JSON array (legacy). Either may be gzipped. Dispatch is on the
+    first non-whitespace byte rather than the filename, so a file that was
+    decompressed or renamed by hand still reads correctly.
+    """
+    opener = gzip.open if path.name.endswith(".gz") else open
+    with opener(path, "rt", encoding="utf-8") as fh:
         first = fh.read(1)
-        if first != "[":
-            fh.seek(0)
-            yield from json.load(fh)
+        while first and first.isspace():
+            first = fh.read(1)
+        if not first:
             return
-        buf, depth, in_str, esc = "", 0, False, False
-        while chunk := fh.read(1 << 20):
-            for ch in chunk:
-                if depth:
-                    buf += ch
-                if in_str:
-                    if esc:
-                        esc = False
-                    elif ch == "\\":
-                        esc = True
-                    elif ch == '"':
-                        in_str = False
-                    continue
-                if ch == '"':
-                    in_str = True
-                elif ch == "{":
-                    if not depth:
-                        buf = "{"
-                    depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if not depth:
-                        yield json.loads(buf)
-                        buf = ""
+        if first == "[":
+            yield from _iter_json_array(fh)
+            return
+        # JSONL: one complete card object per line. The character already
+        # consumed belongs to the first record, so put it back by hand.
+        head = first + fh.readline()
+        if head.strip():
+            yield json.loads(head)
+        for line in fh:
+            if line.strip():
+                yield json.loads(line)
 
 
 def load_oracle(con, path: Path, *, batch: int = 5000) -> int:
@@ -296,17 +351,48 @@ _SELECT = """SELECT name, mana_cost, cmc, type_line, oracle_text, color_identity
 
 def get_cards(con, names: Iterable[str]) -> dict[str, CardRecord]:
     """Look up many cards at once, case-insensitively. Missing names are simply
-    absent from the result -- callers must handle that, loudly."""
+    absent from the result -- callers must handle that, loudly.
+
+    Double-faced cards resolve by face name as well as by Scryfall's combined
+    `Front // Back` name. Decklists everywhere -- Moxfield, Archidekt, and
+    people -- write "Darkbore Pathway", not "Darkbore Pathway // Slitherbore
+    Pathway", and rejecting those as unknown cards is a false negative on a
+    perfectly legal card.
+
+    The record returned is always the WHOLE card, so `color_identity` covers
+    every face. That is deliberate and load-bearing: Ajani, Nacatl Pariah is
+    a white front with a red back, and looking it up by its front face must
+    still report identity {R}{W}.
+    """
     wanted = list(names)
     if not wanted:
         return {}
+    lowered = [n.lower() for n in wanted]
     placeholders = ",".join("?" * len(wanted))
     rows = con.execute(
-        f"{_SELECT} WHERE lower(name) IN ({placeholders})",
-        [n.lower() for n in wanted],
+        f"""{_SELECT} WHERE lower(name) IN ({placeholders})
+               OR lower(split_part(name, ' // ', 1)) IN ({placeholders})
+               OR lower(split_part(name, ' // ', 2)) IN ({placeholders})""",
+        lowered * 3,
     ).fetchall()
-    by_lower = {r[0].lower(): _to_record(r) for r in rows}
-    return {n: by_lower[n.lower()] for n in wanted if n.lower() in by_lower}
+
+    # Exact full-name matches win; a face-name match only fills a gap. Without
+    # that precedence a card whose full name equals another card's face name
+    # could shadow the real one.
+    by_lower: dict[str, CardRecord] = {}
+    faces: dict[str, CardRecord] = {}
+    for r in rows:
+        rec = _to_record(r)
+        by_lower[r[0].lower()] = rec
+        for face in r[0].lower().split(" // "):
+            faces.setdefault(face, rec)
+
+    out: dict[str, CardRecord] = {}
+    for name, low in zip(wanted, lowered, strict=True):
+        rec = by_lower.get(low) or faces.get(low)
+        if rec is not None:
+            out[name] = rec
+    return out
 
 
 def search(con, where: str, params: Sequence[Any] = (), limit: int = 100) -> list[CardRecord]:
