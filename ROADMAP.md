@@ -75,22 +75,53 @@ slots — is not built.
 `decks/<slug>/deck.yaml` is the source of truth. Source material lives in
 `~/Downloads` from earlier sessions; take the highest-numbered file per deck.
 
+All six are now in `deck.yaml`. Four validate clean; two are blocked on a
+single card each, both genuinely banned in Commander.
+
 | Deck | Colours | Status | Source |
 | --- | --- | --- | --- |
-| Gyome, Master Chef — Food | Golgari, B4 | **migrated**, validates 0/0 | `02-the-99-annotated_1.md` |
-| Arahbo — Cats | Selesnya (Kaheera companion) | not migrated | `arahbo-cats-decklist_4.md` |
-| Atla Palani — Dinos | Naya | not migrated | `Atla-Palani-Annotated-Decklist.md` (+ `.txt`, swap list `_8`) |
-| Goreclaw — Mono-green stompy | Green, B4 | not migrated | `goreclaw-mono-green-stompy_2.md` |
-| Tivit — cEDH | Esper, B5 | not migrated | `tivit-cedh-bracket5.md` |
-| Trostani, Selesnya's Voice — Tokens | Selesnya | not migrated | `trostani-tokens-FINAL-decklist_2.md` (+ `trostani-PILOT-GUIDE.md`) |
+| Gyome, Master Chef — Food | Golgari, B4 | **migrated**, 0 errors | `02-the-99-annotated_1.md` |
+| Arahbo — Cats | Selesnya (Kaheera companion) | **migrated**, 0 errors | `arahbo-cats-decklist_4.md` |
+| Trostani, Selesnya's Voice — Tokens | Selesnya, B4 | **migrated**, 0 errors | `trostani-tokens-FINAL-decklist_2.md` |
+| Tivit — cEDH | Esper, B5 | **migrated**, 0 errors / 1 warn | `tivit-cedh-bracket5.md` |
+| Atla Palani — Dinos | Naya, B4 | **migrated**, 1 error — see below | `Atla-Palani-FINAL-Decklist.txt` + annotated |
+| Goreclaw — Mono-green stompy | Green, B4 | **migrated**, 1 error — see below | `goreclaw-mono-green-stompy_2.md` |
 
-Trostani is confirmed in rotation — an older token deck retooled into this
-list. Its plan leans on token doublers multiplying rather than adding, and on
-Trostani's lifegain trigger being load-bearing for cards that check "if you
-gained life this turn."
+### Open: two banned cards need a replacement chosen
 
-Expect the gate to find real problems in each — Gyome's migration turned up a
-97-vs-99 card discrepancy and a tool bug that rejected every double-faced card.
+Both confirmed against Scryfall `legalities.commander`, on a corpus current to
+2026-11-20. Neither is a transcription slip; both lists genuinely contain them.
+
+- **Goreclaw** runs **Primeval Titan** (banned). The slot it fills is "6/6
+  trample, fetches two lands on ETB and on attack — ramp and threat in one
+  card."
+- **Atla Palani** runs **Emrakul, the Aeons Torn** (banned). She was the top of
+  the titan module: 15/15 flying, annihilator 6, protection from coloured
+  spells.
+
+Until a replacement is picked, both decks sit at 99 cards with one illegal
+slot and the gate blocks artifact generation. This is the gate working, not a
+bug to route around.
+
+### What the migration turned up
+
+Beyond the two bans, the gate and a corpus cross-check caught:
+
+- `Captain America's Aid` in the Arahbo list is not a card. The source's own
+  parenthetical, **Sigarda's Aid**, is the real name.
+- The Arahbo source describes the {1}{G}{W} doubling as something you activate
+  with spare mana. Oracle text is *"Whenever another Cat you control attacks,
+  you may pay {1}{G}{W}"* — a triggered ability, once per attacking Cat, so six
+  mana doubles two attackers. Neither of Arahbo's abilities can target himself.
+- The Arahbo source's curve (8/15/17/14/6/3, avg 3.06) was counted by hand and
+  is wrong. From the corpus it is **9/13/20/13/4/4, avg 3.03**.
+- The Arahbo source claims the commander is castable by T5 in 67% of games.
+  `sim mana` at 20,000 games says **57.2%**.
+- Kaheera's companion condition is **not checked by the gate** — it was
+  verified by hand (all 27 creature cards are Cats). Worth building in.
+
+Every one of these was a checkable fact that prose got wrong, which is the
+same lesson as the section below.
 
 ---
 
@@ -109,21 +140,67 @@ Expect the gate to find real problems in each — Gyome's migration turned up a
 
 ## Open decisions
 
-### Hosting
+### Hosting — plan
 
-Wanted: follow along remotely, and eventually point friends at it.
+> Full maintainer setup guide, auth design, per-user data model and measured
+> compute analysis now live in [docs/HOSTING.md](docs/HOSTING.md). Summary below.
 
-The constraint is data, not code. The corpus is ~63 MB of DuckDB built from
-~98 MB of compressed Scryfall bulk, and it is gitignored on purpose — Scryfall
+Wanted: follow along remotely, and eventually point friends at it. Budget is
+not the binding constraint; a few dollars a month is fine.
+
+**The constraint is data and CPU, not code.** The corpus is ~63 MB of DuckDB
+built from ~98 MB of compressed Scryfall bulk, gitignored on purpose — Scryfall
 asks that bulk data not be redistributed, and it is re-downloadable in one
-command. So a deployment must run `mtglab data refresh` at build or boot, not
-ship the database in an image layer.
+command. And Tier 1 is genuinely CPU-bound: `sim mana` at 20,000 games is ~30s,
+a land sweep is ~5 minutes. That rules out most serverless platforms on two
+counts (no persistent disk for the DB, and request timeouts far below a sweep).
 
-Also relevant: the Fan Content Policy permits **noncommercial use only**, so
-whatever this runs on stays free to use.
+Three things follow, and they decide the shortlist:
 
-Nothing about the current architecture blocks this — the API is a normal
-FastAPI app and the frontend is static files.
+1. **Persistent disk is required.** Rebuilding a 63 MB DuckDB from a ~500 MB
+   download on every cold start is unacceptable, so the platform must keep a
+   volume between restarts. This is the single hardest filter.
+2. **`data refresh` is a scheduled job, never a build step.** It needs several
+   minutes and blows any build budget. Run it weekly by cron against the
+   volume — Scryfall publishes daily, but deck tooling does not need
+   day-fresh data, and prices only matter to `price deck`.
+3. **Long sims must stay off the request path.** Already true — `api/jobs.py`
+   and `api/simruns.py` run them as background jobs and the UI polls. Nothing
+   to change.
+
+**Shortlist, real monthly numbers:**
+
+| Option | Cost/mo | Why / why not |
+| --- | --- | --- |
+| **Fly.io** (recommended) | **~$6-8** | `shared-cpu-1x` with 1 GB RAM ≈ $5.70, plus a 3 GB volume at $0.15/GB ≈ $0.45. Persistent volumes, scale-to-zero with fast wake, scheduled Machines for the refresh cron. Best fit without running a server. |
+| **Hetzner CX22 VPS** | **~€4** | 2 vCPU / 4 GB / 40 GB. By far the most CPU per euro, which is what Tier 2 will want. Cost: you own OS updates, TLS and deploys. Pick this if the simulator is the point. |
+| **Railway / Render** | ~$5-7 | Simplest deploys, persistent volumes on paid tiers. Render's free tier has no persistent disk and spins down, so it is not an option here. |
+| Vercel / Netlify / Workers | n/a | Frontend would be free and trivial, but the backend needs a 63 MB local DB and minutes-long CPU. Only viable split: static frontend on Cloudflare Pages (free) + API elsewhere. Not worth the extra moving part at this size. |
+
+**Recommendation: Fly.io**, moving to a Hetzner box if Tier 2 turns out to need
+real cores. 1 GB RAM is the number to watch — DuckDB plus numpy plus a 25,000
+game sweep is the memory high-water mark, and 512 MB is too tight.
+
+**Constraints the deployment has to respect:**
+
+- **Fan Content Policy is noncommercial.** Whatever this runs on stays free to
+  use — no ads, no subscription, no donations tied to it. The disclaimer is
+  already in the UI footer and must stay.
+- **Do not redistribute Scryfall bulk data.** The instance downloads its own
+  copy; the volume is not a public mirror. Keep hot-linking card images from
+  `cards.scryfall.io` rather than proxying or rehosting them, send a
+  descriptive User-Agent, and keep the request rate polite.
+- **Put auth in front before any collection feature ships.** The app has no
+  auth today, which is fine for decks and public card data. But CLAUDE.md rule
+  5 exists because a public inventory of expensive cards tied to a real
+  identity is a targeting list — and that reasoning does not stop at `git`.
+  Cloudflare Access is free for up to 50 users and needs no application
+  changes; that is the cheapest way to let friends in without opening it to
+  everyone.
+
+**Not yet done:** there is no Dockerfile, no `fly.toml`, and no refresh cron.
+Nothing in the architecture blocks any of it — the API is a normal FastAPI app
+and the frontend is prebuilt static files served by it.
 
 ### Rust or Go for the simulation core
 
@@ -163,8 +240,24 @@ producing confident, wrong answers for *every* deck, not just one.
 - Land-fetch ramp compiled to blank cards.
 - `get_cards` matched only Scryfall's combined `Front // Back` name, so every
   modal DFC and adventure card was reported as unknown.
+- **`is_land` tested `"Land" in type_line`** against Scryfall's *combined*
+  type line, so every card whose **back** face is a land counted as a land.
+  Tier 1 uses `is_land` to decide what a land is, so Trostani simulated with
+  **37 lands instead of 35** (Ojer Taq, Growing Rites of Itlimoc) and Atla with
+  37 instead of 36 (Welcome to . . .) — wrong mulligan rates and a wrong
+  land-count recommendation, from decks that looked fine. Fixed by reading the
+  front face and consulting Scryfall's `layout`: a `modal_dfc` lets you choose
+  which face to play, so a land back face is a real land drop; a `transform`
+  permanent is cast as its front face and the back only ever arrives by
+  flipping.
 
-All four are fixed and pinned by tests. The lesson worth keeping: logic in
-tested code gets caught, logic in conversation does not. 104 tests, CI runs
+All five are fixed and pinned by tests. The lesson worth keeping: logic in
+tested code gets caught, logic in conversation does not. 117 tests, CI runs
 them on 3.11 and 3.12, typechecks and builds the frontend, and fails if the
 committed bundle drifts from source.
+
+Two smaller fixes from the same pass: the card-search text input was
+`flex-1` with the default `basis-0` in a wrapping row, so it collapsed to
+~14px next to the fixed-width selects; and `GET /api/decks` now carries the
+gate's error and warning counts so the Library can flag a deck that does not
+validate, instead of rendering a banned card exactly like a clean list.
