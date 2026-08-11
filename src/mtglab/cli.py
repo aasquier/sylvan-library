@@ -16,15 +16,26 @@ import argparse
 import sys
 from pathlib import Path
 
+from mtglab import config
 from mtglab.decks.model import Deck
+from mtglab.sim.compile import (
+    CorpusRequired,
+    compile_deck,
+    enters_tapped,
+    fetches_lands,
+)
 
-DECKS_DIR = Path("decks")
-DATA_DIR = Path("data")
-DB_PATH = DATA_DIR / "mtg.duckdb"
+# Re-exported for callers that still import them from here. The definitions
+# live in `config` so the API does not have to import the CLI, and so tests can
+# point them at a scratch directory.
+deck_paths = config.deck_paths
+
+__all__ = ["main", "deck_paths", "load_all_decks",
+           "enters_tapped", "fetches_lands"]
 
 
 def _load(slug: str) -> Deck:
-    path = DECKS_DIR / slug / "deck.yaml"
+    path = config.DECKS_DIR / slug / "deck.yaml"
     if not path.exists():
         sys.exit(f"no deck at {path}")
     return Deck.load(path)
@@ -33,10 +44,10 @@ def _load(slug: str) -> Deck:
 def _corpus(deck: Deck):
     """Look up every card in the deck. Returns None if the DB is absent, so
     callers can degrade to structural checks with a visible warning."""
-    if not DB_PATH.exists():
+    if not config.DB_PATH.exists():
         return None
     from mtglab.cards import db
-    con = db.connect(DB_PATH)
+    con = db.connect(config.DB_PATH)
     names = deck.commander + [c.name for c in deck.cards] + \
         [c.name for c in deck.swap_board]
     if deck.companion:
@@ -48,7 +59,7 @@ def _corpus(deck: Deck):
 
 def cmd_data_refresh(args):
     from mtglab.cards import db
-    con = db.connect(DB_PATH)
+    con = db.connect(config.DB_PATH)
     print("downloading oracle_cards ...")
     oracle = db.download_bulk("oracle_cards")
     print(f"  {oracle}")
@@ -65,7 +76,7 @@ def cmd_data_refresh(args):
 
 def cmd_data_snapshot(args):
     from mtglab.cards import db
-    con = db.connect(DB_PATH)
+    con = db.connect(config.DB_PATH)
     n = db.snapshot_prices(con)
     print(f"snapshotted {n:,} prices for today")
     con.close()
@@ -73,22 +84,13 @@ def cmd_data_snapshot(args):
 
 # -------------------------------------------------------------------- decks
 
-def deck_paths(decks_dir: Path = DECKS_DIR) -> list[Path]:
-    """Every real deck file, newest-name-first order aside. `_template` and any
-    other underscore-prefixed directory is scaffolding, not a deck."""
-    if not decks_dir.exists():
-        return []
-    return [p for p in sorted(decks_dir.glob("*/deck.yaml"))
-            if not p.parent.name.startswith("_")]
-
-
-def load_all_decks(decks_dir: Path = DECKS_DIR) -> list[Deck]:
+def load_all_decks(decks_dir: Path | None = None) -> list[Deck]:
     """Shared by the CLI and the API so both see exactly the same library."""
-    return [Deck.load(p) for p in deck_paths(decks_dir)]
+    return [Deck.load(p) for p in config.deck_paths(decks_dir)]
 
 
 def cmd_decks_list(args):
-    if not DECKS_DIR.exists():
+    if not config.DECKS_DIR.exists():
         sys.exit("no decks/ directory")
     for deck in load_all_decks():
         cmd = ", ".join(deck.commander) or "?"
@@ -123,7 +125,7 @@ def cmd_decks_build(args):
     if args.against:
         previous = Deck.load(Path(args.against))
 
-    outdir = DECKS_DIR / args.slug / "artifacts"
+    outdir = config.DECKS_DIR / args.slug / "artifacts"
     written = write_all(deck, outdir, cards=cards, previous=previous)
     for path in written:
         print(f"  wrote {path}")
@@ -160,86 +162,19 @@ def cmd_ui(args):
 
 
 # ---------------------------------------------------------------------- sim
-
-def enters_tapped(oracle_text: str) -> bool:
-    """Whether a land unconditionally enters tapped.
-
-    Scryfall retemplated this: current oracle text reads "This land enters
-    tapped", not "enters the battlefield tapped". Matching only the old
-    wording silently treated every modern tapland as untapped, which
-    overstates early mana for every deck.
-
-    Conditional lands are deliberately treated as untapped. Tier 1 cannot
-    evaluate "unless you control a Forest" or a shock land's "you may pay 2
-    life", and in practice those resolve untapped in most real games; calling
-    them tapped would systematically slow every deck instead.
-    """
-    text = (oracle_text or "").lower()
-    if "enters tapped" not in text and "enters the battlefield tapped" not in text:
-        return False
-    return not ("unless" in text or "you may pay" in text)
-
-
-def fetches_lands(oracle_text: str) -> int:
-    """How many lands a spell puts onto the battlefield from the library.
-
-    Nature's Lore, Three Visits, Skyshroud Claim and Sakura-Tribe Elder are
-    ramp that produces no mana of its own. Without this they compile to blank
-    cards, which understates the deck's acceleration and skews the land-count
-    recommendation.
-    """
-    text = (oracle_text or "").lower()
-    if "search your library" not in text or "onto the battlefield" not in text:
-        return 0
-    if not any(w in text for w in ("land", "forest", "swamp", "island",
-                                   "mountain", "plains")):
-        return 0
-    return 2 if ("two" in text or "up to two" in text) else 1
-
+#
+# enters_tapped, fetches_lands and the deck compiler live in
+# `mtglab.sim.compile` -- they are simulator concerns, and the API needs them
+# without importing the command line. Imported above and re-exported.
 
 def _sim_cards(deck: Deck, cards):
-    """Compile a deck into SimCards. Requires the corpus for mana production."""
-    from mtglab.mana import ManaSource, parse_mana_cost
-    from mtglab.sim.tier1.engine import SimCard
-
-    if cards is None:
-        sys.exit("simulation needs the card corpus -- run `mtglab data refresh` first")
-
-    def compile_one(name: str) -> SimCard | None:
-        rec = cards.get(name)
-        if rec is None:
-            return None
-        # Only permanents stay on the battlefield making mana. Scryfall reports
-        # produced_mana for Treasure-makers like Deadly Dispute too, and
-        # without this guard an instant compiles into a permanent mana source.
-        front = rec.type_line.split(" // ")[0]
-        is_permanent = not ("Instant" in front or "Sorcery" in front)
-        produced = frozenset(p for p in rec.produced_mana if p in "WUBRGC")
-        produces = (ManaSource(produced),) if (produced and is_permanent) else ()
-        is_creature = "Creature" in rec.type_line
-        # A fetchland sacrifices itself, so it is net-zero lands and must not
-        # count here -- only spells that add a land to the board do.
-        fetch = 0 if rec.is_land else fetches_lands(rec.oracle_text)
-        return SimCard(
-            name=rec.name,
-            cost=parse_mana_cost(rec.mana_cost),
-            is_land=rec.is_land,
-            enters_tapped=rec.is_land and enters_tapped(rec.oracle_text),
-            produces=produces,
-            produce_delay=1 if (produces and is_creature and not rec.is_land) else 0,
-            fetches_lands=fetch,
-        )
-
-    # Expand by qty. Basics carry qty 8-16, so ignoring it simulated a deck of
-    # ~83 cards with ~20 lands instead of 99 with 34 -- which made every
-    # mulligan rate and land-count recommendation wrong.
-    library = []
-    for entry in deck.cards:
-        compiled = compile_one(entry.name)
-        if compiled is not None:
-            library.extend([compiled] * entry.qty)
-    commander = compile_one(deck.commander[0]) if deck.commander else None
-    return library, commander
+    """CLI wrapper: turn a missing corpus into a clean exit rather than a
+    traceback. Library callers should use `compile_deck` and catch
+    `CorpusRequired`."""
+    try:
+        return compile_deck(deck, cards)
+    except CorpusRequired as exc:
+        sys.exit(str(exc))
 
 
 def cmd_sim_mana(args):
@@ -278,10 +213,10 @@ def cmd_sim_lands(args):
 
 def cmd_price_deck(args):
     from mtglab.cards import db
-    if not DB_PATH.exists():
+    if not config.DB_PATH.exists():
         sys.exit("run `mtglab data refresh` first")
     deck = _load(args.slug)
-    con = db.connect(DB_PATH)
+    con = db.connect(config.DB_PATH)
     names = [c.name for c in deck.cards] + deck.commander
     rows = con.execute("""
         SELECT name, min(price_usd) FROM printings

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from mtglab.cards import db
-from mtglab.cli import DB_PATH, DECKS_DIR, deck_paths
+from mtglab.config import DB_PATH, DECKS_DIR, deck_paths
 from mtglab.decks.analyze import deck_stats
 from mtglab.decks.model import Deck
 from mtglab.decks.validate import validate

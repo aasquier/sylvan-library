@@ -251,6 +251,99 @@ def test_battle_with_a_creature_back_is_not_a_land():
         "Battle — Siege // Legendary Creature — Dinosaur", layout="transform").is_land
 
 
+# ------------------------------------------------------------- corpus load
+#
+# `load_oracle` and `load_printings` build the corpus every other number in
+# the project is derived from, and they need no network -- they take a file.
+# Leaving them untested meant a silent ingest bug would surface as wrong
+# simulation output rather than a failing test.
+
+ORACLE_FIXTURE = [
+    {"oracle_id": "id-1", "name": "Ley Weaver", "mana_cost": "{3}{G}", "cmc": 4,
+     "type_line": "Creature — Human Druid", "oracle_text": "Partner with Lore Weaver",
+     "colors": ["G"], "color_identity": ["G"], "keywords": [],
+     "produced_mana": [], "legalities": {"commander": "legal"},
+     "layout": "normal", "reserved": False, "edhrec_rank": 900,
+     "released_at": "2018-06-08", "set": "bbd",
+     "image_uris": {"normal": "https://img/normal.jpg",
+                    "art_crop": "https://img/art.jpg"}},
+    {"oracle_id": "id-2", "name": "Ojer Taq, Deepest Foundation // Temple",
+     "mana_cost": "{3}{W}{W}", "cmc": 5,
+     "type_line": "Legendary Creature — God // Land", "oracle_text": "",
+     "colors": ["W"], "color_identity": ["W"], "keywords": [],
+     "produced_mana": [], "legalities": {"commander": "legal"},
+     "layout": "transform", "reserved": True, "edhrec_rank": None,
+     "released_at": "2023-11-17", "set": "lci"},
+]
+
+
+def _jsonl(tmp: Path, rows) -> Path:
+    path = tmp / "cards.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    return path
+
+
+def test_connect_creates_the_schema_on_a_fresh_file(tmp_path):
+    """A first run has no database at all; connect() must build one rather
+    than fail on a missing table."""
+    pytest.importorskip("duckdb")
+    from mtglab.cards.db import connect
+    con = connect(tmp_path / "nested" / "mtg.duckdb")
+    try:
+        tables = {r[0] for r in con.execute("SHOW TABLES").fetchall()}
+        assert {"oracle_cards", "printings", "price_history"} <= tables
+    finally:
+        con.close()
+
+
+def test_load_oracle_ingests_and_is_queryable(tmp_path):
+    pytest.importorskip("duckdb")
+    from mtglab.cards.db import connect, load_oracle
+    con = connect(tmp_path / "mtg.duckdb")
+    try:
+        n = load_oracle(con, _jsonl(tmp_path, ORACLE_FIXTURE))
+        assert n == 2
+        got = get_cards(con, ["Ley Weaver"])
+        rec = got["Ley Weaver"]
+        assert rec.color_identity == frozenset({"G"})
+        assert rec.legal_commander
+        assert rec.image_art_crop == "https://img/art.jpg"
+    finally:
+        con.close()
+
+
+def test_load_oracle_preserves_layout_so_is_land_stays_correct(tmp_path):
+    """The regression path for the 37-vs-35 land bug: if layout is dropped on
+    ingest, a transforming permanent with a land back reads as a land again."""
+    pytest.importorskip("duckdb")
+    from mtglab.cards.db import connect, load_oracle
+    con = connect(tmp_path / "mtg.duckdb")
+    try:
+        load_oracle(con, _jsonl(tmp_path, ORACLE_FIXTURE))
+        rec = get_cards(con, ["Ojer Taq, Deepest Foundation"])[
+            "Ojer Taq, Deepest Foundation"]
+        assert rec.layout == "transform"
+        assert not rec.is_land
+        assert rec.reserved is True
+    finally:
+        con.close()
+
+
+def test_load_oracle_is_idempotent(tmp_path):
+    """`data refresh` is run repeatedly; loading twice must not double rows."""
+    pytest.importorskip("duckdb")
+    from mtglab.cards.db import connect, load_oracle
+    con = connect(tmp_path / "mtg.duckdb")
+    try:
+        path = _jsonl(tmp_path, ORACLE_FIXTURE)
+        load_oracle(con, path)
+        load_oracle(con, path)
+        total = con.execute("SELECT count(*) FROM oracle_cards").fetchone()[0]
+        assert total == 2, "a second refresh duplicated the corpus"
+    finally:
+        con.close()
+
+
 def test_layout_round_trips_from_the_database(con):
     """is_land depends on layout, so layout has to survive the query -- a NULL
     column must fall back to 'normal' rather than crashing or reading falsey."""

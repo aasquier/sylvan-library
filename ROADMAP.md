@@ -55,8 +55,10 @@ purchase. Carts are staged for a human to confirm.
 `primer-quick.md`, `primer-advanced.md`, `decklist-annotated.md`,
 `moxfield.txt`, and `swaps.md` when something changed.
 
-Not yet *run* for any deck, because `swaps.md` is a git diff and wants a
-committed baseline first.
+Run for the four decks that pass the gate; Goreclaw and Atla Palani are
+blocked on their banned card. `swaps.md` is the exception — it is a git diff,
+so it only appears once a deck changes against a committed baseline, which has
+not happened yet.
 
 ## 6. Scan upcoming sets against curated decks
 
@@ -66,14 +68,16 @@ slots — is not built.
 
 ## 7. Tier list of curated decks
 
-**Not started.** Depends on Tier 2 and on having more than one deck migrated.
+**Not started.** All six decks are migrated now, so the remaining blocker is
+Tier 2.
 
 ---
 
 ## Deck migration status
 
-`decks/<slug>/deck.yaml` is the source of truth. Source material lives in
-`~/Downloads` from earlier sessions; take the highest-numbered file per deck.
+`decks/<slug>/deck.yaml` is the source of truth. The original markdown in
+`~/Downloads` is historical — it should not be edited or re-imported, and
+several of its claims were wrong (see below).
 
 All six are now in `deck.yaml`. Four validate clean; two are blocked on a
 single card each, both genuinely banned in Commander.
@@ -330,7 +334,7 @@ producing confident, wrong answers for *every* deck, not just one.
   flipping.
 
 All five are fixed and pinned by tests. The lesson worth keeping: logic in
-tested code gets caught, logic in conversation does not. 180 tests, CI runs
+tested code gets caught, logic in conversation does not. 216 tests, CI runs
 them on 3.11 and 3.12, typechecks and builds the frontend, and fails if the
 committed bundle drifts from source.
 

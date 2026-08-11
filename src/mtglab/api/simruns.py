@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import Any
 
 from mtglab.api.service import _connect, _corpus_for, _load_deck
+from mtglab.sim.compile import compile_deck
 from mtglab.sim.tier1.engine import KeepRule, run, simulate_game
 
 TIER1_CAVEAT = (
@@ -28,7 +29,6 @@ LAND_SWEEP_CAVEAT = (
 
 
 def _compile(slug: str):
-    from mtglab.cli import _sim_cards
     deck = _load_deck(slug)
     con = _connect()
     try:
@@ -39,7 +39,7 @@ def _compile(slug: str):
     if not cards:
         raise RuntimeError(
             "simulation needs the card corpus -- run `mtglab data refresh`")
-    library, commander = _sim_cards(deck, cards)
+    library, commander = compile_deck(deck, cards)
     return deck, library, commander
 
 

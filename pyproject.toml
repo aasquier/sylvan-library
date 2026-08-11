@@ -10,7 +10,7 @@ api = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 # httpx backs fastapi's TestClient, so the API tests need it. ruff's floor is
 # 0.16 because the rule selection in [tool.ruff.lint] names rules added after
 # 0.4, and an older ruff would error on the config rather than lint the code.
-dev = ["pytest>=8.0", "ruff>=0.16", "httpx>=0.27"]
+dev = ["pytest>=8.0", "ruff>=0.16", "httpx>=0.27", "coverage>=7.0"]
 
 [project.scripts]
 mtglab = "mtglab.cli:main"
@@ -26,6 +26,18 @@ where = ["src"]
 # Ship the built frontend inside the package so an install serves the UI
 # without a Node toolchain present.
 mtglab = ["web_dist/**/*"]
+
+[tool.coverage.run]
+source = ["src/mtglab"]
+# The __main__ fallback runners in tests/ are not part of the library.
+omit = ["*/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+# Not a gate -- a floor, so a large regression is loud while ordinary churn
+# is not. Raise it deliberately, do not let it drift down.
+fail_under = 80
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
