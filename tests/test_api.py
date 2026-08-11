@@ -63,6 +63,34 @@ def test_decks_lists_the_library(client):
     assert "_template" not in slugs
 
 
+def test_deck_list_carries_the_gate_counts(client):
+    """The shelf renders a deck with a banned card identically to a clean one
+    unless the list endpoint says so, and fetching /validate per deck would be
+    an N+1 on every page load. `errors` may be None when the corpus is missing
+    -- that is 'the gate did not run', not 'the deck passed'."""
+    body = client.get("/api/decks").json()
+    assert body, "no decks found"
+    for deck in body:
+        assert "errors" in deck and "warnings" in deck
+        assert deck["errors"] is None or isinstance(deck["errors"], int)
+        assert deck["warnings"] is None or isinstance(deck["warnings"], int)
+        # Never report a count without the corpus that produced it.
+        assert (deck["errors"] is None) == (deck["warnings"] is None)
+
+
+def test_deck_list_gate_counts_agree_with_the_validate_endpoint(client):
+    """Two code paths compute the same thing; they must not drift."""
+    for deck in client.get("/api/decks").json():
+        if deck["errors"] is None:
+            pytest.skip("no corpus; the gate did not run")
+        rep = client.get(f"/api/decks/{deck['slug']}/validate").json()
+        assert deck["errors"] == len(rep["errors"]), \
+            f"{deck['slug']} error count disagrees with /validate"
+        assert deck["warnings"] == len(rep["warnings"]), \
+            f"{deck['slug']} warning count disagrees with /validate"
+        assert rep["ok"] == (deck["errors"] == 0)
+
+
 def test_deck_detail_has_every_card_with_its_why(client):
     body = client.get("/api/decks/gyome-food").json()
     assert body["total_cards"] == 99

@@ -83,7 +83,14 @@ export default function Library() {
               <div className="space-y-2 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="font-semibold leading-tight">{deck.name}</h2>
-                  {deck.bracket && <Badge>B{deck.bracket}</Badge>}
+                  <div className="flex shrink-0 items-center gap-1">
+                    {deck.errors !== null && deck.errors > 0 && (
+                      <Badge tone="critical">
+                        {deck.errors} error{deck.errors === 1 ? '' : 's'}
+                      </Badge>
+                    )}
+                    {deck.bracket && <Badge>B{deck.bracket}</Badge>}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs"
                      style={{ color: 'var(--text-secondary)' }}>

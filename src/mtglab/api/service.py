@@ -112,7 +112,15 @@ def _card_json(entry, rec) -> dict[str, Any]:
 
 def list_decks() -> list[dict[str, Any]]:
     """The library view. Includes the commander's art so the UI has a hero
-    image without a second round trip per deck."""
+    image without a second round trip per deck.
+
+    Also carries the gate's error and warning counts. The gate is the point of
+    this project, so a shelf that renders a deck with a banned card exactly
+    like a clean one is hiding the only thing it is really for -- and asking
+    the UI to fetch /validate per deck would be an N+1 on every page load.
+    `errors` is None when the corpus is unavailable, which is different from
+    zero and must not render as a pass.
+    """
     con = _connect()
     try:
         out = []
@@ -120,9 +128,15 @@ def list_decks() -> list[dict[str, Any]]:
             deck = Deck.load(path)
             art = None
             identity: list[str] = []
-            if con is not None and deck.commander:
-                found = db.get_cards(con, deck.commander)
-                rec = found.get(deck.commander[0])
+            errors = warnings = None
+            if con is not None:
+                names = deck.card_names() + [c.name for c in deck.swap_board]
+                if deck.companion:
+                    names.append(deck.companion)
+                cards = db.get_cards(con, sorted(set(names)))
+                rep = validate(deck, cards)
+                errors, warnings = len(rep.errors), len(rep.warnings)
+                rec = cards.get(deck.commander[0]) if deck.commander else None
                 if rec is not None:
                     art = getattr(rec, "image_art_crop", None) or rec.image_normal
                     identity = sorted(rec.color_identity)
@@ -137,6 +151,8 @@ def list_decks() -> list[dict[str, Any]]:
                 "strategy": deck.strategy,
                 "art_crop": art,
                 "color_identity": identity,
+                "errors": errors,
+                "warnings": warnings,
             })
         return out
     finally:
