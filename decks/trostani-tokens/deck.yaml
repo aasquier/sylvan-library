@@ -1,0 +1,396 @@
+slug: trostani-tokens
+name: Trostani, Selesnya's Voice — Tokens
+commander:
+  - Trostani, Selesnya's Voice
+bracket: 4
+
+strategy: >
+  Selesnya go-wide tokens built on multiplication rather than addition. Six
+  static token doublers mean two doublers is 4x, three is 8x, four is 16x. The
+  core loop is: land a doubler, generate tokens, Trostani gains life for each
+  one entering, Ocelot Pride sees the lifegain and copies every token that
+  entered this turn, and those copies are themselves doubled by the statics.
+  Two doublers plus Ocelot Pride plus one good token turn is where the
+  300-token boards come from. Then Craterhoof or Moonshaker Cavalry converts
+  width into a single lethal swing.
+
+notes:
+  commander_why: >
+    The lifegain trigger is load-bearing, not incidental. Ocelot Pride only
+    fires "if you gained life this turn" and Belladonna Took's first tier is
+    lifegain — Trostani turns every token that enters into a lifegain trigger,
+    so the best engine in the deck is never off. She also gives free repeatable
+    populate with no mana-negative activation and no combat requirement, and
+    her 2/5 body blocks early aggression while you assemble. Ghired is the
+    better populate commander but is Naya, and a third colour for one card is a
+    bad trade in a deck whose mana is already the tightest part of it.
+  gameplan: >
+    Ramp on 1-3, deploy a doubler on 4, and live to turn 6. The deck does not
+    need to interact much before then — it needs to not die and to hit land
+    drops. From turn 6 the board doubles faster than anyone can remove it.
+  mulligan: >
+    TODO — derive from a Tier 1 sweep. Note the source markdown quotes a
+    60,000-trial figure (Trostani castable 60.9% by T4, 71.4% by T5, 78.6% by
+    T6, mana screw 15.0%) from an earlier tool; re-derive with mtglab rather
+    than inheriting it.
+  curve_plan: >
+    TODO — recount from the corpus, not by hand.
+  pitfalls: >
+    (1) Divine Visitation replaces a populated token's characteristics
+    ENTIRELY, including abilities — so while it is out you cannot populate a
+    large token into a copy of itself, every populate just makes a 4/4 Angel.
+    Still a net win with mostly 1/1s, but the two engines do not stack. (2)
+    Ainok Strike Leader's trigger reads "this creature and/or your commander",
+    and Trostani rarely attacks, so you will mostly trigger it off Ainok
+    itself. (3) No graveyard hate and no fast rebuild after a wrath with all
+    three protection spells spent — accepted trades, not oversights.
+  engine_detail: >
+    Well of Lost Dreams is the single best commander-enabled card here:
+    Trostani gains life for every creature that enters, so the Well converts
+    the entire token engine directly into cards. Cryptolith Rite and Enduring
+    Vitality turn the token board into a second mana base, which is what makes
+    the X-spells and Grand Crescendo lethal.
+  lines: >
+    Second Harvest at instant speed doubles the whole board on top of the
+    statics — hold it for the turn you are killing, not the turn you are
+    building. Voice of Victory shuts off interaction entirely on your turn, so
+    sequence it before the alpha strike rather than after.
+  wincons: >
+    Craterhoof Behemoth or Moonshaker Cavalry for one lethal swing, Triumph of
+    the Hordes when the table has too much life to punch through, Cathars'
+    Crusade quietly making the board lethal several turns early, or Elspeth,
+    Sun's Champion's ultimate.
+  manabase: >
+    TODO — 35 lands inherited from the source, not yet confirmed by a sweep.
+    The source's own note is worth keeping: replacing Fountainport and Gavony
+    Township, both of which tap for colourless only and cannot help cast a
+    {G}{G}{W}{W} commander, with real GW sources was worth roughly 7 points of
+    castability at every turn.
+  matchups: >
+    TODO — needs Tier 2.
+  politics: >
+    You look harmless for five turns and then present lethal from nowhere. The
+    table usually gives you those five turns; the moment a doubler resolves,
+    that stops.
+  failure_modes: >
+    Getting wrathed with protection already spent, or drawing doublers with no
+    generators. The deck has no graveyard recursion to fall back on.
+  swap_philosophy: >
+    Divine Visitation is the clean cut if you would rather run the populate
+    plan uncontaminated — it is the only card actively fighting another engine
+    in the list.
+  rules_corners: >
+    Populate copies a token you control; Divine Visitation's replacement fully
+    overwrites the copy. Minas Tirith and The Shire enter untapped because
+    Trostani is legendary. Ojer Taq triples token creation only while it is a
+    creature, and flips to a land when it dies.
+
+cards:
+  # ------------------------------------------------------ TOKEN DOUBLERS 6
+  - name: Anointed Procession
+    category: engine
+    why: Doubles every token you create. The doublers multiply rather than add.
+  - name: Doubling Season
+    category: engine
+    why: Doubles tokens and +1/+1 counters and planeswalker loyalty. Best-in-class.
+  - name: Parallel Lives
+    category: engine
+    why: Doubles every token you create; functional second Anointed Procession.
+  - name: Mondrak, Glory Dominus
+    category: engine
+    why: Doubles tokens on a 4/4 body that can make itself indestructible — the hardest doubler to remove.
+  - name: Exalted Sunborn
+    category: engine
+    why: >
+      Doubles tokens AND is a 4/5 flying lifelink Angel — the only doubler that
+      affects the board on arrival, and its lifelink feeds Ocelot Pride.
+  - name: Elspeth, Storm Slayer
+    category: engine
+    why: Doubles tokens as a static ability, makes Soldiers each turn, and has a removal mode.
+
+  # --------------------------------------------------- TOKEN GENERATORS 17
+  - name: Ocelot Pride
+    category: engine
+    why: >
+      Your single best card. At end step, if you gained life, make a Cat then
+      copy every token that entered this turn. Exponential with the doublers,
+      and Trostani guarantees the lifegain condition.
+  - name: Adeline, Resplendent Cathar
+    category: threat
+    why: A Human token per opponent every attack; grows to match your board.
+  - name: Brimaz, King of Oreskos
+    category: threat
+    why: Cat Soldier tokens on attack and on block.
+  - name: Cadira, Caller of the Small
+    category: threat
+    why: On combat damage, a Rabbit for every token you already control. Scales to absurdity late.
+  - name: Rhys the Redeemed
+    category: engine
+    why: One-mana body; both activations make or copy tokens. Great mana sink.
+  - name: Scute Swarm
+    category: engine
+    why: Self-copying landfall token. With 35 lands plus ramp, it snowballs fast.
+  - name: Springheart Nantuko
+    category: engine
+    why: Bestow it, then copy the enchanted creature on every landfall.
+  - name: Tendershoot Dryad
+    category: engine
+    why: A Saproling every upkeep; becomes a giant threat itself under City's Blessing.
+  - name: Warren Warleader
+    category: threat
+    why: Offspring 2, then a Rabbit or a team pump every attack.
+  - name: Voice of Victory
+    category: protection
+    why: >
+      Mobilize tokens on attack, plus opponents can't cast spells on your turn
+      — it protects the turn you are killing.
+  - name: Leonin Warleader
+    category: threat
+    why: Two lifelinking Cats on attack, and the lifelink turns on Ocelot Pride.
+  - name: King Darien XLVIII
+    category: threat
+    why: Soldier whenever you take damage; also protects your other legends.
+  - name: Nacatl War-Pride
+    category: threat
+    why: Copies itself equal to the defender's creature count. A multiplayer nightmare.
+  - name: Ainok Strike Leader
+    category: threat
+    why: >
+      A Goblin per opponent when it attacks; sacrifice for team indestructible.
+      Its trigger reads "this creature and/or your commander", and Trostani
+      rarely attacks, so expect to trigger it off Ainok itself.
+  - name: Okoye, Dora Milaje Leader
+    category: threat
+    why: Two Soldiers on ETB, and all your attacking tokens gain first strike permanently.
+  - name: Ancient Gold Dragon
+    category: threat
+    why: Ramps lands off the top and leaves a huge flier.
+  - name: Pest Infestation
+    category: threat
+    why: Scalable token wave or card draw depending on the board state.
+
+  # --------------------------------------------------- POPULATE PACKAGE 3
+  - name: Growing Ranks
+    category: engine
+    why: Free populate at the beginning of every one of your upkeeps. The cleanest repeatable populate in the format.
+  - name: Nesting Dovehawk
+    category: engine
+    why: A second free populate every combat, and it grows itself with every token.
+  - name: Sundering Growth
+    category: interaction
+    why: Destroy an artifact or enchantment, then populate. Removal and a token in one card.
+
+  # --------------------------------------------------- PAYOFFS / ANTHEMS 5
+  - name: Cathars' Crusade
+    category: payoff
+    why: A +1/+1 counter on every creature you control whenever any creature enters. With a wide board this is a one-card kill.
+  - name: Divine Visitation
+    category: payoff
+    why: >
+      Every creature token becomes a 4/4 flying vigilance Angel — your only
+      real evasion. Note it fully replaces populated tokens' characteristics,
+      so it does not stack with the populate plan.
+  - name: Securitron Squadron
+    category: payoff
+    why: Permanent +1/+1 counter on every token that enters, forever. Squad for extra copies.
+  - name: Caretaker's Talent
+    category: card-advantage
+    why: Ramps early, then converts token production into +1/+1 counters and card draw.
+  - name: Ojer Taq, Deepest Foundation
+    category: payoff
+    why: Triples token creation while it is a creature; flips to a land when it dies.
+
+  # ------------------------------------------------------ RAMP & FIXING 12
+  - name: Sol Ring
+    category: ramp
+    why: Best rock in the format.
+  - name: Arcane Signet
+    category: ramp
+    why: Two-mana rock, taps for either of your colours.
+  - name: Avacyn's Pilgrim
+    category: ramp
+    why: One-mana dork for {W}, which is the harder half of {G}{G}{W}{W}.
+  - name: Delighted Halfling
+    category: ramp
+    why: One-mana dork that also makes Trostani uncounterable.
+  - name: Nature's Lore
+    category: ramp
+    why: Fetches a Forest untapped — grabs Temple Garden.
+  - name: Three Visits
+    category: ramp
+    why: Functional Nature's Lore #2.
+  - name: Cultivate
+    category: ramp
+    why: Two basics, one to hand. Ramp and colour fixing together.
+  - name: Kodama's Reach
+    category: ramp
+    why: Functional Cultivate #2; both fix whichever colour you are short on.
+  - name: Cryptolith Rite
+    category: ramp
+    why: Every creature and token taps for mana. In this deck that is a second mana base.
+  - name: Enduring Vitality
+    category: ramp
+    why: Same effect as Cryptolith Rite on a 3/3 vigilance body that rebuys itself as an enchantment when it dies.
+  - name: Awaken the Woods
+    category: ramp
+    why: Puts X Forest tokens straight onto the battlefield — ramp and tokens in one card.
+  - name: Growing Rites of Itlimoc
+    category: ramp
+    why: Ramps early, then flips into a Gaea's-Cradle-style land once you are wide. Your budget Cradle.
+
+  # -------------------------------------------------- CARD DRAW & VALUE 5
+  - name: Skullclamp
+    category: card-advantage
+    why: Equip {1} to a 1-toughness token, it dies, draw 2. With your token supply this is a draw engine, not an Equipment.
+  - name: Belladonna Took
+    category: card-advantage
+    why: >
+      Every turn gain 1 life (which turns on Ocelot Pride), draw a card, then
+      +1/+1 counters on the whole team. Three payoffs on a two-drop.
+  - name: Tocasia's Welcome
+    category: card-advantage
+    why: Draws once per turn whenever a cheap creature or token enters. Tokens are MV 0, so this always fires.
+  - name: Well of Lost Dreams
+    category: card-advantage
+    why: >
+      Trostani gains you life for every creature that enters, so this converts
+      the entire token engine directly into cards. The single best
+      commander-enabled card in the deck.
+  - name: Smothering Tithe
+    category: ramp
+    why: Every opponent draw either taxes them 2 or gives you a Treasure. Passive ramp that does not need your board.
+
+  # ------------------------------------------------ REMOVAL & INTERACTION 4
+  - name: Swords to Plowshares
+    category: interaction
+    why: The most efficient removal ever printed. Instant, exiles anything.
+  - name: Generous Gift
+    category: interaction
+    why: Destroys any permanent and they get a 3/3. Your catch-all answer.
+  - name: Winds of Abandon
+    category: interaction
+    why: >
+      Single removal early; overloaded it is a one-sided wrath that exiles
+      every creature you do not control. The correct sweeper for a go-wide
+      deck.
+  - name: Aura Shards
+    category: interaction
+    why: Every nontoken creature you play destroys an artifact or enchantment. Repeatable and brutal.
+
+  # ---------------------------------------------------------- PROTECTION 3
+  - name: Heroic Intervention
+    category: protection
+    why: Hexproof and indestructible for your board. Two mana to beat a wrath.
+  - name: Unbreakable Formation
+    category: protection
+    why: +1/+1 and indestructible; can be a finisher in a pinch.
+  - name: Akroma's Will
+    category: protection
+    why: >
+      Team +2/+2 with flying, vigilance and trample, or indestructible and
+      protection — often just wins the game outright.
+
+  # ----------------------------------------------------------- FINISHERS 5
+  - name: Craterhoof Behemoth
+    category: win-con
+    why: The classic. +X/+X, trample and haste to the whole team.
+  - name: Moonshaker Cavalry
+    category: win-con
+    why: Gives your entire board flying plus a massive pump. Solves blockers entirely.
+  - name: Triumph of the Hordes
+    category: win-con
+    why: +1/+1, trample and infect — an entirely separate win condition. Ten poison ends anyone.
+  - name: Grand Crescendo
+    category: win-con
+    why: X Citizens at instant speed plus team indestructible. Wrath insurance that also wins.
+  - name: Elspeth, Sun's Champion
+    category: win-con
+    why: Three Soldiers a turn, six with a doubler, and the ultimate is a game-ending anthem.
+
+  # ------------------------------------------------------ SUPPORT/UTILITY 4
+  - name: Mirari's Wake
+    category: engine
+    why: >
+      Creatures get +1/+1 and every land you tap produces an extra mana — a
+      mana doubler and an anthem in one card, which makes every X-spell and
+      mana sink twice as big.
+  - name: Second Harvest
+    category: engine
+    why: Instant speed, doubles your entire board of tokens, and stacks on top of the static doublers.
+  - name: For the Common Good
+    category: engine
+    why: Copy a token X times, tokens gain indestructible, and gain life per token — which feeds Ocelot Pride.
+  - name: Ghalta and Mavren
+    category: threat
+    why: >
+      The old commander, now a payoff. On attack, a huge Dino token or a
+      lifelinking Vampire per attacker — and that lifelink feeds Trostani,
+      Ocelot Pride and Well of Lost Dreams.
+
+  # --------------------------------------------------------------- LANDS 35
+  # Duals and fixing (11)
+  - name: Command Tower
+    category: land
+    why: Perfect fixing.
+  - name: Temple Garden
+    category: land
+    why: Shock dual, and fetchable with Nature's Lore.
+  - name: Windswept Heath
+    category: land
+    why: Fetch — thins and fixes.
+  - name: Razorverge Thicket
+    category: land
+    why: Untapped GW for the first four turns. Replaced Gavony Township, which only tapped for colourless.
+  - name: Brushland
+    category: land
+    why: Always-untapped GW pain land; the 35th land, and where Gaea's Cradle would have gone.
+  - name: Selesnya Sanctuary
+    category: land
+    why: GW bounce land, two mana per turn. Replaced Fountainport, also colourless-only.
+  - name: Sunpetal Grove
+    category: land
+    why: Untapped with a Forest or Plains out.
+  - name: Canopy Vista
+    category: land
+    why: GW battle land.
+  - name: Wooded Bastion
+    category: land
+    why: Filter land — needs another source first, then fixes exactly.
+  - name: Branchloft Pathway
+    category: land
+    why: Choose green or white on play; always untapped.
+  - name: Lush Portico
+    category: land
+    why: GW surveil land.
+  # Utility (6)
+  - name: Yavimaya, Cradle of Growth
+    category: land
+    why: Makes every land a Forest; huge fixing for the {G}{G} half of the commander.
+  - name: Castle Ardenvale
+    category: land
+    why: Makes 1/1 Humans as a mana sink.
+  - name: Minas Tirith
+    category: land
+    why: Draw engine, and it enters untapped because Trostani is legendary.
+  - name: The Shire
+    category: land
+    why: Food tokens, and it also enters untapped off Trostani.
+  - name: Oran-Rief, the Vastwood
+    category: land
+    why: A +1/+1 counter on each green creature that entered this turn.
+  - name: Eiganjo, Seat of the Empire
+    category: land
+    why: White source or a removal spell — never a dead draw.
+  # MDFC (1)
+  - name: Kabira Takedown
+    category: land
+    why: White source, or damage equal to your creature count, which scales perfectly here.
+  # Basics (17)
+  - name: Forest
+    category: land
+    qty: 8
+    why: Green sources for {G}{G}, and the targets Nature's Lore and Cultivate want.
+  - name: Plains
+    category: land
+    qty: 9
+    why: White is the heavier half of the curve, with {W}{W} costs throughout the anthems and finishers.

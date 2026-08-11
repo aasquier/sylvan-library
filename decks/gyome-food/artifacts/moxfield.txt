@@ -1,0 +1,88 @@
+1 Academy Manufactor
+1 Arcane Signet
+1 Ashnod's Altar
+1 Bag End Banquet
+1 Baleful Mastery
+1 Beast Within
+1 Bilbo, Fellow Conspirator
+1 Binding the Old Gods
+1 Blood Artist
+1 Bolas's Citadel
+1 Castle Garenbrig
+1 Cauldron Familiar
+1 Chatterfang, Squirrel General
+1 Command Tower
+1 Darkbore Pathway
+1 Deadly Dispute
+1 Deadly Rollick
+1 Deathcap Glade
+1 Delighted Halfling
+1 Demonic Tutor
+1 Dockside Chef
+1 Elanor Gardner
+1 Experimental Confectioner
+1 Fabled Passage
+8 Forest
+1 Gilded Goose
+1 Gingerbread Cabin
+1 Go for the Throat
+1 Golgari Signet
+1 Great Arashin City
+1 Greta, Sweettooth Scourge
+1 Grim Backwoods
+1 Guardian Project
+1 Hazel's Brewmaster
+1 Heroic Intervention
+1 Idol of Oblivion
+1 Imperial Seal
+1 Jaheira, Friend of the Forest
+1 Kishla Village
+1 Krark-Clan Ironworks
+1 Marionette Apprentice
+1 Mazirek, Kraul Death Priest
+1 Mirkwood Bats
+1 Nadier's Nightblade
+1 Nature's Lore
+1 Night of the Sweets' Revenge
+1 Ninja Pizza
+1 Nuka-Cola Vending Machine
+1 Overgrown Tomb
+1 Parallel Lives
+1 Peregrin Took
+1 Phyrexian Arena
+1 Phyrexian Tower
+1 Pippin, Warden of Isengard
+1 Pitiless Plunderer
+1 Pizza Face, Gastromancer
+1 Ravenous Squirrel
+1 Reckoner's Bargain
+1 Sakura-Tribe Elder
+1 Savvy Hunter
+1 Skullclamp
+1 Skyshroud Claim
+1 Sol Ring
+8 Swamp
+1 Syr Ginger, the Meal Ender
+1 The Great Henge
+1 The Shire
+1 Three Visits
+1 Tireless Provisioner
+1 Torment of Hailfire
+1 Toxic Deluge
+1 Trail of Crumbs
+1 Twilight Mire
+1 Underground Mortuary
+1 Undergrowth Stadium
+1 Urborg, Tomb of Yawgmoth
+1 Verdant Catacombs
+1 Virtue of Persistence
+1 Viscera Seer
+1 Warren Soultrader
+1 Witch of the Moors
+1 Witch's Oven
+1 Worldly Tutor
+1 Yavimaya, Cradle of Growth
+1 Ygra, Eater of All
+
+SIDEBOARD:
+1 Gyome, Master Chef

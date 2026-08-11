@@ -1,0 +1,486 @@
+slug: tivit-cedh
+name: Tivit, Seller of Secrets — Esper cEDH
+commander:
+  - Tivit, Seller of Secrets
+bracket: 5
+
+strategy: >
+  Esper midrange-control at cEDH speed. Fast mana plus free interaction plus
+  hard tutors, protect a window, then win with a compact two-card combo. Tivit
+  himself is a value engine you cast when the coast is clear, not a
+  prerequisite — two of the three win lines do not need him on the battlefield
+  at all. What makes him worth the six mana is that you vote twice on your own
+  council's dilemma, so in a four-player pod every trigger is exactly five
+  artifacts and opponents choose only the flavour, never the count.
+
+notes:
+  commander_why: >
+    Two clauses drive everything. You vote an additional time, so a
+    three-opponent pod means five votes and five artifacts per trigger that
+    opponents cannot deny you. And the trigger is ETB OR combat damage, not
+    "attacks" — which is why a single blocker or a fog turns off the Time Sieve
+    loop and why combat has to be planned around it.
+  gameplan: >
+    Turns 1-2 land, rock, engine — Rhystic Study and especially Mystic Remora
+    down as early as possible, since Remora's value curve collapses after turn
+    four. Turn 3-4 either deploy Tivit with a counter held up or hold
+    everything and answer the pod's fastest deck. Then win off Oracle, the
+    Sieve loop, or the Kitten line.
+  mulligan: >
+    Keep hands that do TWO of these three: produce fast mana, interact for
+    free, or dig. Two lands + a rock + a tutor is a keep; three lands with no
+    acceleration or interaction is not — ship it, this deck functions on five.
+    Auto-keeps: Gemstone Caverns on the draw, Ancient Tomb plus two rocks, or
+    Wishclaw plus protection. You do not need Tivit in your opener; you need
+    mana and answers. Note this policy is hand-quality based and is NOT what
+    Tier 1's land-count mulligan models — do not quote sim mulligan rates for
+    this deck as if they described this rule.
+  curve_plan: >
+    TODO — recount from the corpus, not by hand.
+  pitfalls: >
+    (1) The Time Sieve loop needs FIVE artifacts per iteration and you only get
+    five votes with three living opponents — kill someone and the loop breaks
+    at four unless Lotho, Smothering Tithe, an Urza's Saga Construct or a
+    leftover Clue bridges the gap. Sequence eliminations LAST. (2) Grafdigger's
+    Cage turns off your own Sevinne's Reclamation flashback. (3) Cursed Totem
+    shuts off Ranger-Captain's own sacrifice ability, though it does not touch
+    Tivit, Time Sieve, Clues, Treasures or the Oracle trigger.
+  engine_detail: >
+    Tainted Pact works only because the deck runs exactly one copy of each
+    basic name — one Island, one Swamp, no duplicate names anywhere — so the
+    library exiles fully. Four free counters (Force of Will, Force of Negation,
+    Fierce Guardianship, Pact of Negation) is the number that lets you tap out
+    for Tivit and still hold the table.
+  lines: >
+    Crack Wishclaw Talisman only when you can win on the spot, or when the next
+    player is dead before untapping. Hold Swan Song and An Offer for the win
+    attempt, not for a Rhystic Study. Ward {3} means opponents need real mana
+    to kill Tivit, so often you simply let a removal spell resolve and rebuild
+    rather than spend a free counter. Infinite turns is a soft lock, not a
+    kill — use the turns to crack Clues, dig, and assemble Oracle.
+  wincons: >
+    (1) Thassa's Oracle plus Demonic Consultation or Tainted Pact — two cards,
+    four mana, instant speed, and the default plan. (2) Time Sieve plus Tivit
+    for infinite turns. (3) Displacer Kitten plus Teferi, Time Raveler plus any
+    mana-positive artifact to draw the deck, then Oracle; Teferi's static locks
+    opponents to sorcery speed while you go off.
+  manabase: >
+    30 lands, deliberately low, leaning on 13 fast mana pieces. All three
+    Talismans are here because Tivit costs {3}{W}{U}{B} — coloured sources, not
+    raw mana, are the bottleneck. One Island and one Swamp only, both to stay
+    fetchable under Blood Moon effects and to keep Tainted Pact live. Reserved
+    List is ALLOWED here but only three cards use it (Tundra, Underground Sea,
+    Scrubland); the surveil-land substitutions cost little.
+  matchups: >
+    TODO — needs Tier 2. Known shape: loses to decks that go under it, grinds
+    out anything slower.
+  politics: >
+    Opponents will sometimes vote to deny you Treasures; it does not matter,
+    every vote is still an artifact and Time Sieve does not care which kind.
+    Announce both your votes at once — you vote first, so everyone else has
+    full information. That is the tradeoff for voting twice.
+  failure_modes: >
+    Casting Tivit into an open blue player with nothing held back is how this
+    deck loses. Consultation lines lose to a single Flusterstorm; do not jam
+    without cover unless the table is tapped out.
+  swap_philosophy: >
+    Ten flex slots, each naming what it replaces. Academy Manufactor turns each
+    trigger into 15 artifacts but is dead on its own. The Underworld Breach
+    package adds a third win but wants a more storm-focused shell.
+  rules_corners: >
+    Voice of Victory is legal in Esper: its Warrior tokens are red, but the
+    card has no red mana symbols, so its colour identity is white only. Mana
+    Crypt and Jeweled Lotus are banned as of the September 2024 update — do not
+    go looking for them. Imposter Mech copies a creature as a NONCREATURE
+    Vehicle, so it dodges creature removal and wraths and still counts for Mox
+    Opal and Time Sieve.
+
+cards:
+  # -------------------------------------------------------------- LANDS 30
+  - name: Command Tower
+    category: land
+    why: Perfect fixing, zero cost.
+  - name: Tundra
+    category: land
+    why: Untapped, unconditional, fetchable. Reserved List — substitutable for Meticulous Archive or Adarkar Wastes.
+  - name: Underground Sea
+    category: land
+    why: Untapped, unconditional, fetchable. Reserved List — substitutable for Undercity Sewers or Underground River.
+  - name: Scrubland
+    category: land
+    why: Untapped, unconditional, fetchable. Reserved List — substitutable for Shadowy Backstreet or Caves of Koilos.
+  - name: Hallowed Fountain
+    category: land
+    why: Fetchable dual; the 2 life is a real cost, pay it deliberately.
+  - name: Watery Grave
+    category: land
+    why: Fetchable dual; the 2 life is a real cost, pay it deliberately.
+  - name: Godless Shrine
+    category: land
+    why: Fetchable dual; the 2 life is a real cost, pay it deliberately.
+  - name: Polluted Delta
+    category: land
+    why: Fixing on demand, plus a shuffle for Vampiric and Imperial Seal tops.
+  - name: Flooded Strand
+    category: land
+    why: Fixing on demand, plus a shuffle for Vampiric and Imperial Seal tops.
+  - name: Marsh Flats
+    category: land
+    why: Fixing on demand, plus a shuffle for Vampiric and Imperial Seal tops.
+  - name: Misty Rainforest
+    category: land
+    why: Fixing on demand, plus a shuffle for Vampiric and Imperial Seal tops.
+  - name: Verdant Catacombs
+    category: land
+    why: Fixing on demand, plus a shuffle for Vampiric and Imperial Seal tops.
+  - name: Bloodstained Mire
+    category: land
+    why: Fixing on demand, plus a shuffle for Vampiric and Imperial Seal tops.
+  - name: Arid Mesa
+    category: land
+    why: Fixing on demand, plus a shuffle for Vampiric and Imperial Seal tops.
+  - name: City of Brass
+    category: land
+    why: Painful, but WUB on turn one matters more than 6 life over a game this short.
+  - name: Mana Confluence
+    category: land
+    why: Painful, but WUB on turn one matters more than 6 life over a game this short.
+  - name: Gemstone Caverns
+    category: land
+    why: Free acceleration on the draw — turns a slow seat into the fastest one.
+  - name: Ancient Tomb
+    category: land
+    why: The single best land for casting a 6-drop commander.
+  - name: City of Traitors
+    category: land
+    why: Same job as Ancient Tomb; the drawback rarely bites in a 5-turn game.
+  - name: Urza's Saga
+    category: land
+    why: >
+      Fetches Sol Ring, Mox Opal, Mox Diamond, Chrome Mox, Lotus Petal or
+      Grafdigger's Cage, and the Constructs are Time Sieve fodder.
+  - name: Otawara, Soaring City
+    category: land
+    why: Free-ish answer to Rule of Law, an Oracle, or a Displacer Kitten.
+  - name: Minamo, School at Water's Edge
+    category: land
+    why: Blue source plus an untap that can reset a crewed Imposter Mech or a tapped blocker problem.
+  - name: Morphic Pool
+    category: land
+    why: Untapped dual in a three-opponent pod.
+  - name: Sea of Clouds
+    category: land
+    why: Untapped dual in a three-opponent pod.
+  - name: Vault of Champions
+    category: land
+    why: Untapped dual in a three-opponent pod.
+  - name: Exotic Orchard
+    category: land
+    why: Effectively a dual in a format full of blue-black decks.
+  - name: Spire of Industry
+    category: land
+    why: Artifact density makes this any-colour.
+  - name: Cavern of Souls
+    category: land
+    why: Name Sphinx and Tivit resolves through Force of Will.
+  - name: Island
+    category: land
+    why: >
+      Exactly one — fetchable under Blood Moon effects, and a second copy would
+      break Tainted Pact.
+  - name: Swamp
+    category: land
+    why: >
+      Exactly one — fetchable under Blood Moon effects, and a second copy would
+      break Tainted Pact.
+
+  # ---------------------------------------------------------- FAST MANA 13
+  - name: Sol Ring
+    category: ramp
+    why: The best rate in the format, and an artifact for Mox Opal and Time Sieve.
+  - name: Mana Vault
+    category: ramp
+    why: Three mana on turn one; the untap cost is affordable in a five-turn game.
+  - name: Grim Monolith
+    category: ramp
+    why: Same role as Mana Vault, and a Displacer Kitten engine piece at +2 mana.
+  - name: Mox Opal
+    category: ramp
+    why: Metalcraft is live by turn two most games given the artifact density.
+  - name: Mox Diamond
+    category: ramp
+    why: Free mana when you have a spare land; fetchable off Urza's Saga.
+  - name: Chrome Mox
+    category: ramp
+    why: Free mana at the cost of a card — correct in a deck that wins on turn four.
+  - name: Lotus Petal
+    category: ramp
+    why: One-shot any colour, and an artifact for Mox Opal and Time Sieve.
+  - name: Arcane Signet
+    category: ramp
+    why: Any of the three colours, which is what actually gates Tivit.
+  - name: Talisman of Dominance
+    category: ramp
+    why: Coloured sources, not raw mana, are the bottleneck on {3}{W}{U}{B}.
+  - name: Talisman of Progress
+    category: ramp
+    why: Coloured sources, not raw mana, are the bottleneck on {3}{W}{U}{B}.
+  - name: Talisman of Hierarchy
+    category: ramp
+    why: Coloured sources, not raw mana, are the bottleneck on {3}{W}{U}{B}.
+  - name: Fellwar Stone
+    category: ramp
+    why: Effectively any colour in a pod full of blue-black decks.
+  - name: Dark Ritual
+    category: ramp
+    why: Powers out a turn-one Necropotence or a protected combo turn.
+
+  # ------------------------------------------------------------ ENGINES 10
+  - name: Rhystic Study
+    category: engine
+    why: The best card in the format at taxing a three-opponent pod.
+  - name: Mystic Remora
+    category: engine
+    why: Turns one through four it draws 3-6 cards. Let it die on cue.
+  - name: Smothering Tithe
+    category: engine
+    why: Treasures are mana and Time Sieve ammunition at the same time.
+  - name: The One Ring
+    category: engine
+    why: Protection from everything for a turn, then a draw engine. Great under aggro.
+  - name: Esper Sentinel
+    category: engine
+    why: Taxes every rock and cantrip; draws or slows the table either way.
+  - name: Archivist of Oghma
+    category: engine
+    why: Punishes fetchlands and tutors — every deck at this table does both.
+  - name: Wan Shi Tong, Librarian
+    category: engine
+    why: Flash, and every opponent search grows it and draws you a card. A tutor-heavy pod feeds it constantly.
+  - name: Faerie Mastermind
+    category: engine
+    why: Flash blocker, taxes draw engines, occasionally a big refill.
+  - name: Lotho, Corrupt Shirriff
+    category: engine
+    why: >
+      A Treasure every time any player casts their second spell that turn —
+      ramp and artifact count in one two-drop, and a Time Sieve bridge once an
+      opponent dies.
+  - name: Necropotence
+    category: engine
+    why: If the game goes long, this ends the card-advantage argument permanently.
+
+  # ------------------------------------------------------------- TUTORS 10
+  - name: Demonic Tutor
+    category: tutor
+    why: Unconditional, two mana, to hand.
+  - name: Vampiric Tutor
+    category: tutor
+    why: Instant speed at the cost of a card and 2 life; pairs with the fetch shuffles.
+  - name: Imperial Seal
+    category: tutor
+    why: Sorcery-speed Vampiric, and the fetchlands fix the top-of-library cost.
+  - name: Mystical Tutor
+    category: tutor
+    why: Finds Consultation, a counter, or Cyclonic Rift at instant speed.
+  - name: Enlightened Tutor
+    category: tutor
+    why: Finds Time Sieve, Rhystic Study, Grafdigger's Cage or a Mox.
+  - name: Wishclaw Talisman
+    category: tutor
+    why: >
+      The strongest tutor here if used correctly — only crack it when you can
+      win on the spot, or when the next player is dead before untapping.
+  - name: Whir of Invention
+    category: tutor
+    why: Finds Time Sieve at instant speed off Treasures.
+  - name: Transmute Artifact
+    category: tutor
+    why: Second copy of the Time Sieve tutor effect.
+  - name: Muddle the Mixture
+    category: tutor
+    why: >
+      Transmutes for exactly Thassa's Oracle, Dark Ritual or a Talisman, and
+      otherwise counters a combo piece.
+  - name: Beseech the Mirror
+    category: tutor
+    why: With a spare Clue or Treasure to bargain, casts Demonic Consultation or Time Sieve for free.
+
+  # ------------------------------------------- COMBO, COPY AND RECURSION 8
+  - name: Thassa's Oracle
+    category: win-con
+    why: The win. Hold priority with the ETB trigger on the stack, then empty your library.
+  - name: Demonic Consultation
+    category: win-con
+    why: Name a card not in your deck; two cards and four mana total for the primary kill.
+  - name: Tainted Pact
+    category: win-con
+    why: >
+      Second Consultation, live only because no card name is duplicated in the
+      deck — one Island, one Swamp.
+  - name: Time Sieve
+    category: win-con
+    why: With Tivit connecting, five artifacts per trigger becomes infinite turns for two mana.
+  - name: Displacer Kitten
+    category: engine
+    why: Blinks Teferi on every noncreature spell — the third win line's engine half.
+  - name: Teferi, Time Raveler
+    category: engine
+    why: >
+      The Kitten line's other half, and his static locks opponents to sorcery
+      speed while you go off.
+  - name: Sevinne's Reclamation
+    category: recursion
+    why: >
+      Rebuys a Sieve, a Mox or the Oracle from the yard, and it flashes back —
+      two answers to a Toxic Deluge in one card.
+  - name: Phyrexian Metamorph
+    category: threat
+    why: >
+      Copies the table's best artifact or creature, and counts as artifact
+      number three for Mox Opal.
+
+  # ------------------------------------------------ PROTECTION AND HATE 8
+  - name: Silence
+    category: protection
+    why: The cheapest "I win now" enabler in the deck.
+  - name: Grand Abolisher
+    category: protection
+    why: Same effect as Silence but permanent, and it protects Tivit in combat too.
+  - name: Voice of Victory
+    category: protection
+    why: >
+      A Silence that stays. Legal in Esper because its Warrior tokens are red
+      but the card has no red mana symbols, so its identity is white only.
+  - name: Drannith Magistrate
+    category: protection
+    why: Shuts off every commander in the pod, including the ones that combo from the zone.
+  - name: Opposition Agent
+    category: interaction
+    why: Steals a tutor and often just wins the turn it lands, with flash.
+  - name: Ranger-Captain of Eos
+    category: protection
+    why: Fetches Esper Sentinel or Mental Misstep, then sacrifices for a free Silence on the turn you go off.
+  - name: Grafdigger's Cage
+    category: interaction
+    why: >
+      Blanks Underworld Breach, Yawgmoth's Will and tutor-to-battlefield
+      effects. It also turns off your own Sevinne's flashback — sequence
+      around it.
+  - name: Cursed Totem
+    category: interaction
+    why: >
+      Kills mana dorks, Thrasios and creature-tutor engines. Does not touch
+      Tivit, Time Sieve, Clues, Treasures or the Oracle trigger, but it does
+      shut off Ranger-Captain's sacrifice.
+
+  # -------------------------------------------------------- COUNTERMAGIC 11
+  - name: Force of Will
+    category: protection
+    why: Free counter — one of the four that let you tap out for Tivit and still hold the table.
+  - name: Force of Negation
+    category: protection
+    why: Free counter for noncreature spells, which is most of what kills you.
+  - name: Fierce Guardianship
+    category: protection
+    why: Free counter while you control your commander.
+  - name: Pact of Negation
+    category: protection
+    why: Free counter on the turn you win, when the upkeep cost never comes due.
+  - name: Mana Drain
+    category: interaction
+    why: Counter plus a burst of mana for the following turn.
+  - name: Flusterstorm
+    category: protection
+    why: The cheapest way to protect your own combo through a counter war.
+  - name: Mental Misstep
+    category: interaction
+    why: Free answer to Consultation, Swords, Vampiric Tutor and mana dorks.
+  - name: Swan Song
+    category: protection
+    why: One mana; hold it for the win attempt, not for a Rhystic Study.
+  - name: An Offer You Can't Refuse
+    category: protection
+    why: One mana; the Treasures given away rarely matter in the turn you win.
+  - name: Mindbreak Trap
+    category: interaction
+    why: The answer to a resolved storm turn.
+  - name: Dispel
+    category: protection
+    why: Cheapest protection for your own combo against instant-speed answers.
+
+  # ------------------------------------------- REMOVAL AND DISRUPTION 9
+  - name: Swords to Plowshares
+    category: interaction
+    why: One mana, exiles anything relevant.
+  - name: Path to Exile
+    category: interaction
+    why: Second Swords; the land given up rarely decides a cEDH game.
+  - name: Toxic Deluge
+    category: interaction
+    why: >
+      Your only sweeper — answers Opposition Agent, Bowmasters and go-wide
+      boards for three mana at any life total you choose to pay.
+  - name: Cyclonic Rift
+    category: interaction
+    why: The catch-all reset, and a win-turn clear for blockers.
+  - name: Chain of Vapor
+    category: interaction
+    why: One-mana bounce for a hatebear or your own permanent in response to removal.
+  - name: Sink into Stupor
+    category: interaction
+    why: >
+      Bounces a spell or a nonland permanent, and it is a land when you are
+      short — one of the best flex slots printed.
+  - name: Orcish Bowmasters
+    category: interaction
+    why: >
+      Kills Thassa's Oracle and hatebears at flash speed while punishing every
+      draw engine.
+  - name: Dauthi Voidwalker
+    category: interaction
+    why: Graveyard hate that steals their win condition, on an unblockable 3/2.
+  - name: Imposter Mech
+    category: interaction
+    why: >
+      Copies an opponent's best creature as a noncreature Vehicle, dodging
+      creature removal and wraths, and it is a cheap artifact for Mox Opal and
+      Time Sieve.
+
+swap_board:
+  - name: Academy Manufactor
+    category: engine
+    why: In for Faerie Mastermind. Turns each Tivit trigger into 15 artifacts. Wildly redundant for Time Sieve, dead on its own.
+  - name: Underworld Breach
+    category: win-con
+    why: The "value Breach" build with Lion's Eye Diamond and Brain Freeze; adds a third win but wants a more storm-focused shell.
+  - name: Lion's Eye Diamond
+    category: ramp
+    why: The Breach package's mana half.
+  - name: Brain Freeze
+    category: win-con
+    why: The Breach package's mill half — loop to mill yourself, then escape Thassa's Oracle.
+  - name: Urza, Lord High Artificer
+    category: engine
+    why: In for Necropotence. Makes mana from your artifact pile and doubles as a Time Sieve enabler.
+  - name: Gilded Drake
+    category: interaction
+    why: In for Toxic Deluge. Steals a commander instead of killing a board; better in creature-heavy metas.
+  - name: Timetwister
+    category: engine
+    why: In for Faerie Mastermind, if money genuinely is not a factor.
+  - name: Trickbind
+    category: interaction
+    why: In for Dispel. Answers Thassa's Oracle triggers, Wishclaw activations and fetchlands.
+  - name: Notion Thief
+    category: engine
+    why: In for Archivist of Oghma. Blowout against Wheel and Ad Nauseam decks.
+  - name: Narset, Parter of Veils
+    category: engine
+    why: In for Faerie Mastermind. Same job, stickier, worse ceiling.
+  - name: Aven Mindcensor
+    category: interaction
+    why: In for Imposter Mech. Flash tutor-hate in a tutor-heavy pod.
+  - name: Mnemonic Betrayal
+    category: engine
+    why: In for Beseech the Mirror. Steals three graveyards' worth of answers on the turn you win.
