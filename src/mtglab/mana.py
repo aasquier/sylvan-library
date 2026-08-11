@@ -8,8 +8,10 @@ We solve it exactly with augmenting-path matching (Kuhn's algorithm).
 Vocabulary
 ----------
 Pip      : one colored mana requirement, expressed as the SET of colors that
-           can pay it. {G} -> {"G"}.  {G/W} -> {"G","W"}.  {G/P} -> satisfiable
-           by G or by 2 life, so we treat it as always satisfiable.
+           can pay it. {G} -> {"G"}.  {G/W} -> {"G","W"}.  Phyrexian {G/P} is
+           NOT a pip -- 2 life always pays it, so it constrains the mana base
+           not at all. It is kept separately because it still counts toward
+           mana value and toward color identity.
 Unit     : one mana of output. A source producing N mana expands into N units,
            each carrying the set of colors it can produce. Sol Ring -> two
            units of {"C"}. This expansion is what makes the matching correct
@@ -33,25 +35,32 @@ _SYMBOL_RE = re.compile(r"\{([^}]+)\}")
 class ManaCost:
     """A parsed mana cost.
 
-    generic  : number of generic mana required ({2} -> 2). X counts as 0 here;
-               callers decide what to pay into X.
-    pips     : tuple of frozensets, one per colored requirement.
-    has_x    : whether the cost contains {X}.
+    generic    : number of generic mana required ({2} -> 2). X counts as 0
+                 here; callers decide what to pay into X.
+    pips       : tuple of frozensets, one per colored requirement.
+    phyrexian  : tuple of frozensets, one per Phyrexian symbol, holding the
+                 colors it may be paid with. Separate from `pips` because it
+                 places no demand on the mana base -- but it is a real symbol,
+                 so it counts 1 toward mana value and its colors count toward
+                 color identity. {U/P} is mana value 1 and blue; Kozilek,
+                 Compleated is {8}{C/P}{C/P}, mana value 10 and colorless.
+    has_x      : whether the cost contains {X}.
     """
 
     generic: int = 0
     pips: tuple[frozenset[str], ...] = ()
     has_x: bool = False
+    phyrexian: tuple[frozenset[str], ...] = ()
 
     @property
     def mana_value(self) -> int:
-        return self.generic + len(self.pips)
+        return self.generic + len(self.pips) + len(self.phyrexian)
 
     @property
     def colors(self) -> frozenset[str]:
-        """Every color that appears in any pip (used for identity checks)."""
+        """Every color that appears in any symbol (used for identity checks)."""
         out: set[str] = set()
-        for pip in self.pips:
+        for pip in self.pips + self.phyrexian:
             out |= {c for c in pip if c in COLORS}
         return frozenset(out)
 
@@ -63,6 +72,8 @@ class ManaCost:
             parts.append("{%d}" % self.generic)
         for pip in self.pips:
             parts.append("{%s}" % "/".join(sorted(pip)))
+        for pip in self.phyrexian:
+            parts.append("{%s/P}" % "/".join(sorted(pip)))
         return "".join(parts) or "{0}"
 
 
@@ -77,6 +88,7 @@ def parse_mana_cost(cost: str | None) -> ManaCost:
 
     generic = 0
     pips: list[frozenset[str]] = []
+    phyrexian: list[frozenset[str]] = []
     has_x = False
 
     for raw in _SYMBOL_RE.findall(cost):
@@ -99,8 +111,12 @@ def parse_mana_cost(cost: str | None) -> ManaCost:
 
         if "/" in sym:
             halves = sym.split("/")
-            # Phyrexian: payable with 2 life, so never a constraint on mana.
+            # Phyrexian: payable with 2 life, so never a constraint on mana --
+            # but still one symbol of mana value, and still colored. The corpus
+            # carries the two-color form too ({G/U/P} on Tamiyo, Compleated
+            # Sage), so read the colors rather than assuming a single one.
             if "P" in halves:
+                phyrexian.append(frozenset(h for h in halves if h in ALL_PRODUCIBLE))
                 continue
             # Monocolor hybrid {2/G}: payable by the color, or by 2 generic.
             # The cheaper branch for castability is the colored one, but if we
@@ -120,7 +136,8 @@ def parse_mana_cost(cost: str | None) -> ManaCost:
         # overstate castability.
         generic += 1
 
-    return ManaCost(generic=generic, pips=tuple(pips), has_x=has_x)
+    return ManaCost(generic=generic, pips=tuple(pips), has_x=has_x,
+                    phyrexian=tuple(phyrexian))
 
 
 @dataclass(frozen=True)
@@ -188,6 +205,8 @@ def can_pay(cost: ManaCost, sources: Iterable[ManaSource], *, x_value: int = 0) 
     Condition 2 is safe because any source can pay generic mana.
     """
     units = expand_units(sources)
+    # Deliberately not `cost.mana_value`: that counts Phyrexian symbols, which
+    # are paid with life and so demand no mana at all.
     total_needed = cost.generic + len(cost.pips) + (x_value if cost.has_x else 0)
     if len(units) < total_needed:
         return False

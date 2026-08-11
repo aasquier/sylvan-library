@@ -45,6 +45,9 @@ build/
 dist/
 .pytest_cache/
 .ruff_cache/
+# Hypothesis's example database: a local cache of previously-failing inputs so
+# they get replayed first. Machine-specific, and CI runs with database=None.
+.hypothesis/
 .coverage
 .coverage.*
 htmlcov/

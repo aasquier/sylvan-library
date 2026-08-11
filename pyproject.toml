@@ -10,7 +10,13 @@ api = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 # httpx backs fastapi's TestClient, so the API tests need it. ruff's floor is
 # 0.16 because the rule selection in [tool.ruff.lint] names rules added after
 # 0.4, and an older ruff would error on the config rather than lint the code.
-dev = ["pytest>=8.0", "ruff>=0.16", "httpx>=0.27", "coverage>=7.0"]
+# hypothesis is not optional either: tests/test_mana_properties.py imports it
+# at module level rather than behind an importorskip, deliberately, so that a
+# missing install is an error instead of a silently shorter test run.
+dev = [
+    "pytest>=8.0", "ruff>=0.16", "httpx>=0.27", "coverage>=7.0",
+    "hypothesis>=6.100",
+]
 
 [project.scripts]
 mtglab = "mtglab.cli:main"

@@ -100,6 +100,8 @@ def _consume(cost: ManaCost, sources: list[ManaSource]) -> list[ManaSource] | No
     stay as useful as possible for the next spell this turn.
     """
     units = expand_units(sources)
+    # Not `cost.mana_value` -- Phyrexian symbols are paid with life, so they
+    # add to a card's mana value without ever costing mana here.
     need = cost.generic + len(cost.pips)
     if len(units) < need:
         return None

@@ -38,6 +38,33 @@ def test_parse_phyrexian_is_never_a_mana_constraint():
     assert c.generic == 1
 
 
+def test_phyrexian_still_counts_toward_mana_value_and_colour():
+    """Regression: Phyrexian symbols used to be dropped outright, which put
+    Mental Misstep ({U/P}) in the 0-drop bucket of the curve and made its
+    derived colour identity colourless. Scryfall says cmc 1, identity U.
+    Not a constraint on the mana base is not the same as not being there.
+    """
+    misstep = parse_mana_cost("{U/P}")
+    assert misstep.mana_value == 1
+    assert misstep.colors == frozenset({"U"})
+    assert misstep.pips == ()
+
+    metamorph = parse_mana_cost("{3}{U/P}")          # Phyrexian Metamorph, cmc 4
+    assert metamorph.mana_value == 4
+
+    # Two-colour Phyrexian is one symbol, not two: Tamiyo, Compleated Sage is
+    # {2}{G}{G/U/P}{U} and Scryfall reports cmc 5.
+    tamiyo = parse_mana_cost("{2}{G}{G/U/P}{U}")
+    assert tamiyo.mana_value == 5
+    assert tamiyo.colors == frozenset({"G", "U"})
+
+    # Colourless Phyrexian adds mana value but no colour: Kozilek, Compleated
+    # is {8}{C/P}{C/P}, cmc 10, colour identity empty.
+    kozilek = parse_mana_cost("{8}{C/P}{C/P}")
+    assert kozilek.mana_value == 10
+    assert kozilek.colors == frozenset()
+
+
 def test_parse_monocolor_hybrid_is_costed_conservatively():
     # {2/G} is at worst 2 generic; never claim it is cheaper than it may be.
     c = parse_mana_cost("{2/G}")

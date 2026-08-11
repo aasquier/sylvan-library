@@ -23,9 +23,11 @@ jobs:
       - run: pip install -e ".[dev,api]"
 
       # Fail loudly if that ever stops being true, rather than letting the
-      # importorskip quietly disable a whole test module again.
-      - name: API test dependencies must be present
-        run: python -c "import fastapi, httpx"
+      # importorskip quietly disable a whole test module again. hypothesis is
+      # checked here too: the property tests are the only thing standing
+      # between mana.py and a silently wrong castability answer.
+      - name: Test dependencies must be present
+        run: python -c "import fastapi, httpx, hypothesis"
 
       # Run under coverage rather than bare pytest. `fail_under` in
       # pyproject.toml is a floor, not a target: it makes a large regression

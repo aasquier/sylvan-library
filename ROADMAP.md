@@ -208,10 +208,10 @@ with that card") rather than just refusing.
 ---
 
 > **Next phase:** [docs/ENGINEERING.md](docs/ENGINEERING.md) — property-based
-> and differential testing, container hardening, and Claude review on PRs.
-> A compiled rewrite is **deferred with a written trigger**; the measurements
-> say Tier 1 would gain nothing, and Tier 2 gets built in Python and profiled
-> before that call is re-made.
+> and differential testing (**done**, §2), then ADRs, a deck-source seam,
+> frontend tests and container hardening. A compiled rewrite is **deferred with
+> a written trigger**; the measurements say Tier 1 would gain nothing, and Tier
+> 2 gets built in Python and profiled before that call is re-made.
 
 ## Suggested order
 
@@ -339,10 +339,26 @@ producing confident, wrong answers for *every* deck, not just one.
   permanent is cast as its front face and the back only ever arrives by
   flipping.
 
-All five are fixed and pinned by tests. The lesson worth keeping: logic in
-tested code gets caught, logic in conversation does not. 216 tests, CI runs
+- **Phyrexian mana was dropped by the cost parser**, found 2026-08-10 by the
+  new property tests. `{U/P}` parsed to mana value 0 with no colours, so the
+  curve in `decks/analyze.py` filed Mental Misstep as a 0-drop and Phyrexian
+  Metamorph as a 3-drop, and reported Tivit's average mana value as **1.90
+  instead of 1.93**. Only Tivit runs Phyrexian cards, and the generated
+  artifacts do not carry the curve, so nothing shipped wrong — but the UI and
+  the API did show it. The distinction the fix encodes: a Phyrexian symbol
+  places no demand on the mana base, and is still a symbol with a mana value
+  and a colour.
+
+All six are fixed and pinned by tests. The lesson worth keeping: logic in
+tested code gets caught, logic in conversation does not. 250 tests, CI runs
 them on 3.11 and 3.12, typechecks and builds the frontend, and fails if the
 committed bundle drifts from source.
+
+Since 2026-08-10 the mana solver is also checked against two independent
+reference implementations on every run, and Tier 1's seeded output is pinned to
+a digest verified identical on 3.11 and 3.12 — so a change in any simulation
+number is now a decision someone has to write down. See
+[docs/ENGINEERING.md](docs/ENGINEERING.md) §2.
 
 Two smaller fixes from the same pass: the card-search text input was
 `flex-1` with the default `basis-0` in a wrapping row, so it collapsed to
