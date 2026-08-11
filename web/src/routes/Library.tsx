@@ -11,6 +11,7 @@ export default function Library() {
   const [bracket, setBracket] = useState('all')
   const [color, setColor] = useState('all')
   const [sort, setSort] = useState('name')
+  const [status, setStatus] = useState('all')
 
   useEffect(() => {
     Promise.all([api.decks(), api.health()])
@@ -25,6 +26,7 @@ export default function Library() {
     let list = decks ?? []
     if (bracket !== 'all') list = list.filter((d) => String(d.bracket) === bracket)
     if (color !== 'all') list = list.filter((d) => d.color_identity.includes(color))
+    if (status !== 'all') list = list.filter((d) => d.status === status)
     return [...list].sort((a, b) =>
       sort === 'bracket'
         ? (b.bracket ?? 0) - (a.bracket ?? 0)
@@ -32,7 +34,7 @@ export default function Library() {
           ? b.total_cards - a.total_cards
           : a.name.localeCompare(b.name),
     )
-  }, [decks, bracket, color, sort])
+  }, [decks, bracket, color, status, sort])
 
   if (error) return <ErrorNote>Could not load decks: {error}</ErrorNote>
   if (!decks) return <Spinner label="Loading decks…" />
@@ -59,6 +61,10 @@ export default function Library() {
           <Select label="Color" value={color} onChange={setColor}
                   options={[{ value: 'all', label: 'Any color' },
                     ...['W', 'U', 'B', 'R', 'G'].map((c) => ({ value: c, label: c }))]} />
+          <Select label="Status" value={status} onChange={setStatus}
+                  options={[{ value: 'all', label: 'Built and theory' },
+                    { value: 'built', label: 'Built' },
+                    { value: 'theoretical', label: 'Theory' }]} />
           <Select label="Sort" value={sort} onChange={setSort}
                   options={[
                     { value: 'name', label: 'Name' },
@@ -88,6 +94,10 @@ export default function Library() {
                         ran" -- which is not the same as passing. Rendering it
                         like a clean deck throws away the distinction the list
                         endpoint carries these counts to preserve. */}
+                    {/* A theoretical deck is a list, not a box of cards.
+                        Worth saying on the shelf, because the difference
+                        decides whether you can sit down and play it. */}
+                    {deck.status === 'theoretical' && <Badge>theory</Badge>}
                     {deck.errors === null && <Badge tone="warning">not checked</Badge>}
                     {deck.errors !== null && deck.errors > 0 && (
                       <Badge tone="critical">

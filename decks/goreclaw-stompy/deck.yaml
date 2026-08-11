@@ -1,5 +1,6 @@
 slug: goreclaw-stompy
 name: Goreclaw, Terror of Qal Sisma — Mono-Green Stompy
+status: theoretical  # theoretical: a list, not a box of cards
 commander:
   - Goreclaw, Terror of Qal Sisma
 bracket: 4

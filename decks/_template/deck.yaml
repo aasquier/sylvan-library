@@ -4,6 +4,10 @@
 
 slug: my-deck
 name: My Deck Name
+# built = the cards are sleeved up; theoretical = a list you are
+# thinking about. Absent means theoretical, so nothing is ever
+# silently claimed as owned.
+status: theoretical
 commander:
   - Gyome, Master Chef
 # companion: Kaheera, the Orphanguard   # sits outside the 100

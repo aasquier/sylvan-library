@@ -146,6 +146,7 @@ def list_decks(*, source: DeckSource | None = None) -> list[dict[str, Any]]:
             out.append({
                 "slug": deck.slug,
                 "name": deck.name,
+                "status": deck.status,
                 "commander": deck.commander,
                 "companion": deck.companion,
                 "bracket": deck.bracket,
@@ -172,6 +173,7 @@ def get_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
         return {
             "slug": deck.slug,
             "name": deck.name,
+            "status": deck.status,
             "commander": deck.commander,
             "companion": deck.companion,
             "bracket": deck.bracket,

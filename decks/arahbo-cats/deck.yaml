@@ -1,5 +1,6 @@
 slug: arahbo-cats
 name: Arahbo, Roar of the World — Cats
+status: built  # built: the cards are sleeved up
 commander:
   - Arahbo, Roar of the World
 companion: Kaheera, the Orphanguard

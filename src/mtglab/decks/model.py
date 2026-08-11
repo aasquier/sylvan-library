@@ -79,10 +79,17 @@ class CardEntry:
         return out
 
 
+# Whether the cards are physically in a box, or the deck is still a plan.
+# Defaults to `theoretical` when absent, so nothing is ever silently claimed as
+# owned -- a wrong "built" sends someone to a shelf that has no deck on it.
+DECK_STATUSES = ("built", "theoretical")
+
+
 @dataclass
 class Deck:
     slug: str
     name: str
+    status: str = "theoretical"
     commander: list[str] = field(default_factory=list)
     companion: str | None = None
     bracket: int | None = None
@@ -151,6 +158,7 @@ class Deck:
         return cls(
             slug=raw.get("slug") or slug or "",
             name=raw.get("name") or slug or "",
+            status=str(raw.get("status") or "theoretical").strip().lower(),
             commander=list(commander),
             companion=raw.get("companion"),
             bracket=raw.get("bracket"),
@@ -165,6 +173,7 @@ class Deck:
         payload: dict[str, Any] = {
             "slug": self.slug,
             "name": self.name,
+            "status": self.status,
             "commander": self.commander,
         }
         if self.companion:

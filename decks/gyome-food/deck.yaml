@@ -1,5 +1,6 @@
 slug: gyome-food
 name: Gyome, Master Chef — Food
+status: built  # built: the cards are sleeved up
 commander:
   - Gyome, Master Chef
 bracket: 4
