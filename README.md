@@ -135,44 +135,37 @@ cross-check on Tiers 1–2, never ground truth.
 
 ## Status
 
-Built and tested (38 tests):
+All six decks are migrated to `deck.yaml`, the local app runs, and the
+simulator, gate and artifact generator are in daily use. **216 tests**, CI on
+3.11 and 3.12.
 
-- `mana.py` — cost parsing incl. hybrid/Phyrexian/monocolor-hybrid, exact
-  castability solver, color identity
-- `cards/db.py` — Scryfall bulk ingest, DuckDB schema, price history table
-- `decks/model.py` — deck file format, YAML round-trip
-- `decks/validate.py` — the gate
-- `sim/tier1/engine.py` — Monte Carlo, mulligan policies, land sweeps
-- `artifacts/generate.py` — all five deliverables
-- `cli.py`, `.claude/skills/mtg-lab/SKILL.md`
+| Area | Where |
+| --- | --- |
+| Cost parsing, castability solver, colour identity | `mana.py` |
+| Scryfall bulk ingest, DuckDB schema, price history | `cards/db.py` |
+| Deck file format and YAML round-trip | `decks/model.py` |
+| The gate | `decks/validate.py` |
+| Companion restrictions, Partner/Background pairings | `decks/companion.py`, `decks/partners.py` |
+| Macro category counts vs bracket targets | `decks/analyze.py` |
+| Deck + corpus to SimCards | `sim/compile.py` |
+| Monte Carlo, mulligan policies, land sweeps | `sim/tier1/engine.py` |
+| The five deliverables | `artifacts/generate.py` |
+| Local app: HTTP API, background sim jobs, React UI | `api/`, `web/` |
+| Paths, environment overrides | `config.py` |
 
-Not built yet — roadmap below.
+Two decks fail the gate on one card each — Goreclaw runs Primeval Titan and
+Atla Palani runs Emrakul, the Aeons Torn, both banned in Commander. That is
+the gate working, not a defect.
+
+Not built: the Tier 2 pod simulator, the deck tier list that depends on it,
+card-level spoiler scanning, and deal-watching or cart generation.
 
 ## Roadmap
 
-**Phase 2 — decks in, corpus wired.** Migrate the five existing decks into
-`deck.yaml` files, validate each against the real corpus, regenerate all
-artifacts. Expect the gate to find things.
-
-**Phase 3 — Tier 2 pod simulator.** Policy-profile compiler, archetype agents,
-round-robin, Elo-style ranking, matchup matrix. Delivers the deck tier list.
-
-**Phase 4 — shopping and deal-watching.** Daily price snapshots (cron), a
-`deals` command flagging cards below their trailing median, cheapest-printing
-selection, Mass Entry cart generation. *Hard boundary: never enters payment
-details or completes a purchase.*
-
-**Phase 5 — spoiler scanning.** Pull unreleased set codes from Scryfall
-previews, score each new card against every deck (identity legal? tag match?
-beats a current slot?). Next targets: Reality Fracture (Oct 2), Mystery
-Booster: Commander Edition (Nov 9), Star Trek (Nov 13).
-
-**Phase 6 — the local UI.** FastAPI + React, Scryfall art. Board-state manager
-plus Claude in an opponent seat, reasoning over the board as JSON — *not* a
-rules engine. Building a real one is what took Forge and XMage a decade each.
-
-**Phase 7 — Tier 3 Forge bridge.** deck.yaml → `.dck` export, batch sim runner,
-result parser.
+**[ROADMAP.md](ROADMAP.md) is the plan** — original goals mapped to what
+actually works, plus the open decisions. It is kept current; this file only
+summarises. **[docs/HOSTING.md](docs/HOSTING.md)** covers deploying a shared
+instance: auth, per-user data, measured compute costs and a Fly.io setup guide.
 
 ## Sharing this
 

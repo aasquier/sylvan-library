@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from mtglab.cli import enters_tapped, fetches_lands
+from mtglab.sim.compile import compile_deck, enters_tapped, fetches_lands
 
 # ------------------------------------------------------------- enters tapped
 
@@ -106,7 +106,6 @@ class _Rec:
 def test_qty_is_expanded_into_the_library():
     """The bug: basics carry qty 8-16 and compile_one ran once per ENTRY, so a
     99-card deck simulated as ~83 cards with far too few lands."""
-    from mtglab.cli import _sim_cards
     from mtglab.decks.model import CardEntry, Deck
 
     deck = Deck(slug="t", name="T", commander=["Cmd"], cards=[
@@ -120,7 +119,7 @@ def test_qty_is_expanded_into_the_library():
         "Swamp": _Rec("Swamp", "Basic Land — Swamp", None, "", ("B",)),
         "Sol Ring": _Rec("Sol Ring", "Artifact", "{1}", "", ("C",)),
     }
-    library, commander = _sim_cards(deck, corpus)
+    library, commander = compile_deck(deck, corpus)
     assert len(library) == 17, len(library)
     assert sum(1 for c in library if c.is_land) == 16
     assert commander is not None
@@ -129,7 +128,6 @@ def test_qty_is_expanded_into_the_library():
 def test_instants_do_not_become_permanent_mana_sources():
     """Scryfall reports produced_mana for Treasure-makers like Deadly Dispute.
     Casting one must not leave a mana source on the battlefield."""
-    from mtglab.cli import _sim_cards
     from mtglab.decks.model import CardEntry, Deck
 
     deck = Deck(slug="t", name="T", commander=["Cmd"], cards=[
@@ -140,7 +138,7 @@ def test_instants_do_not_become_permanent_mana_sources():
         "Deadly Dispute": _Rec("Deadly Dispute", "Instant", "{1}{B}", "",
                                ("W", "U", "B", "R", "G")),
     }
-    library, _ = _sim_cards(deck, corpus)
+    library, _ = compile_deck(deck, corpus)
     assert library[0].produces == ()
     assert not library[0].is_ramp
 

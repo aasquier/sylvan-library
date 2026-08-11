@@ -49,10 +49,10 @@ surface, for a feature friends have not asked for. Revisit if they do.
 
 These are needed before any deployment works at all:
 
-1. **Paths are hardcoded and relative.** `cli.py` has `DECKS_DIR = Path("decks")`
-   and `DB_PATH = DATA_DIR / "mtg.duckdb"`. In a container the volume lives at
-   `/data`, so these need environment overrides — `MTGLAB_DATA_DIR` and
-   `MTGLAB_DECKS_DIR`, defaulting to today's values so local use is unchanged.
+1. ~~**Paths are hardcoded and relative.**~~ **Done.** `config.py` reads
+   `MTGLAB_DATA_DIR` and `MTGLAB_DECKS_DIR`, defaulting to `data/` and
+   `decks/` so local use is unchanged. The `fly.toml` below sets both, and the
+   same change is what made the CLI testable against a scratch directory.
 2. **A user/session/deck store.** SQLite, on the volume. Details in §2.
 3. **Auth middleware and a user-scoped query layer.** Details in §1.
 
@@ -247,19 +247,29 @@ objects and must never open the corpus themselves.
 
 ### The DuckDB locking rule, because it will bite you
 
-The lock is held by the **process**, not the connection. I verified this: 12
-simultaneous requests against `/api/decks` all returned 200, because
-single-worker uvicorn serves sync endpoints from a threadpool inside one
-process, and DuckDB is happy with many connections from one process.
+The write lock is held by the **process**, not the connection, and DuckDB
+allows exactly one writer. Two things follow, and an earlier draft of this
+document got the second one wrong.
 
-The consequence for deployment: **do not run `uvicorn --workers 2` or higher**
-with the corpus as it stands. `db.connect()` unconditionally executes the
-schema DDL, so every connection is read-write and therefore process-exclusive.
-A second worker will fail to open the file.
+**Reads are fine, including across processes.** The API opens the corpus with
+`read_only=True` in `service._connect()`, and read-only handles share happily:
+verified with four separate processes querying the corpus simultaneously, all
+succeeding. Within one process it is fine too — 12 concurrent requests against
+`/api/decks` all returned 200, because single-worker uvicorn serves sync
+endpoints from a threadpool. **`uvicorn --workers 2+` is therefore fine for
+serving**, contrary to what this section previously claimed.
 
-Either keep one worker (entirely adequate at this load — the threadpool handles
-concurrency) or add a read-only connection mode for serving and reserve the
-read-write path for `data refresh`.
+**Writes are exclusive, and that is the real constraint.** `db.connect()` —
+the CLI path — executes schema DDL, so it opens read-write and takes the
+exclusive lock. While `mtglab data refresh` is running, nothing else can open
+the corpus read-write, and `service._connect()` deliberately swallows the
+failure and returns `None` so the app degrades to "no corpus" rather than
+500ing every request. Expect a refresh to make card lookups briefly
+unavailable; that is by design, not a bug to fix.
+
+The rule that does still bind: **sim pool workers must receive already-compiled
+`SimCard` objects** rather than opening the corpus themselves, since each new
+process would otherwise contend for a handle it does not need.
 
 ### Should you rewrite the simulator in Rust or Go?
 

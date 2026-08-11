@@ -25,16 +25,32 @@ those are not reachable — widen the environment's access level first, or run
 
 ```
 src/mtglab/
+  config.py               where decks and the corpus live; env-overridable
   mana.py                 cost parsing + castability solver
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema
   decks/validate.py       the gate
+  decks/companion.py      companion deckbuilding restrictions
+  decks/partners.py       Partner / Background / Doctor pairings
+  decks/analyze.py        macro category counts vs bracket targets
+  sim/compile.py          deck.yaml + corpus -> SimCards
   sim/tier1/engine.py     Monte Carlo goldfish
   artifacts/generate.py   the five deliverables
+  api/                    FastAPI app, services, background sim jobs
+  web_dist/               built frontend, committed so `mtglab ui` needs no Node
   cli.py
+web/                      frontend source (React + Vite)
 decks/<slug>/deck.yaml    SOURCE OF TRUTH
 decks/<slug>/artifacts/   GENERATED — never edit by hand
 ```
+
+Layering: `api/` must not import from `cli.py`. Anything both need lives in
+`config.py` or the relevant package — that rule is why `deck_paths` and the
+deck compiler are where they are.
+
+Paths come from `config.py` and honour `MTGLAB_DATA_DIR` and
+`MTGLAB_DECKS_DIR`, defaulting to `data/` and `decks/`. Tests point them at a
+scratch directory with `config.use_paths()`; never reassign the globals.
 
 Keep `mana.py` and `sim/` dependency-light (stdlib + numpy). DuckDB stays
 behind `cards/db.py`. That boundary is what keeps the simulation core fast to
@@ -141,6 +157,12 @@ only), Atla Palani dinosaurs (Naya), Goreclaw mono-green stompy (bracket 4),
 Tivit (Esper cEDH, bracket 5), Gyome food (Golgari, bracket 4), and Trostani
 tokens (Selesnya — an older token deck retooled into this list).
 
-Only Gyome is migrated into `deck.yaml` so far. Source markdown for the rest
-lives in `~/Downloads`; take the highest-numbered file per deck. `ROADMAP.md`
-tracks which is which.
+All six are migrated into `decks/<slug>/deck.yaml`, which is now the only
+source of truth — the original markdown in `~/Downloads` is historical and
+should not be edited or re-imported. `ROADMAP.md` records what the migration
+turned up.
+
+Two decks currently fail the gate on one card each, deliberately and not as a
+bug to route around: **Goreclaw** runs Primeval Titan and **Atla Palani** runs
+Emrakul, the Aeons Torn, both banned in Commander. Picking the replacement is
+the user's call.

@@ -182,6 +182,68 @@ def test_failed_job_reports_the_error_rather_than_hanging(client):
     assert current["error"]
 
 
+def test_land_sweep_returns_a_row_per_count_and_reports_the_spread(client):
+    """The sweep is the command that actually decides a land count, and it was
+    entirely untested. The spread matters as much as the winner: Gyome's curve
+    was flat to 0.07 across 30-40, and reading the argmax of that is reading
+    noise."""
+    if not client.get("/api/health").json()["corpus"]:
+        pytest.skip("no corpus available")
+
+    submitted = client.post("/api/sim/lands",
+                            json={"slug": "gyome-food", "low": 32, "high": 34,
+                                  "games": 200, "seed": 1}).json()
+    body = await_job(client, submitted["id"])
+    assert body["status"] == "done", body.get("error")
+    result = body["result"]
+
+    assert [r["lands"] for r in result["rows"]] == [32, 33, 34]
+    for row in result["rows"]:
+        assert 0.0 <= row["commander_by_t5"] <= 1.0
+        assert 0.0 <= row["mulligan_rate"] <= 1.0
+        assert row["spells_through_t8"] >= 0
+    # A flat curve must be reported as flat rather than leaving the caller to
+    # read the argmax of noise.
+    assert result["deployment_spread"] >= 0
+    assert isinstance(result["flat"], bool)
+    assert result["flat"] == (result["deployment_spread"] < 0.25)
+    assert result["argmax_lands"] in [r["lands"] for r in result["rows"]]
+    assert result["caveat"], "Tier 1 numbers must ship with their caveat"
+
+
+def test_land_sweep_normalises_a_reversed_range(client):
+    """low/high the wrong way round should sweep, not return nothing."""
+    if not client.get("/api/health").json()["corpus"]:
+        pytest.skip("no corpus available")
+
+    submitted = client.post("/api/sim/lands",
+                            json={"slug": "gyome-food", "low": 34, "high": 32,
+                                  "games": 200, "seed": 1}).json()
+    body = await_job(client, submitted["id"])
+    assert body["status"] == "done", body.get("error")
+    assert [r["lands"] for r in body["result"]["rows"]] == [32, 33, 34]
+
+
+def test_sim_payload_bounds_are_clamped_not_rejected(client):
+    """An absurd game count should be pulled into range rather than 500."""
+    if not client.get("/api/health").json()["corpus"]:
+        pytest.skip("no corpus available")
+
+    submitted = client.post("/api/sim/mana",
+                            json={"slug": "gyome-food", "games": 1,
+                                  "turns": 99, "seed": 1}).json()
+    body = await_job(client, submitted["id"])
+    assert body["status"] == "done", body.get("error")
+    assert body["result"]["games"] >= 100, "games floor"
+    assert len(body["result"]["by_turn"]) <= 20, "turns ceiling"
+
+
+def test_keep_rule_uses_documented_defaults():
+    from mtglab.api.simruns import _keep_rule
+    rule = _keep_rule({})
+    assert (rule.min_lands, rule.max_lands) == (2, 5)
+
+
 def test_unknown_job_is_404(client):
     assert client.get("/api/jobs/deadbeef").status_code == 404
 

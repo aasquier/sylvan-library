@@ -27,7 +27,19 @@ jobs:
       - name: API test dependencies must be present
         run: python -c "import fastapi, httpx"
 
-      - run: pytest -q
+      # Run under coverage rather than bare pytest. `fail_under` in
+      # pyproject.toml is a floor, not a target: it makes a large regression
+      # loud without failing the build over ordinary churn. Coverage is
+      # reported on one interpreter only -- the numbers are identical across
+      # both, and printing them twice just makes the log harder to read.
+      - name: Tests
+        run: |
+          if [ "${{ matrix.python-version }}" = "3.12" ]; then
+            coverage run -m pytest -q && coverage report
+          else
+            pytest -q
+          fi
+
       - run: ruff check src tests
 
   frontend:
