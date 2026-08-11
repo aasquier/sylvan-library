@@ -29,6 +29,7 @@ src/mtglab/
   mana.py                 cost parsing + castability solver
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema
+  decks/source.py         DeckSource protocol; file-backed and in-memory
   decks/validate.py       the gate
   decks/companion.py      companion deckbuilding restrictions
   decks/partners.py       Partner / Background / Doctor pairings
@@ -47,6 +48,11 @@ decks/<slug>/artifacts/   GENERATED — never edit by hand
 Layering: `api/` must not import from `cli.py`. Anything both need lives in
 `config.py` or the relevant package — that rule is why `deck_paths` and the
 deck compiler are where they are.
+
+Deck-facing endpoints never read the filesystem. They take a `DeckSource` from
+the request scope (`api/deps.py`), so a second deck tier is one dependency to
+swap rather than thirteen handlers to edit. A `DeckSource` is a **locator, not
+a connection**: background jobs capture one and outlive the request.
 
 Paths come from `config.py` and honour `MTGLAB_DATA_DIR` and
 `MTGLAB_DECKS_DIR`, defaulting to `data/` and `decks/`. Tests point them at a

@@ -404,9 +404,9 @@ exist partly so that when it happens it is additive.
 2. ~~**ADRs for the decisions already made.**~~ **Done 2026-08-10** — ten of
    them in [`docs/adr/`](adr/README.md); see §6. Writing them caught a
    three-way contradiction about corpus refresh.
-3. **A `DeckSource` abstraction and a request scope.** Four call sites and one
-   dependency. Makes the API testable against an in-memory source now, and
-   makes user decks additive later.
+3. ~~**A `DeckSource` abstraction and a request scope.**~~ **Done 2026-08-10** —
+   `decks/source.py` and `api/deps.py`. Every deck-facing route now takes the
+   request scope, and the API is tested against an in-memory source.
 4. **Frontend tests** (Vitest on the job-polling state machine and the
    filters, which are the only pieces with real logic).
 5. **Container hardening** — multi-stage, non-root, multi-arch, scanned,
@@ -450,23 +450,40 @@ codebase needs nothing.
 
 **Worth doing now, because it is cheap now and invasive later:**
 
-1. **A deck source abstraction.** The API reads the filesystem directly in
-   exactly four places (`service.py`: the health count, `_load_deck`, and the
-   library listing). Hosting's two-tier model keeps the curated decks
-   file-backed *permanently* and adds user decks from SQLite — so a
-   `DeckSource` protocol with a `FileDeckSource` implementation is not
-   scaffolding, it is the shape the system ends up with. Adding
-   `SqlDeckSource` later becomes additive instead of touching every endpoint.
-   It also makes the API testable against an in-memory source, which serves
-   the near-term testing goal on its own.
+1. ~~**A deck source abstraction.**~~ **Built 2026-08-10** —
+   `decks/source.py`. A `DeckSource` protocol with three methods (`slugs`,
+   `get`, `all`), a `FileDeckSource` and a `MemoryDeckSource`. It is not
+   scaffolding: hosting's two-tier model keeps the curated decks file-backed
+   *permanently* and adds user decks from SQLite, so this is the shape the
+   system ends up with, and `SqlDeckSource` is now additive rather than a
+   change to every endpoint.
 
-2. **A request scope, even with one implementation.** Nothing models "who is
-   asking". Six of thirteen endpoints are deck-scoped. Introducing a single
-   FastAPI dependency that yields the caller's deck source — returning the
-   file-backed library for now — means auth later swaps *one* implementation
-   rather than rewriting handlers. `docs/HOSTING.md` §1 already requires all
-   user-scoped queries to go through one accessor for isolation; this is that
-   accessor, built before it has anything to isolate.
+   `slugs()` is separate from `all()` on purpose — `/api/health` wants a count,
+   and parsing every deck to produce it is silly now and worse later. It also
+   means one unreadable deck file cannot take the health endpoint down.
+
+   One constraint the protocol carries, and future implementations must
+   respect: **a `DeckSource` is a locator, not a connection.** Background
+   simulation jobs capture one and outlive their request by minutes, so a SQL
+   source opens and closes per call rather than holding a handle.
+
+2. ~~**A request scope, even with one implementation.**~~ **Built
+   2026-08-10** — `api/deps.py`, one dependency, wired into every deck-facing
+   route as a single `Decks` annotation. It returns the curated file-backed
+   library today; when auth arrives it reads the session and returns a source
+   that unions the curated decks with the caller's, and no handler changes.
+   `docs/HOSTING.md` §1 requires all user-scoped queries to go through one
+   accessor for isolation; this is that accessor, built before it has anything
+   to isolate, which is the only time it is cheap.
+
+   Deliberately *not* built: a `UserScope`. There is no session and no user
+   table, and a one-field object modelling a user that does not exist is
+   guessing at a shape rather than preparing for one.
+
+   The payoff arrived immediately rather than at hosting time: `/api/decks`
+   against an empty library is now a two-line test instead of a filesystem
+   fixture, and there is a test that the endpoints read the scope rather than
+   the filesystem at all.
 
 **Accepted, not oversights:**
 
