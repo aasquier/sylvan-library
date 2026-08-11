@@ -24,6 +24,7 @@ from mtglab.decks.source import (
     DeckSource,
     FileDeckSource,
     MemoryDeckSource,
+    ReadOnlySource,
 )
 
 DECK_YAML = """\
@@ -139,6 +140,56 @@ def test_both_implementations_satisfy_the_protocol(source):
     test double is a source without pretending to be one."""
     assert isinstance(source, DeckSource)
 
+
+
+# ------------------------------------------------------------- raw text
+#
+# Edits are surgical, so a source has to hand back the bytes rather than a
+# parsed deck. See decks/edit.py for why.
+
+def test_file_source_round_trips_raw_text(decks_root):
+    source = FileDeckSource(decks_root)
+    text = source.read_text("mini")
+    assert text.startswith("slug: mini")
+
+    source.write_text("mini", text.replace("Mini Deck", "Renamed Deck"))
+    assert source.get("mini").name == "Renamed Deck"
+    assert "Renamed Deck" in (decks_root / "mini" / "deck.yaml").read_text()
+
+
+def test_file_source_text_operations_need_a_real_deck(decks_root):
+    source = FileDeckSource(decks_root)
+    with pytest.raises(DeckNotFound):
+        source.read_text("absent")
+    with pytest.raises(DeckNotFound):
+        source.write_text("absent", "slug: absent\n")
+
+
+def test_memory_source_round_trips_raw_text(decks_root):
+    deck = Deck.load(decks_root / "mini" / "deck.yaml")
+    source = MemoryDeckSource([deck])
+    text = source.read_text("mini")
+    assert "slug: mini" in text
+
+    source.write_text("mini", text.replace("Mini Deck", "Renamed"))
+    assert source.get("mini").name == "Renamed"
+    assert "Renamed" in source.read_text("mini")
+
+
+def test_memory_source_will_not_write_an_unknown_deck(decks_root):
+    with pytest.raises(DeckNotFound):
+        MemoryDeckSource().write_text("mini", "slug: mini\n")
+
+
+def test_a_read_only_source_refuses_writes(decks_root):
+    """What the hosted model needs: curated decks stay read-only for anyone
+    but the maintainer, refused in one place rather than per endpoint."""
+    deck = Deck.load(decks_root / "mini" / "deck.yaml")
+    source = MemoryDeckSource([deck], writable=False)
+    assert source.writable is False
+    assert FileDeckSource(decks_root).writable is True
+    with pytest.raises(ReadOnlySource):
+        source.write_text("mini", "slug: mini\n")
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

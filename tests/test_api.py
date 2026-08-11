@@ -273,6 +273,10 @@ def test_a_swap_keeps_the_slot_and_records_the_given_why(swappable):
         assert card["category"] == "threat", "the slot it filled should carry over"
 
 
+# Split by what each refusal needs. The first group is checked before the
+# corpus is even opened, so it runs on a fresh clone -- which is where most of
+# these mistakes actually get made.
+
 @pytest.mark.parametrize(("payload", "expected"), [
     ({"out": "Primeval Titan", "into": "Cultivator Colossus", "why": "  "},
      "needs a `why`"),
@@ -280,6 +284,17 @@ def test_a_swap_keeps_the_slot_and_records_the_given_why(swappable):
      "not in this deck"),
     ({"out": "Primeval Titan", "into": "Sol Ring", "why": "x"},
      "already in this deck"),
+    ({"out": "Primeval Titan", "into": "Goreclaw, Terror of Qal Sisma", "why": "x"},
+     "is the commander"),
+])
+def test_a_swap_refused_on_the_deck_alone_needs_no_corpus(swappable, payload, expected):
+    with swappable as client:
+        resp = client.post("/api/decks/goreclaw-stompy/swap", json=payload)
+        assert resp.status_code == 422, resp.text
+        assert expected in resp.json()["detail"]
+
+
+@pytest.mark.parametrize(("payload", "expected"), [
     ({"out": "Primeval Titan", "into": "Not A Real Card At All", "why": "x"},
      "corpus knows"),
     ({"out": "Primeval Titan", "into": "Rhystic Study", "why": "x"},
@@ -287,13 +302,27 @@ def test_a_swap_keeps_the_slot_and_records_the_given_why(swappable):
     ({"out": "Primeval Titan", "into": "Black Lotus", "why": "x"},
      "not legal in Commander"),
 ])
-def test_a_bad_swap_is_refused_with_a_reason(swappable, payload, expected):
+def test_a_swap_refused_on_a_card_fact_is_looked_up(swappable, payload, expected):
     with swappable as client:
         if not client.get("/api/health").json()["corpus"]:
             pytest.skip("no corpus available")
         resp = client.post("/api/decks/goreclaw-stompy/swap", json=payload)
         assert resp.status_code == 422, resp.text
         assert expected in resp.json()["detail"]
+
+
+def test_a_swap_without_a_corpus_says_so_rather_than_guessing(swappable):
+    """Legality and colour identity are card facts, and CLAUDE.md rule 1 says
+    those are looked up. With no corpus there is nothing to look them up in, so
+    the swap is refused rather than waved through."""
+    with swappable as client:
+        if client.get("/api/health").json()["corpus"]:
+            pytest.skip("this is the fresh-clone path")
+        resp = client.post("/api/decks/goreclaw-stompy/swap", json={
+            "out": "Primeval Titan", "into": "Cultivator Colossus",
+            "why": "A real rationale."})
+        assert resp.status_code == 422
+        assert "corpus" in resp.json()["detail"]
 
 
 def test_a_refused_swap_changes_nothing(swappable):
