@@ -79,6 +79,11 @@ def create_app(*, dev: bool = False) -> FastAPI:
     def deck_stats(slug: str, decks: Decks) -> dict[str, Any]:
         return service.stats_for(slug, source=decks)
 
+    @app.get("/api/decks/{slug}/suggestions")
+    def deck_suggestions(slug: str, decks: Decks,
+                         limit: int = Query(5, ge=1, le=20)) -> dict[str, Any]:
+        return service.suggestions_for(slug, source=decks, limit=limit)
+
     # ------------------------------------------------------------ cards
 
     @app.get("/api/cards/search")

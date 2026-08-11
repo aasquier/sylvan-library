@@ -141,6 +141,35 @@ export interface LandResult {
   caveat: string
 }
 
+export interface SuggestionCandidate {
+  name: string
+  mana_cost: string | null
+  cmc: number
+  type_line: string
+  oracle_text: string
+  color_identity: string[]
+  image: string | null
+  art_crop: string | null
+  edhrec_rank: number | null
+  /** Weighted similarity to the card being replaced, not a quality judgement. */
+  score: number
+  /** What actually scored, so the number can be argued with. */
+  reasons: string[]
+}
+
+export interface SuggestionTarget {
+  card: string
+  code: string
+  why: string
+  candidates: SuggestionCandidate[]
+}
+
+export interface Suggestions {
+  slug: string
+  corpus_available: boolean
+  targets: SuggestionTarget[]
+}
+
 export interface Job {
   id: string
   kind: string
@@ -214,6 +243,8 @@ export const api = {
   deck: (slug: string) => get<DeckDetail>(`/api/decks/${slug}`),
   validate: (slug: string) => get<ValidationReport>(`/api/decks/${slug}/validate`),
   stats: (slug: string) => get<DeckStats>(`/api/decks/${slug}/stats`),
+  suggestions: (slug: string) =>
+    get<Suggestions>(`/api/decks/${slug}/suggestions`),
   upcomingSets: () => get<{ sets: UpcomingSet[]; as_of: string }>('/api/sets/upcoming'),
   searchCards: (params: Record<string, string | number>) => {
     const qs = new URLSearchParams()

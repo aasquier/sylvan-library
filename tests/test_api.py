@@ -127,6 +127,56 @@ def test_stats_are_json_serialisable(client):
     assert isinstance(body["categories"], list)
 
 
+def test_suggestions_are_offered_for_a_banned_card(client):
+    """Goreclaw runs Primeval Titan, which is banned. The endpoint should name
+    the offender and shortlist legal cards that resemble it."""
+    if not client.get("/api/health").json()["corpus"]:
+        pytest.skip("no corpus available")
+
+    body = client.get("/api/decks/goreclaw-stompy/suggestions").json()
+    assert body["corpus_available"] is True
+    targets = {t["card"]: t for t in body["targets"]}
+    assert "Primeval Titan" in targets, body
+
+    target = targets["Primeval Titan"]
+    assert target["code"] == "banned"
+    assert target["why"], "the slot's rationale is what makes a suggestion legible"
+    assert target["candidates"], "a banned card with no shortlist helps nobody"
+
+    for candidate in target["candidates"]:
+        # Mono-green deck: anything outside {G} is not a legal suggestion.
+        assert set(candidate["color_identity"]) <= {"G"}, candidate["name"]
+        assert candidate["reasons"], "a score with no reason is not a suggestion"
+        assert 0.0 <= candidate["score"] <= 1.2
+
+
+def test_suggestions_never_include_the_card_being_replaced(client):
+    if not client.get("/api/health").json()["corpus"]:
+        pytest.skip("no corpus available")
+    body = client.get("/api/decks/goreclaw-stompy/suggestions").json()
+    for target in body["targets"]:
+        names = {c["name"] for c in target["candidates"]}
+        assert target["card"] not in names
+
+
+def test_a_clean_deck_has_nothing_to_suggest(client):
+    """The endpoint answers "what would fix the gate", so a deck the gate
+    passes must return an empty list rather than unsolicited upgrades."""
+    if not client.get("/api/health").json()["corpus"]:
+        pytest.skip("no corpus available")
+    body = client.get("/api/decks/gyome-food/suggestions").json()
+    assert body["targets"] == []
+
+
+def test_suggestions_for_a_missing_deck_are_a_404(client):
+    assert client.get("/api/decks/nope/suggestions").status_code == 404
+
+
+def test_suggestion_limit_is_bounded(client):
+    assert client.get("/api/decks/goreclaw-stompy/suggestions",
+                      params={"limit": 999}).status_code == 422
+
+
 # ------------------------------------------------- decks, from elsewhere
 #
 # The point of the deck source seam (ADR 4): the endpoints read whatever the

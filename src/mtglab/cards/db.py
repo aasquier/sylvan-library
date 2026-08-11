@@ -333,6 +333,9 @@ class CardRecord:
     # apart from a transforming permanent (you cast the front; the back only
     # ever arrives by flipping).
     layout: str = "normal"
+    # Scryfall's own keyword list (Trample, Flying, Landfall...). Authoritative,
+    # and far cheaper than trying to recover keywords from oracle text.
+    keywords: tuple[str, ...] = ()
 
     @property
     def is_land(self) -> bool:
@@ -368,12 +371,13 @@ def _to_record(row: Sequence[Any]) -> CardRecord:
         reserved=bool(row[7]), edhrec_rank=row[9], image_normal=row[10],
         image_art_crop=row[11] if len(row) > 11 else None,
         layout=(row[12] if len(row) > 12 else None) or "normal",
+        keywords=tuple(row[13] or ()) if len(row) > 13 else (),
     )
 
 
 _SELECT = """SELECT name, mana_cost, cmc, type_line, oracle_text, color_identity,
                     produced_mana, reserved, legalities, edhrec_rank,
-                    image_normal, image_art_crop, layout
+                    image_normal, image_art_crop, layout, keywords
              FROM oracle_cards"""
 
 
@@ -423,11 +427,19 @@ def get_cards(con, names: Iterable[str]) -> dict[str, CardRecord]:
     return out
 
 
-def search(con, where: str, params: Sequence[Any] = (), limit: int = 100) -> list[CardRecord]:
+def search(con, where: str, params: Sequence[Any] = (), limit: int = 100,
+           order_by: str | None = None) -> list[CardRecord]:
     """Escape hatch for ad-hoc corpus queries, e.g.
 
         search(con, "oracle_text ILIKE ? AND list_contains(color_identity,'G')",
                ['%create a Food token%'])
+
+    `order_by` matters more than it looks: without it a LIMIT returns an
+    arbitrary slice of the matches, which is fine for "show me some" and wrong
+    for anything that then ranks what it got back.
     """
-    rows = con.execute(f"{_SELECT} WHERE {where} LIMIT {int(limit)}", list(params)).fetchall()
+    ordering = f" ORDER BY {order_by}" if order_by else ""
+    rows = con.execute(
+        f"{_SELECT} WHERE {where}{ordering} LIMIT {int(limit)}", list(params),
+    ).fetchall()
     return [_to_record(r) for r in rows]

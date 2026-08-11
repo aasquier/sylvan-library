@@ -15,6 +15,7 @@ from typing import Any
 
 from mtglab.cards import db
 from mtglab.config import DB_PATH
+from mtglab.decks import suggest
 from mtglab.decks.analyze import deck_stats
 from mtglab.decks.model import Deck
 from mtglab.decks.source import DeckSource, FileDeckSource
@@ -207,6 +208,54 @@ def validate_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, A
     finally:
         if con is not None:
             con.close()
+
+
+def suggestions_for(slug: str, *, source: DeckSource | None = None,
+                    limit: int = 5) -> dict[str, Any]:
+    """Replacement shortlists for the cards the gate says have to go.
+
+    Only for errors a different card would actually fix -- a missing `why` is a
+    real error, and swapping the card does not resolve it.
+
+    Deliberately reports rather than resolves. ADR 8 rejected auto-substitution
+    on the grounds that a tool which quietly swaps cards is one whose output you
+    can no longer trust to be your deck, and that has not changed because the
+    suggestions got good.
+    """
+    deck = _source(source).get(slug)
+    con = _connect()
+    if con is None:
+        return {"slug": slug, "corpus_available": False, "targets": []}
+    try:
+        cards = _corpus_for(deck, con)
+        rep = validate(deck, cards)
+        fixable = [(i.card, i.code) for i in rep.errors
+                   if i.card and i.code in ("banned", "color-identity")]
+
+        targets = []
+        for name, code in fixable:
+            candidates = suggest.replacements_for(deck, cards, con, name, limit=limit)
+            targets.append({
+                "card": name,
+                "code": code,
+                "why": next((c.why for c in deck.cards if c.name == name), ""),
+                "candidates": [{
+                    "name": c.name,
+                    "mana_cost": c.record.mana_cost,
+                    "cmc": c.record.cmc,
+                    "type_line": c.record.type_line,
+                    "oracle_text": c.record.oracle_text,
+                    "color_identity": sorted(c.record.color_identity),
+                    "image": c.record.image_normal,
+                    "art_crop": c.record.image_art_crop,
+                    "edhrec_rank": c.record.edhrec_rank,
+                    "score": c.score,
+                    "reasons": list(c.reasons),
+                } for c in candidates],
+            })
+        return {"slug": slug, "corpus_available": True, "targets": targets}
+    finally:
+        con.close()
 
 
 def stats_for(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:

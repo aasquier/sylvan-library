@@ -283,6 +283,20 @@ oxlint, Recharts. The gaps are testing and interaction, not framework choice.
   precisely as clean as the four decks that pass. Fixed with a `not checked`
   badge, and pinned by the test that caught it.
 
+- **Replacement suggestions, added 2026-08-10.** `decks/suggest.py` scores
+  similarity to a card being removed and `mtglab decks suggest` / the deck
+  page's validation tab surface a shortlist. Scoring is pure over
+  `CardRecord`s, so 17 tests cover it without a database; only the pool query
+  touches DuckDB. It reports and never edits, which is
+  [ADR 8](adr/0008-the-gate-blocks.md) held rather than revisited.
+
+  The honest limitation, recorded because the top of a ranked list reads like
+  an answer: similarity is not quality. It ranks Regal Behemoth above
+  Cultivator Colossus for Goreclaw's Primeval Titan slot purely on a one-mana
+  curve difference, where Colossus is the closer fit. The fix for that is a
+  human reading five candidates, not weights tuned until one deck comes out
+  right.
+
 - **A four-colour deck would render as "WUBR".** Found while testing
   `identityName`: the four-colour names (Yore-Tiller, Glint-Eye, Dune-Brood,
   Ink-Treader, Witch-Maw) are not in the table. Latent — none of the six
