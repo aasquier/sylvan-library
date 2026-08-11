@@ -30,6 +30,7 @@ src/mtglab/
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema
   decks/source.py         DeckSource protocol; file-backed and in-memory
+  decks/suggest.py        similarity scorer -> replacement shortlists
   decks/validate.py       the gate
   decks/companion.py      companion deckbuilding restrictions
   decks/partners.py       Partner / Background / Doctor pairings
@@ -101,6 +102,7 @@ real identity is a targeting list.
 
 ```bash
 mtglab decks validate <slug>      # gate — fix errors before anything else
+mtglab decks suggest <slug>       # shortlist replacements for what it flagged
 mtglab sim mana <slug>            # baseline consistency
 mtglab sim lands <slug> 30 40     # is the land count right?
 git commit -am "before refactor"  # so swaps.md has something to diff

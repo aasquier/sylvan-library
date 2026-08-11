@@ -57,8 +57,12 @@ function shownNames(): string[] {
 }
 
 beforeEach(() => {
-  vi.mocked(api.decks).mockResolvedValue(DECKS)
-  vi.mocked(api.health).mockResolvedValue(HEALTHY)
+  // Reset, not merely re-stub: a `vi.fn()` from a mock factory is module-level
+  // state that outlives the test, so call history accumulates. Nothing here
+  // asserts a call count today, and this is what stops the first test that
+  // does from being mystifying.
+  vi.mocked(api.decks).mockReset().mockResolvedValue(DECKS)
+  vi.mocked(api.health).mockReset().mockResolvedValue(HEALTHY)
 })
 
 // Explicit, because Testing Library only registers auto-cleanup when the test

@@ -16,7 +16,7 @@ Status keys: **done** · **partial** · **not started**
 | Macro categories covered | **done** | `decks/analyze.py` — counts vs bracket targets |
 | Colour identity confirmation | **done** | `decks/validate.py`, from Scryfall `color_identity` |
 | Deep hits from all of Magic | **partial** | `mtglab ui` card search queries all 35k oracle cards; no "suggest for this deck" scoring yet |
-| Best-in-slot alternatives | **not started** | needs a similarity/upgrade scorer |
+| Best-in-slot alternatives | **partial** | `decks/suggest.py` scores similarity; `mtglab decks suggest <slug>` and `GET /api/decks/{slug}/suggestions`. Aimed at the gate's offenders; `--card` points it anywhere |
 | Upcoming spoilers for new decks | **partial** | `GET /api/sets/upcoming` is live; no card-level scan |
 | Frugal alternatives | **partial** | price data loaded, shown in search; no "cheaper equivalent" logic |
 | Pod simulation of real games | **not started** | Tier 2 |
@@ -106,6 +106,26 @@ Both confirmed against Scryfall `legalities.commander`, on a corpus current to
 Until a replacement is picked, both decks sit at 99 cards with one illegal
 slot and the gate blocks artifact generation. This is the gate working, not a
 bug to route around.
+
+**There is now a shortlist to argue with.** `mtglab decks suggest <slug>`, and
+the same thing under the error on the deck page's validation tab, ranks legal
+cards by measurable similarity to the one being removed — card type, mana
+value, Scryfall's keywords, oracle text, with EDHREC rank only as a tiebreak.
+It reports; it never edits. The decision is still yours, which is
+[ADR 8](docs/adr/0008-the-gate-blocks.md) unchanged.
+
+What it currently surfaces, for the record:
+
+- **Goreclaw / Primeval Titan** — Regal Behemoth, **Cultivator Colossus**,
+  Soul of the Harvest, Earthshaker Dreadmaw, Gruff Triplets.
+- **Atla Palani / Emrakul, the Aeons Torn** — Earthquake Dragon,
+  **Emrakul, the Promised End**, Autochthon Wurm, Draco.
+
+Worth knowing before trusting the order: the scorer ranked Regal Behemoth above
+Cultivator Colossus purely because mana value 7 vs 6 costs it on the curve
+term, and Colossus is the closer fit to "fetches lands". Similarity is not
+quality, the top of the list is not the answer, and tuning the weights until
+one deck's preferred card comes first would be overfitting to a sample of one.
 
 ### What the migration turned up
 

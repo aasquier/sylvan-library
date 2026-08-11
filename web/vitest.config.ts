@@ -13,6 +13,9 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
+    // Restores spies created with `vi.spyOn`. It does NOT reach a bare
+    // `vi.fn()` inside a `vi.mock` factory -- that is module-level state which
+    // survives between tests -- so those are reset explicitly in `beforeEach`.
     restoreMocks: true,
   },
 })

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   api,
   type Card,
   type DeckDetail as Deck,
   type DeckStats,
+  type Suggestions,
   type ValidationReport,
 } from '../lib/api'
 import { categoryLabel, identityName, percent } from '../lib/mtg'
@@ -26,6 +27,8 @@ export default function DeckDetail() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('cards')
   const [groupBy, setGroupBy] = useState('category')
+  const [suggestions, setSuggestions] = useState<Suggestions | null>(null)
+  const requested = useRef<string | null>(null)
 
   useEffect(() => {
     setDeck(null)
@@ -37,7 +40,22 @@ export default function DeckDetail() {
         setReport(v)
       })
       .catch((e) => setError(String(e.message ?? e)))
+    setSuggestions(null)
+    requested.current = null
   }, [slug])
+
+  // Lazily, and only for the tab that shows them: building a shortlist means a
+  // pool query per offending card, which is real work to do on a page most
+  // visits never scroll to. A deck that passes the gate returns immediately.
+  //
+  // The ref, not the state, is what makes this one request. Guarding on
+  // `suggestions` looks equivalent and is not: it stays null until the response
+  // lands, so switching tabs twice in that window fires the query again.
+  useEffect(() => {
+    if (tab !== 'validation' || requested.current === slug) return
+    requested.current = slug
+    api.suggestions(slug).then(setSuggestions).catch(() => setSuggestions(null))
+  }, [tab, slug])
 
   const groups = useMemo(() => {
     if (!deck) return []
@@ -162,18 +180,31 @@ export default function DeckDetail() {
               <ul className="space-y-1">
                 {cards.map((card) => (
                   <li key={card.name}
-                      className="card-surface flex gap-3 rounded-lg px-3 py-2">
+                      className="card-surface flex items-center gap-3 rounded-lg p-2">
+                    {/* The art crop, not the full card: at this size a whole
+                        card scan is an unreadable smudge, while the art alone
+                        is what the eye actually recognises a card by. Hover
+                        still gives the full card for the text. */}
                     <CardHover card={card}>
-                      <span className="cursor-help text-sm font-medium underline decoration-dotted underline-offset-2">
-                        {card.qty > 1 && <span className="tabular mr-1">{card.qty}×</span>}
-                        {card.name}
-                      </span>
+                      <CardArt src={card.art_crop} alt={card.name}
+                               ratio="aspect-[626/457]"
+                               className="w-16 shrink-0 cursor-help" />
                     </CardHover>
-                    <ManaCost cost={card.mana_cost} />
-                    <p className="ml-auto max-w-[62%] text-right text-xs leading-relaxed"
-                       style={{ color: 'var(--text-secondary)' }}>
-                      {card.why}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline gap-2">
+                        <CardHover card={card}>
+                          <span className="cursor-help text-sm font-medium">
+                            {card.qty > 1 && <span className="tabular mr-1">{card.qty}×</span>}
+                            {card.name}
+                          </span>
+                        </CardHover>
+                        <ManaCost cost={card.mana_cost} />
+                      </div>
+                      <p className="mt-0.5 text-xs leading-relaxed"
+                         style={{ color: 'var(--text-secondary)' }}>
+                        {card.why}
+                      </p>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -238,17 +269,54 @@ export default function DeckDetail() {
               rationale, and the deck is the right size.
             </div>
           )}
-          {report.errors.map((issue, i) => (
-            <div key={i} className="rounded-lg px-4 py-3 text-sm"
-                 style={{
-                   background: 'color-mix(in srgb, var(--status-critical) 10%, transparent)',
-                   border: '1px solid color-mix(in srgb, var(--status-critical) 35%, transparent)',
-                 }}>
-              <Badge tone="critical">{issue.code}</Badge>{' '}
-              {issue.card && <strong>{issue.card}: </strong>}
-              {issue.message}
-            </div>
-          ))}
+          {report.errors.map((issue, i) => {
+            const shortlist = suggestions?.targets.find((t) => t.card === issue.card)
+            return (
+              <div key={i} className="space-y-3 rounded-lg px-4 py-3 text-sm"
+                   style={{
+                     background: 'color-mix(in srgb, var(--status-critical) 10%, transparent)',
+                     border: '1px solid color-mix(in srgb, var(--status-critical) 35%, transparent)',
+                   }}>
+                <div>
+                  <Badge tone="critical">{issue.code}</Badge>{' '}
+                  {issue.card && <strong>{issue.card}: </strong>}
+                  {issue.message}
+                </div>
+
+                {shortlist && shortlist.candidates.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      Legal cards that most resemble it, by type, mana value,
+                      keywords and oracle text — with EDHREC rank only as a
+                      tiebreak. <strong>A shortlist to argue with, not a
+                      recommendation:</strong> the choice is yours, and nothing
+                      here edits the deck.
+                    </p>
+                    <ul className="space-y-1">
+                      {shortlist.candidates.map((c) => (
+                        <li key={c.name}
+                            className="flex items-center gap-3 rounded-lg p-2"
+                            style={{ background: 'var(--surface-1)' }}>
+                          <CardArt src={c.art_crop} alt={c.name}
+                                   ratio="aspect-[626/457]" className="w-16 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-sm font-medium">{c.name}</span>
+                              <ManaCost cost={c.mana_cost} />
+                            </div>
+                            <p className="mt-0.5 text-xs leading-relaxed"
+                               style={{ color: 'var(--text-muted)' }}>
+                              {c.reasons.join(' · ')}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )
+          })}
           {report.warnings.map((issue, i) => (
             <div key={i} className="rounded-lg px-4 py-3 text-sm"
                  style={{

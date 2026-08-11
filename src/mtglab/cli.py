@@ -107,6 +107,61 @@ def cmd_decks_validate(args):
     sys.exit(1 if rep.errors else 0)
 
 
+def cmd_decks_suggest(args):
+    """Shortlist replacements for a card that has to leave the deck.
+
+    Informational, so it exits 0 even when the deck is broken. `decks validate`
+    is the gate; this is the thing you run afterwards to get unstuck.
+    """
+    from mtglab.cards import db
+    from mtglab.decks import suggest
+    from mtglab.decks.validate import validate
+
+    deck = _load(args.slug)
+    if not config.DB_PATH.exists():
+        sys.exit("suggestions need the card corpus -- run `mtglab data refresh`")
+
+    con = db.connect(config.DB_PATH)
+    names = deck.commander + [c.name for c in deck.cards] + \
+        [c.name for c in deck.swap_board]
+    cards = db.get_cards(con, names)
+
+    if args.card:
+        targets = [(args.card, "asked for")]
+    else:
+        rep = validate(deck, cards)
+        # Only the errors a different card would actually fix. A missing `why`
+        # is a real error and swapping the card does not resolve it.
+        targets = [(i.card, i.code) for i in rep.errors
+                   if i.card and i.code in ("banned", "color-identity")]
+
+    if not targets:
+        print(f"{deck.slug}: nothing to replace -- the gate reports no card "
+              "that a swap would fix.")
+        return
+
+    print("Ranked by measurable similarity to the card being replaced -- type, "
+          "mana value,\nkeywords, oracle text, then EDHREC rank as a tiebreak. "
+          "This is a shortlist to\nargue with, not a recommendation; the choice "
+          "is yours.\n")
+
+    for name, code in targets:
+        why = next((c.why for c in deck.cards if c.name == name), "")
+        header = f"  {name} ({code})"
+        print(header if not why else f"{header} — {why.strip()}")
+
+        candidates = suggest.replacements_for(deck, cards, con, name,
+                                              limit=args.limit)
+        if not candidates:
+            print("      no candidates -- the corpus does not know this card.\n")
+            continue
+        for i, cand in enumerate(candidates, 1):
+            cost = cand.record.mana_cost or ""
+            print(f"    {i}. {cand.name:<32} {cost:<14} {cand.score:.2f}")
+            print(f"       {' · '.join(cand.reasons)}")
+        print()
+
+
 def cmd_decks_build(args):
     from mtglab.artifacts.generate import write_all
     from mtglab.decks.validate import validate
@@ -246,6 +301,10 @@ def main(argv=None):
     decks.add_parser("list").set_defaults(func=cmd_decks_list)
     v = decks.add_parser("validate"); v.add_argument("slug")
     v.set_defaults(func=cmd_decks_validate)
+    g = decks.add_parser("suggest"); g.add_argument("slug")
+    g.add_argument("--card", help="replace this card, instead of the gate's offenders")
+    g.add_argument("--limit", type=int, default=5)
+    g.set_defaults(func=cmd_decks_suggest)
     b = decks.add_parser("build"); b.add_argument("slug")
     b.add_argument("--against", help="path to a previous deck.yaml, to emit swaps.md")
     b.add_argument("--force", action="store_true")
