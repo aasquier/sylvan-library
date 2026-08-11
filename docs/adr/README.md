@@ -24,6 +24,7 @@ they differ.
 | [8](0008-the-gate-blocks.md) | The gate blocks, and an unevaluated rule warns rather than passing | Accepted |
 | [9](0009-commit-the-built-frontend-bundle.md) | Commit the built frontend bundle | Accepted |
 | [10](0010-correctness-against-independent-oracles.md) | Correctness is established against independent oracles | Accepted |
+| [11](0011-the-api-may-apply-a-swap.md) | The API may apply a swap the user has decided on | Accepted |
 
 **Proposed** means the decision is made and argued but nothing implements it
 yet — 4 and 5 both describe a deployment that does not exist.

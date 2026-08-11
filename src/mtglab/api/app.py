@@ -79,6 +79,26 @@ def create_app(*, dev: bool = False) -> FastAPI:
     def deck_stats(slug: str, decks: Decks) -> dict[str, Any]:
         return service.stats_for(slug, source=decks)
 
+    @app.post("/api/decks/{slug}/swap")
+    def swap_card(slug: str, payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
+        """Carry out a swap the caller has already decided on.
+
+        A write endpoint on an otherwise read-only API, so it is narrow on
+        purpose: one card out, one card in, a rationale the caller supplies,
+        and a re-run of the gate in the response. It cannot add, delete or
+        reorder anything.
+        """
+        try:
+            return service.swap_card(
+                slug,
+                out=str(payload.get("out", "")),
+                into=str(payload.get("into", "")),
+                why=str(payload.get("why", "")),
+                source=decks,
+            )
+        except service.SwapRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     @app.get("/api/decks/{slug}/suggestions")
     def deck_suggestions(slug: str, decks: Decks,
                          limit: int = Query(5, ge=1, le=20)) -> dict[str, Any]:

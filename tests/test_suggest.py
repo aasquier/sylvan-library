@@ -191,6 +191,77 @@ def test_scores_stay_inside_their_documented_range():
     assert 0.0 <= perfect.score <= 1.10
 
 
+
+# ------------------------------------------------- the pool and the wiring
+#
+# `candidate_pool` is the only part that touches DuckDB. A fake connection
+# keeps these runnable without a corpus, which is the property that lets the
+# whole suite run on a fresh clone.
+
+class FakeCon:
+    """Records the SQL it was handed and replays canned rows."""
+
+    def __init__(self, rows=()):
+        self.rows = list(rows)
+        self.sql = ""
+        self.params: list = []
+
+    def execute(self, sql, params=None):
+        self.sql, self.params = sql, list(params or [])
+        return self
+
+    def fetchall(self):
+        return self.rows
+
+
+def row(name, *, cmc=6.0, identity=("G",), type_line="Creature — Beast"):
+    """One row in `_SELECT` column order."""
+    return (name, "{4}{G}{G}", cmc, type_line, "", list(identity), [], False,
+            '{"commander": "legal"}', 100, None, None, "normal", ["Trample"])
+
+
+def test_candidate_pool_filters_to_the_commanders_identity():
+    con = FakeCon([row("Regal Force")])
+    suggest.candidate_pool(con, TITAN, frozenset({"G", "W"}))
+    assert "'G', 'W'" in con.sql
+    assert "commander" in con.sql and "legal" in con.sql
+
+
+def test_candidate_pool_windows_the_mana_value_and_matches_the_type():
+    con = FakeCon([])
+    suggest.candidate_pool(con, TITAN, frozenset({"G"}))
+    assert con.params[:2] == [4.0, 8.0]      # cmc 6, plus or minus two
+    assert "%Creature%" in con.params
+
+
+def test_candidate_pool_orders_before_it_limits():
+    """Without an ORDER BY, a LIMIT returns an arbitrary slice of the matches
+    and the ranking then scores whatever it happened to get."""
+    con = FakeCon([])
+    suggest.candidate_pool(con, TITAN, frozenset({"G"}))
+    assert con.sql.index("ORDER BY") < con.sql.index("LIMIT")
+
+
+def test_replacements_for_excludes_what_the_deck_already_runs(monkeypatch):
+    from mtglab.decks.model import CardEntry, Deck
+
+    deck = Deck(slug="d", name="D", commander=["Goreclaw, Terror of Qal Sisma"],
+                cards=[CardEntry(name="Primeval Titan", category="threat",
+                                 why="Ramp and threat in one card."),
+                       CardEntry(name="Regal Force", category="threat", why="x")])
+    cards = {"Primeval Titan": TITAN, "Regal Force": card("Regal Force"),
+             "Goreclaw, Terror of Qal Sisma": card("Goreclaw, Terror of Qal Sisma")}
+    monkeypatch.setattr(suggest, "candidate_pool",
+                        lambda *a, **k: [card("Regal Force"), card("Fresh Face")])
+
+    names = [c.name for c in suggest.replacements_for(deck, cards, None, "Primeval Titan")]
+    assert names == ["Fresh Face"], "a card already in the 99 is not a suggestion"
+
+
+def test_replacements_for_is_empty_when_the_corpus_does_not_know_the_card():
+    from mtglab.decks.model import Deck
+    assert suggest.replacements_for(Deck(slug="d", name="D"), {}, None, "Nothing") == []
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

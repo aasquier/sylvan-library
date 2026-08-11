@@ -162,6 +162,31 @@ def cmd_decks_suggest(args):
         print()
 
 
+def cmd_decks_swap(args):
+    """Apply a swap the user has already decided on.
+
+    Shares its implementation with the API rather than duplicating it, so the
+    terminal and the app can never disagree about what a swap does.
+    """
+    from mtglab.api import service
+
+    try:
+        result = service.swap_card(args.slug, out=args.out, into=getattr(args, "in"),
+                                   why=args.why)
+    except service.SwapRejected as exc:
+        sys.exit(f"refused: {exc}")
+
+    print(f"  {result['swapped_out']}  ->  {result['swapped_in']}")
+    print(f"\n  gate: {len(result['errors'])} error(s), "
+          f"{len(result['warnings'])} warning(s)")
+    for issue in result["errors"] + result["warnings"]:
+        card = f"[{issue['card']}] " if issue["card"] else ""
+        print(f"    {issue['code']}: {card}{issue['message']}")
+    print("\n  deck.yaml is the source of truth and its history is git history:\n"
+          "  commit this, then `mtglab decks build` --against the previous "
+          "revision for swaps.md.")
+
+
 def cmd_decks_build(args):
     from mtglab.artifacts.generate import write_all
     from mtglab.decks.validate import validate
@@ -305,6 +330,12 @@ def main(argv=None):
     g.add_argument("--card", help="replace this card, instead of the gate's offenders")
     g.add_argument("--limit", type=int, default=5)
     g.set_defaults(func=cmd_decks_suggest)
+    w = decks.add_parser("swap"); w.add_argument("slug")
+    w.add_argument("--out", required=True, help="the card leaving the deck")
+    w.add_argument("--in", required=True, dest="in", help="the card replacing it")
+    w.add_argument("--why", required=True,
+                   help="why the new card earns the slot; the gate requires one")
+    w.set_defaults(func=cmd_decks_swap)
     b = decks.add_parser("build"); b.add_argument("slug")
     b.add_argument("--against", help="path to a previous deck.yaml, to emit swaps.md")
     b.add_argument("--force", action="store_true")

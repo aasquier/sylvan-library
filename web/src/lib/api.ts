@@ -170,6 +170,16 @@ export interface Suggestions {
   targets: SuggestionTarget[]
 }
 
+export interface SwapResult {
+  slug: string
+  swapped_out: string
+  swapped_in: string
+  why: string
+  ok: boolean
+  errors: Issue[]
+  warnings: Issue[]
+}
+
 export interface Job {
   id: string
   kind: string
@@ -255,6 +265,8 @@ export const api = {
       `/api/cards/search?${qs}`,
     )
   },
+  swapCard: (slug: string, body: { out: string; into: string; why: string }) =>
+    post<SwapResult>(`/api/decks/${slug}/swap`, body),
   simMana: (payload: Record<string, unknown>) => post<Job>('/api/sim/mana', payload),
   simLands: (payload: Record<string, unknown>) => post<Job>('/api/sim/lands', payload),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),

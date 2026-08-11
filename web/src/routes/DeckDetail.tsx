@@ -29,6 +29,34 @@ export default function DeckDetail() {
   const [groupBy, setGroupBy] = useState('category')
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null)
   const requested = useRef<string | null>(null)
+  // The card the user is proposing to swap in, and the rationale they are
+  // writing for it. Null means no swap is being composed.
+  const [swapping, setSwapping] = useState<{ out: string; into: string } | null>(null)
+  const [swapWhy, setSwapWhy] = useState('')
+  const [swapError, setSwapError] = useState<string | null>(null)
+  const [swapBusy, setSwapBusy] = useState(false)
+
+  async function applySwap() {
+    if (!swapping || !swapWhy.trim()) return
+    setSwapBusy(true)
+    setSwapError(null)
+    try {
+      await api.swapCard(slug, { ...swapping, why: swapWhy.trim() })
+      // Re-read everything the swap invalidates: the list, the gate, and the
+      // shortlist, which should now be empty for this card.
+      const [d, v] = await Promise.all([api.deck(slug), api.validate(slug)])
+      setDeck(d)
+      setReport(v)
+      requested.current = null
+      setSuggestions(null)
+      setSwapping(null)
+      setSwapWhy('')
+    } catch (e: any) {
+      setSwapError(String(e.message ?? e))
+    } finally {
+      setSwapBusy(false)
+    }
+  }
 
   useEffect(() => {
     setDeck(null)
@@ -297,8 +325,14 @@ export default function DeckDetail() {
                         <li key={c.name}
                             className="flex items-center gap-3 rounded-lg p-2"
                             style={{ background: 'var(--surface-1)' }}>
-                          <CardArt src={c.art_crop} alt={c.name}
-                                   ratio="aspect-[626/457]" className="w-16 shrink-0" />
+                          {/* Same affordance as the decklist: the art is what
+                              you recognise, the full card is what you need to
+                              read before accepting a suggestion. */}
+                          <CardHover card={{ name: c.name, image: c.image }}>
+                            <CardArt src={c.art_crop} alt={c.name}
+                                     ratio="aspect-[626/457]"
+                                     className="w-16 shrink-0 cursor-help" />
+                          </CardHover>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-baseline gap-2">
                               <span className="text-sm font-medium">{c.name}</span>
@@ -309,9 +343,60 @@ export default function DeckDetail() {
                               {c.reasons.join(' · ')}
                             </p>
                           </div>
+                          <button
+                            onClick={() => {
+                              setSwapping({ out: shortlist.card, into: c.name })
+                              setSwapWhy('')
+                              setSwapError(null)
+                            }}
+                            className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
+                            style={{ background: 'var(--gridline)',
+                                     color: 'var(--text-primary)' }}>
+                            Use this card
+                          </button>
                         </li>
                       ))}
                     </ul>
+
+                    {swapping?.out === shortlist.card && (
+                      <div className="space-y-2 rounded-lg p-3"
+                           style={{ background: 'var(--surface-1)' }}>
+                        <p className="text-xs font-medium">
+                          Swap {swapping.out} → {swapping.into}
+                        </p>
+                        {/* Rule 4: every card carries a rationale, and one
+                            written by the tool is exactly the empty
+                            justification that rule exists to prevent. So the
+                            button stays disabled until a human writes one. */}
+                        <textarea
+                          value={swapWhy}
+                          onChange={(e) => setSwapWhy(e.target.value)}
+                          rows={3}
+                          placeholder="Why does this card earn the slot? Required — the gate will not accept a card without a rationale."
+                          className="w-full rounded-md px-2 py-1.5 text-xs outline-none focus:ring-2"
+                          style={{ background: 'var(--surface-2, var(--gridline))',
+                                   color: 'var(--text-primary)',
+                                   border: '1px solid var(--hairline)' }}
+                        />
+                        {swapError && <ErrorNote>{swapError}</ErrorNote>}
+                        <div className="flex items-center gap-2">
+                          <button onClick={applySwap}
+                                  disabled={!swapWhy.trim() || swapBusy}
+                                  className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                                  style={{ background: 'var(--series-1)', color: '#fff' }}>
+                            {swapBusy ? 'Swapping…' : 'Apply swap'}
+                          </button>
+                          <button onClick={() => setSwapping(null)}
+                                  className="text-xs underline"
+                                  style={{ color: 'var(--text-muted)' }}>
+                            Cancel
+                          </button>
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            Writes deck.yaml. Commit it — deck history is git history.
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

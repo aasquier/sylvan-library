@@ -187,10 +187,17 @@ def test_suggestion_limit_is_bounded(client):
 
 @pytest.fixture
 def in_memory_client():
-    """The app, serving exactly the decks a test puts in front of it."""
+    """The app, serving exactly the decks a test puts in front of it.
+
+    The source is built once and handed back on every request, not constructed
+    per call. For a file-backed source that distinction is invisible because
+    the state is on disk; for this one the instance *is* the store, so a fresh
+    one per request would quietly discard every write.
+    """
     def make(decks):
+        source = MemoryDeckSource(decks)
         app = create_app()
-        app.dependency_overrides[deck_source] = lambda: MemoryDeckSource(decks)
+        app.dependency_overrides[deck_source] = lambda: source
         return TestClient(app)
     return make
 
@@ -213,6 +220,135 @@ def test_the_request_scope_does_not_leak_into_the_public_schema(client):
     paths = schema.json()["paths"]
     assert [p["name"] for p in paths["/api/decks"]["get"].get("parameters", [])] == []
     assert [p["name"] for p in paths["/api/decks/{slug}"]["get"]["parameters"]] == ["slug"]
+
+
+# ------------------------------------------------------------------ swaps
+#
+# Every one of these runs against an in-memory source. A test that wrote to
+# decks/ would be editing the repository's own source of truth, and the seam
+# exists precisely so it does not have to.
+
+@pytest.fixture
+def swappable(in_memory_client):
+    """The real Goreclaw list, held in memory so writes go nowhere."""
+    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
+    return in_memory_client([deck])
+
+
+def test_a_swap_replaces_the_card_and_clears_the_gate(swappable):
+    with swappable as client:
+        if not client.get("/api/health").json()["corpus"]:
+            pytest.skip("no corpus available")
+        before = client.get("/api/decks/goreclaw-stompy/validate").json()
+        assert any(i["card"] == "Primeval Titan" for i in before["errors"])
+
+        resp = client.post("/api/decks/goreclaw-stompy/swap", json={
+            "out": "Primeval Titan", "into": "Cultivator Colossus",
+            "why": "Trample body that puts lands onto the battlefield; ramp and "
+                   "threat in one card, same as the slot it replaces.",
+        })
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert (body["swapped_out"], body["swapped_in"]) == \
+            ("Primeval Titan", "Cultivator Colossus")
+        assert body["ok"] is True and body["errors"] == []
+
+        # ...and the deck itself now reflects it.
+        names = {c["name"] for c in client.get("/api/decks/goreclaw-stompy").json()["cards"]}
+        assert "Cultivator Colossus" in names
+        assert "Primeval Titan" not in names
+
+
+def test_a_swap_keeps_the_slot_and_records_the_given_why(swappable):
+    with swappable as client:
+        if not client.get("/api/health").json()["corpus"]:
+            pytest.skip("no corpus available")
+        client.post("/api/decks/goreclaw-stompy/swap", json={
+            "out": "Primeval Titan", "into": "Cultivator Colossus",
+            "why": "A rationale a human wrote.",
+        })
+        card = next(c for c in client.get("/api/decks/goreclaw-stompy").json()["cards"]
+                    if c["name"] == "Cultivator Colossus")
+        assert card["why"] == "A rationale a human wrote."
+        assert card["category"] == "threat", "the slot it filled should carry over"
+
+
+# Split by what each refusal needs. The first group is checked before the
+# corpus is even opened, so it runs on a fresh clone -- which is where most of
+# these mistakes actually get made.
+
+@pytest.mark.parametrize(("payload", "expected"), [
+    ({"out": "Primeval Titan", "into": "Cultivator Colossus", "why": "  "},
+     "needs a `why`"),
+    ({"out": "Not In Deck", "into": "Cultivator Colossus", "why": "x"},
+     "not in this deck"),
+    ({"out": "Primeval Titan", "into": "Sol Ring", "why": "x"},
+     "already in this deck"),
+    ({"out": "Primeval Titan", "into": "Goreclaw, Terror of Qal Sisma", "why": "x"},
+     "is the commander"),
+])
+def test_a_swap_refused_on_the_deck_alone_needs_no_corpus(swappable, payload, expected):
+    with swappable as client:
+        resp = client.post("/api/decks/goreclaw-stompy/swap", json=payload)
+        assert resp.status_code == 422, resp.text
+        assert expected in resp.json()["detail"]
+
+
+@pytest.mark.parametrize(("payload", "expected"), [
+    ({"out": "Primeval Titan", "into": "Not A Real Card At All", "why": "x"},
+     "corpus knows"),
+    ({"out": "Primeval Titan", "into": "Rhystic Study", "why": "x"},
+     "outside the commander's"),
+    ({"out": "Primeval Titan", "into": "Black Lotus", "why": "x"},
+     "not legal in Commander"),
+])
+def test_a_swap_refused_on_a_card_fact_is_looked_up(swappable, payload, expected):
+    with swappable as client:
+        if not client.get("/api/health").json()["corpus"]:
+            pytest.skip("no corpus available")
+        resp = client.post("/api/decks/goreclaw-stompy/swap", json=payload)
+        assert resp.status_code == 422, resp.text
+        assert expected in resp.json()["detail"]
+
+
+def test_a_swap_without_a_corpus_says_so_rather_than_guessing(swappable):
+    """Legality and colour identity are card facts, and CLAUDE.md rule 1 says
+    those are looked up. With no corpus there is nothing to look them up in, so
+    the swap is refused rather than waved through."""
+    with swappable as client:
+        if client.get("/api/health").json()["corpus"]:
+            pytest.skip("this is the fresh-clone path")
+        resp = client.post("/api/decks/goreclaw-stompy/swap", json={
+            "out": "Primeval Titan", "into": "Cultivator Colossus",
+            "why": "A real rationale."})
+        assert resp.status_code == 422
+        assert "corpus" in resp.json()["detail"]
+
+
+def test_a_refused_swap_changes_nothing(swappable):
+    """The check that matters most: a rejection must not leave the deck half
+    edited."""
+    with swappable as client:
+        if not client.get("/api/health").json()["corpus"]:
+            pytest.skip("no corpus available")
+        before = client.get("/api/decks/goreclaw-stompy").json()["cards"]
+        client.post("/api/decks/goreclaw-stompy/swap", json={
+            "out": "Primeval Titan", "into": "Rhystic Study", "why": "no"})
+        assert client.get("/api/decks/goreclaw-stompy").json()["cards"] == before
+
+
+def test_a_read_only_source_refuses_every_swap():
+    """What the hosted two-tier model needs: curated decks stay read-only for
+    someone who is not the maintainer, checked in one place."""
+    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
+    app = create_app()
+    app.dependency_overrides[deck_source] = \
+        lambda: MemoryDeckSource([deck], writable=False)
+    with TestClient(app) as client:
+        resp = client.post("/api/decks/goreclaw-stompy/swap", json={
+            "out": "Primeval Titan", "into": "Cultivator Colossus", "why": "x"})
+        assert resp.status_code == 422
+        assert "read-only" in resp.json()["detail"]
 
 
 def test_an_empty_library_is_empty_rather_than_broken(in_memory_client):
