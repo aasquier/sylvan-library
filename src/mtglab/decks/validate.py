@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from mtglab.decks import companion
 from mtglab.decks.model import CATEGORIES, Deck
 
 SINGLETON_EXEMPT = {
@@ -74,9 +75,19 @@ def validate(deck: Deck, cards: dict | None = None, *,
     if not deck.commander:
         rep.add("error", "no-commander", "deck has no commander")
 
+    # Yorion is the one companion that changes how big the deck must be
+    # ("at least twenty cards more than the minimum deck size"), so the size
+    # check has to know about it or a legal Yorion deck fails here. Keyed by
+    # name because this runs before the corpus is consulted, and because deck
+    # size is a property of the deck rather than a judgement about a card.
+    bonus = companion.DECK_SIZE_BONUS.get((deck.companion or "").lower(), 0)
+    expected_size += bonus
+
     if deck.total_cards != expected_size:
+        because = f" (+{bonus} for {deck.companion})" if bonus else ""
         rep.add("error", "deck-size",
-                f"deck has {deck.total_cards} cards in the 99, expected {expected_size}")
+                f"deck has {deck.total_cards} cards in the 99, "
+                f"expected {expected_size}{because}")
 
     seen: dict[str, int] = {}
     for card in deck.cards:
@@ -153,12 +164,70 @@ def validate(deck: Deck, cards: dict | None = None, *,
 
     # ---- companion ------------------------------------------------------
     if deck.companion:
-        rec = cards.get(deck.companion)
-        if rec and "companion" not in (rec.oracle_text or "").lower():
-            rep.add("error", "not-a-companion",
-                    "listed as companion but has no Companion ability", deck.companion)
+        _check_companion(deck, cards, identity if cmd_records else None, rep)
 
     return rep
+
+
+def _check_companion(deck: Deck, cards: dict,
+                     identity: frozenset[str] | None,
+                     rep: ValidationReport) -> None:
+    """Validate the companion itself and its deckbuilding restriction.
+
+    Previously this confirmed the card had a Companion ability and stopped, so
+    the restriction -- the entire reason a companion costs you anything -- went
+    unchecked, as did the companion's own legality and colour identity.
+    """
+    name = deck.companion
+    rec = cards.get(name)
+    if rec is None:
+        return                      # already reported as unknown-card above
+
+    if not companion.is_companion(rec):
+        rep.add("error", "not-a-companion",
+                "listed as companion but has no Companion ability", name)
+        return
+
+    if not rec.legal_commander:
+        rep.add("error", "companion-banned",
+                "not legal in Commander, so it cannot be your companion", name)
+
+    if identity is not None:
+        illegal = rec.color_identity - identity
+        if illegal:
+            rep.add("error", "companion-color-identity",
+                    f"identity {{{''.join(sorted(rec.color_identity))}}} includes "
+                    f"{{{''.join(sorted(illegal))}}}, outside the commander's "
+                    f"{{{''.join(sorted(identity)) or 'C'}}}", name)
+
+    if name.lower() in (c.name.lower() for c in deck.cards):
+        rep.add("error", "companion-in-99",
+                "the companion sits outside the 100, not in the deck", name)
+
+    # "Your starting deck" includes the commander, and excludes the companion.
+    entries = [(c.name, cards[c.name]) for c in deck.cards if c.name in cards]
+    entries += [(n, cards[n]) for n in deck.commander if n in cards]
+
+    result = companion.check(name, entries, cards)
+    if result.unsupported:
+        # Never report a restriction as satisfied when it was never evaluated.
+        rep.add("warn", "companion-unchecked",
+                f"deckbuilding restriction was NOT verified -- "
+                f"{result.unsupported}. Condition: {result.condition or 'unknown'}",
+                name)
+        return
+
+    if result.violations:
+        shown = ", ".join(sorted(result.violations)[:6])
+        more = len(result.violations) - 6
+        if more > 0:
+            shown += f", and {more} more"
+        level = "error" if result.exact else "warn"
+        detail = "" if result.exact else " (heuristic check -- verify by hand)"
+        rep.add(level, "companion-restriction",
+                f"{len(result.violations)} card(s) break the companion "
+                f"restriction{detail}: {shown}. Condition: {result.condition}",
+                name)
 
 
 def reserved_list(deck: Deck, cards: dict) -> list[str]:
