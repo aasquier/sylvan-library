@@ -515,6 +515,24 @@ def set_card_field(slug: str, *, name: str, field: str, value: Any,
     return _commit(slug, decks, updated, card=entry.name, field=field)
 
 
+def set_deck_field(slug: str, *, field: str, value: Any,
+                   source: DeckSource | None = None) -> dict[str, Any]:
+    """Change one of the deck's own scalars: stage, status or bracket.
+
+    Promotion -- `stage` to `curated` -- is the one that closes the import
+    lifecycle. It is refused while any card is blank, by the edit layer, so the
+    deck is never written into a state its author has to undo.
+    """
+    decks = _for_writing(source)
+    decks.get(slug)                     # 404 before anything else
+    try:
+        updated = edit.set_deck_field(decks.read_text(slug), field=field,
+                                      value=value)
+    except EditFailed as exc:
+        raise EditRejected(str(exc)) from exc
+    return _commit(slug, decks, updated, field=field, value=value)
+
+
 def set_note(slug: str, *, key: str, value: str,
              source: DeckSource | None = None) -> dict[str, Any]:
     """Set one deck-level note -- the prose the advanced primer reads directly.

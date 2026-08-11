@@ -364,6 +364,49 @@ def test_an_unknown_category_is_refused_before_the_corpus_is_needed(decks):
     assert "is not a category" in msg
 
 
+def test_promote_closes_the_import_lifecycle(decks, capsys):
+    """`decks import` writes a draft; this is how it stops being one, without
+    anybody opening a text editor."""
+    import yaml
+
+    path = decks / "mini" / "deck.yaml"
+    path.write_text(GOOD_DECK.replace("bracket: 4", "bracket: 4\nstage: draft"),
+                    encoding="utf-8")
+    code, msg = run(["decks", "promote", "mini"])
+    assert code == 0, msg
+    assert yaml.safe_load(path.read_text())["stage"] == "curated"
+
+
+def test_promote_is_refused_while_a_card_is_blank_and_names_it(decks):
+    import yaml
+
+    path = decks / "mini" / "deck.yaml"
+    path.write_text(
+        GOOD_DECK.replace("bracket: 4", "bracket: 4\nstage: draft")
+                 .replace("    why: Two mana for one.\n", "    why: ''\n"),
+        encoding="utf-8")
+    code, msg = run(["decks", "promote", "mini"])
+    assert code == 1
+    assert "Sol Ring" in msg
+    assert yaml.safe_load(path.read_text())["stage"] == "draft"
+
+
+def test_set_changes_a_deck_field_when_no_card_is_named(decks):
+    import yaml
+
+    code, msg = run(["decks", "set", "mini", "--status", "built"])
+    assert code == 0, msg
+    assert yaml.safe_load((decks / "mini" / "deck.yaml").read_text())["status"] == "built"
+
+
+def test_set_will_not_mix_a_card_field_with_a_deck_field(decks):
+    code, msg = run(["decks", "set", "mini", "--status", "built",
+                     "--card", "Sol Ring"])
+    assert (code, "not a card's" in msg) == (1, True)
+    code, msg = run(["decks", "set", "mini", "--why", "A reason."])
+    assert (code, "name it with --card" in msg) == (1, True)
+
+
 def test_a_refused_edit_leaves_the_file_untouched(decks):
     before = (decks / "mini" / "deck.yaml").read_text()
     run(["decks", "remove", "mini", "--card", "Black Lotus"])

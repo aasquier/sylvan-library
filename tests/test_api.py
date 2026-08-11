@@ -521,6 +521,51 @@ def test_an_empty_note_is_refused(swappable):
         assert "needs text" in resp.json()["detail"]
 
 
+def test_a_draft_is_promoted_once_every_card_is_justified(in_memory_client):
+    """The last step of an import, and until now the last thing in the whole
+    lifecycle that could only be done in a text editor."""
+    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    deck.stage = "draft"
+    with in_memory_client([deck]) as client:
+        resp = client.patch("/api/decks/gyome-food",
+                            json={"field": "stage", "value": "curated"})
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["stage"] == "curated"
+        assert client.get("/api/decks/gyome-food").json()["stage"] == "curated"
+
+
+def test_promotion_is_refused_while_a_card_is_blank(draft_client):
+    with draft_client as client:
+        client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+                     json={"field": "why", "value": ""})
+        resp = client.patch("/api/decks/goreclaw-stompy",
+                            json={"field": "stage", "value": "curated"})
+        assert resp.status_code == 422
+        assert "Sol Ring" in resp.json()["detail"]
+        # And it stayed a draft rather than landing somewhere in between.
+        assert client.get("/api/decks/goreclaw-stompy").json()["stage"] == "draft"
+
+
+def test_deck_status_and_bracket_are_patchable(swappable):
+    with swappable as client:
+        assert client.patch("/api/decks/goreclaw-stompy",
+                            json={"field": "status",
+                                  "value": "built"}).status_code == 200
+        assert client.patch("/api/decks/goreclaw-stompy",
+                            json={"field": "bracket", "value": 5}).status_code == 200
+        body = client.get("/api/decks/goreclaw-stompy").json()
+        assert (body["status"], body["bracket"]) == ("built", 5)
+
+
+def test_a_field_that_is_not_the_decks_own_is_refused(swappable):
+    with swappable as client:
+        for field in ("name", "commander", "cards"):
+            resp = client.patch("/api/decks/goreclaw-stompy",
+                                json={"field": field, "value": "x"})
+            assert resp.status_code == 422, field
+            assert "not a settable deck field" in resp.json()["detail"]
+
+
 def test_a_refused_edit_changes_nothing(swappable):
     """The whole point of verifying before writing. Every refusal above must
     leave the deck byte-identical, not partly applied."""
@@ -551,6 +596,7 @@ def test_a_read_only_source_refuses_every_edit():
             client.patch(f"{base}/cards/Sol Ring",
                          json={"field": "why", "value": "x"}),
             client.put(f"{base}/notes/mulligan", json={"value": "x"}),
+            client.patch(base, json={"field": "status", "value": "built"}),
         ]
         for resp in responses:
             assert resp.status_code == 422

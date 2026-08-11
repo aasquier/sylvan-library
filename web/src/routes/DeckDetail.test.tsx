@@ -17,7 +17,7 @@ vi.mock('../lib/api', () => ({
   api: {
     deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
     swapCard: vi.fn(), addCard: vi.fn(), removeCard: vi.fn(),
-    setCardField: vi.fn(), setNote: vi.fn(),
+    setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),
   },
 }))
 
@@ -129,7 +129,8 @@ beforeEach(() => {
     errors: [], warnings: [], stage: 'curated', total_cards: 99,
     needs_rationale: 0,
   })
-  for (const fn of [api.addCard, api.removeCard, api.setCardField, api.setNote]) {
+  for (const fn of [api.addCard, api.removeCard, api.setCardField, api.setNote,
+                    api.setDeckField]) {
     vi.mocked(fn).mockReset().mockResolvedValue(EDIT_RESULT)
   }
 })
@@ -283,7 +284,9 @@ describe('DeckDetail validation tab', () => {
     expect(screen.getByText('draft')).toBeTruthy()
     expect(screen.getByText('no rationale yet')).toBeTruthy()
     // And it says how to get out, which the badge alone does not.
-    expect(screen.getByText('stage: curated')).toBeTruthy()
+    expect(screen.getByText(/becomes a promotion you can make here/)).toBeTruthy()
+    // Not yet, though: nothing offers to promote a deck that still owes work.
+    expect(screen.queryByRole('button', { name: /promote/i })).toBeNull()
   })
 })
 
@@ -411,5 +414,58 @@ describe('DeckDetail rationale editor', () => {
     fireEvent.click(within(row).getByRole('button', { name: 'Remove' }))
 
     await screen.findByText(/read-only/)
+  })
+})
+
+/**
+ * Promotion — the last step of an import.
+ *
+ * The button only exists once the work is done, and the server refuses it
+ * anyway if it is not. Both halves matter: the UI should not offer an action
+ * that will be rejected, and it must not be the thing enforcing the rule.
+ */
+describe('DeckDetail promotion', () => {
+  const FINISHED = { ...DRAFT, needs_rationale: 0,
+                     cards: DRAFT.cards.map((c) => ({ ...c, why: 'A reason.' })) } as Deck
+
+  it('offers no promotion while cards still owe a rationale', async () => {
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(screen.queryByRole('button', { name: /promote/i })).toBeNull()
+    expect(screen.getByText(/2 of 3 cards still need/)).toBeTruthy()
+  })
+
+  it('offers promotion once nothing is outstanding', async () => {
+    vi.mocked(api.deck).mockResolvedValue(FINISHED)
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(screen.getByText(/every card carries a rationale/i)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /promote to curated/i }))
+    await waitFor(() => expect(api.setDeckField)
+      .toHaveBeenCalledWith('goreclaw-stompy', 'stage', 'curated'))
+    // And the page re-reads, so the banner goes away on its own.
+    await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows the server refusal rather than assuming it worked', async () => {
+    // The UI hides the button when it knows better, but the rule lives in the
+    // gate. If the two ever disagree, the gate wins and the user is told.
+    vi.mocked(api.deck).mockResolvedValue(FINISHED)
+    vi.mocked(api.setDeckField).mockRejectedValue(
+      new Error('1 card(s) still have no `why` (Sol Ring)'))
+    renderDeck()
+    await screen.findByText(DECK.name)
+    fireEvent.click(screen.getByRole('button', { name: /promote to curated/i }))
+
+    await screen.findByText(/still have no `why`/)
+  })
+
+  it('shows no draft banner at all on a curated deck', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(screen.queryByRole('button', { name: /promote/i })).toBeNull()
+    expect(screen.queryByText(/still need/)).toBeNull()
   })
 })

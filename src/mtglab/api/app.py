@@ -182,6 +182,23 @@ def create_app(*, dev: bool = False) -> FastAPI:
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    @app.patch("/api/decks/{slug}")
+    def set_deck_field(slug: str, payload: dict[str, Any],
+                       decks: Decks) -> dict[str, Any]:
+        """Change one of the deck's own fields: stage, status or bracket.
+
+        `stage` to `curated` is promotion, the last step of an import. It is
+        refused while any card still lacks a rationale, so the deck is never
+        written into a state the gate would immediately reject.
+        """
+        if "value" not in payload:
+            raise HTTPException(status_code=422, detail="value is required")
+        try:
+            return service.set_deck_field(slug, field=str(payload.get("field", "")),
+                                          value=payload["value"], source=decks)
+        except service.EditRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     @app.put("/api/decks/{slug}/notes/{key}")
     def set_note(slug: str, key: str, payload: dict[str, Any],
                  decks: Decks) -> dict[str, Any]:
