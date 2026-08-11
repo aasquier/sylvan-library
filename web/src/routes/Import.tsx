@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, type ImportResult } from '../lib/api'
-import { Badge, ErrorNote, Spinner, TextField } from '../components/ui'
+import { Badge, ErrorNote, ManaText, Spinner, TextField } from '../components/ui'
 
 /**
  * Paste a decklist, see exactly what it resolves to, then create it.
@@ -221,7 +221,7 @@ function Preview({ result, showYaml, onToggleYaml }: {
           {result.errors.map((issue, i) => (
             <li key={i} style={{ color: 'var(--status-critical)' }}>
               <span className="font-medium">{issue.code}</span>
-              {issue.card && <> · {issue.card}</>} — {issue.message}
+              {issue.card && <> · {issue.card}</>} — <ManaText>{issue.message}</ManaText>
             </li>
           ))}
         </ul>

@@ -1,35 +1,82 @@
 import { useEffect, useRef, useState } from 'react'
-import { COLOR_NAMES, COLOR_VAR, manaSymbols } from '../lib/mtg'
+import { COLOR_NAMES, COLOR_VAR, manaSymbols, splitManaText } from '../lib/mtg'
 
 /* ------------------------------------------------------------------ pips */
+
+/** One mana symbol. Shared so a cost and a pip in prose cannot drift apart. */
+function Pip({ sym, size }: { sym: string; size: number }) {
+  const solid = COLOR_VAR[sym]
+  return (
+    <span
+      title={COLOR_NAMES[sym] ?? sym}
+      className="inline-flex items-center justify-center rounded-full align-middle font-semibold text-[#141414]"
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.62,
+        background: solid ?? 'var(--mtg-c)',
+        // A ring keeps adjacent pips from merging into one blob, which is the
+        // 2px surface-gap rule applied to inline marks.
+        boxShadow: '0 0 0 1px var(--hairline)',
+      }}
+    >
+      {sym.replace('/', '')}
+    </span>
+  )
+}
 
 export function ManaCost({ cost, size = 16 }: { cost?: string | null; size?: number }) {
   const symbols = manaSymbols(cost)
   if (!symbols.length) return null
   return (
     <span className="inline-flex items-center gap-[2px] align-middle">
-      {symbols.map((sym, i) => {
-        const solid = COLOR_VAR[sym]
-        return (
-          <span
-            key={i}
-            title={COLOR_NAMES[sym] ?? sym}
-            className="inline-flex items-center justify-center rounded-full font-semibold text-[#141414]"
-            style={{
-              width: size,
-              height: size,
-              fontSize: size * 0.62,
-              background: solid ?? 'var(--mtg-c)',
-              // A ring keeps adjacent pips from merging into one blob, which
-              // is the 2px surface-gap rule applied to inline marks.
-              boxShadow: '0 0 0 1px var(--hairline)',
-            }}
-          >
-            {sym.replace('/', '')}
-          </span>
-        )
-      })}
+      {symbols.map((sym, i) => <Pip key={i} sym={sym} size={size} />)}
     </span>
+  )
+}
+
+/**
+ * Prose with its mana symbols drawn rather than spelled.
+ *
+ * The deck files carry 174 of them across `why`, `strategy` and `notes` — "a
+ * {G}{W} activation" reads as punctuation noise until the pips are pips. The
+ * gate's own messages get it too, which is where it pays best: "identity {GW}
+ * includes {W}, outside the commander's {G}" is the single densest sentence in
+ * the app, and it is the one people have to act on.
+ *
+ * Only recognised symbols are converted. A stray `{note}` stays literal text —
+ * turning arbitrary braces into pips would be the tool asserting something
+ * about prose it did not understand.
+ */
+export function ManaText({ children, size = 13 }: {
+  children?: string | null
+  size?: number
+}) {
+  if (!children) return null
+
+  // Consecutive pips are one cost, so they wrap as a unit. Left as loose
+  // siblings, a line break lands inside {1}{G}{W} and strands the {W} at the
+  // start of the next line, where it reads as a bullet rather than as part of
+  // the cost -- which is what the first render of this actually did.
+  const runs: (string | string[])[] = []
+  for (const part of splitManaText(children)) {
+    const last = runs[runs.length - 1]
+    if (part.pip && Array.isArray(last)) last.push(part.text)
+    else runs.push(part.pip ? [part.text] : part.text)
+  }
+
+  return (
+    <>
+      {runs.map((run, i) =>
+        Array.isArray(run)
+          ? (
+            <span key={i} className="whitespace-nowrap" style={{ marginInline: 1 }}>
+              {run.map((sym, j) => <Pip key={j} sym={sym} size={size} />)}
+            </span>
+            )
+          : <span key={i}>{run}</span>,
+      )}
+    </>
   )
 }
 

@@ -10,8 +10,8 @@ import {
 } from '../lib/api'
 import { categoryLabel, identityName, percent } from '../lib/mtg'
 import {
-  Badge, CardArt, CardHover, Caveat, ColorPips, ErrorNote, ManaCost, Select,
-  Spinner, StatTile,
+  Badge, CardArt, CardHover, Caveat, ColorPips, ErrorNote, ManaCost, ManaText,
+  Select, Spinner, StatTile,
 } from '../components/ui'
 import {
   CategoryCoverage, ColorNeedsChart, CurveChart, DataTable,
@@ -187,7 +187,7 @@ export default function DeckDetail() {
       {deck.strategy && (
         <p className="max-w-3xl text-sm leading-relaxed"
            style={{ color: 'var(--text-secondary)' }}>
-          {deck.strategy}
+          <ManaText>{deck.strategy}</ManaText>
         </p>
       )}
 
@@ -256,7 +256,7 @@ export default function DeckDetail() {
                       {card.why ? (
                         <p className="mt-0.5 text-xs leading-relaxed"
                            style={{ color: 'var(--text-secondary)' }}>
-                          {card.why}
+                          <ManaText>{card.why}</ManaText>
                         </p>
                       ) : (
                         /* Where the draft's outstanding work actually is. The
@@ -343,7 +343,7 @@ export default function DeckDetail() {
                 <div>
                   <Badge tone="critical">{issue.code}</Badge>{' '}
                   {issue.card && <strong>{issue.card}: </strong>}
-                  {issue.message}
+                  <ManaText>{issue.message}</ManaText>
                 </div>
 
                 {shortlist && shortlist.candidates.length > 0 && (
@@ -375,7 +375,7 @@ export default function DeckDetail() {
                             </div>
                             <p className="mt-0.5 text-xs leading-relaxed"
                                style={{ color: 'var(--text-muted)' }}>
-                              {c.reasons.join(' · ')}
+                              <ManaText>{c.reasons.join(' · ')}</ManaText>
                             </p>
                           </div>
                           <button
@@ -445,7 +445,7 @@ export default function DeckDetail() {
                  }}>
               <Badge tone="warning">{issue.code}</Badge>{' '}
               {issue.card && <strong>{issue.card}: </strong>}
-              {issue.message}
+              <ManaText>{issue.message}</ManaText>
             </div>
           ))}
         </div>
@@ -466,7 +466,7 @@ export default function DeckDetail() {
               </h3>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed"
                  style={{ color: 'var(--text-secondary)' }}>
-                {value}
+                <ManaText>{value}</ManaText>
               </p>
             </section>
           ))}

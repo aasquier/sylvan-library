@@ -262,4 +262,58 @@ describe('Library', () => {
     const link = screen.getByText('Import a decklist').closest('a')!
     expect(link.getAttribute('href')).toBe('/import')
   })
+
+  // ------------------------------------------------------------- first run
+  //
+  // "You own nothing yet" and "your filters matched nothing" are different
+  // situations with different exits, and the second one used to answer for
+  // both. Until import existed there was nothing to offer here anyway.
+
+  it('greets an empty library rather than blaming the filters', async () => {
+    vi.mocked(api.decks).mockResolvedValue([])
+    renderLibrary()
+    await waitFor(() => expect(screen.getByText('Nothing on the shelf yet.')).toBeTruthy())
+    expect(screen.queryByText('No decks match those filters.')).toBeNull()
+    expect(screen.getByText(/Sylvan Library/)).toBeTruthy()
+  })
+
+  it('still blames the filters when the library is not empty', async () => {
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    fireEvent.change(screen.getByLabelText('Color'), { target: { value: 'R' } })
+    expect(screen.getByText('No decks match those filters.')).toBeTruthy()
+    expect(screen.queryByText('Nothing on the shelf yet.')).toBeNull()
+  })
+
+  it('hides the decorative art from screen readers', async () => {
+    // It carries no information the heading does not; announcing it is noise.
+    vi.mocked(api.decks).mockResolvedValue([])
+    const { container } = renderLibrary()
+    await waitFor(() => expect(screen.getByText('Nothing on the shelf yet.')).toBeTruthy())
+    const art = container.querySelector('img')!
+    expect(art.getAttribute('alt')).toBe('')
+    expect(art.getAttribute('aria-hidden')).toBe('true')
+  })
+})
+
+// ---------------------------------------------------------------- mana pips
+
+describe('Library mana pips', () => {
+  it('draws the symbols in a strategy blurb instead of spelling them', async () => {
+    vi.mocked(api.decks).mockResolvedValue([
+      // Colourless identity, so the only titled pips on the card are the ones
+      // the strategy produced -- the identity row draws its own otherwise.
+      deck({ slug: 'cats', name: 'Cats', color_identity: [],
+             strategy: 'A {G}{W} deck that wants {1}.' }),
+    ])
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(1))
+    const card = screen.getByText('Cats').closest('a')!
+    expect(card.textContent).toContain('A GW deck that wants 1.')
+    expect(card.textContent).not.toContain('{G}')
+    // Each pip carries the colour's name, which is what makes it readable
+    // without the letter being spelled out in the prose.
+    expect(within(card).getByTitle('Green')).toBeTruthy()
+    expect(within(card).getByTitle('White')).toBeTruthy()
+  })
 })

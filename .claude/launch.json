@@ -15,6 +15,16 @@
         "MTGLAB_DATA_DIR=$(mktemp -d) .venv/bin/mtglab ui --no-open --port 8766"
       ],
       "port": 8766
+    },
+    {
+      "name": "mtglab-ui-empty-library",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "MTGLAB_DECKS_DIR=$(mktemp -d) .venv/bin/mtglab ui --no-open --port 8768"
+      ],
+      "port": 8768
     }
   ]
 }
+

@@ -116,6 +116,54 @@ body {
   border: 1px solid var(--hairline);
 }
 
+/* Full-bleed art behind text, as on the empty library.
+ *
+ * The two themes need genuinely different treatment here, which is why this is
+ * CSS rather than one inline gradient. A scrim tuned for light mode is white
+ * over a painting: it lifts the art and the text sits on it. The same scrim in
+ * dark mode is #0d0d0d over a dark forest painting, and the result is mud --
+ * the art is only a little brighter than the page to begin with, so covering
+ * it removes the last of the difference. Dark mode therefore brightens the art
+ * instead of dimming it, and lets the scrim fall away to nothing on the side
+ * with no text over it.
+ *
+ * Dark is the default and the one most people will use, so it is the one that
+ * has to look right.
+ */
+.hero-art {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    var(--page) 0%,
+    color-mix(in srgb, var(--page) 86%, transparent) 44%,
+    color-mix(in srgb, var(--page) 20%, transparent) 100%
+  );
+}
+
+:root[data-theme='dark'] .hero-art,
+:root:where(:not([data-theme='light'])) .hero-art {
+  filter: brightness(1.75) saturate(1.15);
+}
+
+:root[data-theme='dark'] .hero-scrim,
+:root:where(:not([data-theme='light'])) .hero-scrim {
+  background: linear-gradient(
+    to right,
+    var(--page) 0%,
+    color-mix(in srgb, var(--page) 78%, transparent) 42%,
+    transparent 100%
+  );
+}
+
 /* Card art fades in rather than popping, since a deck view loads ~90 at once. */
 .art-fade {
   opacity: 0;

@@ -65,6 +65,52 @@ export function manaSymbols(cost?: string | null): string[] {
   return Array.from(cost.matchAll(/\{([^}]+)\}/g)).map((m) => m[1])
 }
 
+/**
+ * A mana symbol inside prose. Deliberately narrower than `manaSymbols`, which
+ * runs over a `mana_cost` field where everything between braces is a symbol by
+ * definition. In prose it is not: `{note}` and `{}` are ordinary text, and
+ * drawing them as pips would be the UI claiming to have read something it did
+ * not.
+ *
+ * The alternatives, in order: a generic cost like `{10}`; a hybrid or
+ * Phyrexian symbol like `{G/W}` or `{U/P}`; a run of colour letters; or one of
+ * the standalone symbols X/Y/Z, tap, untap, snow, energy.
+ *
+ * The colour run is why this is not simply `manaSymbols`. `validate.py` writes
+ * a colour identity as `{GW}` — one brace, two colours — because that is how
+ * Magic writes an identity. It is not a mana cost, and rendering it as a
+ * single two-letter blob would be wrong, so it expands to one pip per colour.
+ */
+const MANA_IN_TEXT = /\{(\d+|[WUBRG2]\/[WUBRGP]|[WUBRGC]+|[XYZSTQE])\}/gi
+
+export interface ManaTextPart {
+  text: string
+  /** True when `text` is a single symbol to draw, false for literal prose. */
+  pip: boolean
+}
+
+export function splitManaText(text: string): ManaTextPart[] {
+  const parts: ManaTextPart[] = []
+  let at = 0
+
+  for (const match of text.matchAll(MANA_IN_TEXT)) {
+    const start = match.index
+    if (start > at) parts.push({ text: text.slice(at, start), pip: false })
+
+    const symbol = match[1].toUpperCase()
+    // A colour run is several pips; everything else is exactly one.
+    if (/^[WUBRGC]{2,}$/.test(symbol)) {
+      for (const colour of symbol) parts.push({ text: colour, pip: true })
+    } else {
+      parts.push({ text: symbol, pip: true })
+    }
+    at = start + match[0].length
+  }
+
+  if (at < text.length) parts.push({ text: text.slice(at), pip: false })
+  return parts
+}
+
 export const CATEGORY_LABELS: Record<string, string> = {
   land: 'Lands',
   ramp: 'Ramp',
