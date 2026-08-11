@@ -248,10 +248,14 @@ Three things follow, and they decide the shortlist:
 1. **Persistent disk is required.** Rebuilding a 63 MB DuckDB from a ~500 MB
    download on every cold start is unacceptable, so the platform must keep a
    volume between restarts. This is the single hardest filter.
-2. **`data refresh` is a scheduled job, never a build step.** It needs several
-   minutes and blows any build budget. Run it weekly by cron against the
-   volume — Scryfall publishes daily, but deck tooling does not need
-   day-fresh data, and prices only matter to `price deck`.
+2. **`data refresh` is run on demand against the volume, never as a build or
+   boot step.** It needs several minutes, which blows any build budget and —
+   with scale-to-zero putting boot on the request path — would turn a wake into
+   an outage. Cron does not work either: Fly volumes attach to exactly one
+   machine, so a scheduled second Machine cannot mount the corpus. Run it by
+   hand, about monthly. Scryfall publishes daily, but deck tooling does not need
+   day-fresh data, and prices only matter to `price deck`. See
+   [ADR 6](docs/adr/0006-never-redistribute-scryfall-bulk-data.md).
 3. **Long sims must stay off the request path.** Already true — `api/jobs.py`
    and `api/simruns.py` run them as background jobs and the UI polls. Nothing
    to change.
