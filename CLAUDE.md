@@ -150,6 +150,11 @@ next phase: compiled backend, testing rigor, CI/CD) and `docs/HOSTING.md`
 (deploying a shared instance). These are kept current deliberately — read them
 before proposing direction, and update them when direction changes.
 
+`docs/adr/` records the decisions themselves — context, options considered,
+decision, consequences. Unlike the three above, **ADRs are immutable once
+accepted**: do not edit a decision, write a new one that supersedes it. Read
+`docs/adr/README.md` before arguing for a change to something already decided.
+
 ## Out of scope
 
 No purchase automation — the shopping tooling prices decks, watches for deals,

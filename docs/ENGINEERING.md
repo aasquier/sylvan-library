@@ -360,20 +360,31 @@ checked. This is also what makes the SIMD work legible.
 
 ---
 
-## 6. Architecture Decision Records
+## 6. Architecture Decision Records — written 2026-08-10
 
-The most transferable rigor available here, and it costs almost nothing.
+The most transferable rigor available here, and it cost almost nothing.
 
-Add `docs/adr/NNNN-title.md`, one per significant decision, each recording
-context, the options considered, the decision, and the consequences. Seed it
-with the ones already made and argued in this repo:
+[`docs/adr/`](adr/README.md) holds ten, one per significant decision, each
+recording context, the options considered, the decision, and the consequences.
+They are immutable once accepted: a decision that changes gets a new ADR that
+supersedes the old one, and the old one stays, because reasoning that turned out
+to be wrong is usually the most useful thing in the directory.
 
-1. `deck.yaml` in git as the source of truth, and deck history as git history.
-2. DuckDB for the corpus; why not Postgres or SQLite.
-3. Tier 1 stays Python; Tier 2 goes to Rust — with the measurements.
-4. Two embedded databases for hosting (DuckDB read-only + SQLite read-write).
-5. Sessions over JWTs, and no self-signup.
-6. Never redistribute Scryfall bulk data; refresh at boot instead.
+Six were the seed list — deck.yaml in git, DuckDB for the corpus, Tier 1 stays
+Python, two embedded databases, sessions over JWTs, and never redistributing
+Scryfall bulk. Four more earned a place because they were already argued here
+and a reader would otherwise have to reconstruct them: card facts come from the
+corpus rather than memory (7), the gate blocks rather than routing around an
+illegal deck (8), the built frontend bundle is committed (9), and correctness is
+established against independent oracles (10).
+
+Writing them found one thing worth having found: **three documents disagreed
+about when the corpus gets refreshed.** This file said "at boot", ROADMAP said
+"weekly by cron", and HOSTING said neither works — Fly volumes attach to exactly
+one machine, so a scheduled second Machine cannot mount the corpus, and boot is
+on the request path under scale-to-zero. ADR 6 records the resolution and both
+stale lines are corrected. Forcing every decision into "options considered ·
+decision · consequences" is what surfaced it.
 
 A reviewer who reads ADR 3 and finds a profile, a table of numbers, and an
 explicit "we did not port Tier 1, here is why" learns more about the engineer
@@ -390,8 +401,9 @@ exist partly so that when it happens it is additive.
 1. ~~**Property-based tests on `mana.py`** plus determinism tests.~~ **Done
    2026-08-10** — see §2. It found one real bug (Phyrexian mana value) and
    produced the enumerated corpus a port would be tested against.
-2. **ADRs for the decisions already made.** An afternoon, and it reframes the
-   whole repo for a reader.
+2. ~~**ADRs for the decisions already made.**~~ **Done 2026-08-10** — ten of
+   them in [`docs/adr/`](adr/README.md); see §6. Writing them caught a
+   three-way contradiction about corpus refresh.
 3. **A `DeckSource` abstraction and a request scope.** Four call sites and one
    dependency. Makes the API testable against an in-memory source now, and
    makes user decks additive later.
