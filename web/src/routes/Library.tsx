@@ -84,6 +84,11 @@ export default function Library() {
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="font-semibold leading-tight">{deck.name}</h2>
                   <div className="flex shrink-0 items-center gap-1">
+                    {/* null is "the corpus was missing, so the gate never
+                        ran" -- which is not the same as passing. Rendering it
+                        like a clean deck throws away the distinction the list
+                        endpoint carries these counts to preserve. */}
+                    {deck.errors === null && <Badge tone="warning">not checked</Badge>}
                     {deck.errors !== null && deck.errors > 0 && (
                       <Badge tone="critical">
                         {deck.errors} error{deck.errors === 1 ? '' : 's'}

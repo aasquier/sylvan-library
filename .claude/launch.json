@@ -6,6 +6,15 @@
       "runtimeExecutable": ".venv/bin/mtglab",
       "runtimeArgs": ["ui", "--no-open", "--port", "8765"],
       "port": 8765
+    },
+    {
+      "name": "mtglab-ui-no-corpus",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "MTGLAB_DATA_DIR=$(mktemp -d) .venv/bin/mtglab ui --no-open --port 8766"
+      ],
+      "port": 8766
     }
   ]
 }

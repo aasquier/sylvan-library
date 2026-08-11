@@ -58,8 +58,14 @@ jobs:
         working-directory: web
 
       # Run the typecheck on its own so a type error reports as a type error,
-      # not as an opaque build failure.
+      # not as an opaque build failure. This covers the test files too --
+      # tsconfig.app.json includes all of src/.
       - run: npx tsc -b
+        working-directory: web
+
+      # Before the build, so a broken component fails as a failing test rather
+      # than as a bundle that builds fine and misbehaves in the browser.
+      - run: npm test
         working-directory: web
 
       - run: npm run build
