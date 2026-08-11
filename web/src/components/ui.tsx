@@ -136,8 +136,11 @@ export function TextField({
   onChange: (v: string) => void
   placeholder?: string
 }) {
+  // basis-64 gives the field a real preferred width so the wrapping filter row
+  // breaks onto a new line instead of crushing it; flex-1 with the default
+  // basis-0 collapsed it to ~14px next to the fixed-width selects.
   return (
-    <label className="flex min-w-0 flex-1 flex-col gap-1">
+    <label className="flex min-w-48 flex-1 basis-64 flex-col gap-1">
       <span className="text-[11px] font-medium uppercase tracking-wide"
             style={{ color: 'var(--text-muted)' }}>
         {label}

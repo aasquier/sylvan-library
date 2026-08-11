@@ -20,7 +20,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import pytest
 
-from mtglab.cards.db import SCHEMA, _iter_cards, bulk_download_url, get_cards
+from mtglab.cards.db import (
+    SCHEMA,
+    CardRecord,
+    _iter_cards,
+    bulk_download_url,
+    get_cards,
+)
 
 CARDS = [
     {"name": "Gyome, Master Chef", "color_identity": ["B", "G"],
@@ -190,6 +196,76 @@ def test_unknown_name_is_still_absent(con):
 def test_mixed_batch_keeps_every_requested_key(con):
     got = get_cards(con, ["Gyome, Master Chef", "Darkbore Pathway", "Nonesuch"])
     assert set(got) == {"Gyome, Master Chef", "Darkbore Pathway"}
+
+
+# ------------------------------------------------------------------ is_land
+#
+# Scryfall reports one combined type line for a double-faced card, so
+# `"Land" in type_line` was true for every card whose BACK face is a land.
+# Tier 1 uses is_land to decide what a land is, so Trostani simulated with 37
+# lands instead of 35 and Atla with 37 instead of 36 -- the same class of
+# silent, confident, wrong answer as the qty and tapland bugs.
+
+def _rec(type_line, layout="normal"):
+    return CardRecord(
+        name="x", mana_cost=None, cmc=0.0, type_line=type_line, oracle_text="",
+        color_identity=frozenset(), produced_mana=(), legal_commander=True,
+        reserved=False, edhrec_rank=None, image_normal=None, layout=layout,
+    )
+
+
+@pytest.mark.parametrize("type_line", [
+    "Legendary Land",                          # Boseiju, Who Endures
+    "Basic Land — Forest",
+    "Land Creature — Forest Dryad",            # Dryad Arbor
+    "Land // Land",                            # Branchloft Pathway
+])
+def test_front_face_land_is_a_land(type_line):
+    assert _rec(type_line).is_land
+
+
+@pytest.mark.parametrize("type_line", [
+    "Legendary Creature — God // Land",             # Ojer Taq
+    "Legendary Enchantment // Legendary Land",      # Growing Rites of Itlimoc
+    "Enchantment — Saga // Legendary Land",         # Welcome to . . .
+])
+def test_transforming_permanent_with_a_land_back_is_not_a_land(type_line):
+    """You cast the front face. The back only ever arrives by flipping
+    something already on the battlefield, so it is never a land drop."""
+    assert not _rec(type_line, layout="transform").is_land
+
+
+@pytest.mark.parametrize("type_line", [
+    "Instant // Land",     # Sink into Stupor, Kabira Takedown
+    "Sorcery // Land",     # Stump Stomp
+])
+def test_modal_dfc_with_a_land_back_is_a_land(type_line):
+    """A modal DFC lets you choose which face to play, so the land back face
+    is a real land drop and Tier 1 should count it."""
+    assert _rec(type_line, layout="modal_dfc").is_land
+
+
+def test_battle_with_a_creature_back_is_not_a_land():
+    """Invasion of Ikoria -- neither face is a land, and it must not become one."""
+    assert not _rec(
+        "Battle — Siege // Legendary Creature — Dinosaur", layout="transform").is_land
+
+
+def test_layout_round_trips_from_the_database(con):
+    """is_land depends on layout, so layout has to survive the query -- a NULL
+    column must fall back to 'normal' rather than crashing or reading falsey."""
+    con.execute(
+        "INSERT INTO oracle_cards (oracle_id, name, mana_cost, cmc, type_line, "
+        "oracle_text, color_identity, legalities, reserved, layout) "
+        "VALUES ('ot', 'Ojer Taq, Deepest Foundation', '{3}{W}{W}', 5, "
+        "'Legendary Creature — God // Land', '', ['W'], ?, false, 'transform')",
+        [json.dumps({"commander": "legal"})])
+    got = get_cards(con, ["Ojer Taq, Deepest Foundation"])
+    rec = got["Ojer Taq, Deepest Foundation"]
+    assert rec.layout == "transform"
+    assert not rec.is_land
+    # A row loaded before this column was selected still reports sanely.
+    assert get_cards(con, ["Gyome, Master Chef"])["Gyome, Master Chef"].layout == "normal"
 
 
 if __name__ == "__main__":

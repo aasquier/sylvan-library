@@ -20,6 +20,11 @@ export interface DeckSummary {
   strategy: string
   art_crop: string | null
   color_identity: string[]
+  // Gate counts, so the shelf can flag a deck that does not validate. null
+  // means the corpus was unavailable and the gate never ran -- which is not
+  // the same as passing, and must not render as a pass.
+  errors: number | null
+  warnings: number | null
 }
 
 export interface Card {

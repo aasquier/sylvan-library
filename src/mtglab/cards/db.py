@@ -329,10 +329,32 @@ class CardRecord:
     # Cropped art only, no frame or text box. The UI uses it for hero images,
     # where a full card scan reads as clutter.
     image_art_crop: str | None = None
+    # Scryfall's layout. Needed to tell a modal DFC (either face is playable)
+    # apart from a transforming permanent (you cast the front; the back only
+    # ever arrives by flipping).
+    layout: str = "normal"
 
     @property
     def is_land(self) -> bool:
-        return "Land" in (self.type_line or "")
+        """Is this card a land you can actually put onto the battlefield as a
+        land drop?
+
+        Testing `"Land" in type_line` was wrong for every double-faced card
+        whose *back* is a land. Scryfall reports a combined type line, so
+        Ojer Taq ("Legendary Creature — God // Land"), Growing Rites of Itlimoc
+        and Welcome to . . . all read as lands -- and the Tier 1 compiler used
+        this to decide what a land is, so those decks simulated with two or
+        three phantom extra lands.
+
+        The distinction is the layout. A modal DFC lets you choose which face
+        to play, so a land back face is a real land drop. A transforming
+        permanent does not: you cast the front face, and the back arrives only
+        by flipping something already on the battlefield.
+        """
+        faces = (self.type_line or "").split(" // ")
+        if "Land" in faces[0]:
+            return True
+        return self.layout == "modal_dfc" and any("Land" in f for f in faces[1:])
 
 
 def _to_record(row: Sequence[Any]) -> CardRecord:
@@ -345,12 +367,13 @@ def _to_record(row: Sequence[Any]) -> CardRecord:
         legal_commander=legalities.get("commander") == "legal",
         reserved=bool(row[7]), edhrec_rank=row[9], image_normal=row[10],
         image_art_crop=row[11] if len(row) > 11 else None,
+        layout=(row[12] if len(row) > 12 else None) or "normal",
     )
 
 
 _SELECT = """SELECT name, mana_cost, cmc, type_line, oracle_text, color_identity,
                     produced_mana, reserved, legalities, edhrec_rank,
-                    image_normal, image_art_crop
+                    image_normal, image_art_crop, layout
              FROM oracle_cards"""
 
 

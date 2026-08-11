@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mtglab-ui",
+      "runtimeExecutable": ".venv/bin/mtglab",
+      "runtimeArgs": ["ui", "--no-open", "--port", "8765"],
+      "port": 8765
+    }
+  ]
+}
