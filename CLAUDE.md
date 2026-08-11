@@ -149,6 +149,13 @@ rather than folded into losses.
   cases where naive source-counting gives the wrong answer.
 - `ruff check src tests` before pushing.
 
+## Landing work
+
+The repo is public and `main` is protected: pull request required, all four CI
+checks green, branch up to date, enforced for admins. A direct push to `main`
+is rejected — branch first, then open a PR. Squash merge; linear history is
+required.
+
 ## Planning documents
 
 `ROADMAP.md` (goals vs reality, open decisions), `docs/ENGINEERING.md` (the
