@@ -1,5 +1,6 @@
 slug: tivit-cedh
 name: Tivit, Seller of Secrets — Esper cEDH
+status: theoretical  # theoretical: a list, not a box of cards
 commander:
   - Tivit, Seller of Secrets
 bracket: 5

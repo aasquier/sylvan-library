@@ -133,6 +133,7 @@ export default function DeckDetail() {
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-semibold tracking-tight">{deck.name}</h1>
               {deck.bracket && <Badge>Bracket {deck.bracket}</Badge>}
+              {deck.status === 'theoretical' && <Badge>theory</Badge>}
               {report.ok
                 ? <Badge tone="good">valid</Badge>
                 : <Badge tone="critical">{report.errors.length} error(s)</Badge>}

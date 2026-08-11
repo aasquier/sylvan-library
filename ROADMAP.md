@@ -82,7 +82,13 @@ several of its claims were wrong (see below).
 All six are now in `deck.yaml`. Four validate clean; two are blocked on a
 single card each, both genuinely banned in Commander.
 
-| Deck | Colours | Status | Source |
+Separately from the gate, each deck declares whether it physically exists:
+**Goreclaw and Tivit are `theoretical`** — lists Aaron is thinking about — and
+the other four are `built`. The field defaults to `theoretical` when absent,
+because a wrong "built" sends someone to a shelf with no deck on it while a
+wrong "theoretical" costs nothing. The library filters and badges on it.
+
+| Deck | Colours | Gate | Source |
 | --- | --- | --- | --- |
 | Gyome, Master Chef — Food | Golgari, B4 | **migrated**, 0 errors | `02-the-99-annotated_1.md` |
 | Arahbo — Cats | Selesnya (Kaheera companion) | **migrated**, 0 errors | `arahbo-cats-decklist_4.md` |

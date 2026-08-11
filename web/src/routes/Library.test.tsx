@@ -22,6 +22,7 @@ const { api } = await import('../lib/api')
 function deck(overrides: Partial<DeckSummary> & { slug: string }): DeckSummary {
   return {
     name: overrides.slug,
+    status: 'built',
     commander: ['Some Commander'],
     companion: null,
     bracket: 4,
@@ -38,7 +39,7 @@ function deck(overrides: Partial<DeckSummary> & { slug: string }): DeckSummary {
 
 const DECKS: DeckSummary[] = [
   deck({ slug: 'tivit', name: 'Tivit', bracket: 5, color_identity: ['W', 'U', 'B'],
-         total_cards: 100 }),
+         total_cards: 100, status: 'theoretical' }),
   deck({ slug: 'arahbo', name: 'Arahbo', bracket: 3, color_identity: ['G', 'W'],
          total_cards: 99 }),
   deck({ slug: 'goreclaw', name: 'Goreclaw', bracket: 4, color_identity: ['G'],
@@ -176,5 +177,36 @@ describe('Library', () => {
     renderLibrary()
     await waitFor(() => expect(screen.getByText(/Could not load decks/)).toBeTruthy())
     expect(screen.queryByText('No decks match those filters.')).toBeNull()
+  })
+
+  // ---------------------------------------------------------- built vs theory
+
+  it('marks a theoretical deck and leaves a built one unmarked', async () => {
+    // The difference decides whether you can sit down and play it, so a list
+    // you are only thinking about must not look like a box of cards.
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    const tivit = screen.getByText('Tivit').closest('a')!
+    const goreclaw = screen.getByText('Goreclaw').closest('a')!
+    expect(within(tivit).getByText('theory')).toBeTruthy()
+    expect(within(goreclaw).queryByText('theory')).toBeNull()
+  })
+
+  it('filters the shelf down to what is actually built', async () => {
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'built' } })
+    expect(shownNames()).toEqual(['Arahbo', 'Goreclaw'])
+
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'theoretical' } })
+    expect(shownNames()).toEqual(['Tivit'])
+  })
+
+  it('combines the status filter with the others', async () => {
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'built' } })
+    fireEvent.change(screen.getByLabelText('Color'), { target: { value: 'G' } })
+    expect(shownNames()).toEqual(['Arahbo', 'Goreclaw'])
   })
 })

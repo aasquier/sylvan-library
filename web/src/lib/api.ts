@@ -12,6 +12,8 @@ export interface Health {
 export interface DeckSummary {
   slug: string
   name: string
+  /** "built" = the cards are sleeved up; "theoretical" = a list under consideration. */
+  status: string
   commander: string[]
   companion: string | null
   bracket: number | null

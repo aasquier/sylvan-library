@@ -195,6 +195,11 @@ source of truth — the original markdown in `~/Downloads` is historical and
 should not be edited or re-imported. `ROADMAP.md` records what the migration
 turned up.
 
+Each deck declares `status: built | theoretical`. **Goreclaw and Tivit are
+theoretical** — lists under consideration, not boxes of cards; the other four
+are built. Absent means theoretical, so nothing is ever silently claimed as
+owned.
+
 Two decks currently fail the gate on one card each, deliberately and not as a
 bug to route around: **Goreclaw** runs Primeval Titan and **Atla Palani** runs
 Emrakul, the Aeons Torn, both banned in Commander. Picking the replacement is

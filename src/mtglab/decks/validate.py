@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from mtglab.decks import companion, partners
-from mtglab.decks.model import CATEGORIES, Deck
+from mtglab.decks.model import CATEGORIES, DECK_STATUSES, Deck
 
 SINGLETON_EXEMPT = {
     "plains", "island", "swamp", "mountain", "forest", "wastes",
@@ -74,6 +74,12 @@ def validate(deck: Deck, cards: dict | None = None, *,
     # ---- structure ------------------------------------------------------
     if not deck.commander:
         rep.add("error", "no-commander", "deck has no commander")
+
+    # Structural, so it belongs above the `cards is None` early return -- a
+    # nonsense status must not become invisible whenever the corpus is missing.
+    if deck.status not in DECK_STATUSES:
+        rep.add("error", "deck-status",
+                f"status {deck.status!r} is not one of {', '.join(DECK_STATUSES)}")
 
     # Two commanders share the command zone, so the deck holds 98 rather than
     # 99. `expected_size` is the single-commander default; adjust it by however

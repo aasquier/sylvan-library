@@ -206,6 +206,45 @@ def test_quick_primer_surfaces_category_table():
     assert "74%" in out
 
 
+
+# --------------------------------------------------------------- deck status
+
+def test_status_defaults_to_theoretical_when_absent():
+    """Absent must never mean built. A wrong "built" sends someone to a shelf
+    that has no deck on it; a wrong "theoretical" costs nothing."""
+    deck = Deck.from_text("slug: x\nname: X\ncards: []\n")
+    assert deck.status == "theoretical"
+
+
+def test_status_is_read_and_normalised():
+    assert Deck.from_text("slug: x\nname: X\nstatus: BUILT\n").status == "built"
+    assert Deck.from_text("slug: x\nname: X\nstatus: ' theoretical '\n").status \
+        == "theoretical"
+
+
+def test_an_unrecognised_status_fails_the_gate():
+    from mtglab.decks.validate import validate
+    deck = Deck.from_text("slug: x\nname: X\nstatus: someday\ncards: []\n")
+    codes = {i.code for i in validate(deck, None).errors}
+    assert "deck-status" in codes
+
+
+def test_the_curated_decks_declare_a_status():
+    """Recorded 2026-08-11: Goreclaw and Tivit are lists Aaron is thinking
+    about; the other four are sleeved up."""
+    root = Path(__file__).resolve().parents[1] / "decks"
+    statuses = {p.parent.name: Deck.load(p).status
+                for p in sorted(root.glob("*/deck.yaml"))
+                if not p.parent.name.startswith("_")}
+    assert statuses == {
+        "arahbo-cats": "built",
+        "atla-palani-dinos": "built",
+        "goreclaw-stompy": "theoretical",
+        "gyome-food": "built",
+        "tivit-cedh": "theoretical",
+        "trostani-tokens": "built",
+    }
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):
