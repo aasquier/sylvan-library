@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from mtglab.decks import companion
+from mtglab.decks import companion, partners
 from mtglab.decks.model import CATEGORIES, Deck
 
 SINGLETON_EXEMPT = {
@@ -75,16 +75,31 @@ def validate(deck: Deck, cards: dict | None = None, *,
     if not deck.commander:
         rep.add("error", "no-commander", "deck has no commander")
 
+    # Two commanders share the command zone, so the deck holds 98 rather than
+    # 99. `expected_size` is the single-commander default; adjust it by however
+    # many commanders there actually are.
+    reasons = []
+    if len(deck.commander) > 1:
+        expected_size -= len(deck.commander) - 1
+        reasons.append(f"{len(deck.commander)} commanders")
+
     # Yorion is the one companion that changes how big the deck must be
     # ("at least twenty cards more than the minimum deck size"), so the size
     # check has to know about it or a legal Yorion deck fails here. Keyed by
     # name because this runs before the corpus is consulted, and because deck
     # size is a property of the deck rather than a judgement about a card.
     bonus = companion.DECK_SIZE_BONUS.get((deck.companion or "").lower(), 0)
-    expected_size += bonus
+    if bonus:
+        expected_size += bonus
+        reasons.append(f"+{bonus} for {deck.companion}")
+
+    if len(deck.commander) > 2:
+        rep.add("error", "too-many-commanders",
+                f"{len(deck.commander)} commanders listed; Commander allows at "
+                "most two, and only with a pairing ability")
 
     if deck.total_cards != expected_size:
-        because = f" (+{bonus} for {deck.companion})" if bonus else ""
+        because = f" ({', '.join(reasons)})" if reasons else ""
         rep.add("error", "deck-size",
                 f"deck has {deck.total_cards} cards in the 99, "
                 f"expected {expected_size}{because}")
@@ -134,12 +149,26 @@ def validate(deck: Deck, cards: dict | None = None, *,
         identity: frozenset[str] = frozenset()
         for rec in cmd_records:
             identity |= rec.color_identity
+        # A Background, and the ten non-legendary Battlebond `Partner with`
+        # creatures, are legal commanders only as one of a pair -- so whether
+        # a card qualifies depends on how many commanders there are.
+        paired = len(cmd_records) > 1
         for rec in cmd_records:
-            if "Legendary" not in rec.type_line or "Creature" not in rec.type_line:
-                if "can be your commander" not in (rec.oracle_text or "").lower():
-                    rep.add("error", "not-a-commander",
-                            f"type line is {rec.type_line!r} and it does not say "
-                            "it can be your commander", rec.name)
+            if not partners.can_be_commander(rec, paired=paired):
+                extra = ""
+                if not paired and (partners.is_background(rec)
+                                   or (p := partners.pairing(rec)) is not None
+                                   and p.kind == partners.PARTNER_WITH):
+                    extra = (" -- it is only legal as one of two commanders, "
+                             "and this deck lists one")
+                rep.add("error", "not-a-commander",
+                        f"type line is {rec.type_line!r} and it does not say "
+                        f"it can be your commander{extra}", rec.name)
+
+        if len(cmd_records) == 2:
+            problem = partners.check_pair(*cmd_records)
+            if problem:
+                rep.add("error", "illegal-pairing", problem)
 
         for card in deck.cards:
             rec = cards.get(card.name)

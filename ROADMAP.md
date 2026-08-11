@@ -164,6 +164,33 @@ Note "your starting deck" includes your commander, so the commander is part of
 the check — Arahbo, Roar of the World is a Cat Avatar, so the cats list stays
 legal.
 
+### Two-commander pairings are enforced too
+
+`decks/partners.py` covers every way a deck can have two commanders. The gate
+previously assumed one, and was wrong about legal decks in three ways:
+
+- **A Background was rejected outright.** It is a `Legendary Enchantment —
+  Background` whose text never says it can be your commander, so Jaheira +
+  Raised by Giants failed with `not-a-commander`.
+- **Ten `Partner with` cards are not even Legendary** (Lore Weaver, Ley Weaver,
+  Chakram Slinger and the rest of the Battlebond pairs). CR 702.124f grants
+  commander eligibility through the ability rather than printing it on the
+  card, so a type-line test rejects them.
+- **Deck size was always 99.** Two commanders share the command zone, so the
+  deck holds **98**. Any legal partner deck failed `deck-size`.
+
+Mechanics covered, all enumerated from the corpus: plain **Partner**, **Partner
+with `<name>`** (pairs only with that card), **Partner—`<label>`**, **Choose a
+Background** + **Background**, and **Doctor's companion** + a `Time Lord
+Doctor`. `Partner—<label>` is a generalised template and the corpus already
+carries four labels — Friends forever, Survivors, Character select, Father &
+son — so the check matches on the label rather than hardcoding one, and a new
+set adds labels for free.
+
+Also added: more than two commanders is an error, and an illegal pairing says
+precisely why ("Lore Weaver has Partner with Ley Weaver, so it can only pair
+with that card") rather than just refusing.
+
 ---
 
 ## Suggested order
@@ -293,7 +320,7 @@ producing confident, wrong answers for *every* deck, not just one.
   flipping.
 
 All five are fixed and pinned by tests. The lesson worth keeping: logic in
-tested code gets caught, logic in conversation does not. 150 tests, CI runs
+tested code gets caught, logic in conversation does not. 178 tests, CI runs
 them on 3.11 and 3.12, typechecks and builds the frontend, and fails if the
 committed bundle drifts from source.
 
