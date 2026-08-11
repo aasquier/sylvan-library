@@ -162,6 +162,11 @@ card-level spoiler scanning, and deal-watching or cart generation.
 
 ## Roadmap
 
+**[docs/ENGINEERING.md](docs/ENGINEERING.md)** is where the project is
+heading next: a compiled Tier 2, property-based and differential testing,
+container hardening, and automated review on PRs — with the measurements
+behind each call, including the ones that say *don't*.
+
 **[ROADMAP.md](ROADMAP.md) is the plan** — original goals mapped to what
 actually works, plus the open decisions. It is kept current; this file only
 summarises. **[docs/HOSTING.md](docs/HOSTING.md)** covers deploying a shared

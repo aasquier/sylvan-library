@@ -207,6 +207,11 @@ with that card") rather than just refusing.
 
 ---
 
+> **Next phase:** [docs/ENGINEERING.md](docs/ENGINEERING.md) — compiled
+> backend (Tier 2 in Rust, with the measurements for why *not* Tier 1),
+> property-based and differential testing, container hardening, and Claude
+> review on PRs. Written for the case where peers review this repo.
+
 ## Suggested order
 
 1. **Migrate the remaining decks.** Highest value: the Library screen is built
