@@ -9,9 +9,17 @@ technology list; they are impressed by decisions that survive the question
 advance, including in the places where the honest answer is "we measured, and
 it wasn't worth it."
 
+**The compiled-language rewrite is deferred**, with a written trigger — see §1
+and the deferred list at the end. The near-term work is testing rigor,
+container hardening and CI, none of which needs a second language.
+
 ---
 
-## 1. A compiled backend: where it is justified, and where it isn't
+## 1. A compiled backend — deferred, with a trigger
+
+**Decision: stay on Python for now.** Not "not yet, probably soon" — genuinely
+deferred until a measurement says otherwise, with the trigger written down
+below so the call gets re-made on evidence rather than on appetite.
 
 ### Do not rewrite Tier 1
 
@@ -36,17 +44,49 @@ answer when the profile says the workload was never the bottleneck. Porting
 Tier 1 for its own sake is the textbook resume-driven rewrite and it reads that
 way. Skip it.
 
-### Do build Tier 2 in Rust
+### Tier 2 is the candidate — but build it in Python first
 
-Tier 2 — the pod simulator — is a different workload and the case is real.
-Four seats making actual decisions over more turns is plausibly **50–100x the
-work per game**. At Tier 1's measured 0.89 ms/game that is 45–90 ms per game,
-so a 10,000-game matchup is 8–15 minutes, and a round-robin over six decks is
-fifteen matchups. In Python that is a job you start and walk away from; the
-tier list stops being interactive and starts being a nightly batch.
+Tier 2 — the pod simulator — is the only workload here with a plausible case
+for a compiled language. Four seats making actual decisions over more turns is
+maybe **50–100x the work per game**. At Tier 1's measured 0.89 ms/game that
+projects to 45–90 ms per game, so a 10,000-game matchup is 8–15 minutes and a
+six-deck round-robin is fifteen of them.
 
-That is a *measured, forward-looking* justification, which is exactly what the
-existing ROADMAP already says: "Tier 2 is where this decides itself."
+**That projection is an extrapolation, not a measurement**, and it is doing a
+lot of work. The honest move is to build Tier 2 in Python, measure it, and
+only then decide. Writing Rust against a guess about a simulator that does not
+exist yet is the same mistake as porting Tier 1, one level removed.
+
+### The trigger
+
+Reopen this decision when **any** of these is true, and not before:
+
+- A single Tier 2 matchup at 10,000 games takes **> 5 minutes** after
+  profiling and after the cheap wins below.
+- A full six-deck round-robin cannot finish in **under an hour** on the dev
+  machine.
+- Profiling shows a genuine hot loop that is not fixable in Python — that is,
+  the time is in arithmetic and branching rather than in allocation,
+  attribute lookup, or an algorithm that should be better.
+
+Exhaust these first, in order, because they are cheaper than a port and some
+of them are worth doing regardless:
+
+1. **Cache by deck-content hash.** A sim result is a pure function of
+   `(deck content, parameters, seed)`. Most repeat runs should cost nothing.
+2. **`multiprocessing` across games.** Measured at 2.42x on 4 workers, ~20
+   lines, and games are trivially independent.
+3. **Algorithmic work in the policy engine**, which is where a pod simulator's
+   time will actually go — not in the mana solver.
+4. **`__slots__`, precomputed lookup tables, and avoiding per-game
+   allocation** in the inner loop. Ordinary Python optimisation routinely buys
+   2–5x on this shape of code.
+
+If the trigger fires, the plan below is what to do. If it never fires, that is
+a good outcome and the extrapolation above was simply wrong — which is worth
+recording either way.
+
+### If the trigger fires: Rust, not Go
 
 **Rust over Go, for this specific shape.** The hot loop is a library embedded
 in a Python process, not a service. Rust via **PyO3 + maturin** keeps one
@@ -286,11 +326,24 @@ than any amount of Rust would tell them.
 3. **Claude review + security review on PRs.** Immediate, low effort.
 4. **Frontend tests** (Vitest on the polling state machine and the filters).
 5. **Container hardening** — multi-stage, non-root, multi-arch, scanned.
-6. **Tier 2 in Rust via PyO3**, differential-tested against a Python
-   reference, benchmarked with criterion, parallelised with rayon.
-7. **SIMD in the Tier 2 inner loop**, only after a profile says the RNG and
-   shuffle are hot, and only with the scalar version kept and benchmarked.
+6. **Tier 2 in Python**, then profile it.
 
-Steps 1–5 make the existing project defensible. Step 6 is the one that
-genuinely needs a compiled language, and by then the case for it is written
-down and measured rather than asserted.
+Steps 1–5 make the existing project defensible without adding a language.
+
+## Deferred until measured
+
+Parked deliberately, not forgotten. Each needs evidence before it starts.
+
+| Item | Reopen when |
+| --- | --- |
+| **Tier 2 inner loop in Rust** (PyO3, rayon, criterion) | The §1 trigger fires — a matchup over 5 minutes, or a round-robin over an hour, after caching, multiprocessing and ordinary Python optimisation |
+| **SIMD-batched RNG** | A profile of the *Rust* engine shows the generator and shuffle are hot. Not before Rust exists |
+| **Differential testing Python vs Rust** | Ships with the port, not separately — it is what makes the port defensible |
+| **Go** | Only if the engine ever becomes a standalone service rather than a library in-process. Not the current shape |
+
+Note that two items in the sections above stay on the near-term list even
+though the port is parked, because they pay off on the Python engine on their
+own terms: **property-based testing of `mana.py`** (§2) and **determinism
+tests**. Both are also prerequisites for a credible port later — the generated
+cases become the differential corpus — so doing them now is not wasted work in
+either branch of the decision.
