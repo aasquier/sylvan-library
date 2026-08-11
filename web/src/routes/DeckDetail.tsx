@@ -16,6 +16,9 @@ import {
 import {
   CategoryCoverage, ColorNeedsChart, CurveChart, DataTable,
 } from '../components/charts'
+import {
+  AddCardForm, AddNoteForm, NoteEditor, RationaleEditor,
+} from '../components/deckedit'
 
 type Tab = 'cards' | 'stats' | 'validation' | 'notes'
 
@@ -35,6 +38,28 @@ export default function DeckDetail() {
   const [swapWhy, setSwapWhy] = useState('')
   const [swapError, setSwapError] = useState<string | null>(null)
   const [swapBusy, setSwapBusy] = useState(false)
+  // The card whose rationale is being written, and whether the list is filtered
+  // down to the ones a draft still owes.
+  const [editing, setEditing] = useState<string | null>(null)
+  const [onlyUnjustified, setOnlyUnjustified] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  /** Re-read everything an edit invalidates: the list, the stats and the gate.
+   *
+   * Every write returns the gate's verdict already, but the page shows more
+   * than the verdict — category counts, the curve, the shortlist — and a page
+   * that displayed a stale curve next to a fresh gate would be worse than one
+   * that took a second round trip. */
+  async function refresh() {
+    const [d, s, v] = await Promise.all([
+      api.deck(slug), api.stats(slug), api.validate(slug),
+    ])
+    setDeck(d)
+    setStats(s)
+    setReport(v)
+    requested.current = null
+    setSuggestions(null)
+  }
 
   async function applySwap() {
     if (!swapping || !swapWhy.trim()) return
@@ -42,19 +67,29 @@ export default function DeckDetail() {
     setSwapError(null)
     try {
       await api.swapCard(slug, { ...swapping, why: swapWhy.trim() })
-      // Re-read everything the swap invalidates: the list, the gate, and the
-      // shortlist, which should now be empty for this card.
-      const [d, v] = await Promise.all([api.deck(slug), api.validate(slug)])
-      setDeck(d)
-      setReport(v)
-      requested.current = null
-      setSuggestions(null)
+      await refresh()
       setSwapping(null)
       setSwapWhy('')
     } catch (e: any) {
       setSwapError(String(e.message ?? e))
     } finally {
       setSwapBusy(false)
+    }
+  }
+
+  async function saveRationale(name: string, why: string) {
+    await api.setCardField(slug, name, 'why', why)
+    await refresh()
+    setEditing(null)
+  }
+
+  async function removeCard(name: string) {
+    setEditError(null)
+    try {
+      await api.removeCard(slug, name)
+      await refresh()
+    } catch (e: any) {
+      setEditError(String(e.message ?? e))
     }
   }
 
@@ -88,7 +123,10 @@ export default function DeckDetail() {
   const groups = useMemo(() => {
     if (!deck) return []
     const out = new Map<string, Card[]>()
-    for (const card of deck.cards) {
+    const shown = onlyUnjustified
+      ? deck.cards.filter((c) => !c.why.trim())
+      : deck.cards
+    for (const card of shown) {
       const key =
         groupBy === 'type'
           ? (card.type_line?.split(' // ')[0].split('—')[0].trim().split(' ').pop() ?? 'Unknown')
@@ -99,7 +137,7 @@ export default function DeckDetail() {
       out.get(key)!.push(card)
     }
     return [...out.entries()].sort((a, b) => b[1].length - a[1].length)
-  }, [deck, groupBy])
+  }, [deck, groupBy, onlyUnjustified])
 
   if (error) {
     return (
@@ -177,10 +215,20 @@ export default function DeckDetail() {
           </strong>{' '}
           <span style={{ color: 'var(--text-secondary)' }}>
             Its legality, colour identity and size are already checked. Write the
-            rationales in <code>deck.yaml</code>, then set{' '}
-            <code>stage: curated</code> — the gate refuses the promotion while
-            any card is blank, and artifacts stay blocked until it lands.
+            rationales below, then set <code>stage: curated</code> in{' '}
+            <code>deck.yaml</code> — the gate refuses the promotion while any card
+            is blank, and artifacts stay blocked until it lands.
           </span>
+          {deck.needs_rationale > 0 && (
+            <div className="mt-2">
+              <button
+                onClick={() => { setTab('cards'); setOnlyUnjustified(true) }}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium"
+                style={{ background: 'var(--gridline)', color: 'var(--text-primary)' }}>
+                Show the {deck.needs_rationale} that need one
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -207,19 +255,34 @@ export default function DeckDetail() {
 
       {tab === 'cards' && (
         <div className="space-y-5">
-          <div className="flex items-end justify-between gap-4">
-            <Select label="Group by" value={groupBy} onChange={setGroupBy}
-                    options={[
-                      { value: 'category', label: 'Category' },
-                      { value: 'type', label: 'Card type' },
-                      { value: 'mv', label: 'Mana value' },
-                    ]} />
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="flex flex-wrap items-end gap-4">
+              <Select label="Group by" value={groupBy} onChange={setGroupBy}
+                      options={[
+                        { value: 'category', label: 'Category' },
+                        { value: 'type', label: 'Card type' },
+                        { value: 'mv', label: 'Mana value' },
+                      ]} />
+              {deck.needs_rationale > 0 && (
+                <label className="flex items-center gap-2 pb-2 text-xs"
+                       style={{ color: 'var(--text-secondary)' }}>
+                  <input type="checkbox" checked={onlyUnjustified}
+                         onChange={(e) => setOnlyUnjustified(e.target.checked)} />
+                  Only the {deck.needs_rationale} needing a rationale
+                </label>
+              )}
+            </div>
             {!deck.corpus_available && (
               <span className="text-xs" style={{ color: 'var(--status-warning)' }}>
                 No corpus — card text and art unavailable.
               </span>
             )}
           </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <AddCardForm slug={slug} stage={deck.stage} onDone={() => void refresh()} />
+          </div>
+          {editError && <ErrorNote>{editError}</ErrorNote>}
 
           {groups.map(([key, cards]) => (
             <section key={key} className="space-y-2">
@@ -232,8 +295,8 @@ export default function DeckDetail() {
               </h3>
               <ul className="space-y-1">
                 {cards.map((card) => (
-                  <li key={card.name}
-                      className="card-surface flex items-center gap-3 rounded-lg p-2">
+                  <li key={card.name} className="card-surface rounded-lg p-2">
+                   <div className="flex items-center gap-3">
                     {/* The art crop, not the full card: at this size a whole
                         card scan is an unreadable smudge, while the art alone
                         is what the eye actually recognises a card by. Hover
@@ -268,6 +331,29 @@ export default function DeckDetail() {
                         </p>
                       )}
                     </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        onClick={() => setEditing(editing === card.name ? null : card.name)}
+                        className="rounded-md px-2 py-1 text-[11px] font-medium"
+                        style={{ background: 'var(--gridline)',
+                                 color: 'var(--text-primary)' }}>
+                        {card.why ? 'Edit why' : 'Write why'}
+                      </button>
+                      <button
+                        onClick={() => removeCard(card.name)}
+                        title={`Remove ${card.name} from the deck`}
+                        className="rounded-md px-2 py-1 text-[11px]"
+                        style={{ color: 'var(--text-muted)' }}>
+                        Remove
+                      </button>
+                    </div>
+                   </div>
+                   {editing === card.name && (
+                     <RationaleEditor
+                       card={card}
+                       onSave={(why) => saveRationale(card.name, why)}
+                       onCancel={() => setEditing(null)} />
+                   )}
                   </li>
                 ))}
               </ul>
@@ -452,24 +538,31 @@ export default function DeckDetail() {
       )}
 
       {tab === 'notes' && (
-        <div className="grid gap-4 md:grid-cols-2">
-          {Object.entries(deck.notes).length === 0 && (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              No notes recorded.
-            </p>
-          )}
-          {Object.entries(deck.notes).map(([key, value]) => (
-            <section key={key} className="card-surface rounded-xl p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wide"
-                  style={{ color: 'var(--text-muted)' }}>
-                {key.replace(/_/g, ' ')}
-              </h3>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed"
-                 style={{ color: 'var(--text-secondary)' }}>
-                <ManaText>{value}</ManaText>
+        <div className="space-y-4">
+          <Caveat>
+            The deck's thinking, kept in <code>deck.yaml</code> rather than in an
+            artifact — which is why regenerating the five deliverables cannot lose
+            it. The advanced primer reads these keys directly.
+          </Caveat>
+          <div className="grid gap-4 md:grid-cols-2">
+            {Object.entries(deck.notes).length === 0 && (
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                No notes recorded.
               </p>
-            </section>
-          ))}
+            )}
+            {Object.entries(deck.notes).map(([key, value]) => (
+              <section key={key} className="card-surface rounded-xl p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wide"
+                    style={{ color: 'var(--text-muted)' }}>
+                  {key.replace(/_/g, ' ')}
+                </h3>
+                <NoteEditor slug={slug} noteKey={key} value={value}
+                            onDone={() => void refresh()} />
+              </section>
+            ))}
+          </div>
+          <AddNoteForm slug={slug} existing={Object.keys(deck.notes)}
+                       onDone={() => void refresh()} />
         </div>
       )}
     </div>

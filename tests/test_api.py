@@ -353,6 +353,210 @@ def test_a_read_only_source_refuses_every_swap():
         assert "read-only" in resp.json()["detail"]
 
 
+# --------------------------------------------------------------- the edits
+#
+# The rest of the operations (ADR 12). Same in-memory source as the swaps, and
+# the same property being checked each time: one narrow change, the gate re-run
+# and reported, and a refusal that writes nothing.
+
+@pytest.fixture
+def draft_client(in_memory_client):
+    """A draft, so the rule 4 bend is exercisable. Cards keep their `why`s --
+    what makes it a draft is the stage, and a draft with rationales already
+    written is one of ADR 13's four real combinations."""
+    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
+    deck.stage = "draft"
+    return in_memory_client([deck])
+
+
+def test_a_card_can_be_added_and_the_gate_comes_back(swappable):
+    with swappable as client:
+        if not client.get("/api/health").json()["corpus"]:
+            pytest.skip("no corpus available")
+        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+            "name": "Llanowar Reborn", "category": "land",
+            "why": "Enters with a +1/+1 counter to move onto a fatty."})
+        assert resp.status_code == 200, resp.json()
+        body = resp.json()
+        assert body["added"] == "Llanowar Reborn"
+        assert "ok" in body and "errors" in body
+        names = {c["name"] for c in
+                 client.get("/api/decks/goreclaw-stompy").json()["cards"]}
+        assert "Llanowar Reborn" in names
+
+
+def test_a_card_outside_the_commanders_identity_is_refused(swappable):
+    """Rule 2: identity comes from Scryfall's `color_identity`. Goreclaw is
+    mono-green, so a card with any other pip in its identity cannot go in."""
+    with swappable as client:
+        if not client.get("/api/health").json()["corpus"]:
+            pytest.skip("no corpus available")
+        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+            "name": "Swords to Plowshares", "category": "interaction",
+            "why": "One mana, exiles anything."})
+        assert resp.status_code == 422
+        assert "outside the commander's" in resp.json()["detail"]
+
+
+def test_a_card_the_corpus_does_not_know_is_refused(swappable):
+    with swappable as client:
+        if not client.get("/api/health").json()["corpus"]:
+            pytest.skip("no corpus available")
+        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+            "name": "Definitely Not A Card", "category": "ramp", "why": "x"})
+        assert resp.status_code == 422
+        assert "not a card the corpus knows" in resp.json()["detail"]
+
+
+def test_an_unknown_category_is_refused_before_any_lookup(swappable):
+    with swappable as client:
+        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+            "name": "Sol Ring", "category": "rampp", "why": "typo"})
+        assert resp.status_code == 422
+        assert "is not a category" in resp.json()["detail"]
+
+
+def test_a_curated_deck_refuses_a_card_with_no_rationale(swappable):
+    """Rule 4 at the boundary. The tool declines to invent one -- there is no
+    code path here that fills the field in."""
+    with swappable as client:
+        if not client.get("/api/health").json()["corpus"]:
+            pytest.skip("no corpus available")
+        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+            "name": "Llanowar Reborn", "category": "land", "why": "   "})
+        assert resp.status_code == 422
+        assert "needs a `why`" in resp.json()["detail"]
+
+
+def test_a_draft_accepts_a_card_that_still_owes_its_rationale(draft_client):
+    """The one bend (ADR 13): a draft is honestly incomplete and counts what it
+    owes, rather than refusing work while the thinking is still to come."""
+    with draft_client as client:
+        if not client.get("/api/health").json()["corpus"]:
+            pytest.skip("no corpus available")
+        before = client.get("/api/decks/goreclaw-stompy").json()["needs_rationale"]
+        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+            "name": "Llanowar Reborn", "category": "land"})
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["needs_rationale"] == before + 1
+
+
+def test_a_card_can_be_removed_without_a_corpus(swappable):
+    """Removing a card is a fact about this deck file, not about Magic, so it
+    works on a machine that has never run `data refresh`."""
+    with swappable as client:
+        resp = client.request("DELETE",
+                              "/api/decks/goreclaw-stompy/cards/Primeval Titan")
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["removed"] == "Primeval Titan"
+        names = {c["name"] for c in
+                 client.get("/api/decks/goreclaw-stompy").json()["cards"]}
+        assert "Primeval Titan" not in names
+
+
+def test_removing_a_card_that_is_not_there_is_refused(swappable):
+    with swappable as client:
+        resp = client.request("DELETE",
+                              "/api/decks/goreclaw-stompy/cards/Black Lotus")
+        assert resp.status_code == 422
+        assert "not in this deck" in resp.json()["detail"]
+
+
+def test_a_rationale_can_be_written_through_the_api(swappable):
+    """The gap `decks import` opened: a draft arrives owing 99 rationales, and
+    until this endpoint the only way to write one was a text editor."""
+    with swappable as client:
+        resp = client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+                            json={"field": "why",
+                                  "value": "Two mana for one, and it always has been."})
+        assert resp.status_code == 200, resp.json()
+        card = next(c for c in client.get("/api/decks/goreclaw-stompy").json()["cards"]
+                    if c["name"] == "Sol Ring")
+        assert card["why"] == "Two mana for one, and it always has been."
+
+
+def test_a_rationale_cannot_be_blanked_on_a_curated_deck(swappable):
+    with swappable as client:
+        resp = client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+                            json={"field": "why", "value": "   "})
+        assert resp.status_code == 422
+        assert "needs a `why`" in resp.json()["detail"]
+
+
+def test_only_a_short_list_of_card_fields_is_settable(swappable):
+    with swappable as client:
+        for field in ("name", "scryfall_id", "tags"):
+            resp = client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+                                json={"field": field, "value": "x"})
+            assert resp.status_code == 422, field
+            assert "not settable" in resp.json()["detail"]
+
+
+def test_a_category_and_a_quantity_can_be_patched(swappable):
+    with swappable as client:
+        assert client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+                            json={"field": "category",
+                                  "value": "utility"}).status_code == 200
+        assert client.patch("/api/decks/goreclaw-stompy/cards/Forest",
+                            json={"field": "qty", "value": 26}).status_code == 200
+        cards = client.get("/api/decks/goreclaw-stompy").json()["cards"]
+        assert next(c for c in cards if c["name"] == "Sol Ring")["category"] == "utility"
+        assert next(c for c in cards if c["name"] == "Forest")["qty"] == 26
+
+
+def test_a_note_can_be_set_and_read_back(swappable):
+    with swappable as client:
+        resp = client.put("/api/decks/goreclaw-stompy/notes/mulligan",
+                          json={"value": "Keep any two-lander with a one-mana dork."})
+        assert resp.status_code == 200, resp.json()
+        notes = client.get("/api/decks/goreclaw-stompy").json()["notes"]
+        assert notes["mulligan"] == "Keep any two-lander with a one-mana dork."
+
+
+def test_an_empty_note_is_refused(swappable):
+    with swappable as client:
+        resp = client.put("/api/decks/goreclaw-stompy/notes/mulligan",
+                          json={"value": "   "})
+        assert resp.status_code == 422
+        assert "needs text" in resp.json()["detail"]
+
+
+def test_a_refused_edit_changes_nothing(swappable):
+    """The whole point of verifying before writing. Every refusal above must
+    leave the deck byte-identical, not partly applied."""
+    with swappable as client:
+        before = client.get("/api/decks/goreclaw-stompy").json()
+        client.post("/api/decks/goreclaw-stompy/cards",
+                    json={"name": "Sol Ring", "category": "ramp", "why": "dup"})
+        client.request("DELETE", "/api/decks/goreclaw-stompy/cards/Black Lotus")
+        client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+                     json={"field": "why", "value": ""})
+        client.patch("/api/decks/goreclaw-stompy/cards/Forest",
+                     json={"field": "qty", "value": 0})
+        client.put("/api/decks/goreclaw-stompy/notes/x", json={"value": ""})
+        assert client.get("/api/decks/goreclaw-stompy").json() == before
+
+
+def test_a_read_only_source_refuses_every_edit():
+    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
+    app = create_app()
+    app.dependency_overrides[deck_source] = \
+        lambda: MemoryDeckSource([deck], writable=False)
+    with TestClient(app) as client:
+        base = "/api/decks/goreclaw-stompy"
+        responses = [
+            client.post(f"{base}/cards", json={"name": "Forest",
+                                               "category": "land", "why": "x"}),
+            client.request("DELETE", f"{base}/cards/Sol Ring"),
+            client.patch(f"{base}/cards/Sol Ring",
+                         json={"field": "why", "value": "x"}),
+            client.put(f"{base}/notes/mulligan", json={"value": "x"}),
+        ]
+        for resp in responses:
+            assert resp.status_code == 422
+            assert "read-only" in resp.json()["detail"]
+
+
 # ----------------------------------------------------------------- import
 #
 # The import endpoint is the only other write in the API, and it creates rather

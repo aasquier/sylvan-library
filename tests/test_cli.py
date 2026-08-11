@@ -287,6 +287,91 @@ def test_import_dry_run_writes_nothing(decks, capsys):
 
 # ---------------------------------------------------------------- sim paths
 
+# ------------------------------------------------------------- decks editing
+#
+# These run without a corpus, which is exactly the point for three of the four:
+# removing a card, setting a field and writing a note are facts about the deck
+# file rather than about Magic. Adding a card needs the corpus and says so.
+
+def test_remove_takes_a_card_out_without_a_corpus(decks, capsys):
+    code, msg = run(["decks", "remove", "mini", "--card", "Sol Ring"])
+    assert code == 0, msg
+    assert "Sol Ring" not in (decks / "mini" / "deck.yaml").read_text()
+    assert "- Sol Ring" in capsys.readouterr().out
+
+
+def test_set_writes_the_rationale_it_was_given(decks, capsys):
+    """The gap import opened, closed at the terminal: a `why` can be written
+    without opening an editor. The text is the argument's, verbatim."""
+    code, msg = run(["decks", "set", "mini", "--card", "Sol Ring",
+                     "--why", "Two mana for one, and it always has been."])
+    assert code == 0, msg
+    text = (decks / "mini" / "deck.yaml").read_text()
+    assert "Two mana for one, and it always has been." in text
+
+
+def test_set_refuses_to_blank_a_rationale_on_a_curated_deck(decks):
+    code, msg = run(["decks", "set", "mini", "--card", "Sol Ring", "--why", "  "])
+    assert code == 1
+    assert "needs a `why`" in msg
+
+
+def test_set_takes_exactly_one_field(decks):
+    code, msg = run(["decks", "set", "mini", "--card", "Sol Ring"])
+    assert (code, "exactly one" in msg) == (1, True)
+    code, msg = run(["decks", "set", "mini", "--card", "Sol Ring",
+                     "--why", "x", "--qty", "2"])
+    assert (code, "exactly one" in msg) == (1, True)
+
+
+def test_note_sets_deck_level_prose(decks, capsys):
+    code, msg = run(["decks", "note", "mini", "--key", "mulligan",
+                     "--value", "Keep any two-lander with a rock."])
+    assert code == 0, msg
+    text = (decks / "mini" / "deck.yaml").read_text()
+    assert "mulligan" in text and "Keep any two-lander with a rock." in text
+
+
+def test_note_can_read_long_prose_from_a_file(decks, tmp_path):
+    """Long prose is folded across lines the way the deck files write it, so
+    the value is checked after parsing rather than by searching the text."""
+    import yaml
+
+    text = ("Ramp on one through three, land the commander on four, then "
+            "assemble any outlet plus any payoff.")
+    prose = tmp_path / "note.txt"
+    prose.write_text(text, encoding="utf-8")
+    code, msg = run(["decks", "note", "mini", "--key", "gameplan",
+                     "--from-file", str(prose)])
+    assert code == 0, msg
+    written = yaml.safe_load((decks / "mini" / "deck.yaml").read_text())
+    assert written["notes"]["gameplan"] == text
+
+
+def test_add_without_a_corpus_refuses_rather_than_guessing(decks):
+    """Rule 1 applied to a write: a card nobody looked up is a card whose
+    legality and colour identity are a guess."""
+    code, msg = run(["decks", "add", "mini", "--card", "Llanowar Elves",
+                     "--category", "ramp", "--why", "One mana dork."])
+    assert code == 1
+    assert "corpus" in msg
+
+
+def test_an_unknown_category_is_refused_before_the_corpus_is_needed(decks):
+    code, msg = run(["decks", "add", "mini", "--card", "Llanowar Elves",
+                     "--category", "rampp", "--why", "typo"])
+    assert code == 1
+    assert "is not a category" in msg
+
+
+def test_a_refused_edit_leaves_the_file_untouched(decks):
+    before = (decks / "mini" / "deck.yaml").read_text()
+    run(["decks", "remove", "mini", "--card", "Black Lotus"])
+    run(["decks", "set", "mini", "--card", "Sol Ring", "--why", ""])
+    run(["decks", "note", "mini", "--key", "x", "--value", ""])
+    assert (decks / "mini" / "deck.yaml").read_text() == before
+
+
 def test_sim_without_a_corpus_exits_with_advice_not_a_traceback(decks, capsys):
     """`compile_deck` raises CorpusRequired; the CLI turns that into a clean
     message naming the command that fixes it."""

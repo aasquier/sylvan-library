@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 from mtglab import config
-from mtglab.decks.model import Deck
+from mtglab.decks.model import CATEGORIES, Deck
 from mtglab.sim.compile import (
     CorpusRequired,
     compile_deck,
@@ -223,6 +223,24 @@ def cmd_decks_suggest(args):
         print()
 
 
+def _report_edit(result):
+    """What every deck edit prints: the gate, then the reminder to commit.
+
+    An edit that did not re-run the gate would be a deck changed and
+    unchecked, so the verdict is not optional output.
+    """
+    print(f"\n  gate: {len(result['errors'])} error(s), "
+          f"{len(result['warnings'])} warning(s)")
+    for issue in result["errors"] + result["warnings"]:
+        card = f"[{issue['card']}] " if issue["card"] else ""
+        print(f"    {issue['code']}: {card}{issue['message']}")
+    if result.get("stage") == "draft" and result.get("needs_rationale"):
+        print(f"\n  draft: {result['needs_rationale']} card(s) still owe a `why`.")
+    print("\n  deck.yaml is the source of truth and its history is git history:\n"
+          "  commit this, then `mtglab decks build` --against the previous "
+          "revision for swaps.md.")
+
+
 def cmd_decks_swap(args):
     """Apply a swap the user has already decided on.
 
@@ -238,14 +256,75 @@ def cmd_decks_swap(args):
         sys.exit(f"refused: {exc}")
 
     print(f"  {result['swapped_out']}  ->  {result['swapped_in']}")
-    print(f"\n  gate: {len(result['errors'])} error(s), "
-          f"{len(result['warnings'])} warning(s)")
-    for issue in result["errors"] + result["warnings"]:
-        card = f"[{issue['card']}] " if issue["card"] else ""
-        print(f"    {issue['code']}: {card}{issue['message']}")
-    print("\n  deck.yaml is the source of truth and its history is git history:\n"
-          "  commit this, then `mtglab decks build` --against the previous "
-          "revision for swaps.md.")
+    _report_edit(result)
+
+
+def cmd_decks_add(args):
+    from mtglab.api import service
+
+    try:
+        result = service.add_card(args.slug, name=args.card, category=args.category,
+                                  why=args.why or "", qty=args.qty, to=args.to)
+    except service.EditRejected as exc:
+        sys.exit(f"refused: {exc}")
+
+    where = "the swap board" if args.to == "swap_board" else "the 99"
+    qty = f"{args.qty}x " if args.qty != 1 else ""
+    print(f"  + {qty}{result['added']}  ({result['category']}) -> {where}")
+    _report_edit(result)
+
+
+def cmd_decks_remove(args):
+    from mtglab.api import service
+
+    try:
+        result = service.remove_card(args.slug, name=args.card)
+    except service.EditRejected as exc:
+        sys.exit(f"refused: {exc}")
+
+    print(f"  - {result['removed']}")
+    _report_edit(result)
+
+
+def cmd_decks_set(args):
+    """Change one field of one card -- including its `why`.
+
+    Exactly one field per invocation, matching the operation underneath. The
+    rationale is taken verbatim from the argument: nothing here writes one, and
+    a blank one on a curated deck is refused rather than filled in (rule 4).
+    """
+    from mtglab.api import service
+
+    chosen = [(f, v) for f, v in (("why", args.why), ("category", args.category),
+                                  ("qty", args.qty)) if v is not None]
+    if len(chosen) != 1:
+        sys.exit("choose exactly one of --why, --category, --qty")
+    field, value = chosen[0]
+
+    try:
+        result = service.set_card_field(args.slug, name=args.card, field=field,
+                                        value=value)
+    except service.EditRejected as exc:
+        sys.exit(f"refused: {exc}")
+
+    print(f"  {result['card']}: {field} set")
+    _report_edit(result)
+
+
+def cmd_decks_note(args):
+    from mtglab.api import service
+
+    value = args.value
+    if args.from_file:
+        value = Path(args.from_file).read_text(encoding="utf-8")
+
+    try:
+        result = service.set_note(args.slug, key=args.key, value=value or "")
+    except service.EditRejected as exc:
+        sys.exit(f"refused: {exc}")
+
+    print(f"  note {result['note']!r} set")
+    _report_edit(result)
 
 
 def cmd_decks_build(args):
@@ -417,6 +496,30 @@ def main(argv=None):
     w.add_argument("--why", required=True,
                    help="why the new card earns the slot; the gate requires one")
     w.set_defaults(func=cmd_decks_swap)
+    a = decks.add_parser("add", help="add a card to the 99 or the swap board")
+    a.add_argument("slug"); a.add_argument("--card", required=True)
+    a.add_argument("--category", required=True,
+                   help=f"one of: {', '.join(CATEGORIES)}")
+    a.add_argument("--why", help="why the card earns its slot; required unless "
+                                 "the deck is a draft")
+    a.add_argument("--qty", type=int, default=1)
+    a.add_argument("--to", default="cards", choices=["cards", "swap_board"])
+    a.set_defaults(func=cmd_decks_add)
+    rm = decks.add_parser("remove", help="take a card out")
+    rm.add_argument("slug"); rm.add_argument("--card", required=True)
+    rm.set_defaults(func=cmd_decks_remove)
+    st = decks.add_parser("set", help="change one field of one card")
+    st.add_argument("slug"); st.add_argument("--card", required=True)
+    st.add_argument("--why", help="the rationale, in your words")
+    st.add_argument("--category", help=f"one of: {', '.join(CATEGORIES)}")
+    st.add_argument("--qty", type=int)
+    st.set_defaults(func=cmd_decks_set)
+    nt = decks.add_parser("note", help="set a deck-level note")
+    nt.add_argument("slug"); nt.add_argument("--key", required=True)
+    nt.add_argument("--value")
+    nt.add_argument("--from-file", dest="from_file",
+                    help="read the note's text from a file, for long prose")
+    nt.set_defaults(func=cmd_decks_note)
     b = decks.add_parser("build"); b.add_argument("slug")
     b.add_argument("--against", help="path to a previous deck.yaml, to emit swaps.md")
     b.add_argument("--force", action="store_true")

@@ -280,8 +280,8 @@ with that card") rather than just refusing.
 
 ## The deck lifecycle
 
-Planned 2026-08-11. Steps 1 and 2 shipped the same day; 3 and 4 are next.
-Design decisions live in
+Planned 2026-08-11. Steps 1, 2 and 3 shipped the same day; 4 is next. Design
+decisions live in
 [ADR 12](docs/adr/0012-decks-are-edited-by-surgical-operations.md) (how a deck
 is edited) and [ADR 13](docs/adr/0013-an-imported-deck-is-a-draft.md) (what an
 imported deck is). This section is the order of work.
@@ -292,7 +292,8 @@ imported deck is). This section is the order of work.
 | --- | --- | --- |
 | **Create** | copy `decks/_template/deck.yaml` by hand, or import a list with a commander and nothing else | a UI form; the machinery is import's |
 | **Import** | **done** — `mtglab decks import`, `POST /api/decks/import`, the Import page | — |
-| **Refactor** | `decks swap` replaces one card; anything else is a text editor | add, remove, recategorise, change quantity — same surgical model |
+| **Refactor** | **done** — add, remove, recategorise, requantify, rationalise and annotate, from the CLI or the deck page | — |
+| **Promote** | hand-edit `stage: curated` once the rationales are written | the last hand-edit left in the loop; see below |
 | **Export** | `moxfield.txt`, one of the five artifacts | unchanged; it already works |
 
 ### Order, and why
@@ -336,14 +337,36 @@ imported deck is). This section is the order of work.
    was meant to surface. The per-card list lives in the deck file (a blank
    `why:` on every line) and on the deck page.
 
-3. **The rest of the edit operations.** `add_card`, `remove_card`,
-   `set_card_field`, `set_note` — each surgical and self-verifying, per ADR 12.
-   A UI that can import but not then change what it imported is half a tool,
-   and that is now literally the state: you can bring a list in and the only
-   way to write its 99 rationales is a text editor.
+3. **The rest of the edit operations.** ✅ **Done.** `add_card`, `remove_card`,
+   `set_card_field`, `set_note`, each surgical and self-verifying per ADR 12,
+   reachable from `mtglab decks add|remove|set|note`, four endpoints, and the
+   deck page. Writing a rationale no longer means opening a text editor.
+
+   Two things came out of the building. **Every operation now proves itself
+   against an oracle**: it computes the document it ought to produce by mutating
+   the parse — an ordinary dict — and refuses to return text that does not read
+   back as exactly that. The naive parse-mutate-dump is used as the oracle it is
+   good at being while the text surgery does the writing, which is the same move
+   as [ADR 10](docs/adr/0010-correctness-against-independent-oracles.md). It
+   earned its keep immediately: it caught that removing the last card from a
+   list leaves `swap_board:` parsing as `None` rather than `[]`, which
+   `Deck.from_text` would have iterated.
+
+   And **insertion is category-aware**, because the deck files are grouped under
+   section banners (`# ---- RAMP 14`). Appending a land to the end of the list
+   would file it under whichever banner came last, so a new card goes after the
+   last entry already in its category, and the banners — with the blank lines
+   above them — are never inside any edit's reach.
 
 4. **A create path in the UI**, once import and edit both exist, since it is the
    same machinery with an empty list.
+
+5. **Promotion**, which step 3 turned into the last hand-edit in the loop. You
+   can now fill in all 99 rationales in the app and are then told to open
+   `deck.yaml` and change `stage: draft` to `curated`. That wants a
+   `set_deck_field` operation — a fifth one, not in ADR 12's table, which is why
+   it was left out rather than added quietly. It is small, and the gate already
+   owns the hard part: it refuses the promotion while any card is blank.
 
 ### The question this settles
 
@@ -388,12 +411,43 @@ whether the question has a right answer:
 3. **Provenance is always visible.** A user must be able to tell without asking
    whether an answer is the gate's (reproducible) or Claude's (an opinion).
 
+### Modes, decided 2026-08-11
+
+A Claude surface is a **mode**: a system prompt, a tool set, and — the part that
+is code rather than prose — a declaration of what it may write.
+[ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md) has the
+argument. Four are worth building first, and every one of them may write
+**nothing**:
+
+| Mode | What it is for |
+| --- | --- |
+| Rationale interview | asks about a card so the user can write its `why`; import leaves 99 of them owing |
+| Argue a slot | the case against a specific card, from corpus facts and category counts |
+| Deck conversation | anything about a deck, with the gate's output and the corpus in reach |
+| Research | the meta, rulings in practice, cards spoiled ahead of the next bulk refresh |
+
+The interview is the mode that made this worth settling before writing code.
+"Claude asks, the user answers, the answer lands in `why`" breaks no rule — the
+keystrokes are the user's. "Tidy that up" is one button away and is a
+machine-written rationale. So the boundary is drawn where it can be tested
+rather than promised: **no code path passes a model response into the `why`
+field**, and a mode may put a question beside the box but never text inside it.
+
 ### What building it looks like
 
 The natural home is `api/service.py` — it is already the seam both the CLI and
-the app call through, so there is nothing to prepare. Research uses Anthropic's
-server-side web tooling rather than a crawler this project maintains, which
-keeps `CLAUDE.md`'s no-scraping rule intact.
+the app call through, so there is nothing to prepare. The modes' tools are
+functions that already exist there and in `cards/db.py`: `get_cards`,
+`search_cards`, `validate`, `suggest`, `deck_stats`. That is also how rule 1 is
+enforced structurally rather than by asking the model nicely — a mode that needs
+to know what a card does calls the corpus and the tool result is the fact.
+
+Research uses Anthropic's server-side web tooling rather than a crawler this
+project maintains, which keeps `CLAUDE.md`'s no-scraping rule intact.
+
+The rationale editor built in step 3 of the deck lifecycle is already the right
+shape for the interview: the box sits beside a column showing the card as the
+corpus has it, which is where a mode's questions go.
 
 Two things to settle before it ships, both open decisions above: **what a hosted
 Claude surface costs and who pays**, and — for the simulator half — **whether
@@ -403,17 +457,19 @@ Forge can run where the app runs**.
 
 ## Suggested order
 
-1. **The rest of the deck lifecycle** — `add_card`, `remove_card`,
-   `set_card_field`, `set_note` (ADR 12), and a UI for writing a rationale.
-   Import landed on 2026-08-11 and created this gap: you can bring a 99-card
-   list in and the only way to write its `why` fields is a text editor.
-2. **Forge feasibility research** — can `forge.jar sim` be driven from here at
+1. **The rest of the deck lifecycle.** ✅ **Done 2026-08-11.** `add_card`,
+   `remove_card`, `set_card_field`, `set_note` (ADR 12), and the rationale
+   editor. What remains of the lifecycle is the create form and promotion.
+2. **The Claude surface** — the modes in
+   [ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md),
+   starting with the rationale interview, which now has somewhere to put its
+   output. Moved ahead of Forge on 2026-08-11: it is what makes the app useful
+   for judgement rather than facts, and shipping the toolkit to someone else
+   without it hands them a gate and a goldfish sim with no opinion in them.
+   Local runs on the maintainer's own key; the hosted question stays open.
+3. **Forge feasibility research** — can `forge.jar sim` be driven from here at
    all, and can it be reached from a hosted instance? Cheap to answer, and it
    gates goals 2, 3 and 7 together. See the open decision below.
-3. **The Claude surface** — conversation and research, per
-   [ADR 14](docs/adr/0014-python-decides-claude-advises.md). Independent of the
-   simulator work and the first thing that makes the app useful for judgement
-   rather than facts.
 4. **Spoiler scan** and **deals/carts** — both self-contained.
 
 **Tier 2 is deliberately not on this list.** It waits behind Forge (goal 2).
