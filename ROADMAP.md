@@ -117,11 +117,89 @@ Beyond the two bans, the gate and a corpus cross-check caught:
   is wrong. From the corpus it is **9/13/20/13/4/4, avg 3.03**.
 - The Arahbo source claims the commander is castable by T5 in 67% of games.
   `sim mana` at 20,000 games says **57.2%**.
-- Kaheera's companion condition is **not checked by the gate** — it was
-  verified by hand (all 27 creature cards are Cats). Worth building in.
+- Kaheera's companion condition was **not checked by the gate** — verified by
+  hand at the time (all 27 creature cards are Cats). **Now fixed**, see below.
 
 Every one of these was a checkable fact that prose got wrong, which is the
 same lesson as the section below.
+
+### Companion restrictions are now enforced
+
+`decks/companion.py` checks the deckbuilding restriction itself, not just that
+the named card has a Companion ability. All **10 commander-legal companions**
+are covered:
+
+| Companion | Restriction | Check |
+| --- | --- | --- |
+| Gyruda | even mana values | exact |
+| Obosh | odd mana values, lands exempt | exact |
+| Keruga | mana value 3+, lands exempt | exact |
+| Lurrus | permanents mana value 2 or less | exact |
+| Kaheera | creature types, read from her own oracle text | exact |
+| Jegantha | no repeated mana symbol in a cost | exact |
+| Lutri | nonland names all different | exact |
+| Umori | nonland cards share a card type | exact |
+| Yorion | deck size +20, wired into the size check | exact |
+| Zirda | permanents have an activated ability | **heuristic → warning** |
+
+Three further companions exist in the corpus and are *deliberately* reported as
+unchecked: Lutri, Pauper Otter; Treizeci, Sun of Serra; and The Companion of
+the Wilds. Their conditions reference expansion symbols, retro frames and
+specific sets — properties of a *printing*, not of an oracle card. None is
+legal in Commander, so none can legitimately appear anyway.
+
+The design rule: **an unevaluated restriction warns loudly and is never
+reported as satisfied.** An unrecognised companion produces
+`companion-unchecked` rather than a silent pass. Zirda's activated-ability test
+is a colon-plus-keyword heuristic, so it reports at warning level rather than
+blocking generation on a guess.
+
+The same pass closed three other holes the companion had: it was never checked
+for **Commander legality**, never checked for **colour identity** against the
+commander, and never checked for being **listed in the 99** as well. Also,
+`is_companion` now tests the `Companion —` ability marker rather than the mere
+presence of the word "companion", which appears in ordinary rules text.
+
+Note "your starting deck" includes your commander, so the commander is part of
+the check — Arahbo, Roar of the World is a Cat Avatar, so the cats list stays
+legal.
+
+### Two-commander pairings are enforced too
+
+`decks/partners.py` covers every way a deck can have two commanders. The gate
+previously assumed one, and was wrong about legal decks in three ways:
+
+- **A Background was rejected outright.** It is a `Legendary Enchantment —
+  Background` whose text never says it can be your commander, so Jaheira +
+  Raised by Giants failed with `not-a-commander`.
+- **Deck size was always 99.** Two commanders share the command zone, so the
+  deck holds **98**. Any legal partner deck failed `deck-size`. Note the
+  contrast with a companion, which is "effectively a 101st card" and therefore
+  does *not* change the deck size — commanders are inside the 100, companions
+  are not.
+
+**A rule I got wrong first time, recorded so nobody repeats it.** Battlebond
+printed ten *non-legendary* creatures with `Partner with` (Lore Weaver, Ley
+Weaver, Chakram Slinger and friends) for Two-Headed Giant limited. I assumed
+the ability granted commander eligibility the way "Choose a Background" does.
+It does not — the official ruling on those cards is blunt: *"A nonlegendary
+creature can't be your commander, even if it has a 'partner with' ability."*
+The gate now rejects them and says exactly that, because "does not say it can
+be your commander" reads like a data problem rather than a rule. The Background
+exemption is the only real one: it is legal despite not being a creature
+because "Choose a Background" makes it a second commander.
+
+Mechanics covered, all enumerated from the corpus: plain **Partner**, **Partner
+with `<name>`** (pairs only with that card), **Partner—`<label>`**, **Choose a
+Background** + **Background**, and **Doctor's companion** + a `Time Lord
+Doctor`. `Partner—<label>` is a generalised template and the corpus already
+carries four labels — Friends forever, Survivors, Character select, Father &
+son — so the check matches on the label rather than hardcoding one, and a new
+set adds labels for free.
+
+Also added: more than two commanders is an error, and an illegal pairing says
+precisely why ("Lore Weaver has Partner with Ley Weaver, so it can only pair
+with that card") rather than just refusing.
 
 ---
 
@@ -252,7 +330,7 @@ producing confident, wrong answers for *every* deck, not just one.
   flipping.
 
 All five are fixed and pinned by tests. The lesson worth keeping: logic in
-tested code gets caught, logic in conversation does not. 117 tests, CI runs
+tested code gets caught, logic in conversation does not. 180 tests, CI runs
 them on 3.11 and 3.12, typechecks and builds the frontend, and fails if the
 committed bundle drifts from source.
 

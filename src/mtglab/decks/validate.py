@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from mtglab.decks import companion, partners
 from mtglab.decks.model import CATEGORIES, Deck
 
 SINGLETON_EXEMPT = {
@@ -74,9 +75,34 @@ def validate(deck: Deck, cards: dict | None = None, *,
     if not deck.commander:
         rep.add("error", "no-commander", "deck has no commander")
 
+    # Two commanders share the command zone, so the deck holds 98 rather than
+    # 99. `expected_size` is the single-commander default; adjust it by however
+    # many commanders there actually are.
+    reasons = []
+    if len(deck.commander) > 1:
+        expected_size -= len(deck.commander) - 1
+        reasons.append(f"{len(deck.commander)} commanders")
+
+    # Yorion is the one companion that changes how big the deck must be
+    # ("at least twenty cards more than the minimum deck size"), so the size
+    # check has to know about it or a legal Yorion deck fails here. Keyed by
+    # name because this runs before the corpus is consulted, and because deck
+    # size is a property of the deck rather than a judgement about a card.
+    bonus = companion.DECK_SIZE_BONUS.get((deck.companion or "").lower(), 0)
+    if bonus:
+        expected_size += bonus
+        reasons.append(f"+{bonus} for {deck.companion}")
+
+    if len(deck.commander) > 2:
+        rep.add("error", "too-many-commanders",
+                f"{len(deck.commander)} commanders listed; Commander allows at "
+                "most two, and only with a pairing ability")
+
     if deck.total_cards != expected_size:
+        because = f" ({', '.join(reasons)})" if reasons else ""
         rep.add("error", "deck-size",
-                f"deck has {deck.total_cards} cards in the 99, expected {expected_size}")
+                f"deck has {deck.total_cards} cards in the 99, "
+                f"expected {expected_size}{because}")
 
     seen: dict[str, int] = {}
     for card in deck.cards:
@@ -123,12 +149,30 @@ def validate(deck: Deck, cards: dict | None = None, *,
         identity: frozenset[str] = frozenset()
         for rec in cmd_records:
             identity |= rec.color_identity
+        # A Background is a legal commander only as one of a pair, so whether
+        # a card qualifies depends on how many commanders there are.
+        paired = len(cmd_records) > 1
         for rec in cmd_records:
-            if "Legendary" not in rec.type_line or "Creature" not in rec.type_line:
-                if "can be your commander" not in (rec.oracle_text or "").lower():
-                    rep.add("error", "not-a-commander",
-                            f"type line is {rec.type_line!r} and it does not say "
-                            "it can be your commander", rec.name)
+            if not partners.can_be_commander(rec, paired=paired):
+                if partners.nonlegendary_partner(rec):
+                    # The Battlebond trap: the ability is there, the type line
+                    # is not. Say so, because "does not say it can be your
+                    # commander" reads like a data problem rather than a rule.
+                    extra = (" -- a nonlegendary creature can't be your "
+                             "commander even with a 'partner with' ability")
+                elif not paired and partners.is_background(rec):
+                    extra = (" -- a Background is only legal as a second "
+                             "commander, and this deck lists one")
+                else:
+                    extra = ""
+                rep.add("error", "not-a-commander",
+                        f"type line is {rec.type_line!r} and it does not say "
+                        f"it can be your commander{extra}", rec.name)
+
+        if len(cmd_records) == 2:
+            problem = partners.check_pair(*cmd_records)
+            if problem:
+                rep.add("error", "illegal-pairing", problem)
 
         for card in deck.cards:
             rec = cards.get(card.name)
@@ -153,12 +197,70 @@ def validate(deck: Deck, cards: dict | None = None, *,
 
     # ---- companion ------------------------------------------------------
     if deck.companion:
-        rec = cards.get(deck.companion)
-        if rec and "companion" not in (rec.oracle_text or "").lower():
-            rep.add("error", "not-a-companion",
-                    "listed as companion but has no Companion ability", deck.companion)
+        _check_companion(deck, cards, identity if cmd_records else None, rep)
 
     return rep
+
+
+def _check_companion(deck: Deck, cards: dict,
+                     identity: frozenset[str] | None,
+                     rep: ValidationReport) -> None:
+    """Validate the companion itself and its deckbuilding restriction.
+
+    Previously this confirmed the card had a Companion ability and stopped, so
+    the restriction -- the entire reason a companion costs you anything -- went
+    unchecked, as did the companion's own legality and colour identity.
+    """
+    name = deck.companion
+    rec = cards.get(name)
+    if rec is None:
+        return                      # already reported as unknown-card above
+
+    if not companion.is_companion(rec):
+        rep.add("error", "not-a-companion",
+                "listed as companion but has no Companion ability", name)
+        return
+
+    if not rec.legal_commander:
+        rep.add("error", "companion-banned",
+                "not legal in Commander, so it cannot be your companion", name)
+
+    if identity is not None:
+        illegal = rec.color_identity - identity
+        if illegal:
+            rep.add("error", "companion-color-identity",
+                    f"identity {{{''.join(sorted(rec.color_identity))}}} includes "
+                    f"{{{''.join(sorted(illegal))}}}, outside the commander's "
+                    f"{{{''.join(sorted(identity)) or 'C'}}}", name)
+
+    if name.lower() in (c.name.lower() for c in deck.cards):
+        rep.add("error", "companion-in-99",
+                "the companion sits outside the 100, not in the deck", name)
+
+    # "Your starting deck" includes the commander, and excludes the companion.
+    entries = [(c.name, cards[c.name]) for c in deck.cards if c.name in cards]
+    entries += [(n, cards[n]) for n in deck.commander if n in cards]
+
+    result = companion.check(name, entries, cards)
+    if result.unsupported:
+        # Never report a restriction as satisfied when it was never evaluated.
+        rep.add("warn", "companion-unchecked",
+                f"deckbuilding restriction was NOT verified -- "
+                f"{result.unsupported}. Condition: {result.condition or 'unknown'}",
+                name)
+        return
+
+    if result.violations:
+        shown = ", ".join(sorted(result.violations)[:6])
+        more = len(result.violations) - 6
+        if more > 0:
+            shown += f", and {more} more"
+        level = "error" if result.exact else "warn"
+        detail = "" if result.exact else " (heuristic check -- verify by hand)"
+        rep.add(level, "companion-restriction",
+                f"{len(result.violations)} card(s) break the companion "
+                f"restriction{detail}: {shown}. Condition: {result.condition}",
+                name)
 
 
 def reserved_list(deck: Deck, cards: dict) -> list[str]:
