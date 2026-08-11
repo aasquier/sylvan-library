@@ -143,6 +143,13 @@ rather than folded into losses.
   cases where naive source-counting gives the wrong answer.
 - `ruff check src tests` before pushing.
 
+## Planning documents
+
+`ROADMAP.md` (goals vs reality, open decisions), `docs/ENGINEERING.md` (the
+next phase: compiled backend, testing rigor, CI/CD) and `docs/HOSTING.md`
+(deploying a shared instance). These are kept current deliberately — read them
+before proposing direction, and update them when direction changes.
+
 ## Out of scope
 
 No purchase automation — the shopping tooling prices decks, watches for deals,

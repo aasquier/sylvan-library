@@ -207,6 +207,12 @@ with that card") rather than just refusing.
 
 ---
 
+> **Next phase:** [docs/ENGINEERING.md](docs/ENGINEERING.md) — property-based
+> and differential testing, container hardening, and Claude review on PRs.
+> A compiled rewrite is **deferred with a written trigger**; the measurements
+> say Tier 1 would gain nothing, and Tier 2 gets built in Python and profiled
+> before that call is re-made.
+
 ## Suggested order
 
 1. **Migrate the remaining decks.** Highest value: the Library screen is built
