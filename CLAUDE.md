@@ -96,10 +96,12 @@ and land types.
 
 **4. Every card carries a `why`.** Validation fails without one. A card that
 cannot justify its slot is a card to cut. **Never write one on the user's
-behalf** — `decks swap` and the swap endpoint both refuse an empty rationale
-rather than inventing one, which is what keeps [ADR 8](docs/adr/0008-the-gate-blocks.md)
-intact now that the tool can edit decks. See
-[ADR 11](docs/adr/0011-the-api-may-apply-a-swap.md).
+behalf** — every write path refuses an empty rationale rather than inventing
+one, which is what keeps [ADR 8](docs/adr/0008-the-gate-blocks.md) intact now
+that the tool can edit decks. See
+[ADR 11](docs/adr/0011-the-api-may-apply-a-swap.md). The rationale editor in
+the app is the same rule in a UI: the box opens empty, its placeholder is a
+question rather than a draft, and a test pins that.
 
 The one bend, and it does not bend the rule: a deck declares a `stage` as well
 as a `status`. In a **draft** — what `decks import` writes — a missing `why` is
@@ -123,8 +125,18 @@ mtglab decks swap <slug> --out X --in Y --why '...'   # apply your choice
 mtglab sim mana <slug>            # baseline consistency
 mtglab sim lands <slug> 30 40     # is the land count right?
 git commit -am "before refactor"  # so swaps.md has something to diff
-# ...edit deck.yaml...
-mtglab decks validate <slug>
+```
+
+Editing, all surgical and self-verifying ([ADR 12](docs/adr/0012-decks-are-edited-by-surgical-operations.md)),
+each also a route and a control on the deck page:
+
+```bash
+mtglab decks add <slug> --card X --category ramp --why '...'  # corpus-checked
+mtglab decks remove <slug> --card X
+mtglab decks set <slug> --card X --why '...'        # or --category / --qty
+mtglab decks set <slug> --status built              # no --card: a deck field
+mtglab decks note <slug> --key mulligan --value '...'
+mtglab decks promote <slug>       # draft -> curated, once every card is justified
 mtglab decks build <slug> --against <(git show HEAD:decks/<slug>/deck.yaml)
 ```
 
@@ -135,7 +147,17 @@ mtglab decks build <slug> --against <(git show HEAD:decks/<slug>/deck.yaml)
 The split, decided 2026-08-11 and argued in
 [ADR 14](docs/adr/0014-python-decides-claude-advises.md): **anything with a
 right answer belongs in deterministic Python; Claude is for opinions and
-research.** Nothing is built yet — there is no LLM SDK in `pyproject.toml`.
+research.** Not built yet — there is no LLM SDK in `pyproject.toml` — but it is
+the work in progress, so check before assuming.
+
+[ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md) says
+what a surface *is*: a **mode** (a system prompt, a tool set, and what it may
+write) plus a **stance** (the user's dial over initiative, scope, and write
+autonomy). A stance may widen what a mode does, never what it is allowed to do.
+Card facts reach a mode through corpus tools rather than recall, which is how
+rule 1 below becomes structural instead of a request. Target model is
+**Claude Sonnet 5** to begin with — the user's call, not a default to override;
+**load the `claude-api` skill before writing any integration code.**
 
 Deterministic Python owns legality, colour identity, singleton, deck size,
 companion and partner rules, mana solving, Tier 1, category counts, similarity
@@ -153,6 +175,9 @@ anything built later:
    making the case against it is the conversation the curated six came out of.
    Authoring the text that lands in `deck.yaml` is not, and no surface may
    pre-fill that field. Rule 4 above is the rule; this is where its edge is.
+   In code the line is **no path passes a model response into
+   `set_card_field(field="why")`** — an interview supplies questions, the user
+   supplies the words.
 3. **Say which system answered.** The gate's output is reproducible and
    checkable; an opinion is neither. Never present one as the other.
 

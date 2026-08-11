@@ -335,6 +335,17 @@ different class of container than anything costed here. And a Claude surface
 and on a shared instance it is the maintainer's. The numbers above cover the
 app without either.
 
+On the Claude half there is now at least an estimate. A rationale interview
+turn is roughly 12K tokens in and 800 out, and the deck sits in a cached prefix
+that reads at a tenth of input price — so interviewing a whole 99-card draft
+lands near **$1–1.50 on Sonnet 5** and **$2.50–3 on Opus 5**. That is small
+enough not to need a funding model at friends scale, and it is a separate
+account from the app's hosting bill either way. **Research is the mode that is
+not estimated** — web search and long context are where the cost actually is,
+and it is the one plausibly worth gating per user. ADR 15's stance dial doubles
+as the control: off means no API calls at all, which is a defensible hosted
+default.
+
 ### Prerequisites
 
 ```bash
