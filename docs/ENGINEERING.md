@@ -273,6 +273,36 @@ frontend typecheck + build, committed-bundle drift check, and a secrets/corpus
 guard. That is already better than most solo projects. The ladder from here,
 roughly in order of value per unit of effort:
 
+### The repository is public, and `main` is protected
+
+Decided 2026-08-10, after a commit landed on `main` directly because a merge
+returned the working copy there and nobody noticed. CI ran and passed, so
+nothing broke — but "nothing broke this time" is not a control.
+
+Branch protection is unavailable on private repositories on the Free plan;
+both classic protection and rulesets return `403 — Upgrade to GitHub Pro or
+make this repository public`. So the choice was $4/month, a local git hook that
+only guards one machine, or making the repository public. Public won on its own
+merits: this document is explicitly written for the case where peers read the
+repo, the history audit came back clean (no corpus, collection, credential or
+`.env` file in any of 29 commits), and public repositories get unmetered
+Actions minutes. The cost, stated plainly: the author's email address is in the
+metadata of 19 commits and is now public.
+
+The settings on `main`, recorded so they can be rebuilt:
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| Pull request required | yes, **0 approvals** | A solo maintainer cannot approve their own PR, so requiring 1 would deadlock the repo |
+| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-corpus` | The whole pipeline. Renaming a CI job silently stops gating until this list is updated |
+| Strict (branch up to date) | yes | Checks that passed against a stale base did not test what is being merged |
+| Enforce for admins | **yes** | Off, it does not apply to the only contributor, which makes it decorative |
+| Force pushes, deletions | blocked | |
+| Linear history | required | Matches the squash-merge history already in use |
+
+The escape hatch is turning admin enforcement off in settings — deliberately a
+visible act rather than a `--no-verify` away.
+
 ### Claude review on every PR
 
 `anthropics/claude-code-action@v1` is the official action. Verified workflow
@@ -418,9 +448,12 @@ leave hosting a matter of adding an auth layer and a second deck source rather
 than reworking what is here.
 
 Automated PR review (§5) is **deliberately parked** — priced out 2026-08-10.
-Copilot Free does not include PR review; Copilot Pro is $10/mo and consumes
-Actions minutes on a private repo; the Claude action is pay-per-run and needs
-an API key. Revisit when PR volume justifies it.
+Copilot Free does not include PR review; Copilot Pro is $10/mo; the Claude
+action is pay-per-run and needs an API key. One input to that pricing has since
+changed: the repository is public now, so Actions minutes are no longer metered
+and the "it eats the free allowance" half of the argument is gone. The
+per-review cost is not, so this stays parked — but re-price it, rather than
+re-reading the old conclusion, when PR volume justifies a look.
 
 ## Cloud-compatible by construction
 
