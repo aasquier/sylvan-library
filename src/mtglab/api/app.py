@@ -8,15 +8,20 @@ never drift into disagreeing about a deck.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from mtglab.api import jobs, service
-from mtglab.api.service import DeckNotFound
+from mtglab.api.deps import deck_source
+from mtglab.decks.source import DeckNotFound, DeckSource
+
+# The request scope, as one annotation. Every deck-facing route takes it, so
+# when auth arrives the change is to `deps.deck_source` and nowhere else.
+Decks = Annotated[DeckSource, Depends(deck_source)]
 
 WEB_DIST = Path(__file__).resolve().parent.parent / "web_dist"
 
@@ -42,8 +47,8 @@ def create_app(*, dev: bool = False) -> FastAPI:
     # ------------------------------------------------------------- meta
 
     @app.get("/api/health")
-    def health() -> dict[str, Any]:
-        return service.health()
+    def health(decks: Decks) -> dict[str, Any]:
+        return service.health(source=decks)
 
     @app.get("/api/sets/upcoming")
     def upcoming_sets() -> dict[str, Any]:
@@ -59,20 +64,20 @@ def create_app(*, dev: bool = False) -> FastAPI:
     # ------------------------------------------------------------ decks
 
     @app.get("/api/decks")
-    def list_decks() -> list[dict[str, Any]]:
-        return service.list_decks()
+    def list_decks(decks: Decks) -> list[dict[str, Any]]:
+        return service.list_decks(source=decks)
 
     @app.get("/api/decks/{slug}")
-    def get_deck(slug: str) -> dict[str, Any]:
-        return service.get_deck(slug)
+    def get_deck(slug: str, decks: Decks) -> dict[str, Any]:
+        return service.get_deck(slug, source=decks)
 
     @app.get("/api/decks/{slug}/validate")
-    def validate_deck(slug: str) -> dict[str, Any]:
-        return service.validate_deck(slug)
+    def validate_deck(slug: str, decks: Decks) -> dict[str, Any]:
+        return service.validate_deck(slug, source=decks)
 
     @app.get("/api/decks/{slug}/stats")
-    def deck_stats(slug: str) -> dict[str, Any]:
-        return service.stats_for(slug)
+    def deck_stats(slug: str, decks: Decks) -> dict[str, Any]:
+        return service.stats_for(slug, source=decks)
 
     # ------------------------------------------------------------ cards
 
@@ -92,8 +97,13 @@ def create_app(*, dev: bool = False) -> FastAPI:
 
     # -------------------------------------------------------------- sim
 
+    # The job closures capture `decks` and run after the response has been
+    # sent. That is safe because a DeckSource is a locator rather than a
+    # connection -- see the note in `decks/source.py`, which is a constraint on
+    # future implementations, not an accident of this one.
+
     @app.post("/api/sim/mana")
-    def sim_mana(payload: dict[str, Any]) -> dict[str, Any]:
+    def sim_mana(payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
         slug = payload.get("slug")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
@@ -101,12 +111,12 @@ def create_app(*, dev: bool = False) -> FastAPI:
         games = int(payload.get("games", 20_000))
         job = jobs.submit(
             "sim.mana",
-            lambda progress: run_mana(slug, payload, progress),
+            lambda progress: run_mana(slug, payload, progress, source=decks),
             label=f"{slug}: mana, {games:,} games")
         return job.as_dict()
 
     @app.post("/api/sim/lands")
-    def sim_lands(payload: dict[str, Any]) -> dict[str, Any]:
+    def sim_lands(payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
         slug = payload.get("slug")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
@@ -115,7 +125,7 @@ def create_app(*, dev: bool = False) -> FastAPI:
         high = int(payload.get("high", 40))
         job = jobs.submit(
             "sim.lands",
-            lambda progress: run_lands(slug, payload, progress),
+            lambda progress: run_lands(slug, payload, progress, source=decks),
             label=f"{slug}: land sweep {low}-{high}")
         return job.as_dict()
 

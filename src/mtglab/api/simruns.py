@@ -11,7 +11,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from mtglab.api.service import _connect, _corpus_for, _load_deck
+from mtglab.api.service import _connect, _corpus_for, _source
+from mtglab.decks.source import DeckSource
 from mtglab.sim.compile import compile_deck
 from mtglab.sim.tier1.engine import KeepRule, run, simulate_game
 
@@ -28,8 +29,8 @@ LAND_SWEEP_CAVEAT = (
 )
 
 
-def _compile(slug: str):
-    deck = _load_deck(slug)
+def _compile(slug: str, *, source: DeckSource | None = None):
+    deck = _source(source).get(slug)
     con = _connect()
     try:
         cards = _corpus_for(deck, con)
@@ -52,8 +53,9 @@ def _keep_rule(payload: dict[str, Any]) -> KeepRule:
 
 
 def run_mana(slug: str, payload: dict[str, Any],
-             progress: Callable[[int, int], None]) -> dict[str, Any]:
-    deck, library, commander = _compile(slug)
+             progress: Callable[[int, int], None],
+             *, source: DeckSource | None = None) -> dict[str, Any]:
+    deck, library, commander = _compile(slug, source=source)
     games = max(100, min(int(payload.get("games", 20_000)), 200_000))
     turns = max(4, min(int(payload.get("turns", 12)), 20))
     seed = payload.get("seed")
@@ -89,14 +91,15 @@ def run_mana(slug: str, payload: dict[str, Any],
 
 
 def run_lands(slug: str, payload: dict[str, Any],
-              progress: Callable[[int, int], None]) -> dict[str, Any]:
+              progress: Callable[[int, int], None],
+              *, source: DeckSource | None = None) -> dict[str, Any]:
     """Sweep land counts, rebuilding the deck at each size.
 
     The engine's own `sweep_land_counts` takes a builder function; here the
     deck is fixed, so lands are added or removed by cycling the existing pool.
     That preserves the colour mix, which is what the sweep is measuring.
     """
-    deck, library, commander = _compile(slug)
+    deck, library, commander = _compile(slug, source=source)
     low = max(20, int(payload.get("low", 30)))
     high = min(60, int(payload.get("high", 40)))
     if high < low:
@@ -157,10 +160,11 @@ def run_lands(slug: str, payload: dict[str, Any],
     }
 
 
-def goldfish_one(slug: str, seed: int | None = None) -> dict[str, Any]:
+def goldfish_one(slug: str, seed: int | None = None,
+                 *, source: DeckSource | None = None) -> dict[str, Any]:
     """A single game, for the playtest screen. Cheap enough to run inline."""
     import random
-    _deck, library, commander = _compile(slug)
+    _deck, library, commander = _compile(slug, source=source)
     res = simulate_game(library, commander, turns=12,
                         rng=random.Random(seed))
     return {

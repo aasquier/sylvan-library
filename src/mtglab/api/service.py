@@ -14,17 +14,25 @@ from pathlib import Path
 from typing import Any
 
 from mtglab.cards import db
-from mtglab.config import DB_PATH, DECKS_DIR, deck_paths
+from mtglab.config import DB_PATH
 from mtglab.decks.analyze import deck_stats
 from mtglab.decks.model import Deck
+from mtglab.decks.source import DeckSource, FileDeckSource
 from mtglab.decks.validate import validate
 
 SCRYFALL_SETS = "https://api.scryfall.com/sets"
 USER_AGENT = "mtg-lab/0.1 (local personal deckbuilding tool)"
 
 
-class DeckNotFound(Exception):
-    """Raised so the route layer can turn it into a 404 without guessing."""
+def _source(source: DeckSource | None) -> DeckSource:
+    """The caller's deck source, or the default file-backed library.
+
+    Routes always pass one, resolved from the request scope in `deps.py`. The
+    default keeps these functions callable from a script or a test without
+    ceremony, which is the property that made them worth extracting from the
+    routes in the first place.
+    """
+    return source if source is not None else FileDeckSource()
 
 
 # ------------------------------------------------------------------- corpus
@@ -46,7 +54,7 @@ def _connect():
         return None
 
 
-def health() -> dict[str, Any]:
+def health(*, source: DeckSource | None = None) -> dict[str, Any]:
     con = _connect()
     if con is None:
         return {"corpus": False, "oracle_cards": 0, "printings": 0,
@@ -63,17 +71,11 @@ def health() -> dict[str, Any]:
         "oracle_cards": oracle,
         "printings": printings,
         "bulk_files": [f.name for f in files],
-        "decks": len(deck_paths()),
+        "decks": len(_source(source).slugs()),
     }
 
 
 # -------------------------------------------------------------------- decks
-
-def _load_deck(slug: str) -> Deck:
-    path = Path(DECKS_DIR) / slug / "deck.yaml"
-    if not path.exists():
-        raise DeckNotFound(slug)
-    return Deck.load(path)
 
 
 def _corpus_for(deck: Deck, con) -> dict:
@@ -110,7 +112,7 @@ def _card_json(entry, rec) -> dict[str, Any]:
     return out
 
 
-def list_decks() -> list[dict[str, Any]]:
+def list_decks(*, source: DeckSource | None = None) -> list[dict[str, Any]]:
     """The library view. Includes the commander's art so the UI has a hero
     image without a second round trip per deck.
 
@@ -124,8 +126,7 @@ def list_decks() -> list[dict[str, Any]]:
     con = _connect()
     try:
         out = []
-        for path in deck_paths():
-            deck = Deck.load(path)
+        for deck in _source(source).all():
             art = None
             identity: list[str] = []
             errors = warnings = None
@@ -160,8 +161,8 @@ def list_decks() -> list[dict[str, Any]]:
             con.close()
 
 
-def get_deck(slug: str) -> dict[str, Any]:
-    deck = _load_deck(slug)
+def get_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
+    deck = _source(source).get(slug)
     con = _connect()
     try:
         cards = _corpus_for(deck, con)
@@ -190,8 +191,8 @@ def get_deck(slug: str) -> dict[str, Any]:
             con.close()
 
 
-def validate_deck(slug: str) -> dict[str, Any]:
-    deck = _load_deck(slug)
+def validate_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
+    deck = _source(source).get(slug)
     con = _connect()
     try:
         cards = _corpus_for(deck, con) if con is not None else None
@@ -208,8 +209,8 @@ def validate_deck(slug: str) -> dict[str, Any]:
             con.close()
 
 
-def stats_for(slug: str) -> dict[str, Any]:
-    deck = _load_deck(slug)
+def stats_for(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
+    deck = _source(source).get(slug)
     con = _connect()
     try:
         stats = deck_stats(deck, _corpus_for(deck, con))

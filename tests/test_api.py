@@ -20,6 +20,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from mtglab.api import jobs  # noqa: E402
 from mtglab.api.app import create_app  # noqa: E402
+from mtglab.api.deps import deck_source  # noqa: E402
+from mtglab.decks.model import Deck  # noqa: E402
+from mtglab.decks.source import MemoryDeckSource  # noqa: E402
 
 # The job pool has a single worker, so a queued job may sit behind another
 # test's. Poll on a clock rather than an iteration count.
@@ -122,6 +125,53 @@ def test_stats_are_json_serialisable(client):
     assert body["curve"]["buckets"], "no curve buckets"
     assert isinstance(body["curve"]["buckets"][0]["mv"], int)
     assert isinstance(body["categories"], list)
+
+
+# ------------------------------------------------- decks, from elsewhere
+#
+# The point of the deck source seam (ADR 4): the endpoints read whatever the
+# request scope hands them, so hosting can add a second tier by swapping one
+# dependency instead of touching thirteen handlers. These tests are the proof,
+# and they are also the cheapest way to exercise library states the filesystem
+# makes awkward.
+
+@pytest.fixture
+def in_memory_client():
+    """The app, serving exactly the decks a test puts in front of it."""
+    def make(decks):
+        app = create_app()
+        app.dependency_overrides[deck_source] = lambda: MemoryDeckSource(decks)
+        return TestClient(app)
+    return make
+
+
+def test_endpoints_read_the_request_scope_not_the_filesystem(in_memory_client):
+    only = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    with in_memory_client([only]) as client:
+        assert [d["slug"] for d in client.get("/api/decks").json()] == ["gyome-food"]
+        assert client.get("/api/decks/gyome-food").status_code == 200
+        # On disk, and deliberately not in this request's scope.
+        assert client.get("/api/decks/arahbo-cats").status_code == 404
+
+
+def test_the_request_scope_does_not_leak_into_the_public_schema(client):
+    """A dependency injected by annotation can end up documented as a query
+    parameter if it is wired wrong. The endpoint would still work and every
+    other test would still pass, so check the schema itself."""
+    schema = client.get("/openapi.json")
+    assert schema.status_code == 200
+    paths = schema.json()["paths"]
+    assert [p["name"] for p in paths["/api/decks"]["get"].get("parameters", [])] == []
+    assert [p["name"] for p in paths["/api/decks/{slug}"]["get"]["parameters"]] == ["slug"]
+
+
+def test_an_empty_library_is_empty_rather_than_broken(in_memory_client):
+    """Two lines here; creating and removing directories on disk otherwise."""
+    with in_memory_client([]) as client:
+        assert client.get("/api/decks").json() == []
+        health = client.get("/api/health").json()
+        if health["corpus"]:
+            assert health["decks"] == 0
 
 
 # ------------------------------------------------------------------- cards
