@@ -485,11 +485,18 @@ exist partly so that when it happens it is additive.
 4. ~~**Frontend tests**~~ **Done 2026-08-10** — 35 of them, on the job-polling
    state machine, the library filters and `identityName`; see §4. Found the
    library rendering "the gate never ran" identically to "the deck passed".
-5. **Container hardening** — multi-stage, non-root, multi-arch, scanned,
+5. **The deck lifecycle** — import, the draft stage, and the rest of the edit
+   operations. Added 2026-08-11, and it jumps ahead of container hardening
+   deliberately: `docs/HOSTING.md` §6 assumes user decks can be created, and
+   nothing can. Hardening a container that serves an empty library first would
+   be polishing the wrong end. Planned in `ROADMAP.md`; decided in
+   [ADR 12](adr/0012-decks-are-edited-by-surgical-operations.md) and
+   [ADR 13](adr/0013-an-imported-deck-is-a-draft.md).
+6. **Container hardening** — multi-stage, non-root, multi-arch, scanned,
    health-checked. Proves the deployment story without deploying.
-6. **Tier 2 in Python**, then profile it.
+7. **Tier 2 in Python**, then profile it.
 
-Steps 1–5 make the existing project defensible without adding a language, and
+Steps 1–6 make the existing project defensible without adding a language, and
 leave hosting a matter of adding an auth layer and a second deck source rather
 than reworking what is here.
 
