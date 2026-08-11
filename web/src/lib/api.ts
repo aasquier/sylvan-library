@@ -204,14 +204,28 @@ export interface ImportResult {
   warnings: Issue[]
 }
 
-export interface SwapResult {
+/**
+ * What every deck edit hands back: the gate, re-run on the result.
+ *
+ * An edit that did not report the gate would leave a deck changed and
+ * unchecked, so this shape is shared by all of them. `needs_rationale` rides
+ * along because an edit is the likeliest moment for it to move — filling in
+ * the last blank `why` is what makes a draft promotable.
+ */
+export interface EditResult {
   slug: string
-  swapped_out: string
-  swapped_in: string
-  why: string
+  stage: string
+  total_cards: number
+  needs_rationale: number
   ok: boolean
   errors: Issue[]
   warnings: Issue[]
+}
+
+export interface SwapResult extends EditResult {
+  swapped_out: string
+  swapped_in: string
+  why: string
 }
 
 export interface Job {
@@ -262,23 +276,31 @@ async function get<T>(path: string): Promise<T> {
   return resp.json() as Promise<T>
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
   const resp = await fetch(path, {
-    method: 'POST',
+    method,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(body ?? {}),
   })
   if (!resp.ok) {
     let detail = `${resp.status} ${resp.statusText}`
     try {
       const parsed = await resp.json()
-      if (parsed?.detail) detail = JSON.stringify(parsed.detail)
+      // A refusal is a plain sentence the user should read as written — "a
+      // card in a curated deck needs a `why`". FastAPI's own validation errors
+      // arrive as an array, which has no such sentence, so those get stringified.
+      if (typeof parsed?.detail === 'string') detail = parsed.detail
+      else if (parsed?.detail) detail = JSON.stringify(parsed.detail)
     } catch {
       /* keep the status line */
     }
     throw new ApiError(detail, resp.status)
   }
   return resp.json() as Promise<T>
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  return send<T>('POST', path, body)
 }
 
 export const api = {
@@ -301,6 +323,21 @@ export const api = {
   },
   swapCard: (slug: string, body: { out: string; into: string; why: string }) =>
     post<SwapResult>(`/api/decks/${slug}/swap`, body),
+  addCard: (
+    slug: string,
+    body: { name: string; category: string; why?: string; qty?: number; to?: string },
+  ) => post<EditResult>(`/api/decks/${slug}/cards`, body),
+  removeCard: (slug: string, name: string) =>
+    send<EditResult>('DELETE', `/api/decks/${slug}/cards/${encodeURIComponent(name)}`),
+  // One field at a time, matching the operation underneath. `why` goes through
+  // here: it is the rationale editor's write path, and the value is whatever
+  // the user typed — nothing composes, tidies or infers one.
+  setCardField: (slug: string, name: string, field: string, value: string | number) =>
+    send<EditResult>('PATCH', `/api/decks/${slug}/cards/${encodeURIComponent(name)}`,
+      { field, value }),
+  setNote: (slug: string, key: string, value: string) =>
+    send<EditResult>('PUT', `/api/decks/${slug}/notes/${encodeURIComponent(key)}`,
+      { value }),
   importDeck: (body: {
     slug: string
     text: string

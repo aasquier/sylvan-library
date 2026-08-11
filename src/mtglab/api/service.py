@@ -20,7 +20,7 @@ from mtglab.decks import decklist, edit, importer, suggest
 from mtglab.decks.analyze import deck_stats
 from mtglab.decks.edit import EditFailed
 from mtglab.decks.importer import ImportRefused
-from mtglab.decks.model import DECK_STATUSES, Deck
+from mtglab.decks.model import CATEGORIES, DECK_STATUSES, Deck
 from mtglab.decks.source import DeckExists, DeckSource, FileDeckSource
 from mtglab.decks.validate import validate
 
@@ -328,8 +328,208 @@ def import_deck(*, text: str, slug: str, name: str = "",
         con.close()
 
 
-class SwapRejected(Exception):
+class EditRejected(Exception):
+    """The edit was refused, and nothing was written."""
+
+
+class SwapRejected(EditRejected):
     """The swap was refused, and nothing was written."""
+
+
+def _issues(report) -> dict[str, list[dict[str, Any]]]:
+    """The gate's verdict, flattened for JSON."""
+    return {
+        "errors": [{"code": i.code, "message": i.message, "card": i.card}
+                   for i in report.errors],
+        "warnings": [{"code": i.code, "message": i.message, "card": i.card}
+                     for i in report.warnings],
+    }
+
+
+def _for_writing(source: DeckSource | None) -> DeckSource:
+    decks = _source(source)
+    if not decks.writable:
+        raise EditRejected("this deck is read-only")
+    return decks
+
+
+def _identity_of(deck: Deck, con) -> frozenset[str]:
+    """The commander's colour identity, from the corpus.
+
+    Rule 2: read off Scryfall's `color_identity`, never derived from the mana
+    cost. It already accounts for back faces, reminder text and land types --
+    which is what caught *Ajani, Nacatl Pariah* being illegal in a G/W deck.
+    """
+    identity: frozenset[str] = frozenset()
+    for name in deck.commander:
+        rec = db.get_cards(con, [name]).get(name)
+        if rec is not None:
+            identity |= rec.color_identity
+    return identity
+
+
+def _find_card(deck: Deck, name: str):
+    wanted = name.strip().lower()
+    return next((c for c in deck.cards + deck.swap_board
+                 if c.name.lower() == wanted), None)
+
+
+def _commit(slug: str, decks: DeckSource, updated: str,
+            **extra: Any) -> dict[str, Any]:
+    """Write an edited deck, and hand back the gate's verdict on the result.
+
+    Every write goes out through here, so no caller can change a deck without
+    being told what the change did to the gate. `stage` and `needs_rationale`
+    ride along because an edit is the most likely moment for either to move --
+    filling in the last blank `why` is what makes a draft promotable.
+    """
+    decks.write_text(slug, updated)
+    after = decks.get(slug)
+    con = _connect()
+    try:
+        report = validate(after, _corpus_for(after, con))
+    finally:
+        if con is not None:
+            con.close()
+    return {
+        "slug": slug,
+        **extra,
+        "stage": after.stage,
+        "total_cards": after.total_cards,
+        "needs_rationale": len(after.unjustified),
+        "ok": report.ok,
+        **_issues(report),
+    }
+
+
+def _check_category(category: str) -> str:
+    """Refuse a category outside the fixed set.
+
+    Stricter than the gate, which only warns, and deliberately so: the warning
+    is there for hand-written files, while an edit through this path is a
+    choice from a list the caller was shown. `CATEGORIES` is small and fixed so
+    that counts are comparable across decks, and a typo accepted here would
+    quietly cost exactly that comparability.
+    """
+    category = category.strip().lower()
+    if category not in CATEGORIES:
+        raise EditRejected(
+            f"{category!r} is not a category; choose one of {', '.join(CATEGORIES)}")
+    return category
+
+
+def add_card(slug: str, *, name: str, category: str, why: str = "",
+             qty: int = 1, to: str = "cards",
+             source: DeckSource | None = None) -> dict[str, Any]:
+    """Put a card into the 99 or onto the swap board.
+
+    Checked against the corpus before anything is written -- the card has to
+    exist, be legal in Commander, and sit inside the commander's colour
+    identity. That is rule 1 applied to a write: a card nobody looked up is a
+    card whose legality is a guess.
+
+    The rationale requirement is the edit layer's, not this function's, because
+    it depends on the deck: a curated deck refuses a blank `why`, a draft
+    counts it as work still owed (ADR 13). Neither writes one.
+    """
+    if to not in edit.CARD_LISTS:
+        raise EditRejected(f"cards go into {' or '.join(edit.CARD_LISTS)}, not {to!r}")
+    category = _check_category(category)
+    decks = _for_writing(source)
+    deck = decks.get(slug)
+
+    con = _connect()
+    if con is None:
+        raise EditRejected("adding a card needs the card corpus -- "
+                           "run `mtglab data refresh`")
+    try:
+        rec = db.get_cards(con, [name]).get(name)
+        if rec is None:
+            raise EditRejected(f"{name!r} is not a card the corpus knows")
+        if not rec.legal_commander:
+            raise EditRejected(f"{rec.name} is not legal in Commander")
+
+        identity = _identity_of(deck, con)
+        outside = rec.color_identity - identity
+        if outside:
+            raise EditRejected(
+                f"{rec.name}'s identity {{{''.join(sorted(rec.color_identity))}}} "
+                f"includes {{{''.join(sorted(outside))}}}, outside the "
+                f"commander's {{{''.join(sorted(identity)) or 'C'}}}")
+
+        try:
+            updated = edit.add_card(decks.read_text(slug), name=rec.name,
+                                    category=category, why=why, qty=qty,
+                                    list_key=to)
+        except EditFailed as exc:
+            raise EditRejected(str(exc)) from exc
+        return _commit(slug, decks, updated, added=rec.name, category=category,
+                       into=to)
+    finally:
+        con.close()
+
+
+def remove_card(slug: str, *, name: str,
+                source: DeckSource | None = None) -> dict[str, Any]:
+    """Take a card out of the 99 or the swap board.
+
+    Needs no corpus: removing a card is a fact about this deck file, not about
+    Magic. That matters because it means a deck can still be pruned on a
+    machine that has never run `data refresh`.
+    """
+    decks = _for_writing(source)
+    entry = _find_card(decks.get(slug), name)
+    if entry is None:
+        raise EditRejected(f"{name!r} is not in this deck")
+    try:
+        updated = edit.remove_card(decks.read_text(slug), name=entry.name)
+    except EditFailed as exc:
+        raise EditRejected(str(exc)) from exc
+    return _commit(slug, decks, updated, removed=entry.name)
+
+
+def set_card_field(slug: str, *, name: str, field: str, value: Any,
+                   source: DeckSource | None = None) -> dict[str, Any]:
+    """Change one card's category, quantity, or rationale.
+
+    This is the write path behind the rationale editor, and the answer to the
+    gap `decks import` opened: a 99-card draft arrives owing 99 rationales, and
+    until now the only way to write one was a text editor.
+
+    The rationale is the caller's text, written as given. Nothing here -- and
+    nothing in the layer below -- composes, tidies, expands or infers one. That
+    is rule 4, and [ADR 12](docs/adr/0012) rule 3 is where it binds a tool
+    rather than a person.
+    """
+    decks = _for_writing(source)
+    entry = _find_card(decks.get(slug), name)
+    if entry is None:
+        raise EditRejected(f"{name!r} is not in this deck")
+    if field == "category":
+        value = _check_category(str(value))
+    try:
+        updated = edit.set_card_field(decks.read_text(slug), name=entry.name,
+                                      field=field, value=value)
+    except EditFailed as exc:
+        raise EditRejected(str(exc)) from exc
+    return _commit(slug, decks, updated, card=entry.name, field=field)
+
+
+def set_note(slug: str, *, key: str, value: str,
+             source: DeckSource | None = None) -> dict[str, Any]:
+    """Set one deck-level note -- the prose the advanced primer reads directly.
+
+    Notes are the deck's thinking, and they live in the source of truth rather
+    than in an artifact precisely so that regenerating the five deliverables
+    cannot lose them.
+    """
+    decks = _for_writing(source)
+    decks.get(slug)                     # 404 before anything else
+    try:
+        updated = edit.set_note(decks.read_text(slug), key=key, value=value)
+    except EditFailed as exc:
+        raise EditRejected(str(exc)) from exc
+    return _commit(slug, decks, updated, note=key.strip())
 
 
 def swap_card(slug: str, *, out: str, into: str, why: str,
@@ -344,17 +544,17 @@ def swap_card(slug: str, *, out: str, into: str, why: str,
     Everything is checked before anything is written, and the edit itself is
     surgical -- see `decks/edit.py` for why a load-and-dump was not an option.
     """
-    decks = _source(source)
-    if not decks.writable:
-        raise SwapRejected("this deck is read-only")
+    try:
+        decks = _for_writing(source)
+    except EditRejected as exc:
+        raise SwapRejected(str(exc)) from exc
     if not why.strip():
         # Rule 4, enforced at the boundary as well as in the editor: a card
         # that cannot justify its slot is a card to cut.
         raise SwapRejected("a replacement needs a `why`")
 
     deck = decks.get(slug)
-    entry = next((c for c in deck.cards + deck.swap_board
-                  if c.name.lower() == out.strip().lower()), None)
+    entry = _find_card(deck, out)
     if entry is None:
         raise SwapRejected(f"{out!r} is not in this deck")
     if any(c.name.lower() == into.strip().lower()
@@ -374,11 +574,7 @@ def swap_card(slug: str, *, out: str, into: str, why: str,
         if not rec.legal_commander:
             raise SwapRejected(f"{rec.name} is not legal in Commander")
 
-        identity: frozenset[str] = frozenset()
-        for name in deck.commander:
-            commander_rec = db.get_cards(con, [name]).get(name)
-            if commander_rec is not None:
-                identity |= commander_rec.color_identity
+        identity = _identity_of(deck, con)
         outside = rec.color_identity - identity
         if outside:
             raise SwapRejected(
@@ -391,23 +587,11 @@ def swap_card(slug: str, *, out: str, into: str, why: str,
                                         new_name=rec.name, why=why.strip())
         except EditFailed as exc:
             raise SwapRejected(str(exc)) from exc
-        decks.write_text(slug, updated)
-
-        after = decks.get(slug)
-        report = validate(after, _corpus_for(after, con))
-        return {
-            "slug": slug,
-            "swapped_out": entry.name,
-            "swapped_in": rec.name,
-            "why": why.strip(),
-            "ok": report.ok,
-            "errors": [{"code": i.code, "message": i.message, "card": i.card}
-                       for i in report.errors],
-            "warnings": [{"code": i.code, "message": i.message, "card": i.card}
-                         for i in report.warnings],
-        }
     finally:
         con.close()
+
+    return _commit(slug, decks, updated, swapped_out=entry.name,
+                   swapped_in=rec.name, why=why.strip())
 
 
 def suggestions_for(slug: str, *, source: DeckSource | None = None,

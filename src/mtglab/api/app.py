@@ -133,6 +133,65 @@ def create_app(*, dev: bool = False) -> FastAPI:
         except service.SwapRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    # The rest of the edit operations (ADR 12). Each is one narrow write that
+    # re-runs the gate and reports it, so the app can never leave a deck
+    # changed and unchecked. None of them may author a rationale: `why` is
+    # whatever the caller typed, and an empty one on a curated deck is a 422
+    # rather than a blank the tool fills in.
+
+    @app.post("/api/decks/{slug}/cards")
+    def add_card(slug: str, payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
+        try:
+            return service.add_card(
+                slug,
+                name=str(payload.get("name", "")),
+                category=str(payload.get("category", "")),
+                why=str(payload.get("why") or ""),
+                qty=int(payload.get("qty") or 1),
+                to=str(payload.get("to") or "cards"),
+                source=decks,
+            )
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422,
+                                detail=f"qty must be a number: {exc}") from exc
+        except service.EditRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.delete("/api/decks/{slug}/cards/{name}")
+    def remove_card(slug: str, name: str, decks: Decks) -> dict[str, Any]:
+        try:
+            return service.remove_card(slug, name=name, source=decks)
+        except service.EditRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.patch("/api/decks/{slug}/cards/{name}")
+    def set_card_field(slug: str, name: str, payload: dict[str, Any],
+                       decks: Decks) -> dict[str, Any]:
+        """Change one field of one card: its category, quantity or rationale.
+
+        The rationale editor's write path. A PATCH of one field rather than a
+        PUT of the card, because a card is mostly corpus facts and the deck
+        file only carries the handful of things a person decided.
+        """
+        field = str(payload.get("field", ""))
+        if "value" not in payload:
+            raise HTTPException(status_code=422, detail="value is required")
+        try:
+            return service.set_card_field(slug, name=name, field=field,
+                                          value=payload["value"], source=decks)
+        except service.EditRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.put("/api/decks/{slug}/notes/{key}")
+    def set_note(slug: str, key: str, payload: dict[str, Any],
+                 decks: Decks) -> dict[str, Any]:
+        try:
+            return service.set_note(slug, key=key,
+                                    value=str(payload.get("value", "")),
+                                    source=decks)
+        except service.EditRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     @app.get("/api/decks/{slug}/suggestions")
     def deck_suggestions(slug: str, decks: Decks,
                          limit: int = Query(5, ge=1, le=20)) -> dict[str, Any]:

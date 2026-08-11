@@ -16,7 +16,8 @@ import DeckDetail from './DeckDetail'
 vi.mock('../lib/api', () => ({
   api: {
     deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
-    swapCard: vi.fn(),
+    swapCard: vi.fn(), addCard: vi.fn(), removeCard: vi.fn(),
+    setCardField: vi.fn(), setNote: vi.fn(),
   },
 }))
 
@@ -76,6 +77,27 @@ const SHORTLIST: Suggestions = {
   }],
 }
 
+const EDIT_RESULT = {
+  slug: 'goreclaw-stompy', stage: 'curated', total_cards: 99,
+  needs_rationale: 0, ok: true, errors: [], warnings: [],
+}
+
+/** A draft, mid-import: two of its three cards still owe a rationale. */
+const DRAFT = {
+  ...DECK,
+  stage: 'draft',
+  needs_rationale: 2,
+  cards: [
+    DECK.cards[0],
+    { name: 'Sol Ring', category: 'ramp', why: '', qty: 1, known: true,
+      mana_cost: '{1}', cmc: 1, type_line: 'Artifact',
+      oracle_text: '{T}: Add {C}{C}.', color_identity: [] },
+    { name: 'Forest', category: 'land', why: '', qty: 30, known: true,
+      type_line: 'Basic Land — Forest', oracle_text: '{T}: Add {G}.',
+      color_identity: ['G'] },
+  ],
+} as unknown as Deck
+
 function renderDeck() {
   return render(
     <MemoryRouter initialEntries={['/decks/goreclaw-stompy']}>
@@ -104,8 +126,12 @@ beforeEach(() => {
   vi.mocked(api.swapCard).mockReset().mockResolvedValue({
     slug: 'goreclaw-stompy', swapped_out: 'Primeval Titan',
     swapped_in: 'Cultivator Colossus', why: 'because', ok: true,
-    errors: [], warnings: [],
+    errors: [], warnings: [], stage: 'curated', total_cards: 99,
+    needs_rationale: 0,
   })
+  for (const fn of [api.addCard, api.removeCard, api.setCardField, api.setNote]) {
+    vi.mocked(fn).mockReset().mockResolvedValue(EDIT_RESULT)
+  }
 })
 
 afterEach(cleanup)
@@ -258,5 +284,132 @@ describe('DeckDetail validation tab', () => {
     expect(screen.getByText('no rationale yet')).toBeTruthy()
     // And it says how to get out, which the badge alone does not.
     expect(screen.getByText('stage: curated')).toBeTruthy()
+  })
+})
+
+/**
+ * The rationale editor.
+ *
+ * The first test in here is the one that matters most, and it is not about
+ * rendering: it pins that a card with no `why` opens an *empty* box. Rule 4
+ * and ADR 12 rule 3 say the tool never authors a rationale, and the cheapest
+ * way to break that is a placeholder that is really a first draft. This test
+ * fails if anyone ever pre-fills the field.
+ */
+describe('DeckDetail rationale editor', () => {
+  /** The row for one card.
+   *
+   * Anchored on the remove button's title rather than the card name, which
+   * appears twice in a row -- once on the art's hover target and once on the
+   * name itself. */
+  function rowFor(card: string) {
+    return screen.getByTitle(`Remove ${card} from the deck`).closest('li')!
+  }
+
+  async function openEditorFor(card: string) {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    const row = rowFor(card)
+    fireEvent.click(within(row).getByRole('button', { name: /why/i }))
+    return row
+  }
+
+  it('opens an empty box for a card that has no rationale', async () => {
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    const row = await openEditorFor('Sol Ring')
+    const box = within(row).getByRole('textbox') as HTMLTextAreaElement
+
+    expect(box.value).toBe('')
+    // The prompt is a question, not a draft. If this ever reads like a
+    // rationale, the tool has started writing them.
+    expect(box.placeholder).toMatch(/\?$/)
+    expect(within(row).getByRole('button', { name: /save rationale/i })
+      .hasAttribute('disabled')).toBe(true)
+  })
+
+  it('writes exactly what the user typed', async () => {
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    const row = await openEditorFor('Sol Ring')
+    fireEvent.change(within(row).getByRole('textbox'),
+                     { target: { value: '  Two mana for one.  ' } })
+    fireEvent.click(within(row).getByRole('button', { name: /save rationale/i }))
+
+    await waitFor(() => expect(api.setCardField).toHaveBeenCalledWith(
+      'goreclaw-stompy', 'Sol Ring', 'why', 'Two mana for one.'))
+  })
+
+  it('loads an existing rationale for editing rather than starting blank', async () => {
+    const row = await openEditorFor('Primeval Titan')
+    expect((within(row).getByRole('textbox') as HTMLTextAreaElement).value)
+      .toBe('Ramp and threat in one card.')
+  })
+
+  it('shows the card as the corpus has it, beside the box', async () => {
+    // Rule 1 made useful: you argue about the card against what it says, not
+    // against what you remember it saying. Asserted on the type line because
+    // `ManaText` splits the oracle text into symbol elements, so a plain
+    // substring match on it would be testing the renderer instead.
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    const row = await openEditorFor('Sol Ring')
+    expect(within(row).getByText('Artifact')).toBeTruthy()
+    expect(within(row).queryByText(/No corpus text/)).toBeNull()
+  })
+
+  it('surfaces a refusal instead of pretending the edit landed', async () => {
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    vi.mocked(api.setCardField).mockRejectedValue(
+      new Error('a card in a curated deck needs a `why`'))
+    const row = await openEditorFor('Sol Ring')
+    fireEvent.change(within(row).getByRole('textbox'), { target: { value: 'x' } })
+    fireEvent.click(within(row).getByRole('button', { name: /save rationale/i }))
+
+    await screen.findByText(/needs a `why`/)
+  })
+
+  it('re-reads the deck after a successful edit', async () => {
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    const row = await openEditorFor('Sol Ring')
+    fireEvent.change(within(row).getByRole('textbox'), { target: { value: 'Fast mana.' } })
+    fireEvent.click(within(row).getByRole('button', { name: /save rationale/i }))
+
+    // Once on mount, once after the write: the page shows more than the gate
+    // verdict the write returns, so a stale curve beside a fresh gate is worse
+    // than a second round trip.
+    await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2))
+    expect(api.validate).toHaveBeenCalledTimes(2)
+  })
+
+  it('filters the list down to the cards a draft still owes', async () => {
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(rowFor('Primeval Titan')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /show the 2 that need one/i }))
+    await waitFor(() => expect(
+      screen.queryByTitle('Remove Primeval Titan from the deck')).toBeNull())
+    expect(rowFor('Sol Ring')).toBeTruthy()
+    expect(rowFor('Forest')).toBeTruthy()
+  })
+
+  it('removes a card and re-reads the deck', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    const row = rowFor('Primeval Titan')
+    fireEvent.click(within(row).getByRole('button', { name: 'Remove' }))
+
+    await waitFor(() => expect(api.removeCard)
+      .toHaveBeenCalledWith('goreclaw-stompy', 'Primeval Titan'))
+    await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2))
+  })
+
+  it('reports a refused removal rather than silently doing nothing', async () => {
+    vi.mocked(api.removeCard).mockRejectedValue(new Error('this deck is read-only'))
+    renderDeck()
+    await screen.findByText(DECK.name)
+    const row = rowFor('Primeval Titan')
+    fireEvent.click(within(row).getByRole('button', { name: 'Remove' }))
+
+    await screen.findByText(/read-only/)
   })
 })

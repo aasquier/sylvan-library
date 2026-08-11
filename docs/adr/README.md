@@ -28,9 +28,10 @@ they differ.
 | [12](0012-decks-are-edited-by-surgical-operations.md) | Decks are edited by surgical operations over text | Accepted |
 | [13](0013-an-imported-deck-is-a-draft.md) | An imported deck is a draft until every card is justified | Accepted |
 | [14](0014-python-decides-claude-advises.md) | Python decides, Claude advises, and Forge plays the games | Proposed |
+| [15](0015-claude-surfaces-are-modes-with-capabilities.md) | Claude surfaces are modes with a user-set stance, and no stance may write a rationale | Proposed |
 
 **Proposed** means the decision is made and argued but nothing implements it
-yet — 4 and 5 describe a deployment that does not exist, and 14 draws the
+yet — 4 and 5 describe a deployment that does not exist, and 14 and 15 draw the
 boundary for a model integration deliberately before the first client call.
 
 ## Where the longer arguments live
