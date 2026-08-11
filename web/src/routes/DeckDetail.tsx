@@ -325,8 +325,14 @@ export default function DeckDetail() {
                         <li key={c.name}
                             className="flex items-center gap-3 rounded-lg p-2"
                             style={{ background: 'var(--surface-1)' }}>
-                          <CardArt src={c.art_crop} alt={c.name}
-                                   ratio="aspect-[626/457]" className="w-16 shrink-0" />
+                          {/* Same affordance as the decklist: the art is what
+                              you recognise, the full card is what you need to
+                              read before accepting a suggestion. */}
+                          <CardHover card={{ name: c.name, image: c.image }}>
+                            <CardArt src={c.art_crop} alt={c.name}
+                                     ratio="aspect-[626/457]"
+                                     className="w-16 shrink-0 cursor-help" />
+                          </CardHover>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-baseline gap-2">
                               <span className="text-sm font-medium">{c.name}</span>

@@ -68,7 +68,7 @@ const SHORTLIST: Suggestions = {
     candidates: [{
       name: 'Cultivator Colossus', mana_cost: '{4}{G}{G}{G}', cmc: 7,
       type_line: 'Creature — Plant Beast', oracle_text: 'Trample.',
-      color_identity: ['G'], image: null,
+      color_identity: ['G'], image: 'https://example.test/colossus-full.jpg',
       art_crop: 'https://example.test/colossus.jpg', edhrec_rank: 1589,
       score: 0.7593,
       reasons: ['same card type (Creature)', 'shares trample', 'EDHREC rank 1,589'],
@@ -216,5 +216,19 @@ describe('DeckDetail validation tab', () => {
 
     await waitFor(() => expect(screen.getByText(/outside the commander/)).toBeTruthy())
     expect(api.deck).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers the full card on hover for a suggestion, not just the art', async () => {
+    // Accepting a suggestion means reading its rules text, and the shortlist
+    // shows only art and a score. Same affordance as the decklist rows.
+    renderDeck()
+    await screen.findByRole('button', { name: 'Validation' })
+    openValidation()
+    const art = await screen.findByAltText('Cultivator Colossus')
+
+    fireEvent.mouseEnter(art.parentElement!, { clientX: 10, clientY: 10 })
+    const full = await screen.findAllByAltText('Cultivator Colossus')
+    expect(full.length).toBe(2)
+    expect(full.some((el) => el.getAttribute('src')?.includes('colossus-full'))).toBe(true)
   })
 })
