@@ -136,29 +136,93 @@ This is the single highest-value item in this document.
 
 ---
 
-## 2. Property-based testing, before any rewrite
+## 2. Property-based testing — built 2026-08-10
 
 `mana.py` solves a bipartite matching problem: can this pool of sources pay
 this cost? It is subtle enough that `tests/test_mana.py` exists specifically to
-pin cases where naive source-counting is wrong.
+pin cases where naive source-counting is wrong. Those are examples, and
+examples only cover what someone thought of.
 
-That is a textbook fit for **Hypothesis**. Generate random costs and random
-mana pools, then assert the solver agrees with a deliberately slow brute-force
-oracle that tries every assignment. Any disagreement is a real bug, found
-automatically, in the most correctness-critical function in the project.
+`tests/test_mana_properties.py` covers what nobody thought of. Hypothesis
+generates costs and pools, and each one is checked against two independent
+references in `tests/mana_oracle.py`:
 
-Do this *before* the Rust work, because the same generated cases become the
-differential-test corpus for the port.
+- `brute_force_can_pay` — enumerate every injective assignment of pips to mana
+  units. Factorial, and there is nothing in it to get wrong beyond the
+  definition itself.
+- `hall_can_pay` — Hall's marriage theorem: a matching covering every pip
+  exists iff every subset of pips has at least as many usable units as it has
+  pips. A different theorem, so it fails differently instead of sharing a blind
+  spot with the search.
 
-Cheap adjacent wins:
+Neither shares code with `mana.py`. The unit expansion is reimplemented inside
+the oracle on purpose: a reference that imports the implementation cannot catch
+a bug in the part they share.
 
-- **Determinism tests.** A seeded simulation must produce identical output
-  across runs, platforms and Python versions. Cheap to assert, and it is the
-  precondition for differential testing to mean anything.
-- **Mutation testing** (`mutmut`, or `cargo-mutants` on the Rust side) on
-  `decks/validate.py` and `mana.py`. Coverage says a line ran; mutation
-  testing says a test would have *noticed* if it were wrong. 87% line coverage
-  with a poor mutation score is a thing worth knowing about your own suite.
+Alongside the generated cases sits an **enumerated corpus** — 13,944
+(cost, pool) pairs over a small alphabet chosen for structure rather than
+realism, built with `combinations_with_replacement` rather than from a seed. It
+yields the same cases in the same order on any machine in any language,
+forever, which is what makes it usable as the differential corpus for a port
+(§1). `python tests/mana_oracle.py` dumps it as JSON Lines; `--digest` prints
+the hash pinned by `CORPUS_ANSWER_DIGEST`.
+
+### What it found
+
+**The solver is clean.** Every generated case and all 13,944 corpus cases agree
+with both oracles, as do the monotonicity properties (an extra source never
+hurts, widening a pip never hurts, a dearer cost is never easier) and the
+order-invariance ones. `can_pay` and `engine._consume` — a second solver, which
+exists because casting needs the leftovers rather than a yes/no — agree with
+each other on every case. That pairing is the differential test §1 wants,
+available today without a second language.
+
+**The parser was not.** Phyrexian mana was dropped outright, so `{U/P}` parsed
+to mana value 0 with no colours. Scryfall says Mental Misstep is cmc 1 and
+blue. `decks/analyze.py` builds the curve from that number, so the Tivit list
+filed Mental Misstep as a 0-drop and Phyrexian Metamorph as a 3-drop, and
+reported an average mana value of **1.90 where the truth is 1.93**. Fixed by
+keeping Phyrexian symbols in their own `ManaCost.phyrexian` field: they count
+toward mana value and colour identity, and — correctly, because 2 life pays
+them — still place no demand at all on the mana base. The corpus digest did not
+move, which is the evidence that castability semantics did not change with it.
+
+Two things about that bug are worth keeping. It was not in the clever algorithm
+a reviewer would scrutinise; it was in the boring parser feeding it. And
+`mana.py` was at **100% line coverage** with the faulty branch covered — by a
+test that asserted the half of the behaviour that was right (`{G/P}` is not a
+mana constraint) and never asked about the half that was wrong.
+
+### Determinism — built 2026-08-10
+
+`tests/test_determinism.py`, in three levels of increasing strength:
+
+- **Within a process.** Seeded `run`, `simulate_game` and `sweep_land_counts`
+  repeat exactly; two different seeds differ, which is what catches a seed that
+  is accepted and then ignored; the caller's library is not mutated; the
+  progress callback is inert; and every point of a sweep provably starts from
+  the same state, which is what makes a sweep a comparison at all.
+- **Across processes.** `tests/determinism_probe.py` runs a fixed simulation in
+  a fresh interpreter, because hash randomisation is set at process start and
+  cannot be varied in-process. At two `PYTHONHASHSEED` values both the Tier 1
+  digest and the mana corpus digest are unchanged: nothing here reads set or
+  dict iteration order.
+- **Against a pin.** `REFERENCE_DIGEST` is a golden, verified byte-identical on
+  CPython 3.11.15 and 3.12.13. A change in what Tier 1 reports now has to be a
+  decision someone writes down rather than a number that drifts.
+
+A side result worth recording: the probe runs on a bare 3.11 with **numpy not
+installed**. Tier 1 is pure stdlib today. That is the CLAUDE.md dependency rule
+holding in practice, and it is what would make the seam in §1 cheap to cut if
+the trigger ever fires.
+
+### Still open
+
+**Mutation testing** (`mutmut`, or `cargo-mutants` on the Rust side) on
+`decks/validate.py` and `mana.py`. Coverage says a line ran; mutation testing
+says a test would have *noticed* if it were wrong. The Phyrexian bug above is
+the argument in one example: 100% line coverage, and a mutation of that branch
+would have survived.
 
 ---
 
@@ -323,8 +387,9 @@ Decided 2026-08-10: do this list before any hosting work. Hosting is not
 imminent, but see "Cloud-compatible by construction" above — steps 3 and 5
 exist partly so that when it happens it is additive.
 
-1. **Property-based tests on `mana.py`** plus determinism tests. Cheap, finds
-   real bugs, and builds the corpus a port would be tested against.
+1. ~~**Property-based tests on `mana.py`** plus determinism tests.~~ **Done
+   2026-08-10** — see §2. It found one real bug (Phyrexian mana value) and
+   produced the enumerated corpus a port would be tested against.
 2. **ADRs for the decisions already made.** An afternoon, and it reframes the
    whole repo for a reader.
 3. **A `DeckSource` abstraction and a request scope.** Four call sites and one
@@ -358,6 +423,18 @@ codebase needs nothing.
   `MTGLAB_DECKS_DIR`. A container mounting a volume at `/data` just works.
 - `api/` does not import `cli.py`. The web layer has no command-line
   dependency to untangle later.
+**Newly true, worth not regressing:**
+
+- **The one new thing that writes to the working directory is contained.**
+  Hypothesis keeps a `.hypothesis/` cache; the CI profile in
+  `tests/conftest.py` turns off the example database, but — measured, not
+  assumed — a unicode and constants cache is still written regardless. The knob
+  is `HYPOTHESIS_STORAGE_DIRECTORY`, and with it set nothing lands in the repo.
+  That is one line in the container for §3's read-only root filesystem, and it
+  is written down here so it is found before the build fails rather than after.
+  The same profile derandomises, so a pull request never goes red because
+  Hypothesis rolled different examples; deterministic coverage comes from the
+  enumerated corpus instead.
 
 **Worth doing now, because it is cheap now and invasive later:**
 
@@ -399,9 +476,10 @@ Parked deliberately, not forgotten. Each needs evidence before it starts.
 | **Differential testing Python vs Rust** | Ships with the port, not separately — it is what makes the port defensible |
 | **Go** | Only if the engine ever becomes a standalone service rather than a library in-process. Not the current shape |
 
-Note that two items in the sections above stay on the near-term list even
-though the port is parked, because they pay off on the Python engine on their
-own terms: **property-based testing of `mana.py`** (§2) and **determinism
-tests**. Both are also prerequisites for a credible port later — the generated
-cases become the differential corpus — so doing them now is not wasted work in
-either branch of the decision.
+Two items in the sections above stayed on the near-term list even though the
+port is parked, because they pay off on the Python engine on their own terms:
+**property-based testing of `mana.py`** (§2) and **determinism tests**. Both
+shipped on 2026-08-10, and both earned their place in the branch where the port
+never happens — one real bug found, and Tier 1's output now pinned. The corpus
+and the pinned digests are also exactly what a port would be tested against, so
+neither branch of the §1 decision wasted the work.
