@@ -7,6 +7,10 @@ Required for every new deck and every refactor:
   4. moxfield.txt         -- bulk import
   5. swaps.md             -- only when the deck changed (out/in + shopping)
 
+Only for a `curated` deck. A draft has cards whose slot nobody has argued for
+yet, and a primer that quietly omits the argument reads exactly like one that
+had it -- so `write_all` refuses and names the cards still owed (ADR 13).
+
 Generation is deterministic: same deck.yaml, same output. That is the point.
 The prose that only a human or a conversation can supply -- strategy, lines,
 matchup notes -- lives in `notes:` in the deck file, so it survives regeneration
@@ -245,9 +249,39 @@ def swap_list(deck: Deck, previous: Deck, cards: dict | None = None,
 
 # ------------------------------------------------------------------- driver
 
+class DraftDeck(Exception):
+    """Artifacts were requested for a deck nobody has finished reasoning about."""
+
+
 def write_all(deck: Deck, outdir: str | Path, *, cards: dict | None = None,
               previous: Deck | None = None, prices: dict[str, float] | None = None,
               stats: dict[str, Any] | None = None) -> list[Path]:
+    """Write the five deliverables. Raises `DraftDeck` for a draft.
+
+    The refusal is checked here rather than in the CLI so that every caller
+    inherits it -- the API will generate artifacts eventually, and a rule that
+    only the terminal enforces is a rule with a hole in it.
+
+    This is deliberately *not* something `--force` can override, and the
+    distinction is worth being precise about. `--force` overrides the gate's
+    errors, which are things the deck got wrong. A draft is not wrong; it is
+    unfinished, and it says so in the file. The way out is to write the missing
+    rationales and promote it, which is an honest edit to the source of truth
+    rather than a flag. Same argument as ADR 8: a primer for a deck nobody has
+    reasoned about is worse than no primer, because it looks exactly like one
+    for a deck somebody did.
+    """
+    if deck.stage == "draft":
+        pending = deck.unjustified
+        shown = ", ".join(c.name for c in pending[:8])
+        more = f", and {len(pending) - 8} more" if len(pending) > 8 else ""
+        detail = (f"{len(pending)} card(s) still need a `why`: {shown}{more}"
+                  if pending else
+                  "every card is justified -- set `stage: curated` to promote it")
+        raise DraftDeck(
+            f"{deck.slug} is a draft, and the artifacts are the shareable "
+            f"surface. {detail}")
+
     out = Path(outdir)
     out.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []

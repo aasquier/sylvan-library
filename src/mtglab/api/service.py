@@ -8,18 +8,20 @@ behind both the CLI and the app.
 from __future__ import annotations
 
 import json
+import re
 import urllib.request
 from datetime import date
 from pathlib import Path
 from typing import Any
 
+from mtglab import config
 from mtglab.cards import db
-from mtglab.config import DB_PATH
-from mtglab.decks import edit, suggest
+from mtglab.decks import decklist, edit, importer, suggest
 from mtglab.decks.analyze import deck_stats
 from mtglab.decks.edit import EditFailed
-from mtglab.decks.model import Deck
-from mtglab.decks.source import DeckSource, FileDeckSource
+from mtglab.decks.importer import ImportRefused
+from mtglab.decks.model import DECK_STATUSES, Deck
+from mtglab.decks.source import DeckExists, DeckSource, FileDeckSource
 from mtglab.decks.validate import validate
 
 SCRYFALL_SETS = "https://api.scryfall.com/sets"
@@ -44,12 +46,18 @@ def _connect():
 
     Read-only matters: DuckDB allows one writer, so a running `data refresh`
     would otherwise lock the whole app out.
+
+    `config.DB_PATH` is read here rather than imported as a name, for the
+    reason `config.py` exists: binding it at import time makes
+    `config.use_paths()` silently ineffective, so a test can never point the
+    service at a scratch corpus. `deck_paths` and `FileDeckSource` already
+    resolve at call time; this was the last place that did not.
     """
-    if not Path(DB_PATH).exists():
+    if not Path(config.DB_PATH).exists():
         return None
     try:
         import duckdb
-        return duckdb.connect(str(DB_PATH), read_only=True)
+        return duckdb.connect(str(config.DB_PATH), read_only=True)
     except Exception:                                               # noqa: BLE001
         # Most likely a `data refresh` holding the write lock. The app stays
         # usable in degraded form rather than failing every request.
@@ -147,6 +155,12 @@ def list_decks(*, source: DeckSource | None = None) -> list[dict[str, Any]]:
                 "slug": deck.slug,
                 "name": deck.name,
                 "status": deck.status,
+                "stage": deck.stage,
+                # The draft's to-do list, as a number. Carried on the library
+                # payload for the same reason the gate counts are: a shelf that
+                # renders an unreasoned list exactly like a curated deck hides
+                # the distinction the stage exists to draw.
+                "needs_rationale": len(deck.unjustified),
                 "commander": deck.commander,
                 "companion": deck.companion,
                 "bracket": deck.bracket,
@@ -174,6 +188,8 @@ def get_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
             "slug": deck.slug,
             "name": deck.name,
             "status": deck.status,
+            "stage": deck.stage,
+            "needs_rationale": len(deck.unjustified),
             "commander": deck.commander,
             "companion": deck.companion,
             "bracket": deck.bracket,
@@ -211,6 +227,105 @@ def validate_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, A
     finally:
         if con is not None:
             con.close()
+
+
+class ImportRejected(Exception):
+    """The import was refused, and nothing was written."""
+
+
+# A slug becomes a directory name under `decks/`, so it is checked rather than
+# trusted. The API takes it from a request body, and "sanitise it later" is how
+# a path component turns into a path.
+_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def import_deck(*, text: str, slug: str, name: str = "",
+                commander: list[str] | None = None, companion: str = "",
+                bracket: int | None = None, status: str = "theoretical",
+                dry_run: bool = False,
+                source: DeckSource | None = None) -> dict[str, Any]:
+    """Turn a pasted decklist into a draft deck.
+
+    Everything is checked before anything is written, and `dry_run` runs the
+    whole thing -- parse, resolve, build, gate -- without creating the deck.
+    That is what the app's preview is: the same code path, so what you approve
+    is what gets written rather than an estimate of it.
+
+    The deck arrives as `stage: draft` with an empty `why` on every card. That
+    is the entire point of ADR 13: the facts get checked immediately, the
+    thinking is counted rather than fabricated, and the artifacts stay shut
+    until a human has done it.
+    """
+    decks = _source(source)
+    if not decks.writable:
+        raise ImportRejected("this library is read-only")
+
+    slug = slug.strip().lower()
+    if not _SLUG.match(slug):
+        raise ImportRejected(
+            f"{slug!r} is not a usable slug -- lowercase letters, digits and "
+            "single hyphens, e.g. 'arahbo-cats'")
+    if slug in decks.slugs():
+        raise ImportRejected(
+            f"a deck called {slug!r} already exists; pick another slug")
+    if status not in DECK_STATUSES:
+        raise ImportRejected(
+            f"status {status!r} is not one of {', '.join(DECK_STATUSES)}")
+
+    parsed = decklist.parse(text)
+    if not parsed.cards:
+        raise ImportRejected("nothing in that list parsed as a card")
+
+    con = _connect()
+    if con is None:
+        # Without the corpus every name is unknown and no land is filed, so the
+        # import would produce a deck whose facts were never checked -- the one
+        # thing the gate exists to prevent. Refuse rather than half-do it.
+        raise ImportRejected(
+            "importing needs the card corpus -- run `mtglab data refresh`")
+    try:
+        cards = db.get_cards(con, importer.names_in(
+            parsed, commander=commander, companion=companion or None))
+        try:
+            report = importer.build_deck(
+                parsed, cards, slug=slug, name=name or slug,
+                commander=commander, companion=companion or None,
+                bracket=bracket, status=status)
+        except ImportRefused as exc:
+            raise ImportRejected(str(exc)) from exc
+
+        if not dry_run:
+            try:
+                decks.create(slug, report.yaml_text)
+            except DeckExists as exc:
+                raise ImportRejected(f"a deck called {slug!r} already exists") from exc
+
+        gate = validate(report.deck, _corpus_for(report.deck, con))
+        return {
+            "slug": slug,
+            "name": report.deck.name,
+            "stage": report.deck.stage,
+            "status": report.deck.status,
+            "created": not dry_run,
+            "commander": report.deck.commander,
+            "companion": report.deck.companion,
+            "total_cards": report.deck.total_cards,
+            "land_count": report.deck.land_count,
+            "swap_board": [c.name for c in report.deck.swap_board],
+            "needs_rationale": report.needs_rationale,
+            "unknown": report.unknown,
+            "unreadable": [{"line": n, "text": t} for n, t in report.unreadable],
+            "skipped": [{"line": n, "text": t} for n, t in report.skipped],
+            "notes": report.notes,
+            "yaml": report.yaml_text,
+            "ok": gate.ok,
+            "errors": [{"code": i.code, "message": i.message, "card": i.card}
+                       for i in gate.errors],
+            "warnings": [{"code": i.code, "message": i.message, "card": i.card}
+                         for i in gate.warnings],
+        }
+    finally:
+        con.close()
 
 
 class SwapRejected(Exception):

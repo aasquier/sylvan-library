@@ -37,6 +37,19 @@ CATEGORIES = (
 )
 
 
+class _Dumper(yaml.SafeDumper):
+    """pyyaml with sequences indented under their key.
+
+    Its default puts `- name: Sol Ring` hard against the left margin, which is
+    legal YAML and unlike every hand-written deck in the repository. Since a
+    generated deck file is then hand-edited and diffed in git, matching the
+    house style is worth five lines.
+    """
+
+    def increase_indent(self, flow: bool = False, indentless: bool = False):
+        return super().increase_indent(flow, False)
+
+
 @dataclass
 class CardEntry:
     """One card in the 99 (or the command zone, or the swap board)."""
@@ -84,12 +97,25 @@ class CardEntry:
 # owned -- a wrong "built" sends someone to a shelf that has no deck on it.
 DECK_STATUSES = ("built", "theoretical")
 
+# Whether the deck has been reasoned about, or is a list somebody pasted in.
+# Orthogonal to `status`: all four combinations are real, and ADR 13 has the
+# 2x2. A draft is honestly incomplete -- the gate reports its missing `why`
+# fields as warnings and counts them, rather than burying the deck in errors it
+# was always going to have.
+#
+# Defaults to `curated` when absent, which is the OPPOSITE default from
+# `status`, and for the same reason. The six existing decks justify every card,
+# and a default of `draft` would silently demote them. New decks declare
+# themselves drafts explicitly.
+DECK_STAGES = ("draft", "curated")
+
 
 @dataclass
 class Deck:
     slug: str
     name: str
     status: str = "theoretical"
+    stage: str = "curated"
     commander: list[str] = field(default_factory=list)
     companion: str | None = None
     bracket: int | None = None
@@ -121,6 +147,16 @@ class Deck:
     @property
     def land_count(self) -> int:
         return self.category_counts.get("land", 0)
+
+    @property
+    def unjustified(self) -> list[CardEntry]:
+        """Cards with no `why` yet -- the work a draft still owes.
+
+        A count rather than a wall of red is the whole argument of ADR 13: "17
+        cards still need a rationale" is a to-do list, and promoting the deck
+        to `curated` is what finishing it looks like.
+        """
+        return [c for c in self.cards if not c.why.strip()]
 
     def card_names(self, *, include_commander: bool = True) -> list[str]:
         names: list[str] = []
@@ -159,6 +195,7 @@ class Deck:
             slug=raw.get("slug") or slug or "",
             name=raw.get("name") or slug or "",
             status=str(raw.get("status") or "theoretical").strip().lower(),
+            stage=str(raw.get("stage") or "curated").strip().lower(),
             commander=list(commander),
             companion=raw.get("companion"),
             bracket=raw.get("bracket"),
@@ -174,6 +211,7 @@ class Deck:
             "slug": self.slug,
             "name": self.name,
             "status": self.status,
+            "stage": self.stage,
             "commander": self.commander,
         }
         if self.companion:
@@ -184,11 +222,20 @@ class Deck:
             payload["strategy"] = self.strategy
         if self.notes:
             payload["notes"] = self.notes
-        payload["cards"] = [c.to_obj() for c in self.cards]
+        cards = [c.to_obj() for c in self.cards]
+        if self.stage == "draft":
+            # A blank `why:` is the to-do list written into the file itself, so
+            # the work shows up where it has to be done rather than only in the
+            # gate's output. Omitted for a curated deck, where an empty
+            # rationale is a blocking error and should not be pre-typed.
+            for obj in cards:
+                obj.setdefault("why", "")
+        payload["cards"] = cards
         if self.swap_board:
             payload["swap_board"] = [c.to_obj() for c in self.swap_board]
 
-        text = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True, width=100)
+        text = yaml.dump(payload, Dumper=_Dumper, sort_keys=False,
+                         allow_unicode=True, width=100, default_flow_style=False)
         if path is not None:
             target = Path(path)
             if target.is_dir():

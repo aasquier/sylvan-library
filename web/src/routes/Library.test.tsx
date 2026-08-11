@@ -23,6 +23,8 @@ function deck(overrides: Partial<DeckSummary> & { slug: string }): DeckSummary {
   return {
     name: overrides.slug,
     status: 'built',
+    stage: 'curated',
+    needs_rationale: 0,
     commander: ['Some Commander'],
     companion: null,
     bracket: 4,
@@ -208,5 +210,56 @@ describe('Library', () => {
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'built' } })
     fireEvent.change(screen.getByLabelText('Color'), { target: { value: 'G' } })
     expect(shownNames()).toEqual(['Arahbo', 'Goreclaw'])
+  })
+
+  // ---------------------------------------------------------- draft vs curated
+  //
+  // Orthogonal to built vs theory: `status` is whether the cards exist,
+  // `stage` is whether anyone has reasoned about them (ADR 13). A draft that
+  // renders exactly like a curated deck hides the whole distinction.
+
+  it('marks a draft with the number of rationales it still owes', async () => {
+    vi.mocked(api.decks).mockResolvedValue([
+      deck({ slug: 'fresh', name: 'Fresh', stage: 'draft', needs_rationale: 17 }),
+      deck({ slug: 'done', name: 'Done' }),
+    ])
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    const fresh = screen.getByText('Fresh').closest('a')!
+    const done = screen.getByText('Done').closest('a')!
+    expect(within(fresh).getByText('draft · 17')).toBeTruthy()
+    expect(within(done).queryByText(/draft/)).toBeNull()
+  })
+
+  it('a draft is not the same thing as a theory, and both can be true', async () => {
+    vi.mocked(api.decks).mockResolvedValue([
+      deck({ slug: 'both', name: 'Both', status: 'theoretical',
+             stage: 'draft', needs_rationale: 4 }),
+    ])
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(1))
+    const card = screen.getByText('Both').closest('a')!
+    expect(within(card).getByText('theory')).toBeTruthy()
+    expect(within(card).getByText('draft · 4')).toBeTruthy()
+  })
+
+  it('filters the shelf by stage, independently of status', async () => {
+    vi.mocked(api.decks).mockResolvedValue([
+      deck({ slug: 'a', name: 'Adraft', stage: 'draft', needs_rationale: 2 }),
+      deck({ slug: 'b', name: 'Bcurated' }),
+    ])
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    fireEvent.change(screen.getByLabelText('Stage'), { target: { value: 'draft' } })
+    expect(shownNames()).toEqual(['Adraft'])
+    fireEvent.change(screen.getByLabelText('Stage'), { target: { value: 'curated' } })
+    expect(shownNames()).toEqual(['Bcurated'])
+  })
+
+  it('offers a way in to the importer', async () => {
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    const link = screen.getByText('Import a decklist').closest('a')!
+    expect(link.getAttribute('href')).toBe('/import')
   })
 })

@@ -30,6 +30,8 @@ src/mtglab/
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema
   decks/edit.py           surgical deck.yaml edits, minimal diffs
+  decks/decklist.py       pasted decklist -> parsed lines; pure text
+  decks/importer.py       parsed lines + corpus -> a draft deck.yaml
   decks/source.py         DeckSource protocol; file-backed and in-memory
   decks/suggest.py        similarity scorer -> replacement shortlists
   decks/validate.py       the gate
@@ -99,6 +101,14 @@ rather than inventing one, which is what keeps [ADR 8](docs/adr/0008-the-gate-bl
 intact now that the tool can edit decks. See
 [ADR 11](docs/adr/0011-the-api-may-apply-a-swap.md).
 
+The one bend, and it does not bend the rule: a deck declares a `stage` as well
+as a `status`. In a **draft** — what `decks import` writes — a missing `why` is
+a single counted warning rather than 99 errors, so the deck's *facts* get
+checked on day one while the thinking is still owed. Promotion to **curated** is
+refused while any card is blank, and the five artifacts refuse a draft outright.
+Absent means `curated`, the opposite default from `status`, so the six existing
+decks are never silently demoted. [ADR 13](docs/adr/0013-an-imported-deck-is-a-draft.md).
+
 **5. Never commit** card corpus data, collection/wishlist/purchase data, or
 credentials. CI enforces this. A public inventory of expensive cards tied to a
 real identity is a targeting list.
@@ -106,6 +116,7 @@ real identity is a targeting list.
 ## Workflow
 
 ```bash
+mtglab decks import <slug> --from list.txt --commander 'X'   # -> a draft
 mtglab decks validate <slug>      # gate — fix errors before anything else
 mtglab decks suggest <slug>       # shortlist replacements for what it flagged
 mtglab decks swap <slug> --out X --in Y --why '...'   # apply your choice
@@ -199,6 +210,10 @@ Each deck declares `status: built | theoretical`. **Goreclaw and Tivit are
 theoretical** — lists under consideration, not boxes of cards; the other four
 are built. Absent means theoretical, so nothing is ever silently claimed as
 owned.
+
+Separately, each declares `stage: draft | curated` — whether it has been
+reasoned about, as opposed to whether it exists. **All six are curated.** A
+deck brought in with `decks import` starts as a draft; see rule 4.
 
 Two decks currently fail the gate on one card each, deliberately and not as a
 bug to route around: **Goreclaw** runs Primeval Titan and **Atla Palani** runs

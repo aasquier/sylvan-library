@@ -9,6 +9,13 @@ Both are *checkable facts*, and both were missed by reasoning from memory
 instead of from the card. So identity and oracle text are now looked up, and
 `mtglab decks validate` fails loudly rather than producing a confident,
 wrong document.
+
+The gate has exactly one mode switch, and it is `deck.stage` (ADR 13). In a
+draft a missing `why` warns; in a curated deck it blocks. Everything else --
+legality, colour identity, singleton, size, companion and partner rules -- is a
+fact about cards, and facts do not become negotiable because a deck is new. The
+stage is read off the deck rather than passed in per call so that there is one
+answer to "what is this deck", not a caller's opinion of it.
 """
 
 from __future__ import annotations
@@ -16,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from mtglab.decks import companion, partners
-from mtglab.decks.model import CATEGORIES, DECK_STATUSES, Deck
+from mtglab.decks.model import CATEGORIES, DECK_STAGES, DECK_STATUSES, Deck
 
 SINGLETON_EXEMPT = {
     "plains", "island", "swamp", "mountain", "forest", "wastes",
@@ -81,6 +88,15 @@ def validate(deck: Deck, cards: dict | None = None, *,
         rep.add("error", "deck-status",
                 f"status {deck.status!r} is not one of {', '.join(DECK_STATUSES)}")
 
+    # An unrecognised stage is an error rather than a silent fallback to
+    # `curated`. Falling back would make a typo -- `stage: drafted` -- quietly
+    # turn every missing rationale into a blocking error, which is the opposite
+    # of what the author asked for and hard to work out from the output.
+    if deck.stage not in DECK_STAGES:
+        rep.add("error", "deck-stage",
+                f"stage {deck.stage!r} is not one of {', '.join(DECK_STAGES)}")
+    drafting = deck.stage == "draft"
+
     # Two commanders share the command zone, so the deck holds 98 rather than
     # 99. `expected_size` is the single-commander default; adjust it by however
     # many commanders there actually are.
@@ -123,12 +139,32 @@ def validate(deck: Deck, cards: dict | None = None, *,
             rep.add("error", "commander-in-99",
                     "commander is also listed in the 99", cmd)
 
+    # Rule 4 is not negotiable, but it is also not a wall an imported deck has
+    # to climb before anyone can look at it. In a curated deck a missing `why`
+    # is a claim the deck cannot support, and it blocks, one error per card.
+    #
+    # In a draft it is outstanding work, and it collapses to a single counted
+    # warning. That is not cosmetic: a fresh 99-card import produces 99 issues
+    # that all say the same thing, which is a wall nobody reads and would bury
+    # the one error that matters -- ADR 8 requires warnings to stay rare enough
+    # to be read. ADR 13's argument is precisely that a number is a better
+    # prompt than a wall, so the count is the report and the deck file is the
+    # per-card list.
+    pending = deck.unjustified
+    if drafting and pending:
+        shown = ", ".join(c.name for c in pending[:6])
+        more = f", and {len(pending) - 6} more" if len(pending) > 6 else ""
+        rep.add("warn", "draft-incomplete",
+                f"{len(pending)} of {len(deck.cards)} cards still need a `why` "
+                f"({shown}{more}). Write them, then set `stage: curated` -- the "
+                "gate refuses the promotion while any card is still blank")
+
     for card in deck.cards:
         if card.category not in CATEGORIES:
             rep.add("warn", "unknown-category",
                     f"category {card.category!r} is not one of {', '.join(CATEGORIES)}",
                     card.name)
-        if not card.why.strip():
+        if not card.why.strip() and not drafting:
             rep.add("error", "missing-rationale",
                     "no `why` -- every inclusion must justify itself", card.name)
 

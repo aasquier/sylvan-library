@@ -1,6 +1,6 @@
 # 13. An imported deck is a draft until every card is justified
 
-**Status:** Proposed — nothing implements this yet · **Recorded:** 2026-08-11
+**Status:** Accepted · **Recorded:** 2026-08-11 · **Implemented:** 2026-08-11
 
 ## Context
 
@@ -103,5 +103,12 @@ which is the failure mode this project was built to stop.
 - Artifacts gated on `curated` means a hosted user cannot generate a primer
   until they have done the work. That is intended, and it is also the strongest
   argument the tool makes for its own premise.
-- **Nothing here is built.** This ADR is the plan; see the deck lifecycle
-  section in `ROADMAP.md` for the order it gets built in.
+- Built on 2026-08-11, in `decks/decklist.py` (the grammar),
+  `decks/importer.py` (resolution), `decks/model.py` and `decks/validate.py`
+  (the stage), and the `decks import` command, `POST /api/decks/import` and the
+  app's Import page. One thing changed shape in the building: a draft's missing
+  rationales are reported as **one counted warning**, not one per card. Ninety-
+  nine identical warnings is the wall this ADR set out to replace, and it would
+  have buried the banned card that the same run is meant to surface —
+  [ADR 8](0008-the-gate-blocks.md) requires warnings to stay rare enough to
+  read. The per-card list lives in the deck file and on the deck page.

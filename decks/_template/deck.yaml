@@ -8,6 +8,13 @@ name: My Deck Name
 # thinking about. Absent means theoretical, so nothing is ever
 # silently claimed as owned.
 status: theoretical
+# draft = imported, not yet reasoned about; curated = every card
+# justifies its slot. Absent means curated -- the opposite default
+# from status, so an existing deck is never silently demoted. In a
+# draft a missing `why` is a counted warning; promotion to curated
+# is refused while any card is blank, and artifacts stay blocked.
+# `mtglab decks import` writes drafts. See docs/adr/0013.
+stage: curated
 commander:
   - Gyome, Master Chef
 # companion: Kaheera, the Orphanguard   # sits outside the 100

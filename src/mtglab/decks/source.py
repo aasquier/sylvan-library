@@ -63,6 +63,15 @@ class DeckSource(Protocol):
     def write_text(self, slug: str, text: str) -> None:
         """Replace the deck's YAML. Raises `ReadOnlySource` if not permitted."""
 
+    def create(self, slug: str, text: str) -> None:
+        """Add a deck that does not exist yet.
+
+        Separate from `write_text` rather than folded into it, because the two
+        have opposite safety requirements: an update to a deck that has
+        vanished is a bug, and a create over a deck that already exists
+        destroys somebody's work. Raises `DeckExists` or `ReadOnlySource`.
+        """
+
     @property
     def writable(self) -> bool:
         """Whether this caller may edit these decks.
@@ -76,6 +85,10 @@ class DeckSource(Protocol):
 
 class ReadOnlySource(Exception):
     """Raised when a deck source will not accept an edit."""
+
+
+class DeckExists(Exception):
+    """Raised rather than overwriting a deck that is already there."""
 
 
 class FileDeckSource:
@@ -116,6 +129,13 @@ class FileDeckSource:
         # source of truth truncated, and the caller has already verified the
         # text parses.
         self._path(slug).write_text(text, encoding="utf-8")
+
+    def create(self, slug: str, text: str) -> None:
+        path = self.root / slug / "deck.yaml"
+        if path.exists():
+            raise DeckExists(slug)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
 
     @property
     def writable(self) -> bool:
@@ -159,6 +179,14 @@ class MemoryDeckSource:
         if not self._writable:
             raise ReadOnlySource(slug)
         self.get(slug)          # raises DeckNotFound for an unknown deck
+        self._text[slug] = text
+        self._decks[slug] = Deck.from_text(text, slug=slug)
+
+    def create(self, slug: str, text: str) -> None:
+        if not self._writable:
+            raise ReadOnlySource(slug)
+        if slug in self._decks:
+            raise DeckExists(slug)
         self._text[slug] = text
         self._decks[slug] = Deck.from_text(text, slug=slug)
 

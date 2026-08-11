@@ -26,11 +26,10 @@ they differ.
 | [10](0010-correctness-against-independent-oracles.md) | Correctness is established against independent oracles | Accepted |
 | [11](0011-the-api-may-apply-a-swap.md) | The API may apply a swap the user has decided on | Accepted |
 | [12](0012-decks-are-edited-by-surgical-operations.md) | Decks are edited by surgical operations over text | Accepted |
-| [13](0013-an-imported-deck-is-a-draft.md) | An imported deck is a draft until every card is justified | Proposed |
+| [13](0013-an-imported-deck-is-a-draft.md) | An imported deck is a draft until every card is justified | Accepted |
 
 **Proposed** means the decision is made and argued but nothing implements it
-yet — 4 and 5 describe a deployment that does not exist, and 13 describes a
-deck lifecycle that is planned in `ROADMAP.md` but not built.
+yet — 4 and 5 describe a deployment that does not exist.
 
 ## Where the longer arguments live
 

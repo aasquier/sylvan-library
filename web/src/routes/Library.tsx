@@ -12,6 +12,7 @@ export default function Library() {
   const [color, setColor] = useState('all')
   const [sort, setSort] = useState('name')
   const [status, setStatus] = useState('all')
+  const [stage, setStage] = useState('all')
 
   useEffect(() => {
     Promise.all([api.decks(), api.health()])
@@ -27,6 +28,7 @@ export default function Library() {
     if (bracket !== 'all') list = list.filter((d) => String(d.bracket) === bracket)
     if (color !== 'all') list = list.filter((d) => d.color_identity.includes(color))
     if (status !== 'all') list = list.filter((d) => d.status === status)
+    if (stage !== 'all') list = list.filter((d) => d.stage === stage)
     return [...list].sort((a, b) =>
       sort === 'bracket'
         ? (b.bracket ?? 0) - (a.bracket ?? 0)
@@ -34,7 +36,7 @@ export default function Library() {
           ? b.total_cards - a.total_cards
           : a.name.localeCompare(b.name),
     )
-  }, [decks, bracket, color, status, sort])
+  }, [decks, bracket, color, status, stage, sort])
 
   if (error) return <ErrorNote>Could not load decks: {error}</ErrorNote>
   if (!decks) return <Spinner label="Loading decks…" />
@@ -65,12 +67,21 @@ export default function Library() {
                   options={[{ value: 'all', label: 'Built and theory' },
                     { value: 'built', label: 'Built' },
                     { value: 'theoretical', label: 'Theory' }]} />
+          <Select label="Stage" value={stage} onChange={setStage}
+                  options={[{ value: 'all', label: 'Draft and curated' },
+                    { value: 'curated', label: 'Curated' },
+                    { value: 'draft', label: 'Draft' }]} />
           <Select label="Sort" value={sort} onChange={setSort}
                   options={[
                     { value: 'name', label: 'Name' },
                     { value: 'bracket', label: 'Bracket' },
                     { value: 'size', label: 'Card count' },
                   ]} />
+          <Link to="/import"
+                className="h-9 rounded-lg px-4 text-sm font-medium leading-9"
+                style={{ background: 'var(--series-1)', color: '#fff' }}>
+            Import a decklist
+          </Link>
         </div>
       </header>
 
@@ -98,6 +109,15 @@ export default function Library() {
                         Worth saying on the shelf, because the difference
                         decides whether you can sit down and play it. */}
                     {deck.status === 'theoretical' && <Badge>theory</Badge>}
+                    {/* Orthogonal to that: has anyone reasoned about it?
+                        A draft renders like a curated deck unless the shelf
+                        says so, which hides the distinction the stage exists
+                        to draw. The count is the prompt (ADR 13). */}
+                    {deck.stage === 'draft' && (
+                      <Badge tone="warning">
+                        draft · {deck.needs_rationale}
+                      </Badge>
+                    )}
                     {deck.errors === null && <Badge tone="warning">not checked</Badge>}
                     {deck.errors !== null && deck.errors > 0 && (
                       <Badge tone="critical">

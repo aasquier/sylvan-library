@@ -18,6 +18,8 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+import tiny_corpus  # noqa: E402
+from mtglab import config  # noqa: E402
 from mtglab.api import jobs  # noqa: E402
 from mtglab.api.app import create_app  # noqa: E402
 from mtglab.api.deps import deck_source  # noqa: E402
@@ -349,6 +351,140 @@ def test_a_read_only_source_refuses_every_swap():
             "out": "Primeval Titan", "into": "Cultivator Colossus", "why": "x"})
         assert resp.status_code == 422
         assert "read-only" in resp.json()["detail"]
+
+
+# ----------------------------------------------------------------- import
+#
+# The import endpoint is the only other write in the API, and it creates rather
+# than edits. Its refusals run against an in-memory source for the same reason
+# the swap refusals do: a test that wrote to decks/ would be editing the
+# repository's own source of truth.
+
+@pytest.fixture
+def importable(in_memory_client, tmp_path):
+    """An empty library, with a four-card corpus behind it.
+
+    Built rather than borrowed: the real 500MB corpus is absent on a fresh
+    clone and in CI, and the one thing worth proving about import is what it
+    does *with* a corpus.
+    """
+    pytest.importorskip("duckdb")
+    with config.use_paths(data_dir=tmp_path / "data"):
+        tiny_corpus.build(config.DB_PATH)
+        yield in_memory_client([])
+
+
+def test_import_creates_a_draft_and_gates_it_immediately(importable):
+    """ADR 13's bargain, over HTTP: the facts are checked on day one, and the
+    thinking still owed is a number rather than a wall."""
+    with importable as client:
+        resp = client.post("/api/decks/import", json={
+            "slug": "gyome-x", "name": "Gyome imported",
+            "text": tiny_corpus.DECKLIST, "bracket": 4})
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+
+        assert body["created"] is True
+        assert body["stage"] == "draft"
+        assert body["commander"] == ["Gyome, Master Chef"]
+        assert body["total_cards"] == 99
+        assert body["land_count"] == 97
+        assert body["needs_rationale"] == 3
+        assert [i["card"] for i in body["errors"]] == ["Primeval Titan"]
+
+        # And it is a deck the rest of the API can see.
+        deck = client.get("/api/decks/gyome-x").json()
+        assert deck["stage"] == "draft"
+        assert deck["needs_rationale"] == 3
+        assert all(c["why"] == "" for c in deck["cards"]), "no rationale invented"
+        assert {d["slug"] for d in client.get("/api/decks").json()} == {"gyome-x"}
+
+
+def test_import_dry_run_previews_without_creating(importable):
+    """The preview runs the identical code path, so what the user approves is
+    the result rather than an estimate of it."""
+    with importable as client:
+        resp = client.post("/api/decks/import", json={
+            "slug": "gyome-x", "text": tiny_corpus.DECKLIST, "dry_run": True})
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["created"] is False
+        assert body["total_cards"] == 99
+        assert [i["card"] for i in body["errors"]] == ["Primeval Titan"]
+        assert "stage: draft" in body["yaml"]
+        assert client.get("/api/decks").json() == []
+        assert client.get("/api/decks/gyome-x").status_code == 404
+
+
+def test_import_reports_an_unresolved_name_rather_than_guessing(importable):
+    with importable as client:
+        body = client.post("/api/decks/import", json={
+            "slug": "typo-x", "dry_run": True,
+            "text": "Commander\n1 Gyome, Master Chef\nDeck\n1 Sol Rng\n97 Swamp\n",
+        }).json()
+        assert body["unknown"] == ["Sol Rng"]
+        assert any(i["code"] == "unknown-card" for i in body["errors"])
+
+
+@pytest.mark.parametrize(("payload", "expected"), [
+    ({"slug": "../escape", "text": "1 Sol Ring\n"}, "not a usable slug"),
+    ({"slug": "Has Caps", "text": "1 Sol Ring\n"}, "not a usable slug"),
+    ({"slug": "fine", "text": "\n\n# only comments\n"}, "parsed as a card"),
+    ({"slug": "fine", "text": "1 Sol Ring\n1 Swamp\n"}, "no commander"),
+    ({"slug": "fine", "text": "1 Sol Ring\n", "status": "owned"}, "status 'owned'"),
+])
+def test_import_refusals(importable, payload, expected):
+    with importable as client:
+        resp = client.post("/api/decks/import", json=payload)
+        assert resp.status_code == 422, resp.text
+        assert expected in resp.json()["detail"]
+        assert client.get("/api/decks").json() == []
+
+
+def test_import_will_not_overwrite_an_existing_deck(in_memory_client, tmp_path):
+    pytest.importorskip("duckdb")
+    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
+    with config.use_paths(data_dir=tmp_path / "data"):
+        tiny_corpus.build(config.DB_PATH)
+        with in_memory_client([deck]) as client:
+            resp = client.post("/api/decks/import", json={
+                "slug": "goreclaw-stompy", "text": tiny_corpus.DECKLIST})
+            assert resp.status_code == 422
+            assert "already exists" in resp.json()["detail"]
+            # The deck it refused to touch is untouched.
+            assert client.get("/api/decks/goreclaw-stompy").json()["stage"] == "curated"
+
+
+def test_import_without_a_corpus_refuses_rather_than_guessing(in_memory_client,
+                                                              tmp_path):
+    """Every name would be unknown and no land filed, so the deck's facts would
+    never be checked -- the one thing the gate exists to do."""
+    with config.use_paths(data_dir=tmp_path / "absent"), \
+            in_memory_client([]) as client:
+        resp = client.post("/api/decks/import",
+                           json={"slug": "x", "text": "1 Sol Ring\n"})
+        assert resp.status_code == 422
+        assert "corpus" in resp.json()["detail"]
+
+
+def test_a_read_only_library_refuses_import():
+    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
+    app = create_app()
+    app.dependency_overrides[deck_source] = \
+        lambda: MemoryDeckSource([deck], writable=False)
+    with TestClient(app) as client:
+        resp = client.post("/api/decks/import",
+                           json={"slug": "new-deck", "text": "1 Sol Ring\n"})
+        assert resp.status_code == 422
+        assert "read-only" in resp.json()["detail"]
+
+
+def test_the_import_path_does_not_shadow_a_deck_called_import(importable):
+    """`/api/decks/import` is a POST and `/api/decks/{slug}` is a GET, so the
+    two cannot collide -- pinned because the route order looks like it matters
+    and one day somebody will move it."""
+    with importable as client:
+        assert client.get("/api/decks/import").status_code == 404
 
 
 def test_an_empty_library_is_empty_rather_than_broken(in_memory_client):

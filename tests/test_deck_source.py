@@ -20,6 +20,7 @@ import pytest
 from mtglab import config
 from mtglab.decks.model import Deck
 from mtglab.decks.source import (
+    DeckExists,
     DeckNotFound,
     DeckSource,
     FileDeckSource,
@@ -190,6 +191,38 @@ def test_a_read_only_source_refuses_writes(decks_root):
     assert FileDeckSource(decks_root).writable is True
     with pytest.raises(ReadOnlySource):
         source.write_text("mini", "slug: mini\n")
+    with pytest.raises(ReadOnlySource):
+        source.create("new", "slug: new\n")
+
+
+# ---------------------------------------------------------------- creating
+
+def test_create_makes_a_new_deck_and_its_directory(decks_root):
+    source = FileDeckSource(decks_root)
+    source.create("fresh", DECK_YAML.replace("slug: mini", "slug: fresh"))
+    assert (decks_root / "fresh" / "deck.yaml").exists()
+    assert source.get("fresh").total_cards == 99
+    assert "fresh" in source.slugs()
+
+
+def test_create_refuses_to_overwrite_an_existing_deck(decks_root):
+    """`write_text` and `create` have opposite safety requirements, which is
+    why they are separate calls: updating a deck that vanished is a bug, and
+    creating over a deck that exists destroys somebody's work."""
+    source = FileDeckSource(decks_root)
+    with pytest.raises(DeckExists):
+        source.create("mini", "slug: mini\n")
+    # And the deck it refused to touch is unchanged.
+    assert source.get("mini").name == "Mini Deck"
+
+
+def test_memory_source_creates_and_refuses_duplicates(decks_root):
+    source = MemoryDeckSource()
+    source.create("mini", DECK_YAML)
+    assert source.slugs() == ["mini"]
+    assert source.get("mini").name == "Mini Deck"
+    with pytest.raises(DeckExists):
+        source.create("mini", DECK_YAML)
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

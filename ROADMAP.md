@@ -21,11 +21,11 @@ Status keys: **done** · **partial** · **not started**
 | Frugal alternatives | **partial** | price data loaded, shown in search; no "cheaper equivalent" logic |
 | Pod simulation of real games | **not started** | Tier 2 |
 
-Generating a deck from scratch is **not started**, and neither is importing
-one. Everything so far analyses a list you supply, and the only way to supply
-it is to hand-write YAML. See **The deck lifecycle** below — that is the plan,
-and it is the thing blocking a hosted instance from being useful to anyone but
-the maintainer.
+**Importing a list now works** — `mtglab decks import <slug> --from <file|->`,
+`POST /api/decks/import`, and the app's Import page. It resolves names against
+the corpus, files lands and nothing else, and writes a `stage: draft` deck with
+an empty `why` on every card. Generating a deck from scratch is still not
+started, though import subsumes most of it. See **The deck lifecycle** below.
 
 ## 2. Adversarial simulation between decks
 
@@ -244,47 +244,67 @@ with that card") rather than just refusing.
 
 ## The deck lifecycle
 
-Planned 2026-08-11, nothing built yet. Design decisions live in
+Planned 2026-08-11. Steps 1 and 2 shipped the same day; 3 and 4 are next.
+Design decisions live in
 [ADR 12](docs/adr/0012-decks-are-edited-by-surgical-operations.md) (how a deck
 is edited) and [ADR 13](docs/adr/0013-an-imported-deck-is-a-draft.md) (what an
 imported deck is). This section is the order of work.
-
-The tool can analyse, simulate, gate, generate and — as of today — edit one
-card. It cannot **create** a deck or **bring one in**, which means the whole
-thing only works on decks that were hand-written into YAML. Four of the six
-were, once, by hand. That is the gap.
 
 ### Where it stands
 
 | Path | Today | Wanted |
 | --- | --- | --- |
-| **Create** | copy `decks/_template/deck.yaml` by hand | `mtglab decks new <slug> --commander X`, and a UI equivalent |
-| **Import** | nothing; the original markdown was migrated by hand and must not be re-imported | paste a decklist, resolve it against the corpus, get a draft |
+| **Create** | copy `decks/_template/deck.yaml` by hand, or import a list with a commander and nothing else | a UI form; the machinery is import's |
+| **Import** | **done** — `mtglab decks import`, `POST /api/decks/import`, the Import page | — |
 | **Refactor** | `decks swap` replaces one card; anything else is a text editor | add, remove, recategorise, change quantity — same surgical model |
 | **Export** | `moxfield.txt`, one of the five artifacts | unchanged; it already works |
 
 ### Order, and why
 
-1. **Import.** Highest value and it subsumes create — a new deck is an import of
-   an empty list plus a commander. It is also the only one of the three that
-   someone other than the maintainer needs on day one.
+1. **Import.** ✅ **Done.** Highest value and it subsumes create — a new deck is
+   an import of an empty list plus a commander. It is also the only one of the
+   three that someone other than the maintainer needs on day one.
 
-   The work: a line-based decklist parser (`1 Sol Ring`, `1x Sol Ring`, set
-   codes in parentheses, `Commander:` / `Deck:` / `Sideboard:` section headers),
-   name resolution through `db.get_cards` — which already handles double-faced
-   cards by face name — and a writer that produces `deck.yaml` with `stage:
-   draft`. Unknown names are reported, never guessed. Category is inferred only
-   for lands, because `is_land` is a corpus fact; everything else is left for a
-   human to file.
+   `decks/decklist.py` is the grammar: quantities, set codes and collector
+   numbers, `*CMDR*` and foil markers, Archidekt's `[Category]` annotations,
+   Deckstats' `//Section` headers and leading `[SET]` codes, and section
+   headers including card-type groupings. It is pure text → structure, so it
+   tests exhaustively without a database. A line it cannot read comes back with
+   its line number rather than vanishing.
 
-2. **The draft stage in the gate.** `stage: draft | curated`, missing `why` as a
-   warning in draft and an error in curated, promotion refused unless every card
-   is justified, and `decks build` refused on a draft. This is ADR 13, and it is
-   what makes step 1 usable without making rule 4 decorative.
+   `decks/importer.py` resolves those names through `db.get_cards` — which
+   already handles double-faced cards by face name — and writes the file.
+   Unknown names are kept **verbatim** and reported, so the deck stays the size
+   you pasted and the gate flags them as `unknown-card`; dropping them would
+   hand back a 96-card deck silently. Category is inferred only for lands,
+   because `is_land` is a corpus fact that is right about the double-faced
+   cards a type line is wrong about. A sideboard or maybeboard becomes the swap
+   board. Import refuses without a corpus rather than producing a deck whose
+   facts were never checked.
+
+   Two things it deliberately will not do: pick a commander when the list does
+   not name one (it reports the candidates, including the sideboard Moxfield
+   hides it in), and assume a card with a Companion ability is *this deck's*
+   companion.
+
+2. **The draft stage in the gate.** ✅ **Done.** `stage: draft | curated`,
+   defaulting to curated so the six existing decks are never demoted. In a
+   draft a missing `why` is a warning; in a curated deck it blocks. Promotion is
+   refused while any card is blank, and `decks build` refuses a draft outright —
+   not something `--force` overrides, because a draft is not *wrong*, it is
+   unfinished, and the way out is to write the rationales.
+
+   One thing changed shape in the building. A draft's missing rationales report
+   as **one counted warning**, not one per card: 99 identical warnings is the
+   wall ADR 13 set out to replace, and it buried the banned card the same run
+   was meant to surface. The per-card list lives in the deck file (a blank
+   `why:` on every line) and on the deck page.
 
 3. **The rest of the edit operations.** `add_card`, `remove_card`,
    `set_card_field`, `set_note` — each surgical and self-verifying, per ADR 12.
-   A UI that can import but not then change what it imported is half a tool.
+   A UI that can import but not then change what it imported is half a tool,
+   and that is now literally the state: you can bring a list in and the only
+   way to write its 99 rationales is a text editor.
 
 4. **A create path in the UI**, once import and edit both exist, since it is the
    same machinery with an empty list.

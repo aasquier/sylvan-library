@@ -111,6 +111,30 @@ def test_deck_paths_reads_the_current_setting_not_an_import_time_default(tmp_pat
     assert found == ["scratch-deck"]
 
 
+def test_the_service_resolves_the_corpus_path_at_call_time(tmp_path):
+    """The same bug as `deck_paths`, found in `service._connect`, which did
+    `from mtglab.config import DB_PATH` and so bound the default `data/`
+    forever. It worked in production, where the environment is set before the
+    process starts, and made it impossible to point a test at a scratch corpus
+    -- so the import path could only be tested against the real 500MB one."""
+    from mtglab.api import service
+
+    with config.use_paths(data_dir=tmp_path / "empty"):
+        assert service._connect() is None
+
+    pytest.importorskip("duckdb")
+    import tiny_corpus
+
+    with config.use_paths(data_dir=tmp_path / "corpus"):
+        tiny_corpus.build(config.DB_PATH)
+        con = service._connect()
+        assert con is not None
+        try:
+            assert con.execute("SELECT count(*) FROM oracle_cards").fetchone()[0] == 4
+        finally:
+            con.close()
+
+
 def test_env_vars_are_read_at_import(monkeypatch, tmp_path):
     """A container sets these before the process starts; nothing should have
     to call reload_from_env() for them to take effect."""

@@ -134,6 +134,7 @@ export default function DeckDetail() {
               <h1 className="text-2xl font-semibold tracking-tight">{deck.name}</h1>
               {deck.bracket && <Badge>Bracket {deck.bracket}</Badge>}
               {deck.status === 'theoretical' && <Badge>theory</Badge>}
+              {deck.stage === 'draft' && <Badge tone="warning">draft</Badge>}
               {report.ok
                 ? <Badge tone="good">valid</Badge>
                 : <Badge tone="critical">{report.errors.length} error(s)</Badge>}
@@ -159,6 +160,29 @@ export default function DeckDetail() {
           </Link>
         </div>
       </div>
+
+      {/* A draft is a to-do list with a number on it (ADR 13), so the number
+          leads. The cards themselves are marked below, but the count is what
+          says how far off `curated` is — and the artifacts stay shut until
+          then, which is worth saying where someone would go looking. */}
+      {deck.stage === 'draft' && (
+        <div className="rounded-lg px-4 py-3 text-sm"
+             style={{
+               background: 'color-mix(in srgb, var(--status-warning) 12%, transparent)',
+               border: '1px solid color-mix(in srgb, var(--status-warning) 40%, transparent)',
+             }}>
+          <strong>
+            Draft — {deck.needs_rationale} of {deck.cards.length} cards still need
+            a <code>why</code>.
+          </strong>{' '}
+          <span style={{ color: 'var(--text-secondary)' }}>
+            Its legality, colour identity and size are already checked. Write the
+            rationales in <code>deck.yaml</code>, then set{' '}
+            <code>stage: curated</code> — the gate refuses the promotion while
+            any card is blank, and artifacts stay blocked until it lands.
+          </span>
+        </div>
+      )}
 
       {deck.strategy && (
         <p className="max-w-3xl text-sm leading-relaxed"
@@ -229,10 +253,20 @@ export default function DeckDetail() {
                         </CardHover>
                         <ManaCost cost={card.mana_cost} />
                       </div>
-                      <p className="mt-0.5 text-xs leading-relaxed"
-                         style={{ color: 'var(--text-secondary)' }}>
-                        {card.why}
-                      </p>
+                      {card.why ? (
+                        <p className="mt-0.5 text-xs leading-relaxed"
+                           style={{ color: 'var(--text-secondary)' }}>
+                          {card.why}
+                        </p>
+                      ) : (
+                        /* Where the draft's outstanding work actually is. The
+                           gate reports the count; this is the per-card list,
+                           read off the deck rather than off the report. */
+                        <p className="mt-0.5 text-xs italic leading-relaxed"
+                           style={{ color: 'var(--status-warning)' }}>
+                          no rationale yet
+                        </p>
+                      )}
                     </div>
                   </li>
                 ))}

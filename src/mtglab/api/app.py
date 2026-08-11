@@ -67,6 +67,40 @@ def create_app(*, dev: bool = False) -> FastAPI:
     def list_decks(decks: Decks) -> list[dict[str, Any]]:
         return service.list_decks(source=decks)
 
+    @app.post("/api/decks/import")
+    def import_deck(payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
+        """Turn a pasted decklist into a draft deck.
+
+        Declared before `/api/decks/{slug}` so the literal path wins the match
+        -- and it is a POST while that is a GET, so the two could not collide
+        even if the order changed.
+
+        `dry_run` runs the identical code path and writes nothing, which is
+        what the app's preview uses: the user approves the actual result rather
+        than a description of it.
+        """
+        commander = payload.get("commander") or []
+        if isinstance(commander, str):
+            commander = [commander]
+        bracket = payload.get("bracket")
+        try:
+            return service.import_deck(
+                text=str(payload.get("text", "")),
+                slug=str(payload.get("slug", "")),
+                name=str(payload.get("name", "")),
+                commander=[str(c) for c in commander],
+                companion=str(payload.get("companion") or ""),
+                bracket=int(bracket) if bracket not in (None, "") else None,
+                status=str(payload.get("status") or "theoretical"),
+                dry_run=bool(payload.get("dry_run")),
+                source=decks,
+            )
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422,
+                                detail=f"bracket must be a number: {exc}") from exc
+        except service.ImportRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     @app.get("/api/decks/{slug}")
     def get_deck(slug: str, decks: Decks) -> dict[str, Any]:
         return service.get_deck(slug, source=decks)
