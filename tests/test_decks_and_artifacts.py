@@ -245,6 +245,119 @@ def test_the_curated_decks_declare_a_status():
         "trostani-tokens": "built",
     }
 
+
+# ---------------------------------------------------------------- deck stage
+#
+# ADR 13. `stage` says whether a deck has been *reasoned about*; `status` says
+# whether it physically exists. They are orthogonal, which is the argument for
+# two fields rather than one, and they default in opposite directions.
+
+def test_stage_defaults_to_curated_when_absent():
+    """The opposite default from `status`, and for the same reason: the six
+    existing decks justify every card, and defaulting to draft would silently
+    demote them into decks the gate stops blocking."""
+    assert Deck.from_text("slug: x\nname: X\ncards: []\n").stage == "curated"
+
+
+def test_stage_is_read_and_normalised():
+    assert Deck.from_text("slug: x\nname: X\nstage: DRAFT\n").stage == "draft"
+    assert Deck.from_text("slug: x\nname: X\nstage: ' draft '\n").stage == "draft"
+
+
+def test_an_unrecognised_stage_fails_the_gate():
+    """Rather than falling back to curated, which would make a typo turn every
+    missing rationale into a blocking error the author never asked for."""
+    deck = Deck.from_text("slug: x\nname: X\nstage: drafted\ncards: []\n")
+    assert "deck-stage" in {i.code for i in validate(deck, None).errors}
+
+
+def test_a_draft_warns_about_a_missing_why_and_a_curated_deck_blocks():
+    for stage, level in (("draft", "warn"), ("curated", "error")):
+        deck = make_deck(99, stage=stage)
+        deck.cards[3].why = ""
+        rep = validate(deck, corpus_for(deck))
+        codes = {i.code for i in getattr(rep, "errors" if level == "error"
+                                        else "warnings")}
+        assert ("missing-rationale" in codes) == (level == "error"), stage
+        assert ("draft-incomplete" in codes) == (level == "warn"), stage
+        assert rep.ok == (stage == "draft"), stage
+
+
+def test_a_draft_reports_one_counted_issue_rather_than_ninety_nine():
+    """ADR 13's actual argument: a number is a better prompt than a wall, and
+    ADR 8 needs warnings rare enough that the one that matters is readable."""
+    deck = make_deck(99, stage="draft")
+    for card in deck.cards:
+        card.why = ""
+    rep = validate(deck, corpus_for(deck))
+    assert len(rep.warnings) == 1
+    assert rep.warnings[0].code == "draft-incomplete"
+    assert "99 of 99 cards still need a `why`" in rep.warnings[0].message
+
+
+def test_a_draft_still_blocks_on_every_card_fact():
+    """Legality and colour identity are facts about cards. They do not become
+    negotiable because a deck is new."""
+    deck = make_deck(99, stage="draft")
+    for card in deck.cards:
+        card.why = ""
+    corpus = corpus_for(deck)
+    corpus["Card 0"] = FakeCard("Card 0", G, legal_commander=False)
+    corpus["Card 1"] = FakeCard("Card 1", frozenset("U"))
+    assert {i.code for i in validate(deck, corpus).errors} == \
+        {"banned", "color-identity"}
+
+
+def test_promotion_is_refused_while_any_card_is_blank():
+    """`stage: curated` is not something a deck can declare its way into."""
+    deck = make_deck(99, stage="curated")
+    deck.cards[0].why = ""
+    assert not validate(deck, corpus_for(deck)).ok
+
+
+def test_write_all_refuses_a_draft_and_names_what_is_owed():
+    """The artifacts are the shareable surface, and a primer for a deck nobody
+    has reasoned about looks exactly like one for a deck somebody did."""
+    from mtglab.artifacts.generate import DraftDeck
+
+    deck = make_deck(99, stage="draft")
+    deck.cards[0].why = ""
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            write_all(deck, tmp)
+        except DraftDeck as exc:
+            assert "Card 0" in str(exc)
+        else:
+            raise AssertionError("generated artifacts for a draft")
+        assert not list(Path(tmp).iterdir()), "wrote something anyway"
+
+
+def test_write_all_accepts_the_same_deck_once_promoted():
+    deck = make_deck(99, stage="curated")
+    with tempfile.TemporaryDirectory() as tmp:
+        assert len(write_all(deck, tmp)) == 4
+
+
+def test_a_dumped_draft_carries_a_blank_why_for_every_card():
+    """The to-do list, written into the file where the work has to be done."""
+    draft = Deck.from_text(Deck(slug="x", name="X", stage="draft",
+                                cards=[CardEntry("Sol Ring", "ramp")]).dump())
+    assert draft.stage == "draft"
+    assert "why: ''" in draft.dump()
+    # A curated deck must not get one pre-typed: there it is a blocking error.
+    curated = Deck(slug="x", name="X", cards=[CardEntry("Sol Ring", "ramp")])
+    assert "why" not in curated.dump()
+
+
+def test_the_curated_decks_are_all_curated():
+    """None of the six is a draft, which is what makes the default safe."""
+    root = Path(__file__).resolve().parents[1] / "decks"
+    stages = {p.parent.name: Deck.load(p).stage
+              for p in sorted(root.glob("*/deck.yaml"))
+              if not p.parent.name.startswith("_")}
+    assert set(stages.values()) == {"curated"}, stages
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):

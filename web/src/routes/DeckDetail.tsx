@@ -10,8 +10,8 @@ import {
 } from '../lib/api'
 import { categoryLabel, identityName, percent } from '../lib/mtg'
 import {
-  Badge, CardArt, CardHover, Caveat, ColorPips, ErrorNote, ManaCost, Select,
-  Spinner, StatTile,
+  Badge, CardArt, CardHover, Caveat, ColorPips, ErrorNote, ManaCost, ManaText,
+  Select, Spinner, StatTile,
 } from '../components/ui'
 import {
   CategoryCoverage, ColorNeedsChart, CurveChart, DataTable,
@@ -134,6 +134,7 @@ export default function DeckDetail() {
               <h1 className="text-2xl font-semibold tracking-tight">{deck.name}</h1>
               {deck.bracket && <Badge>Bracket {deck.bracket}</Badge>}
               {deck.status === 'theoretical' && <Badge>theory</Badge>}
+              {deck.stage === 'draft' && <Badge tone="warning">draft</Badge>}
               {report.ok
                 ? <Badge tone="good">valid</Badge>
                 : <Badge tone="critical">{report.errors.length} error(s)</Badge>}
@@ -160,10 +161,33 @@ export default function DeckDetail() {
         </div>
       </div>
 
+      {/* A draft is a to-do list with a number on it (ADR 13), so the number
+          leads. The cards themselves are marked below, but the count is what
+          says how far off `curated` is — and the artifacts stay shut until
+          then, which is worth saying where someone would go looking. */}
+      {deck.stage === 'draft' && (
+        <div className="rounded-lg px-4 py-3 text-sm"
+             style={{
+               background: 'color-mix(in srgb, var(--status-warning) 12%, transparent)',
+               border: '1px solid color-mix(in srgb, var(--status-warning) 40%, transparent)',
+             }}>
+          <strong>
+            Draft — {deck.needs_rationale} of {deck.cards.length} cards still need
+            a <code>why</code>.
+          </strong>{' '}
+          <span style={{ color: 'var(--text-secondary)' }}>
+            Its legality, colour identity and size are already checked. Write the
+            rationales in <code>deck.yaml</code>, then set{' '}
+            <code>stage: curated</code> — the gate refuses the promotion while
+            any card is blank, and artifacts stay blocked until it lands.
+          </span>
+        </div>
+      )}
+
       {deck.strategy && (
         <p className="max-w-3xl text-sm leading-relaxed"
            style={{ color: 'var(--text-secondary)' }}>
-          {deck.strategy}
+          <ManaText>{deck.strategy}</ManaText>
         </p>
       )}
 
@@ -229,10 +253,20 @@ export default function DeckDetail() {
                         </CardHover>
                         <ManaCost cost={card.mana_cost} />
                       </div>
-                      <p className="mt-0.5 text-xs leading-relaxed"
-                         style={{ color: 'var(--text-secondary)' }}>
-                        {card.why}
-                      </p>
+                      {card.why ? (
+                        <p className="mt-0.5 text-xs leading-relaxed"
+                           style={{ color: 'var(--text-secondary)' }}>
+                          <ManaText>{card.why}</ManaText>
+                        </p>
+                      ) : (
+                        /* Where the draft's outstanding work actually is. The
+                           gate reports the count; this is the per-card list,
+                           read off the deck rather than off the report. */
+                        <p className="mt-0.5 text-xs italic leading-relaxed"
+                           style={{ color: 'var(--status-warning)' }}>
+                          no rationale yet
+                        </p>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -309,7 +343,7 @@ export default function DeckDetail() {
                 <div>
                   <Badge tone="critical">{issue.code}</Badge>{' '}
                   {issue.card && <strong>{issue.card}: </strong>}
-                  {issue.message}
+                  <ManaText>{issue.message}</ManaText>
                 </div>
 
                 {shortlist && shortlist.candidates.length > 0 && (
@@ -341,7 +375,7 @@ export default function DeckDetail() {
                             </div>
                             <p className="mt-0.5 text-xs leading-relaxed"
                                style={{ color: 'var(--text-muted)' }}>
-                              {c.reasons.join(' · ')}
+                              <ManaText>{c.reasons.join(' · ')}</ManaText>
                             </p>
                           </div>
                           <button
@@ -411,7 +445,7 @@ export default function DeckDetail() {
                  }}>
               <Badge tone="warning">{issue.code}</Badge>{' '}
               {issue.card && <strong>{issue.card}: </strong>}
-              {issue.message}
+              <ManaText>{issue.message}</ManaText>
             </div>
           ))}
         </div>
@@ -432,7 +466,7 @@ export default function DeckDetail() {
               </h3>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed"
                  style={{ color: 'var(--text-secondary)' }}>
-                {value}
+                <ManaText>{value}</ManaText>
               </p>
             </section>
           ))}

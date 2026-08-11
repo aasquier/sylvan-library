@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
 import CardSearch from './routes/CardSearch'
 import DeckDetail from './routes/DeckDetail'
+import Import from './routes/Import'
 import Library from './routes/Library'
 import Simulator from './routes/Simulator'
 import { api, type Health } from './lib/api'
 
 const NAV = [
   { to: '/', label: 'Library', end: true },
+  { to: '/import', label: 'Import', end: false },
   { to: '/search', label: 'Card search', end: false },
   { to: '/simulate', label: 'Simulator', end: false },
 ]
@@ -84,6 +86,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Library />} />
           <Route path="/decks/:slug" element={<DeckDetail />} />
+          <Route path="/import" element={<Import />} />
           <Route path="/search" element={<CardSearch />} />
           <Route path="/simulate" element={<Simulator />} />
           <Route path="*" element={

@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { identityName, manaSymbols, money, percent } from './mtg'
+import { identityName, manaSymbols, money, percent, splitManaText } from './mtg'
 
 describe('identityName', () => {
   it('names the colourless and mono cases', () => {
@@ -120,5 +120,57 @@ describe('money', () => {
     expect(money(12.5)).toBe('$12.50')
     expect(money(0)).toBe('$0.00')
     expect(money(1)).toBe('$1.00')
+  })
+})
+
+
+describe('splitManaText', () => {
+  /** Just the pips, for asserting on what got converted. */
+  const pips = (s: string) => splitManaText(s).filter((p) => p.pip).map((p) => p.text)
+  /** Round-trip: the visible characters, with pips as bare symbols. */
+  const flat = (s: string) => splitManaText(s).map((p) => p.text).join('')
+
+  it('converts the symbols that appear in the deck files', () => {
+    expect(pips('A {G} activation for {1}{G}')).toEqual(['G', '1', 'G'])
+    expect(pips('{T}: Add {C}{C}.')).toEqual(['T', 'C', 'C'])
+  })
+
+  it('expands a colour identity written as one brace', () => {
+    // `validate.py` writes an identity as {GW} -- one brace, two colours,
+    // because that is how Magic writes an identity. Two pips, not one blob.
+    expect(pips('identity {GW} includes {W}, outside {G}')).toEqual(['G', 'W', 'W', 'G'])
+  })
+
+  it('keeps a multi-digit generic cost as a single pip', () => {
+    expect(pips('{10} to cast')).toEqual(['10'])
+  })
+
+  it('keeps hybrid and Phyrexian symbols whole', () => {
+    expect(pips('{G/W} or {U/P}')).toEqual(['G/W', 'U/P'])
+    expect(pips('{2/W} is a twobrid')).toEqual(['2/W'])
+  })
+
+  it('leaves prose that merely contains braces alone', () => {
+    // Turning an arbitrary brace into a pip would be the UI asserting it had
+    // read something it did not.
+    expect(pips('set the {note} key and {} nothing else')).toEqual([])
+    expect(flat('set the {note} key')).toBe('set the {note} key')
+  })
+
+  it('loses no text around the symbols', () => {
+    const prose = 'Pay {2}{G}{G}, then {T} it. Identity {BG}.'
+    expect(flat(prose)).toBe('Pay 2GG, then T it. Identity BG.')
+    expect(splitManaText(prose).filter((p) => !p.pip).map((p) => p.text))
+      .toEqual(['Pay ', ', then ', ' it. Identity ', '.'])
+  })
+
+  it('handles a string that is only a symbol, and one with none', () => {
+    expect(splitManaText('{G}')).toEqual([{ text: 'G', pip: true }])
+    expect(splitManaText('no mana here')).toEqual([{ text: 'no mana here', pip: false }])
+    expect(splitManaText('')).toEqual([])
+  })
+
+  it('normalises case, since prose is written by hand', () => {
+    expect(pips('costs {g}{w}')).toEqual(['G', 'W'])
   })
 })

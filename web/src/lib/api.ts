@@ -14,6 +14,13 @@ export interface DeckSummary {
   name: string
   /** "built" = the cards are sleeved up; "theoretical" = a list under consideration. */
   status: string
+  /**
+   * "curated" = every card justifies its slot; "draft" = imported and not yet
+   * reasoned about. Orthogonal to `status` — all four combinations are real.
+   */
+  stage: string
+  /** Cards with no `why` yet. A draft's to-do list, as a number. */
+  needs_rationale: number
   commander: string[]
   companion: string | null
   bracket: number | null
@@ -172,6 +179,31 @@ export interface Suggestions {
   targets: SuggestionTarget[]
 }
 
+export interface ImportResult {
+  slug: string
+  name: string
+  stage: string
+  status: string
+  /** False for a dry run, which runs the identical path and writes nothing. */
+  created: boolean
+  commander: string[]
+  companion: string | null
+  total_cards: number
+  land_count: number
+  swap_board: string[]
+  needs_rationale: number
+  /** Names the corpus does not know. Kept in the deck verbatim, never guessed. */
+  unknown: string[]
+  unreadable: { line: number; text: string }[]
+  skipped: { line: number; text: string }[]
+  notes: string[]
+  /** The deck.yaml as written, so a preview can show the real thing. */
+  yaml: string
+  ok: boolean
+  errors: Issue[]
+  warnings: Issue[]
+}
+
 export interface SwapResult {
   slug: string
   swapped_out: string
@@ -269,6 +301,16 @@ export const api = {
   },
   swapCard: (slug: string, body: { out: string; into: string; why: string }) =>
     post<SwapResult>(`/api/decks/${slug}/swap`, body),
+  importDeck: (body: {
+    slug: string
+    text: string
+    name?: string
+    commander?: string[]
+    companion?: string
+    bracket?: number | null
+    status?: string
+    dry_run?: boolean
+  }) => post<ImportResult>('/api/decks/import', body),
   simMana: (payload: Record<string, unknown>) => post<Job>('/api/sim/mana', payload),
   simLands: (payload: Record<string, unknown>) => post<Job>('/api/sim/lands', payload),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),

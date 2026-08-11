@@ -3,6 +3,7 @@
     mtglab data refresh                 pull Scryfall bulk + load DuckDB
     mtglab data snapshot                append today's prices to history
     mtglab decks list
+    mtglab decks import <slug> --from   a pasted decklist -> a draft deck
     mtglab decks validate <slug>        the gate -- run before anything else
     mtglab decks build <slug>           generate the artifacts
     mtglab sim mana <slug>              Tier 1 goldfish
@@ -95,7 +96,12 @@ def cmd_decks_list(args):
     for deck in load_all_decks():
         cmd = ", ".join(deck.commander) or "?"
         bracket = f"B{deck.bracket}" if deck.bracket else "B?"
-        print(f"  {deck.slug:<22} {bracket:<4} {deck.total_cards:>3} cards   {cmd}")
+        # Only drafts are flagged. Curated is the norm and labelling it would
+        # make the one thing worth noticing harder to see.
+        draft = f"  draft, {len(deck.unjustified)} to justify" \
+            if deck.stage == "draft" else ""
+        print(f"  {deck.slug:<22} {bracket:<4} {deck.total_cards:>3} cards   "
+              f"{cmd}{draft}")
 
 
 def cmd_decks_validate(args):
@@ -105,6 +111,61 @@ def cmd_decks_validate(args):
     print(rep.render())
     print(f"\n{len(rep.errors)} error(s), {len(rep.warnings)} warning(s)")
     sys.exit(1 if rep.errors else 0)
+
+
+def cmd_decks_import(args):
+    """Bring a decklist in as a draft.
+
+    Shares its implementation with the API, so a list imported in the terminal
+    and the same list imported in the app produce the same deck file.
+    """
+    from mtglab.api import service
+
+    text = sys.stdin.read() if args.source == "-" else \
+        Path(args.source).read_text(encoding="utf-8")
+
+    try:
+        result = service.import_deck(
+            text=text, slug=args.slug, name=args.name or "",
+            commander=args.commander, companion=args.companion or "",
+            bracket=args.bracket, status=args.status, dry_run=args.dry_run)
+    except service.ImportRejected as exc:
+        sys.exit(f"refused: {exc}")
+
+    if args.dry_run:
+        print("dry run -- nothing was written.\n")
+
+    print(f"  {result['name']} ({result['slug']})")
+    print(f"  commander: {', '.join(result['commander'])}"
+          + (f"   companion: {result['companion']}" if result["companion"] else ""))
+    print(f"  {result['total_cards']} cards in the 99, "
+          f"{result['land_count']} lands, "
+          f"{len(result['swap_board'])} on the swap board")
+
+    for note in result["notes"]:
+        print(f"  note: {note}")
+    if result["unknown"]:
+        print(f"\n  {len(result['unknown'])} name(s) the corpus does not know. "
+              "Kept exactly as written -- nothing was guessed:")
+        for name in result["unknown"]:
+            print(f"    {name}")
+    if result["unreadable"]:
+        print(f"\n  {len(result['unreadable'])} line(s) could not be read:")
+        for line in result["unreadable"]:
+            print(f"    line {line['line']}: {line['text']}")
+    if result["skipped"]:
+        print(f"\n  {len(result['skipped'])} token line(s) skipped.")
+
+    print(f"\n  gate: {len(result['errors'])} error(s), "
+          f"{len(result['warnings'])} warning(s)")
+    for issue in result["errors"]:
+        card = f"[{issue['card']}] " if issue["card"] else ""
+        print(f"    {issue['code']}: {card}{issue['message']}")
+
+    print(f"\n  This deck is a DRAFT. {result['needs_rationale']} card(s) still "
+          "need a `why`;\n  write them in deck.yaml, then set `stage: curated`. "
+          "Artifacts stay\n  blocked until then, and nothing will write a "
+          "rationale for you.")
 
 
 def cmd_decks_suggest(args):
@@ -188,7 +249,7 @@ def cmd_decks_swap(args):
 
 
 def cmd_decks_build(args):
-    from mtglab.artifacts.generate import write_all
+    from mtglab.artifacts.generate import DraftDeck, write_all
     from mtglab.decks.validate import validate
 
     deck = _load(args.slug)
@@ -206,7 +267,12 @@ def cmd_decks_build(args):
         previous = Deck.load(Path(args.against))
 
     outdir = config.DECKS_DIR / args.slug / "artifacts"
-    written = write_all(deck, outdir, cards=cards, previous=previous)
+    try:
+        written = write_all(deck, outdir, cards=cards, previous=previous)
+    except DraftDeck as exc:
+        # No --force here on purpose: see the note on `write_all`. The way out
+        # of a draft is to write the rationales, not to pass a flag.
+        sys.exit(f"refusing to generate: {exc}")
     for path in written:
         print(f"  wrote {path}")
 
@@ -326,6 +392,21 @@ def main(argv=None):
     decks.add_parser("list").set_defaults(func=cmd_decks_list)
     v = decks.add_parser("validate"); v.add_argument("slug")
     v.set_defaults(func=cmd_decks_validate)
+    i = decks.add_parser("import", help="bring a decklist in as a draft")
+    i.add_argument("slug", help="directory name under decks/")
+    i.add_argument("--from", dest="source", required=True,
+                   help="path to a decklist, or - for stdin")
+    i.add_argument("--name", help="display name; defaults to the slug")
+    i.add_argument("--commander", action="append", default=[],
+                   help="repeat for a partner pair; overrides the list's own")
+    i.add_argument("--companion", help="sits outside the 100")
+    i.add_argument("--bracket", type=int)
+    i.add_argument("--status", default="theoretical",
+                   choices=("built", "theoretical"),
+                   help="whether the cards physically exist")
+    i.add_argument("--dry-run", action="store_true",
+                   help="resolve and gate the list without writing anything")
+    i.set_defaults(func=cmd_decks_import)
     g = decks.add_parser("suggest"); g.add_argument("slug")
     g.add_argument("--card", help="replace this card, instead of the gate's offenders")
     g.add_argument("--limit", type=int, default=5)

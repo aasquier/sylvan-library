@@ -231,4 +231,32 @@ describe('DeckDetail validation tab', () => {
     expect(full.length).toBe(2)
     expect(full.some((el) => el.getAttribute('src')?.includes('colossus-full'))).toBe(true)
   })
+
+  // ------------------------------------------------------------- draft stage
+
+  it('says nothing about drafts for a curated deck', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(screen.queryByText(/still need a/)).toBeNull()
+    expect(screen.queryByText('no rationale yet')).toBeNull()
+  })
+
+  it('leads a draft with the count it owes, and marks each blank card', async () => {
+    // ADR 13: a to-do list with a number on it. The banner carries the number;
+    // the per-card marks are where the work actually is.
+    vi.mocked(api.deck).mockResolvedValue({
+      ...DECK,
+      stage: 'draft',
+      needs_rationale: 1,
+      cards: [{ ...DECK.cards[0], why: '' }],
+    } as unknown as Deck)
+    renderDeck()
+    await screen.findByText(DECK.name)
+
+    expect(screen.getByText(/1 of 1 cards still need/)).toBeTruthy()
+    expect(screen.getByText('draft')).toBeTruthy()
+    expect(screen.getByText('no rationale yet')).toBeTruthy()
+    // And it says how to get out, which the badge alone does not.
+    expect(screen.getByText('stage: curated')).toBeTruthy()
+  })
 })

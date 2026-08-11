@@ -20,6 +20,7 @@ import pytest
 
 from mtglab import config
 from mtglab.cli import main
+from mtglab.decks.model import Deck
 
 # A real 99, because the gate checks deck size and there is no flag to relax
 # it -- nor should there be. Basics carry qty and are exempt from the
@@ -55,6 +56,13 @@ def decks(tmp_path):
     (root / "_template" / "deck.yaml").write_text(GOOD_DECK, encoding="utf-8")
     with config.use_paths(decks_dir=root, data_dir=tmp_path / "data"):
         yield root
+
+
+def tmp_listing(decks: Path, text: str) -> Path:
+    """A decklist on disk, next to the scratch deck directory."""
+    path = decks.parent / "listing.txt"
+    path.write_text(text, encoding="utf-8")
+    return path
 
 
 def run(argv) -> tuple[int, str]:
@@ -149,6 +157,132 @@ def test_build_moxfield_export_carries_the_commander(decks):
     text = (decks / "mini" / "artifacts" / "moxfield.txt").read_text()
     assert "98 Swamp" in text, "qty must survive the export"
     assert "Gyome, Master Chef" in text
+
+
+def test_build_refuses_a_draft_and_force_does_not_help(decks, capsys):
+    """ADR 13: the artifacts are the shareable surface, and a primer for a deck
+    nobody has reasoned about looks exactly like one for a deck somebody did.
+
+    `--force` overrides the gate's *errors* -- things the deck got wrong. A
+    draft is not wrong, it is unfinished and says so in the file, so the way
+    out is to write the rationales rather than to pass a flag."""
+    draft = GOOD_DECK.replace("name: Mini Deck", "name: Mini Deck\nstage: draft")
+    (decks / "mini" / "deck.yaml").write_text(draft, encoding="utf-8")
+
+    for argv in (["decks", "build", "mini"], ["decks", "build", "mini", "--force"]):
+        code, msg = run(argv)
+        capsys.readouterr()
+        assert code == 1, argv
+        assert "is a draft" in msg, argv
+        assert not (decks / "mini" / "artifacts").exists(), argv
+
+
+def test_build_accepts_a_draft_once_it_is_promoted(decks):
+    """Promotion is mechanical, not a claim: the deck already justifies every
+    card, so setting the stage is all that is left."""
+    promoted = GOOD_DECK.replace("name: Mini Deck", "name: Mini Deck\nstage: curated")
+    (decks / "mini" / "deck.yaml").write_text(promoted, encoding="utf-8")
+    assert run(["decks", "build", "mini"])[0] == 0
+    assert (decks / "mini" / "artifacts" / "moxfield.txt").exists()
+
+
+def test_the_gate_will_not_accept_a_promotion_with_a_blank_rationale(decks, capsys):
+    """`stage: curated` is not something you can declare your way into."""
+    claimed = BAD_DECK.replace("name: Mini Deck", "name: Mini Deck\nstage: curated")
+    (decks / "mini" / "deck.yaml").write_text(claimed, encoding="utf-8")
+    code, _ = run(["decks", "validate", "mini"])
+    assert code == 1
+    assert "missing-rationale" in capsys.readouterr().out
+
+
+def test_a_draft_reports_one_counted_warning_not_a_wall(decks, capsys):
+    """The count is the point (ADR 13). Ninety-nine identical warnings would
+    bury the one error that matters, which ADR 8 forbids."""
+    draft = BAD_DECK.replace("name: Mini Deck", "name: Mini Deck\nstage: draft")
+    (decks / "mini" / "deck.yaml").write_text(draft, encoding="utf-8")
+    code, _ = run(["decks", "validate", "mini"])
+    out = capsys.readouterr().out
+    assert code == 0, "a draft's missing rationale warns; it does not block"
+    assert out.count("missing-rationale") == 0
+    assert "draft-incomplete" in out
+    assert "1 of 2 cards still need a `why`" in out
+
+
+# ------------------------------------------------------------- decks import
+
+def test_import_without_a_corpus_refuses_rather_than_guessing(decks, capsys):
+    """Every name would be unknown and no land would be filed, so the deck's
+    facts would never be checked -- the one thing the gate exists to do."""
+    listing = tmp_listing(decks, "1 Sol Ring\n1 Swamp\n")
+    code, msg = run(["decks", "import", "new-deck", "--from", str(listing),
+                     "--commander", "Gyome, Master Chef"])
+    capsys.readouterr()
+    assert code == 1
+    assert "needs the card corpus" in msg
+    assert not (decks / "new-deck").exists()
+
+
+def test_import_rejects_a_slug_that_is_not_a_directory_name(decks, capsys):
+    """The slug becomes a path component, so it is checked rather than
+    sanitised after the fact."""
+    listing = tmp_listing(decks, "1 Sol Ring\n")
+    for slug in ("../escape", "Has Spaces", "trailing-"):
+        code, msg = run(["decks", "import", slug, "--from", str(listing),
+                         "--commander", "Gyome, Master Chef"])
+        capsys.readouterr()
+        assert code == 1, slug
+        assert "not a usable slug" in msg, slug
+
+
+def test_import_refuses_to_overwrite_an_existing_deck(decks, capsys):
+    listing = tmp_listing(decks, "1 Sol Ring\n")
+    code, msg = run(["decks", "import", "mini", "--from", str(listing),
+                     "--commander", "Gyome, Master Chef"])
+    capsys.readouterr()
+    assert code == 1
+    assert "already exists" in msg
+    # And the deck it refused to touch is untouched.
+    assert (decks / "mini" / "deck.yaml").read_text() == GOOD_DECK
+
+
+def test_import_writes_a_draft_and_the_gate_catches_the_banned_card(decks, capsys):
+    """The whole bargain, end to end: the facts are checked on day one, the
+    thinking is counted rather than invented, and nothing is guessed."""
+    pytest.importorskip("duckdb")
+    import tiny_corpus
+
+    tiny_corpus.build(config.DB_PATH)
+    listing = tmp_listing(decks, tiny_corpus.DECKLIST)
+    code, msg = run(["decks", "import", "gyome-x", "--from", str(listing),
+                     "--name", "Gyome imported", "--bracket", "4"])
+    out = capsys.readouterr().out
+    assert code == 0, msg
+
+    deck = Deck.load(decks / "gyome-x" / "deck.yaml")
+    assert deck.stage == "draft"
+    assert deck.status == "theoretical", "never silently claimed as owned"
+    assert deck.commander == ["Gyome, Master Chef"]
+    assert deck.total_cards == 99
+    assert deck.land_count == 97, "only lands are categorised, and by the corpus"
+    assert [c.why for c in deck.cards] == ["", "", ""], "no rationale is invented"
+
+    assert "banned" in out and "Primeval Titan" in out
+    assert "3 card(s) still need a `why`" in out
+
+
+def test_import_dry_run_writes_nothing(decks, capsys):
+    pytest.importorskip("duckdb")
+    import tiny_corpus
+
+    tiny_corpus.build(config.DB_PATH)
+    listing = tmp_listing(decks, tiny_corpus.DECKLIST)
+    code, msg = run(["decks", "import", "gyome-x", "--from", str(listing),
+                     "--dry-run"])
+    out = capsys.readouterr().out
+    assert code == 0, msg
+    assert "dry run" in out
+    assert "banned" in out, "the preview runs the real gate, not an estimate"
+    assert not (decks / "gyome-x").exists()
 
 
 # ---------------------------------------------------------------- sim paths
