@@ -112,8 +112,11 @@ Absent means `curated`, the opposite default from `status`, so the six existing
 decks are never silently demoted. [ADR 13](docs/adr/0013-an-imported-deck-is-a-draft.md).
 
 **5. Never commit** card corpus data, collection/wishlist/purchase data, or
-credentials. CI enforces this. A public inventory of expensive cards tied to a
-real identity is a targeting list.
+credentials. CI enforces this — by filename, and by scanning the contents of
+every tracked file (the built frontend bundle included) for an API key. A
+public inventory of expensive cards tied to a real identity is a targeting
+list. Secrets reach the app through the environment: a gitignored `.env`
+locally, `fly secrets` deployed, and `.env.example` documents the names.
 
 ## Workflow
 

@@ -145,3 +145,63 @@ def test_env_vars_are_read_at_import(monkeypatch, tmp_path):
     assert decks_dir == tmp_path
     monkeypatch.delenv("MTGLAB_DECKS_DIR")
     config.reload_from_env()
+
+
+# ------------------------------------------------------------------ .env
+#
+# The API key reaches the app through the environment, and the app is started
+# several ways -- `mtglab ui`, uvicorn, the launch configuration in `.claude/`
+# -- only some of which inherit a login shell. A `.env` the process reads
+# itself is what makes that uniform, so its two rules are worth pinning.
+
+def test_a_dotenv_populates_the_environment(tmp_path, monkeypatch):
+    pytest.importorskip("dotenv")
+    monkeypatch.delenv("MTGLAB_SCRATCH_PROBE", raising=False)
+    (tmp_path / ".env").write_text("MTGLAB_SCRATCH_PROBE=from-the-file\n",
+                                   encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    config._load_dotenv()
+    assert os.environ["MTGLAB_SCRATCH_PROBE"] == "from-the-file"
+
+
+def test_the_real_environment_wins_over_the_file(tmp_path, monkeypatch):
+    """A stale `.env` must never silently shadow an exported value.
+
+    This is the rule that matters for the API key specifically: using the wrong
+    key is confusing rather than loud, so the precedence has to be the obvious
+    one.
+    """
+    pytest.importorskip("dotenv")
+    monkeypatch.setenv("MTGLAB_SCRATCH_PROBE", "from-the-environment")
+    (tmp_path / ".env").write_text("MTGLAB_SCRATCH_PROBE=from-the-file\n",
+                                   encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    config._load_dotenv()
+    assert os.environ["MTGLAB_SCRATCH_PROBE"] == "from-the-environment"
+
+
+def test_no_dotenv_is_not_an_error(tmp_path, monkeypatch):
+    """A base install has no `.env` and no python-dotenv. Importing the package
+    must not depend on either."""
+    monkeypatch.chdir(tmp_path)
+    config._load_dotenv()
+
+
+def test_the_api_key_is_never_bound_to_a_name(tmp_path, monkeypatch):
+    """`config` loads the file and stops there.
+
+    The key is read by the Anthropic SDK directly. A value this project never
+    holds is one it cannot log, serialise into an error response, or leak into
+    a prompt -- so the absence of an attribute here is the feature.
+    """
+    pytest.importorskip("dotenv")
+    (tmp_path / ".env").write_text("ANTHROPIC_API_KEY=not-a-real-key\n",
+                                   encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    config._load_dotenv()
+
+    exported = [n for n in dir(config) if not n.startswith("_")]
+    assert not any("KEY" in n.upper() or "TOKEN" in n.upper() or
+                   "SECRET" in n.upper() for n in exported), exported

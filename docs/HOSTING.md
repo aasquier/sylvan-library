@@ -430,10 +430,31 @@ refresh, `app.db`, and backups. It costs about $0.45/month.
 
 ```bash
 fly secrets set SESSION_SECRET="$(openssl rand -base64 32)"
+fly secrets set ANTHROPIC_API_KEY="paste-it-here"   # only once ADR 15's modes exist
 ```
 
-Never put this in `fly.toml` or the repo. Rotating it logs everyone out, which
-is the correct emergency response to a suspected session leak.
+Never put either in `fly.toml` or the repo. Fly stores them encrypted, injects
+them as environment variables at runtime, and setting one triggers a redeploy —
+so they are never in the image either. Rotating `SESSION_SECRET` logs everyone
+out, which is the correct emergency response to a suspected session leak.
+
+`ANTHROPIC_API_KEY` is read by the Anthropic SDK directly; the app never binds
+it to a variable, and asks only whether it is set. Locally the same variable
+comes from a gitignored `.env` (see `.env.example`) rather than from Fly.
+
+Three ways this leaks that are worth naming, because two of them are specific
+to this app:
+
+- **Never with a `VITE_` prefix, and never in `web/.env`.** Vite bakes those
+  into the bundle, and `src/mtglab/web_dist/` is committed to a public
+  repository *and* served to every browser. Every Claude call goes through
+  FastAPI; the frontend must never hold the key. CI scans the committed bundle
+  for exactly this.
+- **Never in a prompt or a message.** Session history persists, so a key placed
+  there is durably stored and readable back for the life of the session.
+- **A spend limit on the API workspace is the backstop**, because storage
+  hygiene eventually fails and a cap bounds what that costs. Rotating the key
+  is a console click.
 
 ### Step 5 — first deploy
 
