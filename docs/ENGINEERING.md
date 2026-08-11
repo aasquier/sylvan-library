@@ -319,16 +319,74 @@ than any amount of Rust would tell them.
 
 ## Suggested order
 
+Decided 2026-08-10: do this list before any hosting work. Hosting is not
+imminent, but see "Cloud-compatible by construction" above — steps 3 and 5
+exist partly so that when it happens it is additive.
+
 1. **Property-based tests on `mana.py`** plus determinism tests. Cheap, finds
-   real bugs, and builds the corpus the port will be tested against.
+   real bugs, and builds the corpus a port would be tested against.
 2. **ADRs for the decisions already made.** An afternoon, and it reframes the
    whole repo for a reader.
-3. **Claude review + security review on PRs.** Immediate, low effort.
-4. **Frontend tests** (Vitest on the polling state machine and the filters).
-5. **Container hardening** — multi-stage, non-root, multi-arch, scanned.
+3. **A `DeckSource` abstraction and a request scope.** Four call sites and one
+   dependency. Makes the API testable against an in-memory source now, and
+   makes user decks additive later.
+4. **Frontend tests** (Vitest on the job-polling state machine and the
+   filters, which are the only pieces with real logic).
+5. **Container hardening** — multi-stage, non-root, multi-arch, scanned,
+   health-checked. Proves the deployment story without deploying.
 6. **Tier 2 in Python**, then profile it.
 
-Steps 1–5 make the existing project defensible without adding a language.
+Steps 1–5 make the existing project defensible without adding a language, and
+leave hosting a matter of adding an auth layer and a second deck source rather
+than reworking what is here.
+
+Automated PR review (§5) is **deliberately parked** — priced out 2026-08-10.
+Copilot Free does not include PR review; Copilot Pro is $10/mo and consumes
+Actions minutes on a private repo; the Claude action is pay-per-run and needs
+an API key. Revisit when PR volume justifies it.
+
+## Cloud-compatible by construction
+
+Hosting is not imminent, but it should not require a rewrite when it happens.
+This section is the short list of seams to get right *during* the near-term
+work, so that hosting is additive. It is deliberately short — most of the
+codebase needs nothing.
+
+**Already done, do not regress:**
+
+- Paths come from `config.py` and honour `MTGLAB_DATA_DIR` /
+  `MTGLAB_DECKS_DIR`. A container mounting a volume at `/data` just works.
+- `api/` does not import `cli.py`. The web layer has no command-line
+  dependency to untangle later.
+
+**Worth doing now, because it is cheap now and invasive later:**
+
+1. **A deck source abstraction.** The API reads the filesystem directly in
+   exactly four places (`service.py`: the health count, `_load_deck`, and the
+   library listing). Hosting's two-tier model keeps the curated decks
+   file-backed *permanently* and adds user decks from SQLite — so a
+   `DeckSource` protocol with a `FileDeckSource` implementation is not
+   scaffolding, it is the shape the system ends up with. Adding
+   `SqlDeckSource` later becomes additive instead of touching every endpoint.
+   It also makes the API testable against an in-memory source, which serves
+   the near-term testing goal on its own.
+
+2. **A request scope, even with one implementation.** Nothing models "who is
+   asking". Six of thirteen endpoints are deck-scoped. Introducing a single
+   FastAPI dependency that yields the caller's deck source — returning the
+   file-backed library for now — means auth later swaps *one* implementation
+   rather than rewriting handlers. `docs/HOSTING.md` §1 already requires all
+   user-scoped queries to go through one accessor for isolation; this is that
+   accessor, built before it has anything to isolate.
+
+**Accepted, not oversights:**
+
+- `api/jobs.py` is an in-process registry. That is correct for a single
+  machine with scale-to-zero, and externalising it would only matter for
+  multiple instances — which the hosting plan does not call for. Revisit only
+  if the deployment ever runs more than one.
+- The frontend needs no preparation. Login is a route, a session context and
+  401 handling; all of that is additive to what exists. Do not pre-build it.
 
 ## Deferred until measured
 
