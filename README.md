@@ -2,8 +2,15 @@
 
 Local toolkit for Commander deckbuilding, playtesting, simulation, and shopping.
 
-Python 3.11+ · DuckDB · numpy · FastAPI (later phases). No cloud, no accounts,
-no API keys. Everything runs on this laptop.
+Python 3.11+ · DuckDB · numpy · FastAPI. Runs on your own machine against a
+local card corpus; nothing is required to leave it for the toolkit to work.
+
+Two planned additions do reach outside, and both are opt-in rather than
+load-bearing: a **Claude surface** for conversation and research
+([ADR 14](docs/adr/0014-python-decides-claude-advises.md)) would need an API
+key, and a **shared instance** ([docs/HOSTING.md](docs/HOSTING.md)) would need
+accounts. Neither is built. The deterministic core — the gate, the mana solver,
+the simulator — never calls either, and is tested without a network.
 
 ## Setup
 
@@ -122,16 +129,25 @@ Commander speed rises monotonically with land count, so optimising it alone
 recommends 40 lands. Deployment peaks and then falls as flood sets in — that
 peak is the answer.
 
-**Tier 2 — abstract pod simulator (next).** Four-player table, each deck
-compiled to a policy profile (curve, interaction density, threat clock, combo
-turn, tutor count, protection). Archetype opponents. This is a *model of*
-Magic — right for bracket placement and matchup matrices, wrong for "is this
-line correct."
+**Tier 3 — Forge headless (next).** `forge.jar sim -d ... -n 100` gives real
+rules and real cards, which is a decade of engine work this project is not
+going to repeat. Its AI is competent with aggro/midrange, weak with control,
+poor with combo, so it systematically undersells combo decks — results are
+reported per archetype, never as one ranking. A cross-check on Tier 1, never
+ground truth.
 
-**Tier 3 — Forge headless (later).** `forge.jar sim -d ... -n 100` gives real
-rules and real cards. Its AI is competent with aggro/midrange, weak with
-control, poor with combo, so it systematically undersells combo decks. A
-cross-check on Tiers 1–2, never ground truth.
+**Tier 2 — abstract pod simulator (deferred behind Tier 3).** Four-player
+table, each deck compiled to a policy profile (curve, interaction density,
+threat clock, combo turn, tutor count, protection). Archetype opponents. This
+is a *model of* Magic — right for bracket placement and matchup matrices, wrong
+for "is this line correct." It is a large build whose fidelity nobody has had
+to defend yet, so Forge goes first: if Forge answers those questions, Tier 2
+may never need building. See `ROADMAP.md` goal 2.
+
+**Playing games is the engine's job, not a model's.** An earlier plan had
+Claude in an opponent seat reasoning over board JSON; ADR 14 retired it. Claude
+is for conversation and research — the questions a corpus cannot answer —
+while anything with a right answer stays in deterministic Python.
 
 ## Status
 

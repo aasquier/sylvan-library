@@ -287,10 +287,13 @@ process would otherwise contend for a handle it does not need.
 3. **A rewrite splits the codebase** into two languages and two toolchains for
    a workload that is not the bottleneck.
 4. **ROADMAP already reached this conclusion** and it still holds: do not port
-   Tier 1 pre-emptively; **Tier 2 is where this decides itself.** A pod
-   simulator is four seats making real decisions over more turns, plausibly
-   50-100x the work per game. That is the measurement that should trigger a
-   port, and it does not exist yet.
+   Tier 1 pre-emptively; **a heavy simulator is where this decides itself.**
+   That was written about Tier 2 — four seats making real decisions over more
+   turns, plausibly 50-100x the work per game. Since 2026-08-11 Tier 2 waits
+   behind a Forge feasibility spike
+   ([ADR 14](adr/0014-python-decides-claude-advises.md)), so the trigger waits
+   on whichever simulator gets built. Either way the measurement that should
+   trigger a port does not exist yet.
 
 **Do these instead, in order of value over effort:**
 
@@ -321,9 +324,16 @@ numpy to replace than you might assume.
 
 **Recommendation: Fly.io.** Persistent volumes, scale-to-zero with fast wake,
 a single deploy command, and no server to patch. Roughly **$6–8/month**, less
-with scale-to-zero. If Tier 2 later needs real cores, move to a Hetzner CX22
-(2 vCPU / 4 GB, ~€4/mo) — more CPU per euro, at the cost of owning OS updates
-and TLS.
+with scale-to-zero. If a simulator later needs real cores, move to a Hetzner
+CX22 (2 vCPU / 4 GB, ~€4/mo) — more CPU per euro, at the cost of owning OS
+updates and TLS.
+
+**Two things could change this sizing, both open decisions in `ROADMAP.md`.**
+Server-side Forge means a JVM plus a card database in the image, which is a
+different class of container than anything costed here. And a Claude surface
+(ADR 14) adds a per-request cost that is *not* CPU — it is somebody's API bill,
+and on a shared instance it is the maintainer's. The numbers above cover the
+app without either.
 
 ### Prerequisites
 

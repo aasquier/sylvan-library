@@ -27,9 +27,11 @@ they differ.
 | [11](0011-the-api-may-apply-a-swap.md) | The API may apply a swap the user has decided on | Accepted |
 | [12](0012-decks-are-edited-by-surgical-operations.md) | Decks are edited by surgical operations over text | Accepted |
 | [13](0013-an-imported-deck-is-a-draft.md) | An imported deck is a draft until every card is justified | Accepted |
+| [14](0014-python-decides-claude-advises.md) | Python decides, Claude advises, and Forge plays the games | Proposed |
 
 **Proposed** means the decision is made and argued but nothing implements it
-yet — 4 and 5 describe a deployment that does not exist.
+yet — 4 and 5 describe a deployment that does not exist, and 14 draws the
+boundary for a model integration deliberately before the first client call.
 
 ## Where the longer arguments live
 

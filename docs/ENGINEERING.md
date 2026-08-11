@@ -46,6 +46,17 @@ way. Skip it.
 
 ### Tier 2 is the candidate — but build it in Python first
 
+> **Amended 2026-08-11.** [ADR 14](adr/0014-python-decides-claude-advises.md)
+> makes Forge the thing that plays real games, and `ROADMAP.md` now defers
+> Tier 2 behind a Forge feasibility spike. **The trigger below is unchanged in
+> shape and now waits on whichever simulator gets built first.** If that turns
+> out to be Forge, this decision may never reopen at all: the expensive loop
+> would live inside a JVM this project does not maintain, and the Python side
+> would be orchestration, parsing and a card-coverage pre-flight — none of
+> which is arithmetic in a hot loop. That is a *better* outcome than a Rust
+> port, not a deferral of one. The rest of this section stands as written, and
+> describes the Tier 2 case if Tier 2 is what gets built.
+
 Tier 2 — the pod simulator — is the only workload here with a plausible case
 for a compiled language. Four seats making actual decisions over more turns is
 maybe **50–100x the work per game**. At Tier 1's measured 0.89 ms/game that
@@ -494,7 +505,9 @@ exist partly so that when it happens it is additive.
    [ADR 13](adr/0013-an-imported-deck-is-a-draft.md).
 6. **Container hardening** — multi-stage, non-root, multi-arch, scanned,
    health-checked. Proves the deployment story without deploying.
-7. **Tier 2 in Python**, then profile it.
+7. **A simulator that plays decks against each other** — the Forge bridge
+   first, Tier 2 in Python only if Forge cannot answer the question — then
+   profile whichever got built.
 
 Steps 1–6 make the existing project defensible without adding a language, and
 leave hosting a matter of adding an auth layer and a second deck source rather
