@@ -496,6 +496,34 @@ The rationale editor built in step 3 of the deck lifecycle is already the right
 shape for the interview: the box sits beside a column showing the card as the
 corpus has it, which is where a mode's questions go.
 
+### The account, the model, and the order of work
+
+Settled 2026-08-11, when the build stopped being hypothetical.
+
+**A separate API account, not the Claude Max subscription.** The developer
+platform bills independently of consumer Claude; Max carries no API credits.
+The account is being set up with its own workspace and spend limit, so this
+project's usage is a line item rather than a share of something larger — which
+is also what will make the hosted-cost decision below answerable with a number
+instead of a guess. The key reaches the app as `ANTHROPIC_API_KEY`, and CI's
+no-secrets check is what keeps it out of the repository.
+
+**Start on Sonnet, and find out whether it is enough.** Claude Sonnet 5
+(`claude-sonnet-5`) rather than the Opus default — Aaron's call, and the
+question it answers is worth answering early: most of what the modes do is
+conversation over tool results the corpus already computed, which is not
+obviously Opus-shaped work. Moving up is a model-ID change and a re-measure, so
+the cheap experiment runs first. Note Sonnet 5's request surface differs from
+its predecessor's in ways that will bite a from-memory implementation —
+adaptive thinking is on by default, sampling parameters are rejected, effort
+defaults to `high`. **Load the `claude-api` skill before writing any of it**
+rather than recalling the shapes.
+
+**Local first, hosted before too long.** The first surface runs against the
+maintainer's own key on his own machine, which needs none of the open decisions
+resolved. Hosting comes after, and by then the local run will have produced
+real per-conversation numbers to size it with.
+
 Two things to settle before it ships, both open decisions above: **what a hosted
 Claude surface costs and who pays**, and — for the simulator half — **whether
 Forge can run where the app runs**.
@@ -507,13 +535,14 @@ Forge can run where the app runs**.
 1. **The rest of the deck lifecycle.** ✅ **Done 2026-08-11.** `add_card`,
    `remove_card`, `set_card_field`, `set_note` (ADR 12), and the rationale
    editor. What remains of the lifecycle is the create form and promotion.
-2. **The Claude surface** — the modes in
+2. **The Claude surface** — **in progress.** The modes in
    [ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md),
    starting with the rationale interview, which now has somewhere to put its
    output. Moved ahead of Forge on 2026-08-11: it is what makes the app useful
    for judgement rather than facts, and shipping the toolkit to someone else
    without it hands them a gate and a goldfish sim with no opinion in them.
-   Local runs on the maintainer's own key; the hosted question stays open.
+   Sonnet 5, on a separate API account, running locally first — see *The
+   account, the model, and the order of work* above.
 3. **Forge feasibility research** — can `forge.jar sim` be driven from here at
    all, and can it be reached from a hosted instance? Cheap to answer, and it
    gates goals 2, 3 and 7 together. See the open decision below.
@@ -554,15 +583,34 @@ matters.
 
 ### What a hosted Claude surface costs, and who pays
 
-**Open, recorded 2026-08-11.** ADR 14 puts conversation and research on the
-Claude API. Locally that is the maintainer's own key and own spend. Hosted, it
-means **the maintainer pays for other people's questions**, and research turns
-are not cheap — web search and long context are where the cost is.
+**Open, recorded 2026-08-11 and narrowed the same day.** ADR 14 puts
+conversation and research on the Claude API. Locally that is the maintainer's
+own key and own spend. Hosted, it means **the maintainer pays for other
+people's questions**.
 
-That is a real constraint on "shareable with friends" and it wants deciding
-before the surface opens up, not after an invoice. Options range from a
-per-user budget, to bring-your-own-key, to keeping the conversational surface
-local-only while the read-only app is what gets shared. Not decided.
+**It is smaller than it felt, at least for the interview.** Estimated from a
+turn shape of roughly 12K tokens in and 800 out — the deck plus one card's
+corpus facts, a question back — with the deck and system prompt sitting in a
+cached prefix that reads at a tenth of input price:
+
+| | First turn | Cached turn | A full 99-card draft |
+| --- | --- | --- | --- |
+| Sonnet 5 | ~$0.03 | ~$0.01 | **~$1.00–1.50** |
+| Opus 5 | ~$0.08 | ~$0.03 | **~$2.50–3.00** |
+
+A dollar or two to interview a whole deck does not need a funding model. These
+are estimates, not measurements — re-derive them with `count_tokens` against
+the real prompt once the surface exists, since the turn shape is the assumption
+doing all the work here.
+
+**Research is still the expensive half** — web search and long context are
+where the cost is, and that half is not estimated above. So the decision
+narrows rather than closing: the interview and deck conversation look
+shareable at friends scale, and research is the mode that may need a per-user
+budget, bring-your-own-key, or staying local. The stance dial in ADR 15 is
+also a cost control — off means no calls at all, which is a reasonable hosted
+default. Batch pricing (half rate) covers anything not latency-sensitive, like
+a spoiler scan across six decks.
 
 ### Hosting — plan
 
