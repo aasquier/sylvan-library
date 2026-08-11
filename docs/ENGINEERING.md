@@ -253,10 +253,41 @@ What to add for a repo that gets reviewed:
 The stack is already modern: React 19, Vite 8, Tailwind 4, TypeScript 6,
 oxlint, Recharts. The gaps are testing and interaction, not framework choice.
 
-- **No frontend tests at all.** Vitest + Testing Library on the pieces with
-  real logic — the filter/sort in `Library.tsx`, the pip-vs-sources maths, the
-  job-polling state machine in the simulator. That last one is a genuine state
-  machine (queued → running → done/error) and it is untested.
+- ~~**No frontend tests at all.**~~ **Built 2026-08-10** — Vitest + Testing
+  Library, 35 tests over the three pieces with real logic. `npm test` runs
+  them; CI runs it before the build, so a broken component fails as a failing
+  test rather than as a bundle that builds fine and misbehaves in a browser.
+
+  - **`followJob`**, the job-polling state machine (queued → running →
+    done/error, plus cancel). Timers are faked, so the 400ms interval is
+    asserted rather than waited out, and the cancel path is pinned — an
+    unmounted Simulator screen must stop polling, not poll forever.
+  - **The library filter and sort**, including the two filters applied at once,
+    and the colour filter being a membership test rather than an exact identity
+    match.
+  - **`identityName`**, which is a lookup table plus a rotation trick to make it
+    order-independent — exactly the code that works for the cases someone tried
+    and quietly fails for the rest. All ten guilds, all ten shards and wedges,
+    five-colour, mono and colourless are pinned.
+
+  Deliberately *not* tested: the pip-vs-sources maths named in the original
+  plan. It turned out to be computed server-side in `decks/analyze.py`, where
+  `tests/test_analyze.py` already covers it; the frontend only displays the
+  number. Writing a frontend test for it would have tested nothing.
+
+  **It found a real bug.** `/api/decks` carries `errors: null` to mean "the
+  corpus was missing, so the gate never ran", explicitly so that it is not
+  rendered as a pass — and the library card rendered it exactly like a clean
+  deck, because the condition was `errors !== null && errors > 0`. With no
+  corpus, Goreclaw and Atla Palani, both of which run a banned card, looked
+  precisely as clean as the four decks that pass. Fixed with a `not checked`
+  badge, and pinned by the test that caught it.
+
+- **A four-colour deck would render as "WUBR".** Found while testing
+  `identityName`: the four-colour names (Yore-Tiller, Glint-Eye, Dune-Brood,
+  Ink-Treader, Witch-Maw) are not in the table. Latent — none of the six
+  curated decks is four-colour — so it is recorded in the test rather than
+  fixed on speculation.
 - **Playwright** for a handful of end-to-end paths against the real API. The
   card-search field that collapsed to 14px would have been caught by one
   assertion on a rendered width.
@@ -437,8 +468,9 @@ exist partly so that when it happens it is additive.
 3. ~~**A `DeckSource` abstraction and a request scope.**~~ **Done 2026-08-10** —
    `decks/source.py` and `api/deps.py`. Every deck-facing route now takes the
    request scope, and the API is tested against an in-memory source.
-4. **Frontend tests** (Vitest on the job-polling state machine and the
-   filters, which are the only pieces with real logic).
+4. ~~**Frontend tests**~~ **Done 2026-08-10** — 35 of them, on the job-polling
+   state machine, the library filters and `identityName`; see §4. Found the
+   library rendering "the gate never ran" identically to "the deck passed".
 5. **Container hardening** — multi-stage, non-root, multi-arch, scanned,
    health-checked. Proves the deployment story without deploying.
 6. **Tier 2 in Python**, then profile it.

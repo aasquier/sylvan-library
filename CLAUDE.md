@@ -40,7 +40,7 @@ src/mtglab/
   api/                    FastAPI app, services, background sim jobs
   web_dist/               built frontend, committed so `mtglab ui` needs no Node
   cli.py
-web/                      frontend source (React + Vite)
+web/                      frontend source (React + Vite); `npm test` is Vitest
 decks/<slug>/deck.yaml    SOURCE OF TRUTH
 decks/<slug>/artifacts/   GENERATED — never edit by hand
 ```
