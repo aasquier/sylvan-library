@@ -21,6 +21,7 @@ from mtglab.decks.edit import (
     remove_card,
     replace_card,
     set_card_field,
+    set_deck_field,
     set_note,
 )
 
@@ -444,6 +445,87 @@ def test_a_quantity_below_one_is_refused():
             set_card_field(DECK, name="Swamp", field="qty", value=qty)
     with pytest.raises(EditFailed, match="whole number"):
         set_card_field(DECK, name="Swamp", field="qty", value="lots")
+
+
+# ---------------------------------------------------------- set_deck_field
+#
+# Promotion is the operation that closes the import lifecycle, and it is the
+# only edit whose refusal depends on the state of every card rather than one.
+
+def test_a_draft_can_be_promoted_once_every_card_is_justified():
+    draft = DECK.replace("bracket: 4", "bracket: 4\nstage: draft")
+    out = set_deck_field(draft, field="stage", value="curated")
+    assert yaml.safe_load(out)["stage"] == "curated"
+    assert changed_lines(draft, out) == 2
+
+
+def test_promotion_is_refused_while_any_card_is_blank():
+    """The gate would catch this anyway -- a curated deck reports one
+    `missing-rationale` per card. Refusing here means the deck is never written
+    into a state its author has to undo."""
+    draft = DECK.replace("bracket: 4", "bracket: 4\nstage: draft")
+    draft = set_card_field(draft, name="Sol Ring", field="why", value="")
+    with pytest.raises(EditFailed, match="still have no `why`") as caught:
+        set_deck_field(draft, field="stage", value="curated")
+    # And it names them, so the refusal is a to-do list rather than a wall.
+    assert "Sol Ring" in str(caught.value)
+
+
+def test_demoting_to_draft_is_never_blocked():
+    """Only promotion has a precondition. Going the other way is admitting the
+    deck is not finished, which is always allowed."""
+    out = set_deck_field(DECK, field="stage", value="draft")
+    assert yaml.safe_load(out)["stage"] == "draft"
+
+
+def test_a_missing_key_is_inserted_where_the_dumper_would_put_it():
+    """`stage` is absent from every deck written before ADR 13. Appending it to
+    the bottom of the file would be legal YAML and unlike every deck here."""
+    assert "stage:" not in DECK
+    out = set_deck_field(DECK, field="stage", value="draft")
+    assert yaml.safe_load(out)["stage"] == "draft"
+    assert out.index("stage:") < out.index("commander:")
+    assert changed_lines(DECK, out) == 1
+
+
+def test_a_trailing_comment_on_the_line_survives():
+    """`status: built  # built: the cards are sleeved up` -- the comment is the
+    author's note about the vocabulary, not about the value."""
+    deck = DECK.replace("name: Mini Deck",
+                        "name: Mini Deck\nstatus: built  # the cards are sleeved up")
+    out = set_deck_field(deck, field="status", value="theoretical")
+    assert "status: theoretical  # the cards are sleeved up" in out
+    assert yaml.safe_load(out)["status"] == "theoretical"
+
+
+def test_only_the_decks_own_scalars_are_settable():
+    for field in ("name", "slug", "commander", "strategy", "notes", "cards"):
+        with pytest.raises(EditFailed, match="not a settable deck field"):
+            set_deck_field(DECK, field=field, value="x")
+
+
+def test_a_stage_or_status_outside_the_vocabulary_is_refused():
+    with pytest.raises(EditFailed, match="stage must be one of"):
+        set_deck_field(DECK, field="stage", value="drafted")
+    with pytest.raises(EditFailed, match="status must be one of"):
+        set_deck_field(DECK, field="status", value="sleeved")
+
+
+def test_a_bracket_is_a_number_in_range():
+    assert yaml.safe_load(set_deck_field(DECK, field="bracket", value=5))["bracket"] == 5
+    with pytest.raises(EditFailed, match="runs from 1 to 5"):
+        set_deck_field(DECK, field="bracket", value=9)
+    with pytest.raises(EditFailed, match="must be a number"):
+        set_deck_field(DECK, field="bracket", value="four")
+
+
+def test_promotion_leaves_every_card_and_note_alone():
+    draft = DECK.replace("bracket: 4", "bracket: 4\nstage: draft")
+    out = set_deck_field(draft, field="stage", value="curated")
+    before, after = yaml.safe_load(draft), yaml.safe_load(out)
+    assert before["cards"] == after["cards"]
+    assert before["notes"] == after["notes"]
+    assert "# A deck file with comments that must survive." in out
 
 
 # ---------------------------------------------------------------- set_note

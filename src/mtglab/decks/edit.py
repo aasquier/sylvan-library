@@ -38,6 +38,8 @@ from typing import Any
 
 import yaml
 
+from mtglab.decks.model import DECK_STAGES, DECK_STATUSES
+
 # `  - name: Primeval Titan` -- the first line of a card entry. The name may be
 # quoted, and a card name can contain almost anything, so the value is taken
 # whole and compared after parsing rather than matched precisely here.
@@ -53,6 +55,24 @@ CARD_LISTS = ("cards", "swap_board")
 # `scryfall_id` and `mana_cost` are overrides for cards the corpus does not yet
 # know, and hand-editing them through this path would mask a stale corpus.
 SETTABLE_FIELDS = ("category", "qty", "why")
+
+# What `set_deck_field` will write: the deck's own scalars. `strategy` and
+# `notes` are prose and belong to `set_note`; `commander` and `companion` change
+# what the whole deck is legal to contain and are a rebuild, not a field edit.
+SETTABLE_DECK_FIELDS = ("stage", "status", "bracket")
+
+# The order `Deck.dump` writes top-level keys in. Used to place a key the file
+# does not have yet -- `stage` is absent from every deck written before ADR 13,
+# and appending it to the bottom of the file would be legal YAML and unlike
+# every deck in the repository.
+_DECK_KEY_ORDER = ("slug", "name", "status", "stage", "commander", "companion",
+                   "bracket", "strategy", "notes", "cards", "swap_board")
+
+# `status: built  # built: the cards are sleeved up` -- a scalar with a trailing
+# comment. The comment is the author's, not the value's, so changing one must
+# not take the other.
+_SCALAR = re.compile(r"^(?P<key>[A-Za-z_][\w-]*):\s*(?P<value>[^#]*?)\s*"
+                     r"(?P<comment>#.*)?$")
 
 # Sentinels for `_rewrite_entry`: a key absent from the change set is copied
 # through untouched, and one mapped to `_DROP` is deleted.
@@ -128,6 +148,24 @@ def _block_span(lines: list[str], key: str) -> tuple[int, int]:
         if lines[j].strip() and not lines[j][:1].isspace():
             return i + 1, j
     return i + 1, len(lines)
+
+
+def _top_level_span(lines: list[str], key: str) -> tuple[int, int] | None:
+    """The line range of a top-level key including its header, or None.
+
+    Unlike `_block_span` this matches a scalar as well as a block, and the range
+    starts at the header rather than after it -- because setting a deck's own
+    field replaces the header line, where a card edit only ever touches what is
+    underneath one.
+    """
+    header = re.compile(rf"^{re.escape(key)}:(\s|$)")
+    for i, line in enumerate(lines):
+        if header.match(line):
+            for j in range(i + 1, len(lines)):
+                if lines[j].strip() and not lines[j][:1].isspace():
+                    return i, j
+            return i, len(lines)
+    return None
 
 
 def _entry_spans(lines: list[str], span: tuple[int, int]) -> list[_Entry]:
@@ -600,6 +638,82 @@ def set_card_field(text: str, *, name: str, field: str, value: Any) -> str:
     item = dict(expected[list_key][position])
     item[field] = value
     expected[list_key][position] = item
+    return _verified(updated, expected)
+
+
+def set_deck_field(text: str, *, field: str, value: Any) -> str:
+    """Change one of the deck's own scalars: its stage, status or bracket.
+
+    The one that matters is `stage`, because promoting a draft to curated is
+    the last step of an import and was, until this operation existed, the last
+    thing in the whole lifecycle that could only be done in a text editor.
+
+    **Promotion is refused while any card is blank.** The gate would catch it
+    either way -- a curated deck reports one `missing-rationale` error per card
+    -- but catching it here means the deck is never written into a state its
+    author has to undo. That is the same shape as refusing a swap with no
+    rationale rather than writing one and failing it afterwards.
+
+    A trailing comment on the line survives: `status: built  # the cards are
+    sleeved up` is the author's note about the vocabulary, not about the value,
+    and ADR 12 rule 1 says an edit touches only what it changes.
+    """
+    if field not in SETTABLE_DECK_FIELDS:
+        raise EditFailed(f"{field!r} is not a settable deck field; choose one of "
+                         f"{', '.join(SETTABLE_DECK_FIELDS)}")
+
+    doc, lines = _open(text)
+
+    if field == "bracket":
+        try:
+            value = int(value)
+        except (TypeError, ValueError) as exc:
+            raise EditFailed(f"bracket must be a number, not {value!r}") from exc
+        if not 1 <= value <= 5:
+            raise EditFailed("bracket runs from 1 to 5")
+    else:
+        value = str(value).strip().lower()
+        allowed = {"stage": DECK_STAGES, "status": DECK_STATUSES}[field]
+        if value not in allowed:
+            raise EditFailed(
+                f"{field} must be one of {', '.join(allowed)}, not {value!r}")
+
+    if field == "stage" and value == "curated":
+        blank = [str(c.get("name", "?")) for c in doc.get("cards") or []
+                 if isinstance(c, dict) and not str(c.get("why") or "").strip()]
+        if blank:
+            shown = ", ".join(blank[:6])
+            more = f", and {len(blank) - 6} more" if len(blank) > 6 else ""
+            raise EditFailed(
+                f"{len(blank)} card(s) still have no `why` ({shown}{more}); a "
+                "curated deck justifies every slot, so write them before "
+                "promoting -- this refuses rather than writing a deck you would "
+                "have to un-promote")
+
+    span = _top_level_span(lines, field)
+    if span is None:
+        # The key is absent -- `stage` is, in every deck written before ADR 13.
+        # Place it where `Deck.dump` would rather than at the end of the file.
+        before = _DECK_KEY_ORDER[:_DECK_KEY_ORDER.index(field)] \
+            if field in _DECK_KEY_ORDER else ()
+        at = 0
+        for key in before:
+            found = _top_level_span(lines, key)
+            if found is not None:
+                content, _tail = _split_tail(lines[found[0]:found[1]], 0)
+                at = max(at, found[0] + len(content))
+        updated = "\n".join(lines[:at] + _render(field, value, 0) + lines[at:])
+    else:
+        start, end = span
+        content, tail = _split_tail(lines[start:end], 0)
+        rendered = _render(field, value, 0)
+        match = _SCALAR.match(lines[start])
+        if match and match["comment"] and len(rendered) == 1:
+            rendered = [f"{rendered[0]}  {match['comment']}"]
+        updated = "\n".join(lines[:start] + rendered + tail + lines[end:])
+
+    expected = copy.deepcopy(doc)
+    expected[field] = value
     return _verified(updated, expected)
 
 

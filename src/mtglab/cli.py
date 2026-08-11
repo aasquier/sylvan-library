@@ -5,6 +5,7 @@
     mtglab decks list
     mtglab decks import <slug> --from   a pasted decklist -> a draft deck
     mtglab decks validate <slug>        the gate -- run before anything else
+    mtglab decks promote <slug>         a draft becomes curated, once justified
     mtglab decks build <slug>           generate the artifacts
     mtglab sim mana <slug>              Tier 1 goldfish
     mtglab sim lands <slug> 30..40      land-count sweep, flood-aware
@@ -18,7 +19,7 @@ import sys
 from pathlib import Path
 
 from mtglab import config
-from mtglab.decks.model import CATEGORIES, Deck
+from mtglab.decks.model import CATEGORIES, DECK_STAGES, DECK_STATUSES, Deck
 from mtglab.sim.compile import (
     CorpusRequired,
     compile_deck,
@@ -287,27 +288,61 @@ def cmd_decks_remove(args):
 
 
 def cmd_decks_set(args):
-    """Change one field of one card -- including its `why`.
+    """Change one field -- of a card with `--card`, of the deck without it.
 
-    Exactly one field per invocation, matching the operation underneath. The
+    Exactly one field per invocation, matching the operation underneath. A
     rationale is taken verbatim from the argument: nothing here writes one, and
     a blank one on a curated deck is refused rather than filled in (rule 4).
     """
     from mtglab.api import service
 
-    chosen = [(f, v) for f, v in (("why", args.why), ("category", args.category),
-                                  ("qty", args.qty)) if v is not None]
+    card_fields = (("why", args.why), ("category", args.category),
+                   ("qty", args.qty))
+    deck_fields = (("stage", args.stage), ("status", args.status),
+                   ("bracket", args.bracket))
+    chosen = [(f, v) for f, v in card_fields + deck_fields if v is not None]
     if len(chosen) != 1:
-        sys.exit("choose exactly one of --why, --category, --qty")
+        sys.exit("choose exactly one of --why, --category, --qty (with --card) "
+                 "or --stage, --status, --bracket (without)")
     field, value = chosen[0]
+    on_a_card = field in dict(card_fields)
+
+    if on_a_card and not args.card:
+        sys.exit(f"--{field} changes a card; name it with --card")
+    if not on_a_card and args.card:
+        sys.exit(f"--{field} is a deck field, not a card's; drop --card")
 
     try:
-        result = service.set_card_field(args.slug, name=args.card, field=field,
-                                        value=value)
+        if on_a_card:
+            result = service.set_card_field(args.slug, name=args.card,
+                                            field=field, value=value)
+            print(f"  {result['card']}: {field} set")
+        else:
+            result = service.set_deck_field(args.slug, field=field, value=value)
+            print(f"  {args.slug}: {field} -> {value}")
     except service.EditRejected as exc:
         sys.exit(f"refused: {exc}")
 
-    print(f"  {result['card']}: {field} set")
+    _report_edit(result)
+
+
+def cmd_decks_promote(args):
+    """Promote a draft to curated -- the last step of an import.
+
+    Refused while any card is still blank, and the refusal names them. That is
+    the gate's rule enforced before the write rather than after it: promoting
+    into a deck with 17 `missing-rationale` errors is a state nobody wants to
+    be left holding.
+    """
+    from mtglab.api import service
+
+    try:
+        result = service.set_deck_field(args.slug, field="stage", value="curated")
+    except service.EditRejected as exc:
+        sys.exit(f"refused: {exc}")
+
+    print(f"  {args.slug}: every card justifies its slot -- promoted to curated.")
+    print("  `mtglab decks build` will now generate the five artifacts.")
     _report_edit(result)
 
 
@@ -508,12 +543,21 @@ def main(argv=None):
     rm = decks.add_parser("remove", help="take a card out")
     rm.add_argument("slug"); rm.add_argument("--card", required=True)
     rm.set_defaults(func=cmd_decks_remove)
-    st = decks.add_parser("set", help="change one field of one card")
-    st.add_argument("slug"); st.add_argument("--card", required=True)
+    st = decks.add_parser("set", help="change one field, of a card or of the deck")
+    st.add_argument("slug")
+    st.add_argument("--card", help="the card to change; omit for a deck field")
     st.add_argument("--why", help="the rationale, in your words")
     st.add_argument("--category", help=f"one of: {', '.join(CATEGORIES)}")
     st.add_argument("--qty", type=int)
+    st.add_argument("--stage", choices=list(DECK_STAGES),
+                    help="curated needs every card justified; see `decks promote`")
+    st.add_argument("--status", choices=list(DECK_STATUSES))
+    st.add_argument("--bracket", type=int)
     st.set_defaults(func=cmd_decks_set)
+    pr = decks.add_parser("promote", help="mark a draft curated, once every card "
+                                          "carries a `why`")
+    pr.add_argument("slug")
+    pr.set_defaults(func=cmd_decks_promote)
     nt = decks.add_parser("note", help="set a deck-level note")
     nt.add_argument("slug"); nt.add_argument("--key", required=True)
     nt.add_argument("--value")

@@ -338,6 +338,11 @@ export const api = {
   setNote: (slug: string, key: string, value: string) =>
     send<EditResult>('PUT', `/api/decks/${slug}/notes/${encodeURIComponent(key)}`,
       { value }),
+  // The deck's own scalars. `stage: curated` is promotion, and the server
+  // refuses it while any card is blank rather than writing a deck the gate
+  // would immediately reject.
+  setDeckField: (slug: string, field: string, value: string | number) =>
+    send<EditResult>('PATCH', `/api/decks/${slug}`, { field, value }),
   importDeck: (body: {
     slug: string
     text: string

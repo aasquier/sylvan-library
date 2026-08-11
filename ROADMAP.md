@@ -280,8 +280,8 @@ with that card") rather than just refusing.
 
 ## The deck lifecycle
 
-Planned 2026-08-11. Steps 1, 2 and 3 shipped the same day; 4 is next. Design
-decisions live in
+Planned 2026-08-11. Steps 1, 2, 3 and 5 shipped the same day; the create form
+is what is left. Design decisions live in
 [ADR 12](docs/adr/0012-decks-are-edited-by-surgical-operations.md) (how a deck
 is edited) and [ADR 13](docs/adr/0013-an-imported-deck-is-a-draft.md) (what an
 imported deck is). This section is the order of work.
@@ -293,7 +293,7 @@ imported deck is). This section is the order of work.
 | **Create** | copy `decks/_template/deck.yaml` by hand, or import a list with a commander and nothing else | a UI form; the machinery is import's |
 | **Import** | **done** — `mtglab decks import`, `POST /api/decks/import`, the Import page | — |
 | **Refactor** | **done** — add, remove, recategorise, requantify, rationalise and annotate, from the CLI or the deck page | — |
-| **Promote** | hand-edit `stage: curated` once the rationales are written | the last hand-edit left in the loop; see below |
+| **Promote** | **done** — `mtglab decks promote`, `PATCH /api/decks/<slug>`, a button on the deck page once nothing is outstanding | — |
 | **Export** | `moxfield.txt`, one of the five artifacts | unchanged; it already works |
 
 ### Order, and why
@@ -361,12 +361,23 @@ imported deck is). This section is the order of work.
 4. **A create path in the UI**, once import and edit both exist, since it is the
    same machinery with an empty list.
 
-5. **Promotion**, which step 3 turned into the last hand-edit in the loop. You
-   can now fill in all 99 rationales in the app and are then told to open
-   `deck.yaml` and change `stage: draft` to `curated`. That wants a
-   `set_deck_field` operation — a fifth one, not in ADR 12's table, which is why
-   it was left out rather than added quietly. It is small, and the gate already
-   owns the hard part: it refuses the promotion while any card is blank.
+5. **Promotion.** ✅ **Done.** `set_deck_field` — a fifth operation, not in
+   ADR 12's original table — writes the deck's own scalars: `stage`, `status`
+   and `bracket`. `mtglab decks promote <slug>` is the ergonomic form, and the
+   deck page grows a button once nothing is outstanding.
+
+   **Promotion is refused before the write, not after it.** The gate would catch
+   a premature one either way — a curated deck reports one `missing-rationale`
+   per card — but refusing up front means the deck is never written into a state
+   its author has to undo, and the refusal names the cards still owing. That is
+   the same shape as refusing a swap with no rationale rather than writing one
+   and failing it afterwards.
+
+   Two details the real files forced. A trailing comment survives the edit:
+   `status: built  # built: the cards are sleeved up` is the author's note about
+   the vocabulary, not about the value. And a key the file does not have yet —
+   `stage` is absent from every deck written before ADR 13 — is inserted where
+   `Deck.dump` would put it rather than appended to the bottom.
 
 ### The question this settles
 

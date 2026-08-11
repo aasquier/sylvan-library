@@ -42,7 +42,12 @@ export default function DeckDetail() {
   // down to the ones a draft still owes.
   const [editing, setEditing] = useState<string | null>(null)
   const [onlyUnjustified, setOnlyUnjustified] = useState(false)
+  // Two error slots, not one: a refused removal belongs next to the cards and a
+  // refused promotion belongs next to the button that asked for it. Sharing one
+  // renders the same sentence in both places.
   const [editError, setEditError] = useState<string | null>(null)
+  const [promoteError, setPromoteError] = useState<string | null>(null)
+  const [promoting, setPromoting] = useState(false)
 
   /** Re-read everything an edit invalidates: the list, the stats and the gate.
    *
@@ -90,6 +95,19 @@ export default function DeckDetail() {
       await refresh()
     } catch (e: any) {
       setEditError(String(e.message ?? e))
+    }
+  }
+
+  async function promote() {
+    setPromoteError(null)
+    setPromoting(true)
+    try {
+      await api.setDeckField(slug, 'stage', 'curated')
+      await refresh()
+    } catch (e: any) {
+      setPromoteError(String(e.message ?? e))
+    } finally {
+      setPromoting(false)
     }
   }
 
@@ -209,25 +227,48 @@ export default function DeckDetail() {
                background: 'color-mix(in srgb, var(--status-warning) 12%, transparent)',
                border: '1px solid color-mix(in srgb, var(--status-warning) 40%, transparent)',
              }}>
-          <strong>
-            Draft — {deck.needs_rationale} of {deck.cards.length} cards still need
-            a <code>why</code>.
-          </strong>{' '}
-          <span style={{ color: 'var(--text-secondary)' }}>
-            Its legality, colour identity and size are already checked. Write the
-            rationales below, then set <code>stage: curated</code> in{' '}
-            <code>deck.yaml</code> — the gate refuses the promotion while any card
-            is blank, and artifacts stay blocked until it lands.
-          </span>
-          {deck.needs_rationale > 0 && (
-            <div className="mt-2">
-              <button
-                onClick={() => { setTab('cards'); setOnlyUnjustified(true) }}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium"
-                style={{ background: 'var(--gridline)', color: 'var(--text-primary)' }}>
-                Show the {deck.needs_rationale} that need one
-              </button>
-            </div>
+          {deck.needs_rationale > 0 ? (
+            <>
+              <strong>
+                Draft — {deck.needs_rationale} of {deck.cards.length} cards still
+                need a <code>why</code>.
+              </strong>{' '}
+              <span style={{ color: 'var(--text-secondary)' }}>
+                Its legality, colour identity and size are already checked. Write
+                the rationales below and this becomes a promotion you can make
+                here — the gate refuses it while any card is blank, and artifacts
+                stay blocked until it lands.
+              </span>
+              <div className="mt-2">
+                <button
+                  onClick={() => { setTab('cards'); setOnlyUnjustified(true) }}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium"
+                  style={{ background: 'var(--gridline)', color: 'var(--text-primary)' }}>
+                  Show the {deck.needs_rationale} that need one
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* The work is done and the deck does not know it yet. This is
+                  the last step of an import, and until `set_deck_field` it was
+                  the last thing in the lifecycle that needed a text editor. */}
+              <strong>Draft — every card carries a rationale.</strong>{' '}
+              <span style={{ color: 'var(--text-secondary)' }}>
+                Nothing is outstanding. Promoting marks it curated and unblocks
+                the five artifacts.
+              </span>
+              <div className="mt-2">
+                <button onClick={promote} disabled={promoting}
+                        className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                        style={{ background: 'var(--series-1)', color: '#fff' }}>
+                  {promoting ? 'Promoting…' : 'Promote to curated'}
+                </button>
+              </div>
+            </>
+          )}
+          {promoteError && (
+            <div className="mt-2"><ErrorNote>{promoteError}</ErrorNote></div>
           )}
         </div>
       )}
