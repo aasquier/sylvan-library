@@ -433,6 +433,42 @@ machine-written rationale. So the boundary is drawn where it can be tested
 rather than promised: **no code path passes a model response into the `why`
 field**, and a mode may put a question beside the box but never text inside it.
 
+### How much of it you want is yours to set
+
+Also 2026-08-11, and it is why ADR 15 has a fourth element. Some people want a
+deckbuilding tool that never speaks unless spoken to; some want the thing that
+dreams up an axis they had not considered. A **stance** is the user's dial over
+three axes — initiative, scope, and write autonomy — with named presets, because
+"never interrupt me, but go wild when I ask" is a real setting that a single
+slider cannot express. Off is a real position: no calls at all.
+
+The stance may widen what a mode does. It may never widen what a mode is
+*allowed* to do, and `why` is off limits at every position.
+
+At the top of the write axis, Claude may apply reversible edits without asking —
+git and `swaps.md` are the undo. What that turns out to permit is narrower than
+it sounds, and narrowed by the editor rather than by a rule about models:
+
+| Operation | Autonomous? |
+| --- | --- |
+| `remove_card`, `set_card_field` (category, qty) | yes — no rationale needed |
+| `add_card` to a draft | yes — a blank `why` there is counted work |
+| `add_card` to a curated deck, `replace_card` | **no** — the operation refuses a blank `why`, and Claude cannot supply one |
+| `set_note` | **no** — deck prose is the same kind of thing as a `why` |
+
+So the most attractive thing to automate, a twelve-card swap, is blocked. The
+way through is the interview: Claude proposes, the user says why they accept,
+and the user's sentence is the rationale. The write stops being autonomous
+exactly where a human judgement enters.
+
+Two things this adds to the build: an **activity log**, since "what did it
+change while I was not looking" cannot be answered with "read the git diff" by
+someone on a hosted instance, and a default that comes from the deck —
+`status: built | theoretical` already separates lists under consideration from
+sleeved cardboard. The stance itself starts as per-conversation state, not
+persisted, so what people actually reach for is known before a default is
+written into anything.
+
 ### What building it looks like
 
 The natural home is `api/service.py` — it is already the seam both the CLI and
