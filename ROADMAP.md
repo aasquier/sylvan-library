@@ -172,12 +172,22 @@ previously assumed one, and was wrong about legal decks in three ways:
 - **A Background was rejected outright.** It is a `Legendary Enchantment —
   Background` whose text never says it can be your commander, so Jaheira +
   Raised by Giants failed with `not-a-commander`.
-- **Ten `Partner with` cards are not even Legendary** (Lore Weaver, Ley Weaver,
-  Chakram Slinger and the rest of the Battlebond pairs). CR 702.124f grants
-  commander eligibility through the ability rather than printing it on the
-  card, so a type-line test rejects them.
 - **Deck size was always 99.** Two commanders share the command zone, so the
-  deck holds **98**. Any legal partner deck failed `deck-size`.
+  deck holds **98**. Any legal partner deck failed `deck-size`. Note the
+  contrast with a companion, which is "effectively a 101st card" and therefore
+  does *not* change the deck size — commanders are inside the 100, companions
+  are not.
+
+**A rule I got wrong first time, recorded so nobody repeats it.** Battlebond
+printed ten *non-legendary* creatures with `Partner with` (Lore Weaver, Ley
+Weaver, Chakram Slinger and friends) for Two-Headed Giant limited. I assumed
+the ability granted commander eligibility the way "Choose a Background" does.
+It does not — the official ruling on those cards is blunt: *"A nonlegendary
+creature can't be your commander, even if it has a 'partner with' ability."*
+The gate now rejects them and says exactly that, because "does not say it can
+be your commander" reads like a data problem rather than a rule. The Background
+exemption is the only real one: it is legal despite not being a creature
+because "Choose a Background" makes it a second commander.
 
 Mechanics covered, all enumerated from the corpus: plain **Partner**, **Partner
 with `<name>`** (pairs only with that card), **Partner—`<label>`**, **Choose a
@@ -320,7 +330,7 @@ producing confident, wrong answers for *every* deck, not just one.
   flipping.
 
 All five are fixed and pinned by tests. The lesson worth keeping: logic in
-tested code gets caught, logic in conversation does not. 178 tests, CI runs
+tested code gets caught, logic in conversation does not. 180 tests, CI runs
 them on 3.11 and 3.12, typechecks and builds the frontend, and fails if the
 committed bundle drifts from source.
 

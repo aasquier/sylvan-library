@@ -149,18 +149,22 @@ def validate(deck: Deck, cards: dict | None = None, *,
         identity: frozenset[str] = frozenset()
         for rec in cmd_records:
             identity |= rec.color_identity
-        # A Background, and the ten non-legendary Battlebond `Partner with`
-        # creatures, are legal commanders only as one of a pair -- so whether
+        # A Background is a legal commander only as one of a pair, so whether
         # a card qualifies depends on how many commanders there are.
         paired = len(cmd_records) > 1
         for rec in cmd_records:
             if not partners.can_be_commander(rec, paired=paired):
-                extra = ""
-                if not paired and (partners.is_background(rec)
-                                   or (p := partners.pairing(rec)) is not None
-                                   and p.kind == partners.PARTNER_WITH):
-                    extra = (" -- it is only legal as one of two commanders, "
-                             "and this deck lists one")
+                if partners.nonlegendary_partner(rec):
+                    # The Battlebond trap: the ability is there, the type line
+                    # is not. Say so, because "does not say it can be your
+                    # commander" reads like a data problem rather than a rule.
+                    extra = (" -- a nonlegendary creature can't be your "
+                             "commander even with a 'partner with' ability")
+                elif not paired and partners.is_background(rec):
+                    extra = (" -- a Background is only legal as a second "
+                             "commander, and this deck lists one")
+                else:
+                    extra = ""
                 rep.add("error", "not-a-commander",
                         f"type line is {rec.type_line!r} and it does not say "
                         f"it can be your commander{extra}", rec.name)

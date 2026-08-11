@@ -187,13 +187,36 @@ def test_a_background_is_eligible_only_as_one_of_two():
     assert partners.can_be_commander(rec, paired=True)
 
 
-def test_a_non_legendary_partner_with_creature_is_eligible_when_paired():
-    """CR 702.124f grants this through the ability, not the type line -- the
-    Battlebond partners are not Legendary."""
+def test_a_non_legendary_partner_with_creature_is_never_a_commander():
+    """The Battlebond trap. Ten commons and uncommons have `Partner with` but
+    are not Legendary -- they were printed for Two-Headed Giant limited. The
+    official ruling on those cards: "A nonlegendary creature can't be your
+    commander, even if it has a 'partner with' ability." A pairing ability
+    never waives the legendary requirement."""
     rec = Fake("Lore Weaver", "Creature — Human Wizard",
                oracle_text="Partner with Ley Weaver")
     assert not partners.can_be_commander(rec, paired=False)
+    assert not partners.can_be_commander(rec, paired=True)
+    assert partners.nonlegendary_partner(rec)
+
+
+def test_a_legendary_partner_with_creature_is_fine():
+    rec = Fake("Pir, Imaginative Rascal", "Legendary Creature — Human",
+               oracle_text="Partner with Toothy, Imaginary Friend")
     assert partners.can_be_commander(rec, paired=True)
+    assert not partners.nonlegendary_partner(rec)
+
+
+def test_the_gate_explains_the_nonlegendary_partner_trap():
+    deck, corpus = build(["Lore Weaver", "Ley Weaver"], ["Sol Ring"], {
+        "Lore Weaver": Fake("Lore Weaver", "Creature — Human Wizard",
+                            oracle_text="Partner with Ley Weaver"),
+        "Ley Weaver": Fake("Ley Weaver", "Creature — Human Druid",
+                           oracle_text="Partner with Lore Weaver")})
+    rep = validate(deck, corpus, expected_size=2)
+    msgs = [i.message for i in rep.errors if i.code == "not-a-commander"]
+    assert len(msgs) == 2, "both halves are illegal, not just one"
+    assert "nonlegendary creature can't be your commander" in msgs[0]
 
 
 def test_explicit_can_be_your_commander_text_is_honoured():
@@ -242,7 +265,7 @@ def test_a_background_alone_is_rejected_with_a_useful_message():
                                  "Legendary Enchantment — Background")})
     rep = validate(deck, corpus, expected_size=1)
     msg = next(i.message for i in rep.errors if i.code == "not-a-commander")
-    assert "one of two commanders" in msg
+    assert "only legal as a second commander" in msg
 
 
 def test_a_legal_background_pairing_passes_the_gate():
