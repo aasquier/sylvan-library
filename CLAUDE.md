@@ -130,6 +130,32 @@ mtglab decks build <slug> --against <(git show HEAD:decks/<slug>/deck.yaml)
 
 `swaps.md` is a **git diff**. Commit before editing or you won't get one.
 
+## Python decides, Claude advises
+
+The split, decided 2026-08-11 and argued in
+[ADR 14](docs/adr/0014-python-decides-claude-advises.md): **anything with a
+right answer belongs in deterministic Python; Claude is for opinions and
+research.** Nothing is built yet — there is no LLM SDK in `pyproject.toml`.
+
+Deterministic Python owns legality, colour identity, singleton, deck size,
+companion and partner rules, mana solving, Tier 1, category counts, similarity
+and price. Reproducible, tested without a network, no model consulted. Claude
+owns conversation about a deck and the questions the corpus cannot answer — the
+meta, whether a spoiled card earns a slot, what a ruling means in practice.
+
+Three boundaries, all of which apply to you in this session as much as to
+anything built later:
+
+1. **Rule 1 binds Claude too.** Card facts come from the corpus, not from
+   recall and not from a web page. Research is for what the corpus lacks —
+   discussion, meta, rulings, cards spoiled ahead of the next bulk refresh.
+2. **Argue about a `why`; never write one.** Interrogating a card's slot and
+   making the case against it is the conversation the curated six came out of.
+   Authoring the text that lands in `deck.yaml` is not, and no surface may
+   pre-fill that field. Rule 4 above is the rule; this is where its edge is.
+3. **Say which system answered.** The gate's output is reproducible and
+   checkable; an opinion is neither. Never present one as the other.
+
 ## Interpreting simulations
 
 **Tier 1** shuffles, draws, and pays costs. It does not model opponents,
@@ -141,10 +167,13 @@ speed.** Commander speed rises monotonically with land count, so optimising it
 alone always recommends more lands. Deployment peaks and then falls as flood
 sets in. That peak is the answer.
 
-**Tier 2** (pod simulator, not yet built) is a model of Magic. Right for
-bracket placement and matchup matrices, wrong for "is this line correct."
+**Tier 2** (pod simulator, not yet built, and **deferred behind Tier 3** as of
+2026-08-11) is a model of Magic. Right for bracket placement and matchup
+matrices, wrong for "is this line correct." Forge goes first; Tier 2 gets built
+only if Forge cannot answer those questions. See ROADMAP goal 2.
 
-**Tier 3** (Forge bridge, not yet built) runs `forge.jar sim -d ... -f
+**Tier 3** (Forge bridge, not yet built, and now the next simulator) runs
+`forge.jar sim -d ... -f
 commander`. Forge's AI is best with aggro and midrange, poor with control, bad
 with most combo. The user's decks sit right on that fault line — Dino and Cat
 are what Forge plays well; Tivit and Gyome are what it plays badly. **Report
@@ -192,7 +221,9 @@ accepted**: do not edit a decision, write a new one that supersedes it. Read
 No purchase automation — the shopping tooling prices decks, watches for deals,
 and builds carts, but never enters payment details and never checks out. No
 marketplace scraping; prices come from Scryfall. No rules engine — the play UI
-manages board state, it does not enforce rules.
+manages board state, it does not enforce rules, and Forge plays the games.
+No web crawler either: research goes through Anthropic's server-side web
+tooling, which is not a way around the scraping ban.
 
 ## The decks
 

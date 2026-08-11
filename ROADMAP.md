@@ -19,7 +19,7 @@ Status keys: **done** · **partial** · **not started**
 | Best-in-slot alternatives | **partial** | `decks/suggest.py` scores similarity; `mtglab decks suggest <slug>` and `GET /api/decks/{slug}/suggestions`. Aimed at the gate's offenders; `--card` points it anywhere |
 | Upcoming spoilers for new decks | **partial** | `GET /api/sets/upcoming` is live; no card-level scan |
 | Frugal alternatives | **partial** | price data loaded, shown in search; no "cheaper equivalent" logic |
-| Pod simulation of real games | **not started** | Tier 2 |
+| Pod simulation of real games | **not started** | Tier 3 (Forge) first; Tier 2 deferred behind it |
 
 **Importing a list now works** — `mtglab decks import <slug> --from <file|->`,
 `POST /api/decks/import`, and the app's Import page. It resolves names against
@@ -29,19 +29,47 @@ started, though import subsumes most of it. See **The deck lifecycle** below.
 
 ## 2. Adversarial simulation between decks
 
-**Not started.** Needs Tier 2 (pod simulator): four seats, each deck compiled to
-a policy profile, archetype opponents, round-robin. This is also what produces
+**Not started, and re-sequenced on 2026-08-11.** This is also what produces
 goal 7's tier list.
+
+Two simulators could answer it, and they answer different questions. **Tier 2**
+(the Python pod simulator) is four seats, each deck compiled to a policy
+profile, archetype opponents, round-robin — a *statistical* model of Magic, not
+a rules engine, right for bracket placement and matchup matrices and wrong for
+"is this line correct". **Tier 3** is the Forge bridge: real games, a real rules
+engine, a real AI, and card coverage that stops short of the whole format.
+
+**Forge goes first, and Tier 2 waits behind it.** Tier 2 is a large build whose
+output is a model whose fidelity nobody has yet had to defend; Forge is an
+integration with an engine that already plays the game. If Forge turns out to
+answer the bracket and matchup questions well enough, Tier 2 may never need
+building — and if it does not, its measurements will say exactly what Tier 2
+has to be better at. That is a cheaper way to find out than building the
+simulator first.
 
 Opponent decks sourced from EDHREC/Moxfield/Archidekt is an **open decision** —
 see below.
 
-## 3. Play against Claude in a local UI
+## 3. Play real games against a real engine
 
-**Partial.** The UI exists (`mtglab ui`) with real Scryfall art, but there is no
-play mode. Needs a board-state manager and Claude in an opponent seat reasoning
-over board JSON. Explicitly *not* a rules engine — building one is what took
-Forge and XMage a decade each.
+**Partial, and re-aimed on 2026-08-11.** The UI exists (`mtglab ui`) with real
+Scryfall art, but there is no play mode.
+
+This goal used to read "play against Claude", with Claude in an opponent seat
+reasoning over board JSON. That is the wrong shape and
+[ADR 14](docs/adr/0014-python-decides-claude-advises.md) retires it: a language
+model handed a board state is neither a rules engine nor a strong player, and
+the one thing it would add over an engine — coverage of cards the engine does
+not implement — is exactly where its answers would be least checkable.
+
+**Forge plays the games instead.** It is a real rules engine with a real AI,
+which is a decade of work this project is not going to repeat, and `CLAUDE.md`
+already specifies how its results must be reported. That makes this goal the
+Tier 3 bridge rather than a separate build.
+
+The remaining work is a board-state manager for the UI — still explicitly *not*
+a rules engine — plus the Forge bridge itself. **Whether Forge can be reached
+from a hosted instance at all is an open decision**; see below.
 
 ## 4. Shopping, swaps, deals
 
@@ -71,8 +99,16 @@ slots — is not built.
 
 ## 7. Tier list of curated decks
 
-**Not started.** All six decks are migrated now, so the remaining blocker is
-Tier 2.
+**Not started.** All six decks are migrated now, so the remaining blocker is a
+simulator that plays decks against each other — Forge first, per goal 2.
+
+Note the caveat this inherits: `CLAUDE.md` requires Forge results to be reported
+**per archetype, never as a single ranking**, because Forge's AI is good with
+aggro and midrange and poor with control and most combo. Aaron's decks sit right
+on that fault line — Dino and Cat are what Forge plays well, Tivit and Gyome are
+what it plays badly. A tier list built from Forge output without that split
+would be a confident ranking of how well Forge plays each deck, which is not the
+question.
 
 ---
 
@@ -320,20 +356,110 @@ second field rather than another value of `status`.
 
 ---
 
+## What Claude is for
+
+Decided 2026-08-11 and recorded as
+[ADR 14](docs/adr/0014-python-decides-claude-advises.md). Nothing is built:
+there is no LLM SDK in `pyproject.toml`, and the only `ANTHROPIC_API_KEY` in
+the repository belongs to the CI reviewer in `docs/ENGINEERING.md`.
+
+**Python decides. Claude advises. Forge plays the games.** The split is by
+whether the question has a right answer:
+
+| | Owned by | Because |
+| --- | --- | --- |
+| Legality, colour identity, singleton, size, companion and partner rules | Deterministic Python | There is a correct answer and it must be the same tomorrow |
+| Mana solving, Tier 1, category counts, similarity, price | Deterministic Python | Same — reproducible, tested without a network |
+| The meta, whether a spoiled card earns a slot, what a ruling means in practice, whether a plan holds together | Claude | No corpus query answers these; they need an opinion or the open internet |
+| Playing actual games | Forge | A real rules engine with a real AI, which took a decade to build |
+
+### The three boundaries
+
+1. **Rule 1 still binds Claude.** Card facts come from the corpus — not from
+   the model's recall, and not from a web page. Research is for what the corpus
+   does not contain: discussion, meta, rulings, cards spoiled ahead of the next
+   bulk refresh.
+2. **Claude may argue about a `why`; it may not write one.** It can
+   interrogate, challenge and make the case against a card's slot — that is the
+   conversation the curated six came out of. It must not author the text that
+   lands in `deck.yaml`, and no surface may pre-fill that field. An
+   edit-before-save gate was considered and rejected: it adds a click to the
+   same failure.
+3. **Provenance is always visible.** A user must be able to tell without asking
+   whether an answer is the gate's (reproducible) or Claude's (an opinion).
+
+### What building it looks like
+
+The natural home is `api/service.py` — it is already the seam both the CLI and
+the app call through, so there is nothing to prepare. Research uses Anthropic's
+server-side web tooling rather than a crawler this project maintains, which
+keeps `CLAUDE.md`'s no-scraping rule intact.
+
+Two things to settle before it ships, both open decisions above: **what a hosted
+Claude surface costs and who pays**, and — for the simulator half — **whether
+Forge can run where the app runs**.
+
+---
+
 ## Suggested order
 
-1. **Migrate the remaining decks.** Highest value: the Library screen is built
-   for a shelf, a tier list is meaningless with one deck, and each migration
-   exercises the gate against a new list.
-2. **Play mode in the UI** — the fun one, and it needs no new engine work
-   beyond board state.
-3. **Tier 2 pod simulator** — unlocks adversarial sims and the tier list
-   together.
+1. **The rest of the deck lifecycle** — `add_card`, `remove_card`,
+   `set_card_field`, `set_note` (ADR 12), and a UI for writing a rationale.
+   Import landed on 2026-08-11 and created this gap: you can bring a 99-card
+   list in and the only way to write its `why` fields is a text editor.
+2. **Forge feasibility research** — can `forge.jar sim` be driven from here at
+   all, and can it be reached from a hosted instance? Cheap to answer, and it
+   gates goals 2, 3 and 7 together. See the open decision below.
+3. **The Claude surface** — conversation and research, per
+   [ADR 14](docs/adr/0014-python-decides-claude-advises.md). Independent of the
+   simulator work and the first thing that makes the app useful for judgement
+   rather than facts.
 4. **Spoiler scan** and **deals/carts** — both self-contained.
+
+**Tier 2 is deliberately not on this list.** It waits behind Forge (goal 2).
 
 ---
 
 ## Open decisions
+
+### Can Forge run where the app runs?
+
+**Open, recorded 2026-08-11, and it gates goals 2, 3 and 7.**
+[ADR 14](docs/adr/0014-python-decides-claude-advises.md) makes Forge the thing
+that plays games. Forge is a JVM desktop application with its own card
+database, and `forge.jar sim -d ... -f commander` is a headless mode of it —
+not a library, not a service.
+
+That sits awkwardly against the hosted instance. A Fly.io image carrying a JVM
+plus Forge's card data is a large image with a real per-run CPU cost, and it
+lands straight back on the Fly-versus-Hetzner sizing question below.
+
+Three shapes, none chosen:
+
+- **Local only.** Forge simulation is something you get when running `mtglab`
+  on your own machine; the hosted instance has a documented feature gap. Keeps
+  the deployment small and honest, and is the smallest thing that could work.
+- **Server-side.** Anyone logged in can run Forge sims. Heavier container, and
+  the CPU question reopens.
+- **A separate worker.** The app queues a job; something else runs Forge. Most
+  flexible, most moving parts, and probably premature.
+
+**Answer this with the feasibility spike, not by guessing.** The prior question
+is whether `forge.jar sim` can be driven from Python here at all, with the card
+coverage pre-flight `CLAUDE.md` requires. If it cannot, none of the above
+matters.
+
+### What a hosted Claude surface costs, and who pays
+
+**Open, recorded 2026-08-11.** ADR 14 puts conversation and research on the
+Claude API. Locally that is the maintainer's own key and own spend. Hosted, it
+means **the maintainer pays for other people's questions**, and research turns
+are not cheap — web search and long context are where the cost is.
+
+That is a real constraint on "shareable with friends" and it wants deciding
+before the surface opens up, not after an invoice. Options range from a
+per-user budget, to bring-your-own-key, to keeping the conversational surface
+local-only while the read-only app is what gets shared. Not decided.
 
 ### Hosting — plan
 
@@ -372,13 +498,20 @@ Three things follow, and they decide the shortlist:
 | Option | Cost/mo | Why / why not |
 | --- | --- | --- |
 | **Fly.io** (recommended) | **~$6-8** | `shared-cpu-1x` with 1 GB RAM ≈ $5.70, plus a 3 GB volume at $0.15/GB ≈ $0.45. Persistent volumes, scale-to-zero with fast wake, scheduled Machines for the refresh cron. Best fit without running a server. |
-| **Hetzner CX22 VPS** | **~€4** | 2 vCPU / 4 GB / 40 GB. By far the most CPU per euro, which is what Tier 2 will want. Cost: you own OS updates, TLS and deploys. Pick this if the simulator is the point. |
+| **Hetzner CX22 VPS** | **~€4** | 2 vCPU / 4 GB / 40 GB. By far the most CPU per euro, which is what a simulator will want — and the only one of these with room for a JVM plus Forge, if that lands server-side. Cost: you own OS updates, TLS and deploys. Pick this if the simulator is the point. |
 | **Railway / Render** | ~$5-7 | Simplest deploys, persistent volumes on paid tiers. Render's free tier has no persistent disk and spins down, so it is not an option here. |
 | Vercel / Netlify / Workers | n/a | Frontend would be free and trivial, but the backend needs a 63 MB local DB and minutes-long CPU. Only viable split: static frontend on Cloudflare Pages (free) + API elsewhere. Not worth the extra moving part at this size. |
 
-**Recommendation: Fly.io**, moving to a Hetzner box if Tier 2 turns out to need
-real cores. 1 GB RAM is the number to watch — DuckDB plus numpy plus a 25,000
-game sweep is the memory high-water mark, and 512 MB is too tight.
+**Recommendation: Fly.io**, moving to a Hetzner box if a simulator turns out to
+need real cores. 1 GB RAM is the number to watch — DuckDB plus numpy plus a
+25,000 game sweep is the memory high-water mark, and 512 MB is too tight.
+
+**Forge changes this sizing question, and the answer is not yet known.** ADR 14
+makes Forge the thing that plays games, and a JVM plus Forge's card database
+server-side is a different class of image and a different CPU profile from
+anything measured here. That is the open decision above; until the feasibility
+spike answers it, this recommendation covers the app *without* server-side
+Forge.
 
 **Constraints the deployment has to respect:**
 
@@ -406,14 +539,24 @@ and the frontend is prebuilt static files served by it.
 Measured on this machine: `sim mana` at 20,000 games takes ~30s; a land sweep
 across 11 counts at 25,000 games each takes ~5 minutes. Tier 1 is tolerable.
 
-**Tier 2 is where this decides itself.** A pod simulator is four seats making
-real decisions over more turns — plausibly 50-100x the work per game. If Tier 2
-in Python turns out to take minutes per matchup, the inner loop moves to a
-compiled language and the rest stays Python.
+**A heavy simulator is where this decides itself**, and as of 2026-08-11 that
+is no longer certain to be Tier 2. The trigger in
+[ADR 3](docs/adr/0003-tier-1-stays-python.md) was written against Tier 2's
+measurements: a pod simulator is four seats making real decisions over more
+turns — plausibly 50-100x the work per game — so if it took minutes per matchup
+in Python, the inner loop would move to a compiled language and the rest would
+stay Python.
+
+Tier 2 now waits behind Forge (goal 2), so **the trigger waits on whichever
+simulator gets built first**. If that is Forge, the compiled-rewrite question
+may not arise at all: the expensive loop would be inside a JVM this project
+does not maintain, and the Python side would be orchestration and parsing. ADR
+3's shape — a written, measured threshold rather than a guess — is unchanged,
+which is why this re-points the trigger rather than superseding the decision.
 
 Do not port Tier 1 pre-emptively. `mana.py` and `sim/tier1/` are deliberately
 stdlib-plus-numpy precisely so they *could* move later; the boundary already
-exists. Measure Tier 2 first.
+exists. Measure before porting anything.
 
 ### Reaching outside Scryfall
 
