@@ -29,6 +29,7 @@ src/mtglab/
   mana.py                 cost parsing + castability solver
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema
+  decks/edit.py           surgical deck.yaml edits, minimal diffs
   decks/source.py         DeckSource protocol; file-backed and in-memory
   decks/suggest.py        similarity scorer -> replacement shortlists
   decks/validate.py       the gate
@@ -92,7 +93,11 @@ and land types.
 `mtglab decks build <slug>`. Never hand-write them.
 
 **4. Every card carries a `why`.** Validation fails without one. A card that
-cannot justify its slot is a card to cut.
+cannot justify its slot is a card to cut. **Never write one on the user's
+behalf** — `decks swap` and the swap endpoint both refuse an empty rationale
+rather than inventing one, which is what keeps [ADR 8](docs/adr/0008-the-gate-blocks.md)
+intact now that the tool can edit decks. See
+[ADR 11](docs/adr/0011-the-api-may-apply-a-swap.md).
 
 **5. Never commit** card corpus data, collection/wishlist/purchase data, or
 credentials. CI enforces this. A public inventory of expensive cards tied to a
@@ -103,6 +108,7 @@ real identity is a targeting list.
 ```bash
 mtglab decks validate <slug>      # gate — fix errors before anything else
 mtglab decks suggest <slug>       # shortlist replacements for what it flagged
+mtglab decks swap <slug> --out X --in Y --why '...'   # apply your choice
 mtglab sim mana <slug>            # baseline consistency
 mtglab sim lands <slug> 30 40     # is the land count right?
 git commit -am "before refactor"  # so swaps.md has something to diff

@@ -51,6 +51,32 @@ class DeckSource(Protocol):
     def all(self) -> list[Deck]:
         """Every deck, parsed, in a stable order."""
 
+    def read_text(self, slug: str) -> str:
+        """The deck's YAML, verbatim.
+
+        Text rather than a parsed `Deck` because edits are surgical: rewriting
+        a deck from its parsed form destroys comments and reflows every folded
+        block, which turns a one-card swap into an unreadable diff. See
+        `decks/edit.py`.
+        """
+
+    def write_text(self, slug: str, text: str) -> None:
+        """Replace the deck's YAML. Raises `ReadOnlySource` if not permitted."""
+
+    @property
+    def writable(self) -> bool:
+        """Whether this caller may edit these decks.
+
+        Always true today, with one local user. `docs/HOSTING.md` keeps the
+        curated decks read-only for everyone but the maintainer, and this is
+        the flag that will say so -- checked in one place rather than
+        rediscovered per endpoint.
+        """
+
+
+class ReadOnlySource(Exception):
+    """Raised when a deck source will not accept an edit."""
+
 
 class FileDeckSource:
     """Decks as `<root>/<slug>/deck.yaml`."""
@@ -76,6 +102,25 @@ class FileDeckSource:
     def all(self) -> list[Deck]:
         return [Deck.load(p) for p in config.deck_paths(self._root)]
 
+    def _path(self, slug: str) -> Path:
+        path = self.root / slug / "deck.yaml"
+        if not path.exists():
+            raise DeckNotFound(slug)
+        return path
+
+    def read_text(self, slug: str) -> str:
+        return self._path(slug).read_text(encoding="utf-8")
+
+    def write_text(self, slug: str, text: str) -> None:
+        # Written whole rather than in place: a partial write would leave the
+        # source of truth truncated, and the caller has already verified the
+        # text parses.
+        self._path(slug).write_text(text, encoding="utf-8")
+
+    @property
+    def writable(self) -> bool:
+        return True
+
     def __repr__(self) -> str:
         return f"FileDeckSource({self.root})"
 
@@ -88,8 +133,10 @@ class MemoryDeckSource:
     about a future SQL source.
     """
 
-    def __init__(self, decks: Iterable[Deck] = ()) -> None:
+    def __init__(self, decks: Iterable[Deck] = (), *, writable: bool = True) -> None:
         self._decks = {d.slug: d for d in decks}
+        self._text: dict[str, str] = {}
+        self._writable = writable
 
     def slugs(self) -> list[str]:
         return sorted(self._decks)
@@ -102,6 +149,22 @@ class MemoryDeckSource:
 
     def all(self) -> list[Deck]:
         return [self._decks[slug] for slug in self.slugs()]
+
+    def read_text(self, slug: str) -> str:
+        if slug in self._text:
+            return self._text[slug]
+        return self.get(slug).dump()
+
+    def write_text(self, slug: str, text: str) -> None:
+        if not self._writable:
+            raise ReadOnlySource(slug)
+        self.get(slug)          # raises DeckNotFound for an unknown deck
+        self._text[slug] = text
+        self._decks[slug] = Deck.from_text(text, slug=slug)
+
+    @property
+    def writable(self) -> bool:
+        return self._writable
 
     def __repr__(self) -> str:
         return f"MemoryDeckSource({len(self._decks)} decks)"

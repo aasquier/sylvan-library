@@ -14,7 +14,10 @@ import type { DeckDetail as Deck, DeckStats, Suggestions, ValidationReport } fro
 import DeckDetail from './DeckDetail'
 
 vi.mock('../lib/api', () => ({
-  api: { deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn() },
+  api: {
+    deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
+    swapCard: vi.fn(),
+  },
 }))
 
 const { api } = await import('../lib/api')
@@ -98,6 +101,11 @@ beforeEach(() => {
   vi.mocked(api.stats).mockReset().mockResolvedValue(STATS)
   vi.mocked(api.validate).mockReset().mockResolvedValue(REPORT)
   vi.mocked(api.suggestions).mockReset().mockResolvedValue(SHORTLIST)
+  vi.mocked(api.swapCard).mockReset().mockResolvedValue({
+    slug: 'goreclaw-stompy', swapped_out: 'Primeval Titan',
+    swapped_in: 'Cultivator Colossus', why: 'because', ok: true,
+    errors: [], warnings: [],
+  })
 })
 
 afterEach(cleanup)
@@ -155,5 +163,58 @@ describe('DeckDetail validation tab', () => {
 
     await screen.findByText(/not legal in Commander/)
     expect(screen.queryByText(/not a recommendation/)).toBeNull()
+  })
+
+  it('will not apply a swap until a rationale is written', async () => {
+    // Rule 4 at the last place it can be enforced. A tool-written rationale is
+    // the empty justification the rule exists to prevent, so the button stays
+    // disabled rather than the app inventing one.
+    renderDeck()
+    await screen.findByRole('button', { name: 'Validation' })
+    openValidation()
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this card' }))
+
+    const apply = screen.getByRole('button', { name: 'Apply swap' })
+    expect(apply.hasAttribute('disabled')).toBe(true)
+    fireEvent.click(apply)
+    expect(api.swapCard).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByRole('textbox'),
+                     { target: { value: 'It ramps and it attacks.' } })
+    expect(screen.getByRole('button', { name: 'Apply swap' }).hasAttribute('disabled'))
+      .toBe(false)
+  })
+
+  it('sends the swap the user composed, and refetches what it invalidated', async () => {
+    renderDeck()
+    await screen.findByRole('button', { name: 'Validation' })
+    openValidation()
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this card' }))
+    fireEvent.change(screen.getByRole('textbox'),
+                     { target: { value: 'It ramps and it attacks.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply swap' }))
+
+    await waitFor(() => expect(api.swapCard).toHaveBeenCalledWith('goreclaw-stompy', {
+      out: 'Primeval Titan',
+      into: 'Cultivator Colossus',
+      why: 'It ramps and it attacks.',
+    }))
+    // The gate result and the deck are both stale the moment a swap lands.
+    await waitFor(() => expect(api.validate).toHaveBeenCalledTimes(2))
+    expect(api.deck).toHaveBeenCalledTimes(2)
+  })
+
+  it('surfaces a refusal instead of pretending the swap worked', async () => {
+    vi.mocked(api.swapCard).mockRejectedValue(
+      new Error("'Rhystic Study' identity {U} is outside the commander's {G}"))
+    renderDeck()
+    await screen.findByRole('button', { name: 'Validation' })
+    openValidation()
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this card' }))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'nope' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply swap' }))
+
+    await waitFor(() => expect(screen.getByText(/outside the commander/)).toBeTruthy())
+    expect(api.deck).toHaveBeenCalledTimes(1)
   })
 })

@@ -15,8 +15,9 @@ from typing import Any
 
 from mtglab.cards import db
 from mtglab.config import DB_PATH
-from mtglab.decks import suggest
+from mtglab.decks import edit, suggest
 from mtglab.decks.analyze import deck_stats
+from mtglab.decks.edit import EditFailed
 from mtglab.decks.model import Deck
 from mtglab.decks.source import DeckSource, FileDeckSource
 from mtglab.decks.validate import validate
@@ -208,6 +209,88 @@ def validate_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, A
     finally:
         if con is not None:
             con.close()
+
+
+class SwapRejected(Exception):
+    """The swap was refused, and nothing was written."""
+
+
+def swap_card(slug: str, *, out: str, into: str, why: str,
+              source: DeckSource | None = None) -> dict[str, Any]:
+    """Replace one card in a deck with another, and re-run the gate.
+
+    This is not the auto-substitution ADR 8 rejected. The judgement stays with
+    the caller: they name the card going in and they write the rationale. What
+    changed is that carrying out a decision they already made no longer means
+    hand-editing YAML.
+
+    Everything is checked before anything is written, and the edit itself is
+    surgical -- see `decks/edit.py` for why a load-and-dump was not an option.
+    """
+    decks = _source(source)
+    if not decks.writable:
+        raise SwapRejected("this deck is read-only")
+    if not why.strip():
+        # Rule 4, enforced at the boundary as well as in the editor: a card
+        # that cannot justify its slot is a card to cut.
+        raise SwapRejected("a replacement needs a `why`")
+
+    deck = decks.get(slug)
+    entry = next((c for c in deck.cards + deck.swap_board
+                  if c.name.lower() == out.strip().lower()), None)
+    if entry is None:
+        raise SwapRejected(f"{out!r} is not in this deck")
+    if any(c.name.lower() == into.strip().lower()
+           for c in deck.cards + deck.swap_board):
+        raise SwapRejected(f"{into!r} is already in this deck")
+    if any(c.lower() == into.strip().lower() for c in deck.commander):
+        raise SwapRejected(f"{into!r} is the commander")
+
+    con = _connect()
+    if con is None:
+        raise SwapRejected("swapping needs the card corpus -- run `mtglab data refresh`")
+    try:
+        found = db.get_cards(con, [into])
+        rec = found.get(into)
+        if rec is None:
+            raise SwapRejected(f"{into!r} is not a card the corpus knows")
+        if not rec.legal_commander:
+            raise SwapRejected(f"{rec.name} is not legal in Commander")
+
+        identity: frozenset[str] = frozenset()
+        for name in deck.commander:
+            commander_rec = db.get_cards(con, [name]).get(name)
+            if commander_rec is not None:
+                identity |= commander_rec.color_identity
+        outside = rec.color_identity - identity
+        if outside:
+            raise SwapRejected(
+                f"{rec.name}'s identity {{{''.join(sorted(rec.color_identity))}}} "
+                f"includes {{{''.join(sorted(outside))}}}, outside the "
+                f"commander's {{{''.join(sorted(identity)) or 'C'}}}")
+
+        try:
+            updated = edit.replace_card(decks.read_text(slug), old_name=entry.name,
+                                        new_name=rec.name, why=why.strip())
+        except EditFailed as exc:
+            raise SwapRejected(str(exc)) from exc
+        decks.write_text(slug, updated)
+
+        after = decks.get(slug)
+        report = validate(after, _corpus_for(after, con))
+        return {
+            "slug": slug,
+            "swapped_out": entry.name,
+            "swapped_in": rec.name,
+            "why": why.strip(),
+            "ok": report.ok,
+            "errors": [{"code": i.code, "message": i.message, "card": i.card}
+                       for i in report.errors],
+            "warnings": [{"code": i.code, "message": i.message, "card": i.card}
+                         for i in report.warnings],
+        }
+    finally:
+        con.close()
 
 
 def suggestions_for(slug: str, *, source: DeckSource | None = None,

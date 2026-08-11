@@ -130,16 +130,27 @@ class Deck:
         path = Path(path)
         if path.is_dir():
             path = path / "deck.yaml"
-        with path.open("r", encoding="utf-8") as fh:
-            raw = yaml.safe_load(fh) or {}
+        return cls.from_text(path.read_text(encoding="utf-8"),
+                             slug=path.parent.name, source_path=path)
+
+    @classmethod
+    def from_text(cls, text: str, *, slug: str | None = None,
+                  source_path: Path | None = None) -> Deck:
+        """Parse deck YAML that is not necessarily a file.
+
+        `docs/HOSTING.md` stores a user's deck as the same YAML in a database
+        row, so the parser has to work on text. One parser, one validator, two
+        sources -- which is the property ADR 4 is relying on.
+        """
+        raw = yaml.safe_load(text) or {}
 
         commander = raw.get("commander") or []
         if isinstance(commander, str):
             commander = [commander]
 
         return cls(
-            slug=raw.get("slug") or path.parent.name,
-            name=raw.get("name", path.parent.name),
+            slug=raw.get("slug") or slug or "",
+            name=raw.get("name") or slug or "",
             commander=list(commander),
             companion=raw.get("companion"),
             bracket=raw.get("bracket"),
@@ -147,7 +158,7 @@ class Deck:
             notes=dict(raw.get("notes", {})),
             cards=[CardEntry.from_obj(c) for c in raw.get("cards", [])],
             swap_board=[CardEntry.from_obj(c) for c in raw.get("swap_board", [])],
-            source_path=path,
+            source_path=source_path,
         )
 
     def dump(self, path: str | Path | None = None) -> str:
