@@ -21,16 +21,27 @@ arc; this is what the next few sessions actually do.
    that pass, deliberately deferred: mutation testing, golden artifact
    snapshots, Playwright/axe, SBOM and image signing, and making
    `dependency review` a required check.
-2. **Manual UI testing** — a person driving the app end to end, not a suite.
-   Import a deck, edit rationales, run sims, exercise the auth gate with
-   `MTGLAB_REQUIRE_AUTH=1` (`.claude/launch.json` has the `mtglab-ui-auth`
-   entry), the claim page, the admin page, deck deletion.
-3. **Deploy** — [docs/HOSTING.md](docs/HOSTING.md) §7 is the checklist. What
+2. ~~**Manual UI testing**~~ — done 2026-08-12, a person driving the app end
+   to end rather than a suite. Before it, all seven screens and the catch-all
+   were smoke-tested clean (every lazy route mounts, no stuck Suspense
+   spinner, no console errors), so what the tour found is UI/UX rather than
+   breakage. The auth-on configuration (`MTGLAB_REQUIRE_AUTH=1`, the
+   `mtglab-ui-auth` launch entry) is still worth a pass of its own, since it
+   is the configuration Fly actually runs.
+3. **UI/UX polish** — the punchlist from that tour, and the phase that now
+   stands between here and deploy. **The list is the maintainer's; it is not
+   reproduced here, and a session should ask for it rather than inventing
+   one.** Two things from the cleanup pass are worth knowing while working
+   through it: the four-colour names now come from `colors.py`'s taxonomy
+   (Artifice, Chaos, Aggression, Altruism, Growth) and any new copy of that
+   table has to agree with it, and the six non-landing routes are lazy, so a
+   new screen wants a `React.lazy` line rather than a top-level import.
+4. **Deploy** — [docs/HOSTING.md](docs/HOSTING.md) §7 is the checklist. What
    remains is an account, a card, a DNS record and the seeding run: the Fly
    app + volume, the Resend account and verified sending domain (start the
    DNS early), `fly secrets`, seed the corpus and decks, then the refresh
    runbook.
-4. **After deploy, next build work in order:** re-price automated PR review
+5. **After deploy, next build work in order:** re-price automated PR review
    (ENGINEERING §5, parked), the stance dial UI, then the remaining three
    Claude modes (argue a slot, deck conversation, research).
 
