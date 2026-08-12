@@ -1,4 +1,4 @@
-"""Login, logout, and the middleware that makes everything else need one.
+"""Login, logout, reset, claim, and the middleware that makes the rest need one.
 
 **Deny by default, from a middleware rather than a per-route dependency**, and
 that choice is the whole security argument of this module. A dependency has to
@@ -29,12 +29,24 @@ cannot send without a CORS preflight the app does not answer. If the cookie
 policy is ever relaxed to `None`, a double-submit token becomes required — the
 note is here because that change would look innocuous.
 
-With auth off these three routes still exist and still work — `login` will open
+With auth off these routes still exist and still work — `login` will open
 `app.db`, verify a password and hand back a cookie that nothing then checks.
 That is deliberate rather than an oversight: it is how the flow gets exercised
 against a real browser on a laptop. What it must never become is a route that
 *grants* something locally, and it does not: with auth off every caller already
 has full access, so a session confers nothing it did not have.
+
+**`reset` and `claim` are ADR 16's email half**, and two properties of them are
+worth finding here rather than in a review:
+
+- `reset` answers the same thing in the same time whether or not the address
+  exists. The response is fixed text, and the lookup and the send both happen
+  in a background task *after* it has gone out — so "no such address" is not
+  merely un-said, it is un-timeable. `invites.send_reset` returns nothing in
+  every case, which is what stops a future edit from branching on the result.
+- `claim` resolves the token before it hashes anything. It is unauthenticated
+  and Argon2 costs 19 MiB a call, so an endpoint that hashed first would be a
+  denial of service with a password field on it.
 """
 
 from __future__ import annotations
@@ -45,12 +57,21 @@ import sqlite3
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from mtglab import config
 from mtglab.api.deps import ANONYMOUS, LOCAL, Scope, UserScope
-from mtglab.auth import db, ratelimit, sessions, users
+from mtglab.auth import (
+    db,
+    invites,
+    mail,
+    passwords,
+    ratelimit,
+    sessions,
+    tokens,
+    users,
+)
 
 _LOG = logging.getLogger("mtglab.auth")
 
@@ -66,12 +87,26 @@ COOKIE_NAME = "sid"
 # `/api/health` is here so a platform health check is a health check rather
 # than a 401. It reports corpus size and the count of curated decks, which is
 # what a public git repository already says.
+#
+# `/api/auth/reset` and `/api/auth/claim` are here because a person who cannot
+# log in is the only person who ever needs them. They are the two routes on
+# this list that *change* something, so both are rate limited, and `claim`
+# proves possession of a 256-bit token before it does any work.
 PUBLIC_PATHS = frozenset({
     "/api/health",
     "/api/auth/login",
     "/api/auth/logout",
     "/api/auth/me",
+    "/api/auth/reset",
+    "/api/auth/claim",
 })
+
+# The only thing `POST /api/auth/reset` ever says. A constant rather than a
+# literal in the handler, because the one way this endpoint leaks is by
+# answering two different things, and a single name is harder to fork than a
+# string typed twice.
+RESET_ANSWER = ("if that address has an account, a link is on its way -- "
+                "check your mail, and the spam folder")
 
 
 def normalise_path(path: str) -> str:
@@ -157,8 +192,15 @@ def scope_for_token(con: sqlite3.Connection, token: str) -> UserScope:
                      is_admin=user.is_admin, authenticated=True)
 
 
-def install(app: FastAPI, *, require: bool, secure_cookies: bool) -> None:
-    """Add the authentication middleware and the three auth routes."""
+def install(app: FastAPI, *, require: bool, secure_cookies: bool,
+            email_sender: mail.EmailSender | None = None) -> None:
+    """Add the authentication middleware and the five auth routes.
+
+    `email_sender` is the ADR 16 seam reaching the edge. `None` means "decide
+    from the environment, when a message is actually being sent" — which is
+    what a real process wants, and which is also why no test in this suite
+    sends mail: the tests pass a recorder instead.
+    """
 
     @app.middleware("http")
     async def authenticate(
@@ -268,6 +310,121 @@ def install(app: FastAPI, *, require: bool, secure_cookies: bool) -> None:
                 sessions.delete(con, token)
         response.delete_cookie(COOKIE_NAME, path="/")
         return {"authenticated": False}
+
+    def _sender() -> mail.EmailSender:
+        return email_sender if email_sender is not None else mail.sender_from_env()
+
+    def _deliver_reset(email: str) -> None:
+        """Look the address up and send, after the response has already gone.
+
+        Everything about this function is downstream of one requirement: the
+        caller must not be able to tell a hit from a miss. Doing the lookup
+        here rather than in the handler means the *response time* carries no
+        signal either — a hit costs a database read and an HTTPS round trip to
+        the mail provider, a miss costs neither, and neither of them happens
+        while anybody is waiting.
+
+        It also means a mail outage cannot become a 500 that says "this
+        address exists, and something went wrong sending to it". The failure
+        is a log line for the maintainer, which is who can act on it.
+        """
+        try:
+            with db.connection() as con:
+                invites.send_reset(con, email, sender=_sender())
+        except (mail.EmailNotSent, mail.EmailNotConfigured, OSError) as exc:
+            # Every one of these carries a status code, a configuration
+            # complaint or a socket error -- and none of them carries a
+            # recipient, which is what makes this line safe to write. ADR 16,
+            # and see `mail._describe` for how that is kept true.
+            _LOG.error("password reset could not be delivered: %s", exc)
+
+    @app.post("/api/auth/reset", status_code=202)
+    def request_reset(payload: dict[str, Any], request: Request,
+                      background: BackgroundTasks) -> dict[str, Any]:
+        """Ask for a password-reset link. Always the same answer (ADR 16).
+
+        202 rather than 200, and the code is the honest one: the request has
+        been accepted and nothing about the outcome is being reported. That is
+        the whole design, not a limitation of it.
+
+        The 429 is not an exception to "always the same answer". Every request
+        is counted, hit or miss — a reset has no success to clear the budget
+        with — so being throttled says something about how often *this* client
+        and *this* mailbox have been asked about, and nothing about whether an
+        account is behind it.
+        """
+        email = str(payload.get("email") or "").strip()
+        if not email:
+            raise HTTPException(status_code=422, detail="an email is required")
+
+        address = client_address(request)
+        keys = ((ratelimit.email_key(email), ratelimit.RESET_PER_MAILBOX),
+                (ratelimit.address_key(address, scope="reset"),
+                 ratelimit.RESET_PER_ADDRESS))
+
+        with db.connection() as con:
+            for key, limit in keys:
+                if ratelimit.exhausted(con, key, limit):
+                    wait = ratelimit.retry_after(con, key, limit)
+                    _LOG.warning("password reset throttled from %s", address)
+                    raise HTTPException(
+                        status_code=429,
+                        detail="too many requests -- wait and try again",
+                        headers={"Retry-After": str(wait)})
+            for key, limit in keys:
+                ratelimit.record_failure(con, key, limit)
+
+        background.add_task(_deliver_reset, email)
+        # No address, and no "for ada@example.com". ADR 16 keeps them out of
+        # logs; this line is where the temptation to be helpful would put one.
+        _LOG.info("password reset requested from %s", address)
+        return {"detail": RESET_ANSWER}
+
+    @app.post("/api/auth/claim")
+    def claim(payload: dict[str, Any], request: Request) -> dict[str, Any]:
+        """Redeem an invite or reset link by choosing a password.
+
+        **It does not log you in.** A cookie here would make an emailed link
+        into a session-minting endpoint, and the thing it would save is one
+        trip through a login form that has to work anyway. What comes back is
+        the username, so that form can be filled in.
+
+        Every session for the account ends inside `tokens.redeem`, in the same
+        transaction that sets the password.
+        """
+        token = str(payload.get("token") or "").strip()
+        password = str(payload.get("password") or "")
+        if not token or not password:
+            raise HTTPException(status_code=422,
+                                detail="a token and a password are required")
+
+        address = client_address(request)
+        key = ratelimit.address_key(address, scope="claim")
+
+        with db.connection() as con:
+            if ratelimit.exhausted(con, key, ratelimit.CLAIM_PER_ADDRESS):
+                wait = ratelimit.retry_after(con, key,
+                                             ratelimit.CLAIM_PER_ADDRESS)
+                raise HTTPException(
+                    status_code=429,
+                    detail="too many attempts -- wait and try again",
+                    headers={"Retry-After": str(wait)})
+            try:
+                user = tokens.redeem(con, token, password)
+            except passwords.WeakPassword as exc:
+                # Not counted and not a refusal of the link: the token is
+                # intact and the sensible next move is a longer password.
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            except tokens.TokenError as exc:
+                ratelimit.record_failure(con, key,
+                                         ratelimit.CLAIM_PER_ADDRESS)
+                _LOG.warning("rejected a claim from %s: %s", address, exc)
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            ratelimit.clear(con, key)
+
+        _LOG.info("password set for %r from %s", user.username, address)
+        return {"detail": "password set -- you can sign in now",
+                "username": user.username}
 
     @app.get("/api/auth/me")
     def me(caller: Scope) -> dict[str, Any]:

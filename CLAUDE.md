@@ -48,7 +48,8 @@ src/mtglab/
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
   artifacts/generate.py   the five deliverables
-  auth/                   app.db, Argon2id, accounts, sessions, rate limit
+  auth/                   app.db, Argon2id, accounts, sessions, rate limit,
+                          invite/reset tokens, the EmailSender seam
   api/                    FastAPI app, services, background sim jobs
   api/auth.py             the deny-by-default middleware and login routes
   api/deps.py             the request scope: who is asking, what they see

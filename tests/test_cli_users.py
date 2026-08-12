@@ -20,14 +20,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 pytest.importorskip("argon2")
 
 from mtglab import config  # noqa: E402
-from mtglab.auth import db, sessions, users  # noqa: E402
+from mtglab.auth import db, sessions, tokens, users  # noqa: E402
 from mtglab.cli import main  # noqa: E402
 
 PASSWORD = "a-perfectly-fine-passphrase"
 
 
 @pytest.fixture
-def app_db(tmp_path):
+def app_db(tmp_path, monkeypatch):
+    # No key and no auth, so `users invite` resolves the console sender and
+    # prints the link instead of sending it. That is the development path, and
+    # it is also the only one a test may take -- no test sends mail (ADR 16).
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("MTGLAB_REQUIRE_AUTH", raising=False)
     with config.use_paths(data_dir=tmp_path / "data"):
         yield tmp_path / "data" / "app.db"
 
@@ -141,6 +146,112 @@ def test_there_is_no_way_to_pass_a_password_as_an_argument(app_db, typed):
         assert caught.value.code == 2, f"{spelling} was accepted"
 
 
+# -------------------------------------------------------------- users invite
+
+def test_invite_creates_an_unclaimed_account_and_prints_a_link(app_db, capsys):
+    """ADR 16's headline: the account exists, cannot log in, and the only way
+    it gets a password is a link its own holder follows."""
+    assert run(["users", "invite", "ada@example.com"]) == (0, "")
+
+    ada = account()
+    assert ada is not None and ada.email == "ada@example.com"
+    with db.connection() as con:
+        assert not users.has_password(con, ada.id)
+        assert users.authenticate(con, "ada", PASSWORD) is None
+        assert tokens.outstanding(con, ada.id, tokens.Purpose.INVITE)
+
+    printed = capsys.readouterr()
+    assert "invited ada" in printed.out
+    # The console sender writes to stderr, and the link is the thing you need.
+    assert "/auth/claim#token=" in printed.err
+    assert "NOT sent" in printed.err
+
+
+def test_the_link_it_prints_is_the_one_that_works(app_db, capsys):
+    run(["users", "invite", "ada@example.com"])
+    link = [w for w in capsys.readouterr().err.split() if "#token=" in w][0]
+    token = link.partition("#token=")[2]
+
+    with db.connection() as con:
+        claimed = tokens.redeem(con, token, PASSWORD)
+        assert claimed.username == "ada"
+        assert users.authenticate(con, "ada", PASSWORD) is not None
+
+
+def test_the_username_defaults_to_the_local_part(app_db):
+    run(["users", "invite", "ada.lovelace@example.com"])
+    assert account("ada.lovelace") is not None
+
+
+def test_the_username_can_be_given(app_db):
+    assert run(["users", "invite", "ada@example.com",
+                "--username", "countess"])[0] == 0
+    assert account("countess").email == "ada@example.com"
+
+
+def test_an_admin_can_be_invited(app_db):
+    run(["users", "invite", "ada@example.com", "--admin"])
+    assert account().is_admin
+
+
+def test_a_local_part_that_cannot_be_a_username_asks_for_one(app_db):
+    code, message = run(["users", "invite", "a+tag@example.com"])
+    assert code == 1
+    assert "--username" in message
+    assert account("a+tag") is None
+
+
+def test_a_taken_username_asks_for_another(app_db, typed):
+    typed.extend([PASSWORD, PASSWORD])
+    run(["users", "add", "ada"])
+    code, message = run(["users", "invite", "ada@example.com"])
+    assert code == 1
+    assert "--username" in message
+
+
+def test_re_inviting_an_unclaimed_account_issues_a_fresh_link(app_db, capsys):
+    """The resend path. The first link stops working, which is the point --
+    somebody who thinks a message went astray should not leave one live."""
+    run(["users", "invite", "ada@example.com"])
+    first = [w for w in capsys.readouterr().err.split() if "#token=" in w][0]
+
+    assert run(["users", "invite", "ada@example.com"])[0] == 0
+    second = [w for w in capsys.readouterr().err.split() if "#token=" in w][0]
+    assert first != second
+
+    with db.connection() as con:
+        with pytest.raises(tokens.InvalidToken):
+            tokens.lookup(con, first.partition("#token=")[2])
+        assert tokens.lookup(con, second.partition("#token=")[2])
+        assert len(users.all_users(con)) == 1, "and no second account"
+
+
+def test_re_inviting_a_claimed_account_is_refused(app_db, typed):
+    """They have a password. What they need is the reset flow, not a second
+    account and not somebody else setting one for them."""
+    typed.extend([PASSWORD, PASSWORD])
+    run(["users", "add", "ada", "--email", "ada@example.com"])
+    code, message = run(["users", "invite", "ada@example.com"])
+    assert code == 1
+    assert "already claimed" in message and "reset" in message
+
+
+def test_an_address_that_is_not_one_is_refused(app_db):
+    code, message = run(["users", "invite", "not-an-address"])
+    assert code == 1
+    assert "email address" in message
+
+
+def test_invite_is_refused_when_a_deployment_has_no_mail(app_db, monkeypatch):
+    """With auth on, the console fallback would print recipients into the
+    platform's log, which ADR 16 forbids. Fail loudly instead."""
+    monkeypatch.setenv("MTGLAB_REQUIRE_AUTH", "1")
+    code, message = run(["users", "invite", "ada@example.com"])
+    assert code == 1
+    assert "RESEND_API_KEY" in message
+    assert account() is None, "and no half-made account is left behind"
+
+
 # ---------------------------------------------------------------- users list
 
 def test_list_says_so_when_there_is_nobody(app_db, capsys):
@@ -163,6 +274,21 @@ def test_list_shows_state_and_live_sessions(app_db, typed, capsys):
     assert "no password" in out, "an unclaimed account must be visible as one"
     assert "ada@example.com" in out, "the maintainer's own terminal may see it"
     assert "$argon2" not in out, "a hash must never be printed"
+
+
+def test_list_distinguishes_an_invited_account_from_a_stranded_one(app_db,
+                                                                   capsys):
+    """"Invited" and "no password" are different problems: one is waiting on
+    somebody's inbox, the other needs a link sending."""
+    run(["users", "invite", "ada@example.com"])
+    run(["users", "add", "grace", "--no-password"])
+    capsys.readouterr()
+
+    assert run(["users", "list"])[0] == 0
+    lines = {line.split()[0]: line
+             for line in capsys.readouterr().out.splitlines() if line.strip()}
+    assert "invited" in lines["ada"]
+    assert "no password" in lines["grace"]
 
 
 # -------------------------------------------------------------- users passwd

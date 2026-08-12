@@ -11,6 +11,7 @@
     mtglab sim mana <slug>              Tier 1 goldfish
     mtglab sim lands <slug> 30..40      land-count sweep, flood-aware
     mtglab price deck <slug>            cheapest legal printing per card
+    mtglab users invite <email>         an account, and a link they claim it with
     mtglab users add <name>             an account; the password is prompted
     mtglab users list                   who exists, and who can log in
     mtglab users passwd <name>          set a password; ends every session
@@ -584,10 +585,11 @@ def cmd_price_deck(args):
 # `--password` flag here and there will not be one, because a password passed
 # as an argument is a password in the shell history and in the process table.
 #
-# What `users add` is for until then is the maintainer's own account, typed at
-# a prompt on a machine they are sitting at (`docs/HOSTING.md` §4 step 8). It
-# can also create an account with no password at all, which is exactly the
-# state an invite leaves behind: the account exists and cannot log in yet.
+# `users invite` is that rule as a command: it creates the account and mails a
+# single-use link, and the password that comes back is one nobody else has ever
+# seen. `users add` remains for the maintainer's own account, typed at a prompt
+# on a machine they are sitting at (`docs/HOSTING.md` §4 step 8), and for the
+# unclaimed account an invite leaves behind when there is no mail provider yet.
 
 def _auth():
     """The auth package, or a clean exit naming the extra that is missing."""
@@ -636,8 +638,86 @@ def cmd_users_add(args):
         print("  no password set -- this account cannot log in yet.")
 
 
+def _username_for(email: str, users) -> str:
+    """A default login handle from an address' local part.
+
+    `ada.lovelace@example.com` becomes `ada.lovelace`, which is both usable and
+    the name the person would have picked. When it is not -- a `+` tag, a
+    single character, a handle somebody already has -- the command asks for
+    `--username` rather than inventing `ada2`, because a login handle chosen by
+    a mangling rule is one its owner has to be told.
+    """
+    local = email.partition("@")[0]
+    return users.normalise_username(local)
+
+
+def cmd_users_invite(args):
+    """Create an account nobody has a password for, and mail its owner a link.
+
+    ADR 16 in one command. The account is created **unclaimed** -- a real row
+    with `password_hash IS NULL`, which `users.authenticate` refuses at the
+    cost of a full hash -- rather than disabled, because `disabled_at` is the
+    maintainer's revocation lever and reusing it here would mean redeeming a
+    link had to un-revoke an account. "Cannot log in yet" and "has been shut
+    off" are different states and the database already tells them apart.
+
+    Re-inviting an unclaimed account is allowed and is the resend path: the
+    previous link stops working the moment a new one is issued. Re-inviting a
+    *claimed* one is refused, and points at the reset flow, because that is
+    what somebody who has forgotten their password actually needs.
+    """
+    db, _, _, users = _auth()
+    from mtglab.auth import invites, mail
+
+    try:
+        address = users.normalise_email(args.email)
+    except users.InvalidEmail as exc:
+        sys.exit(f"refused: {exc}")
+    if address is None:
+        sys.exit("refused: an invite needs an email address to send to")
+
+    try:
+        sender = mail.sender_from_env()
+    except mail.EmailNotConfigured as exc:
+        sys.exit(f"refused: {exc}")
+
+    con = db.connect()
+    try:
+        existing = users.get_by_email(con, address)
+        if existing is not None:
+            if users.has_password(con, existing.id):
+                sys.exit(f"refused: {existing.username} has already claimed "
+                         "that address -- they can use the reset link on the "
+                         "sign-in page")
+            user = existing
+        else:
+            try:
+                name = (users.normalise_username(args.username)
+                        if args.username else _username_for(address, users))
+            except users.InvalidUsername as exc:
+                sys.exit(f"refused: {exc}; pass --username")
+            try:
+                user = users.create(con, name, email=address,
+                                    is_admin=args.admin)
+            except users.UserExists:
+                sys.exit(f"refused: the username {name!r} is taken -- "
+                         "pass --username to choose another")
+        try:
+            invites.send_invite(con, user, sender=sender)
+        except (mail.EmailNotSent, OSError) as exc:
+            sys.exit(f"refused: {exc}")
+    finally:
+        con.close()
+
+    role = " (admin)" if user.is_admin else ""
+    print(f"  invited {user.username}{role}")
+    print("  they choose their own password; the link works once and "
+          "expires in a week.")
+
+
 def cmd_users_list(args):
     db, _, sessions, users = _auth()
+    from mtglab.auth import tokens
 
     con = db.connect()
     try:
@@ -649,7 +729,10 @@ def cmd_users_list(args):
         print(f"  {'username':<20} {'email':<28} {'state':<12} sessions")
         for user in everyone:
             state = "disabled" if user.disabled else (
-                "active" if users.has_password(con, user.id) else "no password")
+                "active" if users.has_password(con, user.id)
+                else ("invited" if tokens.outstanding(con, user.id,
+                                                      tokens.Purpose.INVITE)
+                      else "no password"))
             live = sessions.count_for_user(con, user.id)
             admin = "*" if user.is_admin else " "
             print(f" {admin}{user.username:<20} {user.email or '-':<28} "
@@ -924,6 +1007,13 @@ def main(argv=None):
                     help="create the account unclaimed: it exists and cannot "
                          "log in until a password is set")
     ua.set_defaults(func=cmd_users_add)
+    uinv = us.add_parser("invite",
+                        help="create an account and mail a setup link")
+    uinv.add_argument("email")
+    uinv.add_argument("--username",
+                     help="login handle; defaults to the address' local part")
+    uinv.add_argument("--admin", action="store_true")
+    uinv.set_defaults(func=cmd_users_invite)
     us.add_parser("list").set_defaults(func=cmd_users_list)
     up = us.add_parser("passwd", help="set a password; ends every session")
     up.add_argument("username"); up.set_defaults(func=cmd_users_passwd)

@@ -29,10 +29,14 @@ they differ.
 | [13](0013-an-imported-deck-is-a-draft.md) | An imported deck is a draft until every card is justified | Accepted |
 | [14](0014-python-decides-claude-advises.md) | Python decides, Claude advises, and Forge plays the games | Accepted |
 | [15](0015-claude-surfaces-are-modes-with-capabilities.md) | Claude surfaces are modes with a user-set stance, and no stance may write a rationale | Accepted |
-| [16](0016-accounts-are-invited-and-passwords-are-self-served.md) | Accounts are invited, and passwords are self-served by email | Proposed |
+| [16](0016-accounts-are-invited-and-passwords-are-self-served.md) | Accounts are invited, and passwords are self-served by email | Accepted |
 
 **Proposed** means the decision is made and argued but nothing implements it
-yet — 4, 5 and 16 describe a deployment that does not exist.
+yet — 4 and 5 still describe a deployment that does not exist. 16 was Proposed
+for a matter of hours: the auth core landed the same day it was written and the
+email half the day after, so it is the one part of the hosting plan that is
+code rather than intent. What it does *not* cover is the browser — there is no
+login screen and no admin surface, which `docs/HOSTING.md` §7 tracks.
 
 16 supersedes exactly one paragraph of 5, which is the pattern this directory is
 for: 5's "no self-signup" was a good argument that lost to a better one a day

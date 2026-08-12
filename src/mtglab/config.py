@@ -177,6 +177,35 @@ def secure_cookies() -> bool:
     return _flag("MTGLAB_SECURE_COOKIES", default=require_auth())
 
 
+def base_url() -> str:
+    """Where this instance answers, for links that have to work in an inbox.
+
+    An invite or a reset is a URL somebody clicks days later in another
+    application, so it cannot be relative and cannot be guessed from the
+    request -- a `Host` header is client-supplied, and building a password-reset
+    link out of one is how a reset lands on an attacker's domain. It is
+    configuration, and it is wrong-by-default rather than absent: the local
+    port is what `mtglab ui` serves on, so a laptop needs no setting and a
+    deployment that forgets one sends links to localhost, which is visibly
+    broken rather than quietly hijackable.
+
+    `MTGLAB_BASE_URL`, no trailing slash.
+    """
+    return os.environ.get("MTGLAB_BASE_URL", "").strip().rstrip("/") \
+        or "http://127.0.0.1:8765"
+
+
+def email_from() -> str:
+    """The From address on invites and resets. `MTGLAB_EMAIL_FROM`.
+
+    Resend refuses anything outside a verified sending domain, so this is a
+    deploy-day setting rather than a preference (`docs/HOSTING.md` §7). The
+    default is only ever seen by the console sender.
+    """
+    return os.environ.get("MTGLAB_EMAIL_FROM", "").strip() \
+        or "mtglab <no-reply@localhost>"
+
+
 def client_ip_header() -> str | None:
     """Header naming the real client IP, if a trusted proxy sets one.
 
