@@ -412,6 +412,7 @@ export default function DeckDetail() {
                    </div>
                    {editing === card.name && (
                      <RationaleEditor
+                       slug={slug}
                        card={card}
                        onSave={(why) => saveRationale(card.name, why)}
                        onCancel={() => setEditing(null)} />

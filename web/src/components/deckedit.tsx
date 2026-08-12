@@ -16,7 +16,9 @@
  * rule: they may ask, they may argue, they may not type into the field.
  */
 import { useEffect, useRef, useState } from 'react'
-import { api, type Card, type EditResult } from '../lib/api'
+import {
+  api, type Card, type ClaudeStatus, type EditResult, type InterviewReport,
+} from '../lib/api'
 import { CATEGORY_LABELS, categoryLabel } from '../lib/mtg'
 import { ErrorNote, ManaText, Select } from '../components/ui'
 
@@ -50,6 +52,137 @@ function QuietButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButto
 }
 
 /**
+ * The rationale interview, in the column beside the box rather than in it.
+ *
+ * This component may render questions and may not render anything else. It has
+ * no control that puts text into the textarea — no copy button, no "use this",
+ * no click-to-insert — and that absence is the feature, not an omission to fix
+ * later. The server side is built the same way: the mode's response schema has
+ * no field for a rationale, and anything coming back that does not end in a
+ * question mark is dropped before it reaches here.
+ *
+ * Three states worth keeping apart, because collapsing them tells someone
+ * their key is missing when they simply have not installed the extra:
+ * not installed, not configured, and nothing asked yet.
+ */
+function InterviewPanel({ slug, card }: { slug: string; card: string }) {
+  const [status, setStatus] = useState<ClaudeStatus | null>(null)
+  const [report, setReport] = useState<InterviewReport | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Cheap and local: this endpoint reaches no network, it only reports what
+  // the environment has and what the dial says.
+  useEffect(() => {
+    let live = true
+    api.claudeStatus({ slug })
+      .then((s) => { if (live) setStatus(s) })
+      .catch(() => { if (live) setStatus(null) })
+    return () => { live = false }
+  }, [slug])
+
+  // A new card is a new interview. Without this the questions about the last
+  // card linger beside the next one's empty box, which is the most misleading
+  // thing this panel could do.
+  useEffect(() => { setReport(null); setError(null) }, [card])
+
+  async function askIt() {
+    setBusy(true)
+    setError(null)
+    try {
+      // No stance sent: the server resolves the deck's own default from its
+      // `status` and clamps it to the deployment ceiling. What actually
+      // applied comes back in the report and is shown below.
+      setReport(await api.interview(slug, { card }))
+    } catch (e) {
+      setError(String((e as Error).message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!status) return null
+  if (!status.installed) {
+    return (
+      <p className="border-t pt-2" style={{ borderColor: 'var(--hairline)',
+                                            color: 'var(--text-muted)' }}>
+        Claude is not installed. <code>pip install -e &quot;.[claude]&quot;</code>
+      </p>
+    )
+  }
+  if (!status.configured) {
+    return (
+      <p className="border-t pt-2" style={{ borderColor: 'var(--hairline)',
+                                            color: 'var(--text-muted)' }}>
+        No <code>ANTHROPIC_API_KEY</code> set — see <code>.env.example</code>.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-2 border-t pt-2" style={{ borderColor: 'var(--hairline)' }}>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={askIt}
+          disabled={busy}
+          className="rounded-md px-2 py-1 text-[11px] font-medium disabled:opacity-50"
+          style={{ border: '1px solid var(--hairline)',
+                   color: 'var(--text-primary)' }}
+        >
+          {busy ? 'Asking…' : report ? 'Ask again' : 'Ask for questions'}
+        </button>
+        <span style={{ color: 'var(--text-muted)' }}>
+          It asks. You answer.
+        </span>
+      </div>
+
+      {error && <ErrorNote>{error}</ErrorNote>}
+
+      {report && !report.asked && (
+        <p style={{ color: 'var(--text-muted)' }}>{report.reason}</p>
+      )}
+
+      {report?.asked && (
+        <div className="space-y-2">
+          {/* ADR 14 boundary 3: the gate's output is reproducible and this is
+              not, so they never share a surface without a label. */}
+          <p style={{ color: 'var(--text-muted)' }}>
+            Claude — <span className="font-mono">{report.model}</span>, not the gate
+            {report.stance.preset ? ` · ${report.stance.preset}` : null}
+          </p>
+          {report.questions.length === 0 && (
+            <p style={{ color: 'var(--text-muted)' }}>
+              {report.reason || 'Nothing usable came back.'}
+            </p>
+          )}
+          <ol className="space-y-2">
+            {report.questions.map((q) => (
+              <li key={q.question}>
+                <span className="mr-1 text-[10px] uppercase tracking-wide"
+                      style={{ color: 'var(--text-muted)' }}>{q.angle}</span>
+                <span style={{ color: 'var(--text-primary)' }}>{q.question}</span>
+                {q.fact && (
+                  <span className="mt-0.5 block text-[10px]"
+                        style={{ color: 'var(--text-muted)' }}>{q.fact}</span>
+                )}
+              </li>
+            ))}
+          </ol>
+          {report.questions_dropped > 0 && (
+            <p style={{ color: 'var(--status-warning)' }}>
+              {report.questions_dropped} answer
+              {report.questions_dropped === 1 ? ' was' : 's were'} not a question
+              and {report.questions_dropped === 1 ? 'was' : 'were'} dropped.
+            </p>
+          )}
+          <p style={{ color: 'var(--text-muted)' }}>{report.never}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
  * Write or rewrite one card's `why`.
  *
  * The placeholder is a question, deliberately. A placeholder containing a
@@ -57,8 +190,9 @@ function QuietButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButto
  * between that and a generate button is one keystroke.
  */
 export function RationaleEditor({
-  card, onSave, onCancel,
+  slug, card, onSave, onCancel,
 }: {
+  slug: string
   card: Card
   onSave: (why: string) => Promise<void>
   onCancel: () => void
@@ -119,8 +253,11 @@ export function RationaleEditor({
       </div>
 
       {/* Rule 1, made useful: the card's actual text, from the corpus, next to
-          the box you are arguing in. */}
-      <aside className="space-y-1 rounded-md p-2 text-[11px] leading-relaxed"
+          the box you are arguing in — and, under it, the questions. Both are
+          in this column and neither may reach the box: the corpus states
+          facts, the interview asks things, and the sentence that lands in
+          deck.yaml is typed on the left. */}
+      <aside className="space-y-2 rounded-md p-2 text-[11px] leading-relaxed"
              style={{ background: 'var(--surface-2, var(--gridline))',
                       color: 'var(--text-secondary)' }}>
         <div className="font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -131,6 +268,7 @@ export function RationaleEditor({
           : <p style={{ color: 'var(--text-muted)' }}>
               No corpus text for this card.
             </p>}
+        <InterviewPanel slug={slug} card={card.name} />
       </aside>
     </div>
   )

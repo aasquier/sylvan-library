@@ -284,6 +284,44 @@ def create_app(*, dev: bool = False) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    @app.post("/api/decks/{slug}/interview")
+    def claude_interview(slug: str, payload: dict[str, Any],
+                         decks: Decks) -> dict[str, Any]:
+        """Ask the rationale interview about one card. Returns questions.
+
+        A POST because it costs money and makes a network call, not because it
+        writes anything — it cannot. It is filed under the deck rather than
+        under `/api/claude` because that is what it is about, and because a
+        second mode will want the same shape.
+
+        The failure modes are kept apart deliberately. 503 means no call was
+        possible (no SDK, no key); 502 means a call was made and came back
+        unusable; 422 means the question was wrong. Collapsing them tells
+        someone their key is missing when the model was merely rate limited.
+        """
+        from mtglab.claude.client import ClaudeUnavailable
+        from mtglab.claude.interview import CardNotInDeck
+
+        card = str(payload.get("card", "")).strip()
+        if not card:
+            raise HTTPException(status_code=422, detail="card is required")
+        try:
+            return service.claude_interview(
+                slug=slug, card=card,
+                requested=payload.get("stance") or None,
+                focus=str(payload.get("focus") or ""),
+                source=decks)
+        except CardNotInDeck as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ValueError as exc:
+            # A malformed stance. `CardNotInDeck` is a ValueError too, which is
+            # why it is caught above this rather than below it.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ClaudeUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except service.ClaudeFailed as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
     # ---------------------------------------------------------- colours
 
     @app.get("/api/colors")

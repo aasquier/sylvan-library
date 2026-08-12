@@ -357,6 +357,87 @@ export interface CreateResult {
   total_cards: number
 }
 
+/* ------------------------------------------------------------------ claude */
+
+/** One axis of the stance dial, as `mtglab.claude.stance.describe` renders it. */
+export interface StanceAxis {
+  axis: string
+  question: string
+  level: string
+  means: string
+  levels: string[]
+}
+
+export interface StanceView {
+  /** The preset's name when the axes happen to equal one, else null. */
+  preset: string | null
+  allows_calls: boolean
+  may_write: boolean
+  axes: StanceAxis[]
+}
+
+/**
+ * A Claude surface: a prompt, a tool set, and what it may write.
+ *
+ * `writes` is empty for every mode and is served anyway — a client that has to
+ * assume the capability set will eventually assume wrong.
+ */
+export interface ClaudeMode {
+  name: string
+  purpose: string
+  tools: string[]
+  writes: string[]
+}
+
+export interface ClaudeStatus {
+  /** The SDK rides with the `claude` extra; a base install has neither. */
+  installed: boolean
+  /** Whether a credential is present. Never what it is. */
+  configured: boolean
+  model: string
+  stance: StanceView
+  ceiling: StanceView
+  default: StanceView
+  presets: { name: string; blurb: string; stance: StanceView; available: boolean }[]
+  never: string
+  modes: ClaudeMode[]
+}
+
+export interface InterviewQuestion {
+  question: string
+  /** role | alternative | redundancy | cost | cut | legality */
+  angle: string
+  /** The corpus or gate fact the question rests on. Never an opinion. */
+  fact: string
+}
+
+/**
+ * What the rationale interview came back with.
+ *
+ * Note what is not in this shape: there is no field containing a rationale,
+ * because there is no such field in the schema the model answers against.
+ * `answered_by` is always present so a UI can never render an opinion as
+ * though it were the gate's reproducible output.
+ */
+export interface InterviewReport {
+  answered_by: string
+  mode: string
+  model: string
+  slug: string
+  card: string
+  /** False when the stance was `off` — no call was made, which is not the
+   *  same as a call that found nothing to say. */
+  asked: boolean
+  reason: string
+  stance: StanceView
+  questions: InterviewQuestion[]
+  /** Answers that were not questions, dropped before reaching here. */
+  questions_dropped: number
+  tool_calls: { tool: string; arguments: Record<string, unknown> }[]
+  usage: { input_tokens: number; output_tokens: number }
+  never: string
+}
+
 export const api = {
   health: () => get<Health>('/api/health'),
   decks: () => get<DeckSummary[]>('/api/decks'),
@@ -422,6 +503,18 @@ export const api = {
     bracket?: number | null
     status?: string
   }) => post<CreateResult>('/api/decks', body),
+  // Installed, configured and wanted are three separate answers, and this is
+  // the only place that knows all three. Reaches no network.
+  claudeStatus: (params: { slug?: string; stance?: string } = {}) => {
+    const qs = new URLSearchParams()
+    for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v)
+    return get<ClaudeStatus>(`/api/claude?${qs}`)
+  },
+  // The rationale interview. A POST because it costs money and calls out, not
+  // because it writes anything — it cannot, and there is no field in the
+  // response for a rationale even if it wanted to hand one over.
+  interview: (slug: string, body: { card: string; stance?: string; focus?: string }) =>
+    post<InterviewReport>(`/api/decks/${slug}/interview`, body),
   simMana: (payload: Record<string, unknown>) => post<Job>('/api/sim/mana', payload),
   simLands: (payload: Record<string, unknown>) => post<Job>('/api/sim/lands', payload),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),

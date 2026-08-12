@@ -31,8 +31,37 @@
 > and an unreadable ceiling **failing closed**, because a typo in a deployment
 > variable should cost a feature rather than open one.
 >
-> **Not built:** the modes themselves, the activity log, and the rationale
-> interview.
+> **The rationale interview landed 2026-08-11** — the first mode, and the one
+> this ADR was written ahead of. `mtglab.claude.modes` is the shape (a prompt,
+> a tool set, a `may_write` field that is checked empty, and the tool loop);
+> `mtglab.claude.interview` is the mode. Reachable as
+> `mtglab claude interview <slug> --card X`, as
+> `POST /api/decks/{slug}/interview`, and in the column beside the rationale
+> box on the deck page — the column ADR 12's editor left for it.
+>
+> Three things the build added that the argument below does not name, all of
+> them the same idea: the boundary should not rest on the system prompt.
+> **The answer's schema has no field for a rationale** and forbids extra
+> properties, so a model that wanted to hand over a draft has nowhere to put
+> it. **Every returned item is checked to be a question** — it must end in a
+> question mark, and what does not is dropped and counted, so a mode that has
+> started editorialising is visible rather than helpful. And **the corpus facts
+> are assembled before the call**: `interview.brief()` gathers the oracle text,
+> the gate's verdict, the category counts and the sibling rationales in
+> deterministic Python and hands them over, so rule 1 does not depend on the
+> model choosing to call `get_cards`. Run against the two decks that
+> deliberately fail the gate, it quoted the real text of both banned cards and
+> led with the ban — the failure recorded in ROADMAP as "the hole in rule 1",
+> closed here by construction rather than by asking.
+>
+> One thing the interview found that this ADR could not have: **the corpus does
+> not store power or toughness**, so a rationale claiming "6/6 trample" is not
+> checkable. It asked about that rather than assuming, which is the boundary
+> working, and the gap is now its own piece of work.
+>
+> **Not built:** the other three modes, the activity log, and any UI for the
+> stance itself — the interview sends no stance and takes the deck-derived
+> default, reporting back which one applied.
 
 Refines [ADR 14](0014-python-decides-claude-advises.md), which drew the line
 between what Python decides and what Claude advises on. This one says what a

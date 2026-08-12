@@ -614,8 +614,13 @@ real call and say whether the key is live. A first turn against
 Seven tools now, after `get_cards` was added to close a measured hole in
 rule 1 — see below.
 
-What is *not* built: modes, the stance, any UI, research through server-side
-web tooling, and the Forge half.
+Since then: the **stance** (three axes, off by default, deck-derived default,
+deployment ceiling) and the **first mode**, the rationale interview — with a UI
+beside the rationale box. Both are detailed below.
+
+What is *not* built: the other three modes, a UI for the stance dial itself, the
+activity log the top of the write axis needs, research through server-side web
+tooling, and the Forge half.
 
 The plumbing was already in place: an API key reaches the app from a gitignored
 `.env` or `fly secrets`, named in `.env.example` and in the CI reviewer workflow
@@ -699,6 +704,40 @@ keystrokes are the user's. "Tidy that up" is one button away and is a
 machine-written rationale. So the boundary is drawn where it can be tested
 rather than promised: **no code path passes a model response into the `why`
 field**, and a mode may put a question beside the box but never text inside it.
+
+#### The rationale interview, built 2026-08-11
+
+The first of the four. `mtglab claude interview <slug> --card X`,
+`POST /api/decks/{slug}/interview`, and a panel in the column ADR 12's
+rationale editor left empty for exactly this. The other three are not built.
+
+What is worth carrying forward is **where the boundary ended up living**, since
+none of it is the system prompt:
+
+- **The response schema has no field for a rationale**, and forbids extra
+  properties. A model that wanted to hand over a draft has nowhere to put one.
+- **Every item is checked to be a question** — it must end in a question mark,
+  and what does not is dropped and *counted*. A mode that starts editorialising
+  shows up as a number rather than as help.
+- **The corpus facts arrive before the model does.** `interview.brief()`
+  assembles the oracle text, the gate's verdict, the category counts and the
+  neighbouring cards' rationales in deterministic Python. Rule 1 therefore does
+  not depend on the model choosing to call `get_cards` — which is the same
+  failure mode as the hole above, one level up.
+
+Run against the two decks that deliberately fail the gate, it opened both times
+on the ban and quoted the real oracle text of both banned cards — the case that
+caught the earlier hole, now passing by construction. It cost about 4,900 input
+tokens a card and made **no tool calls at all**, because the brief already had
+what it needed.
+
+**It also found something.** Asked about Primeval Titan, whose rationale claims
+"6/6 trample", it asked whether that was recalled from memory — because the
+corpus does not store power or toughness at all. It does not: no `power` or
+`toughness` column exists. That is a real rule-1 gap for every creature claim in
+every deck, it needs a loader change and a re-ingest, and it is its own piece of
+work. Worth recording *how* it surfaced: by running the surface against a real
+deck, which is the second time that has been the thing that found the gap.
 
 ### How much of it you want is yours to set
 

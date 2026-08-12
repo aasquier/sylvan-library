@@ -21,7 +21,7 @@ from mtglab.decks.analyze import deck_stats
 from mtglab.decks.edit import EditFailed
 from mtglab.decks.importer import ImportRefused
 from mtglab.decks.model import CATEGORIES, DECK_STATUSES, Deck
-from mtglab.decks.source import DeckExists, DeckSource, FileDeckSource
+from mtglab.decks.source import DeckExists, DeckNotFound, DeckSource, FileDeckSource
 from mtglab.decks.validate import validate
 
 SCRYFALL_SETS = "https://api.scryfall.com/sets"
@@ -469,6 +469,7 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
 
     effective = claude_stance.resolve(requested, deck=deck)
     limit = claude_stance.ceiling()
+    interview = claude_interview_mode()
     return {
         "installed": claude_client.sdk_installed(),
         "configured": claude_client.credential_present(),
@@ -490,7 +491,66 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
         # Stated here rather than only in an ADR, because it is the sentence a
         # user should be able to read next to the dial.
         "never": "No stance lets Claude write a card's rationale.",
+        # The modes that exist, so a UI can offer what is built rather than
+        # what ADR 15 planned. One today.
+        "modes": [{
+            "name": interview.name,
+            "purpose": interview.purpose,
+            "tools": list(interview.tool_names),
+            "writes": list(interview.may_write),
+        }],
     }
+
+
+def claude_interview_mode():
+    """The rationale interview's mode object. Imported lazily like the rest.
+
+    A function rather than a module constant so that `service` keeps working
+    on a base install: importing it at module scope would drag the mode --
+    and the tool registry it validates itself against -- into every process
+    that only wanted to list decks.
+    """
+    from mtglab.claude.interview import RATIONALE_INTERVIEW
+    return RATIONALE_INTERVIEW
+
+
+class ClaudeFailed(Exception):
+    """A Claude call was attempted and did not come back usable.
+
+    Distinct from `ClaudeUnavailable`, which means no call was possible in the
+    first place. The caller's answer differs: one is fixed by installing an
+    extra or setting a key, the other by retrying, waiting, or reading what the
+    API actually said.
+    """
+
+
+def claude_interview(*, slug: str, card: str, requested: Any = None,
+                     focus: str = "",
+                     source: DeckSource | None = None) -> dict[str, Any]:
+    """Ask the rationale interview about one card. Returns questions.
+
+    The whole of this project's Claude surface, so far. It reads the deck, the
+    corpus and the gate, and it comes back with things to ask yourself. It
+    cannot write anything -- not because this function declines to, but because
+    nothing under `mtglab.claude` can name a write path at all (ADR 15).
+    """
+    from mtglab.claude import client as claude_client
+    from mtglab.claude.interview import CardNotInDeck, ask
+    from mtglab.claude.modes import ModeExhausted
+
+    try:
+        return ask(slug, card, requested=requested, focus=focus, source=source)
+    except (claude_client.ClaudeUnavailable, CardNotInDeck, DeckNotFound):
+        # Answerable by the caller, and each maps to its own status code.
+        raise
+    except ModeExhausted as exc:
+        raise ClaudeFailed(str(exc)) from exc
+    except Exception as exc:                                       # noqa: BLE001
+        # Broad on purpose, and narrow in effect: everything reaching here is
+        # the SDK failing, and `explain` is the function that already knows how
+        # to turn a 401 into "your key may have expired" rather than a stack
+        # trace. Same treatment `claude check` gives it.
+        raise ClaudeFailed(claude_client.explain(exc)) from exc
 
 
 # ------------------------------------------------------------------- colours
