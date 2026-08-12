@@ -14,6 +14,11 @@ The allowlist is `PUBLIC_PATHS` below. It is short, it is data, and
 generated from the route table, so a new unprotected endpoint fails the suite
 rather than shipping.
 
+The middleware makes one further distinction, added by ADR 17: everything under
+`ADMIN_PREFIX` is refused to a caller who is not an admin, also before routing.
+Same argument, one level up — an admin route is protected by *where it is
+mounted*, so nobody has to remember a decorator for it to be safe.
+
 What the checklist in `docs/HOSTING.md` §1 asks for, and where each item is:
 
 - one generic failure for unknown-user and wrong-password ... `users.authenticate`
@@ -101,6 +106,17 @@ PUBLIC_PATHS = frozenset({
     "/api/auth/claim",
 })
 
+# Everything an admin does lives under one prefix, and the middleware refuses it
+# to anybody else *before routing* — the same mechanism as `PUBLIC_PATHS` and
+# for the same reason. An admin route is then protected by where it is mounted
+# rather than by what its author remembered, so the one somebody adds in a year
+# is covered by having a path rather than by having a decorator.
+#
+# `deps.admin` is the second check, on the route functions themselves. It is
+# what would catch an admin route mounted outside this prefix, which the
+# structural rule by construction cannot see. ADR 17.
+ADMIN_PREFIX = "/api/admin"
+
 # The only thing `POST /api/auth/reset` ever says. A constant rather than a
 # literal in the handler, because the one way this endpoint leaks is by
 # answering two different things, and a single name is harder to fork than a
@@ -138,6 +154,23 @@ def is_public(path: str) -> bool:
     if not normalised.startswith("/api"):
         return True
     return normalised in PUBLIC_PATHS
+
+
+def is_admin_path(path: str) -> bool:
+    """Whether this path may be served only to an admin.
+
+    Normalised through the same function as `is_public`, and for the same
+    reason: the check must never be *less* strict than the router. A prefix test
+    on the raw path would let `/api/./admin/users` through here and straight
+    into the route that matches it.
+
+    The `/` in the second test is what stops `/api/administrators` — a route
+    nobody has written — from being silently swept in. It is cheap to be exact
+    now and confusing to discover later.
+    """
+    normalised = normalise_path(path)
+    return (normalised == ADMIN_PREFIX
+            or normalised.startswith(ADMIN_PREFIX + "/"))
 
 
 def loggable(username: str) -> str:
@@ -228,6 +261,15 @@ def install(app: FastAPI, *, require: bool, secure_cookies: bool,
         if not caller.authenticated and not is_public(request.url.path):
             return JSONResponse(status_code=401,
                                 content={"detail": "authentication required"})
+        # After the 401 and not before it, so an anonymous request for an admin
+        # path is told it needs a session rather than that it needs to be
+        # somebody else. 403 rather than 404 -- see `deps.admin` for why ADR 5's
+        # rule does not reach this case.
+        if not caller.is_admin and is_admin_path(request.url.path):
+            _LOG.warning("refused %s to %r, who is not an admin",
+                         normalise_path(request.url.path), caller.username)
+            return JSONResponse(status_code=403,
+                                content={"detail": "admin only"})
         return await call_next(request)
 
     def _set_cookie(response: Response, token: str) -> None:
@@ -430,14 +472,23 @@ def install(app: FastAPI, *, require: bool, secure_cookies: bool,
     def me(caller: Scope) -> dict[str, Any]:
         """Who the caller is, and whether this instance requires anyone to be.
 
-        Public, and the two fields are separate on purpose: a frontend needs to
+        Public, and the three flags are separate on purpose: a frontend needs to
         tell "you are logged out of an instance that wants a login" from "this
         instance has no login", and one collapsed boolean makes the local app
         render a sign-in form it has no server for.
+
+        `is_admin` is reported at the top level as well as inside `user`, and
+        the difference is exactly the case `user` cannot express: with auth off
+        the caller is `LOCAL` — nobody in particular, and an admin, because
+        there is nobody else for it to be true relative to. A client deriving
+        that from `auth_required` would be reimplementing `deps.LOCAL` in
+        TypeScript, so the server answers it instead. It is never a grant: the
+        middleware reads the scope, not this response.
         """
         return {
             "auth_required": require,
             "authenticated": caller.authenticated,
+            "is_admin": caller.is_admin,
             "user": {"id": caller.user_id, "username": caller.username,
                      "is_admin": caller.is_admin}
             if caller.authenticated else None,

@@ -177,6 +177,38 @@ def secure_cookies() -> bool:
     return _flag("MTGLAB_SECURE_COOKIES", default=require_auth())
 
 
+def admin_email() -> str:
+    """The maintainer's address. `MTGLAB_ADMIN_EMAIL`, empty when unset.
+
+    ADR 17. Set, `auth/bootstrap.py` reconciles the account at this address to
+    admin-and-enabled every time the app or a `mtglab users` command starts —
+    creating it unclaimed if it is absent. Unset, none of that happens, which is
+    what a laptop wants: `mtglab ui` with auth off has no accounts at all and
+    should not acquire one as a side effect of being run.
+
+    Deliberately an address rather than a username. It is the field an invite
+    and a reset are keyed on, so a bootstrapped account is claimable from the
+    sign-in page without anything else being configured first.
+    """
+    return os.environ.get("MTGLAB_ADMIN_EMAIL", "").strip()
+
+
+def admin_username() -> str:
+    """The maintainer's login handle. `MTGLAB_ADMIN_USERNAME`, empty when unset.
+
+    Only consulted when `admin_email()` names an account that does not exist
+    yet; unset, the handle is derived from the address' local part. It exists
+    because that derivation is a guess — `squieraaron@gmail.com` becomes
+    `squieraaron`, which may not be the name its owner wants in URLs and log
+    lines on every instance they ever deploy.
+
+    It never renames an existing account. A username is a login handle that
+    appears in URLs and in `mtglab users list`, so changing one out from under
+    somebody at boot is a surprise this has no way to warn them about.
+    """
+    return os.environ.get("MTGLAB_ADMIN_USERNAME", "").strip()
+
+
 def base_url() -> str:
     """Where this instance answers, for links that have to work in an inbox.
 

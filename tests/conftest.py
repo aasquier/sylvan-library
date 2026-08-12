@@ -1,7 +1,20 @@
-"""Hypothesis configuration.
+"""Hypothesis configuration, and one environment guard.
 
-Two profiles, because a local run and a CI run want different things from the
-same tests.
+The guard first, because it is the shorter story. `MTGLAB_ADMIN_EMAIL` and
+`MTGLAB_ADMIN_USERNAME` (ADR 17) make the app create an account as it starts
+serving, and the maintainer's own `.env` sets them — so a suite that inherited
+the environment would pass in CI, where nothing is set, and fail on the laptop
+of the person who configured their own instance. That is the worst shape a test
+failure can have: it depends on a gitignored file, so nobody else can reproduce
+it.
+
+`_no_maintainer_configured` clears both for every test. The handful that are
+*about* the bootstrap set them back with `monkeypatch.setenv`, which is the
+right way round: reconciling an account is a thing a test opts into, not a
+thing it inherits.
+
+Two Hypothesis profiles, because a local run and a CI run want different things
+from the same tests.
 
 Locally, randomness is the point: every run should get a fresh shot at finding
 something, and the on-disk example database should remember failures so a
@@ -32,7 +45,15 @@ something this file can decide, because the directory is resolved at import.
 
 import os
 
+import pytest
 from hypothesis import HealthCheck, settings
+
+
+@pytest.fixture(autouse=True)
+def _no_maintainer_configured(monkeypatch):
+    """No maintainer is configured unless a test says so. See the docstring."""
+    monkeypatch.delenv("MTGLAB_ADMIN_EMAIL", raising=False)
+    monkeypatch.delenv("MTGLAB_ADMIN_USERNAME", raising=False)
 
 settings.register_profile("dev", max_examples=200, deadline=None)
 settings.register_profile(

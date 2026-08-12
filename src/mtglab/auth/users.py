@@ -15,13 +15,23 @@ Email is here as a column and nowhere else. ADR 16 makes it the first personal
 data this project stores, and it inherits CLAUDE.md rule 5's reasoning about
 what a breach means: **it must never reach a log line, an artifact, or a Claude
 tool result.** The `User` record below is what the API serialises, and it goes
-to its own holder or to the maintainer's terminal — never into anything shared.
+to its own holder, to an authenticated admin, or to the maintainer's terminal —
+never into anything shared.
+
+`set_admin` and `set_disabled` are the other two functions here worth reading
+before editing. Both **refuse to remove the last admin who can sign in**
+(`LastAdmin`), and both do it inside a `BEGIN IMMEDIATE` transaction rather than
+in the handler that called them. ADR 17: the maintainer is the only admin this
+deployment has by design, so each of those calls was one keystroke away from a
+lockout that only a shell on the machine could undo.
 """
 
 from __future__ import annotations
 
 import re
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -57,6 +67,16 @@ class InvalidEmail(ValueError):
     """Raised when an email address could not be an email address."""
 
 
+class LastAdmin(ValueError):
+    """Raised rather than leaving an instance with nobody who can administer it.
+
+    ADR 17. `set_admin(..., False)` and `set_disabled(..., True)` are each one
+    call away from a lockout whose only remedy is a shell on the machine, and
+    this is here rather than in a handler so that the CLI, the admin routes and
+    anything written later inherit the refusal instead of each remembering it.
+    """
+
+
 @dataclass(frozen=True)
 class User:
     """An account, without its password hash.
@@ -83,9 +103,14 @@ class User:
         Opt-in rather than opt-out, because the rule is easy to state and hard
         to remember: an address must never reach a log line, an artifact or a
         tool result (ADR 16), and every one of those would have been written by
-        somebody serialising a user and not thinking about the email field. The
-        only caller that passes `True` is `mtglab users list`, printing to the
-        maintainer's own terminal.
+        somebody serialising a user and not thinking about the email field.
+
+        Two callers pass `True`, and the pair is the whole of the rule as ADR 17
+        restates it: **an address may be serialised only into a response an
+        admin authenticated for.** `mtglab users list` prints to the
+        maintainer's own terminal, and `api/admin.py` answers a caller the
+        middleware has already established is an admin. A third caller needs the
+        argument made again — `tests/test_isolation.py` is where it is pinned.
         """
         body = {
             "id": self.id,
@@ -196,6 +221,72 @@ def count(con: sqlite3.Connection) -> int:
     return int(con.execute("SELECT count(*) AS n FROM users").fetchone()["n"])
 
 
+@contextmanager
+def _exclusive(con: sqlite3.Connection) -> Iterator[None]:
+    """`with con:`, except the write lock is taken before the first read.
+
+    sqlite3 in its default mode opens a transaction on the first *DML* statement
+    and not on a `SELECT`, so the obvious spelling — check inside `with con:`,
+    then update — runs the check outside any transaction at all. Two callers
+    demoting two different admins would each read two, each write one, and the
+    instance would end with none.
+
+    `BEGIN IMMEDIATE` takes the write lock up front, so the second caller waits
+    (`busy_timeout`) and then re-reads a world in which the first has already
+    committed. A rule enforced by a read followed by an unrelated write is not
+    enforced. ADR 17.
+    """
+    con.execute("BEGIN IMMEDIATE")
+    try:
+        yield
+    except BaseException:
+        con.rollback()
+        raise
+    con.commit()
+
+
+# An admin who could actually log in right now: the flag, plus a password to
+# log in with, plus not disabled. All three, and the two beyond the flag are the
+# ones that make this worth a named query.
+#
+# An instance whose only remaining admin is an unclaimed invite is locked out
+# exactly as thoroughly as one with no admin at all -- nobody can sign in, and
+# nobody can promote anybody. A guard that counted that row would report success
+# while the lockout happened, which is the failure it exists to prevent. ADR 17.
+_USABLE_ADMINS = ("SELECT id FROM users WHERE is_admin = 1"
+                  " AND password_hash IS NOT NULL AND disabled_at IS NULL")
+
+
+def usable_admin_ids(con: sqlite3.Connection) -> set[int]:
+    """Every account that is an admin *and* able to sign in as one.
+
+    Public because "how many admins does this instance have" is a question the
+    admin surface asks too — a page that greys out the last demote button is
+    friendlier than one whose button returns 409 — and a second spelling of the
+    predicate is a second thing to keep in step.
+    """
+    return {int(row["id"]) for row in con.execute(_USABLE_ADMINS)}
+
+
+def _refuse_if_last_admin(con: sqlite3.Connection, user_id: int,
+                          doing: str) -> None:
+    """Raise `LastAdmin` if this operation would take the last one away.
+
+    Called from inside the caller's transaction, after `BEGIN IMMEDIATE`, so the
+    count cannot change between the check and the write.
+
+    An operation on an account that is not currently a usable admin changes the
+    count by nothing and is always allowed — including when the count is
+    already zero, where refusing would mean an instance with no admin could
+    never disable anybody.
+    """
+    admins = usable_admin_ids(con)
+    if user_id in admins and len(admins) == 1:
+        raise LastAdmin(
+            f"refusing to {doing}: this is the only admin who can sign in. "
+            "Promote somebody else first.")
+
+
 def has_password(con: sqlite3.Connection, user_id: int) -> bool:
     """Whether this account can log in at all. For `mtglab users list`."""
     row = con.execute("SELECT password_hash FROM users WHERE id = ?",
@@ -235,9 +326,13 @@ def set_disabled(con: sqlite3.Connection, user_id: int, disabled: bool) -> int:
     Disabling revokes sessions too. An account that can no longer log in but
     whose existing cookie still works has not been disabled in any sense the
     person doing it meant.
+
+    Raises `LastAdmin` rather than disabling the only admin who can sign in.
     """
     stamp = datetime.now(UTC).isoformat() if disabled else None
-    with con:
+    with _exclusive(con):
+        if disabled:
+            _refuse_if_last_admin(con, user_id, "disable that account")
         cur = con.execute("UPDATE users SET disabled_at = ? WHERE id = ?",
                           (stamp, user_id))
         if cur.rowcount == 0:
@@ -248,11 +343,20 @@ def set_disabled(con: sqlite3.Connection, user_id: int, disabled: bool) -> int:
 
 
 def set_admin(con: sqlite3.Connection, user_id: int, is_admin: bool) -> None:
-    with con:
+    """Grant or revoke admin. Raises `LastAdmin` rather than revoking the last.
+
+    Sessions are deliberately *not* revoked either way. Admin is read fresh from
+    the account on every request (`api/auth.py:scope_for_token`), so a demotion
+    takes effect on the demoted party's very next call without signing them out
+    of an app they are still entitled to use as themselves.
+    """
+    with _exclusive(con):
+        if not is_admin:
+            _refuse_if_last_admin(con, user_id, "revoke admin")
         cur = con.execute("UPDATE users SET is_admin = ? WHERE id = ?",
                           (int(is_admin), user_id))
-    if cur.rowcount == 0:
-        raise NoSuchUser(str(user_id))
+        if cur.rowcount == 0:
+            raise NoSuchUser(str(user_id))
 
 
 def authenticate(con: sqlite3.Connection, username: str,

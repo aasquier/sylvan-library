@@ -5,9 +5,10 @@ style preference — `docs/HOSTING.md` §1 and ADR 5 both say per-user isolation
 fails when the `user_id` filter is sprinkled across handlers and one is
 forgotten, and the fix is that no handler ever writes the filter itself.
 
-Two dependencies, in a deliberate order:
+Three dependencies, in a deliberate order:
 
-    scope(request)  -> UserScope     who is asking
+    scope(request)     -> UserScope  who is asking
+    admin(scope)       -> UserScope  ...and 403 unless they administer this box
     deck_source(scope) -> DeckSource what that person may see
 
 `deck_source` was here first, returning the curated file-backed library and
@@ -35,7 +36,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
 
 from mtglab.decks.source import DeckSource, FileDeckSource
 
@@ -75,6 +76,34 @@ def scope(request: Request) -> UserScope:
 
 
 Scope = Annotated[UserScope, Depends(scope)]
+
+
+def admin(caller: Scope) -> UserScope:
+    """The caller, if they administer this instance. 403 if they do not.
+
+    **This is the second of two checks, not the only one.** `api/auth.py`
+    refuses anything under `/api/admin` to a non-admin from the middleware,
+    before routing, for the same reason authentication is enforced there: a
+    dependency has to be remembered on each new route, and the route somebody
+    adds in a year is the one that will not have it.
+
+    So what is this for? The case the prefix rule cannot see — an admin route
+    mounted somewhere else by mistake. Then this is the only thing between it
+    and every logged-in account. It costs an attribute read. ADR 17.
+
+    403 and not 404, which is a deliberate exception to ADR 5's rule and worth
+    the sentence: that rule protects resources whose *existence* is the secret,
+    and an admin route's existence is published in a public repository. Whether
+    the caller is an admin is already on `/api/auth/me`. A 404 here would hide
+    nothing and would cost every future debugging session the difference
+    between "not logged in", "not an admin", and "typo in the path".
+    """
+    if not caller.is_admin:
+        raise HTTPException(status_code=403, detail="admin only")
+    return caller
+
+
+Admin = Annotated[UserScope, Depends(admin)]
 
 
 def deck_source(caller: Scope) -> DeckSource:

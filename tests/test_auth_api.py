@@ -49,8 +49,15 @@ def secured(tmp_path):
 
 
 @pytest.fixture
-def local(tmp_path):
-    """The default configuration: no auth, one person, a laptop."""
+def local(tmp_path, monkeypatch):
+    """The default configuration: no auth, one person, a laptop.
+
+    `MTGLAB_ADMIN_EMAIL` is cleared because the app's lifespan reconciles it
+    (ADR 17) — with it set in a developer's `.env`, starting a client would
+    create the `app.db` that `test_the_local_app_touches_no_database` exists to
+    say it does not. The configuration under test is a laptop with nothing set.
+    """
+    monkeypatch.delenv("MTGLAB_ADMIN_EMAIL", raising=False)
     jobs.clear()
     with config.use_paths(data_dir=tmp_path / "data"), \
             TestClient(create_app()) as client:
@@ -100,6 +107,7 @@ def test_me_reports_the_logged_in_account(secured):
     login(secured)
     body = secured.get("/api/auth/me").json()
     assert body == {"auth_required": True, "authenticated": True,
+                    "is_admin": False,
                     "user": {"id": 1, "username": "ada", "is_admin": False}}
 
 
@@ -290,10 +298,18 @@ def test_the_local_app_has_no_login(local):
 
 
 def test_me_says_no_login_is_required(local):
-    """Two separate fields: a frontend must tell "logged out" from "there is
-    nothing to log in to", or the local app renders a sign-in form."""
+    """Three separate fields: a frontend must tell "logged out" from "there is
+    nothing to log in to", or the local app renders a sign-in form.
+
+    `is_admin` is true here while `user` is null, and that pair is the whole
+    reason it sits at the top level (ADR 17). Auth off means the caller is
+    `LOCAL` — an admin, because there is nobody else for it to be true relative
+    to, and authenticated as nobody. A client reading `user?.is_admin` would
+    hide the admin page on the only configuration the app has ever run in.
+    """
     assert local.get("/api/auth/me").json() == {
-        "auth_required": False, "authenticated": False, "user": None}
+        "auth_required": False, "authenticated": False, "is_admin": True,
+        "user": None}
 
 
 def test_the_local_app_touches_no_database(local, tmp_path):

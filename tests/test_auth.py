@@ -490,7 +490,14 @@ def test_has_password_on_a_missing_account_raises(con):
 
 
 def test_admin_is_a_flag_that_can_be_taken_away(con):
+    """Two admins, because ADR 17 refuses to leave an instance with none.
+
+    The second account is not decoration: `set_admin(..., False)` on the only
+    admin who can sign in now raises `LastAdmin`. That refusal and its edges
+    live in `tests/test_admin.py`; this test is still about the flag itself.
+    """
     ada = users.create(con, "ada", password=GOOD, is_admin=True)
+    users.create(con, "grace", password=GOOD, is_admin=True)
     assert users.get(con, "ada").is_admin
     users.set_admin(con, ada.id, False)
     assert not users.get(con, "ada").is_admin

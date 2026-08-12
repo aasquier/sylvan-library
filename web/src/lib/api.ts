@@ -250,6 +250,50 @@ export interface UpcomingSet {
   set_type: string
 }
 
+/** `GET /api/auth/me`. Who the caller is, and what this instance requires.
+ *
+ * `auth_required` and `authenticated` are separate because the app has to tell
+ * "logged out of an instance that wants a login" from "this instance has no
+ * login" — collapsing them makes the local app render a sign-in form it has no
+ * server for.
+ *
+ * `is_admin` is the one to read for gating UI, not `user?.is_admin`. With auth
+ * off the caller is the local single user: an admin, and not authenticated as
+ * anybody, so `user` is null and the nested flag is unreachable. Gating on the
+ * top-level field is what makes the admin page work on a laptop.
+ */
+export interface AuthState {
+  auth_required: boolean
+  authenticated: boolean
+  is_admin: boolean
+  user: { id: number | null; username: string | null; is_admin: boolean } | null
+}
+
+/** One account, as `/api/admin/users` reports it.
+ *
+ * `email` is here and nowhere else in this client. ADR 17 decided an admin sees
+ * addresses; the constraint that replaced "the CLI only" is that an address may
+ * be serialised into a response an admin authenticated for, and this is that
+ * response.
+ */
+export interface Account {
+  id: number
+  username: string
+  email: string | null
+  is_admin: boolean
+  disabled: boolean
+  created_at: string
+  /** "active" | "invited" | "no password" | "disabled" — four real states. */
+  state: string
+  sessions: number
+}
+
+export interface AccountList {
+  users: Account[]
+  /** Admins who can actually sign in. The last one cannot be demoted. */
+  admins: number
+}
+
 export class ApiError extends Error {
   // Declared explicitly rather than as a constructor parameter property, which
   // tsconfig's erasableSyntaxOnly disallows.
@@ -551,6 +595,28 @@ export const api = {
   // response for a rationale even if it wanted to hand one over.
   interview: (slug: string, body: { card: string; stance?: string; focus?: string }) =>
     post<InterviewReport>(`/api/decks/${slug}/interview`, body),
+  // Public, so it is the one call that works before anything else does. The
+  // nav reads it to decide whether to offer the admin page at all.
+  me: () => get<AuthState>('/api/auth/me'),
+  // Everything under here is refused to a non-admin by the middleware, before
+  // routing (ADR 17). Hiding the nav entry is a courtesy to the person using
+  // the app, never the protection — a 403 is what actually stops anybody.
+  accounts: () => get<AccountList>('/api/admin/users'),
+  inviteAccount: (body: { email: string; username?: string; is_admin?: boolean }) =>
+    post<Account>('/api/admin/users', body),
+  // One route for both levers, and both refusals come from the server: the
+  // last admin who can sign in cannot be demoted or disabled, and the answer
+  // is a 409 rather than a silent no-op.
+  updateAccount: (username: string, body: { is_admin?: boolean; disabled?: boolean }) =>
+    send<Account>('PATCH', `/api/admin/users/${encodeURIComponent(username)}`, body),
+  // The only thing an admin may do about a forgotten password. ADR 16 is
+  // unconditional that nobody chooses a password for anybody else.
+  sendReset: (username: string) =>
+    post<{ detail: string }>(
+      `/api/admin/users/${encodeURIComponent(username)}/reset`, {}),
+  revokeSessions: (username: string) =>
+    send<{ username: string; revoked: number }>(
+      'DELETE', `/api/admin/users/${encodeURIComponent(username)}/sessions`),
   simMana: (payload: Record<string, unknown>) => post<Job>('/api/sim/mana', payload),
   simLands: (payload: Record<string, unknown>) => post<Job>('/api/sim/lands', payload),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),

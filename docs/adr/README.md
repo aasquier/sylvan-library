@@ -30,13 +30,22 @@ they differ.
 | [14](0014-python-decides-claude-advises.md) | Python decides, Claude advises, and Forge plays the games | Accepted |
 | [15](0015-claude-surfaces-are-modes-with-capabilities.md) | Claude surfaces are modes with a user-set stance, and no stance may write a rationale | Accepted |
 | [16](0016-accounts-are-invited-and-passwords-are-self-served.md) | Accounts are invited, and passwords are self-served by email | Accepted |
+| [17](0017-the-maintainer-is-named-in-the-environment.md) | The maintainer is named in the environment, and admin routes live behind a prefix | Accepted |
 
 **Proposed** means the decision is made and argued but nothing implements it
 yet — 4 and 5 still describe a deployment that does not exist. 16 was Proposed
 for a matter of hours: the auth core landed the same day it was written and the
 email half the day after, so it is the one part of the hosting plan that is
-code rather than intent. What it does *not* cover is the browser — there is no
-login screen and no admin surface, which `docs/HOSTING.md` §7 tracks.
+code rather than intent.
+
+17 finished the server half the same day, and it is worth reading next to 5
+rather than after it: 5 decided that a resource belonging to one person is
+reported as 404 and not 403, and 17 is the case where that rule deliberately
+does *not* apply — an admin route's existence is published in this repository,
+so 403 hides nothing and says something useful. What is still missing is the
+browser's way in: **there is no login screen and no claim page**, which
+`docs/HOSTING.md` §6 step 5c tracks. The admin surface now exists and, with
+auth on, sits behind a door nobody can open yet.
 
 16 supersedes exactly one paragraph of 5, which is the pattern this directory is
 for: 5's "no self-signup" was a good argument that lost to a better one a day

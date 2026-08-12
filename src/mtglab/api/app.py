@@ -7,6 +7,8 @@ never drift into disagreeing about a deck.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -16,8 +18,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from mtglab import config
-from mtglab.api import auth, jobs, service
+from mtglab.api import admin, auth, jobs, service
 from mtglab.api.deps import Scope, deck_source
+from mtglab.auth import bootstrap
 from mtglab.auth.mail import EmailSender
 from mtglab.decks.source import DeckNotFound, DeckSource
 
@@ -48,14 +51,30 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     secure = (config.secure_cookies() if secure_cookies is None
               else secure_cookies)
 
+    @asynccontextmanager
+    async def startup(_app: FastAPI) -> AsyncIterator[None]:
+        """Reconcile the maintainer to admin, once, as the server comes up.
+
+        ADR 17, and a no-op unless `MTGLAB_ADMIN_EMAIL` is set. It belongs here
+        rather than in the body of `create_app` because this module builds an
+        `app` at import for uvicorn: doing it there would mean that merely
+        *importing* `mtglab.api.app` -- which the CLI and every API test do --
+        creates an `app.db` wherever the environment happens to be pointing.
+        Starting to serve is the event this is actually about.
+        """
+        bootstrap.ensure_maintainer()
+        yield
+
     app = FastAPI(title="sylvan-library", version="0.1.0",
-                  description="Local Commander deckbuilding and simulation.")
+                  description="Local Commander deckbuilding and simulation.",
+                  lifespan=startup)
 
     # First, and before any route is declared: the middleware runs ahead of
     # routing, so what it protects is every path the app will ever serve rather
     # than the ones remembered at review time.
     auth.install(app, require=required, secure_cookies=secure,
                  email_sender=email_sender)
+    admin.install(app, email_sender=email_sender)
 
     if dev:
         # Vite dev server runs on another port, so the browser needs CORS. Only

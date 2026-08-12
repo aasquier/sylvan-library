@@ -33,6 +33,10 @@ def app_db(tmp_path, monkeypatch):
     # it is also the only one a test may take -- no test sends mail (ADR 16).
     monkeypatch.delenv("RESEND_API_KEY", raising=False)
     monkeypatch.delenv("MTGLAB_REQUIRE_AUTH", raising=False)
+    # Every `users` command reconciles the maintainer first (ADR 17). Unset
+    # here, so a test that wants that behaviour opts into it and the rest do
+    # not silently gain an extra account.
+    monkeypatch.delenv("MTGLAB_ADMIN_EMAIL", raising=False)
     with config.use_paths(data_dir=tmp_path / "data"):
         yield tmp_path / "data" / "app.db"
 
@@ -358,6 +362,136 @@ def test_disable_on_an_unknown_account_is_refused(app_db):
     code, message = run(["users", "disable", "nobody"])
     assert code == 1
     assert "no account" in message
+
+
+# ------------------------------------------------------- promote and demote
+
+def test_promote_grants_admin_after_the_fact(app_db, typed, capsys):
+    """`users.set_admin` had no caller until ADR 17; `--admin` at creation was
+    the only way to make one, so promoting somebody meant an `UPDATE` by hand."""
+    typed.extend([PASSWORD, PASSWORD])
+    run(["users", "add", "ada"])
+
+    assert run(["users", "promote", "ada"])[0] == 0
+    out = capsys.readouterr().out
+    assert "ada is now an admin" in out
+    assert account("ada").is_admin
+
+
+def test_demote_refuses_to_leave_the_instance_without_an_admin(app_db, typed):
+    """The guard reaching the terminal. It lives in `auth/users.py`, so this is
+    checking that the command reports it rather than that it exists."""
+    typed.extend([PASSWORD, PASSWORD])
+    run(["users", "add", "root", "--admin"])
+
+    code, message = run(["users", "demote", "root"])
+    assert code == 1
+    assert "only admin" in message
+    assert account("root").is_admin
+
+
+def test_disable_refuses_the_last_admin_too(app_db, typed):
+    """The likelier accident of the two, and the same refusal."""
+    typed.extend([PASSWORD, PASSWORD])
+    run(["users", "add", "root", "--admin"])
+
+    code, message = run(["users", "disable", "root"])
+    assert code == 1
+    assert "only admin" in message
+    assert not account("root").disabled
+
+
+def test_promoting_the_successor_first_unblocks_the_demotion(app_db, typed,
+                                                             capsys):
+    """The documented way to hand an instance over."""
+    typed.extend([PASSWORD, PASSWORD, PASSWORD, PASSWORD])
+    run(["users", "add", "root", "--admin"])
+    run(["users", "add", "heir"])
+
+    assert run(["users", "promote", "heir"])[0] == 0
+    assert run(["users", "demote", "root"])[0] == 0
+    assert not account("root").is_admin
+    assert account("heir").is_admin
+
+
+def test_promoting_an_unclaimed_account_says_it_cannot_sign_in(app_db, capsys):
+    """The case where the command works and the instance still has no admin.
+
+    An invited account with the flag counts for nothing until it has a password,
+    which is what stops this being a way around the last-admin guard.
+    """
+    run(["users", "add", "invited", "--no-password"])
+    capsys.readouterr()
+
+    assert run(["users", "promote", "invited"])[0] == 0
+    out = capsys.readouterr().out
+    assert "cannot sign in" in out
+    assert "0 admin(s) can sign in" in out
+
+
+def test_promote_is_idempotent_and_says_so(app_db, typed, capsys):
+    typed.extend([PASSWORD, PASSWORD])
+    run(["users", "add", "root", "--admin"])
+    capsys.readouterr()
+
+    assert run(["users", "promote", "root"])[0] == 0
+    assert "already an admin" in capsys.readouterr().out
+
+
+def test_promote_on_an_unknown_account_is_refused(app_db):
+    code, message = run(["users", "promote", "nobody"])
+    assert code == 1
+    assert "no account" in message
+
+
+# ------------------------------------------------------- the maintainer bootstrap
+
+def test_a_users_command_reconciles_the_maintainer(app_db, monkeypatch, capsys):
+    """ADR 17 runs before every `users` command, not only at app startup.
+
+    Otherwise the CLI and the app would disagree about who administers the
+    instance depending on which one ran last -- and the CLI is the path that
+    exists precisely for when the app is what is broken.
+    """
+    monkeypatch.setenv("MTGLAB_ADMIN_EMAIL", "maintainer@example.com")
+
+    assert run(["users", "list"])[0] == 0
+    out = capsys.readouterr().out
+    assert "maintainer@example.com" in out
+    assert account("maintainer").is_admin
+
+
+def test_a_demoted_maintainer_is_restored_by_the_next_command(app_db,
+                                                              monkeypatch):
+    """Reconciliation is the guarantee; the last-admin guard is not.
+
+    Worth pinning together because the interaction is not the obvious one. A
+    freshly bootstrapped maintainer has no password, so it is not yet an admin
+    who *can sign in* and the guard does not protect it — the demotion here is
+    allowed. What makes the requirement hold anyway is that the next start puts
+    it back. Two mechanisms, and this is the seam between them.
+    """
+    monkeypatch.setenv("MTGLAB_ADMIN_EMAIL", "maintainer@example.com")
+    run(["users", "list"])
+
+    assert run(["users", "demote", "maintainer"])[0] == 0
+    assert not account("maintainer").is_admin
+
+    run(["users", "list"])
+    assert account("maintainer").is_admin
+
+
+def test_a_claimed_maintainer_is_protected_by_the_guard_as_well(app_db, typed,
+                                                                monkeypatch):
+    """Once it has a password, both mechanisms hold it: refused, not repaired."""
+    monkeypatch.setenv("MTGLAB_ADMIN_EMAIL", "maintainer@example.com")
+    run(["users", "list"])
+    typed.extend([PASSWORD, PASSWORD])
+    run(["users", "passwd", "maintainer"])
+
+    code, message = run(["users", "demote", "maintainer"])
+    assert code == 1
+    assert "only admin" in message
 
 
 # ------------------------------------------------------------------- the file

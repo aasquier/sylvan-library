@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
+import Admin from './routes/Admin'
 import CardSearch from './routes/CardSearch'
 import DeckDetail from './routes/DeckDetail'
 import Import from './routes/Import'
 import Library from './routes/Library'
 import NewDeck from './routes/NewDeck'
 import Simulator from './routes/Simulator'
-import { api, type Health } from './lib/api'
+import { api, type AuthState, type Health } from './lib/api'
 
 const NAV = [
   { to: '/', label: 'Library', end: true },
@@ -15,6 +16,11 @@ const NAV = [
   { to: '/search', label: 'Card search', end: false },
   { to: '/simulate', label: 'Simulator', end: false },
 ]
+
+// Appended for admins only. Hiding it is a courtesy — every route the page
+// calls is refused to anybody else by the middleware, before routing (ADR 17),
+// so this decides what is offered and never what is allowed.
+const ADMIN_NAV = { to: '/admin', label: 'Accounts', end: false }
 
 type Theme = 'light' | 'dark'
 
@@ -34,10 +40,17 @@ function useTheme(): [Theme, () => void] {
 export default function App() {
   const [theme, toggleTheme] = useTheme()
   const [health, setHealth] = useState<Health | null>(null)
+  const [auth, setAuth] = useState<AuthState | null>(null)
 
   useEffect(() => {
     api.health().then(setHealth).catch(() => setHealth(null))
+    // `is_admin` and not `user?.is_admin`: with auth off the caller is the
+    // local single user, who is an admin and is authenticated as nobody, so
+    // the nested flag is null exactly when the page is most usable.
+    api.me().then(setAuth).catch(() => setAuth(null))
   }, [])
+
+  const nav = auth?.is_admin ? [...NAV, ADMIN_NAV] : NAV
 
   return (
     <div className="min-h-full">
@@ -53,7 +66,7 @@ export default function App() {
           </NavLink>
 
           <nav className="flex gap-1">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.end}
                        className="rounded-md px-3 py-1.5 text-sm font-medium transition"
                        style={({ isActive }) => ({
@@ -92,6 +105,10 @@ export default function App() {
           <Route path="/import" element={<Import />} />
           <Route path="/search" element={<CardSearch />} />
           <Route path="/simulate" element={<Simulator />} />
+          {/* Declared unconditionally. A non-admin who types the URL gets the
+              page's own 403 from the API rather than the catch-all's "nothing
+              here", which is the more honest of the two answers. */}
+          <Route path="/admin" element={<Admin />} />
           <Route path="*" element={
             <div className="card-surface rounded-xl px-6 py-10 text-center">
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
