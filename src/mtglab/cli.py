@@ -10,6 +10,7 @@
     mtglab sim mana <slug>              Tier 1 goldfish
     mtglab sim lands <slug> 30..40      land-count sweep, flood-aware
     mtglab price deck <slug>            cheapest legal printing per card
+    mtglab claude check                 one real API call -- is the key live?
 """
 
 from __future__ import annotations
@@ -490,6 +491,36 @@ def cmd_price_deck(args):
     print(f"\n  {total:>8.2f}  TOTAL ({len(rows)}/{len(names)} priced)")
 
 
+# -------------------------------------------------------------------- claude
+
+def cmd_claude_check(args):
+    """One real call, so "is the pipe open" is a command rather than a guess.
+
+    Worth having as a command rather than only a test because of when it gets
+    run: after a key rotation, or weeks later when something returns a 401 and
+    the question is whether the integration broke or the key simply lapsed.
+    `client.explain` answers that in the message rather than leaving it to be
+    rediscovered.
+    """
+    from mtglab.claude import client as claude
+
+    report = claude.check()
+    print(f"  model     {report['model']}")
+    if not report["ok"]:
+        print(f"  status    unavailable\n  reason    {report['error']}")
+        sys.exit(1)
+    print(f"  served by {report['served_by']}")
+    print(f"  reply     {report['text']!r}")
+    print(f"  tokens    {report['input_tokens']} in / "
+          f"{report['output_tokens']} out")
+
+    if args.tools:
+        from mtglab.claude import tools
+        print(f"\n  {len(tools.READ_ONLY)} tools, all read-only:")
+        for name in sorted(tools.READ_ONLY):
+            print(f"    {name}")
+
+
 # --------------------------------------------------------------------- main
 
 def main(argv=None):
@@ -596,6 +627,12 @@ def main(argv=None):
     price = sub.add_parser("price").add_subparsers(dest="cmd", required=True)
     pd = price.add_parser("deck"); pd.add_argument("slug")
     pd.set_defaults(func=cmd_price_deck)
+
+    claude = sub.add_parser("claude").add_subparsers(dest="cmd", required=True)
+    cc = claude.add_parser("check", help="one real call -- is the key working?")
+    cc.add_argument("--tools", action="store_true",
+                    help="also list the tools a Claude surface may call")
+    cc.set_defaults(func=cmd_claude_check)
 
     args = p.parse_args(argv)
     args.func(args)
