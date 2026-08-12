@@ -733,13 +733,18 @@ Forge can run where the app runs**.
 1. **The rest of the deck lifecycle.** ✅ **Done 2026-08-11.** `add_card`,
    `remove_card`, `set_card_field`, `set_note` (ADR 12), and the rationale
    editor. What remains of the lifecycle is the create form and promotion.
-2. **The Claude surface** — **in progress; the pipe is open and grounded.** The
-   client, the tools, the no-`why` boundary and `get_cards` all landed
-   2026-08-11. Next, in order: **(a)** the rationale interview, the mode that
-   made ADR 15 worth writing and which now has both somewhere to put its
-   questions and a card lookup to ask them from; **(b)** the stance; **(c)** a
-   UI, which is what makes any of it reachable by someone who is not at a
-   terminal. Moved ahead of Forge on 2026-08-11: it is what makes the app useful
+2. **The Claude surface** — **in progress; the pipe is open, grounded, and now
+   has a dial.** The client, the tools, the no-`why` boundary and `get_cards`
+   landed 2026-08-11, and **the stance landed the same day** — three axes, four
+   presets, `off` by default, the default derived from the deck's `status`, and
+   a deployment ceiling. `GET /api/claude` answers whether the surface is
+   installed, configured and switched on, as three separate questions.
+   **The stance moved ahead of the interview deliberately**: it is the frame
+   every mode plugs into, and retrofitting a gate around modes that already
+   exist is how the gate ends up with holes. Next, in order: **(a)** the
+   rationale interview, the mode that made ADR 15 worth writing; **(b)** a UI
+   for the dial, which is what makes any of it reachable by someone who is not
+   at a terminal. Moved ahead of Forge on 2026-08-11: it is what makes the app useful
    for judgement rather than facts, and shipping the toolkit to someone else
    without it hands them a gate and a goldfish sim with no opinion in them.
    Sonnet 5, on a separate API account, running locally first — see *The

@@ -266,6 +266,24 @@ def create_app(*, dev: bool = False) -> FastAPI:
                                     identity_exact=identity_exact,
                                     commanders_only=commanders_only)
 
+    # ----------------------------------------------------------- claude
+
+    @app.get("/api/claude")
+    def claude_status(decks: Decks, stance: str = "",
+                      slug: str = "") -> dict[str, Any]:
+        """Is the Claude surface installed, configured, and switched on?
+
+        Three separate answers — a UI that collapses them tells someone their
+        key is missing when actually they turned it off. Reaches no network:
+        the stance is deterministic and availability is a fact about the
+        environment.
+        """
+        try:
+            return service.claude_status(
+                requested=stance or None, slug=slug or None, source=decks)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     # ---------------------------------------------------------- colours
 
     @app.get("/api/colors")
