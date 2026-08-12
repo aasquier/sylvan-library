@@ -448,10 +448,15 @@ oxlint, Recharts. The gaps are testing and interaction, not framework choice.
   human reading five candidates, not weights tuned until one deck comes out
   right.
 
-- ~~**A four-colour deck would render as "WUBR".**~~ **Fixed 2026-08-12.** The
-  five Nephilim names are in the table now, each name↔identity pairing
-  verified against the corpus rather than recalled — the Nephilim are cards,
-  so rule 1 applied to the fix itself.
+- ~~**A four-colour deck would render as "WUBR".**~~ **Fixed 2026-08-12,
+  twice.** The first fix added the Nephilim names, verified against the
+  corpus — and the same day's review pass caught that `src/mtglab/colors.py`
+  had already decided the convention the other way: the Scryfall/C16 names
+  (Artifice, Chaos, Aggression, Altruism, Growth) are canonical and the
+  Nephilim are aliases, and the Start-a-deck grid renders the canonical name.
+  The table now matches the taxonomy, which is the lesson: the repo had
+  already looked it up, and the second copy of the answer has to agree with
+  the first.
 - **Playwright** for a handful of end-to-end paths against the real API. The
   card-search field that collapsed to 14px would have been caught by one
   assertion on a rendered width. Deliberately deferred past the manual UI

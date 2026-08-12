@@ -483,10 +483,16 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             refused as JSON, not served the shell. A client that mistypes an
             endpoint should get an error it can read, never a 200 carrying a
             web page.
+
+            Checked against the *normalised* path, through the same helper the
+            auth middleware uses, because a naive prefix test is more
+            permissive than the router: `//api/decks` and `/api/./decks` do
+            not start with `api/` and would be served the shell.
             """
-            if full_path == "api" or full_path.startswith("api/"):
+            normalised = auth.normalise_path(full_path)
+            if normalised == "/api" or normalised.startswith("/api/"):
                 raise HTTPException(status_code=404,
-                                    detail=f"no such endpoint: /{full_path}")
+                                    detail=f"no such endpoint: {normalised}")
             candidate = WEB_DIST / full_path
             if full_path and candidate.is_file():
                 return FileResponse(candidate)

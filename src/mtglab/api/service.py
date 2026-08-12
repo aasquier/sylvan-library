@@ -94,13 +94,15 @@ def health(*, source: DeckSource | None = None) -> dict[str, Any]:
         return {"corpus": False, "oracle_cards": 0, "printings": 0,
                 "message": "no corpus yet -- run `mtglab data refresh`"}
     try:
-        # `fetchone` is typed as possibly-None. A count(*) always yields a
-        # row, but this is the platform's health-check target and must not
-        # 500 on the impossible case either.
-        oracle_row = con.execute("SELECT count(*) FROM oracle_cards").fetchone()
-        printings_row = con.execute("SELECT count(*) FROM printings").fetchone()
-        oracle = int(oracle_row[0]) if oracle_row else 0
-        printings = int(printings_row[0]) if printings_row else 0
+        def count(table: str) -> int:
+            # `fetchone` is typed as possibly-None. count(*) always yields a
+            # row, but this is the platform's health-check target and must
+            # not 500 on the impossible case either.
+            row = con.execute(f"SELECT count(*) FROM {table}").fetchone()
+            return int(row[0]) if row else 0
+
+        oracle = count("oracle_cards")
+        printings = count("printings")
         stale = corpus_stale(con)
     finally:
         con.close()

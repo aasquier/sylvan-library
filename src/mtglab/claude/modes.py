@@ -208,7 +208,9 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
         )
         tokens_in += resp.usage.input_tokens
         tokens_out += resp.usage.output_tokens
-        tokens_cached += getattr(resp.usage, "cache_read_input_tokens", 0) or 0
+        # `or 0`: the SDK types the field `int | None`, and None means the
+        # platform did not report cache reads, not that zero were served.
+        tokens_cached += resp.usage.cache_read_input_tokens or 0
 
         # Checked before `content` is read, because a refusal can carry an
         # empty content list and indexing into it is how this becomes an

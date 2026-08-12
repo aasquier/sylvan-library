@@ -65,18 +65,19 @@ describe('identityName', () => {
     expect(identityName(['B', 'G'])).toBe('Golgari')         // Gyome
   })
 
-  it('names four-colour identities after the Nephilim', () => {
-    // Each pairing verified against the corpus (rule 1 applied to a name that
-    // is also a card): Yore-Tiller Nephilim's color_identity is {W,U,B,R},
-    // Glint-Eye's {U,B,R,G}, Dune-Brood's {W,B,R,G}, Ink-Treader's {W,U,R,G},
-    // Witch-Maw's {W,U,B,G}.
-    expect(identityName(['W', 'U', 'B', 'R'])).toBe('Yore-Tiller')
-    expect(identityName(['U', 'B', 'R', 'G'])).toBe('Glint-Eye')
-    expect(identityName(['W', 'B', 'R', 'G'])).toBe('Dune-Brood')
-    expect(identityName(['W', 'U', 'R', 'G'])).toBe('Ink-Treader')
-    expect(identityName(['W', 'U', 'B', 'G'])).toBe('Witch-Maw')
+  it('names four-colour identities with the taxonomy\'s canonical names', () => {
+    // These must match src/mtglab/colors.py, where the Scryfall/C16 names are
+    // canonical and the Nephilim names are aliases -- the Start-a-deck grid
+    // renders the taxonomy's name, so a divergent row here would show one
+    // deck under two names in the same session. GET /api/colors is the same
+    // table over the wire.
+    expect(identityName(['W', 'U', 'B', 'R'])).toBe('Artifice')
+    expect(identityName(['U', 'B', 'R', 'G'])).toBe('Chaos')
+    expect(identityName(['W', 'B', 'R', 'G'])).toBe('Aggression')
+    expect(identityName(['W', 'U', 'R', 'G'])).toBe('Altruism')
+    expect(identityName(['W', 'U', 'B', 'G'])).toBe('Growth')
     // Order-independent like every other row in the table.
-    expect(identityName(['G', 'R', 'B', 'U'])).toBe('Glint-Eye')
+    expect(identityName(['G', 'R', 'B', 'U'])).toBe('Chaos')
   })
 })
 

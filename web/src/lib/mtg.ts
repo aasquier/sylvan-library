@@ -40,14 +40,17 @@ const GUILDS: Record<string, string> = {
   BGU: 'Sultai',
   RWB: 'Mardu',
   GUR: 'Temur',
-  // Four-colour: the Nephilim convention, keyed by the missing colour. Each
-  // name's identity is verified against the corpus (the Nephilim are cards),
-  // not recalled -- see the pinning test.
-  WUBR: 'Yore-Tiller',
-  UBRG: 'Glint-Eye',
-  WBRG: 'Dune-Brood',
-  WURG: 'Ink-Treader',
-  WUBG: 'Witch-Maw',
+  // Four-colour: the canonical names from the colour taxonomy in
+  // src/mtglab/colors.py, which is the project's authority on combination
+  // naming -- it makes the Scryfall/Commander-2016 names primary and keeps
+  // the Nephilim names as aliases. This table must agree with it, or the
+  // library and the Start-a-deck grid call the same deck two different
+  // things in one session.
+  WUBR: 'Artifice',
+  UBRG: 'Chaos',
+  WBRG: 'Aggression',
+  WURG: 'Altruism',
+  WUBG: 'Growth',
   WUBRG: 'Five-colour',
 }
 
