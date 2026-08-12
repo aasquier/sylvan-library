@@ -12,8 +12,8 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -92,8 +92,8 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version-file: web/.nvmrc
           cache: npm
@@ -146,7 +146,7 @@ jobs:
   no-secrets-or-corpus:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       # `app.db` joined this list on 2026-08-12. It holds password hashes and
       # email addresses -- the first personal data the project stores (ADR 16)
       # -- and unlike the corpus it is irreplaceable, so a committed one is
@@ -196,16 +196,16 @@ jobs:
   image:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3.7.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0
 
       # amd64 first, and `load`ed into the daemon, because the smoke test and
       # the scan below need a real image to run rather than a manifest. arm64
       # follows at the end; a multi-arch build cannot be loaded.
       - name: Build (linux/amd64)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
         with:
           context: .
           platforms: linux/amd64
@@ -303,7 +303,7 @@ jobs:
       # scanner to an old tag also pins its database schema, which is its own
       # way to end up with a green check that checks nothing.
       - name: Scan for vulnerabilities
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: sylvan-library:ci
           format: table
@@ -317,7 +317,7 @@ jobs:
       # no registry in this story yet, and publishing is a decision with a
       # signing and provenance conversation attached (ENGINEERING §5).
       - name: Build (linux/amd64, linux/arm64)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
         with:
           context: .
           platforms: linux/amd64,linux/arm64
