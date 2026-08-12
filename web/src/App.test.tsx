@@ -199,8 +199,12 @@ describe('with auth on and somebody signed in', () => {
     renderApp()
     await screen.findByText('Card search')
     // Off the library and back, so its mount fetch runs again — the session
-    // ends between the two, which is what it does in a browser.
+    // ends between the two, which is what it does in a browser. The Import
+    // screen is lazy, and the router keeps the old screen up until the chunk
+    // lands, so wait for it to actually render: clicking straight back would
+    // leave Library mounted the whole time and its fetch never re-run.
     fireEvent.click(screen.getByText('Import'))
+    await screen.findByText('Import a decklist')
 
     routes['/api/decks'] = { status: 401, body: { detail: 'authentication required' } }
     routes['/api/auth/me'] = { body: auth({ auth_required: true, is_admin: false }) }

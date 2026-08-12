@@ -1,16 +1,23 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import Admin from './routes/Admin'
-import CardSearch from './routes/CardSearch'
 import Claim from './routes/Claim'
-import DeckDetail from './routes/DeckDetail'
-import Import from './routes/Import'
 import Library from './routes/Library'
 import Login from './routes/Login'
-import NewDeck from './routes/NewDeck'
-import Simulator from './routes/Simulator'
 import { Spinner } from './components/ui'
 import { api, onSessionLost, type AuthState, type Health } from './lib/api'
+
+// Route-level code splitting. Library stays eager because it is the landing
+// page — a spinner on first paint would tax every visit to pay for none — and
+// Login/Claim stay eager because they are the gate, which must not depend on
+// a second fetch succeeding. Everything else loads when navigated to, which
+// keeps Recharts (the single heaviest dependency, used only by DeckDetail and
+// Simulator) out of the entry chunk entirely.
+const Admin = lazy(() => import('./routes/Admin'))
+const CardSearch = lazy(() => import('./routes/CardSearch'))
+const DeckDetail = lazy(() => import('./routes/DeckDetail'))
+const Import = lazy(() => import('./routes/Import'))
+const NewDeck = lazy(() => import('./routes/NewDeck'))
+const Simulator = lazy(() => import('./routes/Simulator'))
 
 const NAV = [
   { to: '/', label: 'Library', end: true },
@@ -242,6 +249,7 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8">
+        <Suspense fallback={<Spinner label="Loading…" />}>
         <Routes>
           <Route path="/" element={<Library />} />
           <Route path="/decks/:slug" element={<DeckDetail />} />
@@ -261,6 +269,7 @@ export default function App() {
             </div>
           } />
         </Routes>
+        </Suspense>
       </main>
 
       <footer className="mx-auto max-w-7xl px-6 pb-10 pt-4 text-xs"
