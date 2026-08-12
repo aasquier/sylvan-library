@@ -137,6 +137,67 @@ def test_the_service_resolves_the_corpus_path_at_call_time(tmp_path):
             con.close()
 
 
+# ------------------------------------------------------- the bulk downloads
+#
+# `DB_PATH` moved with `DATA_DIR` from the day this module was written. The
+# raw Scryfall files it is *built from* did not: `download_bulk` defaulted to a
+# relative `data/scryfall` and `cmd_data_refresh` passed nothing, so with
+# `MTGLAB_DATA_DIR=/data` the corpus went to the volume and the ~500MB of JSON
+# behind it went to the working directory. Found while writing the Dockerfile,
+# where the working directory is an ephemeral container layer and the volume is
+# sized in `docs/HOSTING.md` to hold exactly that download.
+
+def test_scryfall_dir_follows_data_dir(clean_env, monkeypatch):
+    monkeypatch.setenv("MTGLAB_DATA_DIR", "/data")
+    config.reload_from_env()
+    scryfall_dir = config.SCRYFALL_DIR
+    assert scryfall_dir == Path("/data/scryfall")
+
+
+def test_download_bulk_writes_under_the_configured_data_dir(tmp_path, monkeypatch):
+    """The bug itself: the download must land beside the corpus it builds.
+
+    No network -- `_fetch_json` is stubbed and the target is pre-created, so
+    `download_bulk` returns the existing file. What is under test is which
+    directory it looked in, which is the whole of the bug.
+    """
+    from mtglab.cards import db
+
+    monkeypatch.setattr(db, "_fetch_json", lambda url: {
+        "data": [{"type": "oracle_cards",
+                  "updated_at": "2026-08-12T00:00:00.000+00:00",
+                  "download_uri": "https://example.invalid/oracle.jsonl.gz"}]})
+
+    with config.use_paths(data_dir=tmp_path / "volume"):
+        expected = config.SCRYFALL_DIR / "oracle_cards-2026-08-12.jsonl.gz"
+        expected.parent.mkdir(parents=True)
+        expected.write_bytes(b"")
+        assert db.download_bulk("oracle_cards") == expected
+
+    # And nothing was written to the working directory, which is where it went
+    # before. `Path("data/scryfall")` relative to wherever pytest was invoked
+    # is the exact expression that was wrong.
+    assert not (Path("data") / "scryfall" / expected.name).exists()
+
+
+def test_health_reports_bulk_files_from_the_data_dir(tmp_path):
+    """`/api/health` is the container's HEALTHCHECK target and the one endpoint
+    that reports corpus state, so it reporting no bulk files on a fully seeded
+    volume is a wrong answer in the place it is least likely to be questioned.
+    """
+    import tiny_corpus
+    from mtglab.api import service
+    from mtglab.decks.source import MemoryDeckSource
+
+    with config.use_paths(data_dir=tmp_path / "volume"):
+        tiny_corpus.build(config.DB_PATH)
+        config.SCRYFALL_DIR.mkdir(parents=True)
+        (config.SCRYFALL_DIR / "oracle_cards-2026-08-12.jsonl.gz").write_bytes(b"")
+        health = service.health(source=MemoryDeckSource())
+
+    assert health["bulk_files"] == ["oracle_cards-2026-08-12.jsonl.gz"]
+
+
 def test_env_vars_are_read_at_import(monkeypatch, tmp_path):
     """A container sets these before the process starts; nothing should have
     to call reload_from_env() for them to take effect."""

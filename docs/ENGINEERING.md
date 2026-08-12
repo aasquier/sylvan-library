@@ -292,25 +292,59 @@ what ADR 15 means by "a mode is a tool set", not a bug fix.
 
 ---
 
-## 3. Containerisation
+## 3. Containerisation — built 2026-08-12
 
-Already unblocked: `config.py` reads `MTGLAB_DATA_DIR` and `MTGLAB_DECKS_DIR`,
-which was the last thing tying the app to a working directory.
-`docs/HOSTING.md` has a working `Dockerfile` and `fly.toml`.
+`Dockerfile`, `docker-entrypoint.sh`, `.dockerignore` and `fly.toml` are in the
+repository, and the `image` job in CI builds and exercises the image on every
+pull request. `docs/HOSTING.md` §4 is the deployment guide; this is the review
+checklist that shaped the files.
 
-What to add for a repo that gets reviewed:
+- [x] **Multi-stage build** — builder installs into a venv, runtime copies it,
+      so pip and any future compiler stay out of the shipped image.
+- [x] **No Node stage, deliberately**, which is where this list argued with
+      itself. It asked both that the no-Node property be kept and that the image
+      build prove the bundle rebuilds from source. Those pull opposite ways, and
+      the second was already satisfied — the `frontend` job runs the real
+      `npm run build` and fails on any diff against the committed
+      `src/mtglab/web_dist/`, on every PR. Proving it again inside the image
+      would be a slower duplicate bought by making the image depend on Node and
+      the npm registry. **CI proves the bundle is current; the image ships it.**
+- [x] **Non-root user.** The app process runs as `mtglab` (uid 10001). It gets
+      there through an entrypoint rather than a `USER` line: Fly attaches the
+      volume owned by `root:root` and the mount shadows the image's own
+      ownership, so PID 1 starts as root, fixes `/data`, and `exec`s the app
+      under `setpriv`. A bare `USER` would look stricter and leave the app
+      unable to write its own volume. CI asserts the owner of PID 1 in the
+      running container, which is the claim that matters.
+- [ ] **Read-only root filesystem.** Not done, and now *possible* rather than
+      contradictory: it required decks to stop living in the image, which they
+      have. Everything the app writes is under `/data`. Left off because Fly's
+      `fly.toml` has no switch for it, so it would only bind a plain
+      `docker run`, and an untested claim in a deployment file is worse than an
+      absent one.
+- [x] **`HEALTHCHECK` hitting `/api/health`**, using stdlib `urllib` rather
+      than installing `curl` for one request. That path is on `PUBLIC_PATHS`,
+      so it answers with auth on, and CI pins that it reports `"corpus": false`
+      on a fresh volume instead of failing — an unseeded instance is a correct
+      state between deploy and seeding, and a health check that 500s there
+      would have the platform restarting a healthy machine forever.
+- [x] **Multi-arch** (`linux/amd64`, `linux/arm64`) via buildx. Nothing is
+      pushed; publishing needs the signing and provenance conversation in §5.
+- [x] **Image scanning** — Trivy, failing on HIGH/CRITICAL, `ignore-unfixed`
+      because a CVE with no available patch is not something the build can act
+      on and would turn the gate into noise that gets disabled.
+- [x] **Never bake the corpus in.** Scryfall asks that bulk data not be
+      redistributed, and it belongs on the volume. Enforced twice now: the
+      `no-secrets-or-corpus` job checks what is *tracked*, and the `image` job
+      greps the *built image*, which is a different question the moment a
+      `.dockerignore` line is deleted.
 
-- **Multi-stage build.** Node stage builds the frontend, Python stage installs
-  the package, final stage is a slim runtime. Today `web_dist/` is committed
-  so the image needs no Node — keep that property, but the CI image build
-  should prove the bundle can be rebuilt from source.
-- **Non-root user**, read-only root filesystem, and a `HEALTHCHECK` hitting
-  `/api/health` (which already reports corpus state).
-- **Multi-arch** (`linux/amd64`, `linux/arm64`) via buildx. The dev machine is
-  Intel; anything modern people deploy to is arm64.
-- **Image scanning** (Trivy or Grype) as a CI job, failing on HIGH/CRITICAL.
-- **Never bake the corpus in.** Already documented — Scryfall asks that bulk
-  data not be redistributed, and it belongs on the volume.
+**The reason CI carries so much of this.** The maintainer's machine is macOS 12
+on Intel: Docker Desktop supports the three most recent macOS releases and will
+not install, and Homebrew there is too stale to build Colima. **No container can
+be built on it at all.** So the `image` job is not belt-and-braces — it is the
+only place this Dockerfile is ever built, and every property above is asserted
+against a running container rather than read off the file.
 
 ---
 
@@ -382,7 +416,9 @@ oxlint, Recharts. The gaps are testing and interaction, not framework choice.
 Current pipeline, as of 2026-08-12: pytest on 3.11/3.12, coverage with a **90%**
 floor, a **skip-count gate**, ruff, **mypy**, frontend typecheck under
 **`strict`**, **oxlint with `--deny-warnings`**, `npm test`, the build,
-committed-bundle drift check, and a secrets/corpus guard.
+committed-bundle drift check, a secrets/corpus guard, and — since
+containerisation landed — an **`image` job** that builds the Dockerfile for two
+architectures, runs it, and scans it (§3).
 
 Four of those are new, and three of the four are guards against a check being
 green while not checking:
@@ -431,7 +467,7 @@ The settings on `main`, recorded so they can be rebuilt:
 | Setting | Value | Why |
 | --- | --- | --- |
 | Pull request required | yes, **0 approvals** | A solo maintainer cannot approve their own PR, so requiring 1 would deadlock the repo |
-| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-corpus` | The whole pipeline. Renaming a CI job silently stops gating until this list is updated |
+| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-corpus`, `image` | The whole pipeline. Renaming a CI job silently stops gating until this list is updated |
 | Strict (branch up to date) | yes | Checks that passed against a stale base did not test what is being merged |
 | Enforce for admins | **yes** | Off, it does not apply to the only contributor, which makes it decorative |
 | Force pushes, deletions | blocked | |

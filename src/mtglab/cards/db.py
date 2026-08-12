@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeAlias
 
+from mtglab import config
+
 #: A DuckDB connection.
 #:
 #: `Any`, and deliberately so: duckdb ships no type stubs, and it is imported
@@ -199,11 +201,18 @@ def bulk_download_url(entry: dict) -> str:
     return url
 
 
-def download_bulk(kind: str, dest_dir: str | Path = "data/scryfall") -> Path:
+def download_bulk(kind: str, dest_dir: str | Path | None = None) -> Path:
     """Download a Scryfall bulk file. `kind` is 'oracle_cards' or 'default_cards'.
 
     Returns the local path. Skips the download if the local copy is already
     at or newer than Scryfall's published `updated_at`.
+
+    `None` means "ask `config` now" -- the same rule every other path in this
+    project follows, and here it is load-bearing rather than tidy. This used to
+    default to a *relative* `data/scryfall`, so the download landed beside the
+    process's working directory no matter what `MTGLAB_DATA_DIR` said. In a
+    container that put half a gigabyte of JSON on the ephemeral layer while the
+    corpus built from it went to the volume.
 
     The file is stored exactly as served, compression included -- `_iter_cards`
     decompresses on the fly. `default_cards` is ~2GB expanded but well under
@@ -220,7 +229,7 @@ def download_bulk(kind: str, dest_dir: str | Path = "data/scryfall") -> Path:
         ".jsonl" if url.endswith(".jsonl") else \
         ".json.gz" if url.endswith(".json.gz") else ".json"
 
-    dest_dir = Path(dest_dir)
+    dest_dir = Path(dest_dir) if dest_dir is not None else config.SCRYFALL_DIR
     dest_dir.mkdir(parents=True, exist_ok=True)
     stamp = entry["updated_at"][:10]
     target = dest_dir / f"{kind}-{stamp}{suffix}"

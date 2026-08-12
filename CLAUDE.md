@@ -58,7 +58,16 @@ src/mtglab/
 web/                      frontend source (React + Vite); `npm test` is Vitest
 decks/<slug>/deck.yaml    SOURCE OF TRUTH
 decks/<slug>/artifacts/   GENERATED — never edit by hand
+Dockerfile                two stages, no Node; app runs non-root
+docker-entrypoint.sh      fixes the volume's ownership, then drops privileges
+fly.toml                  the only Fly-specific file; no secrets, ever
 ```
+
+Deployed, **decks live on the volume at `/data/decks`, not in the image** — the
+app's editing routes write `deck.yaml`, so decks baked into a layer would lose
+every edit at the next deploy. The image carries them at `/app/decks-seed` and
+`docs/HOSTING.md` §4 step 6 copies them across once. The corpus is never in the
+image at all.
 
 Layering: `api/` must not import from `cli.py`. Anything both need lives in
 `config.py` or the relevant package — that rule is why `deck_paths` and the
@@ -346,10 +355,16 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
 
 ## Landing work
 
-The repo is public and `main` is protected: pull request required, all four CI
-checks green, branch up to date, enforced for admins. A direct push to `main`
-is rejected — branch first, then open a PR. Squash merge; linear history is
-required.
+The repo is public and `main` is protected: pull request required, **all five**
+CI checks green, branch up to date, enforced for admins. A direct push to
+`main` is rejected — branch first, then open a PR. Squash merge; linear history
+is required.
+
+The fifth is `image`, added 2026-08-12 with containerisation. **It cannot be
+run locally** — this Mac is macOS 12 on Intel, where Docker Desktop will not
+install and Homebrew is too stale to build Colima, so CI is the only place the
+`Dockerfile` is ever built. Treat a red `image` job as the first real feedback
+on a container change rather than as a surprise.
 
 ## Planning documents
 

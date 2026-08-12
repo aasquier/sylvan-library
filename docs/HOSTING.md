@@ -433,63 +433,76 @@ Fly's paid tier.
 
 ### Step 1 — Dockerfile
 
+**Both files now exist in the repository** — [`Dockerfile`](../Dockerfile),
+[`docker-entrypoint.sh`](../docker-entrypoint.sh),
+[`.dockerignore`](../.dockerignore) and [`fly.toml`](../fly.toml), landed
+2026-08-12. They carry their reasoning inline; what follows is what the drafts
+this section used to hold got wrong, so the reasoning is not lost with them.
+
 The corpus is **not** in the image. It is ~63 MB built from ~98 MB of Scryfall
 bulk, Scryfall asks that bulk data not be redistributed, and it belongs on the
-volume where it survives deploys. The frontend bundle *is* committed to
-`src/mtglab/web_dist`, so the image needs no Node toolchain.
+volume where it survives deploys. `.dockerignore` keeps `data/` out of the
+build context so a local corpus cannot reach a layer by accident, and the
+`image` job in CI greps the built image for corpus files and fails on a hit —
+the tracked-file check is about the repository, this one is about the artifact.
+The frontend bundle *is* committed to `src/mtglab/web_dist`, so the image needs
+no Node toolchain.
 
-```dockerfile
-FROM python:3.12-slim
+Five things differ from the draft, each for a reason:
 
-ENV PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    MTGLAB_DATA_DIR=/data \
-    MTGLAB_DECKS_DIR=/app/decks
+- **Two stages, and still no Node.** `docs/ENGINEERING.md` §3 asks both that
+  the no-Node property be kept and that the build prove the bundle rebuilds
+  from source. Those pull opposite ways, and the second is already satisfied by
+  the `frontend` job in CI, which runs the real `npm run build` and fails on any
+  diff against the committed bundle. So CI proves the bundle is current and the
+  image ships it; the builder stage exists to keep pip and any future compiler
+  out of the runtime image, not to touch the frontend.
+- **`MTGLAB_DECKS_DIR` is `/data/decks`, not `/app/decks`.** The draft would
+  have lost data. `deck.yaml` is the source of truth and every editing route
+  writes it, so decks inside the image meant a rationale written in the UI
+  vanished at the next deploy — silently, with nothing to notice. See the
+  deck-drift note in §5.
+- **A non-root app process, reached through an entrypoint.** Fly attaches the
+  volume owned by `root:root` and the mount shadows whatever the image had at
+  that path, so a `chown` in the Dockerfile is invisible by the time it matters.
+  PID 1 starts as root, fixes ownership, and `exec`s the app as `mtglab` via
+  `setpriv`. A bare `USER mtglab` would look stricter and leave the app unable
+  to write its own volume.
+- **A `HEALTHCHECK` on `/api/health`**, using stdlib `urllib` rather than
+  adding `curl` — a package installed for one HTTP request is a package to
+  patch forever. That path is on `PUBLIC_PATHS`, so it answers with auth on.
+- **No `README.md` in the build context.** `pyproject.toml` declares no
+  `readme`, so the build backend never reads it.
 
-WORKDIR /app
-COPY pyproject.toml README.md ./
-COPY src ./src
-COPY decks ./decks
-RUN pip install --no-cache-dir ".[api]" argon2-cffi
-
-# Never bake the corpus in: Scryfall asks that bulk data not be
-# redistributed, and it must persist across deploys on the volume.
-EXPOSE 8080
-CMD ["mtglab", "ui", "--no-open", "--host", "0.0.0.0", "--port", "8080"]
-```
-
-> Single worker on purpose — see the DuckDB locking rule in §3.
+> **Single worker on purpose — but not for the reason this section used to
+> give.** The old note pointed at the DuckDB locking rule, and §3 has since
+> corrected itself: read-only handles are safe across processes, so serving on
+> two workers would be fine. What actually binds is `api/jobs.py`, whose
+> registry is a module-level dict in one process. A sim submitted to worker A
+> is invisible to worker B, and `get()` reports what it cannot see as absent —
+> which the route turns into a 404 (ADR 5, never a 403). The symptom would be a
+> running simulation reported as gone, at random, half the time. Sessions and
+> the login rate limiter live in `app.db` and would have been fine.
 
 ### Step 2 — fly.toml
 
-```toml
-app = "sylvan-library"
-primary_region = "iad"          # pick the one nearest you
+[`fly.toml`](../fly.toml) is in the repository. Two things to know before the
+first deploy:
 
-[build]
+- **Four `[env]` values are placeholders** and are marked as such in the file:
+  `MTGLAB_ADMIN_EMAIL`, `MTGLAB_ADMIN_USERNAME`, `MTGLAB_BASE_URL` and
+  `MTGLAB_EMAIL_FROM`. The address ones are placeholders on purpose — this
+  repository is public, and an email address is the one piece of personal data
+  the project handles. Either edit the file or, to keep the address out of git
+  entirely, `fly secrets set MTGLAB_ADMIN_EMAIL=...`; a secret is injected as an
+  environment variable and takes precedence over `[env]`. Neither is a
+  credential, but the second is a private place to put configuration.
+- **`MTGLAB_REQUIRE_AUTH = "1"` is set**, and the local default stays off. One
+  person on a laptop does not need a login; a shared instance is what §1 was
+  written for.
 
-[env]
-  MTGLAB_DATA_DIR = "/data"
-  MTGLAB_DECKS_DIR = "/app/decks"
-  MTGLAB_REQUIRE_AUTH = "1"        # the login screen exists; §6 step 5c
-  MTGLAB_ADMIN_EMAIL = "you@example.com"   # who administers this instance
-  MTGLAB_ADMIN_USERNAME = "you"            # their handle; derived if unset
-
-[mounts]
-  source = "mtglab_data"
-  destination = "/data"
-
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = "suspend"   # scale to zero between visits
-  auto_start_machines = true
-  min_machines_running = 0
-
-[[vm]]
-  size = "shared-cpu-1x"
-  memory = "1gb"                   # 512mb is too tight: DuckDB + a sweep + Argon2
-```
+Nothing secret is in that file and nothing secret may go in it — CI scans every
+tracked file's contents for an API key, the committed frontend bundle included.
 
 ### Step 3 — create the app and volume
 
@@ -502,20 +515,44 @@ fly volumes create mtglab_data --size 3 --region iad
 ```
 
 3 GB leaves room for the 63 MB corpus, the raw Scryfall download during a
-refresh, `app.db`, and backups. It costs about $0.45/month.
+refresh, `app.db`, the decks, and backups. It costs about $0.45/month.
+`fly.toml` also carries `initial_size = "3gb"`, so a volume Fly creates for you
+is the same size as one you create here.
+
+That sizing was only half true until 2026-08-12: `cards.db.download_bulk`
+defaulted to a *relative* `data/scryfall` and `cmd_data_refresh` passed nothing,
+so the corpus went to the volume and the ~98 MB of JSON it is built from went to
+the container's working directory — an ephemeral layer, and not the thing this
+3 GB was sized for. `config.SCRYFALL_DIR` is derived from `MTGLAB_DATA_DIR` now,
+with the same "derived, never set independently" rule as `DB_PATH`.
 
 ### Step 4 — secrets
 
 ```bash
-fly secrets set SESSION_SECRET="$(openssl rand -base64 32)"
+fly secrets set RESEND_API_KEY="paste-it-here"
 fly secrets set ANTHROPIC_API_KEY="paste-it-here"   # only once ADR 15's modes exist
 ```
 
-`MTGLAB_ADMIN_EMAIL` is **not** a secret and goes in `[env]` above rather than
-here — it is an address, not a credential. It is still worth guarding: whoever
-can change it is an admin on the next boot (ADR 17). That is already true of
-anybody who can run `fly secrets` or `fly deploy`, so it grants nothing new,
-and every change the reconciliation makes is written to the log.
+**There is no `SESSION_SECRET`.** This step used to open with one; the code was
+then written and did not need it. Sessions are opaque random tokens stored as
+their SHA-256, so there is nothing to sign and no key to hold — one fewer
+secret to rotate. §7 records the same correction rather than quietly dropping
+the line, because a checklist that loses entries is a checklist nobody trusts.
+
+`RESEND_API_KEY` is the one that is genuinely required: with
+`MTGLAB_REQUIRE_AUTH` on, `sender_from_env()` refuses to fall back to the
+console sender, because that fallback would print recipients' email addresses
+into Fly's logs and ADR 16 forbids it. It is read at call time rather than at
+import, so the app still *starts* without it — what fails is the first invite or
+password reset, which is to say the first thing you will try to do.
+
+`MTGLAB_ADMIN_EMAIL` is **not** a secret and belongs in `[env]` — it is an
+address, not a credential. (It may still be set with `fly secrets` to keep it
+out of a public repository, as step 2 notes; that is a privacy choice, not a
+security one.) It is worth guarding either way: whoever can change it is an
+admin on the next boot (ADR 17). That is already true of anybody who can run
+`fly secrets` or `fly deploy`, so it grants nothing new, and every change the
+reconciliation makes is written to the log.
 
 Never put either of the secrets in `fly.toml` or the repo. Fly stores them
 encrypted, injects
@@ -617,25 +654,58 @@ to this app:
 fly deploy
 ```
 
-The app will start with no corpus. That is expected — `/api/health` reports
-corpus state rather than crashing, which is exactly the fresh-clone case the
-API tests already cover.
+The app will start with **no corpus and no decks**. Both are expected, and both
+are fixed by step 6 — `/api/health` reports corpus state rather than crashing,
+which is exactly the fresh-clone case the API tests already cover, and an empty
+`MTGLAB_DECKS_DIR` yields an empty library rather than an error. The CI `image`
+job pins that: it starts this image with an empty volume and requires
+`/api/health` to answer 200 with `"corpus": false`.
 
-### Step 6 — seed the corpus on the volume
+You should be able to sign in at this point, before seeding anything.
 
-This is the slow one: ~500 MB of downloads and several minutes. Run it as a
-one-off against the running machine, **never** as a build or release step,
-where it would blow the timeout.
+### Step 6 — seed the volume
+
+Two things live on the volume and neither arrives on its own. **This is a
+documented run, not a build step and not a boot step** — the corpus half needs
+several minutes and a ~500 MB download, and with scale-to-zero putting boot on
+the request path, doing it at startup would turn a visit into an outage.
+
+**The decks**, first, because it is instant. The image carries the repository's
+decks at `/app/decks-seed`; `MTGLAB_DECKS_DIR` points at the volume, so nothing
+is live until they are copied:
+
+```bash
+fly ssh console -C "cp -rn /app/decks-seed/. /data/decks/"
+```
+
+`-n` so re-running it never overwrites an edit made on the instance. The copy
+runs as root, so hand the files back afterwards — the entrypoint does this at
+every boot, and a restart would fix it, but not before the first write fails:
+
+```bash
+fly ssh console -C "chown -R mtglab:mtglab /data"
+```
+
+**The corpus**, second, and this is the slow one:
 
 ```bash
 fly ssh console -C "mtglab data refresh"
 ```
 
-Verify:
+Both halves of that download land on the volume, which was not true before
+2026-08-12 — see step 3. If the machine's connection or your shell drops
+part-way, re-run it: `download_bulk` writes to a `.part` file and renames only
+on completion, so an interrupted download is never mistaken for a finished one.
+
+Verify, and note this checks both halves at once — `validate` needs the corpus
+to check card facts and the decks to have something to check:
 
 ```bash
 fly ssh console -C "mtglab decks validate gyome-food"
 ```
+
+Expect **Goreclaw and Atla Palani to fail the gate on one banned card each**.
+That is a known, deliberate state recorded in CLAUDE.md, not a bad deploy.
 
 ### Step 7 — domain and TLS
 
@@ -701,14 +771,43 @@ does not work. Your options, in order of how much I would recommend them:
 
 Start with (1). Only build (2) if you find yourself forgetting.
 
+### Decks on the volume, and the repository
+
+Decks live at `/data/decks` on the instance and at `decks/` in git, and **from
+the first edit made in the hosted app those two diverge.** Neither is
+automatically authoritative; the deployment did not decide that question, it
+created it. Say which one you mean before you copy in either direction.
+
+The honest framing is that the repository is the source of truth for the six
+curated decks and the instance is the source of truth for anything written on
+it. Pull instance-side work back into git rather than pushing over it:
+
+```bash
+fly ssh sftp get /data/decks/<slug>/deck.yaml ./decks/<slug>/deck.yaml
+```
+
+Then `mtglab decks build <slug>` locally and commit — the artifacts are
+generated, so regenerating them beside the deck they describe is the point.
+Going the other way (`sftp put`) silently overwrites whatever was written on the
+instance, so do it only when you know nothing was.
+
+This is worth revisiting rather than living with. A `DeckSource` backed by git,
+or a second tier as §0 sketches, would make the question have one answer; the
+architecture is already shaped for it, since deck-facing endpoints take a
+`DeckSource` from the request scope rather than reading the filesystem.
+
 ### Backups
 
 The corpus needs no backup — `data refresh` rebuilds it in one command. That is
 the whole reason it is gitignored.
 
-`app.db` is the irreplaceable part: users, sessions and every deck your friends
-have written. Back it up with SQLite's online backup, which is safe to run
-against a live database:
+Two things on the volume *are* irreplaceable. **`app.db`** holds users,
+sessions and password hashes. **`/data/decks`** holds every deck edit made on
+the instance and not yet pulled back into git — the rationales your friends
+wrote, which by rule 4 nobody may regenerate on their behalf.
+
+Back `app.db` up with SQLite's online backup, which is safe to run against a
+live database:
 
 ```bash
 fly ssh console -C "sqlite3 /data/app.db \".backup /data/app-backup.db\""
@@ -716,7 +815,18 @@ fly ssh sftp get /data/app-backup.db ./backups/app-$(date +%F).db
 ```
 
 Do not simply `cp` a live SQLite file — with WAL enabled you can capture a torn
-copy. Keep these backups private: they contain password hashes.
+copy. Keep these backups private: they contain password hashes **and email
+addresses**, which is the same reason `app.db` is gitignored (ADR 16). A
+backup directory that ends up in git is the leak this whole rule exists to
+prevent, so keep `backups/` out of the repository.
+
+The decks need no such ceremony — they are plain YAML — but they do need
+copying, which is the same operation as pulling instance-side work back into
+git above:
+
+```bash
+fly ssh sftp get /data/decks ./backups/decks-$(date +%F)
+```
 
 ### Watching it
 
@@ -862,12 +972,41 @@ here rather than rewriting the sections above.
 
 ### Does not exist yet — this is the actual build list
 
-- [ ] **`Dockerfile`** — §4 step 1 has a draft, but there is no file in the repo.
-- [ ] **`fly.toml`** — likewise.
-- [ ] **A documented corpus-seeding run** against the volume. Not a build step
-      and not a boot step: it needs several minutes and a ~500 MB download, and
-      with scale-to-zero putting boot on the request path it would turn a wake
-      into an outage.
+- [x] **`Dockerfile`** — landed 2026-08-12, with `docker-entrypoint.sh` and
+      `.dockerignore`. Two stages and still no Node; non-root app process;
+      `HEALTHCHECK` on `/api/health`; no corpus, enforced against the built
+      image and not just the tree. §4 step 1 records what the draft it replaced
+      got wrong, including the single-worker argument, which was pointing at
+      the wrong cause.
+- [x] **`fly.toml`** — likewise, with four `[env]` placeholders to fill in and
+      no secrets. **`MTGLAB_DECKS_DIR` is `/data/decks`, not `/app/decks`**:
+      the draft would have thrown away every deck edit made in the app at each
+      deploy. See the deck-drift note in §5, which is the question that choice
+      creates rather than answers.
+- [x] **A documented corpus-seeding run** against the volume — §4 step 6, which
+      now seeds decks as well. Not a build step and not a boot step: it needs
+      several minutes and a ~500 MB download, and with scale-to-zero putting
+      boot on the request path it would turn a wake into an outage.
+      **This one needed a code fix to be true rather than only written down.**
+      `download_bulk` defaulted to a relative `data/scryfall`, so the corpus
+      landed on the volume and the ~98 MB it is built from landed on the
+      container's ephemeral layer; `config.SCRYFALL_DIR` is derived from
+      `MTGLAB_DATA_DIR` now. `service.health()` had the same bug, which mattered
+      more than it looks — it is the platform's health-check target, so a fully
+      seeded instance reported no bulk files at all.
+- [x] **The image is built and exercised in CI.** New, and load-bearing: the
+      maintainer's machine is macOS 12 on Intel, where Docker Desktop will not
+      install and Homebrew is too stale to build Colima, so **no container can
+      be built locally at all.** The `image` job is the only place the
+      Dockerfile is ever built. It builds `linux/amd64` and `linux/arm64`
+      (the dev machine is Intel; anything deployed to is arm64), runs the
+      amd64 image with auth on, and requires: `/api/health` answers 200 with
+      `"corpus": false`, `/api/decks` answers 401, PID 1 runs as `mtglab`,
+      `/data` is writable by it, no corpus file exists anywhere in the image,
+      and the decks seed is at the path §4 step 6's copy command names. Trivy
+      fails the build on HIGH/CRITICAL. **Add `image` to the required checks on
+      `main`** — `docs/ENGINEERING.md` §5 keeps that list, and a check that is
+      not required does not gate.
 - [ ] **A refresh procedure.** Cron does not work — Fly volumes attach to
       exactly one machine, so a scheduled second Machine cannot mount the
       corpus. Monthly and by hand is the plan; write it down as a runbook.
@@ -947,13 +1086,15 @@ here rather than rewriting the sections above.
 - [ ] Fly account with a card on file (the machine sizes are paid tier).
 - [x] ~~`SESSION_SECRET` generated (`openssl rand -base64 32`).~~ **Not
       needed** — see above. Sessions are opaque tokens, not signed ones.
-- [ ] `MTGLAB_REQUIRE_AUTH=1` **and `MTGLAB_ADMIN_EMAIL`** in `fly.toml` —
-      the second is what makes the maintainer an admin on that instance, and
-      without it a fresh deployment has nobody who can administer it. Set it to
-      an address you can receive mail at, then claim the account from the
-      sign-in page's reset link once that page exists. `mtglab users add <name>
-      --admin` over `fly ssh console` (§4 step 8) still works and is the
-      break-glass path; it is no longer the only one.
+- [ ] `MTGLAB_REQUIRE_AUTH=1` **and `MTGLAB_ADMIN_EMAIL`** in `fly.toml` — the
+      first is set in the committed file; the second is a placeholder there and
+      is what makes the maintainer an admin on that instance, so without it a
+      fresh deployment has nobody who can administer it. Set it to an address
+      you can receive mail at, then **claim the account from the sign-in page's
+      reset link — that page exists** (it landed 2026-08-12 with the login
+      screen, ticked above). `mtglab users add <name> --admin` over `fly ssh
+      console` (§4 step 8) still works and is the break-glass path; it is no
+      longer the only one.
 - [ ] `RESEND_API_KEY`, `MTGLAB_EMAIL_FROM` and `MTGLAB_BASE_URL` set, and one
       real invite sent to an address you control before anybody else is
       invited. Deliverability is the one part of the email half that no test

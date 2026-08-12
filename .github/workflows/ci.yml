@@ -181,3 +181,146 @@ jobs:
             exit 1
           fi
           echo "no keys in tracked files"
+
+  # The container image. This job is not decoration: the maintainer's machine is
+  # macOS 12 on Intel, where Docker Desktop will not install (it supports the
+  # three most recent macOS releases) and Homebrew is too stale to build Colima.
+  # So this runner is the *only* place the Dockerfile is ever built, and the
+  # only place the claims made in it get checked. It builds, it runs the thing,
+  # and it asks the image the questions `docs/ENGINEERING.md` §3 and
+  # `docs/HOSTING.md` §4 answer in prose.
+  #
+  # Adding this job means adding `image` to the required checks on `main`;
+  # ENGINEERING §5 keeps that list, and a check that is not required is a check
+  # that does not gate.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      # amd64 first, and `load`ed into the daemon, because the smoke test and
+      # the scan below need a real image to run rather than a manifest. arm64
+      # follows at the end; a multi-arch build cannot be loaded.
+      - name: Build (linux/amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: sylvan-library:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Rule 5, enforced against the artifact rather than against the tree. The
+      # `no-secrets-or-corpus` job checks what is *tracked*; this checks what is
+      # *shipped*, which is a different thing the moment a `.dockerignore` line
+      # is deleted. Scryfall asks that bulk data not be redistributed, and a
+      # published image is redistribution.
+      - name: The image must contain no corpus
+        run: |
+          found=$(docker run --rm --entrypoint sh sylvan-library:ci -c \
+            'find / -xdev \( -name "*.duckdb" -o -name "*.jsonl.gz" -o -name "*.json.gz" \) 2>/dev/null' )
+          if [ -n "$found" ]; then
+            echo "::error::corpus data found in the image:"; echo "$found"; exit 1
+          fi
+          echo "no corpus in the image"
+
+      # The decks ship as a seed, not as the live directory -- MTGLAB_DECKS_DIR
+      # points at the volume. If this path moves, HOSTING §4 step 6's copy
+      # command is wrong and a fresh instance silently comes up with no decks.
+      - name: The decks seed must be where the runbook says
+        run: |
+          docker run --rm --entrypoint sh sylvan-library:ci -c \
+            'test -f /app/decks-seed/arahbo-cats/deck.yaml'
+          echo "decks seed present"
+
+      - name: Run it
+        run: |
+          docker volume create mtglab-ci-data
+          # Auth on, as deployed. No RESEND_API_KEY: `sender_from_env()` is
+          # read at call time, not at import, so the app starts -- only the
+          # invite and reset routes would refuse. That is the documented
+          # behaviour and this pins it.
+          docker run -d --name mtglab-ci -p 8080:8080 \
+            -e MTGLAB_REQUIRE_AUTH=1 \
+            -v mtglab-ci-data:/data \
+            sylvan-library:ci
+          for _ in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8080/api/health -o health.json; then
+              echo "up"; cat health.json; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::the container never answered /api/health"
+          docker logs mtglab-ci || true
+          exit 1
+
+      # `/api/health` is on PUBLIC_PATHS *and* reports corpus state, which is
+      # why it is the HEALTHCHECK target. A fresh instance has no corpus and
+      # must say so rather than failing: that is the correct state between a
+      # deploy and the seeding run, and an image that 500s here would make the
+      # platform restart a perfectly healthy machine forever.
+      - name: Health answers with auth on, and reports no corpus
+        run: |
+          grep -q '"corpus": *false' health.json
+          echo "health reports an unseeded instance, as it should"
+
+      # The gate is a gate. If this ever returns 200 the middleware has stopped
+      # refusing before routing, which is the whole of ADR 5's protection.
+      - name: A protected route refuses without a session
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/decks)
+          [ "$code" = "401" ] || { echo "::error::/api/decks answered $code, want 401"; exit 1; }
+          echo "auth is on"
+
+      # The property ENGINEERING §3 asks for, checked on the process that is
+      # actually listening rather than on a `USER` line. PID 1 is the app: the
+      # entrypoint `exec`s it, so there is no shell left in between.
+      - name: The app process is not root
+        run: |
+          who=$(docker exec mtglab-ci stat -c '%U' /proc/1)
+          [ "$who" = "mtglab" ] || { echo "::error::pid 1 runs as $who, want mtglab"; exit 1; }
+          # And it can write to its own volume, which is the reason the
+          # entrypoint starts as root at all.
+          owner=$(docker exec mtglab-ci stat -c '%U' /data)
+          [ "$owner" = "mtglab" ] || { echo "::error::/data owned by $owner"; exit 1; }
+          docker exec --user mtglab mtglab-ci touch /data/.write-probe
+          echo "app runs as $who and can write /data"
+
+      - name: Stop it
+        if: always()
+        run: docker rm -f mtglab-ci || true
+
+      # Fails the build on HIGH/CRITICAL, per ENGINEERING §3. `ignore-unfixed`
+      # because a CVE with no available patch is not something this build can
+      # act on -- it would turn the gate into noise that gets disabled.
+      #
+      # Unpinned, like every other action in this file. ENGINEERING §5's
+      # supply-chain list owns moving all of them to commit SHAs; pinning a
+      # scanner to an old tag also pins its database schema, which is its own
+      # way to end up with a green check that checks nothing.
+      - name: Scan for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: sylvan-library:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      # Last, because it is the slowest: arm64 runs under QEMU. It is here at
+      # all because the dev machine is Intel and anything this would deploy to
+      # is arm64, so "it builds" has to mean both. Nothing is pushed -- there is
+      # no registry in this story yet, and publishing is a decision with a
+      # signing and provenance conversation attached (ENGINEERING §5).
+      - name: Build (linux/amd64, linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

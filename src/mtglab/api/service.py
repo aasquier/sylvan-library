@@ -88,8 +88,12 @@ def health(*, source: DeckSource | None = None) -> dict[str, Any]:
         stale = corpus_stale(con)
     finally:
         con.close()
-    files = sorted(Path("data/scryfall").glob("*.jsonl.gz")) if \
-        Path("data/scryfall").exists() else []
+    # `config.SCRYFALL_DIR`, not a relative literal: this is the platform's
+    # health check target, and under `MTGLAB_DATA_DIR=/data` a hardcoded
+    # `data/scryfall` resolves against the working directory instead of the
+    # volume -- so a fully seeded instance reported no bulk files at all.
+    files = sorted(config.SCRYFALL_DIR.glob("*.jsonl.gz")) if \
+        config.SCRYFALL_DIR.exists() else []
     return {
         "corpus": True,
         "oracle_cards": oracle,
