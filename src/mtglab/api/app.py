@@ -137,6 +137,22 @@ def create_app(*, dev: bool = False) -> FastAPI:
     def get_deck(slug: str, decks: Decks) -> dict[str, Any]:
         return service.get_deck(slug, source=decks)
 
+    @app.delete("/api/decks/{slug}")
+    def delete_deck(slug: str, decks: Decks,
+                    confirm: str = Query("", description="must equal the slug"),
+                    ) -> dict[str, Any]:
+        """Remove a deck from the library, recoverably.
+
+        `confirm` is a query parameter and must equal the slug. A DELETE with
+        no body is the conventional shape, and making the confirmation a value
+        only somebody looking at the right deck can produce is what stops a
+        mis-aimed request from being indistinguishable from an intended one.
+        """
+        try:
+            return service.delete_deck(slug=slug, confirm=confirm, source=decks)
+        except service.DeleteRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     @app.get("/api/decks/{slug}/validate")
     def validate_deck(slug: str, decks: Decks) -> dict[str, Any]:
         return service.validate_deck(slug, source=decks)

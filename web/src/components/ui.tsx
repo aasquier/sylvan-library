@@ -344,12 +344,20 @@ export function CardArt({
   )
 }
 
-/** Full card image on hover, positioned near the cursor. */
+/**
+ * Full card image on hover, positioned near the cursor.
+ *
+ * `className` is for callers whose child is a block — a grid tile or a
+ * full-width row. The wrapper is a `span` and therefore inline by default,
+ * which silently collapses a `w-full` child to its content width; passing
+ * `block` (or `contents`) is how a tile keeps its own layout.
+ */
 export function CardHover({
-  card, children,
+  card, children, className = '',
 }: {
   card: { name: string; image?: string | null }
   children: React.ReactNode
+  className?: string
 }) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const ref = useRef<HTMLSpanElement>(null)
@@ -363,6 +371,7 @@ export function CardHover({
   return (
     <span
       ref={ref}
+      className={className}
       onMouseEnter={(e) => card.image && setPos({ x: e.clientX, y: e.clientY })}
       onMouseMove={(e) => card.image && setPos({ x: e.clientX, y: e.clientY })}
       onMouseLeave={() => setPos(null)}

@@ -451,6 +451,43 @@ def test_help_is_available_at_every_level(argv, capsys):
     assert exc.value.code == 0
 
 
+# -------------------------------------------------------------- deleting
+
+def test_delete_moves_the_deck_aside_and_says_so(decks, capsys):
+    """`--yes` is for scripts, and it still has to name the slug on the command
+    line — there is no spelling of this that deletes a deck nobody typed."""
+    main(["decks", "delete", "mini", "--yes"])
+
+    assert not (decks / "mini").exists()
+    out = capsys.readouterr().out
+    assert "deleted mini" in out
+    assert ".trash" in out, "it must say where the deck went"
+    # And the deck really is recoverable, not merely described as such.
+    trashed = list((decks / ".trash").glob("mini-*/deck.yaml"))
+    assert len(trashed) == 1
+    assert "Mini Deck" in trashed[0].read_text(encoding="utf-8")
+
+
+def test_delete_prompts_for_the_slug_when_not_given_yes(decks, monkeypatch, capsys):
+    monkeypatch.setattr("builtins.input", lambda _: "mini")
+    main(["decks", "delete", "mini"])
+    assert not (decks / "mini").exists()
+
+
+def test_a_mistyped_confirmation_deletes_nothing(decks, monkeypatch, capsys):
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    with pytest.raises(SystemExit) as exc:
+        main(["decks", "delete", "mini"])
+    assert exc.value.code != 0
+    assert (decks / "mini" / "deck.yaml").exists(), "the deck is untouched"
+
+
+def test_deleting_an_unknown_deck_exits_rather_than_tracebacks(decks):
+    with pytest.raises(SystemExit) as exc:
+        main(["decks", "delete", "no-such-deck", "--yes"])
+    assert exc.value.code != 0
+
+
 def test_load_all_decks_reads_every_deck_in_the_configured_directory(decks):
     from mtglab.cli import load_all_decks
     loaded = load_all_decks()

@@ -344,6 +344,18 @@ export interface ChallengeProgress {
   }[]
 }
 
+export interface DeleteResult {
+  slug: string
+  name: string
+  deleted: boolean
+  /** Where the deck went. Not a boolean, because "deleted" and "recoverable"
+   *  have to be separately true and separately visible. */
+  moved_to: string
+  total_cards: number
+  stage: string
+  status: string
+}
+
 export interface CreateResult {
   slug: string
   name: string
@@ -492,6 +504,13 @@ export const api = {
   // so the first screen of the create flow renders on a fresh clone.
   colors: () => get<ColorTaxonomy>('/api/colors'),
   challengeProgress: () => get<ChallengeProgress>('/api/colors/progress'),
+  // The only call here that can lose work. `confirm` must equal the slug —
+  // a value only somebody looking at the right deck can produce, which a
+  // mis-aimed click cannot satisfy. The deck moves to `.trash/` rather than
+  // being unlinked, and the response says where.
+  deleteDeck: (slug: string, confirm: string) =>
+    send<DeleteResult>('DELETE',
+      `/api/decks/${slug}?confirm=${encodeURIComponent(confirm)}`),
   // Start a deck from a commander and nothing else. There is no colour field:
   // identity is derived from the commander, and a second source for it would
   // be a second thing to be wrong.

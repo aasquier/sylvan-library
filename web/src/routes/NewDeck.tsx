@@ -30,7 +30,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type Card, type Combination, type ColorTaxonomy } from '../lib/api'
 import { COLOR_NAMES, COLOR_VAR } from '../lib/mtg'
-import { ManaText } from '../components/ui'
+import { CardHover, ManaText } from '../components/ui'
 
 /** The era whose story named a tier, so the lesson has its setting attached. */
 const TIER_ERA: Record<string, string> = {
@@ -119,6 +119,20 @@ export default function NewDeck() {
   const [commanders, setCommanders] = useState<Card[] | null>(null)
   const [commander, setCommander] = useState<Card | null>(null)
 
+  /**
+   * The three most-built commanders in each combination, keyed by slot.
+   *
+   * The faces of a colour pair, and deliberately *not* a hand-written list of
+   * guild characters: a name typed from memory is a name nobody checked, and
+   * rule 1 applies to reference data the same way it applies to a deck. These
+   * come out of the corpus with their real colour identity, so the three
+   * legends under "Selesnya" are Selesnya because Scryfall says so.
+   *
+   * Cached per key because the carousel is arrow-driven and stepping through
+   * ten guilds should not be ten repeat queries on the way back.
+   */
+  const [leaders, setLeaders] = useState<Record<string, Card[]>>({})
+
   const [slug, setSlug] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
   const [name, setName] = useState('')
@@ -161,6 +175,28 @@ export default function NewDeck() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
+
+  // Who leads the combination currently on screen. Skipped entirely when the
+  // slot is already cached, so arrowing back through the carousel is free.
+  useEffect(() => {
+    if (chosen || mode !== 'guided' || !current) return
+    const key = current.key
+    if (leaders[key]) return
+    let live = true
+    api.searchCards({
+      identity: current.colors.join(''),
+      identity_exact: 'true',
+      commanders_only: 'true',
+      sort: 'edhrec',
+      limit: 3,
+    })
+      .then((r) => { if (live) setLeaders((c) => ({ ...c, [key]: r.cards })) })
+      // A fresh clone has no corpus. An empty list renders as nothing, which
+      // is the right amount of noise for a page whose whole point is that it
+      // works before `data refresh` has ever run.
+      .catch(() => { if (live) setLeaders((c) => ({ ...c, [key]: [] })) })
+    return () => { live = false }
+  }, [current, chosen, mode, leaders])
 
   // Debounced so a name search does not fire a query per keystroke.
   useEffect(() => {
@@ -274,6 +310,7 @@ export default function NewDeck() {
               <ul className="mt-2 max-w-lg space-y-1">
                 {nameHits.map((card) => (
                   <li key={card.name}>
+                    <CardHover card={card} className="block">
                     <button
                       onClick={() => {
                         // Straight past the colour step entirely: the
@@ -292,6 +329,7 @@ export default function NewDeck() {
                         — {card.type_line}
                       </span>
                     </button>
+                    </CardHover>
                   </li>
                 ))}
               </ul>
@@ -347,6 +385,19 @@ export default function NewDeck() {
             ))}
           </div>
 
+          {/* The era belongs to the whole tier, not to each slot in it.
+              Ravnica names all ten guilds; repeating that paragraph under
+              every guild taught it ten times and said nothing about the guild
+              you were actually looking at. It sits here once, above the
+              carousel, and the card below is free to be about Azorius. */}
+          {era && (
+            <p className="max-w-3xl border-l-2 pl-4 text-sm leading-relaxed"
+               style={{ borderColor: 'var(--baseline)', color: 'var(--text-muted)' }}>
+              <strong style={{ color: 'var(--text-secondary)' }}>{era.name}</strong>
+              {' '}— {era.setting}. {era.story}
+            </p>
+          )}
+
           {current && (
             <article
               className="card-surface rounded-xl px-6 py-6"
@@ -386,14 +437,42 @@ export default function NewDeck() {
                 <ManaText>{current.history}</ManaText>
               </p>
 
-              {era && (
-                <p className="mt-4 max-w-3xl border-l-2 pl-4 text-sm leading-relaxed"
-                   style={{ borderColor: 'var(--baseline)', color: 'var(--text-muted)' }}>
-                  <strong style={{ color: 'var(--text-secondary)' }}>
-                    {era.name}
-                  </strong>{' '}
-                  — {era.setting}. {era.story}
-                </p>
+              {/* Who actually leads it — the specific thing this slot has
+                  that the era paragraph above cannot say. Read off the corpus
+                  by exact colour identity rather than typed from memory, so
+                  the three legends under a guild's name are that guild's
+                  colours because Scryfall says they are. Hover for the card. */}
+              {leaders[current.key]?.length > 0 && (
+                <div className="mt-5">
+                  <p className="text-xs uppercase tracking-wide"
+                     style={{ color: 'var(--text-muted)' }}>
+                    Most-built commanders in these colours
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {leaders[current.key].map((card) => (
+                      <CardHover key={card.name} card={card}>
+                        <button
+                          onClick={() => {
+                            // Straight to the name step: picking a face of the
+                            // guild is picking the guild.
+                            setChosen(current)
+                            setCommanders(null)
+                            pickCommander(card)
+                          }}
+                          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition hover:opacity-90"
+                          style={{ border: '1px solid var(--hairline)',
+                                   background: 'var(--page)' }}
+                        >
+                          {card.art_crop && (
+                            <img src={card.art_crop} alt="" loading="lazy"
+                                 className="h-7 w-12 rounded object-cover" />
+                          )}
+                          <span className="font-medium">{card.name}</span>
+                        </button>
+                      </CardHover>
+                    ))}
+                  </div>
+                </div>
               )}
 
               <div className="mt-6 flex flex-wrap items-center gap-2">
@@ -458,21 +537,27 @@ export default function NewDeck() {
             </div>
           )}
 
+          {/* The tile shows the art crop; hovering shows the whole card,
+              floating beside the cursor rather than inside the tile. Choosing
+              a commander is choosing a card, and the crop does not say what it
+              costs, what it does, or whether it is the one you meant. */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {commanders?.map((card) => (
-              <button key={card.name} onClick={() => pickCommander(card)}
-                      className="card-surface overflow-hidden rounded-xl text-left transition hover:opacity-90">
-                {card.art_crop && (
-                  <img src={card.art_crop} alt="" loading="lazy"
-                       className="h-24 w-full object-cover" />
-                )}
-                <div className="px-4 py-3">
-                  <p className="font-medium">{card.name}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    {card.type_line}
-                  </p>
-                </div>
-              </button>
+              <CardHover key={card.name} card={card} className="block">
+                <button onClick={() => pickCommander(card)}
+                        className="card-surface block w-full overflow-hidden rounded-xl text-left transition hover:opacity-90">
+                  {card.art_crop && (
+                    <img src={card.art_crop} alt="" loading="lazy"
+                         className="h-24 w-full object-cover" />
+                  )}
+                  <div className="px-4 py-3">
+                    <p className="font-medium">{card.name}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {card.type_line}
+                    </p>
+                  </div>
+                </button>
+              </CardHover>
             ))}
           </div>
         </section>

@@ -440,6 +440,65 @@ def create_deck(*, slug: str, name: str = "", commander: list[str] | None = None
         con.close()
 
 
+class DeleteRejected(Exception):
+    """The deletion was refused, and nothing was moved."""
+
+
+def delete_deck(*, slug: str, confirm: str,
+                source: DeckSource | None = None) -> dict[str, Any]:
+    """Remove a deck from the library. Recoverably, and only on purpose.
+
+    The last operation in the deck lifecycle, and the only one that can lose
+    work. Three safeguards, chosen so that each catches something the others
+    do not:
+
+    **`confirm` must be the slug, exactly.** Not a boolean, not a `force=true`
+    flag — a value only somebody looking at the right deck can produce. A
+    client that sends `{"confirm": true}` for every deletion has not confirmed
+    anything, and a mis-clicked row cannot satisfy this by accident.
+
+    **A read-only source refuses.** `docs/HOSTING.md` keeps the curated decks
+    read-only for everyone but the maintainer, and this is the operation where
+    that matters most.
+
+    **The deck moves rather than vanishing.** The source says where it went and
+    this returns it, because "deleted" and "recoverable" have to be separately
+    true and separately visible. Committed decks have git as their undo; the
+    draft imported ten minutes ago has only this.
+
+    Deliberately *not* a safeguard: refusing to delete a curated or built deck.
+    A tool that will not let you throw away your own work because it disagrees
+    about the work's importance is the same failure as one that edits a deck
+    without asking — it is your library, and the confirmation is the check.
+    """
+    # Checked here rather than via `_for_writing`, which raises `EditRejected`
+    # -- the wrong exception for a route that catches `DeleteRejected`, and the
+    # wrong word too: nothing is being edited. Same reasoning as `create_deck`.
+    decks = _source(source)
+    if not decks.writable:
+        raise DeleteRejected("this library is read-only")
+    deck = decks.get(slug)                       # raises DeckNotFound
+
+    if confirm != slug:
+        raise DeleteRejected(
+            f"to delete {slug!r}, confirm with the slug itself. Got "
+            f"{confirm!r}. This is deliberately not a yes/no: it is the one "
+            f"operation here that can lose work nothing else recorded.")
+
+    moved_to = decks.delete(slug)
+    return {
+        "slug": slug,
+        "name": deck.name,
+        "deleted": True,
+        # Where it went, so the answer to "can I get it back" is in the
+        # response rather than in someone's memory of how this was built.
+        "moved_to": moved_to,
+        "total_cards": deck.total_cards,
+        "stage": deck.stage,
+        "status": deck.status,
+    }
+
+
 # -------------------------------------------------------------------- claude
 
 def claude_status(*, requested: Any = None, slug: str | None = None,
