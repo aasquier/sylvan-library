@@ -348,7 +348,11 @@ def _report(turn: Turn | None, *, slug: str, card: str,
         "questions_dropped": dropped,
         "tool_calls": turn.tool_calls if turn else [],
         "usage": {"input_tokens": turn.input_tokens if turn else 0,
-                  "output_tokens": turn.output_tokens if turn else 0},
+                  "output_tokens": turn.output_tokens if turn else 0,
+                  # The evidence the prompt cache works. Zero across repeated
+                  # interviews means the prefix is drifting -- surfaced here
+                  # because a number nobody can see is a number nobody checks.
+                  "cache_read_tokens": turn.cache_read_tokens if turn else 0},
         # Said in the payload rather than only in the UI, so a second client
         # cannot render this as anything other than what it is.
         "never": "These are questions. The rationale is yours to write.",

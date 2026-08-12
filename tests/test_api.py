@@ -146,6 +146,17 @@ def test_a_mistyped_api_path_is_a_json_404_not_the_shell(client):
         assert resp.headers["content-type"].startswith("application/json"), path
         assert "no such endpoint" in resp.json()["detail"]
 
+    # `//api/decks` does not match the real route (Starlette matches raw
+    # paths) and lands on the catch-all, where a naive `startswith("api/")`
+    # reads it as a frontend route and serves the shell. The guard normalises
+    # first, through the same helper the auth middleware uses. The full URL
+    # form is deliberate: a bare `client.get("//api/decks")` parses `api` as
+    # a host and never sends this path.
+    resp = client.get("http://testserver//api/decks")
+    assert resp.status_code == 404
+    assert resp.headers["content-type"].startswith("application/json")
+    assert "no such endpoint" in resp.json()["detail"]
+
 
 def test_frontend_routes_still_get_the_shell(client):
     """The refusal above must not overreach: an SPA route is the shell's to
