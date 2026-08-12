@@ -262,10 +262,19 @@ CREATE TABLE user_decks (
   slug TEXT NOT NULL, yaml TEXT NOT NULL, updated_at TEXT NOT NULL,
   UNIQUE(user_id, slug));
 
--- Sim results are a pure function of deck content + parameters. See §3.
+-- Built 2026-08-12; `auth/db.py` migration 3 is the real one. The sketch below
+-- said "a pure function of deck content + parameters", which is close enough
+-- to be dangerous: card facts come from the corpus, so the key is a hash of
+-- the *compiled* deck rather than of deck.yaml. See ADR 18.
 CREATE TABLE sim_cache (
-  key TEXT PRIMARY KEY, result_json TEXT NOT NULL, created_at TEXT NOT NULL);
+  key TEXT PRIMARY KEY, kind TEXT NOT NULL, result_json TEXT NOT NULL,
+  created_at TEXT NOT NULL, last_used_at TEXT NOT NULL);
 ```
+
+`sim_cache` is the one derived table in `app.db` and the only one it is safe to
+drop: every row can be recomputed, and `mtglab sim cache --clear` does exactly
+that. It lives here rather than in a third store because the rows are keyed to
+decks on the same volume and have to survive a deploy the same way they do.
 
 `user_decks.yaml` stores the same YAML the file-backed decks use, so
 `Deck.load` logic, the gate, and the artifact generator all work unchanged on
@@ -370,10 +379,25 @@ process would otherwise contend for a handle it does not need.
 
 **Do these instead, in order of value over effort:**
 
-1. **Cache sim results by deck-content hash.** Biggest win, smallest change,
-   and it makes the hosted UI feel instant.
+1. ~~**Cache sim results by deck-content hash.** Biggest win, smallest change,
+   and it makes the hosted UI feel instant.~~ **Built 2026-08-12** —
+   `sim/cache.py`, the `sim_cache` table in §2, and
+   [ADR 18](adr/0018-a-cached-simulation-is-keyed-on-its-compiled-input.md).
+   **"By deck-content hash" was the wrong key and the ADR is why.** Card facts
+   come from the corpus, so `deck.yaml` can sit byte-identical while a
+   `data refresh` changes what a card does — Scryfall's "enters the battlefield
+   tapped" retemplating is the documented case, and it moves the numbers for
+   every deck. The key is a hash of the **compiled** deck instead: the SimCards
+   the engine is handed, plus the clamped parameters, the seed, and a
+   fingerprint of `engine.py` and `mana.py`'s own source. A hit costs a deck
+   parse and one indexed `get_cards`, so it is milliseconds rather than truly
+   zero — and in exchange a rationale edit does not throw the numbers away and
+   a corpus refresh that matters does.
 2. **Precompute the standard sims when a deck is saved**, so the numbers are
-   already warm when anyone opens the deck.
+   already warm when anyone opens the deck. Cheap now: the cache exists, and
+   this is one call to `plan_mana` on the write path. Not built, because
+   warming a cache for a deck nobody may open is speculative work and the cold
+   path is already only eighteen seconds.
 3. **Scale to zero.** Paying only when someone is actually using it beats every
    micro-optimisation on this list combined.
 4. **Process pool for sweeps** — 2.4x on 4 vCPU, remembering the DuckDB rule.
@@ -851,8 +875,15 @@ Roughly ascending risk, each step independently useful:
 2. **Dockerfile + fly.toml, deploy read-only, no auth.** Just your six curated
    decks, behind Cloudflare Access or a single password, so you can follow
    along remotely. This alone satisfies the original goal.
-3. **Sim result caching.** Biggest performance win, and it is pure
-   infrastructure — no user-facing change.
+3. ~~**Sim result caching.** Biggest performance win, and it is pure
+   infrastructure — no user-facing change.~~ **Done 2026-08-12**, and the
+   second half of that sentence turned out to be wrong. See §3 below and
+   [ADR 18](adr/0018-a-cached-simulation-is-keyed-on-its-compiled-input.md):
+   memoising a *sample* means deciding which sample, and the app was sending no
+   seed at all — so the numbers on a deck were a fresh draw every time, and
+   nothing was cacheable until that was fixed. The user-facing changes are a
+   seed field, a **New sample** button, and every result now saying whether it
+   was computed just now or read back.
 4. ~~**`app.db`, users table, `mtglab users` CLI.**~~ **Done 2026-08-12.**
 5. ~~**Sessions, login, the scoped accessor, and the isolation test** from §1.~~
    **Done 2026-08-12.** Steps 4 and 5 together were "auth core", and the claim
@@ -1004,9 +1035,11 @@ here rather than rewriting the sections above.
       `"corpus": false`, `/api/decks` answers 401, PID 1 runs as `mtglab`,
       `/data` is writable by it, no corpus file exists anywhere in the image,
       and the decks seed is at the path §4 step 6's copy command names. Trivy
-      fails the build on HIGH/CRITICAL. **Add `image` to the required checks on
-      `main`** — `docs/ENGINEERING.md` §5 keeps that list, and a check that is
-      not required does not gate.
+      fails the build on HIGH/CRITICAL. **`image` is a required check on `main`
+      as of 2026-08-12**, which it was not on the day it shipped — a check that
+      is not required does not gate, and it sat passing-but-decorative for a
+      day. `docs/ENGINEERING.md` §5 keeps the list; the settings themselves are
+      the authority, so read them back rather than trusting either document.
 - [ ] **A refresh procedure.** Cron does not work — Fly volumes attach to
       exactly one machine, so a scheduled second Machine cannot mount the
       corpus. Monthly and by hand is the plan; write it down as a runbook.
@@ -1079,7 +1112,18 @@ here rather than rewriting the sections above.
       `.env.example`. Note that `sender_from_env()` **refuses to start without
       the key when auth is on**, deliberately: the console fallback would print
       recipients into the platform's log, which ADR 16 forbids.
-- [ ] **Sim result caching** — build-order step 3, the biggest performance win.
+- [x] **Sim result caching** — build-order step 3, the biggest performance win,
+      landed 2026-08-12 under
+      [ADR 18](adr/0018-a-cached-simulation-is-keyed-on-its-compiled-input.md).
+      `sim/cache.py` plus schema version 3 in `auth/db.py`; a hit is answered
+      inside the request as a job that is already `done`, so no client changed
+      shape. Two things it turned up that are worth knowing before deploy day:
+      **the app was sending no seed**, so every view of a deck was a different
+      sample and nothing could have been cached until that was fixed; and the
+      obvious key — a hash of `deck.yaml` — would have served pre-refresh
+      numbers forever, because card facts come from the corpus and not from the
+      deck file. `mtglab sim cache` reports what is stored and `--clear` empties
+      it, which is a `fly ssh console` away if it is ever needed.
 
 ### Have these in hand before deploy day
 

@@ -512,6 +512,34 @@ def cmd_sim_lands(args):
           "you are buying commander speed with flood.")
 
 
+def cmd_sim_cache(args):
+    """Inspect or empty the memoised Tier 1 results.
+
+    Break-glass and a window, in that order. The cache is keyed on the compiled
+    deck and a fingerprint of the engine's source, so it should never need
+    clearing by hand -- but a cache nobody can see into or drop is a cache that
+    has to be trusted rather than checked, and this project does not do that.
+
+    Note the `enabled` line. "No rows" and "caching is switched off because the
+    engine's source could not be fingerprinted" look identical from a count and
+    want completely different responses.
+    """
+    from mtglab.sim import cache
+
+    if args.clear:
+        print(f"cleared {cache.clear()} cached result(s) from {config.APP_DB_PATH}")
+        return
+
+    info = cache.stats()
+    print(f"store:   {config.APP_DB_PATH}")
+    print(f"enabled: {'yes' if info['enabled'] else 'no -- results are not cached'}")
+    print(f"rows:    {info['rows']} ({info['bytes'] / 1024:.1f} kB)")
+    for kind, count in sorted(info["by_kind"].items()):
+        print(f"  {kind:<18} {count}")
+    if info["oldest"]:
+        print(f"computed between {info['oldest'][:19]} and {info['newest'][:19]} UTC")
+
+
 def cmd_sim_forge(args):
     """Tier 3: hand the decks to Forge and report what it played.
 
@@ -1046,6 +1074,10 @@ def main(argv=None):
     ld.add_argument("--games", type=int, default=5000)
     ld.add_argument("--seed", type=int, default=7)
     ld.set_defaults(func=cmd_sim_lands)
+    sc = sim.add_parser("cache", help="what Tier 1 results are memoised")
+    sc.add_argument("--clear", action="store_true",
+                    help="drop every cached result; they recompute on demand")
+    sc.set_defaults(func=cmd_sim_cache)
     fg = sim.add_parser("forge", help="Tier 3 -- Forge plays real games")
     fg.add_argument("slugs", nargs="+", help="two to four decks")
     fg.add_argument("--games", type=int, default=10)

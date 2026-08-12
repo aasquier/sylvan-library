@@ -35,9 +35,10 @@ The instinct is to port `sim/tier1/` to Rust. The measurements say don't:
 
 An 18-second batch job, run a handful of times a week, on a machine that is
 idle ~99% of the time. A 30x speedup saves seventeen seconds of wall clock
-nobody is waiting on. Meanwhile caching results by deck-content hash removes
-most of the work outright, because deck files change rarely and the same
-numbers get viewed repeatedly.
+nobody is waiting on. Meanwhile caching removes most of the work outright,
+because deck files change rarely and the same numbers get viewed repeatedly —
+**built 2026-08-12**, and keyed on the compiled deck rather than on the deck
+file, for reasons §6 records.
 
 **A reviewer will ask what the rewrite bought.** "It's faster" is not an
 answer when the profile says the workload was never the bottleneck. Porting
@@ -83,8 +84,11 @@ Reopen this decision when **any** of these is true, and not before:
 Exhaust these first, in order, because they are cheaper than a port and some
 of them are worth doing regardless:
 
-1. **Cache by deck-content hash.** A sim result is a pure function of
-   `(deck content, parameters, seed)`. Most repeat runs should cost nothing.
+1. ~~**Cache by deck-content hash.** A sim result is a pure function of
+   `(deck content, parameters, seed)`. Most repeat runs should cost nothing.~~
+   **Built 2026-08-12** — and "deck-content hash" was the wrong key, which is
+   the finding rather than the feature. See the subsection below and
+   [ADR 18](adr/0018-a-cached-simulation-is-keyed-on-its-compiled-input.md).
 2. **`multiprocessing` across games.** Measured at 2.42x on 4 workers, ~20
    lines, and games are trivially independent.
 3. **Algorithmic work in the policy engine**, which is where a pod simulator's
@@ -96,6 +100,49 @@ of them are worth doing regardless:
 If the trigger fires, the plan below is what to do. If it never fires, that is
 a good outcome and the extrapolation above was simply wrong — which is worth
 recording either way.
+
+### Item 1, built — and the key this document asked for was wrong
+
+`sim/cache.py`, schema version 3 in `auth/db.py`, and
+[ADR 18](adr/0018-a-cached-simulation-is-keyed-on-its-compiled-input.md).
+It matters to §1's argument specifically: "caching removes most of the work
+outright" is one of the two legs the decision not to port Tier 1 stands on, and
+it was an assertion about unwritten code until now.
+
+Two things it turned up, both of which this document had wrong in a way that
+would have shipped:
+
+**"A pure function of deck content" is not true, and the false half is the
+dangerous one.** `compile_deck` reads `mana_cost`, `type_line`, `oracle_text`
+and `produced_mana` out of the corpus, so a `data refresh` changes what a card
+does while `deck.yaml` sits byte-identical. §4 of this document already records
+the shape of that bug from the other side: Scryfall retemplated "enters the
+battlefield tapped" to "enters tapped", and matching only the old wording
+treated every modern tapland as untapped. A deck-file key would have served the
+pre-refresh numbers forever, and the refresh that fixed them would have looked
+like it did nothing. **The key is a hash of the compiled `SimCard`s instead** —
+the input rather than a name for it — plus the clamped parameters, the seed, and
+a fingerprint of `engine.py` and `mana.py`'s own source, so a code change
+invalidates even when nobody declared it. A hit costs a deck parse and one
+indexed `get_cards`: milliseconds, not zero, and worth it.
+
+**The app was not seeding its simulations at all.** `run()` took an optional
+seed, the Simulator screen never sent one, and it fell through to
+`random.Random(None)`. Every view of a deck was a different sample — not
+comparable with the last one, not reproducible by anyone, and not a function of
+anything a cache key could name. That is a determinism hole sitting next to §2's
+determinism work, in the one place the numbers are actually read, and nothing
+caught it because every individual result was correct. Runs are seeded by
+default now and the seed is reported on the result; a different sample is a
+button.
+
+The rest is the shape of the guards, which is the part worth copying: the key
+covers every parameter of `run()`, checked against its real signature so a new
+one fails the suite rather than being silently excluded; the key is verified
+stable across processes at two `PYTHONHASHSEED` values, because `frozenset`
+order is not and a key that drifts on restart is a cache that never hits and
+never complains; and `SIM_VERSION` is pinned against `REFERENCE_DIGEST` as a
+pair, so changing what Tier 1 reports forces a decision about what is stored.
 
 ### If the trigger fires: Rust, not Go
 
@@ -475,6 +522,29 @@ The settings on `main`, recorded so they can be rebuilt:
 
 The escape hatch is turning admin enforcement off in settings — deliberately a
 visible act rather than a `--no-verify` away.
+
+**This table was wrong for two days, in the direction that matters.** It listed
+`image` as a required check from the moment containerisation landed; the
+setting was not made until 2026-08-12, so every pull request in between was
+gated by four checks while this said five. Nothing broke, because the job was
+passing anyway — which is precisely why nobody would have noticed. Two things
+follow. A document describing settings is a *plan* until somebody reads the
+settings back, and this one is written to be rebuilt from, so being aspirational
+here is worse than being absent. And **adding a CI job is two steps**: writing
+it, and requiring it. The second has no artifact in the repository, so it is the
+one that gets forgotten.
+
+Read them back with:
+
+```bash
+gh api repos/aasquier/sylvan-library/branches/main/protection --jq .required_status_checks.contexts
+```
+
+Note also that the repository carries a **ruleset** ("Me") alongside the classic
+protection rule. It enforces only deletion and non-fast-forward, and it holds no
+status-check rule at all — so the GitHub UI has two plausible-looking places to
+look for this list and only one of them has it. Settings → Branches, not
+Settings → Rules.
 
 ### Claude review on every PR
 

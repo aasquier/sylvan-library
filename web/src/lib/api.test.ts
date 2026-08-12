@@ -70,6 +70,33 @@ describe('followJob', () => {
     await expect(promise).resolves.toMatchObject({ status: 'done' })
   })
 
+  it('resolves without a request when the submitted job is already done', async () => {
+    // A cache hit: the server memoises Tier 1 results, so the POST that starts
+    // a simulation can come back finished. Polling for it would be a wasted
+    // round trip and a frame of "Running…" for something that is not running.
+    const fetchMock = respondWith(job({ status: 'done', percent: 100 }))
+    const finished = job({
+      status: 'done', percent: 100, done: 1, total: 1,
+      result: { games: 300, cached: true, computed_at: '2026-08-12T09:00:00Z' },
+    })
+
+    const seen: Job[] = []
+    const { promise } = followJob('j1', (j) => seen.push(j), undefined, finished)
+
+    await expect(promise).resolves.toBe(finished)
+    expect(fetchMock).not.toHaveBeenCalled()
+    // The screen still gets its one update, so the result renders.
+    expect(seen).toEqual([finished])
+  })
+
+  it('still polls when the submitted job has work left to do', async () => {
+    const fetchMock = respondWith(job({ status: 'done', percent: 100 }))
+    const { promise } = followJob('j1', () => {}, undefined, job({ status: 'queued' }))
+
+    await expect(promise).resolves.toMatchObject({ status: 'done' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('polls through queued and running before resolving', async () => {
     const fetchMock = respondWith(
       job({ status: 'queued' }),

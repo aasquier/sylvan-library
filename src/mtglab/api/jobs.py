@@ -76,16 +76,41 @@ class Job:
         }
 
 
-def submit(kind: str, fn: Callable[[Callable[[int, int], None]], Any],
-           *, label: str = "", owner: int | None = None) -> Job:
-    """Queue `fn`, handing it a `progress(done, total)` callback to report with."""
-    job = Job(id=uuid.uuid4().hex[:12], kind=kind, label=label, owner=owner)
+def _record(job: Job) -> Job:
+    """Register a job, evicting finished ones if the registry is over its bound."""
     with _LOCK:
         _JOBS[job.id] = job
         if len(_JOBS) > MAX_JOBS:
             finished = [j for j in _JOBS.values() if j.status in ("done", "error")]
             for old in sorted(finished, key=lambda j: j.created_at)[:len(_JOBS) - MAX_JOBS]:
                 _JOBS.pop(old.id, None)
+    return job
+
+
+def completed(kind: str, *, result: Any, label: str = "",
+              owner: int | None = None) -> Job:
+    """A job that is already finished, because its answer was already known.
+
+    This is what a simulation cache hit returns (`sim/cache.py`). The
+    alternative was a second response shape saying "no job, here is the
+    result", and it was rejected: every client would need a branch, a hit would
+    leave no trace in `/api/jobs`, and the claim being made is not "this is not
+    a job" but "this job took no time". A job born done is the honest shape and
+    the response contract does not fork.
+
+    It still costs a registry slot, which is the point of `_record` being
+    shared -- fifty instant hits evict fifty finished jobs, not the running one.
+    """
+    return _record(Job(id=uuid.uuid4().hex[:12], kind=kind, status="done",
+                       done=1, total=1, result=result, label=label,
+                       owner=owner))
+
+
+def submit(kind: str, fn: Callable[[Callable[[int, int], None]], Any],
+           *, label: str = "", owner: int | None = None) -> Job:
+    """Queue `fn`, handing it a `progress(done, total)` callback to report with."""
+    job = _record(Job(id=uuid.uuid4().hex[:12], kind=kind, label=label,
+                      owner=owner))
 
     def progress(done: int, total: int) -> None:
         job.done, job.total = done, total

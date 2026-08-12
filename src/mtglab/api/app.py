@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,10 +19,15 @@ from fastapi.staticfiles import StaticFiles
 
 from mtglab import config
 from mtglab.api import admin, auth, jobs, service
-from mtglab.api.deps import Scope, deck_source
+from mtglab.api.deps import Scope, UserScope, deck_source
 from mtglab.auth import bootstrap
 from mtglab.auth.mail import EmailSender
 from mtglab.decks.source import DeckNotFound, DeckSource
+
+if TYPE_CHECKING:
+    # Type-only, so `simruns` stays lazily imported inside the two routes that
+    # need it -- it pulls in the engine, and every other route pays nothing.
+    from mtglab.api.simruns import Plan
 
 # The request scope, as one annotation. Every deck-facing route takes it, so
 # when auth arrives the change is to `deps.deck_source` and nowhere else.
@@ -413,19 +418,31 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     # than reading the registry directly -- `jobs.get` does the filtering, so
     # "whose is this" is answered in one place (ADR 5).
 
+    # Both sim routes plan before they queue. A plan compiles the deck -- a
+    # parse and one indexed corpus query -- and asks the cache whether these
+    # exact numbers already exist; if they do the job is born finished and the
+    # response is the same shape it always was, just with `status: "done"` on
+    # the first read. The cache is global rather than per-user on purpose: it
+    # is keyed on a hash of the compiled deck, so two callers share an entry
+    # only when they are asking for the identical simulation, and the answer
+    # carries nothing about whose deck produced it.
+
+    def _job_for(plan: Plan, caller: UserScope) -> jobs.Job:
+        """A finished job for a cache hit, a queued one for anything else."""
+        if plan.result is not None:
+            return jobs.completed(plan.kind, result=plan.result,
+                                  label=plan.label, owner=caller.user_id)
+        return jobs.submit(plan.kind, plan.run, label=plan.label,
+                           owner=caller.user_id)
+
     @app.post("/api/sim/mana")
     def sim_mana(payload: dict[str, Any], decks: Decks,
                  caller: Scope) -> dict[str, Any]:
         slug = payload.get("slug")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
-        from mtglab.api.simruns import run_mana
-        games = int(payload.get("games", 20_000))
-        job = jobs.submit(
-            "sim.mana",
-            lambda progress: run_mana(slug, payload, progress, source=decks),
-            label=f"{slug}: mana, {games:,} games", owner=caller.user_id)
-        return job.as_dict()
+        from mtglab.api.simruns import plan_mana
+        return _job_for(plan_mana(slug, payload, source=decks), caller).as_dict()
 
     @app.post("/api/sim/lands")
     def sim_lands(payload: dict[str, Any], decks: Decks,
@@ -433,14 +450,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         slug = payload.get("slug")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
-        from mtglab.api.simruns import run_lands
-        low = int(payload.get("low", 30))
-        high = int(payload.get("high", 40))
-        job = jobs.submit(
-            "sim.lands",
-            lambda progress: run_lands(slug, payload, progress, source=decks),
-            label=f"{slug}: land sweep {low}-{high}", owner=caller.user_id)
-        return job.as_dict()
+        from mtglab.api.simruns import plan_lands
+        return _job_for(plan_lands(slug, payload, source=decks), caller).as_dict()
 
     @app.get("/api/jobs")
     def list_jobs(caller: Scope) -> list[dict[str, Any]]:
