@@ -366,3 +366,188 @@ if __name__ == "__main__":
     # tests take a pytest fixture, so calling them bare would report noise
     # rather than results.
     sys.exit("run these under pytest:  pytest tests/test_cards_db.py")
+
+
+# ------------------------------------------------- printed stats and faces
+#
+# Added with the power/toughness columns. The bug that motivated them is the
+# one in `test_a_double_faced_card_is_not_a_free_spell`: Scryfall puts
+# `mana_cost`, `power` and `toughness` on the *faces* of a double-faced card
+# and not on the card, so reading only the top level recorded all 501 of them
+# with a NULL cost -- which `parse_mana_cost` turns into `{0}`, and the Tier 1
+# compiler then simulates as a free spell.
+
+DFC_FIXTURE = [
+    {"oracle_id": "id-etali",
+     "name": "Etali, Primal Conqueror // Etali, Primal Sickness",
+     "cmc": 7, "layout": "transform",
+     "type_line": "Legendary Creature — Elder Dinosaur // Legendary Creature "
+                  "— Phyrexian Elder Dinosaur",
+     "color_identity": ["G", "R"], "legalities": {"commander": "legal"},
+     "card_faces": [
+         {"name": "Etali, Primal Conqueror", "mana_cost": "{5}{R}{R}",
+          "type_line": "Legendary Creature — Elder Dinosaur",
+          "oracle_text": "Exile cards from the top of each library.",
+          "power": "7", "toughness": "7", "artist": "Ryan Pancoast"},
+         {"name": "Etali, Primal Sickness", "mana_cost": "",
+          "type_line": "Legendary Creature — Phyrexian Elder Dinosaur",
+          "oracle_text": "Toxic 10.", "power": "11", "toughness": "11"},
+     ]},
+    {"oracle_id": "id-tithe", "name": "Smothering Tithe", "mana_cost": "{3}{W}",
+     "cmc": 4, "type_line": "Enchantment", "oracle_text": "Pay {2} or else.",
+     "color_identity": ["W"], "legalities": {"commander": "legal"},
+     "layout": "normal", "game_changer": True, "artist": "Mark Behm"},
+    {"oracle_id": "id-tarmo", "name": "Tarmogoyf", "mana_cost": "{1}{G}",
+     "cmc": 2, "type_line": "Creature — Lhurgoyf", "oracle_text": "It grows.",
+     "color_identity": ["G"], "legalities": {"commander": "legal"},
+     "layout": "normal", "power": "*", "toughness": "1+*"},
+]
+
+
+@pytest.fixture
+def stats_con(tmp_path):
+    pytest.importorskip("duckdb")
+    from mtglab.cards.db import connect, load_oracle
+    con = connect(tmp_path / "mtg.duckdb")
+    load_oracle(con, _jsonl(tmp_path, DFC_FIXTURE))
+    yield con
+    con.close()
+
+
+def test_printed_stats_survive_the_ingest(stats_con):
+    rec = get_cards(stats_con, ["Smothering Tithe"])["Smothering Tithe"]
+    assert rec.power is None, "not a creature; absent, not zero"
+    assert rec.artist == "Mark Behm"
+
+
+def test_stats_are_strings_because_star_is_a_real_value(stats_con):
+    """Coercing to an integer either throws on Tarmogoyf or invents a number.
+    The corpus reports what is printed on the card."""
+    rec = get_cards(stats_con, ["Tarmogoyf"])["Tarmogoyf"]
+    assert rec.power == "*"
+    assert rec.toughness == "1+*"
+
+
+def test_a_double_faced_card_is_not_a_free_spell(stats_con):
+    """The regression path for the bug this column set was added alongside.
+
+    Etali is a seven-drop whose cost lives on its front face. Before the
+    fallback the corpus stored NULL, `parse_mana_cost(None)` returned `{0}`,
+    and Tier 1 cast it on turn one -- in two of the six real decks.
+    """
+    from mtglab.mana import parse_mana_cost
+    rec = get_cards(stats_con, ["Etali, Primal Conqueror"])[
+        "Etali, Primal Conqueror"]
+    assert rec.mana_cost == "{5}{R}{R}"
+    assert str(parse_mana_cost(rec.mana_cost)) != "{0}"
+
+
+def test_a_double_faced_card_reports_its_front_faces_stats(stats_con):
+    """The front face is the one you cast from hand. The back is still in
+    `card_faces`, which is stored unchanged."""
+    rec = get_cards(stats_con, ["Etali, Primal Conqueror"])[
+        "Etali, Primal Conqueror"]
+    assert (rec.power, rec.toughness) == ("7", "7"), "front, not the 11/11 back"
+    assert rec.artist == "Ryan Pancoast"
+
+
+def test_game_changer_is_read_off_the_card(stats_con):
+    assert get_cards(stats_con, ["Smothering Tithe"])["Smothering Tithe"].game_changer
+    assert not get_cards(stats_con, ["Tarmogoyf"])["Tarmogoyf"].game_changer
+
+
+def test_an_absent_game_changer_flag_is_false_not_none(stats_con):
+    """Scryfall omits it on some rows rather than sending false, and a missing
+    flag must not read as a missing *answer* -- `bool(None)` is the right
+    reading here and the ingest makes it explicit."""
+    rec = get_cards(stats_con, ["Etali, Primal Conqueror"])[
+        "Etali, Primal Conqueror"]
+    assert rec.game_changer is False
+
+
+# ------------------------------------------------------ old-schema tolerance
+
+#: `oracle_cards` exactly as it was before the printed-stat columns landed.
+#: Spelled out rather than produced by dropping columns from the current
+#: schema, because that is what an existing database on somebody's disk
+#: actually looks like -- and because DuckDB will not drop a column an index
+#: depends on, which is itself a hint that migrating in place is not free.
+OLD_SCHEMA = """
+CREATE TABLE oracle_cards (
+    oracle_id VARCHAR PRIMARY KEY, name VARCHAR, mana_cost VARCHAR,
+    cmc DOUBLE, type_line VARCHAR, oracle_text VARCHAR, colors VARCHAR[],
+    color_identity VARCHAR[], keywords VARCHAR[], produced_mana VARCHAR[],
+    legalities JSON, layout VARCHAR, card_faces JSON, reserved BOOLEAN,
+    edhrec_rank INTEGER, released_at DATE, set_code VARCHAR,
+    scryfall_uri VARCHAR, image_normal VARCHAR, image_art_crop VARCHAR
+);
+"""
+
+
+@pytest.fixture
+def old_con():
+    duckdb = pytest.importorskip("duckdb")
+    c = duckdb.connect(":memory:")
+    c.execute(OLD_SCHEMA)
+    c.execute(
+        "INSERT INTO oracle_cards (oracle_id, name, mana_cost, cmc, type_line, "
+        "oracle_text, color_identity, legalities, reserved) "
+        "VALUES ('id-gyome', 'Gyome, Master Chef', '{2}{B}{G}', 4, "
+        "'Legendary Creature — Troll', '', ['B','G'], ?, false)",
+        [json.dumps({"commander": "legal"})])
+    yield c
+    c.close()
+
+
+def test_a_corpus_without_the_new_columns_still_answers(old_con):
+    """The API opens the corpus read-only, so it cannot migrate itself. A
+    fixed column list would turn this schema change into an immediate outage
+    for every existing database rather than a prompt to re-ingest."""
+    from mtglab.cards.db import oracle_columns
+    assert "power" not in oracle_columns(old_con)
+
+    got = get_cards(old_con, ["Gyome, Master Chef"])
+    assert got["Gyome, Master Chef"].color_identity == frozenset("BG")
+    assert got["Gyome, Master Chef"].power is None
+    assert got["Gyome, Master Chef"].game_changer is False
+
+
+def test_an_old_corpus_reports_itself_stale(old_con):
+    """So the app can say "re-ingest" rather than showing every creature as
+    statless -- an all-NULL column reads exactly like "no card has power",
+    which is the quiet wrong answer the column was added to prevent."""
+    from mtglab.cards.db import corpus_is_stale
+    assert corpus_is_stale(old_con) is True
+
+
+def test_connect_migrates_an_old_database_in_place(tmp_path):
+    """A writable handle can fix itself, and must: `CREATE TABLE IF NOT EXISTS`
+    does nothing to a table that already exists."""
+    duckdb = pytest.importorskip("duckdb")
+    from mtglab.cards.db import connect, oracle_columns
+    path = tmp_path / "old.duckdb"
+    c = duckdb.connect(str(path))
+    c.execute(OLD_SCHEMA)
+    c.close()
+
+    con = connect(path)
+    try:
+        assert {"power", "toughness", "game_changer", "artist"} <= oracle_columns(con)
+    finally:
+        con.close()
+
+
+def test_a_current_corpus_is_not_stale(stats_con):
+    from mtglab.cards.db import corpus_is_stale
+    assert corpus_is_stale(stats_con) is False
+
+
+def test_an_empty_corpus_is_not_stale(tmp_path):
+    """Nothing to be wrong about, and `health()` already says it is missing."""
+    pytest.importorskip("duckdb")
+    from mtglab.cards.db import connect, corpus_is_stale
+    con = connect(tmp_path / "empty.duckdb")
+    try:
+        assert corpus_is_stale(con) is False
+    finally:
+        con.close()

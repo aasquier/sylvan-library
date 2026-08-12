@@ -64,6 +64,19 @@ def _connect():
         return None
 
 
+def corpus_stale(con) -> bool:
+    """Whether the corpus predates the printed-stat columns. Never raises.
+
+    Wrapped because `health()` must answer on a database in any state at all,
+    including one from a future version of this code. A health check that
+    500s is worse than one that says "I could not tell".
+    """
+    try:
+        return db.corpus_is_stale(con)
+    except Exception:                                               # noqa: BLE001
+        return False
+
+
 def health(*, source: DeckSource | None = None) -> dict[str, Any]:
     con = _connect()
     if con is None:
@@ -72,6 +85,7 @@ def health(*, source: DeckSource | None = None) -> dict[str, Any]:
     try:
         oracle = con.execute("SELECT count(*) FROM oracle_cards").fetchone()[0]
         printings = con.execute("SELECT count(*) FROM printings").fetchone()[0]
+        stale = corpus_stale(con)
     finally:
         con.close()
     files = sorted(Path("data/scryfall").glob("*.jsonl.gz")) if \
@@ -82,6 +96,13 @@ def health(*, source: DeckSource | None = None) -> dict[str, Any]:
         "printings": printings,
         "bulk_files": [f.name for f in files],
         "decks": len(_source(source).slugs()),
+        # A corpus loaded before the printed-stat columns existed answers every
+        # question about power with NULL, which reads as "this card has no
+        # power". Saying so is the difference between a prompt to re-ingest and
+        # a quiet wrong answer about every creature in the library.
+        "corpus_stale": stale,
+        **({"message": "corpus predates power/toughness -- "
+                       "run `mtglab data refresh`"} if stale else {}),
     }
 
 
@@ -118,6 +139,12 @@ def _card_json(entry, rec) -> dict[str, Any]:
             "art_crop": getattr(rec, "image_art_crop", None),
             "edhrec_rank": rec.edhrec_rank,
             "reserved": rec.reserved,
+            # Printed stats, so a rationale claiming "a 6/6" is checkable
+            # against the card rather than against a memory of it.
+            "power": rec.power,
+            "toughness": rec.toughness,
+            "loyalty": rec.loyalty,
+            "game_changer": rec.game_changer,
         })
     return out
 
@@ -1092,6 +1119,16 @@ def cards_named(*, names: list[str]) -> dict[str, Any]:
                 "reserved": rec.reserved,
                 "edhrec_rank": rec.edhrec_rank,
                 "image": rec.image_normal,
+                # Strings, because "*" and "1+*" are real printed values. For
+                # a double-faced card these are the front face's, matching
+                # `mana_cost`; both faces stay available in `card_faces`.
+                "power": rec.power,
+                "toughness": rec.toughness,
+                "loyalty": rec.loyalty,
+                "defense": rec.defense,
+                "game_changer": rec.game_changer,
+                "flavor_text": rec.flavor_text,
+                "artist": rec.artist,
             })
         return {
             "cards": cards,

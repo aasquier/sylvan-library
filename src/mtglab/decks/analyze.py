@@ -31,6 +31,55 @@ CATEGORY_TARGETS: dict[str, tuple[int, int]] = {
     "tutor": (0, 10),
 }
 
+#: How many cards from the official Game Changers list each bracket permits.
+#: `None` means no limit.
+#:
+#: Unlike `CATEGORY_TARGETS` above, which is conventional guidance, this is the
+#: published rule for the bracket a deck declares — which is why it can be
+#: *counted* rather than estimated. Scryfall carries the flag per card, so the
+#: count is a corpus fact.
+#:
+#: It is still reported rather than enforced. `validate.py` is the gate and
+#: this module is the advice, and the same reasoning that keeps a banned card a
+#: matter for the user to resolve applies here: which Game Changer to cut, or
+#: whether to move the deck up a bracket, is a decision rather than a fix.
+GAME_CHANGER_LIMITS: dict[int, int | None] = {
+    1: 0, 2: 0, 3: 3, 4: None, 5: None,
+}
+
+
+def game_changers(deck: Deck, cards: dict | None = None) -> dict[str, Any]:
+    """Which Game Changers the deck runs, and what its bracket allows.
+
+    Returns `allowed: None` for an unlimited bracket and `verdict: "unknown"`
+    when the deck declares no bracket or the corpus is missing — an absent
+    count is not a count of zero, and a deck that reports "0 Game Changers"
+    because nobody looked is the quiet wrong answer this project keeps finding.
+    """
+    cards = cards or {}
+    names = [c.name for c in deck.cards] + list(deck.commander)
+    if deck.companion:
+        names.append(deck.companion)
+
+    found = [n for n in names
+             if getattr(cards.get(n), "game_changer", False)]
+    allowed = GAME_CHANGER_LIMITS.get(deck.bracket or 0)
+
+    if not cards or deck.bracket is None:
+        verdict = "unknown"
+    elif allowed is None or len(found) <= allowed:
+        verdict = "ok"
+    else:
+        verdict = "over"
+
+    return {
+        "cards": sorted(found),
+        "count": len(found),
+        "allowed": allowed,
+        "bracket": deck.bracket,
+        "verdict": verdict,
+    }
+
 
 @dataclass
 class CurveBucket:
@@ -218,6 +267,7 @@ def deck_stats(deck: Deck, cards: dict | None = None) -> dict[str, Any]:
         "land_count": deck.land_count,
         "curve": curve(deck, cards),
         "categories": category_report(deck),
+        "game_changers": game_changers(deck, cards),
         "colors": [
             {
                 "color": n.color,

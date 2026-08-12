@@ -130,7 +130,10 @@ def test_the_service_resolves_the_corpus_path_at_call_time(tmp_path):
         con = service._connect()
         assert con is not None
         try:
-            assert con.execute("SELECT count(*) FROM oracle_cards").fetchone()[0] == 4
+            # The fixture's own size, not a number to remember here -- the
+            # point of this test is which *path* was opened.
+            assert (con.execute("SELECT count(*) FROM oracle_cards").fetchone()[0]
+                    == len(tiny_corpus.CARDS))
         finally:
             con.close()
 

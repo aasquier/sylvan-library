@@ -8,7 +8,10 @@ from memory), so testing it against a fake would test the wrong thing.
 
 Four cards is enough to cover every resolution rule: a legendary commander, a
 colourless artifact, a basic land, and a banned card so the gate has something
-real to catch on day one.
+real to catch on day one. A fifth was added with the power/toughness columns:
+a double-faced card, because that is the one shape where Scryfall puts the
+stats *and the mana cost* on the faces rather than on the card, and reading
+only the top level is how 501 cards ended up in the corpus as free spells.
 """
 
 from __future__ import annotations
@@ -46,7 +49,53 @@ CARDS = [
      "colors": ["G"], "color_identity": ["G"], "keywords": ["Trample"],
      "produced_mana": [], "legalities": {"commander": "banned"},
      "layout": "normal", "reserved": False, "edhrec_rank": 300,
-     "released_at": "2010-10-01", "set": "m11"},
+     "released_at": "2010-10-01", "set": "m11",
+     "power": "6", "toughness": "6", "artist": "Aleksi Briclot",
+     "flavor_text": "The land itself rises to his call."},
+    # A double-faced card, shaped exactly as Scryfall serves one: no top-level
+    # `mana_cost`, `power` or `toughness`, all of it on the faces. Reading only
+    # the top level makes this a free 0/0, which is precisely the bug the
+    # front-face fallback fixes.
+    #
+    # Every value here is copied from the real Scryfall row, including the
+    # {G}{R} identity that a mono-green reading of the name would get wrong.
+    # A fixture that names a real card and then lies about it is a fixture
+    # that teaches the wrong thing -- rule 1 applies to test data too.
+    {"oracle_id": "id-etali", "name": "Etali, Primal Conqueror // Etali, Primal "
+                                      "Sickness",
+     "cmc": 7,
+     "type_line": "Legendary Creature — Elder Dinosaur // Legendary Creature "
+                  "— Phyrexian Elder Dinosaur",
+     "colors": ["R"], "color_identity": ["G", "R"],
+     "keywords": ["Indestructible", "Transform", "Trample"],
+     "produced_mana": [], "legalities": {"commander": "legal"},
+     "layout": "transform", "reserved": False, "edhrec_rank": 790,
+     "released_at": "2023-04-21", "set": "one",
+     "game_changer": False,
+     "card_faces": [
+         {"name": "Etali, Primal Conqueror", "mana_cost": "{5}{R}{R}",
+          "type_line": "Legendary Creature — Elder Dinosaur",
+          "oracle_text": "When this creature enters, each player exiles cards "
+                         "from the top of their library.",
+          "power": "7", "toughness": "7", "artist": "Ryan Pancoast",
+          "image_uris": {"normal": "https://img/etali.jpg",
+                         "art_crop": "https://img/etali-art.jpg"}},
+         {"name": "Etali, Primal Sickness", "mana_cost": "",
+          "type_line": "Legendary Creature — Phyrexian Elder Dinosaur",
+          "oracle_text": "Toxic 10. Trample.",
+          "power": "11", "toughness": "11", "artist": "Ryan Pancoast",
+          "flavor_text": "The contagion spreads and the Multiverse quakes."},
+     ]},
+    # The one card here on the official Game Changers list, so a bracket count
+    # has something real to find.
+    {"oracle_id": "id-tithe", "name": "Smothering Tithe", "mana_cost": "{3}{W}",
+     "cmc": 4, "type_line": "Enchantment",
+     "oracle_text": "Whenever an opponent draws a card, that player may pay "
+                    "{2}. If they don't, you create a Treasure token.",
+     "colors": ["W"], "color_identity": ["W"], "keywords": [],
+     "produced_mana": [], "legalities": {"commander": "legal"},
+     "layout": "normal", "reserved": False, "edhrec_rank": 20,
+     "released_at": "2019-01-25", "set": "rna", "game_changer": True},
 ]
 
 
