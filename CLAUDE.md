@@ -161,10 +161,14 @@ right answer belongs in deterministic Python; Claude is for opinions and
 research.**
 
 **Started, not finished.** `src/mtglab/claude/` is the pipe — a client on
-`ANTHROPIC_API_KEY` and tool schemas over the read-only half of
-`api/service.py`. `mtglab claude check` makes one real call and says whether
-the key is live. There are no modes, no stance and no UI yet, so check what is
-actually there before assuming either way.
+`ANTHROPIC_API_KEY` and seven read-only tool schemas over `api/service.py` —
+plus the stance (`stance.py`, three axes, off by default) and one mode: the
+**rationale interview** (`modes.py`, `interview.py`), which asks about a card's
+slot so you can write its `why`. `mtglab claude check` proves the key;
+`mtglab claude interview <slug> --card X` runs the mode, and the deck page runs
+it beside the rationale box. The other three modes ADR 15 names, the activity
+log, and any UI for the stance dial do not exist — check what is actually there
+before assuming either way.
 
 [ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md) says
 what a surface *is*: a **mode** (a system prompt, a tool set, and what it may

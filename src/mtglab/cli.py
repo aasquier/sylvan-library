@@ -11,6 +11,8 @@
     mtglab sim lands <slug> 30..40      land-count sweep, flood-aware
     mtglab price deck <slug>            cheapest legal printing per card
     mtglab claude check                 one real API call -- is the key live?
+    mtglab claude interview <slug>      questions about a card's slot; you
+                            --card X    write the rationale, it never does
 """
 
 from __future__ import annotations
@@ -566,6 +568,57 @@ def cmd_claude_check(args):
             print(f"    {name}")
 
 
+def cmd_claude_interview(args):
+    """Questions about one card's slot, so you can write its rationale.
+
+    Prints questions and no rationale, which is the whole design rather than a
+    presentation choice -- there is no rationale in the response to print. The
+    output is labelled as Claude's because the gate's output is reproducible
+    and this is not, and a terminal that renders them alike is the one place
+    ADR 14's third boundary is easiest to lose.
+    """
+    from mtglab.api import service
+    from mtglab.claude.client import ClaudeUnavailable
+    from mtglab.claude.interview import CardNotInDeck
+
+    try:
+        report = service.claude_interview(
+            slug=args.slug, card=args.card,
+            requested=args.stance, focus=args.focus or "")
+    except (CardNotInDeck, ClaudeUnavailable, service.ClaudeFailed) as exc:
+        print(f"  {exc}")
+        sys.exit(1)
+
+    stance = report["stance"]
+    print(f"\n  {report['card']} — {report['slug']}")
+    print(f"  asked as: {stance['preset'] or 'custom'} "
+          f"(scope: {stance['axes'][1]['level']})")
+
+    if not report["asked"]:
+        print(f"\n  {report['reason']}")
+        return
+
+    if report["tool_calls"]:
+        looked = ", ".join(sorted({c["tool"] for c in report["tool_calls"]}))
+        print(f"  looked up: {looked}")
+
+    print(f"\n  Claude asks — {report['model']}, not the gate:\n")
+    for i, q in enumerate(report["questions"], 1):
+        print(f"  {i}. [{q['angle']}] {q['question']}")
+        if q["fact"]:
+            print(f"       ({q['fact']})")
+    if not report["questions"]:
+        print(f"  nothing usable came back. {report['reason']}")
+    if report["questions_dropped"]:
+        print(f"\n  {report['questions_dropped']} answer(s) dropped: not questions.")
+
+    print(f"\n  {report['never']}")
+    print(f"  Write it with: mtglab decks set {args.slug} "
+          f"--card {report['card']!r} --why '...'")
+    usage = report["usage"]
+    print(f"  tokens: {usage['input_tokens']} in / {usage['output_tokens']} out")
+
+
 # --------------------------------------------------------------------- main
 
 def main(argv=None):
@@ -688,6 +741,14 @@ def main(argv=None):
     cc.add_argument("--tools", action="store_true",
                     help="also list the tools a Claude surface may call")
     cc.set_defaults(func=cmd_claude_check)
+    ci = claude.add_parser("interview",
+                           help="questions about one card's slot; you write the why")
+    ci.add_argument("slug")
+    ci.add_argument("--card", required=True, help="a card already in the deck")
+    ci.add_argument("--stance", default="consultant",
+                    help="off | consultant | second-opinion | collaborator")
+    ci.add_argument("--focus", help="what you are stuck on, in your own words")
+    ci.set_defaults(func=cmd_claude_interview)
 
     args = p.parse_args(argv)
     args.func(args)

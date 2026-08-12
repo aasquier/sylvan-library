@@ -18,6 +18,7 @@ vi.mock('../lib/api', () => ({
     deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
     swapCard: vi.fn(), addCard: vi.fn(), removeCard: vi.fn(),
     setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),
+    claudeStatus: vi.fn(), interview: vi.fn(),
   },
 }))
 
@@ -113,6 +114,43 @@ function openValidation() {
   fireEvent.click(screen.getByRole('button', { name: 'Validation' }))
 }
 
+/** A stance rendered the way `mtglab.claude.stance.describe` renders one. */
+const STANCE = {
+  preset: 'consultant', allows_calls: true, may_write: false,
+  axes: [
+    { axis: 'initiative', question: 'When may it speak?', level: 'on-request',
+      means: 'Only when you ask it something.',
+      levels: ['off', 'on-request', 'volunteers', 'interjects'] },
+    { axis: 'scope', question: 'How far?', level: 'flagged',
+      means: 'Only the cards the gate already flagged.',
+      levels: ['flagged', 'adjacent', 'rethink'] },
+    { axis: 'write', question: 'What may it change?', level: 'none',
+      means: 'Nothing. It talks; you type.',
+      levels: ['none', 'proposes', 'applies'] },
+  ],
+}
+
+const CLAUDE_STATUS = {
+  installed: true, configured: true, model: 'claude-sonnet-5',
+  stance: STANCE, ceiling: STANCE, default: STANCE, presets: [],
+  never: 'No stance lets Claude write a card’s rationale.',
+  modes: [{ name: 'rationale-interview', purpose: 'Asks about a slot.',
+            tools: ['get_cards'], writes: [] }],
+}
+
+const INTERVIEW = {
+  answered_by: 'claude', mode: 'rationale-interview',
+  model: 'claude-sonnet-5', slug: 'goreclaw-stompy', card: 'Sol Ring',
+  asked: true, reason: '', stance: STANCE,
+  questions: [
+    { question: 'What is it accelerating you into?', angle: 'role',
+      fact: 'Adds two colourless.' },
+  ],
+  questions_dropped: 0,
+  tool_calls: [], usage: { input_tokens: 10, output_tokens: 5 },
+  never: 'These are questions. The rationale is yours to write.',
+}
+
 beforeEach(() => {
   // `mockReset`, not just a fresh return value. `restoreMocks` in
   // vitest.config.ts only touches spies created with `vi.spyOn`; a bare
@@ -133,6 +171,10 @@ beforeEach(() => {
                     api.setDeckField]) {
     vi.mocked(fn).mockReset().mockResolvedValue(EDIT_RESULT)
   }
+  // Installed and configured by default, so the interview panel renders its
+  // button rather than its "not installed" note in most tests.
+  vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(CLAUDE_STATUS)
+  vi.mocked(api.interview).mockReset().mockResolvedValue(INTERVIEW)
 })
 
 afterEach(cleanup)
@@ -345,6 +387,99 @@ describe('DeckDetail rationale editor', () => {
     const row = await openEditorFor('Primeval Titan')
     expect((within(row).getByRole('textbox') as HTMLTextAreaElement).value)
       .toBe('Ramp and threat in one card.')
+  })
+
+  /**
+   * The rationale interview, in the same column as the corpus text.
+   *
+   * The test that matters here is the second one: asking for questions must
+   * leave the textarea exactly as the user left it. Every other guard on this
+   * boundary is server-side — the mode has no write tool, the response schema
+   * has no field for a rationale, non-questions are dropped — and this is the
+   * one that would catch somebody adding a "use this" button in the UI.
+   */
+  it('does not ask anything until the button is pressed', async () => {
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    const row = await openEditorFor('Sol Ring')
+    // Opening the editor may check what is installed; it may not spend money.
+    await waitFor(() => expect(api.claudeStatus).toHaveBeenCalled())
+    expect(api.interview).not.toHaveBeenCalled()
+
+    fireEvent.click(await within(row).findByRole(
+      'button', { name: /ask for questions/i }))
+    await waitFor(() => expect(api.interview).toHaveBeenCalledWith(
+      'goreclaw-stompy', { card: 'Sol Ring' }))
+  })
+
+  it('renders the questions beside the box and puts nothing in it', async () => {
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    const row = await openEditorFor('Sol Ring')
+    const box = within(row).getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(box, { target: { value: 'my own words' } })
+
+    fireEvent.click(await within(row).findByRole(
+      'button', { name: /ask for questions/i }))
+    await within(row).findByText('What is it accelerating you into?')
+
+    // The whole rule, in one assertion: questions arrived, the field did not
+    // change, and there is no control offering to change it.
+    expect(box.value).toBe('my own words')
+    expect(within(row).queryByRole('button', { name: /use this|insert|copy/i }))
+      .toBeNull()
+  })
+
+  it('labels the answer as Claude’s rather than the gate’s', async () => {
+    // ADR 14 boundary 3. The gate's output is reproducible and this is not,
+    // and a user must be able to tell which one they are reading.
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    const row = await openEditorFor('Sol Ring')
+    fireEvent.click(await within(row).findByRole(
+      'button', { name: /ask for questions/i }))
+
+    await within(row).findByText(/not the gate/)
+    expect(within(row).getByText(/yours to write/)).toBeTruthy()
+  })
+
+  it('reports dropped answers rather than hiding them', async () => {
+    // A model that has started writing rationales instead of asking questions
+    // should be visible, not silently filtered.
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    vi.mocked(api.interview).mockResolvedValue({
+      ...INTERVIEW, questions: [], questions_dropped: 2,
+    })
+    const row = await openEditorFor('Sol Ring')
+    fireEvent.click(await within(row).findByRole(
+      'button', { name: /ask for questions/i }))
+
+    await within(row).findByText(/2 answers were not a question/)
+  })
+
+  it('says a stance of off made no call, rather than showing an empty list', async () => {
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    vi.mocked(api.interview).mockResolvedValue({
+      ...INTERVIEW, asked: false, questions: [],
+      reason: 'The stance is off, so no call was made.',
+    })
+    const row = await openEditorFor('Sol Ring')
+    fireEvent.click(await within(row).findByRole(
+      'button', { name: /ask for questions/i }))
+
+    await within(row).findByText(/stance is off/)
+  })
+
+  it('offers nothing to press when the SDK is not installed', async () => {
+    // Three different answers, kept apart: not installed, no key, and nothing
+    // asked yet. Collapsing them tells someone their key is missing when they
+    // simply never installed the extra.
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    vi.mocked(api.claudeStatus).mockResolvedValue({
+      ...CLAUDE_STATUS, installed: false,
+    })
+    const row = await openEditorFor('Sol Ring')
+
+    await within(row).findByText(/not installed/)
+    expect(within(row).queryByRole('button', { name: /ask for questions/i }))
+      .toBeNull()
   })
 
   it('shows the card as the corpus has it, beside the box', async () => {

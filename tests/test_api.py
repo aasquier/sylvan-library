@@ -1055,3 +1055,56 @@ def test_a_deployment_ceiling_marks_presets_unavailable(client, monkeypatch):
 def test_the_rule_with_no_stance_above_it_is_stated_next_to_the_dial(client):
     body = client.get("/api/claude").json()
     assert "rationale" in body["never"]
+
+
+def test_the_status_lists_the_modes_that_actually_exist(client):
+    """ADR 15 planned four. A UI should offer the ones that are built, and the
+    capability column is the part worth serving: it is empty, and saying so is
+    more useful than leaving a client to assume."""
+    body = client.get("/api/claude").json()
+    names = {m["name"] for m in body["modes"]}
+    assert "rationale-interview" in names
+    assert all(m["writes"] == [] for m in body["modes"])
+
+
+# --------------------------------------------------- the rationale interview
+#
+# No test here makes a real call. The route is exercised on the paths that stop
+# before one — a bad request, and a stance of `off` — because those are the
+# paths a suite can assert on for free, and the rest is a command
+# (`mtglab claude interview`) for the same reason `claude check` is.
+
+def test_the_interview_needs_a_card(client):
+    r = client.post("/api/decks/gyome-food/interview", json={})
+    assert r.status_code == 422
+
+
+def test_the_interview_refuses_a_card_the_deck_does_not_run(client):
+    """A 422 rather than a 404: the deck is fine, the question is not."""
+    r = client.post("/api/decks/gyome-food/interview",
+                    json={"card": "Black Lotus", "stance": "consultant"})
+    assert r.status_code == 422
+    assert "not in gyome-food" in r.json()["detail"]
+
+
+def test_the_interview_on_an_unknown_deck_is_a_404(client):
+    r = client.post("/api/decks/no-such-deck/interview", json={"card": "Sol Ring"})
+    assert r.status_code == 404
+
+
+def test_the_interview_at_a_stance_of_off_makes_no_call(client):
+    """`off` is a real position, all the way down to the route. The client is
+    sabotaged so that any attempt to build one fails the test."""
+    import mtglab.claude.client as cc
+    original = cc.connect
+    cc.connect = lambda: pytest.fail("a stance of off must make no call")
+    try:
+        r = client.post("/api/decks/gyome-food/interview",
+                        json={"card": "Bag End Banquet", "stance": "off"})
+    finally:
+        cc.connect = original
+    assert r.status_code == 200
+    body = r.json()
+    assert body["asked"] is False
+    assert body["questions"] == []
+    assert body["answered_by"] == "claude", "labelled even when it said nothing"
