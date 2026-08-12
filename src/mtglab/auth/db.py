@@ -6,6 +6,11 @@ accounts today, their decks at `docs/HOSTING.md` §6 step 6. Different
 lifecycles and different backup rules, which is why §2 says not to merge them
 for tidiness.
 
+One table is the exception and says so in its own migration: `sim_cache` is
+derived, and dropping it costs CPU rather than data. It is here because the
+results are keyed to decks on the same volume and must survive a deploy the
+same way they do.
+
 Three pragmas, each load-bearing:
 
 - **WAL**, so a reader never blocks the writer. The API serves sync endpoints
@@ -34,7 +39,7 @@ from mtglab import config
 
 # Bumped when `_MIGRATIONS` grows. Stored in SQLite's own `user_version`, which
 # costs no table and cannot be forgotten in a schema dump.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # One entry per version, applied in order to whatever the file is at. A fresh
 # database runs all of them; an existing one runs the tail. The invite and
@@ -109,6 +114,40 @@ _MIGRATIONS: tuple[str, ...] = (
     );
 
     CREATE INDEX auth_tokens_by_user ON auth_tokens(user_id, purpose);
+    """,
+    # -- 3 ------------------------------------------------------------------
+    # Memoised Tier 1 results (`sim/cache.py`), the table `docs/HOSTING.md` §2
+    # sketched and ADR 4 listed in this file's contents. It is the one thing in
+    # here that is *derived*: every row can be recomputed from the deck and the
+    # corpus, and dropping the table loses nothing but CPU time. That is why
+    # `mtglab sim cache --clear` is a supported operation and why nothing else
+    # in `app.db` has one.
+    #
+    # It lives here anyway rather than in a third store, because the rows are
+    # keyed to decks that live on the same volume and have to survive a deploy
+    # the same way -- and because a second SQLite file would be a second copy
+    # of the pragmas, the migration ladder and the backup question, for data
+    # measured in kilobytes.
+    """
+    CREATE TABLE sim_cache (
+        -- sha256 over the *compiled* deck, the run parameters, the seed and a
+        -- fingerprint of the engine's own source. Not a deck slug and not a
+        -- hash of deck.yaml: card facts come from the corpus, so a refresh can
+        -- change a simulation while the deck file does not move. See
+        -- `sim/cache.py` for the full argument.
+        key          TEXT PRIMARY KEY,
+        -- 'sim.mana' or 'sim.lands.count'. Stored for `mtglab sim cache` and
+        -- so a future eviction policy can prefer one kind over another; the
+        -- key alone would make both opaque.
+        kind         TEXT NOT NULL,
+        result_json  TEXT NOT NULL,
+        created_at   TEXT NOT NULL,
+        -- Touched on every hit, so eviction is least-recently-used. The
+        -- numbers everyone opens are the ones worth keeping.
+        last_used_at TEXT NOT NULL
+    );
+
+    CREATE INDEX sim_cache_by_use ON sim_cache(last_used_at);
     """,
 )
 

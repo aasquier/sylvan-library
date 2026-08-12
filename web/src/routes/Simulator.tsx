@@ -14,6 +14,46 @@ import {
 
 type Mode = 'mana' | 'lands'
 
+/** The seed a run gets unless you ask for another. Matches
+ * `simruns.DEFAULT_SEED`, so the app and the CLI describe the same sample. */
+const DEFAULT_SEED = 7
+
+/** A seed nobody would pick twice. "New sample" is the deliberate act of
+ * asking for a different draw; everything else is reproducible on purpose. */
+const newSeed = () => Math.floor(Math.random() * 1_000_000) + 1
+
+/** How old a cached result is, in words rather than an ISO timestamp. */
+function ago(iso: string): string {
+  const seconds = Math.max(0, (Date.now() - Date.parse(iso)) / 1000)
+  if (!Number.isFinite(seconds)) return 'earlier'
+  if (seconds < 90) return 'moments ago'
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`
+  if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`
+  return `${Math.round(seconds / 86400)} d ago`
+}
+
+/** Where a number came from: this run, or a previous identical one.
+ *
+ * Shown rather than hidden. The results are cached on the deck's *compiled*
+ * content, so a hit means nothing about the deck or the parameters changed —
+ * but a figure that cannot say how old it is cannot be read honestly, which is
+ * the same reason every Tier 1 result ships with its caveat.
+ */
+function Provenance({ seed, cached, computed_at }: {
+  seed: number; cached: boolean; computed_at: string | null
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs"
+         style={{ color: 'var(--text-secondary)' }}>
+      <Badge>seed {seed}</Badge>
+      {cached && computed_at
+        ? <span>Cached — computed {ago(computed_at)}. Same deck, same
+            parameters, same numbers.</span>
+        : <span>Computed just now.</span>}
+    </div>
+  )
+}
+
 export default function Simulator() {
   const [params, setParams] = useSearchParams()
   const [decks, setDecks] = useState<DeckSummary[]>([])
@@ -25,6 +65,7 @@ export default function Simulator() {
   const [minPieces, setMinPieces] = useState(3)
   const [low, setLow] = useState(30)
   const [high, setHigh] = useState(40)
+  const [seed, setSeed] = useState(DEFAULT_SEED)
 
   const [job, setJob] = useState<Job | null>(null)
   const [mana, setMana] = useState<ManaResult | null>(null)
@@ -45,7 +86,7 @@ export default function Simulator() {
     if (slug) setParams({ deck: slug }, { replace: true })
   }, [slug, setParams])
 
-  async function run() {
+  async function run(withSeed = seed) {
     if (!slug) return
     cancelRef.current?.()
     setError(null)
@@ -54,14 +95,16 @@ export default function Simulator() {
     try {
       const payload = {
         slug, games, min_lands: minLands, max_lands: maxLands,
-        min_pieces: minPieces,
+        min_pieces: minPieces, seed: withSeed,
       }
       const submitted =
         mode === 'mana'
           ? await api.simMana({ ...payload, turns: 12 })
           : await api.simLands({ ...payload, low, high, games: Math.min(games, 25000) })
       setJob(submitted)
-      const follower = followJob(submitted.id, setJob)
+      // The submitted job is handed on: results are cached server-side, so it
+      // can already be `done` and there is nothing to poll for.
+      const follower = followJob(submitted.id, setJob, undefined, submitted)
       cancelRef.current = follower.cancel
       const finished = await follower.promise
       if (mode === 'mana') setMana(finished.result as ManaResult)
@@ -69,6 +112,17 @@ export default function Simulator() {
     } catch (e) {
       setError(errorMessage(e))
     }
+  }
+
+  /** Re-run the same deck against a different shuffle.
+   *
+   * The seed is fixed by default so the numbers on a deck are reproducible and
+   * cost nothing to look at twice. Wanting a second sample is legitimate and
+   * cheap to ask for — it is just no longer what happens by accident. */
+  function resample() {
+    const next = newSeed()
+    setSeed(next)
+    void run(next)
   }
 
   const running = job?.status === 'queued' || job?.status === 'running'
@@ -108,10 +162,18 @@ export default function Simulator() {
                          min={0} max={7} />
           </>
         )}
-        <button onClick={run} disabled={running || !slug}
+        <NumberField label="Seed" value={seed} onChange={setSeed}
+                     min={1} max={999999} />
+        <button onClick={() => run()} disabled={running || !slug}
                 className="h-9 rounded-lg px-4 text-sm font-medium disabled:opacity-50"
                 style={{ background: 'var(--series-1)', color: '#fff' }}>
           {running ? 'Running…' : 'Run simulation'}
+        </button>
+        <button onClick={resample} disabled={running || !slug}
+                title="Run the same deck against a different shuffle"
+                className="h-9 rounded-lg border px-4 text-sm font-medium disabled:opacity-50"
+                style={{ borderColor: 'var(--gridline)' }}>
+          New sample
         </button>
       </div>
 
@@ -167,6 +229,8 @@ export default function Simulator() {
             />
           </section>
 
+          <Provenance seed={mana.seed} cached={mana.cached}
+                      computed_at={mana.computed_at} />
           <Caveat>{mana.caveat}</Caveat>
         </div>
       )}
@@ -231,6 +295,8 @@ export default function Simulator() {
             />
           </section>
 
+          <Provenance seed={lands.seed} cached={lands.cached}
+                      computed_at={lands.computed_at} />
           <Caveat>{lands.caveat}</Caveat>
         </div>
       )}

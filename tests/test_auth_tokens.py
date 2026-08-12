@@ -58,8 +58,8 @@ class Recorder:
 
 # --------------------------------------------------------------- the schema
 
-def test_the_database_is_at_version_two(con):
-    assert con.execute("PRAGMA user_version").fetchone()[0] == 2
+def test_the_database_is_at_version_three(con):
+    assert con.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 3
 
 
 def test_a_version_one_database_migrates_in_place(tmp_path):
@@ -72,16 +72,45 @@ def test_a_version_one_database_migrates_in_place(tmp_path):
     old = auth_db.connect(path)
     users.create(old, "ada", password=PASSWORD)
     # Wind it back to what version 1 left behind.
-    old.executescript("DROP TABLE auth_tokens; PRAGMA user_version = 1;")
+    old.executescript(
+        "DROP TABLE auth_tokens; DROP TABLE sim_cache; PRAGMA user_version = 1;")
     old.commit()
     old.close()
 
     migrated = auth_db.connect(path)
     try:
-        assert migrated.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert migrated.execute("PRAGMA user_version").fetchone()[0] == 3
         assert users.get(migrated, "ada") is not None, "the account survived"
         assert tokens.issue(migrated, users.get(migrated, "ada").id,
                             tokens.Purpose.INVITE)
+        assert migrated.execute("SELECT count(*) FROM sim_cache").fetchone()[0] == 0
+    finally:
+        migrated.close()
+
+
+def test_a_version_two_database_gains_the_sim_cache(tmp_path):
+    """The upgrade that actually happens on the maintainer's laptop.
+
+    Every `app.db` in existence when the simulation cache landed was at version
+    two, holding real accounts. The tail of the ladder has to run against one
+    without touching what is already there -- which is the case a fresh-database
+    test cannot see, because a fresh database runs every migration in order and
+    would pass even if the tail assumed an empty file.
+    """
+    from mtglab.auth import db as auth_db
+
+    path = tmp_path / "v2.db"
+    old = auth_db.connect(path)
+    users.create(old, "ada", password=PASSWORD)
+    old.executescript("DROP TABLE sim_cache; PRAGMA user_version = 2;")
+    old.commit()
+    old.close()
+
+    migrated = auth_db.connect(path)
+    try:
+        assert migrated.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert users.get(migrated, "ada") is not None, "the account survived"
+        assert migrated.execute("SELECT count(*) FROM sim_cache").fetchone()[0] == 0
     finally:
         migrated.close()
 

@@ -31,6 +31,7 @@ they differ.
 | [15](0015-claude-surfaces-are-modes-with-capabilities.md) | Claude surfaces are modes with a user-set stance, and no stance may write a rationale | Accepted |
 | [16](0016-accounts-are-invited-and-passwords-are-self-served.md) | Accounts are invited, and passwords are self-served by email | Accepted |
 | [17](0017-the-maintainer-is-named-in-the-environment.md) | The maintainer is named in the environment, and admin routes live behind a prefix | Accepted |
+| [18](0018-a-cached-simulation-is-keyed-on-its-compiled-input.md) | A cached simulation is keyed on its compiled input, not on the deck file | Accepted |
 
 **Proposed** means the decision is made and argued but nothing implements it
 yet — 4 and 5 still describe a deployment that does not exist. 16 was Proposed
@@ -42,10 +43,18 @@ code rather than intent.
 rather than after it: 5 decided that a resource belonging to one person is
 reported as 404 and not 403, and 17 is the case where that rule deliberately
 does *not* apply — an admin route's existence is published in this repository,
-so 403 hides nothing and says something useful. What is still missing is the
-browser's way in: **there is no login screen and no claim page**, which
-`docs/HOSTING.md` §6 step 5c tracks. The admin surface now exists and, with
-auth on, sits behind a door nobody can open yet.
+so 403 hides nothing and says something useful. The browser's way in — the
+login screen and the claim page, `docs/HOSTING.md` §6 step 5c — landed later
+the same day, so the admin surface is reachable rather than sitting behind a
+door nobody can open.
+
+18 is the first ADR that refines an earlier one without superseding any of it.
+4 put a `sim_cache` table in `app.db` and described a sim result as a pure
+function of "deck content + parameters"; that storage decision stands and the
+description was wrong in a way that would have shipped stale numbers, because
+card facts come from the corpus rather than from the deck file. Writing it down
+as its own record rather than as a correction to 4 is the directory's own rule:
+the sentence that was almost right is more useful visible than edited away.
 
 16 supersedes exactly one paragraph of 5, which is the pattern this directory is
 for: 5's "no self-signup" was a good argument that lost to a better one a day

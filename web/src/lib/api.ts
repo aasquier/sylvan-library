@@ -117,7 +117,20 @@ export interface TurnRow {
   commander_down: number
 }
 
-export interface ManaResult {
+/** What every Tier 1 result carries about its own provenance.
+ *
+ * `seed` is on the payload because a simulation is only reproducible if you
+ * know which sample you are looking at, and `cached` because a figure served
+ * from a previous run is honest only when it says so. Both are rendered.
+ */
+export interface SimProvenance {
+  seed: number
+  cached: boolean
+  /** When the numbers were computed. Null when they were computed just now. */
+  computed_at: string | null
+}
+
+export interface ManaResult extends SimProvenance {
   slug: string
   deck_name: string
   games: number
@@ -139,7 +152,7 @@ export interface LandRow {
   mulligan_rate: number
 }
 
-export interface LandResult {
+export interface LandResult extends SimProvenance {
   slug: string
   deck_name: string
   games: number
@@ -709,15 +722,27 @@ export const api = {
   job: (id: string) => get<Job>(`/api/jobs/${id}`),
 }
 
-/** Poll a job to completion. Resolves on done, rejects on error. */
+/** Poll a job to completion. Resolves on done, rejects on error.
+ *
+ * `initial` is the job as the submitting POST returned it. Since results are
+ * cached server-side, that response can already be `done` — the work was
+ * finished before the request arrived — and polling for a job that has nothing
+ * left to do is a wasted round trip and a frame of "Running…" for something
+ * that is not running.
+ */
 export function followJob(
   id: string,
   onTick: (job: Job) => void,
   intervalMs = 400,
+  initial?: Job,
 ): { promise: Promise<Job>; cancel: () => void } {
   let cancelled = false
   const cancel = () => {
     cancelled = true
+  }
+  if (initial && initial.status === 'done') {
+    onTick(initial)
+    return { promise: Promise.resolve(initial), cancel }
   }
   const promise = new Promise<Job>((resolve, reject) => {
     const tick = async () => {

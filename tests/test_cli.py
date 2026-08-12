@@ -427,6 +427,29 @@ def test_sim_lands_without_a_corpus_also_exits_cleanly(decks, capsys):
     assert "data refresh" in msg
 
 
+def test_sim_cache_reports_an_empty_store_without_creating_noise(decks, capsys):
+    """The break-glass window on the memoised results.
+
+    Reporting `enabled` separately matters: "no rows" and "caching is off
+    because the engine could not be fingerprinted" look identical from a count
+    and want opposite responses.
+    """
+    main(["sim", "cache"])
+    out = capsys.readouterr().out
+    assert "rows:    0" in out
+    assert "enabled: yes" in out
+
+
+def test_sim_cache_clear_empties_the_store(decks, capsys):
+    from mtglab.sim import cache
+    cache.put("a-key", "sim.mana", {"games": 1})
+    assert cache.stats()["rows"] == 1
+
+    main(["sim", "cache", "--clear"])
+    assert "cleared 1 cached result" in capsys.readouterr().out
+    assert cache.stats()["rows"] == 0
+
+
 # ------------------------------------------------------------ argv handling
 
 def test_no_subcommand_is_an_error_not_a_crash(capsys):

@@ -910,6 +910,192 @@ def test_keep_rule_uses_documented_defaults():
     assert (rule.min_lands, rule.max_lands) == (2, 5)
 
 
+# ------------------------------------------------------------- sim caching
+#
+# The unit-level guarantees -- what reaches the key, that it survives a
+# restart, that a broken store is a miss -- are in `test_sim_cache.py`. These
+# are the ones that need the whole stack: a request, a deck source, a corpus
+# and the job registry, which is where a cache turns into a wrong answer if it
+# is going to.
+
+def test_a_repeated_simulation_is_served_without_running_again(sim_client):
+    """The claim the whole feature rests on: the second identical request
+    costs no CPU, and says that it did not."""
+    from mtglab.sim.tier1 import engine
+
+    body = {"slug": "mono-green", "games": 300, "turns": 8, "seed": 5}
+    first = await_job(sim_client, sim_client.post("/api/sim/mana", json=body).json()["id"])
+    assert first["status"] == "done", first.get("error")
+    assert first["result"]["cached"] is False
+    assert first["result"]["computed_at"] is None
+
+    calls = []
+    original = engine.run
+
+    def counted(*args, **kwargs):
+        calls.append(1)
+        return original(*args, **kwargs)
+
+    # Patched on the module the runner imported from, so a hit is provable by
+    # the simulator never being entered rather than by a stopwatch.
+    engine.run = counted
+    try:
+        second = sim_client.post("/api/sim/mana", json=body).json()
+    finally:
+        engine.run = original
+
+    assert second["status"] == "done", "a hit is answered in the request"
+    assert second["percent"] == 100
+    assert calls == [], "the simulator ran again on a cache hit"
+    assert second["result"]["cached"] is True
+    assert second["result"]["computed_at"], "a cached figure must date itself"
+    # The numbers themselves, not just the envelope.
+    assert second["result"]["by_turn"] == first["result"]["by_turn"]
+    assert second["result"]["mulligan_rate"] == first["result"]["mulligan_rate"]
+    assert second["result"]["caveat"], "a cached result still carries its caveat"
+
+
+def test_a_cache_hit_is_still_the_callers_job_and_nobody_elses(sim_client):
+    """A job born done is a job: it lists, it polls, and ADR 5's scoping is
+    unchanged by it having taken no time."""
+    body = {"slug": "mono-green", "games": 300, "turns": 8, "seed": 6}
+    await_job(sim_client, sim_client.post("/api/sim/mana", json=body).json()["id"])
+    hit = sim_client.post("/api/sim/mana", json=body).json()
+
+    polled = sim_client.get(f"/api/jobs/{hit['id']}")
+    assert polled.status_code == 200, "a finished job must still be pollable"
+    assert polled.json()["result"]["cached"] is True
+    assert hit["id"] in [j["id"] for j in sim_client.get("/api/jobs").json()]
+
+
+def test_editing_a_card_invalidates_but_editing_a_rationale_does_not(sim_client):
+    """The reason the key is the compiled deck rather than the deck file.
+
+    A `why` cannot reach a simulation, so rewriting one must not throw the
+    numbers away. Swapping a card obviously must.
+    """
+    body = {"slug": "mono-green", "games": 300, "turns": 8, "seed": 8}
+    first = await_job(sim_client, sim_client.post("/api/sim/mana", json=body).json()["id"])
+    assert first["result"]["cached"] is False
+
+    edited = sim_client.patch("/api/decks/mono-green/cards/Sol Ring", json={
+        "field": "why",
+        "value": "Two mana on turn one is the fastest thing this deck can do, "
+                 "and every payoff here is expensive enough to want it.",
+    })
+    assert edited.status_code == 200, edited.text
+    assert sim_client.post("/api/sim/mana", json=body).json()["result"]["cached"] \
+        is True, "a rationale edit must not invalidate a simulation"
+
+    swapped = sim_client.post("/api/decks/mono-green/swap", json={
+        "out": "Cultivator Colossus", "into": "Terastodon",
+        "why": "Blows up three permanents on the way in, which this list has "
+               "no other answer for.",
+    })
+    assert swapped.status_code == 200, swapped.text
+    submitted = sim_client.post("/api/sim/mana", json=body).json()
+    assert submitted["status"] != "done", \
+        "changing the 99 must invalidate the deck's cached numbers"
+    after = await_job(sim_client, submitted["id"])
+    assert after["result"]["cached"] is False
+    assert after["result"]["by_turn"] != first["result"]["by_turn"], \
+        "a different 99 should produce different numbers, not a relabelled hit"
+
+
+def test_a_land_sweep_reuses_the_counts_it_has_already_run(sim_client):
+    """Per-count caching, and the invariant that makes it sound: a reused row
+    is byte-identical to the one a fresh run produces."""
+    base = {"slug": "mono-green", "games": 200, "seed": 3}
+    first = await_job(sim_client, sim_client.post(
+        "/api/sim/lands", json={**base, "low": 32, "high": 34}).json()["id"])
+    assert first["status"] == "done", first.get("error")
+    assert first["result"]["cached"] is False
+    rows = {r["lands"]: r for r in first["result"]["rows"]}
+
+    # Overlapping range: 33 and 34 are known, 35 is not, so this is still a job.
+    partial = sim_client.post("/api/sim/lands",
+                              json={**base, "low": 33, "high": 35}).json()
+    body = await_job(sim_client, partial["id"])
+    assert body["status"] == "done", body.get("error")
+    assert body["result"]["cached"] is False, "one count still had to be run"
+    reused = {r["lands"]: r for r in body["result"]["rows"]}
+    assert [r["lands"] for r in body["result"]["rows"]] == [33, 34, 35]
+    for count in (33, 34):
+        assert reused[count] == rows[count], \
+            "a reused row must equal what a fresh run produced"
+
+    # Now every count is known, so the whole sweep is answered in the request.
+    whole = sim_client.post("/api/sim/lands",
+                            json={**base, "low": 33, "high": 35}).json()
+    assert whole["status"] == "done"
+    assert whole["result"]["cached"] is True
+    assert whole["result"]["computed_at"]
+    assert whole["result"]["rows"] == body["result"]["rows"]
+    assert whole["result"]["argmax_lands"] == body["result"]["argmax_lands"]
+
+
+def test_an_unseeded_run_is_reproducible_rather_than_random(sim_client):
+    """An absent seed used to mean a fresh sample every time, which the app
+    never asked for and could not cache. It resolves to a default now, and the
+    result says which sample it is."""
+    from mtglab.api.simruns import DEFAULT_SEED
+
+    body = {"slug": "mono-green", "games": 300, "turns": 8}
+    first = await_job(sim_client, sim_client.post("/api/sim/mana", json=body).json()["id"])
+    assert first["result"]["seed"] == DEFAULT_SEED
+    assert sim_client.post("/api/sim/mana", json=body).json()["result"]["cached"] \
+        is True
+
+
+def test_clamping_happens_before_the_key(sim_client):
+    """Two requests that run the identical simulation must share an entry.
+    Keying on the raw payload would store 200,000 games twice."""
+    absurd = {"slug": "mono-green", "games": 10 ** 9, "turns": 4, "seed": 9}
+    exact = {**absurd, "games": 200_000}
+    from mtglab.api import simruns
+    assert simruns._mana_params(absurd) == simruns._mana_params(exact)
+
+
+@pytest.mark.parametrize("route", ["/api/sim/mana", "/api/sim/lands"])
+def test_a_deck_that_cannot_compile_still_fails_through_the_job(sim_client, route):
+    """Planning moved compilation into the request. A missing deck must still
+    be reported the way it was before -- as a job error, not an exception out
+    of the route.
+
+    Both routes, and the assertion is on the *message* rather than on the
+    status. An earlier draft handled a planning failure by re-running the
+    failing compile inside the job, which made `plan_lands` call `run_lands`
+    and `run_lands` call `plan_lands`: mutual recursion on exactly this input.
+    It still ended in `status == "error"`, so only the text gave it away --
+    a RecursionError where the caller needed to read "no such deck".
+    """
+    submitted = sim_client.post(route, json={"slug": "no-such-deck",
+                                             "games": 300, "low": 32, "high": 33})
+    assert submitted.status_code == 200
+    body = await_job(sim_client, submitted.json()["id"])
+    assert body["status"] == "error"
+    assert "no-such-deck" in body["error"], \
+        f"the error should name the deck, not the failure to look for it: {body['error']}"
+
+
+def test_a_land_sweep_with_no_lands_reports_that_and_nothing_else(
+        in_memory_client, corpus):
+    """The other `plan_lands` failure, and the one `_resize` raises rather than
+    `_compile`: it has to survive the same fallback."""
+    from mtglab.decks.model import CardEntry
+
+    landless = tiny_corpus.mono_green_deck(clean=True)
+    landless.cards = [CardEntry(name="Sol Ring", category="ramp", qty=99,
+                                why="A fixture with no lands at all.")]
+    jobs.clear()
+    with in_memory_client([landless]) as client:
+        submitted = client.post("/api/sim/lands", json={
+            "slug": "mono-green", "low": 32, "high": 33, "games": 200})
+        body = await_job(client, submitted.json()["id"])
+        assert body["status"] == "error"
+        assert "no lands" in body["error"]
+
+
 def test_unknown_job_is_404(client):
     assert client.get("/api/jobs/deadbeef").status_code == 404
 

@@ -45,6 +45,7 @@ src/mtglab/
   decks/partners.py       Partner / Background / Doctor pairings
   decks/analyze.py        macro category counts vs bracket targets
   sim/compile.py          deck.yaml + corpus -> SimCards
+  sim/cache.py            memoised Tier 1 results, keyed on compiled input
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
   artifacts/generate.py   the five deliverables
@@ -143,8 +144,21 @@ never as a confirmation: the endpoint says the same thing whether or not the
 address exists, and a cheerful "check your inbox" would leak from the client
 what ADR 16 built the server not to say.
 
+**Tier 1 results are cached** (ADR 18), and the key is what makes that safe:
+a hash of the **compiled** deck — the SimCards the engine is handed — plus the
+clamped parameters, the seed, and a fingerprint of `engine.py` and `mana.py`'s
+source. Not a hash of `deck.yaml`: card facts come from the corpus, so a
+`data refresh` can change a simulation while the deck file does not move. A hit
+is a job that was born `done`, so no client changed shape, and every result now
+carries `seed`, `cached` and `computed_at` — **quote a cached number as
+cached.** Runs are seeded by default (`simruns.DEFAULT_SEED`); an unseeded
+sample was what the app used to show and is not reproducible. Land sweeps cache
+per count, so an overlapping range reuses rows. `mtglab sim cache [--clear]`.
+
 Keep `mana.py` and `sim/` dependency-light (stdlib + numpy). DuckDB stays
-behind `cards/db.py`. That boundary is what keeps the simulation core fast to
+behind `cards/db.py`. `sim/cache.py` imports `auth/db.py` for one reason and it
+is not auth: that module is the `app.db` connection helper, and a second
+migration ladder for the same file would be worse than the import. That boundary is what keeps the simulation core fast to
 test: the solver, the gate and the simulator all take plain records, so most of
 the suite needs no database at all.
 
@@ -227,6 +241,7 @@ mtglab decks suggest <slug>       # shortlist replacements for what it flagged
 mtglab decks swap <slug> --out X --in Y --why '...'   # apply your choice
 mtglab sim mana <slug>            # baseline consistency
 mtglab sim lands <slug> 30 40     # is the land count right?
+mtglab sim cache                  # what Tier 1 results are memoised; --clear
 mtglab sim forge <a> <b> [c] [d]  # Tier 3 — Forge plays real games
 git commit -am "before refactor"  # so swaps.md has something to diff
 ```
