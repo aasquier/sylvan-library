@@ -237,16 +237,7 @@ def test_a_refusal_is_reported_rather_than_indexed_into(scripted):
 def test_a_rejected_tool_comes_back_as_a_tool_result_not_an_exception(scripted,
                                                                      source):
     """A model asking for a tool that does not exist should learn that the door
-    does not exist, and carry on -- not end the conversation.
-
-    Note what this does *not* pin, because it surprised the author: `tools.run`
-    dispatches against the global `READ_ONLY` registry, not against the calling
-    mode's `tool_names`. A mode that advertises four tools and gets asked for a
-    fifth *registered* one will run it. That is bounded -- all seven are
-    read-only and the package cannot reach a write path at all
-    (`test_claude_boundary.py`) -- but "a mode is a tool set" is currently
-    enforced by what is advertised rather than by what is accepted.
-    """
+    does not exist, and carry on -- not end the conversation."""
     stub = scripted([
         _Response([_ToolUse("set_card_field", {"slug": "mini"})],
                   stop_reason="tool_use"),
@@ -258,6 +249,28 @@ def test_a_rejected_tool_comes_back_as_a_tool_result_not_an_exception(scripted,
     result = stub.messages.calls[1]["messages"][-1]["content"][0]
     assert result["is_error"] is True
     assert "ToolNotAllowed" in result["content"]
+
+
+def test_a_registered_tool_outside_the_mode_is_refused(scripted, source):
+    """ADR 15 says a mode *is* a tool set, and this is where that holds at the
+    door rather than in the advertisement: `converse` dispatches with
+    `allowed=mode.tool_names`, so a *registered* read-only tool the mode did
+    not offer -- here `search_cards`, which MODE does not carry -- is refused
+    exactly like an unregistered one, and the refusal names the mode's own
+    tools so the model can recover."""
+    stub = scripted([
+        _Response([_ToolUse("search_cards", {"text": "ramp"})],
+                  stop_reason="tool_use"),
+        _Response([_Text("noted")]),
+    ])
+    turn = converse(MODE, messages=ASK, stance=Stance(), source=source)
+
+    assert turn.text == "noted"
+    result = stub.messages.calls[1]["messages"][-1]["content"][0]
+    assert result["is_error"] is True
+    assert "ToolNotAllowed" in result["content"]
+    assert "not offered by this mode" in result["content"]
+    assert "get_cards" in result["content"]
 
 
 def test_bad_tool_arguments_also_come_back_as_a_result(scripted, source):

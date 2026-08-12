@@ -1,6 +1,6 @@
 [project]
 name = "mtg-lab"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local Magic: the Gathering deckbuilding, simulation and shopping toolkit"
 requires-python = ">=3.11"
 dependencies = ["pyyaml>=6.0", "duckdb>=1.0", "numpy>=1.26"]

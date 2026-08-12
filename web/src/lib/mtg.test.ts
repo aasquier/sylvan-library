@@ -65,13 +65,18 @@ describe('identityName', () => {
     expect(identityName(['B', 'G'])).toBe('Golgari')         // Gyome
   })
 
-  it('falls back to the colour letters for four-colour identities', () => {
-    // Documenting a real gap rather than asserting it is right: the four-colour
-    // names (Yore-Tiller, Glint-Eye, Dune-Brood, Ink-Treader, Witch-Maw) are
-    // not in the table, so a four-colour deck would render as "WUBR" in the
-    // library. None of the six curated decks is four-colour, so this is latent.
-    expect(identityName(['W', 'U', 'B', 'R'])).toBe('WUBR')
-    expect(identityName(['U', 'B', 'R', 'G'])).toBe('UBRG')
+  it('names four-colour identities after the Nephilim', () => {
+    // Each pairing verified against the corpus (rule 1 applied to a name that
+    // is also a card): Yore-Tiller Nephilim's color_identity is {W,U,B,R},
+    // Glint-Eye's {U,B,R,G}, Dune-Brood's {W,B,R,G}, Ink-Treader's {W,U,R,G},
+    // Witch-Maw's {W,U,B,G}.
+    expect(identityName(['W', 'U', 'B', 'R'])).toBe('Yore-Tiller')
+    expect(identityName(['U', 'B', 'R', 'G'])).toBe('Glint-Eye')
+    expect(identityName(['W', 'B', 'R', 'G'])).toBe('Dune-Brood')
+    expect(identityName(['W', 'U', 'R', 'G'])).toBe('Ink-Treader')
+    expect(identityName(['W', 'U', 'B', 'G'])).toBe('Witch-Maw')
+    // Order-independent like every other row in the table.
+    expect(identityName(['G', 'R', 'B', 'U'])).toBe('Glint-Eye')
   })
 })
 

@@ -220,7 +220,8 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
             arguments = dict(block.input)
             calls.append({"tool": block.name, "arguments": arguments})
             try:
-                out = tools.run(block.name, arguments, source=source)
+                out = tools.run(block.name, arguments, source=source,
+                                allowed=mode.tool_names)
                 content, is_error = json.dumps(out, default=str), False
             except (tools.ToolNotAllowed, tools.ToolArgumentsRejected,
                     DeckNotFound) as exc:
