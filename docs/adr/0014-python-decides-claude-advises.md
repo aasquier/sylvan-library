@@ -1,6 +1,22 @@
 # 14. Python decides, Claude advises, and Forge plays the games
 
-**Status:** Proposed — nothing implements this yet · **Recorded:** 2026-08-11
+**Status:** Accepted · **Recorded:** 2026-08-11 · **Implemented:** 2026-08-11, in part
+
+> The body below is the decision as argued and is not edited. This note says
+> only how far it has been built, because the Consequences close with "nothing
+> here is built" and that stopped being true.
+>
+> **Built:** the SDK dependency, a client on `ANTHROPIC_API_KEY`, and tool
+> schemas over the read-only half of `api/service.py` — `src/mtglab/claude/`.
+> Boundary 2 is structural rather than promised: nothing in that package can
+> name a deck write, and `tests/test_claude_boundary.py` fails on the commit
+> that makes one reachable.
+>
+> **Not built:** the modes and stances of [ADR 15](0015-claude-surfaces-are-modes-with-capabilities.md),
+> any UI, research via server-side web tooling, and the whole Forge half —
+> boundary 1 also has a measured hole, recorded in `ROADMAP.md`: a banned card
+> is invisible to `search_cards`, so card facts are not yet reachable for the
+> two cards the library fails the gate on.
 
 ## Context
 

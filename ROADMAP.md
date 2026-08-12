@@ -393,11 +393,43 @@ second field rather than another value of `status`.
 ## What Claude is for
 
 Decided 2026-08-11 and recorded as
-[ADR 14](docs/adr/0014-python-decides-claude-advises.md). No code is built yet:
-there is no LLM SDK in `pyproject.toml`. The plumbing around it is — an API key
-reaches the app from a gitignored `.env` or `fly secrets`, named in
-`.env.example` and in the CI reviewer workflow in `docs/ENGINEERING.md`, and CI
-fails the build on a key committed to any tracked file.
+[ADR 14](docs/adr/0014-python-decides-claude-advises.md). **The pipe is open as
+of 2026-08-11** — `src/mtglab/claude/` has the `anthropic` dependency behind a
+`claude` extra, a client built off `ANTHROPIC_API_KEY`, six tool schemas over
+the read-only half of `api/service.py`, and `mtglab claude check` to make one
+real call and say whether the key is live. A first turn against
+`claude-sonnet-5` answered correctly over live decks, calling `list_decks`,
+`validate_deck` and `search_cards` unprompted.
+
+What is *not* built: modes, the stance, any UI, research through server-side
+web tooling, and the Forge half. And one gap that is not a deferral —
+see *The hole in rule 1* below.
+
+The plumbing was already in place: an API key reaches the app from a gitignored
+`.env` or `fly secrets`, named in `.env.example` and in the CI reviewer workflow
+in `docs/ENGINEERING.md`, and CI fails the build on a key committed to any
+tracked file.
+
+### The hole in rule 1
+
+**Open, found 2026-08-11 by running the first turn rather than by reasoning
+about it.** `search_cards` filters to `legalities.commander = 'legal'`, which is
+correct for finding cards to play and wrong for looking one up: **a banned card
+cannot be described at all.**
+
+Asked which decks fail the gate and what the flagged cards do, the first turn
+got the gate's answer right and then could not look up either Emrakul, the
+Aeons Torn or Primeval Titan — the two deliberate failures in
+`atla-palani-dinos` and `goreclaw-stompy`. It said so and labelled the fallback
+as unverified recall, which is boundary 3 working exactly as designed. It still
+answered from memory, which is boundary 1 not working, on precisely the two
+cards this project most needs to discuss.
+
+The fix is the `get_cards` tool ADR 15's table already names and
+`api/service.py` does not have: `service.cards_named()`, exact names through
+`db.get_cards`, no legality filter. Small, and it should land **before any mode
+ships** — a rationale interview walking 99 cards is the worst possible place to
+discover this. `tests/test_claude_tools.py` pins the gap so it stays visible.
 
 **Python decides. Claude advises. Forge plays the games.** The split is by
 whether the question has a right answer:
@@ -491,6 +523,17 @@ functions that already exist there and in `cards/db.py`: `get_cards`,
 enforced structurally rather than by asking the model nicely — a mode that needs
 to know what a card does calls the corpus and the tool result is the fact.
 
+**Done, with one correction.** `mtglab.claude.tools` wraps six of them:
+`list_decks`, `get_deck`, `validate_deck`, `deck_stats`, `suggest_replacements`
+and `search_cards`. `get_cards` was the one name on that list with no service
+function behind it, which turned out to matter more than it looked — the hole
+above.
+
+`READ_ONLY` is the whole capability set, and a mode subsets it rather than
+extending it. That is what makes ADR 15's rule cheap to keep: the package has
+no write door, so a mode written next month cannot open one without editing
+the registry, which is where the test is looking.
+
 Research uses Anthropic's server-side web tooling rather than a crawler this
 project maintains, which keeps `CLAUDE.md`'s no-scraping rule intact.
 
@@ -526,6 +569,14 @@ maintainer's own key on his own machine, which needs none of the open decisions
 resolved. Hosting comes after, and by then the local run will have produced
 real per-conversation numbers to size it with.
 
+*First real numbers, 2026-08-11.* A health check is 18 in / 6 out. A three-tool
+turn over the live library — "which decks fail the gate, on what card, and what
+does that card do" — cost **25,142 in / 1,198 out**, about $0.06 at Sonnet 5's
+introductory rate. Input dominates by 20:1, which is the shape to expect: tool
+results are large and answers are short. Two consequences worth carrying into
+the mode work — prompt caching is the lever that matters, and `get_deck` is the
+expensive tool, since it returns 99 cards with full oracle text.
+
 Two things to settle before it ships, both open decisions above: **what a hosted
 Claude surface costs and who pays**, and — for the simulator half — **whether
 Forge can run where the app runs**.
@@ -537,10 +588,12 @@ Forge can run where the app runs**.
 1. **The rest of the deck lifecycle.** ✅ **Done 2026-08-11.** `add_card`,
    `remove_card`, `set_card_field`, `set_note` (ADR 12), and the rationale
    editor. What remains of the lifecycle is the create form and promotion.
-2. **The Claude surface** — **in progress.** The modes in
-   [ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md),
-   starting with the rationale interview, which now has somewhere to put its
-   output. Moved ahead of Forge on 2026-08-11: it is what makes the app useful
+2. **The Claude surface** — **in progress; the pipe is open.** The client, the
+   tools and the no-`why` boundary landed 2026-08-11. Next, in order:
+   **(a)** `service.cards_named()`, closing *The hole in rule 1* — before any
+   mode, not after; **(b)** the rationale interview, the mode that made ADR 15
+   worth writing and which now has somewhere to put its questions; **(c)** the
+   stance. Moved ahead of Forge on 2026-08-11: it is what makes the app useful
    for judgement rather than facts, and shipping the toolkit to someone else
    without it hands them a gate and a goldfish sim with no opinion in them.
    Sonnet 5, on a separate API account, running locally first — see *The

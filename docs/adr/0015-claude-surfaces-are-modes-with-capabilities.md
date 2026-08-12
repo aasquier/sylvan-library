@@ -1,6 +1,23 @@
 # 15. Claude surfaces are modes with a user-set stance, and no stance may write a rationale
 
-**Status:** Proposed · **Decided:** 2026-08-11 · **Recorded:** 2026-08-11
+**Status:** Accepted · **Decided:** 2026-08-11 · **Recorded:** 2026-08-11 · **Implemented:** 2026-08-11, in part
+
+> The body below is the decision as argued and is not edited. This note says
+> only how far it has been built.
+>
+> **Built:** the capability set, which is the part that had to exist first.
+> `mtglab.claude.tools.READ_ONLY` is the complete list of service functions any
+> surface can reach, and `run()` refuses by name anything outside it. Rule 1 of
+> the three under *The modes* — "no mode may write `why`, at any stance" — is
+> the assertion this ADR asked for and it is tested, structurally: nothing
+> under `src/mtglab/claude/` may so much as name a write function, checked over
+> the package's syntax tree so it fails on the commit that adds one rather than
+> on a call path that exists today.
+>
+> **Not built:** the modes themselves, the stance and its three axes, the
+> activity log, and the rationale interview. `get_cards` in the mode table has
+> no service function behind it yet, which is a live gap rather than a
+> deferral — see `ROADMAP.md`.
 
 Refines [ADR 14](0014-python-decides-claude-advises.md), which drew the line
 between what Python decides and what Claude advises on. This one says what a

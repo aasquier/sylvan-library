@@ -13,7 +13,13 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 mtglab data refresh          # ~500MB from Scryfall, several minutes
 pytest -q
+mtglab claude check          # optional: is the API key live?
 ```
+
+Extras: `api` (FastAPI + the app), `claude` (the Anthropic SDK), `dev` (which
+includes both plus the test tooling). A base install has the gate, the mana
+solver and Tier 1, and needs neither a network nor an account. `claude check`
+needs `ANTHROPIC_API_KEY`; see `.env.example`.
 
 `data refresh` needs network access to `api.scryfall.com` and
 `data.scryfall.io`. In a cloud session with default Trusted network access
@@ -150,8 +156,13 @@ mtglab decks build <slug> --against <(git show HEAD:decks/<slug>/deck.yaml)
 The split, decided 2026-08-11 and argued in
 [ADR 14](docs/adr/0014-python-decides-claude-advises.md): **anything with a
 right answer belongs in deterministic Python; Claude is for opinions and
-research.** Not built yet — there is no LLM SDK in `pyproject.toml` — but it is
-the work in progress, so check before assuming.
+research.**
+
+**Started, not finished.** `src/mtglab/claude/` is the pipe — a client on
+`ANTHROPIC_API_KEY` and tool schemas over the read-only half of
+`api/service.py`. `mtglab claude check` makes one real call and says whether
+the key is live. There are no modes, no stance and no UI yet, so check what is
+actually there before assuming either way.
 
 [ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md) says
 what a surface *is*: a **mode** (a system prompt, a tool set, and what it may
@@ -180,7 +191,10 @@ anything built later:
    pre-fill that field. Rule 4 above is the rule; this is where its edge is.
    In code the line is **no path passes a model response into
    `set_card_field(field="why")`** — an interview supplies questions, the user
-   supplies the words.
+   supplies the words. Enforced structurally rather than by prompt: nothing
+   under `src/mtglab/claude/` may name a deck-write function at all, checked
+   over the package's syntax tree by `tests/test_claude_boundary.py`, so the
+   helpful-looking commit that adds one fails before a prompt is written.
 3. **Say which system answered.** The gate's output is reproducible and
    checkable; an opinion is neither. Never present one as the other.
 

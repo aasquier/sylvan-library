@@ -27,12 +27,18 @@ they differ.
 | [11](0011-the-api-may-apply-a-swap.md) | The API may apply a swap the user has decided on | Accepted |
 | [12](0012-decks-are-edited-by-surgical-operations.md) | Decks are edited by surgical operations over text | Accepted |
 | [13](0013-an-imported-deck-is-a-draft.md) | An imported deck is a draft until every card is justified | Accepted |
-| [14](0014-python-decides-claude-advises.md) | Python decides, Claude advises, and Forge plays the games | Proposed |
-| [15](0015-claude-surfaces-are-modes-with-capabilities.md) | Claude surfaces are modes with a user-set stance, and no stance may write a rationale | Proposed |
+| [14](0014-python-decides-claude-advises.md) | Python decides, Claude advises, and Forge plays the games | Accepted |
+| [15](0015-claude-surfaces-are-modes-with-capabilities.md) | Claude surfaces are modes with a user-set stance, and no stance may write a rationale | Accepted |
 
 **Proposed** means the decision is made and argued but nothing implements it
-yet — 4 and 5 describe a deployment that does not exist, and 14 and 15 draw the
-boundary for a model integration deliberately before the first client call.
+yet — 4 and 5 describe a deployment that does not exist.
+
+14 and 15 were Proposed for exactly one day, which was the point: they drew the
+boundary for a model integration before the first client call rather than after
+it. Both are now Accepted and **partly** implemented — the client, the tools and
+the rule that no code path writes a `why`; not the modes, the stances, or Forge.
+Each carries a note at the top saying which half is which, because a status of
+Accepted on its own would overstate it.
 
 ## Where the longer arguments live
 
