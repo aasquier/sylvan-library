@@ -228,7 +228,8 @@ already sets: per archetype, never one ranking.
   deck"* — a real question, and a different one from "is this deck good".
 
 **The prerequisite stack is the other reason to wait.** Opt-in sharing needs
-auth (does not exist), a per-user data model (does not exist), consent and
+auth (the core exists as of 2026-08-12; the email half does not), a per-user
+data model (still does not — `user_decks` is build-order step 6), consent and
 withdrawal semantics for shared decks, and moderation of user content. The
 leaderboard on top of that needs *continuous* simulation compute — on a
 self-funded box, with four-player pod timings still unmeasured and a
@@ -1168,17 +1169,22 @@ Forge.
   copy; the volume is not a public mirror. Keep hot-linking card images from
   `cards.scryfall.io` rather than proxying or rehosting them, send a
   descriptive User-Agent, and keep the request rate polite.
-- **Put auth in front before any collection feature ships.** The app has no
-  auth today, which is fine for decks and public card data. But CLAUDE.md rule
-  5 exists because a public inventory of expensive cards tied to a real
-  identity is a targeting list — and that reasoning does not stop at `git`.
-  Cloudflare Access is free for up to 50 users and needs no application
-  changes; that is the cheapest way to let friends in without opening it to
-  everyone.
+- **Put auth in front before any collection feature ships.** CLAUDE.md rule 5
+  exists because a public inventory of expensive cards tied to a real identity
+  is a targeting list — and that reasoning does not stop at `git`.
+  **The auth core landed 2026-08-12** (`src/mtglab/auth/`, ADR 5 and ADR 16):
+  accounts, Argon2id, sessions, the scoped accessor and the adversarial
+  isolation test, all off unless `MTGLAB_REQUIRE_AUTH` is set. Cloudflare
+  Access remains the recorded exit if the remaining half sprawls.
 
 **Not yet done:** there is no Dockerfile, no `fly.toml`, and no refresh cron.
 Nothing in the architecture blocks any of it — the API is a normal FastAPI app
 and the frontend is prebuilt static files served by it.
+
+**Two things auth still needs**, both in `docs/HOSTING.md` §7: the email half
+(invite links and password resets — build-order step 5b) and **a login screen
+in the app**. The API is finished; the frontend has not been touched, so
+turning auth on today gives you an SPA that loads and 401s on every fetch.
 
 ### Rust or Go for the simulation core
 

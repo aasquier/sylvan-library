@@ -26,8 +26,12 @@ jobs:
       # importorskip quietly disable a whole test module again. hypothesis is
       # checked here too: the property tests are the only thing standing
       # between mana.py and a silently wrong castability answer.
+      # `argon2` joined the list on 2026-08-12 for the same reason. Without it,
+      # tests/test_auth.py, tests/test_auth_api.py, tests/test_cli_users.py and
+      # tests/test_isolation.py all skip at import -- and the last of those is
+      # the one ADR 5 calls the highest-value test in the auth story.
       - name: Test dependencies must be present
-        run: python -c "import fastapi, httpx, hypothesis"
+        run: python -c "import fastapi, httpx, hypothesis, argon2"
 
       # Run under coverage rather than bare pytest. `fail_under` in
       # pyproject.toml is a floor, not a target: it makes a large regression
@@ -143,10 +147,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # `app.db` joined this list on 2026-08-12. It holds password hashes and
+      # email addresses -- the first personal data the project stores (ADR 16)
+      # -- and unlike the corpus it is irreplaceable, so a committed one is
+      # both a leak and a thing somebody might try to "restore" from git.
       - name: Reject committed card data, collections, or credentials
         run: |
           bad=$(git ls-files | grep -Ei \
-            '(^data/.*\.(json|duckdb)$|collection|wishlist|inventory|purchases|orders|\.env$|cookies\.json)' \
+            '(^data/.*\.(json|duckdb)$|app\.db|collection|wishlist|inventory|purchases|orders|\.env$|cookies\.json)' \
             || true)
           if [ -n "$bad" ]; then
             echo "These files must not be committed:"; echo "$bad"; exit 1

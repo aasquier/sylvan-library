@@ -144,7 +144,17 @@ mtglab price deck <slug>              # cheapest non-promo printing per card
 
 mtglab claude check                   # one real API call -- is the key live?
 mtglab ui [--port 8765] [--dev]       # the local app
+
+mtglab users add <name> [--admin]     # prompts twice; there is no --password
+mtglab users list                     # who exists, and who can log in
+mtglab users passwd <name>            # prompts; ends every session
+mtglab users disable|enable <name>
 ```
+
+The `users` commands are for a **hosted** instance and do nothing to a local
+one: authentication is off unless `MTGLAB_REQUIRE_AUTH` is set, so `mtglab ui`
+on your own machine has no login and never will. See
+[docs/HOSTING.md](docs/HOSTING.md) §1.
 
 ## Simulation tiers
 

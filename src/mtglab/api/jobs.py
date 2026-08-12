@@ -9,6 +9,16 @@ failures to something a friend is supposed to be able to clone and run.
 So: a bounded thread pool plus a dict. Jobs are ephemeral by design. Restart
 the server and they are gone, which is correct for a local tool where the
 inputs are cheap to resubmit.
+
+**Every job carries an owner, and lookups take one.** A job is the first thing
+in this app that belongs to a person rather than to the library: its label
+names a deck and its result is a simulation somebody paid thirty seconds of CPU
+for. `get()` and `all_jobs()` therefore filter rather than trust the caller to,
+and a job belonging to somebody else is reported as *absent* — the route turns
+`None` into a 404, never a 403, so ids cannot be probed (ADR 5).
+
+The owner is `None` when auth is off, which is every local run: one person,
+every job theirs.
 """
 
 from __future__ import annotations
@@ -43,6 +53,10 @@ class Job:
     result: Any = None
     error: str | None = None
     label: str = ""
+    # Whose job this is. `None` means "the local user", which is everybody when
+    # auth is off. Never serialised: a caller who can see a job already knows
+    # whose it is, and one who cannot must not learn it exists.
+    owner: int | None = None
     created_at: str = field(
         default_factory=lambda: datetime.now(UTC).isoformat())
 
@@ -63,9 +77,9 @@ class Job:
 
 
 def submit(kind: str, fn: Callable[[Callable[[int, int], None]], Any],
-           *, label: str = "") -> Job:
+           *, label: str = "", owner: int | None = None) -> Job:
     """Queue `fn`, handing it a `progress(done, total)` callback to report with."""
-    job = Job(id=uuid.uuid4().hex[:12], kind=kind, label=label)
+    job = Job(id=uuid.uuid4().hex[:12], kind=kind, label=label, owner=owner)
     with _LOCK:
         _JOBS[job.id] = job
         if len(_JOBS) > MAX_JOBS:
@@ -94,14 +108,20 @@ def submit(kind: str, fn: Callable[[Callable[[int, int], None]], Any],
     return job
 
 
-def get(job_id: str) -> Job | None:
+def get(job_id: str, *, owner: int | None = None) -> Job | None:
+    """One job, if it is this owner's. `None` covers both "no such job" and
+    "not yours", which is the point -- the caller cannot tell them apart, and
+    neither can whoever is probing ids."""
     with _LOCK:
-        return _JOBS.get(job_id)
+        job = _JOBS.get(job_id)
+    return job if job is not None and job.owner == owner else None
 
 
-def all_jobs() -> list[Job]:
+def all_jobs(*, owner: int | None = None) -> list[Job]:
+    """This owner's jobs, newest first."""
     with _LOCK:
-        return sorted(_JOBS.values(), key=lambda j: j.created_at, reverse=True)
+        mine = [j for j in _JOBS.values() if j.owner == owner]
+    return sorted(mine, key=lambda j: j.created_at, reverse=True)
 
 
 def clear() -> None:
