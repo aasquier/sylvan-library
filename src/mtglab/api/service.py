@@ -12,7 +12,7 @@ import re
 import urllib.request
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from mtglab import colors, config
 from mtglab.cards import db
@@ -23,6 +23,17 @@ from mtglab.decks.importer import ImportRefused
 from mtglab.decks.model import CATEGORIES, DECK_STATUSES, Deck
 from mtglab.decks.source import DeckExists, DeckNotFound, DeckSource, FileDeckSource
 from mtglab.decks.validate import validate
+
+if TYPE_CHECKING:
+    # Type-only, so the lazy-import discipline holds at runtime: duckdb stays
+    # inside `_connect`, and the Claude package stays out of a base install's
+    # import graph entirely.
+    from duckdb import DuckDBPyConnection
+
+    from mtglab.cards.db import CardRecord
+    from mtglab.claude.modes import Mode
+    from mtglab.decks.model import CardEntry
+    from mtglab.decks.validate import ValidationReport
 
 SCRYFALL_SETS = "https://api.scryfall.com/sets"
 USER_AGENT = "mtg-lab/0.1 (local personal deckbuilding tool)"
@@ -41,7 +52,7 @@ def _source(source: DeckSource | None) -> DeckSource:
 
 # ------------------------------------------------------------------- corpus
 
-def _connect():
+def _connect() -> DuckDBPyConnection | None:
     """A read-only handle, or None when the corpus has not been built yet.
 
     Read-only matters: DuckDB allows one writer, so a running `data refresh`
@@ -64,7 +75,7 @@ def _connect():
         return None
 
 
-def corpus_stale(con) -> bool:
+def corpus_stale(con: DuckDBPyConnection) -> bool:
     """Whether the corpus predates the printed-stat columns. Never raises.
 
     Wrapped because `health()` must answer on a database in any state at all,
@@ -83,8 +94,13 @@ def health(*, source: DeckSource | None = None) -> dict[str, Any]:
         return {"corpus": False, "oracle_cards": 0, "printings": 0,
                 "message": "no corpus yet -- run `mtglab data refresh`"}
     try:
-        oracle = con.execute("SELECT count(*) FROM oracle_cards").fetchone()[0]
-        printings = con.execute("SELECT count(*) FROM printings").fetchone()[0]
+        # `fetchone` is typed as possibly-None. A count(*) always yields a
+        # row, but this is the platform's health-check target and must not
+        # 500 on the impossible case either.
+        oracle_row = con.execute("SELECT count(*) FROM oracle_cards").fetchone()
+        printings_row = con.execute("SELECT count(*) FROM printings").fetchone()
+        oracle = int(oracle_row[0]) if oracle_row else 0
+        printings = int(printings_row[0]) if printings_row else 0
         stale = corpus_stale(con)
     finally:
         con.close()
@@ -113,7 +129,8 @@ def health(*, source: DeckSource | None = None) -> dict[str, Any]:
 # -------------------------------------------------------------------- decks
 
 
-def _corpus_for(deck: Deck, con) -> dict:
+def _corpus_for(deck: Deck,
+                con: DuckDBPyConnection | None) -> dict[str, CardRecord]:
     if con is None:
         return {}
     names = deck.commander + [c.name for c in deck.cards] + \
@@ -123,7 +140,7 @@ def _corpus_for(deck: Deck, con) -> dict:
     return db.get_cards(con, names)
 
 
-def _card_json(entry, rec) -> dict[str, Any]:
+def _card_json(entry: CardEntry, rec: CardRecord | None) -> dict[str, Any]:
     """One row of the 99, merged with whatever the corpus knows about it."""
     out: dict[str, Any] = {
         "name": entry.name,
@@ -592,7 +609,7 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
     }
 
 
-def claude_interview_mode():
+def claude_interview_mode() -> Mode:
     """The rationale interview's mode object. Imported lazily like the rest.
 
     A function rather than a module constant so that `service` keeps working
@@ -718,7 +735,7 @@ class SwapRejected(EditRejected):
     """The swap was refused, and nothing was written."""
 
 
-def _issues(report) -> dict[str, list[dict[str, Any]]]:
+def _issues(report: ValidationReport) -> dict[str, list[dict[str, Any]]]:
     """The gate's verdict, flattened for JSON."""
     return {
         "errors": [{"code": i.code, "message": i.message, "card": i.card}
@@ -735,7 +752,7 @@ def _for_writing(source: DeckSource | None) -> DeckSource:
     return decks
 
 
-def _identity_of(deck: Deck, con) -> frozenset[str]:
+def _identity_of(deck: Deck, con: DuckDBPyConnection) -> frozenset[str]:
     """The commander's colour identity, from the corpus.
 
     Rule 2: read off Scryfall's `color_identity`, never derived from the mana
@@ -750,7 +767,7 @@ def _identity_of(deck: Deck, con) -> frozenset[str]:
     return identity
 
 
-def _find_card(deck: Deck, name: str):
+def _find_card(deck: Deck, name: str) -> CardEntry | None:
     wanted = name.strip().lower()
     return next((c for c in deck.cards + deck.swap_board
                  if c.name.lower() == wanted), None)
@@ -1259,7 +1276,9 @@ def upcoming_sets(*, force: bool = False) -> dict[str, Any]:
     """
     today = date.today().isoformat()
     if not force and _SETS_CACHE.get("day") == today:
-        return _SETS_CACHE["data"]
+        # The cache maps two keys to two shapes, so indexing is Any; the cast
+        # states what "data" holds rather than widening the return type.
+        return cast("dict[str, Any]", _SETS_CACHE["data"])
 
     req = urllib.request.Request(
         SCRYFALL_SETS, headers={"User-Agent": USER_AGENT,
