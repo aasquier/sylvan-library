@@ -10,8 +10,10 @@ advance, including in the places where the honest answer is "we measured, and
 it wasn't worth it."
 
 **The compiled-language rewrite is deferred**, with a written trigger — see §1
-and the deferred list at the end. The near-term work is testing rigor,
-container hardening and CI, none of which needs a second language.
+and the deferred list at the end. The testing-rigor, container-hardening and
+CI work this document planned has landed; what remains near-term is deploying
+(docs/HOSTING.md §7) and the open items marked below, none of which needs a
+second language.
 
 ---
 
@@ -327,15 +329,17 @@ says a test would have *noticed* if it were wrong. The Phyrexian bug above is
 the argument in one example: 100% line coverage, and a mutation of that branch
 would have survived.
 
-**A mode's tool set is advertised, not enforced.** Found while writing
-`tests/test_claude_modes.py`: `Mode.tool_names` decides which schemas the model
-is *shown*, but `tools.run` dispatches against the global `READ_ONLY` registry,
-so a model asking for a registered tool the mode did not offer gets a real
-answer. The blast radius is bounded — all seven tools are read-only, and
-`test_claude_boundary.py` proves the package cannot name a write function at
-all — so this is a tidiness question rather than a safety one. It is recorded
-rather than fixed because narrowing dispatch to the mode is a decision about
-what ADR 15 means by "a mode is a tool set", not a bug fix.
+~~**A mode's tool set is advertised, not enforced.**~~ **Decided and enforced
+2026-08-12.** Found while writing `tests/test_claude_modes.py`: `Mode.tool_names`
+decided which schemas the model was *shown*, but `tools.run` dispatched against
+the global `READ_ONLY` registry, so a model asking for a registered tool the
+mode did not offer got a real answer. Bounded — all seven tools are read-only
+and `test_claude_boundary.py` proves the package cannot name a write function —
+but it was a decision about what ADR 15 means by "a mode is a tool set", so it
+was decided rather than silently fixed: `converse` now passes
+`allowed=mode.tool_names` into dispatch, and a registered tool outside the mode
+is refused exactly like an unregistered one, with the refusal naming the mode's
+own tools. Pinned in both `test_claude_tools.py` and `test_claude_modes.py`.
 
 ---
 
@@ -444,17 +448,22 @@ oxlint, Recharts. The gaps are testing and interaction, not framework choice.
   human reading five candidates, not weights tuned until one deck comes out
   right.
 
-- **A four-colour deck would render as "WUBR".** Found while testing
-  `identityName`: the four-colour names (Yore-Tiller, Glint-Eye, Dune-Brood,
-  Ink-Treader, Witch-Maw) are not in the table. Latent — none of the six
-  curated decks is four-colour — so it is recorded in the test rather than
-  fixed on speculation.
+- ~~**A four-colour deck would render as "WUBR".**~~ **Fixed 2026-08-12.** The
+  five Nephilim names are in the table now, each name↔identity pairing
+  verified against the corpus rather than recalled — the Nephilim are cards,
+  so rule 1 applied to the fix itself.
 - **Playwright** for a handful of end-to-end paths against the real API. The
   card-search field that collapsed to 14px would have been caught by one
-  assertion on a rendered width.
-- **Accessibility**: `axe-core` in CI. Cheap, and reviewers notice.
-- The bundle is 661 kB (195 kB gzipped) and Vite already warns. Route-level
-  code splitting is the obvious fix if it ever matters.
+  assertion on a rendered width. Deliberately deferred past the manual UI
+  pass and the deploy.
+- **Accessibility**: `axe-core` in CI. Cheap, and reviewers notice. Same
+  deferral.
+- ~~The bundle is 661 kB (195 kB gzipped) and Vite already warns.~~ **Split
+  2026-08-12.** Route-level code splitting: Library stays eager (the landing
+  page), Login/Claim stay eager (the gate), the other six screens are lazy.
+  The entry chunk went from 726 kB (it had grown since the 661 figure) to
+  262 kB, with Recharts in a 398 kB chunk only DeckDetail and Simulator load,
+  and the Vite warning is gone.
 
 ---
 
@@ -617,13 +626,26 @@ mechanical:
 
 ### Supply chain and release
 
-- Pin actions by commit SHA, not tag.
-- `dependency-review-action` on PRs; Dependabot or Renovate for updates.
-- Generate an SBOM (`syft`) and attach it to releases.
-- Sign container images with `cosign`, publish via OIDC rather than long-lived
-  registry credentials.
-- Tagged releases with generated notes; the version in `pyproject.toml` is
-  still `0.1.0` and should start moving.
+The first three landed 2026-08-12:
+
+- [x] **Actions pinned by commit SHA**, version in a trailing comment —
+      including `trivy-action`, which had been riding `@master`. Dependabot
+      understands the comment convention and keeps both current.
+- [x] **`dependency-review-action` on every PR**, failing on high-severity
+      introductions. It needed the repository's dependency graph enabled,
+      which was done by enabling Dependabot alerts — a settings change with
+      no artifact in the tree, recorded here for the same reason the branch
+      protection table is. **It is not yet a required check on `main`** —
+      the "adding a CI job is two steps" lesson below applies, and the second
+      step is deliberately left as a decision.
+- [x] **Dependabot**, weekly, grouped per ecosystem (actions, pip, npm).
+- [ ] Generate an SBOM (`syft`) and attach it to releases.
+- [ ] Sign container images with `cosign`, publish via OIDC rather than
+      long-lived registry credentials.
+- [ ] Tagged releases with generated notes. The version moved off `0.1.0`
+      (to 0.2.0, 2026-08-12, now read from package metadata rather than a
+      second literal) and the first tag should coincide with the first
+      deploy.
 
 ### Benchmarks as a gate
 
@@ -667,9 +689,10 @@ than any amount of Rust would tell them.
 
 ## Suggested order
 
-Decided 2026-08-10: do this list before any hosting work. Hosting is not
-imminent, but see "Cloud-compatible by construction" above — steps 3 and 5
-exist partly so that when it happens it is additive.
+Decided 2026-08-10: do this list before any hosting work. Hosting was not
+imminent then; as of 2026-08-12 it is (docs/HOSTING.md §7 is the checklist),
+and the sequencing held — every step below landed before the deploy rather
+than after it.
 
 1. ~~**Property-based tests on `mana.py`** plus determinism tests.~~ **Done
    2026-08-10** — see §2. It found one real bug (Phyrexian mana value) and
@@ -683,18 +706,16 @@ exist partly so that when it happens it is additive.
 4. ~~**Frontend tests**~~ **Done 2026-08-10** — 35 of them, on the job-polling
    state machine, the library filters and `identityName`; see §4. Found the
    library rendering "the gate never ran" identically to "the deck passed".
-5. **The deck lifecycle** — import, the draft stage, and the rest of the edit
-   operations. Added 2026-08-11, and it jumps ahead of container hardening
-   deliberately: `docs/HOSTING.md` §6 assumes user decks can be created, and
-   nothing can. Hardening a container that serves an empty library first would
-   be polishing the wrong end. Planned in `ROADMAP.md`; decided in
-   [ADR 12](adr/0012-decks-are-edited-by-surgical-operations.md) and
+5. ~~**The deck lifecycle**~~ **Done 2026-08-11** — import, the draft stage,
+   the surgical edits and promotion.
+   [ADR 12](adr/0012-decks-are-edited-by-surgical-operations.md),
    [ADR 13](adr/0013-an-imported-deck-is-a-draft.md).
-6. **Container hardening** — multi-stage, non-root, multi-arch, scanned,
-   health-checked. Proves the deployment story without deploying.
+6. ~~**Container hardening**~~ **Done 2026-08-12** — multi-stage, non-root,
+   multi-arch, scanned, health-checked; see §3.
 7. **A simulator that plays decks against each other** — the Forge bridge
-   first, Tier 2 in Python only if Forge cannot answer the question — then
-   profile whichever got built.
+   **landed 2026-08-11** (`mtglab sim forge`, heads-up and pods measured);
+   what remains open is the hosted deployment shape, and Tier 2 only if Forge
+   cannot answer the bracket and matchup questions.
 
 Steps 1–6 make the existing project defensible without adding a language, and
 leave hosting a matter of adding an auth layer and a second deck source rather
@@ -710,10 +731,11 @@ re-reading the old conclusion, when PR volume justifies a look.
 
 ## Cloud-compatible by construction
 
-Hosting is not imminent, but it should not require a rewrite when it happens.
-This section is the short list of seams to get right *during* the near-term
-work, so that hosting is additive. It is deliberately short — most of the
-codebase needs nothing.
+Written when hosting was not imminent; it is now, and the bet paid — hosting
+turned out to be additive, exactly as this section argued for. The seams below
+were gotten right during the near-term work, and the auth layer and container
+landed on top of them without reworking a handler. Kept because the
+"do not regress" entries still bind.
 
 **Already done, do not regress:**
 

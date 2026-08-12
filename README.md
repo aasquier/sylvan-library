@@ -11,12 +11,14 @@ One thing now reaches outside, opt-in and behind its own install extra: a
 **Claude surface** for conversation and research
 ([ADR 14](docs/adr/0014-python-decides-claude-advises.md),
 [ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md)). The
-pipe is built — a client and read-only tools over the corpus — and the modes
-and UI on top of it are not. Install without `[claude]` and nothing about the
-toolkit changes: no account, no key, no calls.
+pipe, the stance dial, and the first mode — the rationale interview — are
+built; the other three modes and a UI for the dial are not. Install without
+`[claude]` and nothing about the toolkit changes: no account, no key, no calls.
 
-A **shared instance** ([docs/HOSTING.md](docs/HOSTING.md)) would need accounts.
-Not built.
+A **shared instance** ([docs/HOSTING.md](docs/HOSTING.md)) is built code-side —
+invite-only accounts, sessions, an admin page, a container — and switched off
+by default: auth only exists where `MTGLAB_REQUIRE_AUTH` is set. What remains
+before a deployment is infrastructure, tracked in HOSTING §7.
 
 ## Setup
 
@@ -136,19 +138,25 @@ mtglab decks set <slug> --card X --why '...'      # or --category / --qty
 mtglab decks swap <slug> --out X --in Y --why '...'
 mtglab decks note <slug> --key mulligan --value '...'
 mtglab decks promote <slug>           # draft -> curated, once every card is justified
+mtglab decks delete <slug>            # confirm by typing the slug; moves to decks/.trash/
 
 mtglab sim mana <slug>                # Tier 1 goldfish
 mtglab sim lands <slug> 30 40         # land-count sweep, flood-aware
+mtglab sim cache [--clear]            # what Tier 1 results are memoised
+mtglab sim forge <a> <b> [c] [d]      # Tier 3 -- Forge plays real games
 
 mtglab price deck <slug>              # cheapest non-promo printing per card
 
 mtglab claude check                   # one real API call -- is the key live?
+mtglab claude interview <slug> --card X   # questions about a slot; you write the why
 mtglab ui [--port 8765] [--dev]       # the local app
 
+mtglab users invite <email>           # an account, and a link they claim it with
 mtglab users add <name> [--admin]     # prompts twice; there is no --password
 mtglab users list                     # who exists, and who can log in
 mtglab users passwd <name>            # prompts; ends every session
 mtglab users disable|enable <name>
+mtglab users promote|demote <name>    # admin, and never the last one
 ```
 
 The `users` commands are for a **hosted** instance and do nothing to a local
@@ -175,18 +183,19 @@ Commander speed rises monotonically with land count, so optimising it alone
 recommends 40 lands. Deployment peaks and then falls as flood sets in — that
 peak is the answer.
 
-**Tier 3 — Forge headless (next, not built).** [Forge](https://github.com/Card-Forge/forge)
-is an open-source rules engine with a documented headless mode:
-
-```bash
-forge sim -d <deck.dck> ... -f Commander -n 100 -c 300 -q
-```
+**Tier 3 — Forge headless (built).** [Forge](https://github.com/Card-Forge/forge)
+is an open-source rules engine with a headless mode, and `mtglab sim forge`
+drives it: real Commander games between real decks, with a card-coverage
+pre-flight run before *and* after, because a card Forge does not implement is
+silently dropped rather than an error. Setup and the measured timings are in
+[docs/FORGE.md](docs/FORGE.md).
 
 Real rules and real cards — a decade of engine work this project is not going
 to repeat. Its AI is competent with aggro/midrange, weak with control and poor
 with combo, so it systematically undersells combo decks; results get reported
 per archetype, never as one ranking. A cross-check on Tier 1, never ground
-truth.
+truth — measured, not assumed: Forge's AI lost 8–2 piloting the bracket 5 cEDH
+deck against a casual dinosaur list.
 
 **Nothing else is a candidate**, which is worth stating so it stops being
 re-asked. [XMage](https://github.com/magefree/mage) has excellent rules
@@ -211,10 +220,14 @@ while anything with a right answer stays in deterministic Python.
 ## Status
 
 All six decks are migrated to `deck.yaml`, the local app runs, and the
-simulator, gate and artifact generator are in daily use. **532 Python tests and
-90 frontend tests** as of 2026-08-11, CI on 3.11 and 3.12 with a coverage floor,
-ruff, a committed-bundle drift check, and a secrets scan that fails on an API
-key in any tracked file.
+simulator, gate and artifact generator are in daily use. Roughly **1,090
+Python tests and 160 frontend tests** as of 2026-08-12 (treat the counts as a
+staleness signal, not a fact to quote). CI runs pytest on 3.11 and 3.12 with a
+90% coverage floor and a skip-count gate, ruff, strict-by-default mypy, Vitest,
+a strict frontend typecheck, oxlint, a committed-bundle drift check, a secrets
+scan that fails on an API key in any tracked file, a container build that
+exercises the image, and a dependency review on every PR — with every action
+pinned by commit SHA and Dependabot keeping the pins current.
 
 | Area | Where |
 | --- | --- |
@@ -229,20 +242,22 @@ key in any tracked file.
 | Macro category counts vs bracket targets | `decks/analyze.py` |
 | Deck + corpus to SimCards | `sim/compile.py` |
 | Monte Carlo, mulligan policies, land sweeps | `sim/tier1/engine.py` |
+| Memoised Tier 1 results, keyed on compiled input | `sim/cache.py` |
+| The Forge bridge: .dck export, coverage, run, parse | `sim/tier3/` |
 | The five deliverables | `artifacts/generate.py` |
+| Accounts, sessions, invites, the admin bootstrap | `auth/` |
 | Local app: HTTP API, background sim jobs, React UI | `api/`, `web/` |
-| Claude client and read-only corpus tools | `claude/` |
+| Claude client, stance, read-only tools, the interview | `claude/` |
 | Paths, environment overrides | `config.py` |
 
 Two decks fail the gate on one card each — Goreclaw runs Primeval Titan and
 Atla Palani runs Emrakul, the Aeons Torn, both banned in Commander. That is
 the gate working, not a defect.
 
-Not built, and stated plainly so nothing here reads as a promise: **the Forge
-bridge (Tier 3)** and the Tier 2 pod simulator deferred behind it, the deck tier
-list that depends on them, the **Claude modes, stance and UI** on top of the
-client that does exist, card-level spoiler scanning, and deal-watching or cart
-generation.
+Not built, and stated plainly so nothing here reads as a promise: the Tier 2
+pod simulator (deferred behind Forge), the deck tier list that depends on a
+pod measurement, **three of the four Claude modes** and a UI for the stance
+dial, card-level spoiler scanning, and deal-watching or cart generation.
 
 ## Roadmap
 
