@@ -6,6 +6,7 @@
     mtglab decks import <slug> --from   a pasted decklist -> a draft deck
     mtglab decks validate <slug>        the gate -- run before anything else
     mtglab decks promote <slug>         a draft becomes curated, once justified
+    mtglab decks delete <slug>          remove one; it moves to decks/.trash/
     mtglab decks build <slug>           generate the artifacts
     mtglab sim mana <slug>              Tier 1 goldfish
     mtglab sim lands <slug> 30..40      land-count sweep, flood-aware
@@ -349,6 +350,39 @@ def cmd_decks_promote(args):
     _report_edit(result)
 
 
+def cmd_decks_delete(args):
+    """Remove a deck from the library, recoverably.
+
+    Interactive by default: it prints what is about to go and asks for the slug
+    back. `--yes` is for scripts, and it still has to name the slug on the
+    command line, so there is no spelling of this that deletes a deck the
+    caller did not type out.
+    """
+    from mtglab.api import service
+
+    try:
+        deck = service.get_deck(args.slug)
+    except Exception as exc:                                       # noqa: BLE001
+        sys.exit(f"refused: {exc}")
+
+    print(f"  {deck['name']} ({args.slug})")
+    print(f"  {deck['total_cards']} cards, {deck['stage']}, {deck['status']}")
+    if not args.yes:
+        # Reading the slug back, not a y/n. The point is that the answer is
+        # only producible by somebody looking at the right deck.
+        typed = input(f"  type the slug to delete it [{args.slug}]: ").strip()
+    else:
+        typed = args.slug
+
+    try:
+        result = service.delete_deck(slug=args.slug, confirm=typed)
+    except service.DeleteRejected as exc:
+        sys.exit(f"refused: {exc}")
+
+    print(f"\n  deleted {result['slug']}.")
+    print(f"  moved to {result['moved_to']} -- it is not gone, it is aside.")
+
+
 def cmd_decks_note(args):
     from mtglab.api import service
 
@@ -687,6 +721,12 @@ def main(argv=None):
                                           "carries a `why`")
     pr.add_argument("slug")
     pr.set_defaults(func=cmd_decks_promote)
+    dl = decks.add_parser("delete", help="remove a deck; it moves to .trash/")
+    dl.add_argument("slug")
+    dl.add_argument("--yes", action="store_true",
+                    help="skip the prompt; the slug on the command line is the "
+                         "confirmation")
+    dl.set_defaults(func=cmd_decks_delete)
     nt = decks.add_parser("note", help="set a deck-level note")
     nt.add_argument("slug"); nt.add_argument("--key", required=True)
     nt.add_argument("--value")

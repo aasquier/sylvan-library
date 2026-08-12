@@ -14,7 +14,7 @@ import type { DeckSummary, Health } from '../lib/api'
 import Library from './Library'
 
 vi.mock('../lib/api', () => ({
-  api: { decks: vi.fn(), health: vi.fn() },
+  api: { decks: vi.fn(), health: vi.fn(), deleteDeck: vi.fn() },
 }))
 
 const { api } = await import('../lib/api')
@@ -66,6 +66,11 @@ beforeEach(() => {
   // does from being mystifying.
   vi.mocked(api.decks).mockReset().mockResolvedValue(DECKS)
   vi.mocked(api.health).mockReset().mockResolvedValue(HEALTHY)
+  vi.mocked(api.deleteDeck).mockReset().mockResolvedValue({
+    slug: 'goreclaw', name: 'Goreclaw', deleted: true,
+    moved_to: 'decks/.trash/goreclaw-20260811T220000Z',
+    total_cards: 99, stage: 'curated', status: 'built',
+  })
 })
 
 // Explicit, because Testing Library only registers auto-cleanup when the test
@@ -315,5 +320,81 @@ describe('Library mana pips', () => {
     // without the letter being spelled out in the prose.
     expect(within(card).getByTitle('Green')).toBeTruthy()
     expect(within(card).getByTitle('White')).toBeTruthy()
+  })
+})
+
+/**
+ * Deleting a deck.
+ *
+ * The safeguard is that the confirmation is the slug rather than a yes/no: an
+ * "Are you sure?" is answered identically by someone who read it and someone
+ * who clicked through it. These tests pin that the button stays disabled until
+ * the slug matches, that cancelling calls nothing, and that the response's
+ * `moved_to` is shown — a deletion is only survivable if you can see where it
+ * went.
+ */
+describe('Library deck deletion', () => {
+  async function openDialogFor(name: string) {
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    fireEvent.click(screen.getByRole('button', { name: `Delete ${name}` }))
+    return screen.getByRole('dialog')
+  }
+
+  it('will not delete until the slug is typed exactly', async () => {
+    const dialog = await openDialogFor('Goreclaw')
+    const confirm = within(dialog).getByRole('button', { name: /delete this deck/i })
+    expect(confirm.hasAttribute('disabled')).toBe(true)
+
+    fireEvent.change(within(dialog).getByRole('textbox'),
+                     { target: { value: 'gorecla' } })
+    expect(confirm.hasAttribute('disabled')).toBe(true)
+
+    fireEvent.change(within(dialog).getByRole('textbox'),
+                     { target: { value: 'goreclaw' } })
+    expect(confirm.hasAttribute('disabled')).toBe(false)
+  })
+
+  it('sends the typed slug as the confirmation', async () => {
+    const dialog = await openDialogFor('Goreclaw')
+    fireEvent.change(within(dialog).getByRole('textbox'),
+                     { target: { value: 'goreclaw' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /delete this deck/i }))
+
+    await waitFor(() => expect(api.deleteDeck).toHaveBeenCalledWith(
+      'goreclaw', 'goreclaw'))
+  })
+
+  it('drops the deck from the shelf and says where it went', async () => {
+    const dialog = await openDialogFor('Goreclaw')
+    fireEvent.change(within(dialog).getByRole('textbox'),
+                     { target: { value: 'goreclaw' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /delete this deck/i }))
+
+    await waitFor(() => expect(shownNames()).toEqual(['Arahbo', 'Tivit']))
+    // "Deleted" and "recoverable" are separate facts, and the second one is
+    // the reason anyone presses the button without dread.
+    expect(screen.getByText(/decks\/\.trash\/goreclaw-/)).toBeTruthy()
+  })
+
+  it('cancelling deletes nothing', async () => {
+    const dialog = await openDialogFor('Goreclaw')
+    fireEvent.click(within(dialog).getByRole('button', { name: /cancel/i }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(api.deleteDeck).not.toHaveBeenCalled()
+    expect(shownNames()).toContain('Goreclaw')
+  })
+
+  it('keeps the deck on the shelf when the server refuses', async () => {
+    vi.mocked(api.deleteDeck).mockRejectedValue(
+      new Error('this library is read-only'))
+    const dialog = await openDialogFor('Goreclaw')
+    fireEvent.change(within(dialog).getByRole('textbox'),
+                     { target: { value: 'goreclaw' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /delete this deck/i }))
+
+    await within(dialog).findByText(/read-only/)
+    expect(shownNames()).toContain('Goreclaw')
   })
 })

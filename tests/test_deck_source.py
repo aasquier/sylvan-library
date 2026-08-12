@@ -224,5 +224,82 @@ def test_memory_source_creates_and_refuses_duplicates(decks_root):
     with pytest.raises(DeckExists):
         source.create("mini", DECK_YAML)
 
+
+# ---------------------------------------------------------------- deleting
+
+def test_delete_moves_the_deck_aside_rather_than_erasing_it(decks_root):
+    """The promise the return value makes: it says *where*, not whether.
+
+    A deck committed to git has `git checkout` as its undo. The deck this is
+    most likely to be aimed at by mistake is a draft imported ten minutes ago,
+    which has no other copy — so the delete has to leave one.
+    """
+    source = FileDeckSource(decks_root)
+    (decks_root / "mini" / "artifacts").mkdir()
+    (decks_root / "mini" / "artifacts" / "primer-quick.md").write_text("x")
+
+    moved_to = source.delete("mini")
+
+    assert not (decks_root / "mini").exists()
+    assert "mini" not in source.slugs()
+    landed = Path(moved_to)
+    assert landed.is_dir()
+    assert (landed / "deck.yaml").exists()
+    # The artifacts go with it. A folder of primers for a deck that no longer
+    # exists is worse than no folder at all.
+    assert (landed / "artifacts" / "primer-quick.md").exists()
+
+
+def test_a_trashed_deck_is_invisible_to_the_library(decks_root):
+    """`.trash` is dot-prefixed so `config.deck_paths` cannot see it — the
+    glob is `*/deck.yaml` and a trashed deck sits a level deeper. A deleted
+    deck reappearing in the library would be the whole feature backwards."""
+    source = FileDeckSource(decks_root)
+    source.delete("mini")
+    assert "mini" not in source.slugs()
+    assert "mini" not in {d.slug for d in source.all()}
+    # And nothing under `.trash` is mistaken for a deck, however it is named.
+    assert not any(".trash" in p.parts for p in config.deck_paths(decks_root))
+
+
+def test_deleting_twice_is_a_not_found_rather_than_a_second_move(decks_root):
+    source = FileDeckSource(decks_root)
+    source.delete("mini")
+    with pytest.raises(DeckNotFound):
+        source.delete("mini")
+
+
+def test_delete_refuses_an_unknown_deck(decks_root):
+    with pytest.raises(DeckNotFound):
+        FileDeckSource(decks_root).delete("no-such-deck")
+
+
+def test_two_deletions_of_the_same_slug_can_coexist_in_the_trash(decks_root):
+    """Import, delete, re-import, delete again. The second must not overwrite
+    the first — which is the one case a bare `slug` directory name would."""
+    source = FileDeckSource(decks_root)
+    first = source.delete("mini")
+    source.create("mini", DECK_YAML)
+    second = source.delete("mini")
+    assert first != second
+    assert Path(first).exists() and Path(second).exists()
+
+
+def test_memory_source_deletes(decks_root):
+    deck = Deck.load(decks_root / "mini" / "deck.yaml")
+    source = MemoryDeckSource([deck])
+    assert source.delete("mini")
+    assert source.slugs() == []
+    with pytest.raises(DeckNotFound):
+        source.get("mini")
+
+
+def test_a_read_only_source_refuses_a_delete(decks_root):
+    deck = Deck.load(decks_root / "mini" / "deck.yaml")
+    source = MemoryDeckSource([deck], writable=False)
+    with pytest.raises(ReadOnlySource):
+        source.delete("mini")
+    assert source.slugs() == ["mini"], "and the deck is still there"
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

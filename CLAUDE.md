@@ -148,6 +148,7 @@ mtglab decks set <slug> --card X --why '...'        # or --category / --qty
 mtglab decks set <slug> --status built              # no --card: a deck field
 mtglab decks note <slug> --key mulligan --value '...'
 mtglab decks promote <slug>       # draft -> curated, once every card is justified
+mtglab decks delete <slug>        # confirm by typing the slug; moves to decks/.trash/
 mtglab decks build <slug> --against <(git show HEAD:decks/<slug>/deck.yaml)
 ```
 

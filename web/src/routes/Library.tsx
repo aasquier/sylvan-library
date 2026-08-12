@@ -7,6 +7,94 @@ import {
 } from '../components/ui'
 
 /**
+ * Confirm a deletion by typing the slug.
+ *
+ * Not a yes/no. The server refuses anything but the slug itself, and this is
+ * the same check on the near side rather than a softer one: an "Are you sure?"
+ * is answered the same way by someone who read the dialog and someone who
+ * clicked through it, and the deck this is most likely to be aimed at by
+ * mistake is a draft imported minutes ago that git has never seen.
+ *
+ * It says where the deck goes, because a deletion someone is nervous about is
+ * one they should be able to see is reversible before they commit to it.
+ */
+function DeleteDialog({ deck, onCancel, onDeleted }: {
+  deck: DeckSummary
+  onCancel: () => void
+  onDeleted: (movedTo: string) => void
+}) {
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const matches = typed.trim() === deck.slug
+
+  async function remove() {
+    if (!matches) return
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await api.deleteDeck(deck.slug, typed.trim())
+      onDeleted(result.moved_to)
+    } catch (e) {
+      setError(String((e as Error).message ?? e))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style={{ background: 'rgba(0,0,0,0.6)' }}
+         onClick={onCancel}>
+      <div className="card-surface w-full max-w-md rounded-xl p-6"
+           role="dialog" aria-modal="true"
+           aria-label={`Delete ${deck.name}`}
+           onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold tracking-tight">Delete {deck.name}?</h2>
+        <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+          {deck.total_cards} cards · {deck.stage} · {deck.status}
+        </p>
+        <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          The deck moves to <code>decks/.trash/</code> rather than being erased,
+          so this is reversible from the shell. Its artifacts go with it.
+        </p>
+        <label className="mt-4 block">
+          <span className="text-xs uppercase tracking-wide"
+                style={{ color: 'var(--text-muted)' }}>
+            Type <code>{deck.slug}</code> to confirm
+          </span>
+          <input
+            autoFocus
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') onCancel()
+              if (e.key === 'Enter' && matches) void remove()
+            }}
+            className="mt-1 w-full rounded-md px-3 py-2 font-mono text-sm"
+            style={{ background: 'var(--page)', color: 'var(--text-primary)',
+                     border: '1px solid var(--hairline)' }}
+          />
+        </label>
+        {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
+        <div className="mt-5 flex items-center gap-3">
+          <button onClick={remove} disabled={!matches || busy}
+                  className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40"
+                  style={{ background: 'var(--status-critical)', color: '#fff' }}>
+            {busy ? 'Deleting…' : 'Delete this deck'}
+          </button>
+          <button onClick={onCancel} disabled={busy}
+                  className="rounded-lg px-3 py-2 text-sm"
+                  style={{ border: '1px solid var(--hairline)',
+                           color: 'var(--text-secondary)' }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
  * Sylvan Library, Yeong-Hao Han, Commander's Arsenal (2012) — the card this
  * project is named after.
  *
@@ -75,6 +163,10 @@ export default function Library() {
   const [sort, setSort] = useState('name')
   const [status, setStatus] = useState('all')
   const [stage, setStage] = useState('all')
+  const [deleting, setDeleting] = useState<DeckSummary | null>(null)
+  // Kept after the dialog closes: "it is in .trash/" is the sentence that
+  // makes a deletion feel survivable, and it is useless if it flashes past.
+  const [deleted, setDeleted] = useState<{ name: string; movedTo: string } | null>(null)
 
   useEffect(() => {
     Promise.all([api.decks(), api.health()])
@@ -147,6 +239,21 @@ export default function Library() {
         </div>
       </header>
 
+      {deleted && (
+        <div className="card-surface flex flex-wrap items-center gap-2 rounded-lg px-4 py-3 text-sm"
+             style={{ color: 'var(--text-secondary)' }}>
+          <span>
+            Deleted <strong>{deleted.name}</strong>. It moved to{' '}
+            <code>{deleted.movedTo}</code> — not gone, aside.
+          </span>
+          <button onClick={() => setDeleted(null)}
+                  className="ml-auto text-xs underline"
+                  style={{ color: 'var(--text-muted)' }}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {decks.length === 0 ? (
         <FirstRun />
       ) : shown.length === 0 ? (
@@ -157,8 +264,25 @@ export default function Library() {
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((deck) => (
-            <Link key={deck.slug} to={`/decks/${deck.slug}`}
-                  className="card-surface group overflow-hidden rounded-xl transition hover:-translate-y-0.5 hover:shadow-lg">
+            // `group/card` is on this wrapper rather than on the Link, because
+            // the delete button has to sit outside the Link — inside it, a
+            // click would navigate — and still react to hovering the card.
+            <div key={deck.slug} className="group/card relative">
+            {/* Muted until the card is hovered or the button is focused:
+                deleting a deck should be reachable without being the thing
+                your eye lands on. */}
+            <button
+              onClick={() => setDeleting(deck)}
+              title={`Delete ${deck.name}`}
+              aria-label={`Delete ${deck.name}`}
+              className="absolute right-2 top-2 z-10 rounded-md px-2 py-1 text-[11px] opacity-0 transition focus:opacity-100 group-hover/card:opacity-100"
+              style={{ background: 'var(--surface-1)', color: 'var(--text-muted)',
+                       border: '1px solid var(--hairline)' }}
+            >
+              Delete
+            </button>
+            <Link to={`/decks/${deck.slug}`}
+                  className="card-surface block overflow-hidden rounded-xl transition hover:-translate-y-0.5 hover:shadow-lg">
               <CardArt src={deck.art_crop} alt={deck.commander[0] ?? deck.name}
                        ratio="aspect-[626/300]" className="rounded-none" />
               <div className="space-y-2 p-4">
@@ -208,8 +332,25 @@ export default function Library() {
                 )}
               </div>
             </Link>
+            </div>
           ))}
         </div>
+      )}
+
+      {deleting && (
+        <DeleteDialog
+          deck={deleting}
+          onCancel={() => setDeleting(null)}
+          onDeleted={(movedTo) => {
+            // Drop it from the list here rather than re-fetching: the server
+            // has already confirmed, and a round trip would leave the deck on
+            // screen for a beat after it was gone.
+            setDecks((current) => (current ?? []).filter(
+              (d) => d.slug !== deleting.slug))
+            setDeleted({ name: deleting.name, movedTo })
+            setDeleting(null)
+          }}
+        />
       )}
     </div>
   )

@@ -18,6 +18,14 @@ forge-*.jar
 jdk-*/
 *.dck
 
+# --- Deleted decks -----------------------------------------------------------
+# `mtglab decks delete` moves a deck's whole directory here rather than
+# unlinking it, so the mistake is survivable for the deck that most needs it:
+# a draft imported minutes ago and never committed, which has no other copy.
+# Ignored because a deletion should leave the working tree without also
+# staging a pile of files nobody asked to add.
+decks/.trash/
+
 # --- Never commit: anything that identifies what you physically own ---------
 # A public inventory of expensive cards tied to a real identity is a
 # targeting list. Keep these local, permanently.

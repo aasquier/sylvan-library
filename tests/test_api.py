@@ -988,6 +988,84 @@ def test_commander_search_is_exact_and_returns_actual_commanders(client):
                "can be your commander" in (card["oracle_text"] or "").lower()
 
 
+# ---------------------------------------------------------------- deleting
+#
+# Against an in-memory source, so no test here can delete a real deck out of
+# `decks/` -- which is the failure mode worth designing the fixture around
+# when the operation under test is the one that removes things.
+
+@pytest.fixture
+def deletable(client):
+    """A one-deck library the tests may destroy."""
+    deck = Deck.from_text(
+        "slug: doomed\nname: Doomed Deck\nstage: draft\n"
+        "commander:\n  - Gyome, Master Chef\n"
+        "cards:\n  - name: Swamp\n    category: land\n    qty: 99\n",
+        slug="doomed")
+    source = MemoryDeckSource([deck])
+    client.app.dependency_overrides[deck_source] = lambda: source
+    yield source
+    client.app.dependency_overrides.pop(deck_source, None)
+
+
+def test_deleting_needs_the_slug_as_confirmation(client, deletable):
+    """Not a boolean. A client that sends `confirm=true` for every deletion has
+    confirmed nothing, and a mis-aimed request looks exactly like an intended
+    one. The slug is a value only somebody looking at the right deck has."""
+    r = client.request("DELETE", "/api/decks/doomed?confirm=true")
+    assert r.status_code == 422
+    assert "confirm with the slug" in r.json()["detail"]
+    assert deletable.slugs() == ["doomed"], "and nothing was moved"
+
+
+def test_deleting_with_no_confirmation_at_all_is_refused(client, deletable):
+    assert client.request("DELETE", "/api/decks/doomed").status_code == 422
+    assert deletable.slugs() == ["doomed"]
+
+
+def test_deleting_the_wrong_slug_is_refused(client, deletable):
+    """The mis-click this is actually protecting against: the right dialog
+    open over the wrong row."""
+    r = client.request("DELETE", "/api/decks/doomed?confirm=arahbo-cats")
+    assert r.status_code == 422
+    assert deletable.slugs() == ["doomed"]
+
+
+def test_deleting_with_the_slug_removes_the_deck_and_says_where_it_went(
+        client, deletable):
+    r = client.request("DELETE", "/api/decks/doomed?confirm=doomed")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["deleted"] is True
+    assert body["name"] == "Doomed Deck"
+    # "Deleted" and "recoverable" have to be separately true and separately
+    # visible, so the response carries a location rather than only a boolean.
+    assert body["moved_to"]
+    assert deletable.slugs() == []
+
+
+def test_deleting_an_unknown_deck_is_a_404(client, deletable):
+    r = client.request("DELETE", "/api/decks/no-such-deck?confirm=no-such-deck")
+    assert r.status_code == 404
+
+
+def test_a_read_only_library_refuses_a_deletion(client):
+    """docs/HOSTING.md keeps the curated decks read-only for everyone but the
+    maintainer. This is the operation where that matters most."""
+    deck = Deck.from_text(
+        "slug: doomed\nname: Doomed\ncommander:\n  - Gyome, Master Chef\n",
+        slug="doomed")
+    source = MemoryDeckSource([deck], writable=False)
+    client.app.dependency_overrides[deck_source] = lambda: source
+    try:
+        r = client.request("DELETE", "/api/decks/doomed?confirm=doomed")
+        assert r.status_code == 422
+        assert "read-only" in r.json()["detail"]
+        assert source.slugs() == ["doomed"]
+    finally:
+        client.app.dependency_overrides.pop(deck_source, None)
+
+
 # ----------------------------------------------------------------- claude
 
 def test_claude_status_separates_installed_configured_and_wanted(client):
