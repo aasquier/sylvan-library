@@ -3,14 +3,20 @@
 Local toolkit for Commander deckbuilding, playtesting, simulation, and shopping.
 
 Python 3.11+ · DuckDB · numpy · FastAPI. Runs on your own machine against a
-local card corpus; nothing is required to leave it for the toolkit to work.
+local card corpus. **The deterministic core — the gate, the mana solver, the
+simulator — never reaches the network, and its whole test suite runs without
+one.**
 
-Two planned additions do reach outside, and both are opt-in rather than
-load-bearing: a **Claude surface** for conversation and research
-([ADR 14](docs/adr/0014-python-decides-claude-advises.md)) would need an API
-key, and a **shared instance** ([docs/HOSTING.md](docs/HOSTING.md)) would need
-accounts. Neither is built. The deterministic core — the gate, the mana solver,
-the simulator — never calls either, and is tested without a network.
+One thing now reaches outside, opt-in and behind its own install extra: a
+**Claude surface** for conversation and research
+([ADR 14](docs/adr/0014-python-decides-claude-advises.md),
+[ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md)). The
+pipe is built — a client and read-only tools over the corpus — and the modes
+and UI on top of it are not. Install without `[claude]` and nothing about the
+toolkit changes: no account, no key, no calls.
+
+A **shared instance** ([docs/HOSTING.md](docs/HOSTING.md)) would need accounts.
+Not built.
 
 ## Setup
 
@@ -44,6 +50,10 @@ mtglab data refresh          # ~15 min first run: Scryfall bulk -> DuckDB
 mtglab decks list
 mtglab ui                    # the app, at http://127.0.0.1:8765
 ```
+
+Extras: `api` (the app), `claude` (the Anthropic SDK), `dev` (both, plus test
+tooling). A bare `pip install -e .` gets the gate, the mana solver and the
+simulator, which need neither an account nor a network.
 
 ## The app
 
@@ -92,6 +102,21 @@ outside the commander's color identity, a banned card, a card missing its
 `why`. This exists because color-identity and oracle-text mistakes are
 *checkable facts* that get missed when cards are evaluated from memory.
 
+**A deck also declares a `stage`, separately from whether it exists.** A list
+brought in with `decks import` starts as a `draft`, where a missing `why` is one
+counted warning rather than 99 errors — so the deck's *facts* get checked on day
+one while the thinking is still owed. Promotion to `curated` is refused while
+any card is blank, and the artifacts refuse a draft outright
+([ADR 13](docs/adr/0013-an-imported-deck-is-a-draft.md)).
+
+**Nothing writes a rationale for you.** Every write path refuses an empty `why`
+rather than inventing one — including the Claude surface, which may argue about
+a card's slot and may never author the text that lands in `deck.yaml`. That is
+enforced structurally, not by asking nicely: no module under
+`src/mtglab/claude/` may reference a deck-write function at all, and a test
+fails on the commit that adds one
+([ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md)).
+
 ## Commands
 
 ```bash
@@ -99,14 +124,25 @@ mtglab data refresh [--oracle-only]   # Scryfall bulk -> DuckDB
 mtglab data snapshot                  # append today's prices to history
 
 mtglab decks list
+mtglab decks import <slug> --from list.txt --commander 'X'   # -> a draft
 mtglab decks validate <slug>          # the gate
+mtglab decks suggest <slug>           # replacements for what the gate flagged
 mtglab decks build <slug> [--against path/to/old/deck.yaml]
+
+# Surgical edits (ADR 12) -- each one re-runs the gate on the result
+mtglab decks add <slug> --card X --category ramp --why '...'
+mtglab decks remove <slug> --card X
+mtglab decks set <slug> --card X --why '...'      # or --category / --qty
+mtglab decks swap <slug> --out X --in Y --why '...'
+mtglab decks note <slug> --key mulligan --value '...'
+mtglab decks promote <slug>           # draft -> curated, once every card is justified
 
 mtglab sim mana <slug>                # Tier 1 goldfish
 mtglab sim lands <slug> 30 40         # land-count sweep, flood-aware
 
 mtglab price deck <slug>              # cheapest non-promo printing per card
 
+mtglab claude check                   # one real API call -- is the key live?
 mtglab ui [--port 8765] [--dev]       # the local app
 ```
 
@@ -129,12 +165,25 @@ Commander speed rises monotonically with land count, so optimising it alone
 recommends 40 lands. Deployment peaks and then falls as flood sets in — that
 peak is the answer.
 
-**Tier 3 — Forge headless (next).** `forge.jar sim -d ... -n 100` gives real
-rules and real cards, which is a decade of engine work this project is not
-going to repeat. Its AI is competent with aggro/midrange, weak with control,
-poor with combo, so it systematically undersells combo decks — results are
-reported per archetype, never as one ranking. A cross-check on Tier 1, never
-ground truth.
+**Tier 3 — Forge headless (next, not built).** [Forge](https://github.com/Card-Forge/forge)
+is an open-source rules engine with a documented headless mode:
+
+```bash
+forge sim -d <deck.dck> ... -f Commander -n 100 -c 300 -q
+```
+
+Real rules and real cards — a decade of engine work this project is not going
+to repeat. Its AI is competent with aggro/midrange, weak with control and poor
+with combo, so it systematically undersells combo decks; results get reported
+per archetype, never as one ranking. A cross-check on Tier 1, never ground
+truth.
+
+**Nothing else is a candidate**, which is worth stating so it stops being
+re-asked. [XMage](https://github.com/magefree/mage) has excellent rules
+coverage but is a networked play server with no headless batch mode. Cockatrice
+has no rules enforcement at all — it is a virtual tabletop. Arena and MTGO are
+closed, forbid automation, and Arena has no Commander. Deck sites like
+MTGGoldfish are prices and lists, not engines.
 
 **Tier 2 — abstract pod simulator (deferred behind Tier 3).** Four-player
 table, each deck compiled to a policy profile (curve, interaction density,
@@ -152,8 +201,10 @@ while anything with a right answer stays in deterministic Python.
 ## Status
 
 All six decks are migrated to `deck.yaml`, the local app runs, and the
-simulator, gate and artifact generator are in daily use. **216 tests**, CI on
-3.11 and 3.12.
+simulator, gate and artifact generator are in daily use. **532 Python tests and
+90 frontend tests** as of 2026-08-11, CI on 3.11 and 3.12 with a coverage floor,
+ruff, a committed-bundle drift check, and a secrets scan that fails on an API
+key in any tracked file.
 
 | Area | Where |
 | --- | --- |
@@ -161,20 +212,27 @@ simulator, gate and artifact generator are in daily use. **216 tests**, CI on
 | Scryfall bulk ingest, DuckDB schema, price history | `cards/db.py` |
 | Deck file format and YAML round-trip | `decks/model.py` |
 | The gate | `decks/validate.py` |
+| Pasted decklist -> parsed lines -> a draft deck | `decks/decklist.py`, `decks/importer.py` |
+| Surgical deck edits, minimal diffs | `decks/edit.py` |
+| Replacement similarity scoring | `decks/suggest.py` |
 | Companion restrictions, Partner/Background pairings | `decks/companion.py`, `decks/partners.py` |
 | Macro category counts vs bracket targets | `decks/analyze.py` |
 | Deck + corpus to SimCards | `sim/compile.py` |
 | Monte Carlo, mulligan policies, land sweeps | `sim/tier1/engine.py` |
 | The five deliverables | `artifacts/generate.py` |
 | Local app: HTTP API, background sim jobs, React UI | `api/`, `web/` |
+| Claude client and read-only corpus tools | `claude/` |
 | Paths, environment overrides | `config.py` |
 
 Two decks fail the gate on one card each — Goreclaw runs Primeval Titan and
 Atla Palani runs Emrakul, the Aeons Torn, both banned in Commander. That is
 the gate working, not a defect.
 
-Not built: the Tier 2 pod simulator, the deck tier list that depends on it,
-card-level spoiler scanning, and deal-watching or cart generation.
+Not built, and stated plainly so nothing here reads as a promise: **the Forge
+bridge (Tier 3)** and the Tier 2 pod simulator deferred behind it, the deck tier
+list that depends on them, the **Claude modes, stance and UI** on top of the
+client that does exist, card-level spoiler scanning, and deal-watching or cart
+generation.
 
 ## Roadmap
 
