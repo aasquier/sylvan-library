@@ -19,8 +19,20 @@
 > a banned card was unreadable, so rule 1 leaked on exactly the cards this
 > project fails the gate on. `service.cards_named()` closed it the same day.
 >
-> **Not built:** the modes themselves, the stance and its three axes, the
-> activity log, and the rationale interview.
+> **The stance and its three axes landed 2026-08-11.** `mtglab.claude.stance`
+> is the dial: initiative, scope and write autonomy as independent ordered
+> axes, four named presets over them, `off` as a real position that makes no
+> calls, and the default derived from the deck's `status` exactly as argued
+> below. It is stdlib-only and needs neither the SDK nor a key — which is the
+> property that makes "off" trustworthy rather than merely configured. Two
+> things the ADR did not anticipate and the build added: a **deployment
+> ceiling** (`MTGLAB_CLAUDE_STANCE_CEILING`) that clamps per axis, so a hosted
+> instance can cap what any user selects while a local run does not have to;
+> and an unreadable ceiling **failing closed**, because a typo in a deployment
+> variable should cost a feature rather than open one.
+>
+> **Not built:** the modes themselves, the activity log, and the rationale
+> interview.
 
 Refines [ADR 14](0014-python-decides-claude-advises.md), which drew the line
 between what Python decides and what Claude advises on. This one says what a

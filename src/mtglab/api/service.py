@@ -440,6 +440,59 @@ def create_deck(*, slug: str, name: str = "", commander: list[str] | None = None
         con.close()
 
 
+# -------------------------------------------------------------------- claude
+
+def claude_status(*, requested: Any = None, slug: str | None = None,
+                  source: DeckSource | None = None) -> dict[str, Any]:
+    """What the Claude surface is, and how much of it is switched on.
+
+    Answers three separate questions that are easy to conflate:
+
+    * **Is it installed?** The SDK rides with the `claude` extra.
+    * **Is it configured?** A credential is present, or it is not.
+    * **Is it wanted?** The stance, which is the user's decision and is `off`
+      until somebody says otherwise.
+
+    All three can be false independently, and a UI needs to say which — "no
+    opinions here" reads very differently from "you have not set a key". None
+    of this reaches the network: the stance is stdlib-only and availability is
+    a question about the environment, so this endpoint answers on a base
+    install with no account.
+    """
+    from mtglab.claude import client as claude_client
+    from mtglab.claude import stance as claude_stance
+
+    deck = None
+    if slug:
+        decks = _source(source)
+        deck = Deck.from_text(decks.read_text(slug), slug=slug)
+
+    effective = claude_stance.resolve(requested, deck=deck)
+    limit = claude_stance.ceiling()
+    return {
+        "installed": claude_client.sdk_installed(),
+        "configured": claude_client.credential_present(),
+        "model": claude_client.model(),
+        "stance": claude_stance.describe(effective),
+        # The deployment's cap, so a UI can grey out what it may not offer
+        # rather than letting someone pick a level that is silently clamped.
+        "ceiling": claude_stance.describe(limit),
+        "default": claude_stance.describe(
+            claude_stance.default_for(deck) if deck else claude_stance.OFF),
+        "presets": [{
+            "name": name,
+            "blurb": claude_stance.PRESET_BLURBS[name],
+            "stance": claude_stance.describe(preset_stance),
+            # Whether this deployment will actually honour it unclamped.
+            "available": claude_stance.clamp(preset_stance, limit)
+            == preset_stance,
+        } for name, preset_stance in claude_stance.PRESETS.items()],
+        # Stated here rather than only in an ADR, because it is the sentence a
+        # user should be able to read next to the dial.
+        "never": "No stance lets Claude write a card's rationale.",
+    }
+
+
 # ------------------------------------------------------------------- colours
 
 def color_taxonomy() -> dict[str, Any]:

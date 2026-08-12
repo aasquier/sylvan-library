@@ -21,6 +21,15 @@ rather than over this paragraph.
 """
 
 from mtglab.claude.client import MODEL, ClaudeUnavailable, available, check, connect
+from mtglab.claude.stance import (
+    OFF,
+    PRESETS,
+    Stance,
+    ceiling,
+    default_for,
+    describe,
+    resolve,
+)
 from mtglab.claude.tools import READ_ONLY, run, schemas
 
 # `connect()` rather than `client()`, matching `db.connect()` -- and because a
@@ -29,4 +38,7 @@ from mtglab.claude.tools import READ_ONLY, run, schemas
 __all__ = [
     "MODEL", "ClaudeUnavailable", "available", "check", "connect",
     "READ_ONLY", "run", "schemas",
+    # The stance is stdlib-only on purpose: the dial has to be readable, and
+    # settable to `off`, on an install with neither the SDK nor a key.
+    "OFF", "PRESETS", "Stance", "ceiling", "default_for", "describe", "resolve",
 ]

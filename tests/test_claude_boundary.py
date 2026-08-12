@@ -43,7 +43,7 @@ CLAUDE_PKG = Path(__file__).resolve().parents[1] / "src" / "mtglab" / "claude"
 #: launder a rationale through its `why` argument just as effectively.
 WRITE_SURFACE = frozenset({
     "add_card", "remove_card", "set_card_field", "set_deck_field",
-    "set_note", "swap_card", "import_deck", "_commit",
+    "set_note", "swap_card", "import_deck", "create_deck", "_commit",
 })
 
 #: The private write helpers and the editor module underneath them. Naming the

@@ -986,3 +986,72 @@ def test_commander_search_is_exact_and_returns_actual_commanders(client):
         assert set(card["color_identity"]) == {"W", "G"}, card["name"]
         assert "Legendary" in card["type_line"] or \
                "can be your commander" in (card["oracle_text"] or "").lower()
+
+
+# ----------------------------------------------------------------- claude
+
+def test_claude_status_separates_installed_configured_and_wanted(client):
+    """Three questions a UI must not conflate: "no opinions here" reads very
+    differently from "you never set a key"."""
+    body = client.get("/api/claude").json()
+    assert isinstance(body["installed"], bool)
+    assert isinstance(body["configured"], bool)
+    assert body["model"].startswith("claude-")
+    # Off until somebody says otherwise, whatever is installed.
+    assert body["stance"]["preset"] == "off"
+    assert body["stance"]["allows_calls"] is False
+
+
+def test_claude_status_reaches_no_network(client):
+    """It answers on a base install with no account — so it may not call out
+    to check. Availability is a fact about the environment."""
+    import mtglab.claude.client as cc
+    original = cc.connect
+    cc.connect = lambda: pytest.fail("claude_status must not build a client")
+    try:
+        assert client.get("/api/claude").status_code == 200
+    finally:
+        cc.connect = original
+
+
+def test_the_stance_default_comes_from_the_decks_status(client):
+    """ADR 15: a theoretical deck is a list under consideration, a built one is
+    sleeved cardboard. The default follows a field that already exists."""
+    theoretical = client.get("/api/claude",
+                             params={"slug": "goreclaw-stompy"}).json()
+    built = client.get("/api/claude", params={"slug": "arahbo-cats"}).json()
+    assert theoretical["default"]["preset"] == "second-opinion"
+    assert built["default"]["preset"] == "consultant"
+    # Neither default may write.
+    assert not theoretical["default"]["may_write"]
+    assert not built["default"]["may_write"]
+
+
+def test_a_requested_stance_is_reported_back_resolved(client):
+    body = client.get("/api/claude", params={"stance": "collaborator"}).json()
+    assert body["stance"]["preset"] == "collaborator"
+    assert body["stance"]["may_write"] is True
+
+
+def test_an_unknown_stance_is_refused_rather_than_ignored(client):
+    """Silently falling back would hand someone a different dial than the one
+    they asked for."""
+    r = client.get("/api/claude", params={"stance": "chatty"})
+    assert r.status_code == 422
+
+
+def test_a_deployment_ceiling_marks_presets_unavailable(client, monkeypatch):
+    """So a UI can grey out what it may not offer, rather than letting someone
+    pick a level that is silently clamped."""
+    from mtglab.claude import stance as st
+    monkeypatch.setenv(st.CEILING_ENV, "consultant")
+    body = client.get("/api/claude", params={"stance": "collaborator"}).json()
+    assert body["stance"]["preset"] == "consultant", "clamped to the ceiling"
+    unavailable = {p["name"] for p in body["presets"] if not p["available"]}
+    assert "collaborator" in unavailable
+    assert "off" not in unavailable
+
+
+def test_the_rule_with_no_stance_above_it_is_stated_next_to_the_dial(client):
+    body = client.get("/api/claude").json()
+    assert "rationale" in body["never"]
