@@ -232,3 +232,103 @@ if __name__ == "__main__":
                 print(f"  FAIL  {name}: {exc}")
     print(f"\n{failures} failure(s)")
     sys.exit(1 if failures else 0)
+
+
+# ---------------------------------------------------------- game changers
+#
+# The one bracket rule that can be *counted* rather than estimated: Scryfall
+# flags the official Game Changers list per card, so a declared bracket finally
+# has something to be checked against. Reported, not enforced -- `validate.py`
+# is the gate, and which Game Changer to cut is a decision rather than a fix.
+
+def _Rec(game_changer=False, *, type_line="Artifact", cmc=2.0,
+         mana_cost="{2}"):
+    """A real `CardRecord`, not a stub.
+
+    `deck_stats` reads the curve, the pips and the type line as well as this
+    flag, and a stub thin enough to make one test pass is a stub that breaks
+    the next one. Importing `db` costs nothing here -- duckdb is imported
+    lazily inside `connect()`.
+    """
+    from mtglab.cards.db import CardRecord
+    return CardRecord(
+        name="stub", mana_cost=mana_cost, cmc=cmc, type_line=type_line,
+        oracle_text="", color_identity=frozenset("G"), produced_mana=(),
+        legal_commander=True, reserved=False, edhrec_rank=None,
+        image_normal=None, game_changer=game_changer)
+
+
+def _deck_with(names, bracket=3):
+    from mtglab.decks.model import Deck
+    return Deck.from_text(
+        f"slug: gc\nname: GC\nbracket: {bracket}\n"
+        "commander:\n  - Gyome, Master Chef\n"
+        "cards:\n" + "".join(
+            f"  - name: {n}\n    category: ramp\n    why: x\n" for n in names),
+        slug="gc")
+
+
+def test_counts_the_game_changers_a_deck_runs():
+    from mtglab.decks.analyze import game_changers
+    deck = _deck_with(["Smothering Tithe", "Llanowar Elves"])
+    corpus = {"Smothering Tithe": _Rec(True), "Llanowar Elves": _Rec(False),
+              "Gyome, Master Chef": _Rec(False)}
+    report = game_changers(deck, corpus)
+    assert report["cards"] == ["Smothering Tithe"]
+    assert report["count"] == 1
+    assert report["allowed"] == 3
+    assert report["verdict"] == "ok"
+
+
+def test_a_bracket_three_deck_over_the_cap_is_flagged():
+    from mtglab.decks.analyze import game_changers
+    names = ["A", "B", "C", "D"]
+    deck = _deck_with(names, bracket=3)
+    corpus = {n: _Rec(True) for n in names} | {"Gyome, Master Chef": _Rec(False)}
+    report = game_changers(deck, corpus)
+    assert report["count"] == 4
+    assert report["verdict"] == "over", "bracket 3 permits three"
+
+
+def test_a_high_bracket_has_no_limit():
+    from mtglab.decks.analyze import game_changers
+    names = ["A", "B", "C", "D", "E"]
+    deck = _deck_with(names, bracket=5)
+    corpus = {n: _Rec(True) for n in names} | {"Gyome, Master Chef": _Rec(False)}
+    report = game_changers(deck, corpus)
+    assert report["allowed"] is None
+    assert report["verdict"] == "ok", "cEDH is where these belong"
+
+
+def test_the_commander_counts_too():
+    """A Game Changer in the command zone is available every game, which is
+    rather the point of the list."""
+    from mtglab.decks.analyze import game_changers
+    deck = _deck_with(["Llanowar Elves"])
+    corpus = {"Llanowar Elves": _Rec(False), "Gyome, Master Chef": _Rec(True)}
+    assert game_changers(deck, corpus)["count"] == 1
+
+
+def test_no_corpus_is_unknown_rather_than_zero():
+    """An absent count is not a count of zero. A deck reporting "0 Game
+    Changers" because nobody looked is the quiet wrong answer this whole
+    column set exists to prevent."""
+    from mtglab.decks.analyze import game_changers
+    report = game_changers(_deck_with(["Smothering Tithe"]), {})
+    assert report["verdict"] == "unknown"
+    assert report["count"] == 0
+
+
+def test_no_declared_bracket_is_unknown_rather_than_ok():
+    from mtglab.decks.analyze import game_changers
+    deck = _deck_with(["Smothering Tithe"], bracket="")
+    corpus = {"Smothering Tithe": _Rec(True), "Gyome, Master Chef": _Rec(False)}
+    assert game_changers(deck, corpus)["verdict"] == "unknown"
+
+
+def test_deck_stats_carries_the_report():
+    from mtglab.decks.analyze import deck_stats
+    stats = deck_stats(_deck_with(["Smothering Tithe"]),
+                       {"Smothering Tithe": _Rec(True),
+                        "Gyome, Master Chef": _Rec(False)})
+    assert stats["game_changers"]["count"] == 1
