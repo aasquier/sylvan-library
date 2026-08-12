@@ -442,6 +442,56 @@ out, which is the correct emergency response to a suspected session leak.
 it to a variable, and asks only whether it is set. Locally the same variable
 comes from a gitignored `.env` (see `.env.example`) rather than from Fly.
 
+#### Why a static key here, and when to stop using one
+
+Anthropic offers three authentication methods, and their documented fit is
+worth quoting rather than guessing at, because the answer for this app is not
+the answer for every app:
+
+| Method | Documented best for |
+| --- | --- |
+| **API key** | "Local development, prototyping, scripts, and **single-tenant servers where you control secret storage**" |
+| **Workload Identity Federation** | "Production workloads on cloud platforms (AWS, Google Cloud, Azure), CI/CD pipelines, and Kubernetes, **where you want to eliminate static secrets**" |
+| App Attest | iOS/macOS apps calling the API directly with no backend — not us |
+
+A single-tenant Fly app with secrets in `fly secrets` is the first row
+verbatim, so the key is the right instrument here and not a shortcut. The
+guidance for moving is conditional rather than aspirational: adopt federation
+"when your workload already has a platform-issued identity you can federate."
+
+**WIF exchanges an OIDC JWT from an identity provider you already trust for a
+short-lived token the SDK refreshes itself — there is no `sk-ant-api...` string
+to mint, distribute, or rotate.** Setup is three Console resources (a service
+account, a federation issuer, and a federation rule) plus an IdP that issues
+OIDC tokens; the named ones are AWS IAM, Google Cloud, Azure/Entra, Kubernetes
+service accounts, GitHub Actions, SPIFFE, and Okta. Two consequences for us:
+
+- **Fly is not on that list.** Whether Fly's machine OIDC tokens can back a
+  federation rule is a question for Fly's own docs before betting on it, and
+  the Hetzner alternative in §3 has no platform identity at all. Until one of
+  those resolves, a key in `fly secrets` is the endpoint, not a waypoint.
+- **CI is the better first candidate.** GitHub Actions is an OIDC issuer
+  Anthropic supports, and the reviewer workflow in `docs/ENGINEERING.md`
+  already requests `id-token: write`. That is the place where a static
+  repository secret could actually be removed.
+
+Federation is not a free upgrade either — Anthropic's own caveat is that it
+"does not, on its own, guarantee end-to-end security: the trust chain is only
+as strong as your identity provider's configuration, and a long-lived secret
+one hop upstream ... can still undermine it."
+
+#### Key expiration, chosen once
+
+A key's expiration is set **at creation and cannot be changed afterwards** —
+3 hours, 1 day, 7 days, 30 days, a custom duration, or **Never**. "Never" is
+the documented choice "for keys you store in a secrets manager and rotate
+yourself", which is what `fly secrets` is. A short-lived key is the better
+choice for a laptop, where the blast radius of a leak is a stolen file rather
+than a breached host. Anthropic emails the creator before expiry on keys with a
+lifetime of a week or more, and an expired key returns `401` with no way to
+reactivate it — so use separate keys per environment (workspaces scope them),
+and the local one expiring can never take production down.
+
 Three ways this leaks that are worth naming, because two of them are specific
 to this app:
 

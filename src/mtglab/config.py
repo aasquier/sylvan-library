@@ -33,6 +33,9 @@ Anthropic SDK directly, never bound to a name in this project. The reason is
 the one this module's own history teaches -- a value captured at import is a
 value that cannot be changed later -- plus a value we never hold is a value we
 cannot log, serialise into an error, or leak into a prompt.
+
+The one exception is a blank credential, which is deleted rather than passed
+along; see `_drop_blank_credentials` for why empty is worse than absent.
 """
 
 from __future__ import annotations
@@ -63,7 +66,23 @@ def _load_dotenv() -> None:
         load_dotenv(found, override=False)
 
 
+# Anthropic's credential precedence treats an empty string as a credential that
+# is *present*: with `ANTHROPIC_API_KEY=""` the SDK selects the API-key path
+# with an empty key and fails as a 401, instead of falling through or reporting
+# that nothing is configured. Their docs say to unset rather than blank these.
+# A half-filled `.env` is the obvious way to produce one by accident, so drop
+# them here and turn a confusing 401 into an honest "no credentials".
+_BLANK_IS_WORSE_THAN_ABSENT = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+
+
+def _drop_blank_credentials() -> None:
+    for name in _BLANK_IS_WORSE_THAN_ABSENT:
+        if name in os.environ and not os.environ[name].strip():
+            del os.environ[name]
+
+
 _load_dotenv()
+_drop_blank_credentials()
 
 DATA_DIR: Path
 DECKS_DIR: Path

@@ -205,3 +205,34 @@ def test_the_api_key_is_never_bound_to_a_name(tmp_path, monkeypatch):
     exported = [n for n in dir(config) if not n.startswith("_")]
     assert not any("KEY" in n.upper() or "TOKEN" in n.upper() or
                    "SECRET" in n.upper() for n in exported), exported
+
+
+def test_a_blank_credential_is_dropped_rather_than_passed_along(monkeypatch):
+    """Empty is worse than absent, per Anthropic's credential precedence.
+
+    `ANTHROPIC_API_KEY=""` selects the API-key path with an empty key and fails
+    as a 401, instead of falling through or reporting that nothing is
+    configured. A half-filled `.env` is the obvious way to produce one by
+    accident, so it is deleted here and the failure becomes honest.
+    """
+    for blank in ("", "   "):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", blank)
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", blank)
+        config._drop_blank_credentials()
+        assert "ANTHROPIC_API_KEY" not in os.environ
+        assert "ANTHROPIC_AUTH_TOKEN" not in os.environ
+
+
+def test_a_real_credential_is_left_alone(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    config._drop_blank_credentials()
+    assert os.environ["ANTHROPIC_API_KEY"] == "not-a-real-key"
+
+
+def test_the_example_env_does_not_ship_a_blank_key():
+    """`.env.example` is meant to be copied. If it set the key to nothing, the
+    copy would be the failure mode above rather than a clean unset."""
+    example = (Path(__file__).resolve().parents[1] / ".env.example").read_text()
+    live = [ln for ln in example.splitlines()
+            if ln.strip() and not ln.lstrip().startswith("#")]
+    assert not any(ln.startswith("ANTHROPIC_API_KEY=") for ln in live), live
