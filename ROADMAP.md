@@ -1181,10 +1181,27 @@ Forge.
 Nothing in the architecture blocks any of it — the API is a normal FastAPI app
 and the frontend is prebuilt static files served by it.
 
-**Two things auth still needs**, both in `docs/HOSTING.md` §7: the email half
-(invite links and password resets — build-order step 5b) and **a login screen
-in the app**. The API is finished; the frontend has not been touched, so
-turning auth on today gives you an SPA that loads and 401s on every fetch.
+**Auth's server side is finished as of 2026-08-12** — the core (step 5) and the
+email half (step 5b: invites, password resets, tokens stored hashed and
+single-use, the `EmailSender` seam). **What is left is browser-side and
+administrative**, and both are in `docs/HOSTING.md` §7:
+
+- **A login screen**, plus the claim page the emailed link lands on. The API is
+  finished; the frontend has not been touched, so turning auth on today gives
+  you an SPA that loads and 401s on every fetch.
+- **An admin UI, and admin authorization that means something.** `is_admin` is
+  stored on every account and carried on the request scope, and nothing reads
+  it to decide anything — an admin is currently a flag with no privileges
+  attached. Alongside it: **the maintainer must always be an admin on every
+  instance**, which needs a bootstrap path for a fresh deployment, a refusal to
+  demote or disable the last admin, and a way to grant the flag after account
+  creation. None of that exists yet and all of it is cheaper before there are
+  accounts to migrate.
+
+The `mtglab users` CLI stays after the admin UI ships rather than being
+replaced by it: it is the bootstrap path — the first account on a fresh
+instance predates anybody who could log in to create it — and the recovery path
+when mail or the frontend is broken.
 
 ### Rust or Go for the simulation core
 

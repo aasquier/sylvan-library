@@ -1,6 +1,6 @@
 # 16. Accounts are invited, and passwords are self-served by email
 
-**Status:** Proposed — no auth exists yet · **Decided:** 2026-08-12
+**Status:** Accepted · **Decided:** 2026-08-12 · **Implemented:** 2026-08-12
 
 **Supersedes the "no self-signup" half of
 [ADR 5](0005-sessions-over-jwts-and-no-self-signup.md).** Everything else in

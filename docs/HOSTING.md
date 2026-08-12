@@ -60,17 +60,19 @@ These are needed before any deployment works at all:
 
 ## 1. Login and per-user isolation
 
-> **Built, as of 2026-08-12** — everything in this section except the email
-> half. `src/mtglab/auth/` is `app.db`, Argon2id, accounts, sessions and the
-> login rate limiter; `src/mtglab/api/auth.py` is the middleware and the three
+> **Built, as of 2026-08-12** — the whole of this section's server side.
+> `src/mtglab/auth/` is `app.db`, Argon2id, accounts, sessions, the login rate
+> limiter and (step 5b) the token machinery, the `EmailSender` seam and
+> `mtglab users invite`; `src/mtglab/api/auth.py` is the middleware and the five
 > routes; `api/deps.py` is the scoped accessor. It is **off unless
 > `MTGLAB_REQUIRE_AUTH` is set**, because the local single-user app is how this
 > runs today and putting a login in front of it would be a regression.
 >
-> What is still to come is §6 step 5b: `mtglab users invite`, the emailed setup
-> link, and `POST /api/auth/reset`. Until then `mtglab users add` prompts for a
-> password at the terminal, which is the maintainer's own bootstrap account and
-> not a way to set somebody else's.
+> **What is left is browser-side and administrative**, and both block a deploy
+> with auth on: a login screen (there is none, so the SPA 401s on every fetch),
+> and an **admin surface** — `is_admin` is stored on every account and carried
+> on the request scope, but nothing yet *requires* it, so an admin today is a
+> flag with no privileges attached. §6 steps 5c and 5d, and §7 tracks both.
 
 ### Use Argon2id, sessions, and no self-signup
 
@@ -724,15 +726,39 @@ Roughly ascending risk, each step independently useful:
    no network, no container. What genuinely needs a deploy is as narrow as
    predicted — `Secure` cookies over real TLS, HSTS, proxy headers, and email
    deliverability.
-5b. **Invite, verify and reset over email** (ADR 16). **Next.** Split out from 5
-   because the half above proves itself in the test suite and this half cannot.
-   It arrives as schema version 2 in `auth/db.py`, an `EmailSender` protocol
-   with a console implementation, and one token module serving both entry
-   points. Every rule it needs from step 5 is already there and tested:
-   `password_hash` is nullable so an unclaimed account is a real state,
-   `users.set_password` already revokes every session, and
-   `users.get_by_email` is written with a note that a miss must answer
-   identically to a hit.
+5b. ~~**Invite, verify and reset over email** (ADR 16).~~ **Done 2026-08-12.**
+   Schema version 2 in `auth/db.py`, `auth/tokens.py` serving both entry
+   points, the `EmailSender` seam in `auth/mail.py` with a console
+   implementation, `mtglab users invite`, and `POST /api/auth/reset` plus
+   `POST /api/auth/claim`. Every rule it needed from step 5 was already there
+   and tested, which is why it was a small build: `password_hash` is nullable
+   so an unclaimed account is a real state, and `users.get_by_email` was
+   written with a note that a miss must answer identically to a hit.
+   What it cannot prove locally is the half it was split out for —
+   deliverability. No test sends mail.
+5c. **A login screen**, and the claim page behind the emailed link. The API is
+   finished and the frontend has not been touched. Deploying with auth on
+   before this exists gives an app that loads and 401s on every fetch.
+5d. **The admin surface — an admin UI, and the authorization that gives it
+   teeth.** `is_admin` exists on the account, on `UserScope`, and in
+   `/api/auth/me`, and **nothing reads it to decide anything**. Two halves,
+   and the second is the one with the security argument in it:
+   - *Enforcement.* An `admin` classification alongside public/shared/
+     user-scoped in `tests/test_isolation.py`, so an admin route is refused to
+     a non-admin by the same generated sweep that already refuses an
+     unauthenticated one — and a new admin route that forgets the check fails
+     the suite rather than shipping.
+   - *A surface.* Accounts, invites, disable/enable, live sessions — the
+     `mtglab users` commands as a page, for the same reason the deck editor is
+     a page: a hosted app whose administration is SSH-only is one the
+     maintainer can only run from a laptop with the key on it.
+
+   **The maintainer must always be an admin, on every instance** — see the
+   dedicated item in §7 for what that requires, because "there is always at
+   least one admin, and it is me" is a property nothing currently guarantees.
+   The CLI stays regardless: it is the bootstrap path (the first account on a
+   fresh deployment predates anyone who could log in to create it) and the
+   break-glass path when mail is misconfigured.
 6. **User decks** in `user_decks`, reusing the existing YAML parser, gate and
    artifact generator.
 7. **Process pool for sweeps** once anyone actually complains about the wait.
@@ -771,6 +797,11 @@ here rather than rewriting the sections above.
       their SHA-256, so there is nothing to sign and no key to hold. One fewer
       secret to rotate, and the item is struck rather than silently dropped
       because a checklist that loses entries is a checklist nobody trusts.
+- [x] **The email half of auth** — build-order step 5b, landed 2026-08-12.
+      `mtglab users invite`, `POST /api/auth/reset`, `POST /api/auth/claim`,
+      tokens stored hashed and single-use, and the `EmailSender` seam. What
+      this does **not** tick is the provider itself: the code is done, the
+      account and the verified domain are still deploy-day items below.
 
 ### Does not exist yet — this is the actual build list
 
@@ -783,26 +814,53 @@ here rather than rewriting the sections above.
 - [ ] **A refresh procedure.** Cron does not work — Fly volumes attach to
       exactly one machine, so a scheduled second Machine cannot mount the
       corpus. Monthly and by hand is the plan; write it down as a runbook.
-- [ ] **The email half of auth** — build-order step 5b. The core landed
-      2026-08-12; what is missing is `mtglab users invite`, the emailed setup
-      link, `POST /api/auth/reset`, and the `EmailSender` seam, per
-      [ADR 16](adr/0016-accounts-are-invited-and-passwords-are-self-served.md).
-      Until it ships, an account for somebody else is created unclaimed and the
-      password is set by whoever holds the box. Still not needed for the six
-      curated decks, still **required before any collection feature ships**
-      (rule 5's reasoning does not stop at `git`). Cloudflare Access remains
-      the exit if this sprawls.
-- [ ] **A login screen in the app.** The API is finished and the frontend has
-      not been touched: with `MTGLAB_REQUIRE_AUTH` on, the SPA loads and every
+- [ ] **A login screen in the app**, and the claim page behind the emailed
+      link. Build-order step 5c. The API is finished and the frontend has not
+      been touched: with `MTGLAB_REQUIRE_AUTH` on, the SPA loads and every
       fetch it makes returns 401. `GET /api/auth/me` answers `auth_required`
       and `authenticated` separately so the client can tell "logged out" from
       "this instance has no login" — that is the endpoint to build against.
-      **Deploying with auth on before this exists gives you an unusable app.**
-- [ ] **A transactional email provider.** New with ADR 16 and not previously on
-      this list, because the superseded plan had no email at all. Needs a
-      `RESEND_API_KEY` in `fly secrets`, a **verified sending domain** (DNS
-      records, so start it early — propagation is not instant), and a decision
-      about the From address. Add it to `.env.example` when the code lands.
+      The claim page reads the token from `location.hash` (never the query
+      string — see `auth/invites.py` for why) and posts it to
+      `/api/auth/claim`. **Deploying with auth on before this exists gives you
+      an unusable app.**
+- [ ] **An admin UI, and admin authorization that means something.**
+      Build-order step 5d, added 2026-08-12. `is_admin` is stored, carried on
+      `UserScope`, and reported by `/api/auth/me` — and **no route or function
+      requires it**, so today an admin differs from any other account only in
+      what `mtglab users list` prints beside their name. Needs both halves:
+      an enforced `admin` classification in `tests/test_isolation.py`, and a
+      page that does what `mtglab users` does. Administering a hosted app over
+      SSH only works while the maintainer is at the machine with the key.
+- [ ] **The maintainer is always an admin, on every instance.** Stated as a
+      requirement 2026-08-12, and nothing currently guarantees it. Four things
+      it needs, none of them large and all of them easier before there is data
+      to migrate:
+      - **A bootstrap admin.** A fresh deployment has an empty `users` table
+        and no way in. Either the first account created is admin
+        automatically, or an env var (`MTGLAB_ADMIN_EMAIL`) mints an invite for
+        it on first boot. The env-var form is the one that survives a volume
+        being recreated; the first-account form is the one with no new
+        configuration in it. **Decide before the first deploy, not after.**
+      - **No last-admin lockout.** `users.set_admin` and `set_disabled` will
+        both happily remove the only admin an instance has. Refuse that, in
+        the auth core rather than in a handler, so the CLI and any future
+        admin page inherit it.
+      - **A way to grant it after the fact.** `users.set_admin` exists and no
+        command calls it; `--admin` at creation is the only path today.
+      - **Recovery that does not depend on the app.** `mtglab users` against
+        the volume over `fly ssh console` is the answer, and it is a reason
+        the CLI stays after the admin UI ships rather than being replaced
+        by it.
+- [ ] **A transactional email provider.** New with ADR 16. The *code* landed
+      2026-08-12 and is ticked above; what is outstanding is the account and
+      the DNS. Needs a `RESEND_API_KEY` in `fly secrets`, a **verified sending
+      domain** (DNS records, so start it early — propagation is not instant),
+      and `MTGLAB_EMAIL_FROM` set to an address on it. Also `MTGLAB_BASE_URL`,
+      or every emailed link points at `127.0.0.1`. All three are in
+      `.env.example`. Note that `sender_from_env()` **refuses to start without
+      the key when auth is on**, deliberately: the console fallback would print
+      recipients into the platform's log, which ADR 16 forbids.
 - [ ] **Sim result caching** — build-order step 3, the biggest performance win.
 
 ### Have these in hand before deploy day
@@ -811,7 +869,13 @@ here rather than rewriting the sections above.
 - [x] ~~`SESSION_SECRET` generated (`openssl rand -base64 32`).~~ **Not
       needed** — see above. Sessions are opaque tokens, not signed ones.
 - [ ] `MTGLAB_REQUIRE_AUTH=1` in `fly.toml`, and an admin account created over
-      `fly ssh console` (§4 step 8) — *after* the login screen exists.
+      `fly ssh console` (§4 step 8) — *after* the login screen exists. Create
+      it with `mtglab users add <name> --admin`, which prompts; that account is
+      the maintainer's and the one the item above is about.
+- [ ] `RESEND_API_KEY`, `MTGLAB_EMAIL_FROM` and `MTGLAB_BASE_URL` set, and one
+      real invite sent to an address you control before anybody else is
+      invited. Deliverability is the one part of the email half that no test
+      covers, by design.
 - [ ] A domain, if you want one, plus the Fly TLS certificate step.
 - [ ] Cloudflare Access configured, if the instance is not to be public.
 - [ ] **A second home for `ANTHROPIC_API_KEY`.** One key, one environment, two
@@ -825,6 +889,10 @@ here rather than rewriting the sections above.
 
 ### Decisions that must be made before, not during
 
+- [ ] **How the maintainer becomes admin on a fresh instance** — first account
+      wins, or `MTGLAB_ADMIN_EMAIL`. See the readiness item above. This is a
+      decision because both answers are defensible and swapping later means
+      touching a populated `users` table.
 - [ ] **The Forge deployment shape** — local only, server-side, or a worker.
       Open in `ROADMAP.md`, and the section below is what it costs.
 - [ ] **Fly or Hetzner.** §4 recommends Fly for the app alone. **If Forge goes

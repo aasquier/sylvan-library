@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from mtglab import config
 from mtglab.api import auth, jobs, service
 from mtglab.api.deps import Scope, deck_source
+from mtglab.auth.mail import EmailSender
 from mtglab.decks.source import DeckNotFound, DeckSource
 
 # The request scope, as one annotation. Every deck-facing route takes it, so
@@ -28,7 +29,8 @@ WEB_DIST = Path(__file__).resolve().parent.parent / "web_dist"
 
 
 def create_app(*, dev: bool = False, require_auth: bool | None = None,
-               secure_cookies: bool | None = None) -> FastAPI:
+               secure_cookies: bool | None = None,
+               email_sender: EmailSender | None = None) -> FastAPI:
     """Build the app.
 
     `require_auth` defaults to `MTGLAB_REQUIRE_AUTH`, which is off — see
@@ -36,6 +38,11 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     argument exists so a test can build the deployed configuration without
     setting environment variables, which is what makes the whole auth core
     checkable on a laptop (`docs/HOSTING.md` §6 step 5).
+
+    `email_sender` is the same idea one layer further out (ADR 16): `None`
+    resolves from the environment when a message is sent, and a test passes a
+    recorder, which is how "no test sends mail" is a property of the wiring
+    rather than a promise.
     """
     required = config.require_auth() if require_auth is None else require_auth
     secure = (config.secure_cookies() if secure_cookies is None
@@ -47,7 +54,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     # First, and before any route is declared: the middleware runs ahead of
     # routing, so what it protects is every path the app will ever serve rather
     # than the ones remembered at review time.
-    auth.install(app, require=required, secure_cookies=secure)
+    auth.install(app, require=required, secure_cookies=secure,
+                 email_sender=email_sender)
 
     if dev:
         # Vite dev server runs on another port, so the browser needs CORS. Only

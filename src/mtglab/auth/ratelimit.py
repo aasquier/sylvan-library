@@ -21,10 +21,25 @@ The window is fixed rather than sliding, which means an attacker who times it
 right gets two full budgets across a window boundary. That is a real property
 and an acceptable one: 20 attempts instead of 10, against Argon2 at 19 MiB a
 go, is not the difference between safe and breached.
+
+**Two things widened when the email half arrived (ADR 16).** The table is still
+called `login_attempts`, which is now half a lie — it counts attempts against a
+budget, and the reset endpoint is the caller that made that distinction
+visible: a reset has no "success" to clear the counter with, so *every* request
+is counted, not only the ones that went nowhere. Renaming a table nothing else
+reads was not worth a third migration.
+
+And "address" is overloaded here in a way worth stating rather than tidying:
+`address_key` has always meant the client's IP, and ADR 16's "rate-limited per
+address" means the mailbox. The mailbox keys are `email_key`, which hashes,
+and the reason it hashes is not secrecy — it is that a limiter keyed on the
+plaintext would accumulate the addresses of people who do *not* have accounts,
+which is personal data this project has no reason to hold (ADR 16 again).
 """
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -49,13 +64,47 @@ class Limit:
 PER_ACCOUNT = Limit(failures=10, window=timedelta(minutes=15))
 PER_ADDRESS = Limit(failures=30, window=timedelta(minutes=15))
 
+# Password reset. Three links to one mailbox in an hour covers "it did not
+# arrive, try again" twice over; beyond that somebody is using the endpoint to
+# mail-bomb an address they do not control, which is the abuse this stops.
+# Ten from one client covers a household sharing a NAT and a person with two
+# accounts.
+RESET_PER_MAILBOX = Limit(failures=3, window=timedelta(hours=1))
+RESET_PER_ADDRESS = Limit(failures=10, window=timedelta(hours=1))
+
+# Redeeming a link. The token is 256 bits, so this is not about guessing --
+# it is that `/api/auth/claim` is unauthenticated and hashes a password with
+# Argon2, and 19 MiB per request is worth a ceiling even behind a check that
+# rejects a bad token before any of it is spent.
+CLAIM_PER_ADDRESS = Limit(failures=20, window=timedelta(minutes=15))
+
 
 def account_key(username: str) -> str:
     return f"user:{username.strip().lower()}"
 
 
-def address_key(address: str) -> str:
-    return f"ip:{address}"
+def address_key(address: str, *, scope: str = "login") -> str:
+    """A client's IP, per flow.
+
+    Scoped so that failing to redeem a link cannot spend the budget somebody
+    needs to log in. One shared IP counter across every unauthenticated
+    endpoint would make any one of them a way to lock a client out of the
+    others.
+    """
+    return f"ip:{scope}:{address}"
+
+
+def email_key(address: str) -> str:
+    """A mailbox, keyed by hash.
+
+    Never the plaintext: a reset request for an address with no account would
+    otherwise store that address, which is personal data the project has no
+    reason to be holding for somebody who is not a user. 32 hex characters of
+    SHA-256 is 128 bits, which is a great deal more than is needed to keep a
+    handful of accounts from colliding.
+    """
+    digest = hashlib.sha256(address.strip().lower().encode("utf-8")).hexdigest()
+    return f"mailbox:{digest[:32]}"
 
 
 def _now() -> datetime:

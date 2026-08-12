@@ -34,13 +34,14 @@ from mtglab import config
 
 # Bumped when `_MIGRATIONS` grows. Stored in SQLite's own `user_version`, which
 # costs no table and cannot be forgotten in a schema dump.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # One entry per version, applied in order to whatever the file is at. A fresh
 # database runs all of them; an existing one runs the tail. The invite and
-# reset tokens ADR 16 describes arrive as version 2 rather than as an edit to
-# the string below -- a migration you can no longer see is a migration nobody
-# can reason about.
+# reset tokens ADR 16 describes arrived as version 2 rather than as an edit to
+# version 1 -- a migration you can no longer see is a migration nobody can
+# reason about, and by the time this was written there was already an `app.db`
+# on a laptop with an account in it.
 _MIGRATIONS: tuple[str, ...] = (
     # -- 1 ------------------------------------------------------------------
     """
@@ -81,6 +82,33 @@ _MIGRATIONS: tuple[str, ...] = (
         window_start TEXT NOT NULL,
         failures     INTEGER NOT NULL
     );
+    """,
+    # -- 2 ------------------------------------------------------------------
+    # ADR 16's token machinery. One table for both entry points, because "a
+    # bespoke second path is how one of them ends up weaker" is the reason the
+    # ADR gives for not writing two.
+    """
+    CREATE TABLE auth_tokens (
+        -- The hash of the token, for the same reason `sessions` stores one:
+        -- reading this file must not hand over a live credential, and an
+        -- unused invite row is exactly that until it expires.
+        token_hash TEXT PRIMARY KEY,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        -- 'invite' or 'reset'. Stored rather than inferred, because the two
+        -- have different lifetimes and a token issued for one must not be
+        -- redeemable as the other.
+        purpose    TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        -- Set on redemption rather than deleting the row. Single-use either
+        -- way; what the row buys is that a second click on the same link can
+        -- be told it has already been used instead of that it never existed.
+        -- That distinction is not a leak: whoever is holding the token already
+        -- knows it was real.
+        used_at    TEXT
+    );
+
+    CREATE INDEX auth_tokens_by_user ON auth_tokens(user_id, purpose);
     """,
 )
 
