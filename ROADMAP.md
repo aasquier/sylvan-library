@@ -654,6 +654,54 @@ is whether `forge.jar sim` can be driven from Python here at all, with the card
 coverage pre-flight `CLAUDE.md` requires. If it cannot, none of the above
 matters.
 
+#### The spike brief, researched 2026-08-11
+
+Written down so the next session starts from evidence rather than re-deriving
+it. **Forge remains the only candidate** and the question "should we use
+something else instead" is closed:
+
+| Option | Verdict |
+| --- | --- |
+| [Forge](https://github.com/Card-Forge/forge) | **The one to use.** Documented headless mode, actively maintained, Commander is a first-class format. |
+| [XMage](https://github.com/magefree/mage) | No. Excellent rules coverage (~19k unique cards) but it is a networked play server — no headless batch mode, not built for running hundreds of games for statistics. |
+| Cockatrice | No. **No rules enforcement at all** — a virtual tabletop, not an engine. Frequently suggested; cannot simulate anything. |
+| Arena / MTGO | No. Closed, no API, automation against ToS, and Arena has no Commander. |
+| Deck sites (MTGGoldfish et al.) | Not engines. Prices and lists. Also already out of scope — `CLAUDE.md` bans marketplace scraping. |
+
+The invocation, from Forge's own AI wiki — note it matches `CLAUDE.md`'s Tier 3
+requirements exactly, which were written against the real flag list:
+
+```bash
+forge sim -d <deck.dck> ... -f Commander -n 100 -c 300 -q
+```
+
+`-f Commander` selects the format · `-n` game count · `-m` matches (best-of) ·
+`-c` seconds before a draw is declared, **default 120, which is the number
+`CLAUDE.md` says to raise for Tivit** · `-q` results only · `-D` an absolute
+deck directory · `-t` tournament type. Games end with an announcement of the
+winner and the match status, so the output is line-oriented text to parse — not
+JSON, and that parser is part of the spike.
+
+**Prerequisite, checked on this machine:** Forge needs **Java 17+**; the Mac has
+10.0.1 and 1.8. `brew install openjdk@21` resolves cleanly on the pinned
+Homebrew, so this is an install rather than a blocker, and it needs no OS
+upgrade — which matters, since the machine is at its macOS ceiling.
+
+**What the spike has to produce**, in order, stopping at the first thing that
+fails:
+
+1. A `.dck` exporter from `deck.yaml` — Forge's own deck format, and the first
+   place a mismatch will show up.
+2. One headless Commander game that completes and whose result parses.
+3. **The card-coverage pre-flight.** Non-negotiable per `CLAUDE.md`: Forge does
+   not implement every card, and silently dropping cards would poison every
+   number that follows. Establish how a dropped card is reported *before*
+   trusting any result.
+4. A timing measurement per game, which is what makes the local-vs-hosted
+   question above answerable with a number.
+
+Only then does the deployment shape get chosen.
+
 ### What a hosted Claude surface costs, and who pays
 
 **Open, recorded 2026-08-11 and narrowed the same day.** ADR 14 puts
