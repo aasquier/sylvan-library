@@ -85,8 +85,25 @@ do. Anything that belongs to one person is reported as **404, never 403**, to
 another (ADR 5). Nothing in `src/mtglab/auth/` imports FastAPI, which is what
 lets `mtglab users` work on a box with no web server.
 
-The frontend has no login screen yet — `docs/HOSTING.md` §7 records that as a
-blocker for deploying with auth on.
+Invites and password resets are built (ADR 16): `auth/tokens.py` issues
+single-use hashed links for both, `auth/mail.py` is the `EmailSender` seam, and
+**no test sends mail.** An invite is an *unclaimed* account
+(`password_hash IS NULL`), never a disabled one — `disabled_at` is the
+maintainer's revocation lever and redeeming a link must not undo it.
+
+Two things auth does **not** have, both blockers for deploying with auth on and
+both tracked in `docs/HOSTING.md` §7:
+
+- **No login screen**, and no claim page for the emailed link. The token
+  arrives in the URL *fragment*, so the page must read `location.hash` — a
+  query string would put a live credential in every access log.
+- **No admin surface, and `is_admin` has no teeth.** It is stored on the
+  account, carried on `UserScope` and reported by `/api/auth/me`, and **no
+  route reads it.** The standing requirement is that the maintainer is always
+  an admin on every instance; nothing currently guarantees that, and how the
+  first admin is minted on a fresh `users` table is an open decision. Do not
+  add an admin route without also adding an enforced `admin` classification to
+  `tests/test_isolation.py`.
 
 Keep `mana.py` and `sim/` dependency-light (stdlib + numpy). DuckDB stays
 behind `cards/db.py`. That boundary is what keeps the simulation core fast to
