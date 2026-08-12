@@ -1035,9 +1035,11 @@ here rather than rewriting the sections above.
       `"corpus": false`, `/api/decks` answers 401, PID 1 runs as `mtglab`,
       `/data` is writable by it, no corpus file exists anywhere in the image,
       and the decks seed is at the path §4 step 6's copy command names. Trivy
-      fails the build on HIGH/CRITICAL. **Add `image` to the required checks on
-      `main`** — `docs/ENGINEERING.md` §5 keeps that list, and a check that is
-      not required does not gate.
+      fails the build on HIGH/CRITICAL. **`image` is a required check on `main`
+      as of 2026-08-12**, which it was not on the day it shipped — a check that
+      is not required does not gate, and it sat passing-but-decorative for a
+      day. `docs/ENGINEERING.md` §5 keeps the list; the settings themselves are
+      the authority, so read them back rather than trusting either document.
 - [ ] **A refresh procedure.** Cron does not work — Fly volumes attach to
       exactly one machine, so a scheduled second Machine cannot mount the
       corpus. Monthly and by hand is the plan; write it down as a runbook.

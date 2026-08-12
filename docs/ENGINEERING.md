@@ -523,6 +523,29 @@ The settings on `main`, recorded so they can be rebuilt:
 The escape hatch is turning admin enforcement off in settings — deliberately a
 visible act rather than a `--no-verify` away.
 
+**This table was wrong for two days, in the direction that matters.** It listed
+`image` as a required check from the moment containerisation landed; the
+setting was not made until 2026-08-12, so every pull request in between was
+gated by four checks while this said five. Nothing broke, because the job was
+passing anyway — which is precisely why nobody would have noticed. Two things
+follow. A document describing settings is a *plan* until somebody reads the
+settings back, and this one is written to be rebuilt from, so being aspirational
+here is worse than being absent. And **adding a CI job is two steps**: writing
+it, and requiring it. The second has no artifact in the repository, so it is the
+one that gets forgotten.
+
+Read them back with:
+
+```bash
+gh api repos/aasquier/sylvan-library/branches/main/protection --jq .required_status_checks.contexts
+```
+
+Note also that the repository carries a **ruleset** ("Me") alongside the classic
+protection rule. It enforces only deletion and non-fast-forward, and it holds no
+status-check rule at all — so the GitHub UI has two plausible-looking places to
+look for this list and only one of them has it. Settings → Branches, not
+Settings → Rules.
+
 ### Claude review on every PR
 
 `anthropics/claude-code-action@v1` is the official action. Verified workflow
