@@ -90,20 +90,43 @@ stateless-scaling problem to solve. A session row you can `DELETE` is simpler
 and strictly more controllable. Store a hash of the token, not the token, so a
 database read does not hand over live sessions.
 
-**No self-signup.** You provision accounts:
+**Invite-only, and the account holder owns the password.** Changed
+2026-08-12; see [ADR 16](adr/0016-accounts-are-invited-and-passwords-are-self-served.md),
+which supersedes this section's original "no self-signup, you run
+`mtglab users passwd`" plan. That plan deleted a great deal of infrastructure
+and was right about the cost — what it got wrong is that an admin-set password
+is a password that has existed in plaintext in a chat window, and that a
+forgotten password being "one command" is only cheap for the person running it.
 
 ```bash
-mtglab users add ada
-mtglab users passwd ada
+mtglab users invite ada@example.com   # disabled account + single-use setup link
 mtglab users list
-mtglab users disable ada
+mtglab users disable ada@example.com
 ```
 
-This one decision deletes an enormous amount of infrastructure: no signup flow,
-no email verification, no SMTP provider, no password-reset tokens, no bot
-abuse, no CAPTCHA, no per-email cost. A forgotten password is you running
-`mtglab users passwd`. For a site with fewer than a dozen known people, this is
-the correct trade, and it is why the monthly bill can stay near zero.
+The invitee follows the link and sets their own password. Password reset is the
+same token machinery behind a second entry point — one implementation, because
+a bespoke second path is how one of the two ends up weaker. Tokens are stored
+hashed, single-use, and short-lived (an hour for a reset; longer for an invite,
+which grants nothing until used). **Changing a password invalidates every
+session for that user** — a reset is usually somebody suspecting compromise,
+and one that leaves the attacker logged in has answered the wrong question.
+
+**The reset endpoint answers identically whether or not the address exists**,
+and is rate-limited per address and per IP. The login rules below already forbid
+leaking account existence through timing; a reset form that says "no such user"
+gives the same thing away through the front door.
+
+Mail goes through **Resend**, behind an `EmailSender` protocol with a console
+implementation for development. **No test sends mail**, the same rule that keeps
+the Claude tests off the network. This is a real new dependency: an API key in
+`fly secrets`, a verified sending domain, and deliverability as something that
+can break.
+
+What is *not* built is open signup. Sim jobs and the corpus are expensive per
+user, and an open door needs bot defence and an abuse story to protect something
+with no revenue behind it. Opening it later is a flag and a rate limiter, not a
+rewrite — the token machinery and the users table are the same either way.
 
 **The rest of the checklist**, none of it optional:
 
@@ -647,12 +670,20 @@ Roughly ascending risk, each step independently useful:
    infrastructure — no user-facing change.
 4. **`app.db`, users table, `mtglab users` CLI.** No web login yet.
 5. **Sessions, login, the scoped accessor, and the isolation test** from §1.
+   Steps 4 and 5 together are "auth core", and **all of it is testable locally
+   with no deployment** — which is why they are worth doing before the
+   Dockerfile despite sitting after it in this list. What genuinely needs a
+   deploy is narrow: `Secure` cookies over real TLS, HSTS, proxy headers, and
+   email deliverability.
+5b. **Invite, verify and reset over email** (ADR 16). Split out from 5 because
+   the half above proves itself in the test suite and this half cannot.
 6. **User decks** in `user_decks`, reusing the existing YAML parser, gate and
    artifact generator.
 7. **Process pool for sweeps** once anyone actually complains about the wait.
 
 Stopping after step 2 is a perfectly good outcome if the multi-user part turns
-out not to matter. Do not build auth until someone wants an account.
+out not to matter. "Do not build auth until someone wants an account" was the
+rule here until 2026-08-12; somebody wants an account, so it is being built.
 
 ---
 
@@ -687,10 +718,17 @@ here rather than rewriting the sections above.
 - [ ] **A refresh procedure.** Cron does not work — Fly volumes attach to
       exactly one machine, so a scheduled second Machine cannot mount the
       corpus. Monthly and by hand is the plan; write it down as a runbook.
-- [ ] **Auth.** Nothing today. Not needed for the six curated decks, and
-      **required before any collection feature ships** (rule 5's reasoning does
-      not stop at `git`). Cloudflare Access is free to 50 users and needs no
-      application change.
+- [ ] **Auth.** Nothing today, and **now the active build** (2026-08-12) —
+      invite-only accounts with self-served passwords and email reset, per
+      [ADR 16](adr/0016-accounts-are-invited-and-passwords-are-self-served.md).
+      Still not needed for the six curated decks, still **required before any
+      collection feature ships** (rule 5's reasoning does not stop at `git`).
+      Cloudflare Access remains the exit if this sprawls.
+- [ ] **A transactional email provider.** New with ADR 16 and not previously on
+      this list, because the superseded plan had no email at all. Needs a
+      `RESEND_API_KEY` in `fly secrets`, a **verified sending domain** (DNS
+      records, so start it early — propagation is not instant), and a decision
+      about the From address. Add it to `.env.example` when the code lands.
 - [ ] **Sim result caching** — build-order step 3, the biggest performance win.
 
 ### Have these in hand before deploy day
