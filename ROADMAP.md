@@ -115,6 +115,129 @@ what it plays badly. A tier list built from Forge output without that split
 would be a confident ranking of how well Forge plays each deck, which is not the
 question.
 
+**That caveat is now measured, not predicted.** From the spike, ten games each:
+
+| Matchup | Result |
+| --- | --- |
+| Arahbo cats vs Atla Palani dinos | **10–0** cats |
+| Tivit cEDH vs Atla Palani dinos | **2–8** dinos |
+
+Tivit is the bracket 5 cEDH list — the most powerful deck of the six by a wide
+margin — and Forge's AI lost with it 8–2 to a casual dinosaur deck. Any tier
+list that sorted on those numbers would put the dinosaurs above the cEDH deck
+and look authoritative doing it. **Keep these numbers to hand whenever a
+ranking is proposed**; they are the cheapest available argument against one.
+
+## 8. Onboarding for someone new to Commander
+
+**Not started, recorded 2026-08-11** from Aaron's design notes. Every goal above
+assumes a player who already knows what they want to build. This one does not,
+and it is the goal most aligned with pointing this at friends — they will not
+all be twenty-year players.
+
+Four pieces. Three of them share one dataset, which is the main finding here.
+
+### The colour taxonomy *is* the 32 Deck Challenge
+
+The [32 Deck Challenge](https://archidekt.com/folders/384512) — build a deck for
+every colour combination — decomposes as **1 colourless + 5 mono + 10 pairs +
+10 three-colour (5 shards + 5 wedges) + 5 four-colour + 1 five-colour = 32.**
+Those are exactly the nodes a colour-wheel diagram draws. So the Ravnica guild
+pentagram, the Alara shards, the Tarkir wedges, the four-colour groups and
+challenge progress tracking are **one dataset with several views**, not five
+features:
+
+> 32 rows keyed by colour identity → name, tier (mono/guild/shard/wedge/…),
+> and a short philosophy blurb.
+
+Progress tracking then costs nothing: group a user's decks by `color_identity`
+and see which slots are empty. That field already comes from Scryfall and rule 2
+already makes it the authority, so there is no new source of truth.
+
+The pentagram's geometry is worth stating because it carries the lesson: five
+vertices in WUBRG order, the five **perimeter edges** are the allied guilds, the
+five **chords across the middle** are the enemy guilds. The shape teaches the
+colour pie by itself.
+
+Three things to settle before building it:
+
+- **Four-colour naming has competing conventions.** Look it up; do not assert
+  one from memory. This is a rule 1 habit applied to something that is not a
+  card.
+- **Mana symbols are Wizards' artwork.** Scryfall serves symbol SVGs, so the
+  rule that already governs card images applies unchanged: hotlink, never
+  commit, never rehost.
+- **The blurbs are editorial prose** and somebody has to write them. Note this
+  is *not* blocked by rule 4 — a guild's philosophy is general reference, not a
+  card's `why` in a `deck.yaml` — but it is prose whose accuracy is checkable,
+  so it should be checked.
+
+### Archetype reference, and the wall it runs into
+
+Aaron named two sources: [the MTG wiki's Archetype
+page](https://mtg.fandom.com/wiki/Archetype) and [EDHREC's
+themes](https://edhrec.com/tags/themes). **Neither can be ingested.** `CLAUDE.md`
+bans a web crawler outright and says in as many words that server-side web
+tooling "is not a way around the scraping ban". EDHREC's themes are also derived
+from their own aggregated data, so their terms would need reading before any
+bulk use even if we were willing.
+
+Three options that stay inside the rules, and they compose:
+
+1. **Link out.** Costs nothing, and a link is not a scrape.
+2. **Hand-curate a small archetype taxonomy of our own**, which composes with
+   the `tags` field already on `CardEntry` and with the macro categories in
+   `decks/analyze.py`.
+3. **Let a Claude research mode answer archetype questions live.** This is
+   exactly ADR 14's half — "the questions the corpus cannot answer" — and it is
+   the only one of the three that scales past what we are willing to type.
+
+### A theme interview
+
+*"What is your favourite zodiac sign? What historical period do you relate to?"*
+→ a colour combination → a commander. This is a different product from every
+tool that opens by asking which commander you have already chosen, and it is the
+most differentiated idea in this section.
+
+Mechanically it is an **ADR 15 mode** — a system prompt, a tool set, and a write
+scope — and it queues behind the rationale interview, which is already next. It
+also chains into the taxonomy above: theme → colours → an empty slot in the 32.
+
+The boundary holds, and it is worth writing down why so nobody has to re-derive
+it: **a theme is not a card's `why`**, so rule 4 is not engaged by asking these
+questions. The moment the mode starts naming cards, **rule 1 is** — those come
+from corpus tools, never from recall. And it still may not pre-fill a `why`.
+
+## 9. Shared decks and a simulation leaderboard
+
+**Parked 2026-08-11, deliberately and not for lack of interest.** The idea:
+users opt into having their decks used in simulations, and the winners form a
+leaderboard for people to play against.
+
+**The ranking is the problem, and goal 7 above has the measurement.** Forge's AI
+lost 8–2 with the bracket 5 cEDH deck against a casual dinosaur list. A
+leaderboard sorted on Forge results would rank the dinosaurs higher, present the
+number as authoritative, and — the part that makes it worse than a bad
+statistic — **people would build toward it.** That inverts the rule `CLAUDE.md`
+already sets: per archetype, never one ranking.
+
+**Two shapes could survive**, and neither is ruled out:
+
+- Separate boards **per archetype**, so aggro is never ranked against combo.
+- One board, honestly relabelled as *"how well does Forge's AI pilot this
+  deck"* — a real question, and a different one from "is this deck good".
+
+**The prerequisite stack is the other reason to wait.** Opt-in sharing needs
+auth (does not exist), a per-user data model (does not exist), consent and
+withdrawal semantics for shared decks, and moderation of user content. The
+leaderboard on top of that needs *continuous* simulation compute — on a
+self-funded box, with four-player pod timings still unmeasured and a
+134-second game already observed.
+
+**What would unpark it:** the pod measurement from the Forge open decision, plus
+a decision on which of the two shapes above is worth having. Do the measurement
+first; it is an afternoon and it constrains everything else here.
+
 ---
 
 ## Deck migration status
@@ -627,8 +750,14 @@ Forge can run where the app runs**.
    is the *deployment shape*, which the numbers inform but do not decide — see
    the open decision below.
 4. **Spoiler scan** and **deals/carts** — both self-contained.
+5. **The colour taxonomy** (goal 8). Cheapest thing on this list that a new
+   player would notice: one 32-row dataset gives the guild/shard/wedge diagrams,
+   the colour-pie lesson and 32 Deck Challenge tracking at once. No Claude, no
+   auth, no network.
 
 **Tier 2 is deliberately not on this list.** It waits behind Forge (goal 2).
+**Nor is the leaderboard** (goal 9), which is parked behind the pod measurement
+and a decision about what a ranking would even mean.
 
 ---
 
