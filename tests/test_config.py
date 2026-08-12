@@ -145,3 +145,94 @@ def test_env_vars_are_read_at_import(monkeypatch, tmp_path):
     assert decks_dir == tmp_path
     monkeypatch.delenv("MTGLAB_DECKS_DIR")
     config.reload_from_env()
+
+
+# ------------------------------------------------------------------ .env
+#
+# The API key reaches the app through the environment, and the app is started
+# several ways -- `mtglab ui`, uvicorn, the launch configuration in `.claude/`
+# -- only some of which inherit a login shell. A `.env` the process reads
+# itself is what makes that uniform, so its two rules are worth pinning.
+
+def test_a_dotenv_populates_the_environment(tmp_path, monkeypatch):
+    pytest.importorskip("dotenv")
+    monkeypatch.delenv("MTGLAB_SCRATCH_PROBE", raising=False)
+    (tmp_path / ".env").write_text("MTGLAB_SCRATCH_PROBE=from-the-file\n",
+                                   encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    config._load_dotenv()
+    assert os.environ["MTGLAB_SCRATCH_PROBE"] == "from-the-file"
+
+
+def test_the_real_environment_wins_over_the_file(tmp_path, monkeypatch):
+    """A stale `.env` must never silently shadow an exported value.
+
+    This is the rule that matters for the API key specifically: using the wrong
+    key is confusing rather than loud, so the precedence has to be the obvious
+    one.
+    """
+    pytest.importorskip("dotenv")
+    monkeypatch.setenv("MTGLAB_SCRATCH_PROBE", "from-the-environment")
+    (tmp_path / ".env").write_text("MTGLAB_SCRATCH_PROBE=from-the-file\n",
+                                   encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    config._load_dotenv()
+    assert os.environ["MTGLAB_SCRATCH_PROBE"] == "from-the-environment"
+
+
+def test_no_dotenv_is_not_an_error(tmp_path, monkeypatch):
+    """A base install has no `.env` and no python-dotenv. Importing the package
+    must not depend on either."""
+    monkeypatch.chdir(tmp_path)
+    config._load_dotenv()
+
+
+def test_the_api_key_is_never_bound_to_a_name(tmp_path, monkeypatch):
+    """`config` loads the file and stops there.
+
+    The key is read by the Anthropic SDK directly. A value this project never
+    holds is one it cannot log, serialise into an error response, or leak into
+    a prompt -- so the absence of an attribute here is the feature.
+    """
+    pytest.importorskip("dotenv")
+    (tmp_path / ".env").write_text("ANTHROPIC_API_KEY=not-a-real-key\n",
+                                   encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    config._load_dotenv()
+
+    exported = [n for n in dir(config) if not n.startswith("_")]
+    assert not any("KEY" in n.upper() or "TOKEN" in n.upper() or
+                   "SECRET" in n.upper() for n in exported), exported
+
+
+def test_a_blank_credential_is_dropped_rather_than_passed_along(monkeypatch):
+    """Empty is worse than absent, per Anthropic's credential precedence.
+
+    `ANTHROPIC_API_KEY=""` selects the API-key path with an empty key and fails
+    as a 401, instead of falling through or reporting that nothing is
+    configured. A half-filled `.env` is the obvious way to produce one by
+    accident, so it is deleted here and the failure becomes honest.
+    """
+    for blank in ("", "   "):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", blank)
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", blank)
+        config._drop_blank_credentials()
+        assert "ANTHROPIC_API_KEY" not in os.environ
+        assert "ANTHROPIC_AUTH_TOKEN" not in os.environ
+
+
+def test_a_real_credential_is_left_alone(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    config._drop_blank_credentials()
+    assert os.environ["ANTHROPIC_API_KEY"] == "not-a-real-key"
+
+
+def test_the_example_env_does_not_ship_a_blank_key():
+    """`.env.example` is meant to be copied. If it set the key to nothing, the
+    copy would be the failure mode above rather than a clean unset."""
+    example = (Path(__file__).resolve().parents[1] / ".env.example").read_text()
+    live = [ln for ln in example.splitlines()
+            if ln.strip() and not ln.lstrip().startswith("#")]
+    assert not any(ln.startswith("ANTHROPIC_API_KEY=") for ln in live), live

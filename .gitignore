@@ -19,6 +19,9 @@ wishlist.yaml
 # --- Never commit: credentials and sessions ---------------------------------
 .env
 .env.*
+# ...except the template, which carries names and no values. The negation has
+# to come after `.env.*` or it is overridden rather than overriding.
+!.env.example
 *.pem
 *.key
 cookies.json

@@ -6,7 +6,10 @@ requires-python = ">=3.11"
 dependencies = ["pyyaml>=6.0", "duckdb>=1.0", "numpy>=1.26"]
 
 [project.optional-dependencies]
-api = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
+# python-dotenv lets `config.py` read a `.env` however the process was started,
+# which is how the API key reaches the app locally. Optional and imported
+# defensively: a base install has no `.env` to read, and the core stays light.
+api = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-dotenv>=1.0"]
 # httpx backs fastapi's TestClient, so the API tests need it. ruff's floor is
 # 0.16 because the rule selection in [tool.ruff.lint] names rules added after
 # 0.4, and an older ruff would error on the config rather than lint the code.
@@ -15,7 +18,7 @@ api = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 # missing install is an error instead of a silently shorter test run.
 dev = [
     "pytest>=8.0", "ruff>=0.16", "httpx>=0.27", "coverage>=7.0",
-    "hypothesis>=6.100",
+    "hypothesis>=6.100", "python-dotenv>=1.0",
 ]
 
 [project.scripts]

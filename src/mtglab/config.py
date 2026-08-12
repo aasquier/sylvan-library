@@ -20,6 +20,22 @@ so local use is unchanged:
 Resolved once at import. Tests that need a different location should use
 `use_paths()` rather than reassigning the module globals, so the derived
 `DB_PATH` cannot drift out of step with `DATA_DIR`.
+
+A `.env` file is loaded first, if one is present and python-dotenv is
+installed. That is here rather than in an entry point because the app is
+started several ways -- `mtglab ui`, uvicorn, the launch configuration in
+`.claude/` -- and only some of them inherit a login shell's environment. A file
+the process reads itself works regardless of how it was started.
+
+**Secrets are not resolved here.** `.env` is loaded into `os.environ` and that
+is the end of this module's involvement: `ANTHROPIC_API_KEY` is read by the
+Anthropic SDK directly, never bound to a name in this project. The reason is
+the one this module's own history teaches -- a value captured at import is a
+value that cannot be changed later -- plus a value we never hold is a value we
+cannot log, serialise into an error, or leak into a prompt.
+
+The one exception is a blank credential, which is deleted rather than passed
+along; see `_drop_blank_credentials` for why empty is worse than absent.
 """
 
 from __future__ import annotations
@@ -28,6 +44,45 @@ import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+
+
+def _load_dotenv() -> None:
+    """Populate `os.environ` from a `.env`, without overriding what is set.
+
+    Optional: python-dotenv rides with the `api` extra, and a base install has
+    no `.env` to read. The real environment wins over the file, so an exported
+    variable is never silently shadowed by a stale one on disk -- which matters
+    most for the API key, where using the wrong one is confusing rather than
+    loud.
+    """
+    try:
+        from dotenv import find_dotenv, load_dotenv
+    except ImportError:
+        return
+    # Search upward from the working directory, not from this file: installed
+    # in site-packages, the package's own parents are the wrong tree.
+    found = find_dotenv(usecwd=True)
+    if found:
+        load_dotenv(found, override=False)
+
+
+# Anthropic's credential precedence treats an empty string as a credential that
+# is *present*: with `ANTHROPIC_API_KEY=""` the SDK selects the API-key path
+# with an empty key and fails as a 401, instead of falling through or reporting
+# that nothing is configured. Their docs say to unset rather than blank these.
+# A half-filled `.env` is the obvious way to produce one by accident, so drop
+# them here and turn a confusing 401 into an honest "no credentials".
+_BLANK_IS_WORSE_THAN_ABSENT = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+
+
+def _drop_blank_credentials() -> None:
+    for name in _BLANK_IS_WORSE_THAN_ABSENT:
+        if name in os.environ and not os.environ[name].strip():
+            del os.environ[name]
+
+
+_load_dotenv()
+_drop_blank_credentials()
 
 DATA_DIR: Path
 DECKS_DIR: Path

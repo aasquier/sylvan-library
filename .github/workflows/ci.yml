@@ -100,3 +100,24 @@ jobs:
             echo "These files must not be committed:"; echo "$bad"; exit 1
           fi
           echo "clean"
+
+      # The check above is by filename, which catches a committed `.env` and
+      # nothing else. A key pasted into a source file, a note, or the built
+      # frontend bundle is the likelier accident, so scan contents too.
+      - name: Reject API keys pasted into tracked files
+        run: |
+          # Assembled by concatenation so this workflow does not match its own
+          # pattern, and requiring a long body so prose writing the bare prefix
+          # does not fail the build. Real keys are far longer than 16 chars.
+          pattern="sk-""ant-[A-Za-z0-9_-]{16,}"
+          # -I skips binaries; web_dist/ is deliberately in scope, because a key
+          # reaching the committed frontend bundle is both public and shipped to
+          # every browser.
+          bad=$(git grep -nIE "$pattern" || true)
+          if [ -n "$bad" ]; then
+            echo "An API key looks committed. REVOKE IT in the console first,"
+            echo "then remove it from the file and from git history:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "no keys in tracked files"

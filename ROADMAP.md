@@ -393,9 +393,11 @@ second field rather than another value of `status`.
 ## What Claude is for
 
 Decided 2026-08-11 and recorded as
-[ADR 14](docs/adr/0014-python-decides-claude-advises.md). Nothing is built:
-there is no LLM SDK in `pyproject.toml`, and the only `ANTHROPIC_API_KEY` in
-the repository belongs to the CI reviewer in `docs/ENGINEERING.md`.
+[ADR 14](docs/adr/0014-python-decides-claude-advises.md). No code is built yet:
+there is no LLM SDK in `pyproject.toml`. The plumbing around it is — an API key
+reaches the app from a gitignored `.env` or `fly secrets`, named in
+`.env.example` and in the CI reviewer workflow in `docs/ENGINEERING.md`, and CI
+fails the build on a key committed to any tracked file.
 
 **Python decides. Claude advises. Forge plays the games.** The split is by
 whether the question has a right answer:

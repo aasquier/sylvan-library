@@ -430,10 +430,101 @@ refresh, `app.db`, and backups. It costs about $0.45/month.
 
 ```bash
 fly secrets set SESSION_SECRET="$(openssl rand -base64 32)"
+fly secrets set ANTHROPIC_API_KEY="paste-it-here"   # only once ADR 15's modes exist
 ```
 
-Never put this in `fly.toml` or the repo. Rotating it logs everyone out, which
-is the correct emergency response to a suspected session leak.
+Never put either in `fly.toml` or the repo. Fly stores them encrypted, injects
+them as environment variables at runtime, and setting one triggers a redeploy —
+so they are never in the image either. Rotating `SESSION_SECRET` logs everyone
+out, which is the correct emergency response to a suspected session leak.
+
+`ANTHROPIC_API_KEY` is read by the Anthropic SDK directly; the app never binds
+it to a variable, and asks only whether it is set. Locally the same variable
+comes from a gitignored `.env` (see `.env.example`) rather than from Fly.
+
+#### Why a static key here, and when to stop using one
+
+Anthropic offers three authentication methods, and their documented fit is
+worth quoting rather than guessing at, because the answer for this app is not
+the answer for every app:
+
+| Method | Documented best for |
+| --- | --- |
+| **API key** | "Local development, prototyping, scripts, and **single-tenant servers where you control secret storage**" |
+| **Workload Identity Federation** | "Production workloads on cloud platforms (AWS, Google Cloud, Azure), CI/CD pipelines, and Kubernetes, **where you want to eliminate static secrets**" |
+| App Attest | iOS/macOS apps calling the API directly with no backend — not us |
+
+A single-tenant Fly app with secrets in `fly secrets` is the first row
+verbatim, so the key is the right instrument here and not a shortcut. The
+guidance for moving is conditional rather than aspirational: adopt federation
+"when your workload already has a platform-issued identity you can federate."
+
+**WIF exchanges an OIDC JWT from an identity provider you already trust for a
+short-lived token the SDK refreshes itself — there is no `sk-ant-api...` string
+to mint, distribute, or rotate.** Setup is three Console resources (a service
+account, a federation issuer, and a federation rule) plus an IdP that issues
+OIDC tokens; the named ones are AWS IAM, Google Cloud, Azure/Entra, Kubernetes
+service accounts, GitHub Actions, SPIFFE, and Okta. Two consequences for us:
+
+- **Fly is not on that list.** Whether Fly's machine OIDC tokens can back a
+  federation rule is a question for Fly's own docs before betting on it, and
+  the Hetzner alternative in §3 has no platform identity at all. Until one of
+  those resolves, a key in `fly secrets` is the endpoint, not a waypoint.
+- **CI is the better first candidate.** GitHub Actions is an OIDC issuer
+  Anthropic supports, and the reviewer workflow in `docs/ENGINEERING.md`
+  already requests `id-token: write`. That is the place where a static
+  repository secret could actually be removed.
+
+Federation is not a free upgrade either — Anthropic's own caveat is that it
+"does not, on its own, guarantee end-to-end security: the trust chain is only
+as strong as your identity provider's configuration, and a long-lived secret
+one hop upstream ... can still undermine it."
+
+#### Key expiration, chosen once
+
+A key's expiration is set **at creation and cannot be changed afterwards** —
+3 hours, 1 day, 7 days, 30 days, a custom duration, or **Never**. "Never" is
+the documented choice "for keys you store in a secrets manager and rotate
+yourself", which is what `fly secrets` is. A short-lived key is the better
+choice while the key lives mainly on a laptop, where the blast radius of a leak
+is a stolen file rather than a breached host.
+
+Anthropic emails the key's creator before expiry — 7 days ahead for a key with
+a lifetime of at least 14 days — and an **expired key returns `401` with no way
+to reactivate it**. Rotating means creating a new key and replacing it
+everywhere it lives.
+
+**This project runs a single environment**, so there is one key rather than one
+per stage. That is the right call at this size — two keys is two things to keep
+in sync for a benefit that only appears once other people have accounts — but
+it has two consequences worth stating plainly:
+
+- Once deployed, one key lives in **two places**: the gitignored `.env` on the
+  maintainer's machine and `fly secrets` on the host. A rotation is not done
+  until both are updated, and the second one is the easy one to forget.
+- There is no staging key to fail first. The expiry date is therefore an
+  operational date, not a background detail, and a short-lived key wants either
+  a calendar reminder or a switch to **Never** once `fly secrets` is holding it.
+
+**Make the failure legible in code.** When the Claude surface lands, a `401`
+from the API should say *the key was rejected and may have expired* rather than
+surfacing as a generic error — that message is worth writing on the day the
+integration is built, because it will be read a month later by someone who has
+forgotten the key had a lifetime at all.
+
+Three ways this leaks that are worth naming, because two of them are specific
+to this app:
+
+- **Never with a `VITE_` prefix, and never in `web/.env`.** Vite bakes those
+  into the bundle, and `src/mtglab/web_dist/` is committed to a public
+  repository *and* served to every browser. Every Claude call goes through
+  FastAPI; the frontend must never hold the key. CI scans the committed bundle
+  for exactly this.
+- **Never in a prompt or a message.** Session history persists, so a key placed
+  there is durably stored and readable back for the life of the session.
+- **A spend limit on the API workspace is the backstop**, because storage
+  hygiene eventually fails and a cap bounds what that costs. Rotating the key
+  is a console click.
 
 ### Step 5 — first deploy
 
