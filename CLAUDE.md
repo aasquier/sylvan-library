@@ -46,6 +46,7 @@ src/mtglab/
   decks/analyze.py        macro category counts vs bracket targets
   sim/compile.py          deck.yaml + corpus -> SimCards
   sim/tier1/engine.py     Monte Carlo goldfish
+  sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
   artifacts/generate.py   the five deliverables
   api/                    FastAPI app, services, background sim jobs
   web_dist/               built frontend, committed so `mtglab ui` needs no Node
@@ -133,6 +134,7 @@ mtglab decks suggest <slug>       # shortlist replacements for what it flagged
 mtglab decks swap <slug> --out X --in Y --why '...'   # apply your choice
 mtglab sim mana <slug>            # baseline consistency
 mtglab sim lands <slug> 30 40     # is the land count right?
+mtglab sim forge <a> <b> [c] [d]  # Tier 3 — Forge plays real games
 git commit -am "before refactor"  # so swaps.md has something to diff
 ```
 
@@ -214,16 +216,25 @@ sets in. That peak is the answer.
 matrices, wrong for "is this line correct." Forge goes first; Tier 2 gets built
 only if Forge cannot answer those questions. See ROADMAP goal 2.
 
-**Tier 3** (Forge bridge, not yet built, and now the next simulator) runs
-`forge.jar sim -d ... -f
-commander`. Forge's AI is best with aggro and midrange, poor with control, bad
-with most combo. The user's decks sit right on that fault line — Dino and Cat
-are what Forge plays well; Tivit and Gyome are what it plays badly. **Report
-Forge results per archetype with that caveat, never as a single ranking.** Also
-required: a pre-flight card-coverage check (Forge does not implement every
-card, and silently dropping cards would poison results), a raised `-c` clock
-since the 120s default will draw out Tivit games, and draws reported separately
-rather than folded into losses.
+**Tier 3** (Forge bridge — the spike landed 2026-08-11; `mtglab sim forge`)
+runs `forge.jar sim -d ... -f Commander`. Forge's AI is best with aggro and
+midrange, poor with control, bad with most combo. The user's decks sit right on
+that fault line — Dino and Cat are what Forge plays well; Tivit and Gyome are
+what it plays badly. **Report Forge results per archetype with that caveat,
+never as a single ranking.** Also required, and all now in `sim/tier3/`: a
+pre-flight card-coverage check, a raised `-c` clock (the default is 300 here),
+and draws reported separately rather than folded into losses — with a clock-out
+separate again from a real draw.
+
+The coverage check is not a formality. **A card Forge does not implement does
+not stop the game**: it prints a warning and plays on with 96 cards, reporting
+a winner and a turn count that look entirely normal. That is why coverage is
+checked twice, before and after, and why `run_games` raises instead of
+returning a flag. See [docs/FORGE.md](docs/FORGE.md).
+
+**Quote a median and a tail, never a mean.** Game length is heavily
+right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
+134s. A mean hides that, and the tail is what a timeout has to be set against.
 
 ## Working style
 

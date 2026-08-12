@@ -111,6 +111,26 @@ def reload_from_env() -> None:
     _apply(*_read_env())
 
 
+# Forge's installed distribution: the desktop jar plus `res/`, several hundred
+# megabytes of it. Deliberately outside the repository -- CLAUDE.md rule 5
+# forbids committing card corpus data, and Forge's `res/cardsfolder` is exactly
+# that for a second engine.
+FORGE_HOME_DEFAULT = Path.home() / ".local" / "share" / "mtglab" / "forge"
+
+
+def forge_home() -> Path:
+    """Where the Forge distribution is unpacked. `MTGLAB_FORGE_HOME` overrides.
+
+    A function rather than a module constant, unlike everything above it. Forge
+    is optional -- a base install has no JVM and never wants one -- so the path
+    is resolved when something actually reaches for it, and a machine that
+    installs Forge mid-session does not need the process restarted. It is also
+    the only path here that points outside both the project and its data
+    directory, which is the point: nothing under it may ever be tracked.
+    """
+    return Path(os.environ.get("MTGLAB_FORGE_HOME") or FORGE_HOME_DEFAULT)
+
+
 @contextmanager
 def use_paths(*, data_dir: Path | str | None = None,
               decks_dir: Path | str | None = None) -> Iterator[None]:

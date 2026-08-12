@@ -6,6 +6,18 @@ data/cache/
 data/*.duckdb
 data/*.duckdb.wal
 
+# --- Never commit: Forge's distribution, its card data, or a JVM ------------
+# Tier 3 keeps all of this outside the repository on purpose (see
+# `config.forge_home`), so these patterns should never match anything. They are
+# here for the day somebody unpacks the tarball in the working directory:
+# `res/cardsfolder` is a second engine's card corpus and rule 5 covers it, the
+# jar is 40 MB of binary, and a `.dck` is generated input to a simulator rather
+# than one of the five artifacts.
+forge/
+forge-*.jar
+jdk-*/
+*.dck
+
 # --- Never commit: anything that identifies what you physically own ---------
 # A public inventory of expensive cards tied to a real identity is a
 # targeting list. Keep these local, permanently.

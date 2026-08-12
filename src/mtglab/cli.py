@@ -470,6 +470,51 @@ def cmd_sim_lands(args):
           "you are buying commander speed with flood.")
 
 
+def cmd_sim_forge(args):
+    """Tier 3: hand the decks to Forge and report what it played.
+
+    `--check-only` is the coverage pre-flight on its own. It reads a zip and
+    needs no JVM, so it is the cheap thing to run first and the only half of
+    this command that works without the distribution installed.
+    """
+    from mtglab.sim.tier3 import run as forge
+    from mtglab.sim.tier3.coverage import ForgeNotInstalled
+
+    decks = [_load(slug) for slug in args.slugs]
+    try:
+        if args.check_only:
+            for report in forge.check_coverage(decks):
+                print(report.summary())
+            return
+        result = forge.run_games(decks, games=args.games, clock=args.clock,
+                                 seed=args.seed)
+    except (ForgeNotInstalled, forge.CoverageFailed,
+            forge.ResultsUntrustworthy) as exc:
+        sys.exit(str(exc))
+
+    wins: dict[str, int] = {}
+    for game in result.games:
+        wins[result.winner_slug(game) or "draw"] = \
+            wins.get(result.winner_slug(game) or "draw", 0) + 1
+
+    played = [g.milliseconds / 1000 for g in result.games]
+    print(f"{len(result.games)} games in {result.wall_seconds:.1f}s "
+          f"({result.startup_seconds:.1f}s of it JVM + card database)")
+    print(f"per game: {min(played):.1f}s min / "
+          f"{sum(played) / len(played):.1f}s mean / {max(played):.1f}s max")
+    for slug in args.slugs:
+        print(f"  {slug:<22} {wins.get(slug, 0)}")
+    if wins.get("draw"):
+        print(f"  {'draw':<22} {wins['draw']}")
+    clocked = sum(1 for g in result.games if g.timed_out)
+    if clocked:
+        # Never folded into the draw count: a clock-out is the measurement
+        # giving up, not the game ending.
+        print(f"  ({clocked} hit the {args.clock}s clock and were called draws)")
+    print("\nForge's AI is best at aggro and midrange, poor at control and bad "
+          "at most combo.\nRead these per archetype, not as one ranking.")
+
+
 # -------------------------------------------------------------------- price
 
 def cmd_price_deck(args):
@@ -614,6 +659,16 @@ def main(argv=None):
     ld.add_argument("--games", type=int, default=5000)
     ld.add_argument("--seed", type=int, default=7)
     ld.set_defaults(func=cmd_sim_lands)
+    fg = sim.add_parser("forge", help="Tier 3 -- Forge plays real games")
+    fg.add_argument("slugs", nargs="+", help="two to four decks")
+    fg.add_argument("--games", type=int, default=10)
+    # 300, not Forge's default of 120: a long game should be a long game, not
+    # a draw the clock invented.
+    fg.add_argument("--clock", type=int, default=300)
+    fg.add_argument("--seed", type=int, default=None)
+    fg.add_argument("--check-only", action="store_true",
+                    help="card-coverage pre-flight only; needs no JVM")
+    fg.set_defaults(func=cmd_sim_forge)
 
     ui = sub.add_parser("ui")
     ui.add_argument("--port", type=int, default=8765)
