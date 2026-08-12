@@ -19,7 +19,9 @@ vi.mock('react-router-dom', async () => ({
   useNavigate: () => navigate,
 }))
 
-vi.mock('../lib/api', () => ({
+vi.mock('../lib/api', async () => ({
+  errorMessage: (await vi.importActual<typeof import('../lib/api')>(
+    '../lib/api')).errorMessage,
   api: { importDeck: vi.fn() },
   ApiError: class extends Error {},
 }))

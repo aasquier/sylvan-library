@@ -227,6 +227,51 @@ installed**. Tier 1 is pure stdlib today. That is the CLAUDE.md dependency rule
 holding in practice, and it is what would make the seam in §1 cheap to cut if
 the trigger ever fires.
 
+### The suite CI ran was not the suite anyone was reading — fixed 2026-08-12
+
+Worth recording as its own finding, because it invalidated every coverage
+number in this document until it was fixed, and because nothing about it was
+visible from a green check.
+
+`data/mtg.duckdb` is a ~500MB Scryfall download that CI does not have and
+should not have (ADR 6). So 29 tests opened with some variant of
+
+```python
+if not client.get("/api/health").json()["corpus"]:
+    pytest.skip("no corpus available")
+```
+
+and every one of them passed on the maintainer's laptop and skipped on every
+pull request. What skipped was not incidental: the entire card-fact surface —
+swap, add, suggestions, card search, deck creation, the Tier 1 job endpoints,
+and the Claude corpus tools. **The layer that exists to enforce rule 1 was the
+layer no pull request ever exercised.** Locally the suite ran 692 tests at 87%;
+CI ran 663 at 82%, and reported success.
+
+The fix is `tests/tiny_corpus.py`, which now builds a genuine DuckDB corpus of
+21 real cards in about a second. Two things made that work rather than merely
+look like it:
+
+- **The cards are real, read out of the corpus and pasted verbatim.** Rule 1
+  applies to test data: a fixture naming Ajani and then claiming mono-white
+  would teach the exact error CLAUDE.md cites. Ajani is in the fixture *with*
+  its {R}{W} identity, so that cautionary tale is now executable.
+- **The decks are synthetic.** `mono_green_deck()` is a legal 99 built only
+  from those 21 cards, shaped like Goreclaw's real list — mono-green
+  commander, exactly one banned card — so the same assertions run without
+  needing all 35,000. Pointing the real decks at a 21-card corpus would have
+  been the other option and a worse one: 90 unknown-card errors per deck, and
+  tests that assert cleanliness would have had to be weakened to survive it.
+
+Result: **740 tests and 90% coverage, with or without the real corpus.** Two
+tests still need the full download and now say so with a `needs_full_corpus`
+marker rather than a bare skip — the 32-way colour-combination check (a fixture
+holding those 32 cards would verify the fixture rather than the table) and the
+commander-search ordering bug (which needs more cards than the query limit to
+reproduce at all). CI fails if that count moves, which is the control that was
+missing: **a suite that quietly shrinks cannot be caught by a suite that
+quietly shrinks.**
+
 ### Still open
 
 **Mutation testing** (`mutmut`, or `cargo-mutants` on the Rust side) on
@@ -234,6 +279,16 @@ the trigger ever fires.
 says a test would have *noticed* if it were wrong. The Phyrexian bug above is
 the argument in one example: 100% line coverage, and a mutation of that branch
 would have survived.
+
+**A mode's tool set is advertised, not enforced.** Found while writing
+`tests/test_claude_modes.py`: `Mode.tool_names` decides which schemas the model
+is *shown*, but `tools.run` dispatches against the global `READ_ONLY` registry,
+so a model asking for a registered tool the mode did not offer gets a real
+answer. The blast radius is bounded — all seven tools are read-only, and
+`test_claude_boundary.py` proves the package cannot name a write function at
+all — so this is a tidiness question rather than a safety one. It is recorded
+rather than fixed because narrowing dispatch to the mode is a decision about
+what ADR 15 means by "a mode is a tool set", not a bug fix.
 
 ---
 
@@ -324,10 +379,36 @@ oxlint, Recharts. The gaps are testing and interaction, not framework choice.
 
 ## 5. CI/CD
 
-Current pipeline: pytest on 3.11/3.12, coverage with an 80% floor, ruff,
-frontend typecheck + build, committed-bundle drift check, and a secrets/corpus
-guard. That is already better than most solo projects. The ladder from here,
-roughly in order of value per unit of effort:
+Current pipeline, as of 2026-08-12: pytest on 3.11/3.12, coverage with a **90%**
+floor, a **skip-count gate**, ruff, **mypy**, frontend typecheck under
+**`strict`**, **oxlint with `--deny-warnings`**, `npm test`, the build,
+committed-bundle drift check, and a secrets/corpus guard.
+
+Four of those are new, and three of the four are guards against a check being
+green while not checking:
+
+- **The skip gate.** See §2 — CI ran 663 of 692 tests and said so nowhere. The
+  build now fails if the skipped count is anything other than the two declared
+  `needs_full_corpus` tests.
+- **`tsc` under `strict`.** `tsconfig.app.json` had `noUnusedLocals` and
+  friends but never `"strict": true`, so `strictNullChecks` was off across all
+  5,913 lines of frontend and a null deref type-checked clean. Turning it on
+  produced **zero errors** — the code was already written defensively; what was
+  missing was anything holding it that way. It immediately caught one latent
+  problem: Recharts types `dataKey` as `string | number | ((obj) => unknown)`,
+  and a function is not a valid React key.
+- **oxlint.** A devDependency with a `lint` script that CI never ran. Both
+  warnings it had to report were dead re-exports.
+- **mypy**, strict by default with a named list of ten modules that are not
+  there yet. Direction over starting point: lax-by-default means a new module
+  is born unchecked and nobody notices. 24 of 42 modules passed `--strict` on
+  the first run, including all of `mana.py`, `sim/tier1/` and `sim/tier3/`. It
+  found three real latent problems — a `str | None` reaching `.lower()` on the
+  companion path, an optional assigned to a non-optional in `get_cards`, and
+  six `catch (e: any)` clauses in the frontend where `e.message` was unchecked
+  property access.
+
+The ladder from here, roughly in order of value per unit of effort:
 
 ### The repository is public, and `main` is protected
 

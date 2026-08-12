@@ -14,9 +14,14 @@ this function, so the comments explaining them are load-bearing.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from mtglab.decks.model import Deck
+
+if TYPE_CHECKING:
+    # Import-time only: `engine` is imported inside the function so
+    # that Tier 1 stays loadable without this module, and vice versa.
+    from mtglab.sim.tier1.engine import SimCard
 
 
 class CorpusRequired(RuntimeError):
@@ -64,7 +69,9 @@ def fetches_lands(oracle_text: str) -> int:
     return 2 if ("two" in text or "up to two" in text) else 1
 
 
-def compile_deck(deck: Deck, cards: dict[str, Any] | None):
+def compile_deck(
+    deck: Deck, cards: dict[str, Any] | None,
+) -> tuple[list[SimCard], SimCard | None]:
     """Compile a deck into `(library, commander)` SimCards.
 
     Raises `CorpusRequired` when `cards` is missing: mana production cannot be

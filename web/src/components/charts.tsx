@@ -23,13 +23,23 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import type { TooltipContentProps } from 'recharts'
 import type { CategoryRow, ColorNeed, CurveBucket, LandRow, TurnRow } from '../lib/api'
-import { COLOR_NAMES, COLOR_VAR, categoryLabel, percent } from '../lib/mtg'
+import { COLOR_NAMES, categoryLabel } from '../lib/mtg'
 
 const AXIS = { fill: 'var(--text-muted)', fontSize: 11 }
 const GRID = 'var(--gridline)'
 
-function TooltipBox({ active, payload, label, suffix = '' }: any) {
+/** Recharts injects `active`, `payload` and `label` by cloning the element
+ *  passed to `content`, so every one of them is optional here -- `suffix` is
+ *  the only prop a call site actually writes. `Partial` is what expresses
+ *  that, and it is why the `payload?.length` guard below is load-bearing
+ *  rather than defensive. */
+type TooltipBoxProps = Partial<TooltipContentProps> & {
+  suffix?: string
+}
+
+function TooltipBox({ active, payload, label, suffix = '' }: TooltipBoxProps) {
   if (!active || !payload?.length) return null
   return (
     <div
@@ -41,8 +51,11 @@ function TooltipBox({ active, payload, label, suffix = '' }: any) {
       }}
     >
       <div className="mb-1 font-semibold">{label}</div>
-      {payload.map((p: any) => (
-        <div key={p.dataKey} className="flex items-center gap-2">
+      {/* `dataKey` is `string | number | ((obj) => unknown)` in Recharts, and a
+          function is not a valid React key -- every chart here passes a string
+          literal, so this only ever stringifies something already a string. */}
+      {payload.map((p) => (
+        <div key={String(p.dataKey)} className="flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-full"
                 style={{ background: p.color }} />
           <span style={{ color: 'var(--text-secondary)' }}>{p.name}</span>
@@ -274,12 +287,28 @@ export function ColorNeedsChart({ needs }: { needs: ColorNeed[] }) {
   )
 }
 
+/** One column of a `DataTable`, with `format` tied to the type of the value
+ *  its own `key` selects.
+ *
+ *  The mapped type distributes over the row's keys, so `{ key: 'mulligan_rate',
+ *  format: (v) => percent(v) }` infers `v` as `number` from `LandRow` rather
+ *  than the `any` this used to be. It also makes a typo in `key` an error --
+ *  previously `key: 'mulligan_rat'` type-checked and rendered `undefined`.
+ */
+type Column<Row> = {
+  [K in keyof Row & string]: {
+    key: K
+    label: string
+    format?: (v: Row[K]) => string
+  }
+}[keyof Row & string]
+
 /** The table view that discharges the light-mode contrast WARN. */
-export function DataTable({
+export function DataTable<Row extends object>({
   columns, rows,
 }: {
-  columns: { key: string; label: string; format?: (v: any) => string }[]
-  rows: Record<string, any>[]
+  columns: Column<Row>[]
+  rows: Row[]
 }) {
   return (
     <div className="overflow-x-auto">
@@ -310,4 +339,3 @@ export function DataTable({
   )
 }
 
-export { percent, COLOR_VAR }

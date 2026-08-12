@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   api,
+  errorMessage,
   type Card,
   type DeckDetail as Deck,
   type DeckStats,
   type Suggestions,
   type ValidationReport,
 } from '../lib/api'
-import { categoryLabel, identityName, percent } from '../lib/mtg'
+import { categoryLabel, identityName } from '../lib/mtg'
 import {
   Badge, CardArt, CardHover, Caveat, ColorPips, ErrorNote, ManaCost, ManaText,
   Select, Spinner, StatTile,
@@ -75,8 +76,8 @@ export default function DeckDetail() {
       await refresh()
       setSwapping(null)
       setSwapWhy('')
-    } catch (e: any) {
-      setSwapError(String(e.message ?? e))
+    } catch (e) {
+      setSwapError(errorMessage(e))
     } finally {
       setSwapBusy(false)
     }
@@ -93,8 +94,8 @@ export default function DeckDetail() {
     try {
       await api.removeCard(slug, name)
       await refresh()
-    } catch (e: any) {
-      setEditError(String(e.message ?? e))
+    } catch (e) {
+      setEditError(errorMessage(e))
     }
   }
 
@@ -104,8 +105,8 @@ export default function DeckDetail() {
     try {
       await api.setDeckField(slug, 'stage', 'curated')
       await refresh()
-    } catch (e: any) {
-      setPromoteError(String(e.message ?? e))
+    } catch (e) {
+      setPromoteError(errorMessage(e))
     } finally {
       setPromoting(false)
     }
@@ -120,7 +121,7 @@ export default function DeckDetail() {
         setStats(s)
         setReport(v)
       })
-      .catch((e) => setError(String(e.message ?? e)))
+      .catch((e) => setError(errorMessage(e)))
     setSuggestions(null)
     requested.current = null
   }, [slug])
@@ -632,4 +633,3 @@ export default function DeckDetail() {
   )
 }
 
-export { percent }

@@ -122,7 +122,6 @@ def test_the_service_resolves_the_corpus_path_at_call_time(tmp_path):
     with config.use_paths(data_dir=tmp_path / "empty"):
         assert service._connect() is None
 
-    pytest.importorskip("duckdb")
     import tiny_corpus
 
     with config.use_paths(data_dir=tmp_path / "corpus"):

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  api, followJob, type DeckSummary, type Job, type LandResult, type ManaResult,
+  api, errorMessage, followJob, type DeckSummary, type Job, type LandResult, type ManaResult,
 } from '../lib/api'
 import { percent } from '../lib/mtg'
 import {
@@ -36,7 +36,7 @@ export default function Simulator() {
     api.decks().then((d) => {
       setDecks(d)
       if (!slug && d.length) setSlug(d[0].slug)
-    }).catch((e) => setError(String(e.message ?? e)))
+    }).catch((e) => setError(errorMessage(e)))
     // Cancel any in-flight poll when the screen unmounts.
     return () => cancelRef.current?.()
   }, [])                                     // eslint-disable-line react-hooks/exhaustive-deps
@@ -66,8 +66,8 @@ export default function Simulator() {
       const finished = await follower.promise
       if (mode === 'mana') setMana(finished.result as ManaResult)
       else setLands(finished.result as LandResult)
-    } catch (e: any) {
-      setError(String(e.message ?? e))
+    } catch (e) {
+      setError(errorMessage(e))
     }
   }
 

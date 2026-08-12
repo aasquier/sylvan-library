@@ -22,7 +22,17 @@ import urllib.request
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
+
+#: A DuckDB connection.
+#:
+#: `Any`, and deliberately so: duckdb ships no type stubs, and it is imported
+#: lazily inside `connect()` precisely so the simulation core stays free of it
+#: (CLAUDE.md's dependency rule). An alias rather than a bare `Any` at each of
+#: the two dozen call sites, so the intent reads as "the checker cannot see
+#: into this library" rather than "nobody got round to annotating this" -- and
+#: so there is one place to narrow if duckdb ever publishes stubs.
+Connection: TypeAlias = Any
 
 BULK_INDEX = "https://api.scryfall.com/bulk-data"
 USER_AGENT = "mtg-lab/0.1 (local personal deckbuilding tool)"
@@ -115,7 +125,7 @@ _ADDED_COLUMNS = (
 )
 
 
-def connect(db_path: str | Path = "data/mtg.duckdb"):
+def connect(db_path: str | Path = "data/mtg.duckdb") -> Connection:
     import duckdb  # imported lazily so the sim core stays dependency-free
 
     path = Path(db_path)
@@ -591,9 +601,13 @@ def get_cards(con, names: Iterable[str]) -> dict[str, CardRecord]:
 
     out: dict[str, CardRecord] = {}
     for name, low in zip(wanted, lowered, strict=True):
-        rec = by_lower.get(low) or faces.get(low)
-        if rec is not None:
-            out[name] = rec
+        # Named apart from the `rec` above: reusing that binding made this an
+        # optional assignment to a non-optional variable, which is exactly the
+        # shape a type checker should object to even though the guard below
+        # makes it safe today.
+        found = by_lower.get(low) or faces.get(low)
+        if found is not None:
+            out[name] = found
     return out
 
 

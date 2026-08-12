@@ -198,7 +198,9 @@ def _find(deck: dict[str, Any], name: str) -> dict[str, Any]:
         pool.append(deck["commander_card"])
     for entry in pool:
         if entry["name"].casefold() == wanted:
-            return entry
+            # `deck` is an untyped JSON payload, so the entry is `Any`;
+            # say what the signature already promises.
+            return dict(entry)
     raise CardNotInDeck(
         f"{name!r} is not in {deck['slug']}. The interview argues about a card "
         f"already in a deck; adding one is a different operation.")

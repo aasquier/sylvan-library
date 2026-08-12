@@ -98,7 +98,7 @@ def available() -> bool:
     return sdk_installed() and credential_present()
 
 
-def connect():
+def connect() -> Any:
     """An `anthropic.Anthropic`, or `ClaudeUnavailable` with a fixable reason.
 
     Constructed with no arguments on purpose: that is the path where the SDK

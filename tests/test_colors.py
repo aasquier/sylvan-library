@@ -124,19 +124,24 @@ def test_every_combination_cites_a_card_to_check_it_against():
         assert c.verified_by.strip(), f"{c.name} cites no card"
 
 
+@pytest.mark.needs_full_corpus
 def test_verified_by_names_match_the_real_corpus():
     """The claim that `Selesnya Charm` is {G}{W} is checkable. Check it.
 
-    Skips without a corpus, which means it does not run in CI -- the suite is
-    deliberately database-free (ADR 2). It is still worth having: this is the
-    test that would catch a misremembered guild, a misspelled card, or a wedge
-    filed as a shard, and it runs on the maintainer's machine where the corpus
-    lives. Every one of the 32 was verified this way before the table landed.
+    One of the two tests `tiny_corpus` cannot carry, and marked rather than
+    silently skipped so the gap is countable. The point is to check all 32
+    combinations at once -- every guild, shard and wedge -- against cards
+    nobody chose for the fixture. Putting those 32 cards in the fixture would
+    make the test verify the fixture rather than the table, which is the one
+    thing it must not do: this is what would catch a misremembered guild, a
+    misspelled card, or a wedge filed as a shard.
+
+    So it runs where the corpus lives. Every one of the 32 was verified this
+    way before the table landed.
     """
-    pytest.importorskip("duckdb")
     from mtglab import config
     if not config.DB_PATH.exists():
-        pytest.skip(f"no corpus at {config.DB_PATH} -- run `mtglab data refresh`")
+        pytest.skip(f"needs the full corpus at {config.DB_PATH}")
 
     from mtglab.cards import db
     con = db.connect(config.DB_PATH)

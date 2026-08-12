@@ -248,7 +248,6 @@ def test_import_refuses_to_overwrite_an_existing_deck(decks, capsys):
 def test_import_writes_a_draft_and_the_gate_catches_the_banned_card(decks, capsys):
     """The whole bargain, end to end: the facts are checked on day one, the
     thinking is counted rather than invented, and nothing is guessed."""
-    pytest.importorskip("duckdb")
     import tiny_corpus
 
     tiny_corpus.build(config.DB_PATH)
@@ -271,7 +270,6 @@ def test_import_writes_a_draft_and_the_gate_catches_the_banned_card(decks, capsy
 
 
 def test_import_dry_run_writes_nothing(decks, capsys):
-    pytest.importorskip("duckdb")
     import tiny_corpus
 
     tiny_corpus.build(config.DB_PATH)
@@ -514,3 +512,293 @@ def test_forge_check_only_names_the_cards_forge_lacks(decks, monkeypatch):
     code, msg = run(["sim", "forge", "mini", "mini", "--check-only"])
     assert code == 1
     assert "Sol Ring" in msg
+
+
+# ------------------------------------------------- the commands that need a corpus
+#
+# `cli.py` sat at 62% because roughly a third of it -- suggest, the simulators,
+# card lookup, price, the Claude surface -- opens `config.DB_PATH` on the first
+# line and exits if it is missing. On a machine with no corpus those handlers
+# were unreachable, so CI ran the argument parsing and none of the work.
+#
+# `tiny_corpus` removes that. The scratch deck below is built from cards the
+# fixture knows, so the same `main()` runs the same code path it runs for real.
+
+@pytest.fixture
+def corpus_decks(tmp_path):
+    """A scratch deck directory *with* a corpus beside it."""
+    import tiny_corpus
+
+    root = tmp_path / "decks"
+    (root / "mini").mkdir(parents=True)
+    (root / "mini" / "deck.yaml").write_text(GOOD_DECK, encoding="utf-8")
+    with config.use_paths(decks_dir=root, data_dir=tmp_path / "data"):
+        tiny_corpus.build(config.DB_PATH)
+        yield root
+
+
+def write_deck(root: Path, slug: str, deck) -> None:
+    """Put a `Deck` object on disk under the scratch directory."""
+    (root / slug).mkdir(parents=True, exist_ok=True)
+    deck.slug = slug
+    deck.dump(root / slug / "deck.yaml")
+
+
+def test_validate_with_a_corpus_checks_card_facts_not_just_structure(corpus_decks,
+                                                                     capsys):
+    """Without a corpus the gate degrades to structural checks. With one it
+    resolves every name, which is the half that was never exercised in CI."""
+    code, _ = run(["decks", "validate", "mini"])
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "0 error(s)" in out
+
+
+def test_validate_reports_a_banned_card_by_name(corpus_decks, capsys):
+    import tiny_corpus
+    write_deck(corpus_decks, "banned", tiny_corpus.mono_green_deck())
+    code, _ = run(["decks", "validate", "banned"])
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert "Primeval Titan" in out
+
+
+def test_suggest_shortlists_replacements_for_what_the_gate_flagged(corpus_decks,
+                                                                   capsys):
+    import tiny_corpus
+    write_deck(corpus_decks, "banned", tiny_corpus.mono_green_deck())
+    code, _ = run(["decks", "suggest", "banned"])
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "Primeval Titan" in out
+    # A shortlist with nothing on it is the failure mode worth catching.
+    assert "Cultivator Colossus" in out or "Craterhoof" in out
+
+
+def test_suggest_on_a_clean_deck_says_so_rather_than_upselling(corpus_decks,
+                                                              capsys):
+    import tiny_corpus
+    write_deck(corpus_decks, "clean", tiny_corpus.mono_green_deck(clean=True))
+    code, _ = run(["decks", "suggest", "clean"])
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "Primeval Titan" not in out
+
+
+def test_sim_mana_runs_and_prints_its_caveat(corpus_decks, capsys):
+    """The command runs end to end and reports a row per turn."""
+    code, _ = run(["sim", "mana", "mini", "--games", "50", "--turns", "4",
+                   "--seed", "1"])
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "games=50" in out and "turns=4" in out
+    # One row per simulated turn, which is the whole result.
+    for turn in ("1", "2", "3", "4"):
+        assert turn in out
+
+
+def test_sim_mana_is_seeded_and_repeatable(corpus_decks, capsys):
+    """Same seed, same numbers -- otherwise a sweep is not a comparison."""
+    run(["sim", "mana", "mini", "--games", "50", "--turns", "4", "--seed", "7"])
+    first = capsys.readouterr().out
+    run(["sim", "mana", "mini", "--games", "50", "--turns", "4", "--seed", "7"])
+    assert capsys.readouterr().out == first
+
+
+def test_sim_lands_sweeps_the_requested_range(corpus_decks, capsys):
+    code, _ = run(["sim", "lands", "mini", "34", "36", "--games", "40",
+                   "--seed", "1"])
+    out = capsys.readouterr().out
+    assert code == 0, out
+    for count in ("34", "35", "36"):
+        assert count in out
+
+
+def test_sim_needs_a_corpus_and_says_which_command_fixes_it(decks):
+    """The fresh-clone path: refuse rather than simulate a deck of unknowns."""
+    code, msg = run(["sim", "mana", "mini", "--games", "10"])
+    assert code == 1
+    assert "data refresh" in msg
+
+
+def test_price_deck_reports_rather_than_crashing_without_printings(corpus_decks,
+                                                                  capsys):
+    """`tiny_corpus` loads oracle rows but no printings, which is exactly the
+    state a corpus refreshed with --oracle-only is in. Pricing must degrade to
+    "no price" rather than raising."""
+    code, _ = run(["price", "deck", "mini"])
+    out = capsys.readouterr().out
+    assert code in (0, 1), out
+
+
+# ------------------------------------------------------ the Claude commands
+#
+# Both call out to Anthropic on their first line, so on any machine without a
+# key they exited before doing anything and CI covered neither. The service
+# layer is stubbed here: what is worth pinning is the terminal output, and in
+# particular ADR 14's third boundary -- Claude's answer has to be *labelled* as
+# Claude's, because the gate's output is reproducible and this is not.
+
+def test_claude_check_reports_a_working_key(decks, monkeypatch, capsys):
+    from mtglab.claude import client as claude
+    monkeypatch.setattr(claude, "check", lambda: {
+        "ok": True, "model": "claude-sonnet-5", "served_by": "claude-sonnet-5",
+        "text": "ok", "input_tokens": 12, "output_tokens": 3})
+    code, _ = run(["claude", "check"])
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "claude-sonnet-5" in out
+    assert "12 in / 3 out" in out
+
+
+def test_claude_check_exits_nonzero_when_the_key_is_dead(decks, monkeypatch,
+                                                        capsys):
+    """The command exists to answer "is the key live?", so the exit code has to
+    carry the answer -- it gets used as a shell gate."""
+    from mtglab.claude import client as claude
+    monkeypatch.setattr(claude, "check", lambda: {
+        "ok": False, "model": "claude-sonnet-5",
+        "error": "authentication_error: invalid x-api-key"})
+    code, _ = run(["claude", "check"])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "unavailable" in out
+    assert "invalid x-api-key" in out
+
+
+def test_claude_check_can_list_the_tools_a_surface_may_call(decks, monkeypatch,
+                                                            capsys):
+    from mtglab.claude import client as claude
+    monkeypatch.setattr(claude, "check", lambda: {
+        "ok": True, "model": "m", "served_by": "m", "text": "ok",
+        "input_tokens": 1, "output_tokens": 1})
+    run(["claude", "check", "--tools"])
+    out = capsys.readouterr().out
+    assert "all read-only" in out
+    assert "get_cards" in out and "validate_deck" in out
+
+
+def _interview_report(**overrides):
+    report = {
+        "slug": "mini", "card": "Sol Ring", "model": "claude-sonnet-5",
+        "asked": True, "reason": "",
+        "stance": {"preset": "consultant",
+                   "axes": [{"level": "on-request"}, {"level": "flagged"},
+                            {"level": "none"}]},
+        "tool_calls": [{"tool": "get_cards"}, {"tool": "get_cards"},
+                       {"tool": "validate_deck"}],
+        "questions": [
+            {"angle": "cost", "question": "What does the second one do?",
+             "fact": "mana value 1"},
+            {"angle": "slot", "question": "What comes out for it?", "fact": ""},
+        ],
+        "questions_dropped": 0,
+        "never": "Claude never writes a rationale.",
+        "usage": {"input_tokens": 900, "output_tokens": 120},
+    }
+    report.update(overrides)
+    return report
+
+
+def test_claude_interview_prints_questions_and_says_whose_they_are(decks,
+                                                                   monkeypatch,
+                                                                   capsys):
+    """Rule 4 and ADR 14's third boundary in one command: questions, no
+    rationale, and a label saying this is not the gate."""
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_interview",
+                        lambda **kw: _interview_report())
+    code, _ = run(["claude", "interview", "mini", "--card", "Sol Ring"])
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "not the gate" in out
+    assert "1. [cost] What does the second one do?" in out
+    assert "(mana value 1)" in out
+    assert "900 in / 120 out" in out
+
+
+def test_the_interview_tells_you_to_write_the_why_yourself(decks, monkeypatch,
+                                                           capsys):
+    """The command's last word is the user's next command, and it is a `set`
+    with the rationale left as `...` -- there is nothing to paste."""
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_interview",
+                        lambda **kw: _interview_report())
+    run(["claude", "interview", "mini", "--card", "Sol Ring"])
+    out = capsys.readouterr().out
+    assert "mtglab decks set mini --card 'Sol Ring' --why '...'" in out
+    assert "Claude never writes a rationale." in out
+
+
+def test_the_interview_names_what_it_looked_up(decks, monkeypatch, capsys):
+    """Rule 1's receipt: an opinion assembled from corpus lookups should say
+    which ones, deduplicated rather than one line per call."""
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_interview",
+                        lambda **kw: _interview_report())
+    run(["claude", "interview", "mini", "--card", "Sol Ring"])
+    assert "looked up: get_cards, validate_deck" in capsys.readouterr().out
+
+
+def test_an_interview_that_was_not_asked_says_why(decks, monkeypatch, capsys):
+    """Stance `off` means no call was made. That has to read differently from
+    a call that came back with nothing."""
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_interview", lambda **kw: _interview_report(
+        asked=False, reason="stance is off, so no call was made",
+        questions=[], tool_calls=[]))
+    code, _ = run(["claude", "interview", "mini", "--card", "Sol Ring",
+                   "--stance", "off"])
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "no call was made" in out
+    assert "not the gate" not in out
+
+
+def test_an_empty_answer_is_reported_rather_than_printed_as_success(decks,
+                                                                    monkeypatch,
+                                                                    capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_interview", lambda **kw: _interview_report(
+        questions=[], reason="the model returned prose, not questions"))
+    run(["claude", "interview", "mini", "--card", "Sol Ring"])
+    out = capsys.readouterr().out
+    assert "nothing usable came back" in out
+
+
+def test_dropped_answers_are_counted_out_loud(decks, monkeypatch, capsys):
+    """A filtered response that silently shrank would look like the model had
+    less to say, rather than like the filter doing its job."""
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_interview",
+                        lambda **kw: _interview_report(questions_dropped=2))
+    run(["claude", "interview", "mini", "--card", "Sol Ring"])
+    assert "2 answer(s) dropped" in capsys.readouterr().out
+
+
+def test_asking_about_a_card_that_is_not_in_the_deck_exits_nonzero(decks,
+                                                                   monkeypatch,
+                                                                   capsys):
+    from mtglab.api import service
+    from mtglab.claude.interview import CardNotInDeck
+
+    def boom(**kw):
+        raise CardNotInDeck("'Black Lotus' is not in mini.")
+    monkeypatch.setattr(service, "claude_interview", boom)
+    code, _ = run(["claude", "interview", "mini", "--card", "Black Lotus"])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "not in mini" in out
+
+
+def test_an_unavailable_claude_is_a_message_not_a_traceback(decks, monkeypatch,
+                                                            capsys):
+    from mtglab.api import service
+    from mtglab.claude.client import ClaudeUnavailable
+
+    def boom(**kw):
+        raise ClaudeUnavailable("no ANTHROPIC_API_KEY")
+    monkeypatch.setattr(service, "claude_interview", boom)
+    code, _ = run(["claude", "interview", "mini", "--card", "Sol Ring"])
+    assert code == 1
+    assert "no ANTHROPIC_API_KEY" in capsys.readouterr().out

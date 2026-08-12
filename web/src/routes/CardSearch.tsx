@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, type Card } from '../lib/api'
+import { api, errorMessage, type Card } from '../lib/api'
 import { money } from '../lib/mtg'
 import {
   Badge, CardArt, CardHover, ErrorNote, ManaCost, NumberField, Select, Spinner,
@@ -47,8 +47,8 @@ export default function CardSearch() {
       if (mine !== seq.current) return
       setCards(body.cards)
       setMessage(body.message ?? null)
-    } catch (e: any) {
-      if (mine === seq.current) setError(String(e.message ?? e))
+    } catch (e) {
+      if (mine === seq.current) setError(errorMessage(e))
     } finally {
       if (mine === seq.current) setBusy(false)
     }

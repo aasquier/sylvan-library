@@ -46,7 +46,7 @@ class _Dumper(yaml.SafeDumper):
     house style is worth five lines.
     """
 
-    def increase_indent(self, flow: bool = False, indentless: bool = False):
+    def increase_indent(self, flow: bool = False, indentless: bool = False) -> None:
         return super().increase_indent(flow, False)
 
 

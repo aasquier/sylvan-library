@@ -273,3 +273,143 @@ def test_check_coverage_raises_rather_than_returning_a_flag(monkeypatch):
                                       why="x")])
     with pytest.raises(run.CoverageFailed, match="Chicken Troupe"):
         run.check_coverage([deck])
+
+
+# ---------------------------------------------------- setup, before any game
+#
+# `sim/tier3/run.py` sat at 50%: everything that shells out to Forge was
+# untestable without a 467 MB download, and the *setup* code around it went
+# untested by association. That code is pure filesystem and environment logic,
+# and it is where the confusing failures live -- a wrong Java gets blamed on
+# Forge, and a profile written into the wrong directory mixes generated decks
+# into whatever the user saved by hand.
+
+def _fake_java(path, version: str):
+    """A script that answers `-version` the way a JVM does: on stderr."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f'#!/bin/sh\necho \'openjdk version "{version}" 2026-01-01\' >&2\n',
+        encoding="utf-8")
+    path.chmod(0o755)
+    return path
+
+
+def test_the_java_override_is_used_when_it_is_new_enough(tmp_path, monkeypatch):
+    from mtglab.sim.tier3 import run as forge
+    java = _fake_java(tmp_path / "jdk21" / "bin" / "java", "21.0.2")
+    monkeypatch.setenv("MTGLAB_JAVA", str(java))
+    assert forge.java_binary() == java
+
+
+def test_a_java_that_is_too_old_is_rejected_rather_than_used(tmp_path, monkeypatch):
+    """The specific trap: this machine's /usr/bin/java is 10, and Forge fails
+    on it in a way that reads like a Forge bug rather than a Java one."""
+    from mtglab.sim.tier3 import run as forge
+    old = _fake_java(tmp_path / "old" / "bin" / "java", "10.0.1")
+    monkeypatch.setenv("MTGLAB_JAVA", str(old))
+    monkeypatch.setattr(forge.shutil, "which", lambda _: None)
+    monkeypatch.setattr(forge, "BUNDLED_JDK", tmp_path / "absent")
+
+    with pytest.raises(forge.ForgeNotInstalled) as exc:
+        forge.java_binary()
+    # The version it found has to appear, or the advice is unactionable.
+    assert "10" in str(exc.value)
+    assert "MTGLAB_JAVA" in str(exc.value)
+
+
+def test_a_java_that_does_not_exist_is_skipped_not_crashed_on(tmp_path,
+                                                              monkeypatch):
+    from mtglab.sim.tier3 import run as forge
+    good = _fake_java(tmp_path / "jdk21" / "bin" / "java", "21.0.2")
+    monkeypatch.setenv("MTGLAB_JAVA", str(tmp_path / "nothing" / "java"))
+    monkeypatch.setattr(forge, "BUNDLED_JDK", tmp_path / "absent")
+    monkeypatch.setattr(forge.shutil, "which", lambda _: str(good))
+    assert forge.java_binary() == good
+
+
+def test_no_java_at_all_says_what_was_checked(tmp_path, monkeypatch):
+    from mtglab.sim.tier3 import run as forge
+    monkeypatch.delenv("MTGLAB_JAVA", raising=False)
+    monkeypatch.setattr(forge, "BUNDLED_JDK", tmp_path / "absent")
+    monkeypatch.setattr(forge.shutil, "which", lambda _: None)
+    with pytest.raises(forge.ForgeNotInstalled) as exc:
+        forge.java_binary()
+    assert "nothing" in str(exc.value)
+
+
+def test_the_newest_desktop_jar_wins(tmp_path):
+    """Forge distributions accumulate jars across upgrades; running an old one
+    silently plays with an old card pool."""
+    from mtglab.sim.tier3 import run as forge
+    for version in ("1.6.50", "1.6.9", "2.0.1"):
+        (tmp_path / f"forge-gui-desktop-{version}-jar-with-dependencies.jar").touch()
+    assert forge.desktop_jar(tmp_path).name == \
+        "forge-gui-desktop-2.0.1-jar-with-dependencies.jar"
+
+
+def test_a_directory_with_no_jar_names_the_env_var(tmp_path):
+    from mtglab.sim.tier3 import run as forge
+    with pytest.raises(forge.ForgeNotInstalled) as exc:
+        forge.desktop_jar(tmp_path)
+    assert "MTGLAB_FORGE_HOME" in str(exc.value)
+
+
+def test_the_profile_is_ours_not_the_users_own(tmp_path, monkeypatch):
+    """Forge defaults to the user's own data directory. Writing generated decks
+    there would mix them into whatever the person saved by hand."""
+    from mtglab.sim.tier3 import run as forge
+    monkeypatch.setenv("MTGLAB_FORGE_PROFILE", str(tmp_path / "mine"))
+    assert forge.forge_profile() == tmp_path / "mine"
+
+    monkeypatch.delenv("MTGLAB_FORGE_PROFILE")
+    assert "mtglab" in str(forge.forge_profile())
+
+
+def test_ensure_profile_writes_the_marker_and_returns_the_deck_dir(tmp_path,
+                                                                  monkeypatch):
+    from mtglab.sim.tier3 import run as forge
+    home = tmp_path / "forge"
+    home.mkdir()
+    monkeypatch.setenv("MTGLAB_FORGE_PROFILE", str(tmp_path / "profile"))
+
+    deck_dir = forge.ensure_profile(home)
+    assert deck_dir == tmp_path / "profile" / "decks" / "commander"
+    assert deck_dir.is_dir()
+
+    marker = home / "forge.profile.properties"
+    assert f"userDir={tmp_path / 'profile'}" in marker.read_text()
+
+
+def test_ensure_profile_does_not_rewrite_an_unchanged_marker(tmp_path,
+                                                             monkeypatch):
+    """It reaches into a shared Forge install, so a no-op run must be a no-op
+    on disk."""
+    from mtglab.sim.tier3 import run as forge
+    home = tmp_path / "forge"
+    home.mkdir()
+    monkeypatch.setenv("MTGLAB_FORGE_PROFILE", str(tmp_path / "profile"))
+
+    forge.ensure_profile(home)
+    marker = home / "forge.profile.properties"
+    before = marker.stat().st_mtime_ns
+    forge.ensure_profile(home)
+    assert marker.stat().st_mtime_ns == before
+
+
+def test_ensure_profile_rewrites_when_the_profile_moves(tmp_path, monkeypatch):
+    from mtglab.sim.tier3 import run as forge
+    home = tmp_path / "forge"
+    home.mkdir()
+    monkeypatch.setenv("MTGLAB_FORGE_PROFILE", str(tmp_path / "first"))
+    forge.ensure_profile(home)
+
+    monkeypatch.setenv("MTGLAB_FORGE_PROFILE", str(tmp_path / "second"))
+    forge.ensure_profile(home)
+    assert f"userDir={tmp_path / 'second'}" in \
+        (home / "forge.profile.properties").read_text()
+
+
+def test_ensure_profile_refuses_a_missing_forge_home(tmp_path):
+    from mtglab.sim.tier3 import run as forge
+    with pytest.raises(forge.ForgeNotInstalled):
+        forge.ensure_profile(tmp_path / "absent")
