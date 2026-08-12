@@ -680,6 +680,77 @@ def stats_for(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
 
 # -------------------------------------------------------------------- cards
 
+#: A rationale interview walks a whole deck, so the cap is a deck: 99 plus a
+#: commander. Beyond that a caller wants `search_cards`, not a lookup.
+MAX_NAMED_CARDS = 100
+
+
+def cards_named(*, names: list[str]) -> dict[str, Any]:
+    """Exact-name card lookup. The answer to "what does this card actually do".
+
+    Distinct from `search_cards`, and the distinction is the point.
+    `search_cards` filters to `legalities.commander = 'legal'`, which is right
+    when the question is "what could I play" and wrong when the question is
+    "what is this card" -- **a banned card is invisible to it.** That was found
+    by running a Claude turn rather than by reasoning about it: asked what the
+    two cards failing the gate do, it could not look up either Emrakul, the
+    Aeons Torn or Primeval Titan, said so, and answered from labelled recall.
+    Honest, and still rule 1 failing.
+
+    So this filters on nothing. It reports `legal_commander` per card instead,
+    which is strictly more useful: a banned card comes back with its real
+    oracle text *and* the fact that it is banned, rather than as a shrug.
+
+    **Names that do not resolve are returned in `not_found`, never omitted.**
+    `db.get_cards` drops misses silently and says callers must handle that
+    loudly; this is that handling. A lookup that quietly returns four cards for
+    five names is how a confident claim gets made about the fifth.
+    """
+    wanted = [n.strip() for n in names if n and n.strip()][:MAX_NAMED_CARDS]
+    if not wanted:
+        return {"cards": [], "not_found": [], "corpus_available": True}
+
+    con = _connect()
+    if con is None:
+        return {"cards": [], "not_found": wanted, "corpus_available": False,
+                "message": "no corpus yet -- run `mtglab data refresh`"}
+    try:
+        found = db.get_cards(con, wanted)
+        cards = []
+        for asked in wanted:
+            rec = found.get(asked)
+            if rec is None:
+                continue
+            cards.append({
+                # The corpus's spelling, not the caller's. Asked for "arahbo,
+                # roar of the world" you get the real name back, which is what
+                # any follow-up edit has to be keyed on.
+                "name": rec.name,
+                "asked_as": asked if asked != rec.name else None,
+                "mana_cost": rec.mana_cost,
+                "cmc": rec.cmc,
+                "type_line": rec.type_line,
+                "oracle_text": rec.oracle_text,
+                # From Scryfall's own field, never derived from the mana cost:
+                # it already accounts for back faces, reminder text and land
+                # types. Rule 2, and the reason Ajani, Nacatl Pariah is {R}{W}.
+                "color_identity": sorted(rec.color_identity),
+                "keywords": list(rec.keywords),
+                "layout": rec.layout,
+                "legal_commander": rec.legal_commander,
+                "reserved": rec.reserved,
+                "edhrec_rank": rec.edhrec_rank,
+                "image": rec.image_normal,
+            })
+        return {
+            "cards": cards,
+            "not_found": [n for n in wanted if n not in found],
+            "corpus_available": True,
+        }
+    finally:
+        con.close()
+
+
 def search_cards(*, q: str = "", identity: str = "", type_line: str = "",
                  cmc_max: float | None = None, price_max: float | None = None,
                  sort: str = "edhrec", limit: int = 60) -> dict[str, Any]:

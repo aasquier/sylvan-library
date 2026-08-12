@@ -12,11 +12,15 @@
 > name a deck write, and `tests/test_claude_boundary.py` fails on the commit
 > that makes one reachable.
 >
+> Boundary 1 had a measured hole for a few hours and no longer does: a banned
+> card was invisible to `search_cards`, which filters to Commander-legal, so
+> the two cards the library deliberately fails the gate on could not be looked
+> up at all. `service.cards_named()` and the `get_cards` tool close it —
+> no filters, legality reported as a field. `ROADMAP.md` keeps the account,
+> because finding it required running a turn rather than reading the code.
+>
 > **Not built:** the modes and stances of [ADR 15](0015-claude-surfaces-are-modes-with-capabilities.md),
-> any UI, research via server-side web tooling, and the whole Forge half —
-> boundary 1 also has a measured hole, recorded in `ROADMAP.md`: a banned card
-> is invisible to `search_cards`, so card facts are not yet reachable for the
-> two cards the library fails the gate on.
+> any UI, research via server-side web tooling, and the whole Forge half.
 
 ## Context
 

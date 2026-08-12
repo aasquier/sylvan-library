@@ -27,25 +27,23 @@ Reading a `why` is a different act and stays allowed -- `get_deck` returns
 every rationale, because interrogating a card's slot means seeing what was
 claimed for it. Argue about it; never author it.
 
-**Known gap, and it is a hole in rule 1.** ADR 15's table names `get_cards` --
-exact-name lookup -- as a tool of every mode, and there is no such function in
-`api/service.py` to wrap: `db.get_cards` is reached only through the private
-`_corpus_for`. Exact lookup therefore goes through `search_cards`, and
-`search_cards` filters to `legalities.commander = 'legal'`, which is right for
-a deckbuilding search and wrong for a fact lookup.
+**Two card tools, and the split is load-bearing.** `get_cards` looks names up;
+`search_cards` finds candidates. They are not interchangeable, because
+`search_cards` filters to `legalities.commander = 'legal'` -- correct when the
+question is "what could I play", wrong when it is "what is this card", since it
+makes **a banned card invisible**.
 
-**A banned card is invisible to this tool set.** Measured, not theorised: asked
-which decks fail the gate and what the flagged cards do, a first turn got the
-gate's answer correctly and then could not look up either Emrakul, the Aeons
-Torn or Primeval Titan -- the two deliberate failures in
-`atla-palani-dinos` and `goreclaw-stompy`. It said so and labelled the fallback
-as unverified recall, which is ADR 14's third boundary working. It still
-answered from recall, which is the first boundary not working, on precisely the
-two cards this project most needs to discuss.
+That was a real hole in rule 1, found by running a turn rather than by
+reasoning about one: asked what the two cards failing the gate do, a first turn
+could not look up Emrakul, the Aeons Torn or Primeval Titan, said the corpus
+had nothing, and answered from labelled recall. ADR 14's third boundary
+working; its first boundary not. `get_cards` closes it -- no filters at all,
+`legal_commander` reported per card, so a banned card returns its real oracle
+text *and* its ban status.
 
-`service.cards_named()` -- exact names, through `db.get_cards`, no legality
-filter -- closes it, and should land before any mode ships.
-`tests/test_claude_tools.py` pins the gap so it stays visible.
+So: a claim about a **named** card goes through `get_cards`, always.
+`search_cards` is for the question "what else is out there", and its
+description says so.
 """
 
 from __future__ import annotations
@@ -188,14 +186,45 @@ READ_ONLY: dict[str, Tool] = {
                 "can write."),
         ),
         Tool(
+            name="get_cards",
+            fn=service.cards_named,
+            required=("names",),
+            properties={
+                "names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": ("Exact card names, up to 100. Case does "
+                                    "not matter, and either face of a "
+                                    "double-faced card resolves the whole "
+                                    "card."),
+                },
+            },
+            description=(
+                "Look up named cards in the corpus and return what they "
+                "actually do: oracle text, mana cost, mana value, type line, "
+                "colour identity, keywords, Commander legality, Reserved List "
+                "status and popularity rank. "
+                "**Every claim you make about a specific card must come from "
+                "this tool, including cards you are certain you remember.** "
+                "Your recollection of a card is not evidence; this is. Colour "
+                "identity in particular is the corpus's own field and accounts "
+                "for back faces, so never infer it from a mana cost. "
+                "Unlike search_cards this filters on nothing, so it is also "
+                "the only way to read a banned card -- it comes back with its "
+                "text and with legal_commander false. Names that do not "
+                "resolve are listed in not_found: if a card you asked about is "
+                "there, you do not know what it does, and saying so is the "
+                "correct answer."),
+        ),
+        Tool(
             name="search_cards",
             fn=service.search_cards,
             required=("q",),
             properties={
                 "q": {"type": "string",
                       "description": ("Matched against card name and rules "
-                                      "text. Pass a card's exact full name to "
-                                      "look that card up.")},
+                                      "text, e.g. 'destroy target creature' "
+                                      "or 'Cat'.")},
                 "identity": {"type": "string",
                              "description": ("Colour identity filter as WUBRG "
                                              "letters, e.g. 'GW'. A subset "
@@ -215,16 +244,17 @@ READ_ONLY: dict[str, Tool] = {
                           "description": "Rows to return, capped at 200. Default 60."},
             },
             description=(
-                "Search the Scryfall card corpus -- every Commander-legal "
-                "card, with oracle text, mana cost, colour identity, type "
-                "line, mana value, popularity rank and price. "
-                "**Call this for every claim about what a card does or costs, "
-                "including cards you are confident you remember.** Card text "
-                "is checked, never recalled: the colour identity and the "
-                "oracle text this returns are the facts, and your memory of "
-                "them is not. Also the tool for finding cards -- it searches "
-                "the whole history of the game, so deep cuts are reachable, "
-                "not just staples."),
+                "Find candidate cards you cannot already name, filtered by "
+                "rules text, colour identity, type, mana value and price. "
+                "This is the discovery tool: use it for 'what else could go "
+                "here', 'what green cards do X', 'cheaper alternatives to "
+                "this'. It searches the whole history of the game, so deep "
+                "cuts are reachable, not only staples. "
+                "**It returns only Commander-legal cards, so it is not a "
+                "lookup tool** -- a banned card will simply be missing, and "
+                "absence here is not evidence a card does not exist. When you "
+                "already know a card's name and want to know what it does, "
+                "call get_cards instead."),
         ),
     )
 }

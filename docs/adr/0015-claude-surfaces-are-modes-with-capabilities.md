@@ -14,10 +14,13 @@
 > the package's syntax tree so it fails on the commit that adds one rather than
 > on a call path that exists today.
 >
+> Every tool in the mode table above now exists, `get_cards` included — it was
+> the one with no service function behind it, and the gap turned out to matter:
+> a banned card was unreadable, so rule 1 leaked on exactly the cards this
+> project fails the gate on. `service.cards_named()` closed it the same day.
+>
 > **Not built:** the modes themselves, the stance and its three axes, the
-> activity log, and the rationale interview. `get_cards` in the mode table has
-> no service function behind it yet, which is a live gap rather than a
-> deferral — see `ROADMAP.md`.
+> activity log, and the rationale interview.
 
 Refines [ADR 14](0014-python-decides-claude-advises.md), which drew the line
 between what Python decides and what Claude advises on. This one says what a

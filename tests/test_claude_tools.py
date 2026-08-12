@@ -77,12 +77,23 @@ def test_a_mode_can_narrow_the_tool_set():
     assert [s["name"] for s in narrowed] == ["get_deck", "validate_deck"]
 
 
-def test_the_card_lookup_tool_tells_the_model_not_to_trust_itself():
+def test_the_lookup_tool_tells_the_model_not_to_trust_itself():
     """Rule 1 is structural -- the tool is the only source of card facts -- but
     the description is what makes the model reach for it in the first place."""
+    description = tools.READ_ONLY["get_cards"].description.lower()
+    assert "every claim you make about a specific card" in description
+    assert "remember" in description
+    assert "not_found" in description, (
+        "the model has to be told that an unresolved name means it does not "
+        "know the card, or silence reads as confirmation")
+
+
+def test_the_search_tool_says_it_is_not_a_lookup():
+    """The two card tools are not interchangeable, and the failure mode when a
+    model treats them as such is a banned card silently reading as absent."""
     description = tools.READ_ONLY["search_cards"].description.lower()
-    assert "call this for every claim" in description
-    assert "memory" in description
+    assert "not a lookup tool" in description
+    assert "get_cards" in description
 
 
 # ----------------------------------------------------------------- dispatch
@@ -124,26 +135,90 @@ def test_search_cards_runs_without_a_deck_source():
     assert "cards" in result
 
 
-def test_a_banned_card_is_invisible_to_the_card_tool():
-    """Pins the known gap rather than leaving it in a docstring.
-
-    `search_cards` filters to Commander-legal, which is right for finding cards
-    to play and wrong for looking one up: a banned card cannot be described at
-    all. That is rule 1 with a hole in it, and it opens on exactly the two
-    cards the library currently fails the gate on.
-
-    This test is expected to *change* when `service.cards_named()` lands -- it
-    is a marker, not an endorsement. Skipped without a corpus, like the rest of
-    the corpus-dependent suite.
-    """
-    legal = tools.run("search_cards", {"q": "Sol Ring", "limit": 5})
-    if not legal["cards"]:
+def requires_corpus():
+    if not tools.run("get_cards", {"names": ["Sol Ring"]})["cards"]:
         pytest.skip("no corpus -- run `mtglab data refresh`")
 
-    banned = tools.run("search_cards", {"q": "Primeval Titan", "limit": 5})
-    assert not any(c["name"] == "Primeval Titan" for c in banned["cards"]), (
-        "search_cards now returns banned cards. If that is deliberate, this "
-        "gap is closed and the test should assert the opposite.")
+
+def test_get_cards_looks_a_card_up_by_name():
+    requires_corpus()
+    result = tools.run("get_cards", {"names": ["sol ring"]})
+    card = result["cards"][0]
+    # The corpus's spelling comes back, not the caller's.
+    assert card["name"] == "Sol Ring"
+    assert card["asked_as"] == "sol ring"
+    assert "Add {C}{C}" in card["oracle_text"]
+
+
+def test_a_banned_card_can_be_looked_up_and_says_it_is_banned():
+    """The hole this tool exists to close.
+
+    `search_cards` filters to Commander-legal, so the two cards the library
+    deliberately fails the gate on were invisible to it -- and a first turn
+    duly answered about them from recall. A lookup filters on nothing and
+    reports legality as a field, which is strictly more useful than absence.
+    """
+    requires_corpus()
+    for name in ("Primeval Titan", "Emrakul, the Aeons Torn"):
+        looked_up = tools.run("get_cards", {"names": [name]})
+        assert looked_up["not_found"] == [], f"{name} is still not reachable"
+        card = looked_up["cards"][0]
+        assert card["name"] == name
+        assert card["legal_commander"] is False
+        assert card["oracle_text"], "no oracle text -- the point of the lookup"
+
+        # And the reason the split matters: discovery still hides it.
+        found = tools.run("search_cards", {"q": name, "limit": 10})
+        assert not any(c["name"] == name for c in found["cards"])
+
+
+def test_a_name_that_does_not_resolve_is_reported_not_dropped():
+    """Silence is the dangerous answer. A lookup that returns one card for two
+    names is how a confident claim gets made about the second."""
+    requires_corpus()
+    result = tools.run("get_cards",
+                       {"names": ["Sol Ring", "Sol Ringg, Destroyer of Typos"]})
+    assert [c["name"] for c in result["cards"]] == ["Sol Ring"]
+    assert result["not_found"] == ["Sol Ringg, Destroyer of Typos"]
+
+
+def test_colour_identity_comes_back_whole_for_a_double_faced_card():
+    """Rule 2, and the specific error that caused it: Ajani, Nacatl Pariah has
+    a white front and a red back, so looking it up by the front face must still
+    report {R}{W}. Derived from the mana cost it would read as mono-white and
+    pass a Selesnya legality check it should fail."""
+    requires_corpus()
+    result = tools.run("get_cards", {"names": ["Ajani, Nacatl Pariah"]})
+    if not result["cards"]:
+        pytest.skip("corpus predates the card")
+    assert sorted(result["cards"][0]["color_identity"]) == ["R", "W"]
+
+
+def test_a_lookup_is_capped_at_a_deck():
+    """A model can ask for anything. 100 is a commander plus the 99."""
+    from mtglab.api import service
+    result = tools.run("get_cards", {"names": ["Sol Ring"] * 400})
+    assert len(result["cards"]) + len(result["not_found"]) <= service.MAX_NAMED_CARDS
+
+
+def test_an_empty_lookup_is_not_an_error():
+    assert tools.run("get_cards", {"names": []})["cards"] == []
+
+
+def test_a_lookup_without_a_corpus_says_so_rather_than_reporting_nothing(tmp_path):
+    """The state a fresh clone is in, before `data refresh`.
+
+    Reporting every name as `not_found` with `corpus_available: false` is very
+    different from reporting an empty result: one says "I cannot check", the
+    other reads as "no such card". A model that conflates them will tell
+    somebody a real card does not exist.
+    """
+    from mtglab import config
+    with config.use_paths(data_dir=tmp_path / "empty"):
+        result = tools.run("get_cards", {"names": ["Sol Ring"]})
+    assert result["corpus_available"] is False
+    assert result["not_found"] == ["Sol Ring"]
+    assert result["cards"] == []
 
 
 # ------------------------------------------------------ argument validation
