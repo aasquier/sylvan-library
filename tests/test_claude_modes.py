@@ -70,6 +70,10 @@ class _ToolUse:
 class _Usage:
     input_tokens: int = 10
     output_tokens: int = 5
+    # None by default, the way an SDK that predates the field -- or a platform
+    # that does not report it -- would answer. The accounting must read that
+    # as zero rather than crash or sum None.
+    cache_read_input_tokens: int | None = None
 
 
 @dataclass
@@ -155,7 +159,41 @@ def test_the_mode_sets_the_model_tools_and_effort(scripted):
     assert sent["model"] == "claude-sonnet-5"
     assert {t["name"] for t in sent["tools"]} == {"get_deck", "get_cards"}
     assert sent["output_config"]["effort"] == "high"
-    assert "Answer the question." in sent["system"]
+    assert "Answer the question." in sent["system"][0]["text"]
+
+
+def test_the_system_block_carries_a_cache_breakpoint(scripted):
+    """Tools render ahead of system, so one marker on the system block caches
+    both -- the byte-stable prefix -- while the per-call brief stays outside.
+    Losing this silently costs ~10x on every repeated prefix token and nothing
+    visibly breaks, which is why it is pinned."""
+    stub = scripted([_Response([_Text("ok")])])
+    converse(MODE, messages=ASK, stance=Stance())
+
+    system = stub.messages.calls[0]["system"]
+    assert isinstance(system, list) and len(system) == 1
+    assert system[0]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_cache_reads_are_accounted_when_the_api_reports_them(scripted, source):
+    """`usage.cache_read_input_tokens` is the only evidence the cache works;
+    a Turn that dropped it would leave callers unable to check."""
+    scripted([
+        _Response([_ToolUse("get_deck", {"slug": "mini"})], stop_reason="tool_use",
+                  usage=_Usage(cache_read_input_tokens=1500)),
+        _Response([_Text("done")], usage=_Usage(cache_read_input_tokens=1600)),
+    ])
+    turn = converse(MODE, messages=ASK, stance=Stance(), source=source)
+    assert turn.cache_read_tokens == 3100
+
+
+def test_a_usage_without_cache_reads_reports_zero(scripted):
+    """The default _Usage answers None for the cache field, mirroring an SDK
+    or platform that does not report one -- accounting must degrade to zero,
+    not crash or sum None."""
+    scripted([_Response([_Text("ok")])])
+    turn = converse(MODE, messages=ASK, stance=Stance())
+    assert turn.cache_read_tokens == 0
 
 
 def test_a_response_schema_is_passed_as_the_output_format(scripted):

@@ -146,6 +146,12 @@ class Turn:
     input_tokens: int
     output_tokens: int
     refused: bool = False
+    #: How many of `input_tokens`' worth of prompt were served from the prompt
+    #: cache (at ~a tenth of the price). Zero on a cold call; if it stays zero
+    #: across repeated calls of the same mode, the prefix is drifting and the
+    #: breakpoint in `converse` is buying nothing -- that is the number to
+    #: check, per the caching guidance, before believing the cache works.
+    cache_read_tokens: int = 0
 
     def parsed(self) -> Any:
         """The answer as JSON, for a mode that constrained its format."""
@@ -178,19 +184,31 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
 
     history = list(messages)
     calls: list[dict[str, Any]] = []
-    tokens_in = tokens_out = 0
+    tokens_in = tokens_out = tokens_cached = 0
 
     for _ in range(max_turns):
         resp = con.messages.create(
             model=client.model(),
             max_tokens=mode.max_tokens,
-            system=mode.system(stance),
+            # A cache breakpoint on the system block caches the tools and the
+            # system prompt together (tools render first, so the marker covers
+            # both). That boundary is byte-stable for a given mode and stance
+            # while everything after it -- the brief, the question, the tool
+            # round trips -- varies, which is exactly where the skill says to
+            # cut. It pays twice: across the turns of one tool loop, and across
+            # consecutive calls of the same mode, which is the shape of
+            # interviewing a draft's 99 owed rationales one card at a time.
+            # The interview mode's prefix measures ~1.5k tokens, above the
+            # model's minimum cacheable size; below it the marker is inert.
+            system=[{"type": "text", "text": mode.system(stance),
+                     "cache_control": {"type": "ephemeral"}}],
             tools=schemas,
             output_config=output_config,
             messages=history,
         )
         tokens_in += resp.usage.input_tokens
         tokens_out += resp.usage.output_tokens
+        tokens_cached += getattr(resp.usage, "cache_read_input_tokens", 0) or 0
 
         # Checked before `content` is read, because a refusal can carry an
         # empty content list and indexing into it is how this becomes an
@@ -199,7 +217,7 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
             return Turn(mode=mode.name, model=resp.model,
                         stop_reason=resp.stop_reason, text="", tool_calls=calls,
                         input_tokens=tokens_in, output_tokens=tokens_out,
-                        refused=True)
+                        refused=True, cache_read_tokens=tokens_cached)
 
         # Appended whole, thinking blocks included. Sonnet 5 returns them with
         # empty text by default and they still have to go back unedited.
@@ -211,7 +229,8 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
             return Turn(mode=mode.name, model=resp.model,
                         stop_reason=resp.stop_reason, text=text,
                         tool_calls=calls, input_tokens=tokens_in,
-                        output_tokens=tokens_out)
+                        output_tokens=tokens_out,
+                        cache_read_tokens=tokens_cached)
 
         results = []
         for block in resp.content:
