@@ -15,8 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from mtglab.api import jobs, service
-from mtglab.api.deps import deck_source
+from mtglab import config
+from mtglab.api import auth, jobs, service
+from mtglab.api.deps import Scope, deck_source
 from mtglab.decks.source import DeckNotFound, DeckSource
 
 # The request scope, as one annotation. Every deck-facing route takes it, so
@@ -26,9 +27,27 @@ Decks = Annotated[DeckSource, Depends(deck_source)]
 WEB_DIST = Path(__file__).resolve().parent.parent / "web_dist"
 
 
-def create_app(*, dev: bool = False) -> FastAPI:
+def create_app(*, dev: bool = False, require_auth: bool | None = None,
+               secure_cookies: bool | None = None) -> FastAPI:
+    """Build the app.
+
+    `require_auth` defaults to `MTGLAB_REQUIRE_AUTH`, which is off — see
+    `config.require_auth` for why the local tool is not put behind a login. The
+    argument exists so a test can build the deployed configuration without
+    setting environment variables, which is what makes the whole auth core
+    checkable on a laptop (`docs/HOSTING.md` §6 step 5).
+    """
+    required = config.require_auth() if require_auth is None else require_auth
+    secure = (config.secure_cookies() if secure_cookies is None
+              else secure_cookies)
+
     app = FastAPI(title="sylvan-library", version="0.1.0",
                   description="Local Commander deckbuilding and simulation.")
+
+    # First, and before any route is declared: the middleware runs ahead of
+    # routing, so what it protects is every path the app will ever serve rather
+    # than the ones remembered at review time.
+    auth.install(app, require=required, secure_cookies=secure)
 
     if dev:
         # Vite dev server runs on another port, so the browser needs CORS. Only
@@ -362,8 +381,14 @@ def create_app(*, dev: bool = False) -> FastAPI:
     # connection -- see the note in `decks/source.py`, which is a constraint on
     # future implementations, not an accident of this one.
 
+    # A job belongs to whoever submitted it. The four routes below are the only
+    # user-scoped resource in the app today, and they take the scope rather
+    # than reading the registry directly -- `jobs.get` does the filtering, so
+    # "whose is this" is answered in one place (ADR 5).
+
     @app.post("/api/sim/mana")
-    def sim_mana(payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
+    def sim_mana(payload: dict[str, Any], decks: Decks,
+                 caller: Scope) -> dict[str, Any]:
         slug = payload.get("slug")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
@@ -372,11 +397,12 @@ def create_app(*, dev: bool = False) -> FastAPI:
         job = jobs.submit(
             "sim.mana",
             lambda progress: run_mana(slug, payload, progress, source=decks),
-            label=f"{slug}: mana, {games:,} games")
+            label=f"{slug}: mana, {games:,} games", owner=caller.user_id)
         return job.as_dict()
 
     @app.post("/api/sim/lands")
-    def sim_lands(payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
+    def sim_lands(payload: dict[str, Any], decks: Decks,
+                  caller: Scope) -> dict[str, Any]:
         slug = payload.get("slug")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
@@ -386,16 +412,18 @@ def create_app(*, dev: bool = False) -> FastAPI:
         job = jobs.submit(
             "sim.lands",
             lambda progress: run_lands(slug, payload, progress, source=decks),
-            label=f"{slug}: land sweep {low}-{high}")
+            label=f"{slug}: land sweep {low}-{high}", owner=caller.user_id)
         return job.as_dict()
 
     @app.get("/api/jobs")
-    def list_jobs() -> list[dict[str, Any]]:
-        return [j.as_dict() for j in jobs.all_jobs()]
+    def list_jobs(caller: Scope) -> list[dict[str, Any]]:
+        return [j.as_dict() for j in jobs.all_jobs(owner=caller.user_id)]
 
     @app.get("/api/jobs/{job_id}")
-    def get_job(job_id: str) -> dict[str, Any]:
-        job = jobs.get(job_id)
+    def get_job(job_id: str, caller: Scope) -> dict[str, Any]:
+        # 404 rather than 403 for somebody else's job, so an id cannot be
+        # probed for existence. `jobs.get` has already collapsed the two cases.
+        job = jobs.get(job_id, owner=caller.user_id)
         if job is None:
             raise HTTPException(status_code=404, detail=f"no job '{job_id}'")
         return job.as_dict()

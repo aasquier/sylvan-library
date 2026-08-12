@@ -11,6 +11,10 @@
     mtglab sim mana <slug>              Tier 1 goldfish
     mtglab sim lands <slug> 30..40      land-count sweep, flood-aware
     mtglab price deck <slug>            cheapest legal printing per card
+    mtglab users add <name>             an account; the password is prompted
+    mtglab users list                   who exists, and who can log in
+    mtglab users passwd <name>          set a password; ends every session
+    mtglab users disable|enable <name>
     mtglab claude check                 one real API call -- is the key live?
     mtglab claude interview <slug>      questions about a card's slot; you
                             --card X    write the rationale, it never does
@@ -572,6 +576,139 @@ def cmd_price_deck(args):
     print(f"\n  {total:>8.2f}  TOTAL ({len(rows)}/{len(names)} priced)")
 
 
+# -------------------------------------------------------------------- users
+#
+# ADR 16 is the rule these commands live under: **no password is ever chosen by
+# one person for another.** The way an invited account gets a password is a
+# single-use emailed link, and that is the next build -- there is no
+# `--password` flag here and there will not be one, because a password passed
+# as an argument is a password in the shell history and in the process table.
+#
+# What `users add` is for until then is the maintainer's own account, typed at
+# a prompt on a machine they are sitting at (`docs/HOSTING.md` §4 step 8). It
+# can also create an account with no password at all, which is exactly the
+# state an invite leaves behind: the account exists and cannot log in yet.
+
+def _auth():
+    """The auth package, or a clean exit naming the extra that is missing."""
+    try:
+        from mtglab.auth import db, passwords, sessions, users
+    except ModuleNotFoundError:
+        # argon2-cffi rides with the api extra; see pyproject.toml.
+        sys.exit("accounts need the api extra:  pip install -e '.[api]'")
+    return db, passwords, sessions, users
+
+
+def _prompt_new_password(who: str) -> str:
+    """Read a password twice, from the terminal, never from an argument."""
+    import getpass
+
+    _, passwords, _, _ = _auth()
+    first = getpass.getpass(f"  new password for {who}: ")
+    if first != getpass.getpass("  again: "):
+        sys.exit("refused: the two entries did not match")
+    try:
+        passwords.check_strength(first)
+    except passwords.WeakPassword as exc:
+        sys.exit(f"refused: {exc}")
+    return first
+
+
+def cmd_users_add(args):
+    db, _, _, users = _auth()
+
+    password = None if args.no_password else _prompt_new_password(args.username)
+    con = db.connect()
+    try:
+        user = users.create(con, args.username, password=password,
+                            email=args.email, is_admin=args.admin)
+    except (users.UserExists, users.InvalidUsername,
+            users.InvalidEmail) as exc:
+        # Named rather than a bare ValueError, which all three subclass: a
+        # genuine programming error should be a traceback, not "refused:".
+        sys.exit(f"refused: {exc}")
+    finally:
+        con.close()
+
+    role = " (admin)" if user.is_admin else ""
+    print(f"  created {user.username}{role} in {config.APP_DB_PATH}")
+    if password is None:
+        print("  no password set -- this account cannot log in yet.")
+
+
+def cmd_users_list(args):
+    db, _, sessions, users = _auth()
+
+    con = db.connect()
+    try:
+        everyone = users.all_users(con)
+        if not everyone:
+            print(f"  no accounts in {config.APP_DB_PATH}")
+            print("  create one with `mtglab users add <name>`")
+            return
+        print(f"  {'username':<20} {'email':<28} {'state':<12} sessions")
+        for user in everyone:
+            state = "disabled" if user.disabled else (
+                "active" if users.has_password(con, user.id) else "no password")
+            live = sessions.count_for_user(con, user.id)
+            admin = "*" if user.is_admin else " "
+            print(f" {admin}{user.username:<20} {user.email or '-':<28} "
+                  f"{state:<12} {live}")
+        print("\n  * admin")
+    finally:
+        con.close()
+
+
+def cmd_users_passwd(args):
+    """Set a password, ending every session for that account.
+
+    The revocation is not a courtesy. A password change is usually somebody who
+    suspects compromise, and one that leaves the other party logged in has
+    answered the wrong question (ADR 16).
+    """
+    db, _, _, users = _auth()
+
+    con = db.connect()
+    try:
+        user = users.get(con, args.username)
+        if user is None:
+            sys.exit(f"refused: no account {args.username!r}")
+        password = _prompt_new_password(user.username)
+        ended = users.set_password(con, user.id, password)
+    finally:
+        con.close()
+
+    print(f"  password set for {user.username}")
+    if ended:
+        print(f"  {ended} session(s) ended -- every device signs in again.")
+
+
+def _set_disabled(username: str, disabled: bool):
+    db, _, _, users = _auth()
+
+    con = db.connect()
+    try:
+        user = users.get(con, username)
+        if user is None:
+            sys.exit(f"refused: no account {username!r}")
+        ended = users.set_disabled(con, user.id, disabled)
+    finally:
+        con.close()
+
+    print(f"  {user.username} is now "
+          f"{'disabled' if disabled else 'enabled'}")
+    if ended:
+        print(f"  {ended} session(s) ended.")
+
+
+def cmd_users_disable(args):
+    _set_disabled(args.username, True)
+
+
+def cmd_users_enable(args):
+    _set_disabled(args.username, False)
+
+
 # -------------------------------------------------------------------- claude
 
 def cmd_claude_check(args):
@@ -775,6 +912,25 @@ def main(argv=None):
     price = sub.add_parser("price").add_subparsers(dest="cmd", required=True)
     pd = price.add_parser("deck"); pd.add_argument("slug")
     pd.set_defaults(func=cmd_price_deck)
+
+    us = sub.add_parser("users", help="accounts for the hosted app")\
+        .add_subparsers(dest="cmd", required=True)
+    ua = us.add_parser("add", help="create an account; the password is prompted")
+    ua.add_argument("username")
+    ua.add_argument("--email", help="for password resets, once that lands")
+    ua.add_argument("--admin", action="store_true")
+    # There is no --password, deliberately. See the note above cmd_users_add.
+    ua.add_argument("--no-password", action="store_true",
+                    help="create the account unclaimed: it exists and cannot "
+                         "log in until a password is set")
+    ua.set_defaults(func=cmd_users_add)
+    us.add_parser("list").set_defaults(func=cmd_users_list)
+    up = us.add_parser("passwd", help="set a password; ends every session")
+    up.add_argument("username"); up.set_defaults(func=cmd_users_passwd)
+    ud = us.add_parser("disable"); ud.add_argument("username")
+    ud.set_defaults(func=cmd_users_disable)
+    ue = us.add_parser("enable"); ue.add_argument("username")
+    ue.set_defaults(func=cmd_users_enable)
 
     claude = sub.add_parser("claude").add_subparsers(dest="cmd", required=True)
     cc = claude.add_parser("check", help="one real call -- is the key working?")

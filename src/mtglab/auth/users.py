@@ -1,0 +1,292 @@
+"""Accounts, and the single path that verifies one.
+
+`authenticate()` is the only function in the project that turns a password into
+an identity. Everything the checklist in `docs/HOSTING.md` §1 asks for about
+login lives inside it rather than in the route that calls it — one generic
+answer for every failure, a hash computed even when the account does not exist,
+and disabled checked *after* the verification so that "no such user", "wrong
+password" and "account disabled" cost the same and say the same thing.
+
+Which is worth stating plainly, because the temptation runs the other way: a
+helpful login form that says "that account is disabled" is a login form that
+confirms the account exists to anybody who asks.
+
+Email is here as a column and nowhere else. ADR 16 makes it the first personal
+data this project stores, and it inherits CLAUDE.md rule 5's reasoning about
+what a breach means: **it must never reach a log line, an artifact, or a Claude
+tool result.** The `User` record below is what the API serialises, and it goes
+to its own holder or to the maintainer's terminal — never into anything shared.
+"""
+
+from __future__ import annotations
+
+import re
+import sqlite3
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+from mtglab.auth import passwords
+
+# Deliberately narrow. A username is a login handle, not a display name -- it
+# ends up in URLs, log lines and `mtglab users list` output, and the set of
+# characters that are unambiguous in all three is small. Case-insensitive at
+# the database (COLLATE NOCASE), so `Aaron` and `aaron` are one account.
+USERNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{1,31}$")
+
+# Not an RFC 5322 validator, and not trying to be. The only check that means
+# anything about deliverability is sending a message to the address, which is
+# what the invite flow does; everything short of that is a shape test whose
+# false negatives are somebody's perfectly real address.
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class UserExists(ValueError):
+    """Raised rather than silently taking over an existing account."""
+
+
+class NoSuchUser(ValueError):
+    """Raised when an operation names an account that is not there."""
+
+
+class InvalidUsername(ValueError):
+    """Raised when a username could not be a username."""
+
+
+class InvalidEmail(ValueError):
+    """Raised when an email address could not be an email address."""
+
+
+@dataclass(frozen=True)
+class User:
+    """An account, without its password hash.
+
+    The hash is not a field on purpose. This record gets returned from the API,
+    logged, and printed; a hash that is never loaded into it cannot leak out of
+    it. `authenticate` reads the column directly and keeps it local.
+    """
+
+    id: int
+    username: str
+    email: str | None
+    is_admin: bool
+    disabled_at: datetime | None
+    created_at: datetime
+
+    @property
+    def disabled(self) -> bool:
+        return self.disabled_at is not None
+
+    def as_dict(self, *, include_email: bool = False) -> dict[str, Any]:
+        """The account, serialised. **Without the address unless asked.**
+
+        Opt-in rather than opt-out, because the rule is easy to state and hard
+        to remember: an address must never reach a log line, an artifact or a
+        tool result (ADR 16), and every one of those would have been written by
+        somebody serialising a user and not thinking about the email field. The
+        only caller that passes `True` is `mtglab users list`, printing to the
+        maintainer's own terminal.
+        """
+        body = {
+            "id": self.id,
+            "username": self.username,
+            "is_admin": self.is_admin,
+            "disabled": self.disabled,
+            "created_at": self.created_at.isoformat(),
+        }
+        return {**body, "email": self.email} if include_email else body
+
+
+def _row_to_user(row: sqlite3.Row) -> User:
+    return User(
+        id=row["id"],
+        username=row["username"],
+        email=row["email"],
+        is_admin=bool(row["is_admin"]),
+        disabled_at=datetime.fromisoformat(row["disabled_at"])
+        if row["disabled_at"] else None,
+        created_at=datetime.fromisoformat(row["created_at"]),
+    )
+
+
+def normalise_username(username: str) -> str:
+    """Trim and validate. Raises `InvalidUsername`; does not change case."""
+    candidate = username.strip()
+    if not USERNAME_RE.match(candidate):
+        raise InvalidUsername(
+            f"{username!r} is not a usable username -- 2 to 32 characters, "
+            "letters, digits, dot, dash or underscore, starting with a letter "
+            "or digit")
+    return candidate
+
+
+def normalise_email(email: str | None) -> str | None:
+    """Trim, lowercase and shape-check. `None` and empty both mean absent."""
+    if email is None or not email.strip():
+        return None
+    candidate = email.strip().lower()
+    if not EMAIL_RE.match(candidate):
+        raise InvalidEmail(f"{email!r} does not look like an email address")
+    return candidate
+
+
+def create(con: sqlite3.Connection, username: str, *,
+           password: str | None = None, email: str | None = None,
+           is_admin: bool = False) -> User:
+    """Add an account.
+
+    `password=None` creates an account that **cannot log in yet** — which is
+    what ADR 16's invite issues, and why the column is nullable. Until the
+    email half lands, the only caller that uses it is a test.
+    """
+    name = normalise_username(username)
+    address = normalise_email(email)
+    password_hash = passwords.hash_password(password) if password else None
+    try:
+        with con:
+            cur = con.execute(
+                "INSERT INTO users (username, password_hash, email, is_admin,"
+                " created_at) VALUES (?, ?, ?, ?, ?)",
+                (name, password_hash, address, int(is_admin),
+                 datetime.now(UTC).isoformat()))
+    except sqlite3.IntegrityError as exc:
+        # Both unique columns land here. Say which, because "that is taken" for
+        # an address the caller cannot see is an unhelpful place to stop.
+        which = "email address" if "email" in str(exc) else "username"
+        raise UserExists(f"that {which} is already registered") from exc
+    fetched = get_by_id(con, int(cur.lastrowid or 0))
+    if fetched is None:                                # unreachable in practice
+        raise NoSuchUser(name)
+    return fetched
+
+
+def get(con: sqlite3.Connection, username: str) -> User | None:
+    """One account by name, case-insensitively. `None` if there is no such."""
+    row = con.execute("SELECT * FROM users WHERE username = ?",
+                      (username.strip(),)).fetchone()
+    return _row_to_user(row) if row else None
+
+
+def get_by_id(con: sqlite3.Connection, user_id: int) -> User | None:
+    row = con.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    return _row_to_user(row) if row else None
+
+
+def get_by_email(con: sqlite3.Connection, email: str) -> User | None:
+    """One account by address. The lookup the reset flow will need.
+
+    Note for whoever builds that flow: a `None` from here must produce the same
+    response as a hit (ADR 16), so this returning `None` is not permission to
+    tell the caller anything.
+    """
+    address = normalise_email(email)
+    if address is None:
+        return None
+    row = con.execute("SELECT * FROM users WHERE email = ?",
+                      (address,)).fetchone()
+    return _row_to_user(row) if row else None
+
+
+def all_users(con: sqlite3.Connection) -> list[User]:
+    rows = con.execute("SELECT * FROM users ORDER BY username COLLATE NOCASE")
+    return [_row_to_user(row) for row in rows]
+
+
+def count(con: sqlite3.Connection) -> int:
+    return int(con.execute("SELECT count(*) AS n FROM users").fetchone()["n"])
+
+
+def has_password(con: sqlite3.Connection, user_id: int) -> bool:
+    """Whether this account can log in at all. For `mtglab users list`."""
+    row = con.execute("SELECT password_hash FROM users WHERE id = ?",
+                      (user_id,)).fetchone()
+    if row is None:
+        raise NoSuchUser(str(user_id))
+    return row["password_hash"] is not None
+
+
+def set_password(con: sqlite3.Connection, user_id: int, password: str) -> int:
+    """Set a password and revoke every session for that account.
+
+    Returns the number of sessions ended. One transaction, so there is no
+    window in which the password has changed and the old sessions are still
+    live — which is the failure ADR 16 is pointing at when it says a reset that
+    leaves the attacker logged in has answered the wrong question.
+
+    The `DELETE` is written out here rather than delegated to
+    `sessions.delete_for_user`, which opens a transaction of its own: sqlite3's
+    connection context manager does not nest, so the inner block would commit
+    the outer one and reopen exactly the window this function exists to close.
+    """
+    password_hash = passwords.hash_password(password)
+    with con:
+        cur = con.execute("UPDATE users SET password_hash = ? WHERE id = ?",
+                          (password_hash, user_id))
+        if cur.rowcount == 0:
+            raise NoSuchUser(str(user_id))
+        revoked = con.execute("DELETE FROM sessions WHERE user_id = ?",
+                              (user_id,)).rowcount
+    return revoked
+
+
+def set_disabled(con: sqlite3.Connection, user_id: int, disabled: bool) -> int:
+    """Disable or re-enable an account. Returns sessions ended.
+
+    Disabling revokes sessions too. An account that can no longer log in but
+    whose existing cookie still works has not been disabled in any sense the
+    person doing it meant.
+    """
+    stamp = datetime.now(UTC).isoformat() if disabled else None
+    with con:
+        cur = con.execute("UPDATE users SET disabled_at = ? WHERE id = ?",
+                          (stamp, user_id))
+        if cur.rowcount == 0:
+            raise NoSuchUser(str(user_id))
+        revoked = con.execute("DELETE FROM sessions WHERE user_id = ?",
+                              (user_id,)).rowcount if disabled else 0
+    return revoked
+
+
+def set_admin(con: sqlite3.Connection, user_id: int, is_admin: bool) -> None:
+    with con:
+        cur = con.execute("UPDATE users SET is_admin = ? WHERE id = ?",
+                          (int(is_admin), user_id))
+    if cur.rowcount == 0:
+        raise NoSuchUser(str(user_id))
+
+
+def authenticate(con: sqlite3.Connection, username: str,
+                 password: str) -> User | None:
+    """The one place a password becomes an identity. `None` means no.
+
+    Every refusal costs one Argon2 verification, including the ones that could
+    be answered without doing any work at all — an unknown username, and an
+    account created by an invite that has not been claimed. That is the point:
+    a login that returns faster for a name nobody has registered has told the
+    person asking that nobody has registered it.
+    """
+    row = con.execute(
+        "SELECT id, password_hash, disabled_at FROM users WHERE username = ?",
+        (username.strip(),)).fetchone()
+
+    if row is None:
+        passwords.verify_dummy(password)
+        return None
+
+    stored: str | None = row["password_hash"]
+    if not passwords.verify(stored, password):
+        return None
+
+    # Checked *after* the hash, not before, so a disabled account is refused in
+    # the same time and with the same message as a wrong password.
+    if row["disabled_at"] is not None:
+        return None
+
+    # The one moment an old hash can be upgraded for free: the plaintext is in
+    # hand and has just been proven correct.
+    if stored is not None and passwords.needs_rehash(stored):
+        with con:
+            con.execute("UPDATE users SET password_hash = ? WHERE id = ?",
+                        (passwords.hash_password(password), row["id"]))
+
+    return get_by_id(con, int(row["id"]))

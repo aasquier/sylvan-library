@@ -9,7 +9,16 @@ dependencies = ["pyyaml>=6.0", "duckdb>=1.0", "numpy>=1.26"]
 # python-dotenv lets `config.py` read a `.env` however the process was started,
 # which is how the API key reaches the app locally. Optional and imported
 # defensively: a base install has no `.env` to read, and the core stays light.
-api = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-dotenv>=1.0"]
+#
+# argon2-cffi rides with `api` rather than getting an extra of its own. Auth
+# exists to serve the app to more than one person, so an install with no web
+# server has nothing to authenticate, and a base install still needs neither a
+# network nor an account. `mtglab.auth.passwords` imports it at module level --
+# a password hasher that might not be there is worse than one that is missing
+# loudly -- and `cli.py` imports the auth package inside the `users` commands,
+# so on a base install everything else works and only those report the extra.
+api = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-dotenv>=1.0",
+       "argon2-cffi>=23.1"]
 # The Claude surface (ADR 14/15). Its own extra rather than part of `api`
 # because "off is a real position": a base install has a gate, a mana solver
 # and a simulator that need no account and no network, and that should keep
@@ -35,10 +44,14 @@ claude = ["anthropic>=0.69"]
 # CI gate, so a checkout that cannot run it cannot reproduce the build. Without
 # `types-PyYAML` the run reports two import-untyped errors and nothing else,
 # which reads exactly like "the checker is broken".
+# `argon2-cffi` is here for the same reason `anthropic` is: the tests that hold
+# a boundary in place must not be skippable. tests/test_isolation.py is the one
+# ADR 5 calls the highest-value test in the whole auth story, and without the
+# hasher installed it would not run at all.
 dev = [
     "pytest>=8.0", "ruff>=0.16", "httpx>=0.27", "coverage>=7.0",
     "hypothesis>=6.100", "python-dotenv>=1.0", "anthropic>=0.69",
-    "mypy>=1.11", "types-PyYAML>=6.0",
+    "mypy>=1.11", "types-PyYAML>=6.0", "argon2-cffi>=23.1",
 ]
 
 [project.scripts]

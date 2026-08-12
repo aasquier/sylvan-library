@@ -60,6 +60,18 @@ These are needed before any deployment works at all:
 
 ## 1. Login and per-user isolation
 
+> **Built, as of 2026-08-12** — everything in this section except the email
+> half. `src/mtglab/auth/` is `app.db`, Argon2id, accounts, sessions and the
+> login rate limiter; `src/mtglab/api/auth.py` is the middleware and the three
+> routes; `api/deps.py` is the scoped accessor. It is **off unless
+> `MTGLAB_REQUIRE_AUTH` is set**, because the local single-user app is how this
+> runs today and putting a login in front of it would be a regression.
+>
+> What is still to come is §6 step 5b: `mtglab users invite`, the emailed setup
+> link, and `POST /api/auth/reset`. Until then `mtglab users add` prompts for a
+> password at the terminal, which is the maintainer's own bootstrap account and
+> not a way to set somebody else's.
+
 ### Use Argon2id, sessions, and no self-signup
 
 You asked for username and password. Here is the shape that is both correct and
@@ -101,7 +113,19 @@ forgotten password being "one command" is only cheap for the person running it.
 ```bash
 mtglab users invite ada@example.com   # disabled account + single-use setup link
 mtglab users list
-mtglab users disable ada@example.com
+mtglab users disable ada
+```
+
+What exists today is the half that needs no email. `add` prompts twice at the
+terminal and **there is no `--password` flag**, because a password passed as an
+argument is a password in the shell history and in the process table:
+
+```bash
+mtglab users add aaron --email aaron@example.com --admin   # prompts
+mtglab users add ada --no-password    # the state an invite leaves behind
+mtglab users passwd ada               # prompts; ends every session
+mtglab users list                     # who exists, and who can log in
+mtglab users disable|enable ada
 ```
 
 The invitee follows the link and sets their own password. Password reset is the
@@ -174,6 +198,26 @@ and one is forgotten. Two rules:
    value test in the whole auth story.
 
 Return 404 rather than 403 for another user's object, so IDs cannot be probed.
+
+**Both are built** (`api/deps.py`, `tests/test_isolation.py`), and two things
+about how turned out to matter more than expected.
+
+The first is that **the accessor is enforced by middleware, not by a
+dependency**. A dependency has to be remembered on each new route, and the
+route somebody adds in a year is exactly the one that will not have it — and it
+will look entirely normal in review. Middleware runs before routing, so an
+endpoint nobody protected is refused because nobody listed it. The allowlist is
+`api/auth.py:PUBLIC_PATHS`, four entries long, and the test reads that same
+constant so the two cannot drift.
+
+The second is that the isolation test needed **something to isolate**, and the
+user deck tier at step 6 does not exist yet. The answer was already in the app:
+a background simulation job belongs to whoever submitted it, and its label
+names the deck they are working on. So `jobs` is owner-scoped, and the
+adversarial test is real rather than a placeholder waiting for step 6. The
+generated part is what carries it forward — every `/api` route must be
+classified public, shared or user-scoped, and an unclassified one fails the
+suite with instructions.
 
 ---
 
@@ -594,12 +638,17 @@ fly certs show mtg.yourdomain.com
 ### Step 8 — create your account
 
 ```bash
-fly ssh console -C "mtglab users add aaron --admin"
+fly ssh console -C "mtglab users add aaron --email you@example.com --admin"
 ```
 
-Do this from a terminal you trust, and set the password when prompted rather
-than passing it as an argument — command-line arguments land in shell history
-and in the process table.
+Do this from a terminal you trust. It prompts for the password twice; there is
+no way to pass one as an argument, because command-line arguments land in shell
+history and in the process table.
+
+Everyone else gets an invite rather than an account you made a password for
+(ADR 16). Until that ships, `mtglab users add <name> --no-password` creates the
+account in exactly the state an invite leaves it — existing, unable to log in —
+and the holder claims it however you arrange.
 
 ---
 
@@ -668,15 +717,22 @@ Roughly ascending risk, each step independently useful:
    along remotely. This alone satisfies the original goal.
 3. **Sim result caching.** Biggest performance win, and it is pure
    infrastructure — no user-facing change.
-4. **`app.db`, users table, `mtglab users` CLI.** No web login yet.
-5. **Sessions, login, the scoped accessor, and the isolation test** from §1.
-   Steps 4 and 5 together are "auth core", and **all of it is testable locally
-   with no deployment** — which is why they are worth doing before the
-   Dockerfile despite sitting after it in this list. What genuinely needs a
-   deploy is narrow: `Secure` cookies over real TLS, HSTS, proxy headers, and
-   email deliverability.
-5b. **Invite, verify and reset over email** (ADR 16). Split out from 5 because
-   the half above proves itself in the test suite and this half cannot.
+4. ~~**`app.db`, users table, `mtglab users` CLI.**~~ **Done 2026-08-12.**
+5. ~~**Sessions, login, the scoped accessor, and the isolation test** from §1.~~
+   **Done 2026-08-12.** Steps 4 and 5 together were "auth core", and the claim
+   that **all of it is testable locally with no deployment** held: 154 tests,
+   no network, no container. What genuinely needs a deploy is as narrow as
+   predicted — `Secure` cookies over real TLS, HSTS, proxy headers, and email
+   deliverability.
+5b. **Invite, verify and reset over email** (ADR 16). **Next.** Split out from 5
+   because the half above proves itself in the test suite and this half cannot.
+   It arrives as schema version 2 in `auth/db.py`, an `EmailSender` protocol
+   with a console implementation, and one token module serving both entry
+   points. Every rule it needs from step 5 is already there and tested:
+   `password_hash` is nullable so an unclaimed account is a real state,
+   `users.set_password` already revokes every session, and
+   `users.get_by_email` is written with a note that a miss must answer
+   identically to a hit.
 6. **User decks** in `user_decks`, reusing the existing YAML parser, gate and
    artifact generator.
 7. **Process pool for sweeps** once anyone actually complains about the wait.
@@ -706,6 +762,15 @@ here rather than rewriting the sections above.
       by scanning every tracked file's contents, the built bundle included.
 - [x] **Read-only DuckDB is safe across processes and threads**, verified in
       §3, so `uvicorn --workers 2+` is fine for serving.
+- [x] **The auth core** — `app.db`, Argon2id, accounts, sessions, the login
+      rate limiter, `mtglab users`, the scoped accessor and the adversarial
+      isolation test. Build-order steps 4 and 5, landed 2026-08-12, **off
+      unless `MTGLAB_REQUIRE_AUTH` is set**. Turn it on in `fly.toml`.
+- [x] **No `SESSION_SECRET` is needed.** It was on the pre-deploy list below
+      until the code was written; sessions are opaque random tokens stored as
+      their SHA-256, so there is nothing to sign and no key to hold. One fewer
+      secret to rotate, and the item is struck rather than silently dropped
+      because a checklist that loses entries is a checklist nobody trusts.
 
 ### Does not exist yet — this is the actual build list
 
@@ -718,12 +783,21 @@ here rather than rewriting the sections above.
 - [ ] **A refresh procedure.** Cron does not work — Fly volumes attach to
       exactly one machine, so a scheduled second Machine cannot mount the
       corpus. Monthly and by hand is the plan; write it down as a runbook.
-- [ ] **Auth.** Nothing today, and **now the active build** (2026-08-12) —
-      invite-only accounts with self-served passwords and email reset, per
+- [ ] **The email half of auth** — build-order step 5b. The core landed
+      2026-08-12; what is missing is `mtglab users invite`, the emailed setup
+      link, `POST /api/auth/reset`, and the `EmailSender` seam, per
       [ADR 16](adr/0016-accounts-are-invited-and-passwords-are-self-served.md).
-      Still not needed for the six curated decks, still **required before any
-      collection feature ships** (rule 5's reasoning does not stop at `git`).
-      Cloudflare Access remains the exit if this sprawls.
+      Until it ships, an account for somebody else is created unclaimed and the
+      password is set by whoever holds the box. Still not needed for the six
+      curated decks, still **required before any collection feature ships**
+      (rule 5's reasoning does not stop at `git`). Cloudflare Access remains
+      the exit if this sprawls.
+- [ ] **A login screen in the app.** The API is finished and the frontend has
+      not been touched: with `MTGLAB_REQUIRE_AUTH` on, the SPA loads and every
+      fetch it makes returns 401. `GET /api/auth/me` answers `auth_required`
+      and `authenticated` separately so the client can tell "logged out" from
+      "this instance has no login" — that is the endpoint to build against.
+      **Deploying with auth on before this exists gives you an unusable app.**
 - [ ] **A transactional email provider.** New with ADR 16 and not previously on
       this list, because the superseded plan had no email at all. Needs a
       `RESEND_API_KEY` in `fly secrets`, a **verified sending domain** (DNS
@@ -734,7 +808,10 @@ here rather than rewriting the sections above.
 ### Have these in hand before deploy day
 
 - [ ] Fly account with a card on file (the machine sizes are paid tier).
-- [ ] `SESSION_SECRET` generated (`openssl rand -base64 32`).
+- [x] ~~`SESSION_SECRET` generated (`openssl rand -base64 32`).~~ **Not
+      needed** — see above. Sessions are opaque tokens, not signed ones.
+- [ ] `MTGLAB_REQUIRE_AUTH=1` in `fly.toml`, and an admin account created over
+      `fly ssh console` (§4 step 8) — *after* the login screen exists.
 - [ ] A domain, if you want one, plus the Fly TLS certificate step.
 - [ ] Cloudflare Access configured, if the instance is not to be public.
 - [ ] **A second home for `ANTHROPIC_API_KEY`.** One key, one environment, two

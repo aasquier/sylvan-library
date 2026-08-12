@@ -6,6 +6,16 @@ data/cache/
 data/*.duckdb
 data/*.duckdb.wal
 
+# --- Never commit: the app database -----------------------------------------
+# `app.db` is the other half of ADR 4: users, password hashes, and — since
+# ADR 16 — email addresses. It is the one file here that is irreplaceable and
+# the one that must never be public. The `-wal` and `-shm` siblings are WAL
+# mode's, and a `-wal` alone can contain committed rows.
+data/app.db
+data/app.db-*
+*.db-wal
+*.db-shm
+
 # --- Never commit: Forge's distribution, its card data, or a JVM ------------
 # Tier 3 keeps all of this outside the repository on purpose (see
 # `config.forge_home`), so these patterns should never match anything. They are

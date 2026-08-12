@@ -48,7 +48,10 @@ src/mtglab/
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
   artifacts/generate.py   the five deliverables
+  auth/                   app.db, Argon2id, accounts, sessions, rate limit
   api/                    FastAPI app, services, background sim jobs
+  api/auth.py             the deny-by-default middleware and login routes
+  api/deps.py             the request scope: who is asking, what they see
   web_dist/               built frontend, committed so `mtglab ui` needs no Node
   cli.py
 web/                      frontend source (React + Vite); `npm test` is Vitest
@@ -68,6 +71,21 @@ a connection**: background jobs capture one and outlive the request.
 Paths come from `config.py` and honour `MTGLAB_DATA_DIR` and
 `MTGLAB_DECKS_DIR`, defaulting to `data/` and `decks/`. Tests point them at a
 scratch directory with `config.use_paths()`; never reassign the globals.
+`app.db` — the SQLite half of ADR 4, holding users and sessions — is derived
+from `MTGLAB_DATA_DIR` and moves with it.
+
+**Auth is off unless `MTGLAB_REQUIRE_AUTH` is set.** The local app is one
+person on a laptop and a login in front of it would be a regression; the
+deployment turns it on. When it is on, `api/auth.py`'s middleware refuses
+every path that is not in `PUBLIC_PATHS` — **before routing**, so an endpoint
+nobody remembered to protect is refused rather than served. Adding a route
+means classifying it in `tests/test_isolation.py`; the suite fails until you
+do. Anything that belongs to one person is reported as **404, never 403**, to
+another (ADR 5). Nothing in `src/mtglab/auth/` imports FastAPI, which is what
+lets `mtglab users` work on a box with no web server.
+
+The frontend has no login screen yet — `docs/HOSTING.md` §7 records that as a
+blocker for deploying with auth on.
 
 Keep `mana.py` and `sim/` dependency-light (stdlib + numpy). DuckDB stays
 behind `cards/db.py`. That boundary is what keeps the simulation core fast to
@@ -134,6 +152,13 @@ every tracked file (the built frontend bundle included) for an API key. A
 public inventory of expensive cards tied to a real identity is a targeting
 list. Secrets reach the app through the environment: a gitignored `.env`
 locally, `fly secrets` deployed, and `.env.example` documents the names.
+
+`app.db` is gitignored for the same reason and one more: it holds password
+hashes and, since ADR 16, **email addresses — the first personal data this
+project stores.** An address must never reach a log line, an artifact, or a
+Claude tool result. `User.as_dict()` leaves it out unless asked, and the only
+caller that asks is `mtglab users list`, printing to the maintainer's own
+terminal.
 
 ## Workflow
 

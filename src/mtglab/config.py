@@ -14,7 +14,7 @@ lists this as the first prerequisite for deploying anything.
 Both are read from the environment now, defaulting to exactly what they were,
 so local use is unchanged:
 
-    MTGLAB_DATA_DIR    default "data"    corpus, price history
+    MTGLAB_DATA_DIR    default "data"    corpus, price history, app.db
     MTGLAB_DECKS_DIR   default "decks"   deck.yaml source of truth
 
 Resolved once at import. Tests that need a different location should use
@@ -87,6 +87,7 @@ _drop_blank_credentials()
 DATA_DIR: Path
 DECKS_DIR: Path
 DB_PATH: Path
+APP_DB_PATH: Path
 
 
 def _read_env() -> tuple[Path, Path]:
@@ -95,12 +96,17 @@ def _read_env() -> tuple[Path, Path]:
 
 
 def _apply(data_dir: Path, decks_dir: Path) -> None:
-    global DATA_DIR, DECKS_DIR, DB_PATH
+    global DATA_DIR, DECKS_DIR, DB_PATH, APP_DB_PATH
     DATA_DIR = data_dir
     DECKS_DIR = decks_dir
     # Derived, never set independently -- that is the whole reason this lives
     # behind a function instead of three assignable globals.
     DB_PATH = data_dir / "mtg.duckdb"
+    # The second embedded database (ADR 4): SQLite, transactional, holding
+    # users and sessions. Beside the corpus on the same volume, but a different
+    # lifecycle -- the corpus is regenerable and gitignored, `app.db` is the
+    # irreplaceable half and the thing that gets backed up.
+    APP_DB_PATH = data_dir / "app.db"
 
 
 _apply(*_read_env())
@@ -129,6 +135,58 @@ def forge_home() -> Path:
     directory, which is the point: nothing under it may ever be tracked.
     """
     return Path(os.environ.get("MTGLAB_FORGE_HOME") or FORGE_HOME_DEFAULT)
+
+
+# --------------------------------------------------------------------- auth
+#
+# Functions rather than constants, for the reason `forge_home` is one: these
+# are read when something reaches for them, so a test or a container can change
+# the answer without reimporting the module.
+#
+# The default is **off**, and that is not laziness. `mtglab ui` is a local
+# single-user tool that a friend is meant to be able to clone and run; putting a
+# login in front of it would be a regression for the only way the app is used
+# today. The deployment turns it on (`MTGLAB_REQUIRE_AUTH=1` in `fly.toml`), and
+# `docs/HOSTING.md` §6 step 5 is explicit that the whole of the auth core is
+# testable locally with no deployment -- which it is, by flipping this.
+
+_TRUE = frozenset({"1", "true", "yes", "on"})
+
+
+def _flag(name: str, *, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in _TRUE
+
+
+def require_auth() -> bool:
+    """Whether every non-public route needs a session. `MTGLAB_REQUIRE_AUTH`."""
+    return _flag("MTGLAB_REQUIRE_AUTH")
+
+
+def secure_cookies() -> bool:
+    """Whether the session cookie carries `Secure`. `MTGLAB_SECURE_COOKIES`.
+
+    Defaults to whatever `require_auth()` says, because the two travel
+    together: auth on means deployed means TLS, auth off means
+    `http://127.0.0.1` where a `Secure` cookie is simply never sent back and
+    login appears to succeed and then not work. Overridable for the case that
+    breaks the correlation -- a local instance behind a real certificate.
+    """
+    return _flag("MTGLAB_SECURE_COOKIES", default=require_auth())
+
+
+def client_ip_header() -> str | None:
+    """Header naming the real client IP, if a trusted proxy sets one.
+
+    Unset by default, and deliberately so: rate limiting keyed on a header any
+    client can send is rate limiting an attacker opts out of by typing a
+    different number. Set this (`Fly-Client-IP`, `X-Forwarded-For`) only when a
+    proxy you control is guaranteed to overwrite it on the way in.
+    """
+    name = os.environ.get("MTGLAB_CLIENT_IP_HEADER", "").strip()
+    return name or None
 
 
 @contextmanager
