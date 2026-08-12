@@ -7,6 +7,35 @@ Status keys: **done** · **partial** · **not started**
 
 ---
 
+## The near-term TODO
+
+Decided 2026-08-12, in order. Everything below it in this file is the longer
+arc; this is what the next few sessions actually do.
+
+1. ~~**The best-practices and cleanup pass.**~~ Landed 2026-08-12: the API
+   catch-all refuses `/api` misses as JSON, dead code out, mode tool sets
+   enforced at dispatch, four-colour names in, `api/service.py` and
+   `api/simruns.py` strict under mypy, route-level code splitting (262 kB
+   entry, Recharts lazy), actions SHA-pinned with dependency review and
+   Dependabot, the mode prefix prompt-cached, version 0.2.0. Still open from
+   that pass, deliberately deferred: mutation testing, golden artifact
+   snapshots, Playwright/axe, SBOM and image signing, and making
+   `dependency review` a required check.
+2. **Manual UI testing** — a person driving the app end to end, not a suite.
+   Import a deck, edit rationales, run sims, exercise the auth gate with
+   `MTGLAB_REQUIRE_AUTH=1` (`.claude/launch.json` has the `mtglab-ui-auth`
+   entry), the claim page, the admin page, deck deletion.
+3. **Deploy** — [docs/HOSTING.md](docs/HOSTING.md) §7 is the checklist. What
+   remains is an account, a card, a DNS record and the seeding run: the Fly
+   app + volume, the Resend account and verified sending domain (start the
+   DNS early), `fly secrets`, seed the corpus and decks, then the refresh
+   runbook.
+4. **After deploy, next build work in order:** re-price automated PR review
+   (ENGINEERING §5, parked), the stance dial UI, then the remaining three
+   Claude modes (argue a slot, deck conversation, research).
+
+---
+
 ## 1. Analyse or generate decks with simulation
 
 | Sub-goal | Status | Where |
@@ -385,101 +414,40 @@ one deck's preferred card comes first would be overfitting to a sample of one.
 
 ### What the migration turned up
 
-Beyond the two bans, the gate and a corpus cross-check caught:
+Beyond the two bans, the gate and a corpus cross-check caught five errors in
+the source prose — a card name that does not exist (the real one was Sigarda's
+Aid), Arahbo's doubling described as an activation when it is a per-attacker
+trigger, a hand-counted curve off by a few cards per bucket, a claimed 67%
+T5 commander rate that sampling puts at 57.2%, and Kaheera's companion
+condition never checked by the gate at all (now enforced, below). Every one
+was a checkable fact that prose got wrong.
 
-- `Captain America's Aid` in the Arahbo list is not a card. The source's own
-  parenthetical, **Sigarda's Aid**, is the real name.
-- The Arahbo source describes the {1}{G}{W} doubling as something you activate
-  with spare mana. Oracle text is *"Whenever another Cat you control attacks,
-  you may pay {1}{G}{W}"* — a triggered ability, once per attacking Cat, so six
-  mana doubles two attackers. Neither of Arahbo's abilities can target himself.
-- The Arahbo source's curve (8/15/17/14/6/3, avg 3.06) was counted by hand and
-  is wrong. From the corpus it is **9/13/20/13/4/4, avg 3.03**.
-- The Arahbo source claims the commander is castable by T5 in 67% of games.
-  `sim mana` at 20,000 games says **57.2%**.
-- Kaheera's companion condition was **not checked by the gate** — verified by
-  hand at the time (all 27 creature cards are Cats). **Now fixed**, see below.
+### Companion and partner rules are enforced
 
-Every one of these was a checkable fact that prose got wrong, which is the
-same lesson as the section below.
+Condensed 2026-08-12 — the detail lives in `decks/companion.py`,
+`decks/partners.py` and their tests, which are the authority.
 
-### Companion restrictions are now enforced
+**Companions** (`decks/companion.py`): all 10 commander-legal companions'
+deckbuilding restrictions are checked — nine exactly, Zirda's
+activated-ability test as a heuristic that warns rather than blocks. The
+design rule worth keeping: **an unevaluated restriction warns loudly and is
+never reported as satisfied** — an unrecognised companion produces
+`companion-unchecked`, not a silent pass. Three printing-dependent companions
+(expansion symbols, retro frames) are deliberately unchecked; none is
+Commander-legal anyway. The companion is also checked for legality, colour
+identity, and not being listed in the 99, and "your starting deck" includes
+the commander — Arahbo is a Cat Avatar, so the cats list stays legal.
 
-`decks/companion.py` checks the deckbuilding restriction itself, not just that
-the named card has a Companion ability. All **10 commander-legal companions**
-are covered:
-
-| Companion | Restriction | Check |
-| --- | --- | --- |
-| Gyruda | even mana values | exact |
-| Obosh | odd mana values, lands exempt | exact |
-| Keruga | mana value 3+, lands exempt | exact |
-| Lurrus | permanents mana value 2 or less | exact |
-| Kaheera | creature types, read from her own oracle text | exact |
-| Jegantha | no repeated mana symbol in a cost | exact |
-| Lutri | nonland names all different | exact |
-| Umori | nonland cards share a card type | exact |
-| Yorion | deck size +20, wired into the size check | exact |
-| Zirda | permanents have an activated ability | **heuristic → warning** |
-
-Three further companions exist in the corpus and are *deliberately* reported as
-unchecked: Lutri, Pauper Otter; Treizeci, Sun of Serra; and The Companion of
-the Wilds. Their conditions reference expansion symbols, retro frames and
-specific sets — properties of a *printing*, not of an oracle card. None is
-legal in Commander, so none can legitimately appear anyway.
-
-The design rule: **an unevaluated restriction warns loudly and is never
-reported as satisfied.** An unrecognised companion produces
-`companion-unchecked` rather than a silent pass. Zirda's activated-ability test
-is a colon-plus-keyword heuristic, so it reports at warning level rather than
-blocking generation on a guess.
-
-The same pass closed three other holes the companion had: it was never checked
-for **Commander legality**, never checked for **colour identity** against the
-commander, and never checked for being **listed in the 99** as well. Also,
-`is_companion` now tests the `Companion —` ability marker rather than the mere
-presence of the word "companion", which appears in ordinary rules text.
-
-Note "your starting deck" includes your commander, so the commander is part of
-the check — Arahbo, Roar of the World is a Cat Avatar, so the cats list stays
-legal.
-
-### Two-commander pairings are enforced too
-
-`decks/partners.py` covers every way a deck can have two commanders. The gate
-previously assumed one, and was wrong about legal decks in three ways:
-
-- **A Background was rejected outright.** It is a `Legendary Enchantment —
-  Background` whose text never says it can be your commander, so Jaheira +
-  Raised by Giants failed with `not-a-commander`.
-- **Deck size was always 99.** Two commanders share the command zone, so the
-  deck holds **98**. Any legal partner deck failed `deck-size`. Note the
-  contrast with a companion, which is "effectively a 101st card" and therefore
-  does *not* change the deck size — commanders are inside the 100, companions
-  are not.
-
-**A rule I got wrong first time, recorded so nobody repeats it.** Battlebond
-printed ten *non-legendary* creatures with `Partner with` (Lore Weaver, Ley
-Weaver, Chakram Slinger and friends) for Two-Headed Giant limited. I assumed
-the ability granted commander eligibility the way "Choose a Background" does.
-It does not — the official ruling on those cards is blunt: *"A nonlegendary
-creature can't be your commander, even if it has a 'partner with' ability."*
-The gate now rejects them and says exactly that, because "does not say it can
-be your commander" reads like a data problem rather than a rule. The Background
-exemption is the only real one: it is legal despite not being a creature
-because "Choose a Background" makes it a second commander.
-
-Mechanics covered, all enumerated from the corpus: plain **Partner**, **Partner
-with `<name>`** (pairs only with that card), **Partner—`<label>`**, **Choose a
-Background** + **Background**, and **Doctor's companion** + a `Time Lord
-Doctor`. `Partner—<label>` is a generalised template and the corpus already
-carries four labels — Friends forever, Survivors, Character select, Father &
-son — so the check matches on the label rather than hardcoding one, and a new
-set adds labels for free.
-
-Also added: more than two commanders is an error, and an illegal pairing says
-precisely why ("Lore Weaver has Partner with Ley Weaver, so it can only pair
-with that card") rather than just refusing.
+**Two-commander pairings** (`decks/partners.py`): plain Partner, Partner
+with `<name>`, `Partner—<label>` (matched on the label, so new sets add
+labels for free), Choose a Background + Background, and Doctor's companion +
+a Time Lord Doctor — all enumerated from the corpus, with deck size correctly
+98 when two commanders share the zone (companions, by contrast, sit outside
+the 100). **One rule got wrong the first time and recorded so nobody repeats
+it:** Battlebond's non-legendary `Partner with` creatures do *not* gain
+commander eligibility — the official ruling is blunt about it — and the gate
+rejects them saying exactly that, because "does not say it can be your
+commander" reads like a data problem rather than a rule.
 
 ---
 
@@ -491,104 +459,37 @@ with that card") rather than just refusing.
 
 ## The deck lifecycle
 
-Planned 2026-08-11. Steps 1, 2, 3 and 5 shipped the same day; the create form
-is what is left. Design decisions live in
+**Complete as of 2026-08-11** — create (`POST /api/decks` and the New Deck
+page, which teaches the colour combinations on the way in), import, the
+surgical edits, promotion, deletion (confirm by typing the slug; moves to
+`decks/.trash/`), and export. Design decisions live in
 [ADR 12](docs/adr/0012-decks-are-edited-by-surgical-operations.md) (how a deck
 is edited) and [ADR 13](docs/adr/0013-an-imported-deck-is-a-draft.md) (what an
-imported deck is). This section is the order of work.
+imported deck is). The build notes below are kept for what they settled, not
+as a plan.
 
-### Where it stands
+### What the build settled, kept as findings
 
-| Path | Today | Wanted |
-| --- | --- | --- |
-| **Create** | copy `decks/_template/deck.yaml` by hand, or import a list with a commander and nothing else | a UI form; the machinery is import's |
-| **Import** | **done** — `mtglab decks import`, `POST /api/decks/import`, the Import page | — |
-| **Refactor** | **done** — add, remove, recategorise, requantify, rationalise and annotate, from the CLI or the deck page | — |
-| **Promote** | **done** — `mtglab decks promote`, `PATCH /api/decks/<slug>`, a button on the deck page once nothing is outstanding | — |
-| **Export** | `moxfield.txt`, one of the five artifacts | unchanged; it already works |
+Condensed 2026-08-12; the code and its tests are the authority.
 
-### Order, and why
-
-1. **Import.** ✅ **Done.** Highest value and it subsumes create — a new deck is
-   an import of an empty list plus a commander. It is also the only one of the
-   three that someone other than the maintainer needs on day one.
-
-   `decks/decklist.py` is the grammar: quantities, set codes and collector
-   numbers, `*CMDR*` and foil markers, Archidekt's `[Category]` annotations,
-   Deckstats' `//Section` headers and leading `[SET]` codes, and section
-   headers including card-type groupings. It is pure text → structure, so it
-   tests exhaustively without a database. A line it cannot read comes back with
-   its line number rather than vanishing.
-
-   `decks/importer.py` resolves those names through `db.get_cards` — which
-   already handles double-faced cards by face name — and writes the file.
-   Unknown names are kept **verbatim** and reported, so the deck stays the size
-   you pasted and the gate flags them as `unknown-card`; dropping them would
-   hand back a 96-card deck silently. Category is inferred only for lands,
-   because `is_land` is a corpus fact that is right about the double-faced
-   cards a type line is wrong about. A sideboard or maybeboard becomes the swap
-   board. Import refuses without a corpus rather than producing a deck whose
-   facts were never checked.
-
-   Two things it deliberately will not do: pick a commander when the list does
-   not name one (it reports the candidates, including the sideboard Moxfield
-   hides it in), and assume a card with a Companion ability is *this deck's*
-   companion.
-
-2. **The draft stage in the gate.** ✅ **Done.** `stage: draft | curated`,
-   defaulting to curated so the six existing decks are never demoted. In a
-   draft a missing `why` is a warning; in a curated deck it blocks. Promotion is
-   refused while any card is blank, and `decks build` refuses a draft outright —
-   not something `--force` overrides, because a draft is not *wrong*, it is
-   unfinished, and the way out is to write the rationales.
-
-   One thing changed shape in the building. A draft's missing rationales report
-   as **one counted warning**, not one per card: 99 identical warnings is the
-   wall ADR 13 set out to replace, and it buried the banned card the same run
-   was meant to surface. The per-card list lives in the deck file (a blank
-   `why:` on every line) and on the deck page.
-
-3. **The rest of the edit operations.** ✅ **Done.** `add_card`, `remove_card`,
-   `set_card_field`, `set_note`, each surgical and self-verifying per ADR 12,
-   reachable from `mtglab decks add|remove|set|note`, four endpoints, and the
-   deck page. Writing a rationale no longer means opening a text editor.
-
-   Two things came out of the building. **Every operation now proves itself
-   against an oracle**: it computes the document it ought to produce by mutating
-   the parse — an ordinary dict — and refuses to return text that does not read
-   back as exactly that. The naive parse-mutate-dump is used as the oracle it is
-   good at being while the text surgery does the writing, which is the same move
-   as [ADR 10](docs/adr/0010-correctness-against-independent-oracles.md). It
-   earned its keep immediately: it caught that removing the last card from a
-   list leaves `swap_board:` parsing as `None` rather than `[]`, which
-   `Deck.from_text` would have iterated.
-
-   And **insertion is category-aware**, because the deck files are grouped under
-   section banners (`# ---- RAMP 14`). Appending a land to the end of the list
-   would file it under whichever banner came last, so a new card goes after the
-   last entry already in its category, and the banners — with the blank lines
-   above them — are never inside any edit's reach.
-
-4. **A create path in the UI**, once import and edit both exist, since it is the
-   same machinery with an empty list.
-
-5. **Promotion.** ✅ **Done.** `set_deck_field` — a fifth operation, not in
-   ADR 12's original table — writes the deck's own scalars: `stage`, `status`
-   and `bracket`. `mtglab decks promote <slug>` is the ergonomic form, and the
-   deck page grows a button once nothing is outstanding.
-
-   **Promotion is refused before the write, not after it.** The gate would catch
-   a premature one either way — a curated deck reports one `missing-rationale`
-   per card — but refusing up front means the deck is never written into a state
-   its author has to undo, and the refusal names the cards still owing. That is
-   the same shape as refusing a swap with no rationale rather than writing one
-   and failing it afterwards.
-
-   Two details the real files forced. A trailing comment survives the edit:
-   `status: built  # built: the cards are sleeved up` is the author's note about
-   the vocabulary, not about the value. And a key the file does not have yet —
-   `stage` is absent from every deck written before ADR 13 — is inserted where
-   `Deck.dump` would put it rather than appended to the bottom.
+- **Import** (`decks/decklist.py` grammar, `decks/importer.py` resolution):
+  unknown names are kept verbatim and reported rather than dropped — dropping
+  them would hand back a 96-card deck silently. It refuses without a corpus,
+  and deliberately will not pick a commander the list did not name or assume
+  a Companion-ability card is *this deck's* companion.
+- **The draft stage**: a draft's missing rationales report as **one counted
+  warning**, not 99 — the per-card wall was burying the banned card the same
+  run was meant to surface. `decks build` refuses a draft outright, with no
+  `--force`, because a draft is not wrong, it is unfinished.
+- **The surgical edits** prove themselves against an oracle — the naive
+  parse-mutate-dump computes the document each edit ought to produce, and the
+  text surgery refuses to return anything that does not read back as exactly
+  that (the ADR 10 move; it immediately caught an empty `swap_board:` parsing
+  as `None`). Insertion is category-aware so a new card lands under its own
+  section banner.
+- **Promotion is refused before the write, not after it** — the deck is never
+  written into a state its author has to undo, and the refusal names the
+  cards still owing.
 
 ### The question this settles
 
@@ -842,7 +743,12 @@ stops guessing at searches.)
 Input dominates by 20:1, which is the shape to expect: tool results are large
 and answers are short. Two consequences worth carrying into the mode work —
 prompt caching is the lever that matters, and `get_deck` is the expensive tool,
-since it returns 99 cards with full oracle text.
+since it returns 99 cards with full oracle text. **The caching half landed
+2026-08-12:** `converse` puts a cache breakpoint on the system block, which
+caches the tools and system prompt together (the interview's prefix is ~1.5k
+tokens, above the model's cacheable minimum), and `Turn.cache_read_tokens`
+reports what the cache actually served — the number to watch, because a zero
+across repeated calls means the prefix is drifting.
 
 Two things to settle before it ships, both open decisions above: **what a hosted
 Claude surface costs and who pays**, and — for the simulator half — **whether
@@ -1177,9 +1083,12 @@ Forge.
   isolation test, all off unless `MTGLAB_REQUIRE_AUTH` is set. Cloudflare
   Access remains the recorded exit if the remaining half sprawls.
 
-**Not yet done:** there is no Dockerfile, no `fly.toml`, and no refresh cron.
-Nothing in the architecture blocks any of it — the API is a normal FastAPI app
-and the frontend is prebuilt static files served by it.
+**Done 2026-08-12:** the `Dockerfile`, `fly.toml`, `.dockerignore` and
+`docker-entrypoint.sh` are in the repository, CI builds and exercises the image
+on every PR, and the corpus-and-decks seeding run is documented in HOSTING §4
+step 6. A refresh cron deliberately does not exist — the refresh is monthly and
+by hand, for the volume-attachment reasons in ADR 6; the runbook is the one
+item §7 still lists as prose to write.
 
 **Auth's server side is finished as of 2026-08-12** — the core (step 5), the
 email half (step 5b: invites, password resets, tokens stored hashed and
