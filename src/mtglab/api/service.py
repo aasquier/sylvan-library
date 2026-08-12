@@ -14,9 +14,9 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from mtglab import config
+from mtglab import colors, config
 from mtglab.cards import db
-from mtglab.decks import decklist, edit, importer, suggest
+from mtglab.decks import decklist, edit, importer, partners, suggest
 from mtglab.decks.analyze import deck_stats
 from mtglab.decks.edit import EditFailed
 from mtglab.decks.importer import ImportRefused
@@ -326,6 +326,185 @@ def import_deck(*, text: str, slug: str, name: str = "",
         }
     finally:
         con.close()
+
+
+class CreateRejected(Exception):
+    """The deck was not created, and nothing was written."""
+
+
+def create_deck(*, slug: str, name: str = "", commander: list[str] | None = None,
+                companion: str = "", bracket: int | None = None,
+                status: str = "theoretical",
+                source: DeckSource | None = None) -> dict[str, Any]:
+    """Start a new deck from a commander and nothing else.
+
+    The last gap in the deck lifecycle. `import_deck` refuses an empty list --
+    correctly, since an import with no cards is a mistake -- so create is its
+    own path rather than an import of nothing.
+
+    What it will not do is exactly what import will not do: **it never picks a
+    commander for you**, and the deck arrives as a `draft` with no rationales,
+    because there is nothing yet to justify. The 99 gets filled in afterwards
+    by the edit operations that already exist.
+
+    Colour identity is deliberately *not* a parameter. It is derived from the
+    commander by rule 2, and accepting it here would create a second, weaker
+    source of truth for the one fact this project refuses to guess at. The
+    colour taxonomy is how a person *finds* a commander, not how a deck records
+    what it is.
+    """
+    # Checked here rather than via `_for_writing`, which raises `EditRejected`
+    # -- the wrong exception for a route that only catches `CreateRejected`,
+    # and the wrong words too: nothing is being edited, and the deck whose
+    # writability is in question does not exist yet. This matches what
+    # `import_deck` does, for the same reasons.
+    decks = _source(source)
+    if not decks.writable:
+        raise CreateRejected("this library is read-only")
+    commander = [c.strip() for c in (commander or []) if c.strip()]
+
+    slug = slug.strip().lower()
+    if not _SLUG.match(slug):
+        raise CreateRejected(
+            f"{slug!r} is not a usable slug -- lowercase letters, digits and "
+            "single hyphens, e.g. 'arahbo-cats'")
+    if slug in decks.slugs():
+        raise CreateRejected(
+            f"a deck called {slug!r} already exists; pick another slug")
+    if not commander:
+        raise CreateRejected("a new deck needs a commander")
+    if len(commander) > 2:
+        raise CreateRejected(
+            f"{len(commander)} commanders listed; Commander allows at most two")
+    if status not in DECK_STATUSES:
+        raise CreateRejected(
+            f"status {status!r} is not one of {', '.join(DECK_STATUSES)}")
+
+    con = _connect()
+    if con is None:
+        # Same refusal as import, for the same reason: a deck whose commander
+        # was never checked is a deck whose colour identity is a guess.
+        raise CreateRejected(
+            "creating a deck needs the card corpus -- run `mtglab data refresh`")
+    try:
+        names = [*commander] + ([companion] if companion else [])
+        found = db.get_cards(con, names)
+        missing = [n for n in names if n not in found]
+        if missing:
+            raise CreateRejected(
+                "not in the corpus: " + ", ".join(sorted(missing)))
+
+        paired = len(commander) == 2
+        for cmd in commander:
+            if not partners.can_be_commander(found[cmd], paired=paired):
+                raise CreateRejected(
+                    f"{found[cmd].name} cannot be your commander -- it is "
+                    f"{found[cmd].type_line}")
+        if paired:
+            # The same check the gate runs. Two commanders is not "any two
+            # legends" -- Partner, Partner with, Friends forever, Choose a
+            # Background and Doctor's companion each have their own rule.
+            why = partners.check_pair(found[commander[0]], found[commander[1]])
+            if why:
+                raise CreateRejected(why)
+
+        identity = frozenset().union(
+            *(found[c].color_identity for c in commander)) if commander else frozenset()
+
+        deck = Deck(
+            slug=slug,
+            name=name.strip() or found[commander[0]].name,
+            status=status,
+            stage="draft",
+            commander=commander,
+            companion=companion or None,
+            bracket=bracket,
+        )
+        decks.create(slug, deck.dump())
+
+        combo = colors.of(identity)
+        return {
+            "slug": slug,
+            "name": deck.name,
+            "stage": deck.stage,
+            "status": deck.status,
+            "created": True,
+            "commander": deck.commander,
+            "companion": deck.companion,
+            "color_identity": sorted(identity),
+            "combination": {"key": combo.key, "name": combo.name,
+                            "tier": combo.tier},
+            "total_cards": 0,
+        }
+    finally:
+        con.close()
+
+
+# ------------------------------------------------------------------- colours
+
+def color_taxonomy() -> dict[str, Any]:
+    """The 32 colour combinations, the five colours, and the three eras.
+
+    Pure reference data -- no corpus, no deck source, no network. It is the
+    vocabulary the create flow teaches, and it is the same table the 32 Deck
+    Challenge is scored against.
+    """
+    return {
+        "colors": [{"code": c.code, "name": c.name, "wants": c.wants,
+                    "fears": c.fears} for c in colors.COLORS],
+        "tiers": [{"key": t, "label": colors.TIER_LABELS[t]}
+                  for t in colors.TIERS],
+        "eras": [{"name": e.name, "setting": e.setting, "named": e.named,
+                  "story": e.story} for e in colors.ERAS],
+        "combinations": [{
+            "key": c.key,
+            "name": c.name,
+            "tier": c.tier,
+            "colors": list(c.colors),
+            "size": c.size,
+            "tagline": c.tagline,
+            "history": c.history,
+            "aliases": list(c.aliases),
+            "verified_by": c.verified_by,
+        } for c in colors.COMBINATIONS],
+    }
+
+
+def challenge_progress(*, source: DeckSource | None = None) -> dict[str, Any]:
+    """Which of the 32 slots the library has filled, and which are empty.
+
+    A deck's slot is `colors.of(its colour identity)`, and that identity comes
+    from the commander via the corpus -- so without one this reports the slots
+    as unknown rather than inventing them from the deck file.
+    """
+    decks = _source(source)
+    con = _connect()
+    filled: dict[str, list[dict[str, str]]] = {}
+    try:
+        for slug in decks.slugs():
+            deck = Deck.from_text(decks.read_text(slug), slug=slug)
+            if con is None or not deck.commander:
+                continue
+            found = db.get_cards(con, deck.commander)
+            recs = [found[c] for c in deck.commander if c in found]
+            if not recs:
+                continue
+            identity = frozenset().union(*(r.color_identity for r in recs))
+            key = colors.key_for(identity)
+            filled.setdefault(key, []).append({"slug": slug, "name": deck.name})
+    finally:
+        if con is not None:
+            con.close()
+
+    return {
+        "corpus": con is not None or bool(filled),
+        "filled": len(filled),
+        "total": len(colors.COMBINATIONS),
+        "slots": [{
+            "key": c.key, "name": c.name, "tier": c.tier,
+            "decks": filled.get(c.key, []),
+        } for c in colors.COMBINATIONS],
+    }
 
 
 class EditRejected(Exception):
@@ -753,12 +932,25 @@ def cards_named(*, names: list[str]) -> dict[str, Any]:
 
 def search_cards(*, q: str = "", identity: str = "", type_line: str = "",
                  cmc_max: float | None = None, price_max: float | None = None,
-                 sort: str = "edhrec", limit: int = 60) -> dict[str, Any]:
+                 sort: str = "edhrec", limit: int = 60,
+                 identity_exact: bool = False,
+                 commanders_only: bool = False) -> dict[str, Any]:
     """Corpus search: the 'deep hits from the whole history' tool.
 
     `identity` is a subset filter, not an exact match -- passing "BG" returns
     every card legal in a Golgari deck, which includes colorless and mono
     cards. That is the question a deckbuilder actually asks.
+
+    `identity_exact` flips it, and the create flow needs the flip. Choosing
+    Selesnya and being offered mono-white legends is not wrong -- they are
+    legal in a Selesnya deck -- but a deck led by one *is* a mono-white deck,
+    so it fills a different slot in the 32. When the question is "which
+    commander makes this combination", only an exact match answers it.
+
+    `commanders_only` filters to cards that may actually lead a deck, using
+    the same `partners.can_be_commander` the gate uses rather than a type-line
+    guess -- which matters for the cards that are legal commanders without
+    being Legendary Creatures.
     """
     con = _connect()
     if con is None:
@@ -768,17 +960,33 @@ def search_cards(*, q: str = "", identity: str = "", type_line: str = "",
         where = ["json_extract_string(legalities, 'commander') = 'legal'"]
         params: list[Any] = []
 
-        if identity:
+        if identity or identity_exact:
             allowed = [c for c in identity.upper() if c in "WUBRG"]
             listed = ", ".join(f"'{c}'" for c in allowed) or "''"
             where.append(
                 f"len(list_filter(color_identity, x -> x NOT IN ({listed}))) = 0")
+            if identity_exact:
+                # Subset plus the right size is set equality, and it lets the
+                # colourless slot work: an empty identity with length 0.
+                where.append(f"len(color_identity) = {len(allowed)}")
         if q:
             where.append("(name ILIKE ? OR oracle_text ILIKE ?)")
             params += [f"%{q}%", f"%{q}%"]
         if type_line:
             where.append("type_line ILIKE ?")
             params.append(f"%{type_line}%")
+        if commanders_only:
+            # A *superset* of `partners.can_be_commander`, pushed into SQL so
+            # that LIMIT counts candidates rather than counting spells that are
+            # about to be discarded. Without it the filter runs after the
+            # limit, and a search for Selesnya commanders returns the sixty
+            # best Selesnya cards, none of which is a commander, and then
+            # nothing at all. The authoritative check still runs in Python
+            # below -- this only narrows what the database hands over, and it
+            # is deliberately loose (a card whose *back* face is a legendary
+            # creature matches here and is rejected there).
+            where.append("(type_line ILIKE '%Legendary%Creature%'"
+                         " OR oracle_text ILIKE '%can be your commander%')")
         if cmc_max is not None:
             where.append("cmc <= ?")
             params.append(cmc_max)
@@ -811,6 +1019,14 @@ def search_cards(*, q: str = "", identity: str = "", type_line: str = "",
         if price_max is not None:
             cards = [c for c in cards
                      if c["price_usd"] is not None and c["price_usd"] <= price_max]
+        if commanders_only:
+            # Applied after the query rather than in SQL, because the rule is
+            # `partners.can_be_commander` and that reads oracle text as well as
+            # the type line. One implementation of the rule, not two.
+            keep = db.get_cards(con, [c["name"] for c in cards])
+            cards = [c for c in cards
+                     if c["name"] in keep
+                     and partners.can_be_commander(keep[c["name"]])]
         return {"cards": cards, "total": len(cards)}
     finally:
         con.close()

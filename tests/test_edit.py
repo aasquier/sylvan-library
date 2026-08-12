@@ -666,3 +666,24 @@ def test_a_deck_the_editor_cannot_read_is_refused_rather_than_guessed():
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+def test_an_empty_deck_cannot_promote_itself_to_curated():
+    """"Every card is justified" is vacuously true of no cards.
+
+    The blank-`why` guard passes an empty deck, so without this it promotes
+    cleanly and claims the thinking is done about a deck that has none. It was
+    unreachable until the create flow could make an empty deck; it is reachable
+    now.
+    """
+    text = (
+        "slug: brand-new\n"
+        "name: Brand New\n"
+        "status: theoretical\n"
+        "stage: draft\n"
+        "commander:\n"
+        "  - Gyome, Master Chef\n"
+        "cards: []\n"
+    )
+    with pytest.raises(EditFailed, match="no cards yet"):
+        set_deck_field(text, field="stage", value="curated")

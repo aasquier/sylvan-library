@@ -303,6 +303,60 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return send<T>('POST', path, body)
 }
 
+/** One of the 32 colour combinations. Mirrors `mtglab.colors.Combination`. */
+export interface Combination {
+  /** Canonical WUBRG-ordered key, or "C" for colourless. */
+  key: string
+  name: string
+  /** colorless | mono | guild | shard | wedge | quad | five */
+  tier: string
+  colors: string[]
+  size: number
+  tagline: string
+  history: string
+  /**
+   * The other naming convention. Scryfall's Commander 2016 names are primary
+   * and EDHREC's Nephilim are the aliases — they describe identical colour
+   * sets, and someone arriving from EDHREC needs to find the slot they came
+   * for.
+   */
+  aliases: string[]
+  /** A real card whose Scryfall colour identity proves this row. */
+  verified_by: string
+}
+
+export interface ColorTaxonomy {
+  colors: { code: string; name: string; wants: string; fears: string }[]
+  tiers: { key: string; label: string }[]
+  eras: { name: string; setting: string; named: string; story: string }[]
+  combinations: Combination[]
+}
+
+export interface ChallengeProgress {
+  corpus: boolean
+  filled: number
+  total: number
+  slots: {
+    key: string
+    name: string
+    tier: string
+    decks: { slug: string; name: string }[]
+  }[]
+}
+
+export interface CreateResult {
+  slug: string
+  name: string
+  stage: string
+  status: string
+  created: boolean
+  commander: string[]
+  companion: string | null
+  color_identity: string[]
+  combination: { key: string; name: string; tier: string }
+  total_cards: number
+}
+
 export const api = {
   health: () => get<Health>('/api/health'),
   decks: () => get<DeckSummary[]>('/api/decks'),
@@ -353,6 +407,21 @@ export const api = {
     status?: string
     dry_run?: boolean
   }) => post<ImportResult>('/api/decks/import', body),
+  // The 32 combinations and their history. No corpus, no decks, no network —
+  // so the first screen of the create flow renders on a fresh clone.
+  colors: () => get<ColorTaxonomy>('/api/colors'),
+  challengeProgress: () => get<ChallengeProgress>('/api/colors/progress'),
+  // Start a deck from a commander and nothing else. There is no colour field:
+  // identity is derived from the commander, and a second source for it would
+  // be a second thing to be wrong.
+  createDeck: (body: {
+    slug: string
+    commander: string[]
+    name?: string
+    companion?: string
+    bracket?: number | null
+    status?: string
+  }) => post<CreateResult>('/api/decks', body),
   simMana: (payload: Record<string, unknown>) => post<Job>('/api/sim/mana', payload),
   simLands: (payload: Record<string, unknown>) => post<Job>('/api/sim/lands', payload),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),
