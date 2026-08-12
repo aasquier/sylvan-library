@@ -18,7 +18,7 @@ export const COLOR_VAR: Record<string, string> = {
   C: 'var(--mtg-c)',
 }
 
-/** Colour-pair names players actually use. */
+/** Colour-combination names players actually use. */
 const GUILDS: Record<string, string> = {
   WU: 'Azorius',
   UB: 'Dimir',
@@ -40,6 +40,14 @@ const GUILDS: Record<string, string> = {
   BGU: 'Sultai',
   RWB: 'Mardu',
   GUR: 'Temur',
+  // Four-colour: the Nephilim convention, keyed by the missing colour. Each
+  // name's identity is verified against the corpus (the Nephilim are cards),
+  // not recalled -- see the pinning test.
+  WUBR: 'Yore-Tiller',
+  UBRG: 'Glint-Eye',
+  WBRG: 'Dune-Brood',
+  WURG: 'Ink-Treader',
+  WUBG: 'Witch-Maw',
   WUBRG: 'Five-colour',
 }
 

@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+import mtglab
 from mtglab import config
 from mtglab.api import admin, auth, jobs, service
 from mtglab.api.deps import Scope, UserScope, deck_source
@@ -70,7 +71,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         bootstrap.ensure_maintainer()
         yield
 
-    app = FastAPI(title="sylvan-library", version="0.1.0",
+    app = FastAPI(title="sylvan-library", version=mtglab.__version__,
                   description="Local Commander deckbuilding and simulation.",
                   lifespan=startup)
 
@@ -477,9 +478,15 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         def spa(full_path: str):
             """Serve the built app, letting the client router own real paths.
 
-            Anything under /api has already matched above, so a miss here is a
-            frontend route, not a missing endpoint.
+            A miss under /api lands here too -- FastAPI falls through to the
+            catch-all rather than 404ing on the prefix -- and it must be
+            refused as JSON, not served the shell. A client that mistypes an
+            endpoint should get an error it can read, never a 200 carrying a
+            web page.
             """
+            if full_path == "api" or full_path.startswith("api/"):
+                raise HTTPException(status_code=404,
+                                    detail=f"no such endpoint: /{full_path}")
             candidate = WEB_DIST / full_path
             if full_path and candidate.is_file():
                 return FileResponse(candidate)

@@ -48,7 +48,7 @@ from mtglab.decks.model import Deck
 from mtglab.decks.source import DeckSource
 from mtglab.sim import cache
 from mtglab.sim.compile import compile_deck
-from mtglab.sim.tier1.engine import KeepRule, SimCard, run, simulate_game
+from mtglab.sim.tier1.engine import KeepRule, SimCard, run
 
 TIER1_CAVEAT = (
     "Tier 1 shuffles, draws and pays costs. It does not model opponents, "
@@ -385,21 +385,3 @@ def plan_lands(slug: str, payload: dict[str, Any],
                                         turns, keep, seed, progress))
 
 
-def goldfish_one(slug: str, seed: int | None = None,
-                 *, source: DeckSource | None = None) -> dict[str, Any]:
-    """A single game, for the playtest screen. Cheap enough to run inline.
-
-    Deliberately uncached: one game is a millisecond, and the screen's whole
-    purpose is a fresh draw each time somebody presses the button.
-    """
-    import random
-    _deck, library, commander = _compile(slug, source=source)
-    res = simulate_game(library, commander, turns=12,
-                        rng=random.Random(seed))
-    return {
-        "commander_turn": res.commander_turn,
-        "mulligans": res.mulligans,
-        "lands_by_turn": res.lands_by_turn,
-        "mana_by_turn": res.mana_by_turn,
-        "spells_by_turn": res.spells_by_turn,
-    }

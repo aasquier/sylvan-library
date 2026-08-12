@@ -100,6 +100,31 @@ def test_the_search_tool_says_it_is_not_a_lookup():
 
 # ----------------------------------------------------------------- dispatch
 
+def test_run_refuses_a_registered_tool_outside_the_allowed_set(source):
+    """`allowed` is how a mode's tool set binds at dispatch, not only in the
+    schemas it advertises. The refusal must name the caller's own tools, so a
+    model that asked for the wrong one can recover by asking differently."""
+    with pytest.raises(tools.ToolNotAllowed) as err:
+        tools.run("search_cards", {"text": "ramp"},
+                  allowed=("get_deck", "get_cards"))
+    assert "not offered by this mode" in str(err.value)
+    assert "get_cards" in str(err.value)
+
+
+def test_run_with_no_allowed_set_is_the_whole_registry(source):
+    """None means an unrestricted caller (the CLI), not an empty set."""
+    result = tools.run("list_decks", source=source, allowed=None)
+    assert [d["slug"] for d in result] == ["mini"]
+
+
+def test_run_still_refuses_an_unregistered_tool_first():
+    """A write function is refused as nonexistent even if a buggy caller were
+    to list it as allowed -- the registry check comes first."""
+    with pytest.raises(tools.ToolNotAllowed) as err:
+        tools.run("set_card_field", {}, allowed=("set_card_field",))
+    assert "read-only" in str(err.value)
+
+
 def test_list_decks_runs_against_the_given_source(source):
     result = tools.run("list_decks", source=source)
     assert [d["slug"] for d in result] == ["mini"]

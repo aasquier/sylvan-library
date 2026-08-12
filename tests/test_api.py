@@ -135,6 +135,27 @@ def test_deck_detail_has_every_card_with_its_why(client):
     assert all(c["why"] for c in body["cards"]), "a card lost its rationale"
 
 
+def test_a_mistyped_api_path_is_a_json_404_not_the_shell(client):
+    """The SPA catch-all must refuse /api/* misses. Before this was pinned, a
+    mistyped endpoint returned 200 with text/html -- a *success* carrying a
+    web page, which is the silent-wrong-answer shape this project is written
+    against."""
+    for path in ("/api/no-such-endpoint", "/api"):
+        resp = client.get(path)
+        assert resp.status_code == 404, path
+        assert resp.headers["content-type"].startswith("application/json"), path
+        assert "no such endpoint" in resp.json()["detail"]
+
+
+def test_frontend_routes_still_get_the_shell(client):
+    """The refusal above must not overreach: an SPA route is the shell's to
+    serve, and so is the root."""
+    for path in ("/", "/decks/gyome-food", "/apiary"):
+        resp = client.get(path)
+        assert resp.status_code == 200, path
+        assert resp.headers["content-type"].startswith("text/html"), path
+
+
 def test_missing_deck_is_a_404_not_a_500(client):
     resp = client.get("/api/decks/does-not-exist")
     assert resp.status_code == 404

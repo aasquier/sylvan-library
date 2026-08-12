@@ -284,19 +284,30 @@ def schemas(names: tuple[str, ...] | None = None) -> list[dict[str, Any]]:
 
 
 def run(name: str, arguments: dict[str, Any] | None = None, *,
-        source: DeckSource | None = None) -> Any:
+        source: DeckSource | None = None,
+        allowed: tuple[str, ...] | None = None) -> Any:
     """Execute one tool call from a model response.
 
     The allowlist check happens here, on the name the model actually sent,
     rather than being assumed from what was advertised in `tools`. A model can
     ask for anything; this function is what decides that asking for
     `set_card_field` gets a refusal instead of a write.
+
+    `allowed` narrows dispatch to a mode's declared tool set, so "a mode is a
+    tool set" (ADR 15) holds at the door and not only in the advertisement. A
+    registered tool the mode did not offer is refused exactly like an
+    unregistered one; None means the whole read-only registry, which is what
+    direct callers such as the CLI get.
     """
     tool = READ_ONLY.get(name)
     if tool is None:
         raise ToolNotAllowed(
             f"{name!r} is not an available tool. This surface is read-only: "
             f"available tools are {', '.join(sorted(READ_ONLY))}.")
+    if allowed is not None and name not in allowed:
+        raise ToolNotAllowed(
+            f"{name!r} is not offered by this mode. Its tools are "
+            f"{', '.join(sorted(allowed))}.")
 
     args = dict(arguments or {})
     unknown = sorted(set(args) - set(tool.properties))
