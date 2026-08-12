@@ -227,7 +227,28 @@ export default function DeckDetail() {
                background: 'color-mix(in srgb, var(--status-warning) 12%, transparent)',
                border: '1px solid color-mix(in srgb, var(--status-warning) 40%, transparent)',
              }}>
-          {deck.needs_rationale > 0 ? (
+          {deck.cards.length === 0 ? (
+            <>
+              {/* A brand-new deck from the create flow. Without this branch it
+                  falls into "every card carries a rationale, nothing is
+                  outstanding" and offers promotion — vacuously true of a deck
+                  with no cards, and the server now refuses it. Say what is
+                  actually true instead. */}
+              <strong>Draft — this deck is empty.</strong>{' '}
+              <span style={{ color: 'var(--text-secondary)' }}>
+                Its commander and colour identity are set. Add the 99 next, from
+                a decklist or a card at a time; each card will want a reason for
+                its slot before this can become curated.
+              </span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Link to="/import"
+                      className="rounded-lg px-3 py-1.5 text-xs font-medium"
+                      style={{ background: 'var(--gridline)', color: 'var(--text-primary)' }}>
+                  Paste a decklist
+                </Link>
+              </div>
+            </>
+          ) : deck.needs_rationale > 0 ? (
             <>
               <strong>
                 Draft — {deck.needs_rationale} of {deck.cards.length} cards still

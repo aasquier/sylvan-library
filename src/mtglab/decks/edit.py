@@ -679,7 +679,18 @@ def set_deck_field(text: str, *, field: str, value: Any) -> str:
                 f"{field} must be one of {', '.join(allowed)}, not {value!r}")
 
     if field == "stage" and value == "curated":
-        blank = [str(c.get("name", "?")) for c in doc.get("cards") or []
+        cards = doc.get("cards") or []
+        if not cards:
+            # Vacuously true is not true enough. "Every card is justified" is
+            # trivially satisfied by a deck with no cards, so the blank-`why`
+            # check below passes and an empty deck promotes itself to curated
+            # -- a claim that the thinking is done about a deck that does not
+            # exist yet. Unreachable until the create flow could make an empty
+            # deck; reachable now, so it is refused here.
+            raise EditFailed(
+                "this deck has no cards yet, so there is nothing to have "
+                "justified; add the 99 before promoting it to curated")
+        blank = [str(c.get("name", "?")) for c in cards
                  if isinstance(c, dict) and not str(c.get("why") or "").strip()]
         if blank:
             shown = ", ".join(blank[:6])

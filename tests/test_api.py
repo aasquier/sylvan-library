@@ -876,3 +876,113 @@ def test_job_progress_is_reported(client):
     assert body["status"] == "done"
     assert body["percent"] == 100
     assert client.get("/api/jobs").json()[0]["id"] == job.id
+
+
+# ---------------------------------------------------------------- colours
+
+def test_colors_needs_no_corpus_and_no_decks(client):
+    """The one deck-facing page that works on a fresh clone.
+
+    Nothing here touches DuckDB, the deck source or the network, which is what
+    makes the create flow's first screen safe to show before `data refresh`
+    has ever run.
+    """
+    body = client.get("/api/colors").json()
+    assert len(body["combinations"]) == 32
+    assert [c["code"] for c in body["colors"]] == list("WUBRG")
+    assert {e["name"] for e in body["eras"]} == {"Ravnica", "Alara", "Tarkir"}
+    selesnya = next(c for c in body["combinations"] if c["key"] == "WG")
+    assert selesnya["name"] == "Selesnya"
+    assert selesnya["tier"] == "guild"
+
+
+def test_four_colour_slots_expose_both_naming_conventions(client):
+    """Scryfall's name is primary, EDHREC's Nephilim is the alias -- someone
+    arriving from EDHREC has to find the slot they came for."""
+    body = client.get("/api/colors").json()
+    quad = next(c for c in body["combinations"] if c["key"] == "WUBR")
+    assert quad["name"] == "Artifice"
+    assert quad["aliases"] == ["Yore-Tiller"]
+
+
+def test_challenge_progress_counts_filled_slots(in_memory_client):
+    with in_memory_client([Deck.load(Path("decks/gyome-food/deck.yaml"))]) as c:
+        body = c.get("/api/colors/progress").json()
+    assert body["total"] == 32
+    assert len(body["slots"]) == 32
+    # Gyome is Golgari. Without a corpus the identity cannot be derived at all,
+    # so the assertion is conditional -- the same tolerance the rest of this
+    # file has for a fresh clone.
+    golgari = next(s for s in body["slots"] if s["key"] == "BG")
+    if body["filled"]:
+        assert [d["slug"] for d in golgari["decks"]] == ["gyome-food"]
+
+
+# ----------------------------------------------------------------- create
+
+def test_create_makes_a_draft_from_a_commander(in_memory_client):
+    if not config.DB_PATH.exists():
+        pytest.skip("creating a deck needs the corpus")
+    with in_memory_client([]) as c:
+        body = c.post("/api/decks", json={
+            "slug": "brand-new", "commander": ["Gyome, Master Chef"]}).json()
+    assert body["created"] is True
+    # A new deck owes its rationales, so it starts as a draft -- ADR 13.
+    assert body["stage"] == "draft"
+    assert body["total_cards"] == 0
+    assert body["color_identity"] == ["B", "G"]
+    assert body["combination"]["name"] == "Golgari"
+
+
+def test_create_refuses_a_card_that_cannot_lead_a_deck(in_memory_client):
+    if not config.DB_PATH.exists():
+        pytest.skip("creating a deck needs the corpus")
+    with in_memory_client([]) as c:
+        r = c.post("/api/decks", json={"slug": "nope", "commander": ["Sol Ring"]})
+    assert r.status_code == 422
+    assert "cannot be your commander" in r.json()["detail"]
+
+
+def test_create_refuses_a_deck_with_no_commander(in_memory_client):
+    with in_memory_client([]) as c:
+        r = c.post("/api/decks", json={"slug": "nope", "commander": []})
+    assert r.status_code == 422
+    assert "needs a commander" in r.json()["detail"]
+
+
+def test_create_refuses_a_duplicate_slug(in_memory_client):
+    if not config.DB_PATH.exists():
+        pytest.skip("creating a deck needs the corpus")
+    existing = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    with in_memory_client([existing]) as c:
+        r = c.post("/api/decks", json={
+            "slug": "gyome-food", "commander": ["Gyome, Master Chef"]})
+    assert r.status_code == 422
+    assert "already exists" in r.json()["detail"]
+
+
+def test_create_is_refused_on_a_read_only_library():
+    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    app = create_app()
+    app.dependency_overrides[deck_source] = \
+        lambda: MemoryDeckSource([deck], writable=False)
+    with TestClient(app) as client:
+        r = client.post("/api/decks", json={
+            "slug": "nope", "commander": ["Gyome, Master Chef"]})
+    assert r.status_code == 422
+
+
+def test_commander_search_is_exact_and_returns_actual_commanders(client):
+    """The bug this pins: `commanders_only` used to filter after the SQL
+    limit, so a search for Selesnya commanders returned the sixty best
+    Selesnya cards, none of which was a commander, and then nothing."""
+    if not config.DB_PATH.exists():
+        pytest.skip("card search needs the corpus")
+    cards = client.get("/api/cards/search", params={
+        "identity": "WG", "identity_exact": True,
+        "commanders_only": True, "limit": 10}).json()["cards"]
+    assert cards, "a search for Selesnya commanders must return some"
+    for card in cards:
+        assert set(card["color_identity"]) == {"W", "G"}, card["name"]
+        assert "Legendary" in card["type_line"] or \
+               "can be your commander" in (card["oracle_text"] or "").lower()

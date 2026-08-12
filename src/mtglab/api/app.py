@@ -101,6 +101,38 @@ def create_app(*, dev: bool = False) -> FastAPI:
         except service.ImportRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    @app.post("/api/decks")
+    def create_deck(payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
+        """Start a new deck from a commander and nothing else.
+
+        The last gap in the deck lifecycle. Like the import route it is
+        declared before `/api/decks/{slug}`, and like that route it is a POST
+        against a GET, so the two cannot collide.
+
+        There is no `color_identity` field on purpose: identity is derived from
+        the commander (rule 2), and accepting one here would be a second source
+        of truth for the one fact this project will not guess at.
+        """
+        commander = payload.get("commander") or []
+        if isinstance(commander, str):
+            commander = [commander]
+        bracket = payload.get("bracket")
+        try:
+            return service.create_deck(
+                slug=str(payload.get("slug", "")),
+                name=str(payload.get("name", "")),
+                commander=[str(c) for c in commander],
+                companion=str(payload.get("companion") or ""),
+                bracket=int(bracket) if bracket not in (None, "") else None,
+                status=str(payload.get("status") or "theoretical"),
+                source=decks,
+            )
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422,
+                                detail=f"bracket must be a number: {exc}") from exc
+        except service.CreateRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     @app.get("/api/decks/{slug}")
     def get_deck(slug: str, decks: Decks) -> dict[str, Any]:
         return service.get_deck(slug, source=decks)
@@ -225,10 +257,31 @@ def create_app(*, dev: bool = False) -> FastAPI:
         price_max: float | None = None,
         sort: str = "edhrec",
         limit: int = Query(60, ge=1, le=200),
+        identity_exact: bool = False,
+        commanders_only: bool = False,
     ) -> dict[str, Any]:
         return service.search_cards(q=q, identity=identity, type_line=type_line,
                                     cmc_max=cmc_max, price_max=price_max,
-                                    sort=sort, limit=limit)
+                                    sort=sort, limit=limit,
+                                    identity_exact=identity_exact,
+                                    commanders_only=commanders_only)
+
+    # ---------------------------------------------------------- colours
+
+    @app.get("/api/colors")
+    def color_taxonomy() -> dict[str, Any]:
+        """The 32 combinations, the five colours and the three eras.
+
+        No corpus, no deck source, no network -- so this is the one deck-facing
+        page that works on a fresh clone before `data refresh` has ever run.
+        """
+        return service.color_taxonomy()
+
+    @app.get("/api/colors/progress")
+    def challenge_progress(decks: Decks) -> dict[str, Any]:
+        """Which of the 32 slots the library has filled. The 32 Deck
+        Challenge, scored against the same table."""
+        return service.challenge_progress(source=decks)
 
     # -------------------------------------------------------------- sim
 
