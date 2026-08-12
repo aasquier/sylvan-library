@@ -17,6 +17,15 @@
       "port": 8766
     },
     {
+      "name": "mtglab-ui-auth",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "MTGLAB_DATA_DIR=${TMPDIR:-/tmp}/mtglab-auth-demo MTGLAB_REQUIRE_AUTH=1 MTGLAB_BASE_URL=http://127.0.0.1:8767 .venv/bin/mtglab ui --no-open --port 8767"
+      ],
+      "port": 8767
+    },
+    {
       "name": "mtglab-ui-empty-library",
       "runtimeExecutable": "bash",
       "runtimeArgs": [

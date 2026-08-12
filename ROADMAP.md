@@ -1192,14 +1192,19 @@ fourth classification checked against the prefix in both directions, and
 standing requirement is a property rather than a setup step. The core also now
 refuses to demote or disable the last admin who can sign in.
 
-**What is left is one browser-side item**, and it is in `docs/HOSTING.md` §6
-step 5c:
-
-- **A login screen**, plus the claim page the emailed link lands on. The API is
-  finished; nothing in the frontend has been touched for it, so turning auth on
-  today gives you an SPA that loads and 401s on every fetch — the Accounts page
-  included, which is the odd position of a finished admin surface behind a door
-  nobody can open.
+**The browser side landed the same day** (step 5c), so nothing code-side is
+left between here and a deployment with auth on. The login screen and the claim
+page are `web/src/routes/Login.tsx` and `Claim.tsx`, and the decision that
+shaped both is in `App.tsx`: auth is a **gate** that replaces the whole shell
+rather than a route beside the others, mirroring a server that refuses
+everything outside `PUBLIC_PATHS` before routing. With auth off the gate is
+never reached and the app is exactly what it was — no login, no sign-out
+button, nothing — which is what `auth_required` and `authenticated` being two
+fields has been for since the auth core. A 401 from any fetch is handled once,
+in `lib/api.ts`, for the same reason the server's check is middleware. The
+claim page reads `location.hash` and never the query string, and does not sign
+anybody in; it hands the username to the login form, which is all
+`POST /api/auth/claim` gives it.
 
 The `mtglab users` CLI stays now that the admin UI has shipped rather than being
 replaced by it: it is the bootstrap path — the first account on a fresh
