@@ -261,6 +261,23 @@ export class ApiError extends Error {
   }
 }
 
+/** The message to show for a caught value.
+ *
+ * Every `catch` in the app wanted this and each wrote `catch (e: any)` with
+ * `String(e.message ?? e)` inline. `any` on a catch binding switches off
+ * `useUnknownInCatchVariables` for that clause, so `e.message` was unchecked
+ * property access on six paths -- and `throw "a string"` anywhere upstream
+ * would have produced the literal text `undefined` on screen.
+ *
+ * Everything this app throws is an `Error` (`ApiError` extends it, and the
+ * job poller rejects with one), so the narrowing is exact rather than
+ * defensive; the `String` fallback is only there for what a third party might
+ * throw.
+ */
+export function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e)
+}
+
 async function get<T>(path: string): Promise<T> {
   const resp = await fetch(path)
   if (!resp.ok) {

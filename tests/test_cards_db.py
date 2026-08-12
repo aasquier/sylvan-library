@@ -146,7 +146,7 @@ ROWS = [
 
 @pytest.fixture
 def con():
-    duckdb = pytest.importorskip("duckdb")
+    import duckdb
     c = duckdb.connect(":memory:")
     c.execute(SCHEMA)
     for oid, name, cost, type_line, identity in ROWS:
@@ -286,7 +286,6 @@ def _jsonl(tmp: Path, rows) -> Path:
 def test_connect_creates_the_schema_on_a_fresh_file(tmp_path):
     """A first run has no database at all; connect() must build one rather
     than fail on a missing table."""
-    pytest.importorskip("duckdb")
     from mtglab.cards.db import connect
     con = connect(tmp_path / "nested" / "mtg.duckdb")
     try:
@@ -297,7 +296,6 @@ def test_connect_creates_the_schema_on_a_fresh_file(tmp_path):
 
 
 def test_load_oracle_ingests_and_is_queryable(tmp_path):
-    pytest.importorskip("duckdb")
     from mtglab.cards.db import connect, load_oracle
     con = connect(tmp_path / "mtg.duckdb")
     try:
@@ -315,7 +313,6 @@ def test_load_oracle_ingests_and_is_queryable(tmp_path):
 def test_load_oracle_preserves_layout_so_is_land_stays_correct(tmp_path):
     """The regression path for the 37-vs-35 land bug: if layout is dropped on
     ingest, a transforming permanent with a land back reads as a land again."""
-    pytest.importorskip("duckdb")
     from mtglab.cards.db import connect, load_oracle
     con = connect(tmp_path / "mtg.duckdb")
     try:
@@ -331,7 +328,6 @@ def test_load_oracle_preserves_layout_so_is_land_stays_correct(tmp_path):
 
 def test_load_oracle_is_idempotent(tmp_path):
     """`data refresh` is run repeatedly; loading twice must not double rows."""
-    pytest.importorskip("duckdb")
     from mtglab.cards.db import connect, load_oracle
     con = connect(tmp_path / "mtg.duckdb")
     try:
@@ -406,7 +402,6 @@ DFC_FIXTURE = [
 
 @pytest.fixture
 def stats_con(tmp_path):
-    pytest.importorskip("duckdb")
     from mtglab.cards.db import connect, load_oracle
     con = connect(tmp_path / "mtg.duckdb")
     load_oracle(con, _jsonl(tmp_path, DFC_FIXTURE))
@@ -486,7 +481,7 @@ CREATE TABLE oracle_cards (
 
 @pytest.fixture
 def old_con():
-    duckdb = pytest.importorskip("duckdb")
+    import duckdb
     c = duckdb.connect(":memory:")
     c.execute(OLD_SCHEMA)
     c.execute(
@@ -523,7 +518,8 @@ def test_an_old_corpus_reports_itself_stale(old_con):
 def test_connect_migrates_an_old_database_in_place(tmp_path):
     """A writable handle can fix itself, and must: `CREATE TABLE IF NOT EXISTS`
     does nothing to a table that already exists."""
-    duckdb = pytest.importorskip("duckdb")
+    import duckdb
+
     from mtglab.cards.db import connect, oracle_columns
     path = tmp_path / "old.duckdb"
     c = duckdb.connect(str(path))
@@ -544,7 +540,6 @@ def test_a_current_corpus_is_not_stale(stats_con):
 
 def test_an_empty_corpus_is_not_stale(tmp_path):
     """Nothing to be wrong about, and `health()` already says it is missing."""
-    pytest.importorskip("duckdb")
     from mtglab.cards.db import connect, corpus_is_stale
     con = connect(tmp_path / "empty.duckdb")
     try:

@@ -134,7 +134,7 @@ def _match(a: Any, pa: Pairing | None, b: Any, pb: Pairing | None) -> bool:
     if pa.kind == LABELED:
         return pb is not None and pb.kind == LABELED and pb.label.lower() == pa.label.lower()
     if pa.kind == PARTNER_WITH:
-        return pa.partner_name.lower() == b.name.lower()
+        return bool(pa.partner_name.lower() == b.name.lower())
     if pa.kind == BACKGROUND_CHOOSER:
         return is_background(b)
     if pa.kind == DOCTORS_COMPANION:

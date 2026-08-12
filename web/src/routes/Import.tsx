@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, type ImportResult } from '../lib/api'
+import { api, errorMessage, type ImportResult } from '../lib/api'
 import { Badge, ErrorNote, ManaText, Spinner, TextField } from '../components/ui'
 
 /**
@@ -65,8 +65,8 @@ export default function Import() {
       const result = await api.importDeck(body(dryRun))
       setPreview(result)
       if (result.created) navigate(`/decks/${result.slug}`)
-    } catch (e: any) {
-      setError(String(e.message ?? e))
+    } catch (e) {
+      setError(errorMessage(e))
       if (!dryRun) setPreview(null)
     } finally {
       setBusy(null)

@@ -71,7 +71,17 @@ scratch directory with `config.use_paths()`; never reassign the globals.
 
 Keep `mana.py` and `sim/` dependency-light (stdlib + numpy). DuckDB stays
 behind `cards/db.py`. That boundary is what keeps the simulation core fast to
-test, and it is why the test suite runs without a database.
+test: the solver, the gate and the simulator all take plain records, so most of
+the suite needs no database at all.
+
+The tests that *do* need one build it. `tests/tiny_corpus.py` loads 21 real
+cards into a scratch DuckDB in about a second, and `mono_green_deck()` is a
+legal 99 built only from those cards. That is what the card-fact tests use —
+swap, add, suggestions, search, the Tier 1 endpoints, the Claude tools. It is
+**not** the ~500MB Scryfall corpus, which stays out of git and out of CI
+(ADR 6). Before it existed those 29 tests skipped on every pull request and
+passed only on this machine; `ci.yml` now fails if the skip count moves off the
+two tests that genuinely need the full download.
 
 ## Non-negotiables
 
@@ -253,7 +263,12 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
 - Reserved List is allowed or forbidden **per deck** — check the deck file.
 - Every bug fix gets a test. `mana.py` is subtle; `tests/test_mana.py` pins the
   cases where naive source-counting gives the wrong answer.
-- `ruff check src tests` before pushing.
+- `ruff check src tests` and `mypy` before pushing. mypy is strict by default
+  with ten named exceptions in `pyproject.toml`; that list is meant to shrink,
+  so a new module is strict from the day it is written.
+- Frontend: `npx tsc -b`, `npx oxlint --deny-warnings` and `npm test` in
+  `web/`, then rebuild the committed bundle with `npm --prefix web run build`
+  if anything under `web/src` changed. CI checks all four.
 
 ## Landing work
 

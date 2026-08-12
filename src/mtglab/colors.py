@@ -30,6 +30,7 @@ arriving from EDHREC finds what they are looking for.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 # Canonical order. Every key in this module is a subset of WUBRG written in
@@ -38,7 +39,7 @@ from dataclasses import dataclass, field
 WUBRG = "WUBRG"
 
 
-def key_for(colors) -> str:
+def key_for(colors: Iterable[str]) -> str:
     """Canonical key for a set of colours. `frozenset({'G','W'})` -> `'WG'`."""
     return "".join(c for c in WUBRG if c in set(colors)) or "C"
 
@@ -416,7 +417,7 @@ COMBINATIONS: tuple[Combination, ...] = (
 BY_KEY = {c.key: c for c in COMBINATIONS}
 
 
-def of(colors) -> Combination:
+def of(colors: Iterable[str]) -> Combination:
     """The combination for a colour identity. Accepts any iterable of codes.
 
     `of(deck_color_identity)` is a deck's slot in the 32 Deck Challenge, which

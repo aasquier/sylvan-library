@@ -31,9 +31,14 @@ claude = ["anthropic>=0.69"]
 # skippable: it is what keeps a model response out of a card's `why` as modes
 # get added. It needs the package importable, not a key -- no test in the
 # suite reaches the network or spends a token.
+# mypy and the yaml stubs are here rather than optional: the type checker is a
+# CI gate, so a checkout that cannot run it cannot reproduce the build. Without
+# `types-PyYAML` the run reports two import-untyped errors and nothing else,
+# which reads exactly like "the checker is broken".
 dev = [
     "pytest>=8.0", "ruff>=0.16", "httpx>=0.27", "coverage>=7.0",
     "hypothesis>=6.100", "python-dotenv>=1.0", "anthropic>=0.69",
+    "mypy>=1.11", "types-PyYAML>=6.0",
 ]
 
 [project.scripts]
@@ -48,8 +53,10 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 # Ship the built frontend inside the package so an install serves the UI
-# without a Node toolchain present.
-mtglab = ["web_dist/**/*"]
+# without a Node toolchain present. `py.typed` marks the package as carrying
+# inline annotations, so a consumer's own type checker reads them instead of
+# treating every import from mtglab as `Any` (PEP 561).
+mtglab = ["web_dist/**/*", "py.typed"]
 
 [tool.coverage.run]
 source = ["src/mtglab"]
@@ -61,11 +68,93 @@ show_missing = true
 skip_empty = true
 # Not a gate -- a floor, so a large regression is loud while ordinary churn
 # is not. Raise it deliberately, do not let it drift down.
-fail_under = 80
+#
+# 80 -> 90 on 2026-08-12. The number moved for two reasons and only one of them
+# was new tests. CI used to run 663 of the 692 tests that ran locally, because
+# 29 of them skipped without `data/mtg.duckdb`; building a real corpus from
+# `tests/tiny_corpus.py` took the CI figure from 82% to 86% without a line of
+# new test code, which is to say four of those points had been written all
+# along and were simply not being run. The rest came from the CLI's
+# corpus-backed commands, the Claude conversation loop, and Forge's setup path.
+fail_under = 90
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+# A skipped test is a test nobody is reading the result of, so the suite is
+# not allowed to skip silently. `-ra` prints the reason for every one.
+addopts = "-ra"
+markers = [
+    # The two tests `tests/tiny_corpus.py` genuinely cannot carry: the 32-way
+    # colour-combination check (a fixture containing the 32 cards would verify
+    # the fixture rather than the table) and the commander-search ordering bug
+    # (which needs more cards than the query limit to reproduce at all).
+    #
+    # Everything else that used to need `data/mtg.duckdb` now builds a real
+    # corpus from the fixture instead. This marker exists so the remainder is
+    # declared and countable rather than an ad-hoc `pytest.skip` that quietly
+    # grows -- `ci.yml` fails the build if the skip count moves.
+    "needs_full_corpus: requires a real `mtglab data refresh` corpus, not the fixture",
+]
+
+[tool.mypy]
+# Strict by default, with a named and shrinking list of exceptions below.
+#
+# That direction matters more than the starting point. The alternative --
+# lax by default, strict where someone opted in -- means a new module is born
+# unchecked and nobody notices; this way a new module is strict on the day it
+# is written, which is the only day making it strict is free. 24 of the 42
+# modules already passed `--strict` the first time it was run, including all of
+# `mana.py`, `sim/tier1/` and `sim/tier3/`, so the floor was already high.
+#
+# Deliberately no `python_version`. Pinning it to the 3.11 floor makes mypy
+# parse numpy's bundled stubs with a 3.11 grammar, and they use `type X = ...`
+# -- a 3.12 statement -- so the run dies on numpy before ever reaching our
+# code. Following the interpreter instead means CI type-checks on 3.12 only,
+# the same interpreter it reports coverage on, and for the same reason: a
+# second run would print the same answer twice.
+files = ["src/mtglab"]
+strict = true
+# Show the rule name so a failure says which knob it came from.
+show_error_codes = true
+
+# The ten modules that do not pass `--strict` yet, with the count at the time
+# the checker landed. They are here to be worked down, not to be permanent --
+# and until then the *rest* of the package cannot regress, which is the point.
+# `check_untyped_defs` still applies to every one of them (that was clean
+# across the whole package on day one), so this is a weaker check rather than
+# no check.
+#
+#   cli.py            33     api/service.py    25     cards/db.py       24
+#   decks/companion   11     decks/analyze.py   7     decks/importer.py  4
+#   decks/validate.py  3     artifacts/gen      3     api/app.py         3
+#   api/simruns.py     3
+[[tool.mypy.overrides]]
+module = [
+    "mtglab.cli",
+    "mtglab.api.app",
+    "mtglab.api.service",
+    "mtglab.api.simruns",
+    "mtglab.artifacts.generate",
+    "mtglab.cards.db",
+    "mtglab.decks.analyze",
+    "mtglab.decks.companion",
+    "mtglab.decks.importer",
+    "mtglab.decks.validate",
+]
+# `strict` is not a per-module setting -- it is shorthand that expands at the
+# top level only, so `strict = false` here would be silently ignored and these
+# modules would fail the build anyway. The flags it turns on have to be named
+# one at a time, which is tedious but at least makes the exemption explicit:
+# these five are relaxed, and everything else `strict` implies still applies.
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+disallow_any_generics = false
+warn_return_any = false
+# The one that stays on. It was clean across the whole package on day one, so
+# these modules are still checked -- just not required to be annotated.
+check_untyped_defs = true
 
 [tool.ruff]
 # Pin the rule set explicitly. Ruff's default selection widened a lot between

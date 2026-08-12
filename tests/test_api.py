@@ -1,8 +1,18 @@
 """API surface.
 
-These run against the real deck files in `decks/` but tolerate a missing
-corpus, because a fresh clone has no `data/mtg.duckdb` until `data refresh`
-runs -- and the app has to stay usable in that state rather than 500ing.
+Two kinds of test live here, and the difference is deliberate.
+
+The endpoints that read a deck file run against the **real** decks in `decks/`
+and need no corpus, because a fresh clone has none until `data refresh` runs
+and the app has to stay usable in that state rather than 500ing.
+
+The endpoints that look a card up -- swap, add, suggestions, search, the Tier 1
+jobs -- take the `corpus` fixture and the synthetic deck from `tiny_corpus`.
+They used to run against the real decks too, gated on `data/mtg.duckdb`, which
+meant they skipped on every pull request and passed only on the maintainer's
+laptop. Card facts cannot be faked (rule 1) and the 500MB corpus cannot go in
+CI (ADR 6), so the fixture is a real DuckDB corpus of 21 real cards with a
+legal 99 built out of them.
 """
 
 import sys
@@ -36,6 +46,23 @@ def client():
     jobs.clear()
     with TestClient(create_app()) as c:
         yield c
+
+
+@pytest.fixture
+def corpus(tmp_path):
+    """A real, queryable corpus -- built rather than borrowed.
+
+    The card-fact endpoints (swap, add, suggestions, search) look every name
+    up, so without this they were gated on `data/mtg.duckdb` being present.
+    That file is a 500MB download nobody puts in CI, so 29 tests skipped on
+    every pull request and passed only on the maintainer's laptop: the worst
+    shape a test can have, because the green check was reporting on a suite
+    five points of coverage smaller than the one being read.
+
+    `tiny_corpus.build` produces a genuine DuckDB corpus in about a second.
+    """
+    with config.use_paths(data_dir=tmp_path / "data"):
+        yield tiny_corpus.build(config.DB_PATH)
 
 
 def await_job(client, job_id: str) -> dict:
@@ -83,11 +110,16 @@ def test_deck_list_carries_the_gate_counts(client):
         assert (deck["errors"] is None) == (deck["warnings"] is None)
 
 
-def test_deck_list_gate_counts_agree_with_the_validate_endpoint(client):
-    """Two code paths compute the same thing; they must not drift."""
+def test_deck_list_gate_counts_agree_with_the_validate_endpoint(corpus, client):
+    """Two code paths compute the same thing; they must not drift.
+
+    Takes `corpus` so the gate actually runs. What it reports does not matter
+    here -- against a 21-card corpus the real decks are mostly unknown
+    cards, and that is fine, because the subject is whether the two paths
+    agree rather than whether any deck is clean.
+    """
     for deck in client.get("/api/decks").json():
-        if deck["errors"] is None:
-            pytest.skip("no corpus; the gate did not run")
+        assert deck["errors"] is not None, f"{deck['slug']}: the gate did not run"
         rep = client.get(f"/api/decks/{deck['slug']}/validate").json()
         assert deck["errors"] == len(rep["errors"]), \
             f"{deck['slug']} error count disagrees with /validate"
@@ -129,45 +161,52 @@ def test_stats_are_json_serialisable(client):
     assert isinstance(body["categories"], list)
 
 
-def test_suggestions_are_offered_for_a_banned_card(client):
-    """Goreclaw runs Primeval Titan, which is banned. The endpoint should name
-    the offender and shortlist legal cards that resemble it."""
-    if not client.get("/api/health").json()["corpus"]:
-        pytest.skip("no corpus available")
+def test_suggestions_are_offered_for_a_banned_card(swappable):
+    """The fixture deck runs Primeval Titan, which is banned. The endpoint
+    should name the offender and shortlist legal cards that resemble it."""
+    with swappable as client:
+        body = client.get("/api/decks/mono-green/suggestions").json()
+        assert body["corpus_available"] is True
+        targets = {t["card"]: t for t in body["targets"]}
+        assert "Primeval Titan" in targets, body
 
-    body = client.get("/api/decks/goreclaw-stompy/suggestions").json()
-    assert body["corpus_available"] is True
-    targets = {t["card"]: t for t in body["targets"]}
-    assert "Primeval Titan" in targets, body
+        target = targets["Primeval Titan"]
+        assert target["code"] == "banned"
+        assert target["why"], \
+            "the slot's rationale is what makes a suggestion legible"
+        assert target["candidates"], "a banned card with no shortlist helps nobody"
 
-    target = targets["Primeval Titan"]
-    assert target["code"] == "banned"
-    assert target["why"], "the slot's rationale is what makes a suggestion legible"
-    assert target["candidates"], "a banned card with no shortlist helps nobody"
-
-    for candidate in target["candidates"]:
-        # Mono-green deck: anything outside {G} is not a legal suggestion.
-        assert set(candidate["color_identity"]) <= {"G"}, candidate["name"]
-        assert candidate["reasons"], "a score with no reason is not a suggestion"
-        assert 0.0 <= candidate["score"] <= 1.2
-
-
-def test_suggestions_never_include_the_card_being_replaced(client):
-    if not client.get("/api/health").json()["corpus"]:
-        pytest.skip("no corpus available")
-    body = client.get("/api/decks/goreclaw-stompy/suggestions").json()
-    for target in body["targets"]:
-        names = {c["name"] for c in target["candidates"]}
-        assert target["card"] not in names
+        for candidate in target["candidates"]:
+            # Mono-green deck: anything outside {G} is not a legal suggestion.
+            assert set(candidate["color_identity"]) <= {"G"}, candidate["name"]
+            assert candidate["reasons"], "a score with no reason is not a suggestion"
+            assert 0.0 <= candidate["score"] <= 1.2
 
 
-def test_a_clean_deck_has_nothing_to_suggest(client):
+def test_suggestions_never_include_the_card_being_replaced(swappable):
+    with swappable as client:
+        body = client.get("/api/decks/mono-green/suggestions").json()
+        for target in body["targets"]:
+            names = {c["name"] for c in target["candidates"]}
+            assert target["card"] not in names
+
+
+def test_suggestions_never_include_a_card_already_in_the_deck(swappable):
+    """Regal Behemoth and Vorinclex are in the list and would otherwise score
+    well for the Titan's slot -- suggesting a card you already run is noise."""
+    with swappable as client:
+        body = client.get("/api/decks/mono-green/suggestions").json()
+        held = {c["name"] for c in client.get("/api/decks/mono-green").json()["cards"]}
+        for target in body["targets"]:
+            assert not ({c["name"] for c in target["candidates"]} & held)
+
+
+def test_a_clean_deck_has_nothing_to_suggest(clean_client):
     """The endpoint answers "what would fix the gate", so a deck the gate
     passes must return an empty list rather than unsolicited upgrades."""
-    if not client.get("/api/health").json()["corpus"]:
-        pytest.skip("no corpus available")
-    body = client.get("/api/decks/gyome-food/suggestions").json()
-    assert body["targets"] == []
+    with clean_client as client:
+        body = client.get("/api/decks/mono-green/suggestions").json()
+        assert body["targets"] == []
 
 
 def test_suggestions_for_a_missing_deck_are_a_404(client):
@@ -231,20 +270,50 @@ def test_the_request_scope_does_not_leak_into_the_public_schema(client):
 # exists precisely so it does not have to.
 
 @pytest.fixture
-def swappable(in_memory_client):
-    """The real Goreclaw list, held in memory so writes go nowhere."""
-    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
-    return in_memory_client([deck])
+def swappable(in_memory_client, corpus):
+    """The fixture deck, held in memory so writes go nowhere, with a corpus
+    behind it so card facts can actually be looked up.
+
+    This was the real Goreclaw list until the corpus fixture existed. Same
+    shape -- a mono-green commander, a legal 99, exactly one banned card --
+    but built out of `tiny_corpus.CARDS`, so the gate has something real to
+    catch without needing all 35,000 cards to find it.
+    """
+    return in_memory_client([tiny_corpus.mono_green_deck()])
+
+
+@pytest.fixture
+def clean_client(in_memory_client, corpus):
+    """The same deck with a legal card in the Titan's slot, so "the gate found
+    nothing" is testable as its own case rather than inferred."""
+    return in_memory_client([tiny_corpus.mono_green_deck(clean=True)])
+
+
+@pytest.fixture
+def sim_client(in_memory_client, corpus):
+    """A deck the simulator can actually compile.
+
+    Tier 1 needs a card record for every slot, so these were pointed at
+    `gyome-food` and the real corpus -- which is why the whole simulation
+    surface, jobs and polling included, went untested in CI. The fixture deck
+    compiles against `tiny_corpus`, so the job contract the UI depends on is
+    now exercised on every pull request.
+
+    A background job captures the `DeckSource` and outlives its request, which
+    is fine here: `await_job` blocks inside the test, so `corpus` is still on
+    the stack when the worker reads it.
+    """
+    jobs.clear()
+    with in_memory_client([tiny_corpus.mono_green_deck(clean=True)]) as c:
+        yield c
 
 
 def test_a_swap_replaces_the_card_and_clears_the_gate(swappable):
     with swappable as client:
-        if not client.get("/api/health").json()["corpus"]:
-            pytest.skip("no corpus available")
-        before = client.get("/api/decks/goreclaw-stompy/validate").json()
+        before = client.get("/api/decks/mono-green/validate").json()
         assert any(i["card"] == "Primeval Titan" for i in before["errors"])
 
-        resp = client.post("/api/decks/goreclaw-stompy/swap", json={
+        resp = client.post("/api/decks/mono-green/swap", json={
             "out": "Primeval Titan", "into": "Cultivator Colossus",
             "why": "Trample body that puts lands onto the battlefield; ramp and "
                    "threat in one card, same as the slot it replaces.",
@@ -256,20 +325,18 @@ def test_a_swap_replaces_the_card_and_clears_the_gate(swappable):
         assert body["ok"] is True and body["errors"] == []
 
         # ...and the deck itself now reflects it.
-        names = {c["name"] for c in client.get("/api/decks/goreclaw-stompy").json()["cards"]}
+        names = {c["name"] for c in client.get("/api/decks/mono-green").json()["cards"]}
         assert "Cultivator Colossus" in names
         assert "Primeval Titan" not in names
 
 
 def test_a_swap_keeps_the_slot_and_records_the_given_why(swappable):
     with swappable as client:
-        if not client.get("/api/health").json()["corpus"]:
-            pytest.skip("no corpus available")
-        client.post("/api/decks/goreclaw-stompy/swap", json={
+        client.post("/api/decks/mono-green/swap", json={
             "out": "Primeval Titan", "into": "Cultivator Colossus",
             "why": "A rationale a human wrote.",
         })
-        card = next(c for c in client.get("/api/decks/goreclaw-stompy").json()["cards"]
+        card = next(c for c in client.get("/api/decks/mono-green").json()["cards"]
                     if c["name"] == "Cultivator Colossus")
         assert card["why"] == "A rationale a human wrote."
         assert card["category"] == "threat", "the slot it filled should carry over"
@@ -291,7 +358,7 @@ def test_a_swap_keeps_the_slot_and_records_the_given_why(swappable):
 ])
 def test_a_swap_refused_on_the_deck_alone_needs_no_corpus(swappable, payload, expected):
     with swappable as client:
-        resp = client.post("/api/decks/goreclaw-stompy/swap", json=payload)
+        resp = client.post("/api/decks/mono-green/swap", json=payload)
         assert resp.status_code == 422, resp.text
         assert expected in resp.json()["detail"]
 
@@ -306,21 +373,26 @@ def test_a_swap_refused_on_the_deck_alone_needs_no_corpus(swappable, payload, ex
 ])
 def test_a_swap_refused_on_a_card_fact_is_looked_up(swappable, payload, expected):
     with swappable as client:
-        if not client.get("/api/health").json()["corpus"]:
-            pytest.skip("no corpus available")
-        resp = client.post("/api/decks/goreclaw-stompy/swap", json=payload)
+        resp = client.post("/api/decks/mono-green/swap", json=payload)
         assert resp.status_code == 422, resp.text
         assert expected in resp.json()["detail"]
 
 
-def test_a_swap_without_a_corpus_says_so_rather_than_guessing(swappable):
+def test_a_swap_without_a_corpus_says_so_rather_than_guessing(in_memory_client,
+                                                              tmp_path):
     """Legality and colour identity are card facts, and CLAUDE.md rule 1 says
     those are looked up. With no corpus there is nothing to look them up in, so
-    the swap is refused rather than waved through."""
-    with swappable as client:
-        if client.get("/api/health").json()["corpus"]:
-            pytest.skip("this is the fresh-clone path")
-        resp = client.post("/api/decks/goreclaw-stompy/swap", json={
+    the swap is refused rather than waved through.
+
+    Points at an empty directory rather than skipping when a corpus happens to
+    be present. The fresh-clone path is a behaviour worth pinning, and it used
+    to be tested only on machines that had never run `data refresh` -- which
+    is to say, almost nowhere.
+    """
+    with config.use_paths(data_dir=tmp_path / "absent"), \
+            in_memory_client([tiny_corpus.mono_green_deck()]) as client:
+        assert client.get("/api/health").json()["corpus"] is False
+        resp = client.post("/api/decks/mono-green/swap", json={
             "out": "Primeval Titan", "into": "Cultivator Colossus",
             "why": "A real rationale."})
         assert resp.status_code == 422
@@ -331,23 +403,21 @@ def test_a_refused_swap_changes_nothing(swappable):
     """The check that matters most: a rejection must not leave the deck half
     edited."""
     with swappable as client:
-        if not client.get("/api/health").json()["corpus"]:
-            pytest.skip("no corpus available")
-        before = client.get("/api/decks/goreclaw-stompy").json()["cards"]
-        client.post("/api/decks/goreclaw-stompy/swap", json={
+        before = client.get("/api/decks/mono-green").json()["cards"]
+        client.post("/api/decks/mono-green/swap", json={
             "out": "Primeval Titan", "into": "Rhystic Study", "why": "no"})
-        assert client.get("/api/decks/goreclaw-stompy").json()["cards"] == before
+        assert client.get("/api/decks/mono-green").json()["cards"] == before
 
 
 def test_a_read_only_source_refuses_every_swap():
     """What the hosted two-tier model needs: curated decks stay read-only for
     someone who is not the maintainer, checked in one place."""
-    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
+    deck = tiny_corpus.mono_green_deck()
     app = create_app()
     app.dependency_overrides[deck_source] = \
         lambda: MemoryDeckSource([deck], writable=False)
     with TestClient(app) as client:
-        resp = client.post("/api/decks/goreclaw-stompy/swap", json={
+        resp = client.post("/api/decks/mono-green/swap", json={
             "out": "Primeval Titan", "into": "Cultivator Colossus", "why": "x"})
         assert resp.status_code == 422
         assert "read-only" in resp.json()["detail"]
@@ -360,20 +430,16 @@ def test_a_read_only_source_refuses_every_swap():
 # and reported, and a refusal that writes nothing.
 
 @pytest.fixture
-def draft_client(in_memory_client):
+def draft_client(in_memory_client, corpus):
     """A draft, so the rule 4 bend is exercisable. Cards keep their `why`s --
     what makes it a draft is the stage, and a draft with rationales already
     written is one of ADR 13's four real combinations."""
-    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
-    deck.stage = "draft"
-    return in_memory_client([deck])
+    return in_memory_client([tiny_corpus.mono_green_deck(stage="draft")])
 
 
 def test_a_card_can_be_added_and_the_gate_comes_back(swappable):
     with swappable as client:
-        if not client.get("/api/health").json()["corpus"]:
-            pytest.skip("no corpus available")
-        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+        resp = client.post("/api/decks/mono-green/cards", json={
             "name": "Llanowar Reborn", "category": "land",
             "why": "Enters with a +1/+1 counter to move onto a fatty."})
         assert resp.status_code == 200, resp.json()
@@ -381,7 +447,7 @@ def test_a_card_can_be_added_and_the_gate_comes_back(swappable):
         assert body["added"] == "Llanowar Reborn"
         assert "ok" in body and "errors" in body
         names = {c["name"] for c in
-                 client.get("/api/decks/goreclaw-stompy").json()["cards"]}
+                 client.get("/api/decks/mono-green").json()["cards"]}
         assert "Llanowar Reborn" in names
 
 
@@ -389,9 +455,7 @@ def test_a_card_outside_the_commanders_identity_is_refused(swappable):
     """Rule 2: identity comes from Scryfall's `color_identity`. Goreclaw is
     mono-green, so a card with any other pip in its identity cannot go in."""
     with swappable as client:
-        if not client.get("/api/health").json()["corpus"]:
-            pytest.skip("no corpus available")
-        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+        resp = client.post("/api/decks/mono-green/cards", json={
             "name": "Swords to Plowshares", "category": "interaction",
             "why": "One mana, exiles anything."})
         assert resp.status_code == 422
@@ -400,9 +464,7 @@ def test_a_card_outside_the_commanders_identity_is_refused(swappable):
 
 def test_a_card_the_corpus_does_not_know_is_refused(swappable):
     with swappable as client:
-        if not client.get("/api/health").json()["corpus"]:
-            pytest.skip("no corpus available")
-        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+        resp = client.post("/api/decks/mono-green/cards", json={
             "name": "Definitely Not A Card", "category": "ramp", "why": "x"})
         assert resp.status_code == 422
         assert "not a card the corpus knows" in resp.json()["detail"]
@@ -410,7 +472,7 @@ def test_a_card_the_corpus_does_not_know_is_refused(swappable):
 
 def test_an_unknown_category_is_refused_before_any_lookup(swappable):
     with swappable as client:
-        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+        resp = client.post("/api/decks/mono-green/cards", json={
             "name": "Sol Ring", "category": "rampp", "why": "typo"})
         assert resp.status_code == 422
         assert "is not a category" in resp.json()["detail"]
@@ -420,9 +482,7 @@ def test_a_curated_deck_refuses_a_card_with_no_rationale(swappable):
     """Rule 4 at the boundary. The tool declines to invent one -- there is no
     code path here that fills the field in."""
     with swappable as client:
-        if not client.get("/api/health").json()["corpus"]:
-            pytest.skip("no corpus available")
-        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+        resp = client.post("/api/decks/mono-green/cards", json={
             "name": "Llanowar Reborn", "category": "land", "why": "   "})
         assert resp.status_code == 422
         assert "needs a `why`" in resp.json()["detail"]
@@ -432,10 +492,8 @@ def test_a_draft_accepts_a_card_that_still_owes_its_rationale(draft_client):
     """The one bend (ADR 13): a draft is honestly incomplete and counts what it
     owes, rather than refusing work while the thinking is still to come."""
     with draft_client as client:
-        if not client.get("/api/health").json()["corpus"]:
-            pytest.skip("no corpus available")
-        before = client.get("/api/decks/goreclaw-stompy").json()["needs_rationale"]
-        resp = client.post("/api/decks/goreclaw-stompy/cards", json={
+        before = client.get("/api/decks/mono-green").json()["needs_rationale"]
+        resp = client.post("/api/decks/mono-green/cards", json={
             "name": "Llanowar Reborn", "category": "land"})
         assert resp.status_code == 200, resp.json()
         assert resp.json()["needs_rationale"] == before + 1
@@ -446,18 +504,18 @@ def test_a_card_can_be_removed_without_a_corpus(swappable):
     works on a machine that has never run `data refresh`."""
     with swappable as client:
         resp = client.request("DELETE",
-                              "/api/decks/goreclaw-stompy/cards/Primeval Titan")
+                              "/api/decks/mono-green/cards/Primeval Titan")
         assert resp.status_code == 200, resp.json()
         assert resp.json()["removed"] == "Primeval Titan"
         names = {c["name"] for c in
-                 client.get("/api/decks/goreclaw-stompy").json()["cards"]}
+                 client.get("/api/decks/mono-green").json()["cards"]}
         assert "Primeval Titan" not in names
 
 
 def test_removing_a_card_that_is_not_there_is_refused(swappable):
     with swappable as client:
         resp = client.request("DELETE",
-                              "/api/decks/goreclaw-stompy/cards/Black Lotus")
+                              "/api/decks/mono-green/cards/Black Lotus")
         assert resp.status_code == 422
         assert "not in this deck" in resp.json()["detail"]
 
@@ -466,18 +524,18 @@ def test_a_rationale_can_be_written_through_the_api(swappable):
     """The gap `decks import` opened: a draft arrives owing 99 rationales, and
     until this endpoint the only way to write one was a text editor."""
     with swappable as client:
-        resp = client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+        resp = client.patch("/api/decks/mono-green/cards/Sol Ring",
                             json={"field": "why",
                                   "value": "Two mana for one, and it always has been."})
         assert resp.status_code == 200, resp.json()
-        card = next(c for c in client.get("/api/decks/goreclaw-stompy").json()["cards"]
+        card = next(c for c in client.get("/api/decks/mono-green").json()["cards"]
                     if c["name"] == "Sol Ring")
         assert card["why"] == "Two mana for one, and it always has been."
 
 
 def test_a_rationale_cannot_be_blanked_on_a_curated_deck(swappable):
     with swappable as client:
-        resp = client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+        resp = client.patch("/api/decks/mono-green/cards/Sol Ring",
                             json={"field": "why", "value": "   "})
         assert resp.status_code == 422
         assert "needs a `why`" in resp.json()["detail"]
@@ -486,7 +544,7 @@ def test_a_rationale_cannot_be_blanked_on_a_curated_deck(swappable):
 def test_only_a_short_list_of_card_fields_is_settable(swappable):
     with swappable as client:
         for field in ("name", "scryfall_id", "tags"):
-            resp = client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+            resp = client.patch("/api/decks/mono-green/cards/Sol Ring",
                                 json={"field": field, "value": "x"})
             assert resp.status_code == 422, field
             assert "not settable" in resp.json()["detail"]
@@ -494,28 +552,28 @@ def test_only_a_short_list_of_card_fields_is_settable(swappable):
 
 def test_a_category_and_a_quantity_can_be_patched(swappable):
     with swappable as client:
-        assert client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+        assert client.patch("/api/decks/mono-green/cards/Sol Ring",
                             json={"field": "category",
                                   "value": "utility"}).status_code == 200
-        assert client.patch("/api/decks/goreclaw-stompy/cards/Forest",
+        assert client.patch("/api/decks/mono-green/cards/Forest",
                             json={"field": "qty", "value": 26}).status_code == 200
-        cards = client.get("/api/decks/goreclaw-stompy").json()["cards"]
+        cards = client.get("/api/decks/mono-green").json()["cards"]
         assert next(c for c in cards if c["name"] == "Sol Ring")["category"] == "utility"
         assert next(c for c in cards if c["name"] == "Forest")["qty"] == 26
 
 
 def test_a_note_can_be_set_and_read_back(swappable):
     with swappable as client:
-        resp = client.put("/api/decks/goreclaw-stompy/notes/mulligan",
+        resp = client.put("/api/decks/mono-green/notes/mulligan",
                           json={"value": "Keep any two-lander with a one-mana dork."})
         assert resp.status_code == 200, resp.json()
-        notes = client.get("/api/decks/goreclaw-stompy").json()["notes"]
+        notes = client.get("/api/decks/mono-green").json()["notes"]
         assert notes["mulligan"] == "Keep any two-lander with a one-mana dork."
 
 
 def test_an_empty_note_is_refused(swappable):
     with swappable as client:
-        resp = client.put("/api/decks/goreclaw-stompy/notes/mulligan",
+        resp = client.put("/api/decks/mono-green/notes/mulligan",
                           json={"value": "   "})
         assert resp.status_code == 422
         assert "needs text" in resp.json()["detail"]
@@ -536,31 +594,31 @@ def test_a_draft_is_promoted_once_every_card_is_justified(in_memory_client):
 
 def test_promotion_is_refused_while_a_card_is_blank(draft_client):
     with draft_client as client:
-        client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+        client.patch("/api/decks/mono-green/cards/Sol Ring",
                      json={"field": "why", "value": ""})
-        resp = client.patch("/api/decks/goreclaw-stompy",
+        resp = client.patch("/api/decks/mono-green",
                             json={"field": "stage", "value": "curated"})
         assert resp.status_code == 422
         assert "Sol Ring" in resp.json()["detail"]
         # And it stayed a draft rather than landing somewhere in between.
-        assert client.get("/api/decks/goreclaw-stompy").json()["stage"] == "draft"
+        assert client.get("/api/decks/mono-green").json()["stage"] == "draft"
 
 
 def test_deck_status_and_bracket_are_patchable(swappable):
     with swappable as client:
-        assert client.patch("/api/decks/goreclaw-stompy",
+        assert client.patch("/api/decks/mono-green",
                             json={"field": "status",
                                   "value": "built"}).status_code == 200
-        assert client.patch("/api/decks/goreclaw-stompy",
+        assert client.patch("/api/decks/mono-green",
                             json={"field": "bracket", "value": 5}).status_code == 200
-        body = client.get("/api/decks/goreclaw-stompy").json()
+        body = client.get("/api/decks/mono-green").json()
         assert (body["status"], body["bracket"]) == ("built", 5)
 
 
 def test_a_field_that_is_not_the_decks_own_is_refused(swappable):
     with swappable as client:
         for field in ("name", "commander", "cards"):
-            resp = client.patch("/api/decks/goreclaw-stompy",
+            resp = client.patch("/api/decks/mono-green",
                                 json={"field": field, "value": "x"})
             assert resp.status_code == 422, field
             assert "not a settable deck field" in resp.json()["detail"]
@@ -570,25 +628,25 @@ def test_a_refused_edit_changes_nothing(swappable):
     """The whole point of verifying before writing. Every refusal above must
     leave the deck byte-identical, not partly applied."""
     with swappable as client:
-        before = client.get("/api/decks/goreclaw-stompy").json()
-        client.post("/api/decks/goreclaw-stompy/cards",
+        before = client.get("/api/decks/mono-green").json()
+        client.post("/api/decks/mono-green/cards",
                     json={"name": "Sol Ring", "category": "ramp", "why": "dup"})
-        client.request("DELETE", "/api/decks/goreclaw-stompy/cards/Black Lotus")
-        client.patch("/api/decks/goreclaw-stompy/cards/Sol Ring",
+        client.request("DELETE", "/api/decks/mono-green/cards/Black Lotus")
+        client.patch("/api/decks/mono-green/cards/Sol Ring",
                      json={"field": "why", "value": ""})
-        client.patch("/api/decks/goreclaw-stompy/cards/Forest",
+        client.patch("/api/decks/mono-green/cards/Forest",
                      json={"field": "qty", "value": 0})
-        client.put("/api/decks/goreclaw-stompy/notes/x", json={"value": ""})
-        assert client.get("/api/decks/goreclaw-stompy").json() == before
+        client.put("/api/decks/mono-green/notes/x", json={"value": ""})
+        assert client.get("/api/decks/mono-green").json() == before
 
 
 def test_a_read_only_source_refuses_every_edit():
-    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
+    deck = tiny_corpus.mono_green_deck()
     app = create_app()
     app.dependency_overrides[deck_source] = \
         lambda: MemoryDeckSource([deck], writable=False)
     with TestClient(app) as client:
-        base = "/api/decks/goreclaw-stompy"
+        base = "/api/decks/mono-green"
         responses = [
             client.post(f"{base}/cards", json={"name": "Forest",
                                                "category": "land", "why": "x"}),
@@ -612,13 +670,12 @@ def test_a_read_only_source_refuses_every_edit():
 
 @pytest.fixture
 def importable(in_memory_client, tmp_path):
-    """An empty library, with a four-card corpus behind it.
+    """An empty library, with the fixture corpus behind it.
 
     Built rather than borrowed: the real 500MB corpus is absent on a fresh
     clone and in CI, and the one thing worth proving about import is what it
     does *with* a corpus.
     """
-    pytest.importorskip("duckdb")
     with config.use_paths(data_dir=tmp_path / "data"):
         tiny_corpus.build(config.DB_PATH)
         yield in_memory_client([])
@@ -692,7 +749,6 @@ def test_import_refusals(importable, payload, expected):
 
 
 def test_import_will_not_overwrite_an_existing_deck(in_memory_client, tmp_path):
-    pytest.importorskip("duckdb")
     deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
     with config.use_paths(data_dir=tmp_path / "data"):
         tiny_corpus.build(config.DB_PATH)
@@ -748,20 +804,16 @@ def test_an_empty_library_is_empty_rather_than_broken(in_memory_client):
 
 # ------------------------------------------------------------------- cards
 
-def test_card_search_respects_the_limit(client):
+def test_card_search_respects_the_limit(corpus, client):
     body = client.get("/api/cards/search", params={"limit": 5}).json()
-    if body.get("message"):
-        pytest.skip("no corpus available")
     assert len(body["cards"]) <= 5
 
 
-def test_card_search_identity_filter_is_a_subset_check(client):
+def test_card_search_identity_filter_is_a_subset_check(corpus, client):
     """Asking for BG must return colorless and mono-B cards too -- that is the
     question a Golgari deckbuilder is actually asking."""
     body = client.get("/api/cards/search",
                       params={"identity": "BG", "limit": 50}).json()
-    if body.get("message"):
-        pytest.skip("no corpus available")
     for card in body["cards"]:
         assert set(card["color_identity"]) <= {"B", "G"}, card["name"]
 
@@ -776,17 +828,15 @@ def test_sim_requires_a_slug(client):
     assert client.post("/api/sim/mana", json={}).status_code == 422
 
 
-def test_sim_job_runs_to_completion(client):
+def test_sim_job_runs_to_completion(sim_client):
     """Submit, poll, and get a result -- the whole contract the UI relies on."""
-    if not client.get("/api/health").json()["corpus"]:
-        pytest.skip("no corpus available")
 
-    submitted = client.post("/api/sim/mana",
-                            json={"slug": "gyome-food", "games": 300,
+    submitted = sim_client.post("/api/sim/mana",
+                            json={"slug": "mono-green", "games": 300,
                                   "turns": 8, "seed": 1}).json()
     assert submitted["status"] in ("queued", "running", "done")
 
-    body = await_job(client, submitted["id"])
+    body = await_job(sim_client, submitted["id"])
     assert body["status"] == "done", body.get("error")
     result = body["result"]
     assert result["games"] == 300
@@ -804,18 +854,16 @@ def test_failed_job_reports_the_error_rather_than_hanging(client):
     assert current["error"]
 
 
-def test_land_sweep_returns_a_row_per_count_and_reports_the_spread(client):
+def test_land_sweep_returns_a_row_per_count_and_reports_the_spread(sim_client):
     """The sweep is the command that actually decides a land count, and it was
     entirely untested. The spread matters as much as the winner: Gyome's curve
     was flat to 0.07 across 30-40, and reading the argmax of that is reading
     noise."""
-    if not client.get("/api/health").json()["corpus"]:
-        pytest.skip("no corpus available")
 
-    submitted = client.post("/api/sim/lands",
-                            json={"slug": "gyome-food", "low": 32, "high": 34,
+    submitted = sim_client.post("/api/sim/lands",
+                            json={"slug": "mono-green", "low": 32, "high": 34,
                                   "games": 200, "seed": 1}).json()
-    body = await_job(client, submitted["id"])
+    body = await_job(sim_client, submitted["id"])
     assert body["status"] == "done", body.get("error")
     result = body["result"]
 
@@ -833,28 +881,24 @@ def test_land_sweep_returns_a_row_per_count_and_reports_the_spread(client):
     assert result["caveat"], "Tier 1 numbers must ship with their caveat"
 
 
-def test_land_sweep_normalises_a_reversed_range(client):
+def test_land_sweep_normalises_a_reversed_range(sim_client):
     """low/high the wrong way round should sweep, not return nothing."""
-    if not client.get("/api/health").json()["corpus"]:
-        pytest.skip("no corpus available")
 
-    submitted = client.post("/api/sim/lands",
-                            json={"slug": "gyome-food", "low": 34, "high": 32,
+    submitted = sim_client.post("/api/sim/lands",
+                            json={"slug": "mono-green", "low": 34, "high": 32,
                                   "games": 200, "seed": 1}).json()
-    body = await_job(client, submitted["id"])
+    body = await_job(sim_client, submitted["id"])
     assert body["status"] == "done", body.get("error")
     assert [r["lands"] for r in body["result"]["rows"]] == [32, 33, 34]
 
 
-def test_sim_payload_bounds_are_clamped_not_rejected(client):
+def test_sim_payload_bounds_are_clamped_not_rejected(sim_client):
     """An absurd game count should be pulled into range rather than 500."""
-    if not client.get("/api/health").json()["corpus"]:
-        pytest.skip("no corpus available")
 
-    submitted = client.post("/api/sim/mana",
-                            json={"slug": "gyome-food", "games": 1,
+    submitted = sim_client.post("/api/sim/mana",
+                            json={"slug": "mono-green", "games": 1,
                                   "turns": 99, "seed": 1}).json()
-    body = await_job(client, submitted["id"])
+    body = await_job(sim_client, submitted["id"])
     assert body["status"] == "done", body.get("error")
     assert body["result"]["games"] >= 100, "games floor"
     assert len(body["result"]["by_turn"]) <= 20, "turns ceiling"
@@ -920,9 +964,7 @@ def test_challenge_progress_counts_filled_slots(in_memory_client):
 
 # ----------------------------------------------------------------- create
 
-def test_create_makes_a_draft_from_a_commander(in_memory_client):
-    if not config.DB_PATH.exists():
-        pytest.skip("creating a deck needs the corpus")
+def test_create_makes_a_draft_from_a_commander(corpus, in_memory_client):
     with in_memory_client([]) as c:
         body = c.post("/api/decks", json={
             "slug": "brand-new", "commander": ["Gyome, Master Chef"]}).json()
@@ -934,9 +976,7 @@ def test_create_makes_a_draft_from_a_commander(in_memory_client):
     assert body["combination"]["name"] == "Golgari"
 
 
-def test_create_refuses_a_card_that_cannot_lead_a_deck(in_memory_client):
-    if not config.DB_PATH.exists():
-        pytest.skip("creating a deck needs the corpus")
+def test_create_refuses_a_card_that_cannot_lead_a_deck(corpus, in_memory_client):
     with in_memory_client([]) as c:
         r = c.post("/api/decks", json={"slug": "nope", "commander": ["Sol Ring"]})
     assert r.status_code == 422
@@ -950,9 +990,7 @@ def test_create_refuses_a_deck_with_no_commander(in_memory_client):
     assert "needs a commander" in r.json()["detail"]
 
 
-def test_create_refuses_a_duplicate_slug(in_memory_client):
-    if not config.DB_PATH.exists():
-        pytest.skip("creating a deck needs the corpus")
+def test_create_refuses_a_duplicate_slug(corpus, in_memory_client):
     existing = Deck.load(Path("decks/gyome-food/deck.yaml"))
     with in_memory_client([existing]) as c:
         r = c.post("/api/decks", json={
@@ -972,12 +1010,22 @@ def test_create_is_refused_on_a_read_only_library():
     assert r.status_code == 422
 
 
+@pytest.mark.needs_full_corpus
 def test_commander_search_is_exact_and_returns_actual_commanders(client):
     """The bug this pins: `commanders_only` used to filter after the SQL
     limit, so a search for Selesnya commanders returned the sixty best
-    Selesnya cards, none of which was a commander, and then nothing."""
+    Selesnya cards, none of which was a commander, and then nothing.
+
+    The one test here that `tiny_corpus` genuinely cannot carry, and it is
+    marked rather than quietly skipped so the gap is countable. Reproducing
+    the bug needs *more* Selesnya cards than the limit, with the commander
+    ranked below the cut -- against 21 cards the filter and the limit
+    cannot disagree, so a fixture version would pass whether or not the bug
+    was back. Eleven more fixture rows to keep one assertion honest is a
+    worse trade than saying plainly that this one needs the real corpus.
+    """
     if not config.DB_PATH.exists():
-        pytest.skip("card search needs the corpus")
+        pytest.skip("needs the full corpus -- run `mtglab data refresh`")
     cards = client.get("/api/cards/search", params={
         "identity": "WG", "identity_exact": True,
         "commanders_only": True, "limit": 10}).json()["cards"]

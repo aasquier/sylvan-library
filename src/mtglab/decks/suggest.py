@@ -38,7 +38,7 @@ import re
 from dataclasses import dataclass
 
 from mtglab.cards import db
-from mtglab.cards.db import CardRecord
+from mtglab.cards.db import CardRecord, Connection
 from mtglab.decks.model import Deck
 
 # Card types, most specific first: a "Legendary Artifact Creature" is a
@@ -213,7 +213,8 @@ def rank(target: CardRecord, candidates: list[CardRecord], *, why: str = "",
     return scored[:limit]
 
 
-def candidate_pool(con, target: CardRecord, identity: frozenset[str], *,
+def candidate_pool(con: Connection, target: CardRecord,
+                   identity: frozenset[str], *,
                    pool_size: int = 400) -> list[CardRecord]:
     """Everything legal that could plausibly fill the slot.
 
@@ -240,7 +241,8 @@ def candidate_pool(con, target: CardRecord, identity: frozenset[str], *,
                      order_by="edhrec_rank NULLS LAST")
 
 
-def replacements_for(deck: Deck, cards: dict[str, CardRecord], con, name: str, *,
+def replacements_for(deck: Deck, cards: dict[str, CardRecord], con: Connection,
+                     name: str, *,
                      limit: int = 5) -> list[Candidate]:
     """Suggestions for one card in one deck.
 

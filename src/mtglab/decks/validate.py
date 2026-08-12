@@ -254,6 +254,8 @@ def _check_companion(deck: Deck, cards: dict,
     unchecked, as did the companion's own legality and colour identity.
     """
     name = deck.companion
+    if name is None:
+        return                      # no companion declared; the caller checks
     rec = cards.get(name)
     if rec is None:
         return                      # already reported as unknown-card above

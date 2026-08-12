@@ -13,7 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DeckDetail as Deck, DeckStats, Suggestions, ValidationReport } from '../lib/api'
 import DeckDetail from './DeckDetail'
 
-vi.mock('../lib/api', () => ({
+vi.mock('../lib/api', async () => ({
+  // The real one: it is pure, and a stub here would let a regression in
+  // message extraction pass every refusal test in this file.
+  errorMessage: (await vi.importActual<typeof import('../lib/api')>(
+    '../lib/api')).errorMessage,
   api: {
     deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
     swapCard: vi.fn(), addCard: vi.fn(), removeCard: vi.fn(),

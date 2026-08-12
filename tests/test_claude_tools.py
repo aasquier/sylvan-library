@@ -18,6 +18,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+import tiny_corpus  # noqa: E402
+from mtglab import config  # noqa: E402
 from mtglab.claude import client, tools  # noqa: E402
 from mtglab.decks.model import Deck  # noqa: E402
 from mtglab.decks.source import MemoryDeckSource  # noqa: E402
@@ -135,13 +137,20 @@ def test_search_cards_runs_without_a_deck_source():
     assert "cards" in result
 
 
-def requires_corpus():
-    if not tools.run("get_cards", {"names": ["Sol Ring"]})["cards"]:
-        pytest.skip("no corpus -- run `mtglab data refresh`")
+@pytest.fixture
+def corpus(tmp_path):
+    """The corpus these tools are the whole point of consulting.
+
+    These used to call a `requires_corpus()` helper that skipped when
+    `data/mtg.duckdb` was missing -- which is every CI run, so the tool
+    layer that exists specifically to keep card facts out of a model's
+    recall was itself never exercised by a pull request.
+    """
+    with config.use_paths(data_dir=tmp_path / "data"):
+        yield tiny_corpus.build(config.DB_PATH)
 
 
-def test_get_cards_looks_a_card_up_by_name():
-    requires_corpus()
+def test_get_cards_looks_a_card_up_by_name(corpus):
     result = tools.run("get_cards", {"names": ["sol ring"]})
     card = result["cards"][0]
     # The corpus's spelling comes back, not the caller's.
@@ -150,7 +159,7 @@ def test_get_cards_looks_a_card_up_by_name():
     assert "Add {C}{C}" in card["oracle_text"]
 
 
-def test_a_banned_card_can_be_looked_up_and_says_it_is_banned():
+def test_a_banned_card_can_be_looked_up_and_says_it_is_banned(corpus):
     """The hole this tool exists to close.
 
     `search_cards` filters to Commander-legal, so the two cards the library
@@ -158,7 +167,6 @@ def test_a_banned_card_can_be_looked_up_and_says_it_is_banned():
     duly answered about them from recall. A lookup filters on nothing and
     reports legality as a field, which is strictly more useful than absence.
     """
-    requires_corpus()
     for name in ("Primeval Titan", "Emrakul, the Aeons Torn"):
         looked_up = tools.run("get_cards", {"names": [name]})
         assert looked_up["not_found"] == [], f"{name} is still not reachable"
@@ -172,25 +180,27 @@ def test_a_banned_card_can_be_looked_up_and_says_it_is_banned():
         assert not any(c["name"] == name for c in found["cards"])
 
 
-def test_a_name_that_does_not_resolve_is_reported_not_dropped():
+def test_a_name_that_does_not_resolve_is_reported_not_dropped(corpus):
     """Silence is the dangerous answer. A lookup that returns one card for two
     names is how a confident claim gets made about the second."""
-    requires_corpus()
     result = tools.run("get_cards",
                        {"names": ["Sol Ring", "Sol Ringg, Destroyer of Typos"]})
     assert [c["name"] for c in result["cards"]] == ["Sol Ring"]
     assert result["not_found"] == ["Sol Ringg, Destroyer of Typos"]
 
 
-def test_colour_identity_comes_back_whole_for_a_double_faced_card():
+def test_colour_identity_comes_back_whole_for_a_double_faced_card(corpus):
     """Rule 2, and the specific error that caused it: Ajani, Nacatl Pariah has
     a white front and a red back, so looking it up by the front face must still
     report {R}{W}. Derived from the mana cost it would read as mono-white and
-    pass a Selesnya legality check it should fail."""
-    requires_corpus()
+    pass a Selesnya legality check it should fail.
+
+    The "corpus predates the card" skip this used to carry is gone: the
+    fixture contains Ajani, so the assertion cannot be quietly stepped over
+    on a machine with an older download.
+    """
     result = tools.run("get_cards", {"names": ["Ajani, Nacatl Pariah"]})
-    if not result["cards"]:
-        pytest.skip("corpus predates the card")
+    assert result["cards"], "Ajani is in tiny_corpus; a miss here is a lookup bug"
     assert sorted(result["cards"][0]["color_identity"]) == ["R", "W"]
 
 

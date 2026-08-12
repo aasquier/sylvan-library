@@ -34,15 +34,56 @@ jobs:
       # loud without failing the build over ordinary churn. Coverage is
       # reported on one interpreter only -- the numbers are identical across
       # both, and printing them twice just makes the log harder to read.
+      #
+      # `pipefail` because the log is teed for the skip check below, and
+      # without it a failing pytest would be masked by a succeeding `tee`.
       - name: Tests
         run: |
+          set -o pipefail
           if [ "${{ matrix.python-version }}" = "3.12" ]; then
-            coverage run -m pytest -q && coverage report
+            coverage run -m pytest -q | tee pytest.log
+            coverage report
           else
-            pytest -q
+            pytest -q | tee pytest.log
           fi
 
+      # The check that would have caught the reason this job was ever green
+      # while testing less than the maintainer's laptop did.
+      #
+      # Until 2026-08-12, 29 tests called `pytest.skip("no corpus available")`
+      # because CI has no `data/mtg.duckdb` -- so the whole card-fact surface
+      # (swap, add, suggestions, search, the simulators, the Claude tools) was
+      # reported as passing while never running. A skipped test is a test
+      # nobody reads the result of, and the failure mode is silent by
+      # construction: the check stays green as the suite quietly shrinks.
+      #
+      # `tests/tiny_corpus.py` builds a real DuckDB corpus in about a second,
+      # so those tests now run here. Exactly two remain, both carrying the
+      # `needs_full_corpus` marker and both explained where they are declared.
+      # If that number moves, this fails and somebody has to say why.
+      - name: The suite must not skip silently
+        run: |
+          expected=2
+          got=$(grep -c '^SKIPPED' pytest.log || true)
+          if [ "$got" != "$expected" ]; then
+            echo "::error::expected $expected skipped test(s), got $got"
+            echo "A skipped test is a test nobody is reading the result of."
+            echo "Either make it run, or mark it needs_full_corpus and raise"
+            echo "the expected count here deliberately."
+            grep '^SKIPPED' pytest.log || true
+            exit 1
+          fi
+          echo "$got skipped, all declared"
+
       - run: ruff check src tests
+
+      # Type checking, on 3.12 only. mypy follows the running interpreter
+      # rather than a pinned `python_version` (see pyproject.toml for why
+      # numpy's stubs force that), so a second run on 3.11 would not be a
+      # second opinion -- it would be the same answer with a worse parser.
+      - name: Types
+        if: matrix.python-version == '3.12'
+        run: mypy
 
   frontend:
     runs-on: ubuntu-latest
@@ -60,7 +101,18 @@ jobs:
       # Run the typecheck on its own so a type error reports as a type error,
       # not as an opaque build failure. This covers the test files too --
       # tsconfig.app.json includes all of src/.
+      #
+      # `strict` went on in tsconfig.app.json on 2026-08-12. Before that this
+      # step ran with strictNullChecks off, so `possibly undefined` was not an
+      # error and a null deref type-checked clean and failed in the browser.
       - run: npx tsc -b
+        working-directory: web
+
+      # oxlint has been a devDependency with a `lint` script since the frontend
+      # landed, and nothing ever ran it. `--deny-warnings` because a warning
+      # nobody is required to look at is a warning nobody looks at -- the two
+      # it reported when this was wired up were both dead re-exports.
+      - run: npx oxlint --deny-warnings
         working-directory: web
 
       # Before the build, so a broken component fails as a failing test rather

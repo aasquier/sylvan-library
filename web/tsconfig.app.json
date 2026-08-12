@@ -17,6 +17,11 @@
     "jsx": "react-jsx",
 
     /* Linting */
+    /* `strict` was absent until 2026-08-12, which meant strictNullChecks was
+       off across the whole frontend: `possibly undefined` was not an error,
+       so a null deref type-checked clean and failed in the browser. Turning
+       it on is the single highest-value change available to this config. */
+    "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
