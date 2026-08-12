@@ -8,9 +8,15 @@ and this module makes three things true of that address every time the app or a
 
 - The account **exists** — created unclaimed (`password_hash IS NULL`) if it
   did not, which is ADR 16's own shape for an account whose password nobody
-  else has ever seen.
+  else has ever seen. Its handle comes from `MTGLAB_ADMIN_USERNAME`, or is
+  derived from the address when that is unset.
 - It is an **admin**.
 - It is **not disabled**.
+
+Those are the three it *reconciles*. The username is not among them: it is used
+when the account is created and never afterwards, because a handle appears in
+URLs and in `mtglab users list`, and changing somebody's at boot is a surprise
+this has no way to warn them about.
 
 Reconciling rather than only creating is the whole point, and it is the
 difference between this and the first-account-wins option ADR 17 rejected. A
@@ -44,6 +50,11 @@ _LOG = logging.getLogger("mtglab.auth")
 def username_for(email: str) -> str:
     """A login handle from an address' local part, sanitised to fit.
 
+    The fallback when `MTGLAB_ADMIN_USERNAME` is unset, and a guess:
+    `ada.lovelace@example.com` becomes `ada.lovelace`, which is usually the
+    name its owner would have picked and sometimes is not. Set the variable
+    when it is not.
+
     `mtglab users invite` has the same problem and answers it differently — it
     refuses and asks for `--username`, because an invited person has to be told
     the handle they were given and one invented by a mangling rule is a bad
@@ -51,8 +62,7 @@ def username_for(email: str) -> str:
 
     Here there is nobody to ask. This runs unattended at boot, and a refusal
     would mean an instance with no admin because an address had a `+` in it. So
-    it mangles, deterministically, and the maintainer can rename by editing the
-    row or by taking the fallback: `admin`.
+    it mangles, deterministically, and the last resort is `admin`.
     """
     local = email.partition("@")[0]
     cleaned = "".join(c for c in local if c.isalnum() or c in "._-").lstrip("._-")
@@ -60,6 +70,25 @@ def username_for(email: str) -> str:
         return users.normalise_username(cleaned)
     except users.InvalidUsername:
         return "admin"
+
+
+def _wanted_username(email: str) -> str:
+    """The configured handle if there is a usable one, else derived from `email`.
+
+    A malformed `MTGLAB_ADMIN_USERNAME` is logged and ignored rather than
+    fatal, for the same reason a malformed address is: an instance that refuses
+    to start because a preference is misspelled has turned a cosmetic problem
+    into an outage.
+    """
+    configured = config.admin_username()
+    if not configured:
+        return username_for(email)
+    try:
+        return users.normalise_username(configured)
+    except users.InvalidUsername as exc:
+        _LOG.error("MTGLAB_ADMIN_USERNAME is unusable (%s); "
+                   "deriving the handle from the address instead", exc)
+        return username_for(email)
 
 
 def _unique_username(con: sqlite3.Connection, wanted: str) -> str:
@@ -114,7 +143,12 @@ def ensure_maintainer(con: sqlite3.Connection | None = None) -> users.User | Non
 
     account = users.get_by_email(con, normalised)
     if account is None:
-        name = _unique_username(con, username_for(normalised))
+        wanted = _wanted_username(normalised)
+        name = _unique_username(con, wanted)
+        if name != wanted:
+            _LOG.warning("the handle %r is taken, so the maintainer account is "
+                         "%r -- rename the other account if that is wrong",
+                         wanted, name)
         account = users.create(con, name, email=normalised, is_admin=True)
         _LOG.warning(
             "created maintainer account %r from MTGLAB_ADMIN_EMAIL -- it has "

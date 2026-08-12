@@ -102,8 +102,11 @@ ADR 17 — an admin route's existence is published in a public repository.
 
 `MTGLAB_ADMIN_EMAIL` names the maintainer, and `auth/bootstrap.py` reconciles
 that account to admin-and-enabled at every start of the app and of every
-`mtglab users` command, creating it unclaimed if absent. Unset, it does nothing,
-which is what a laptop wants. Separately, `users.set_admin` and `set_disabled`
+`mtglab users` command, creating it unclaimed if absent —
+`MTGLAB_ADMIN_USERNAME` gives it a handle, and is the one thing *not*
+reconciled, since renaming somebody at boot is a surprise. Unset, none of it
+happens, which is what a laptop wants. **There is no `MTGLAB_ADMIN_PASSWORD`**
+and there will not be one; ADR 16 stands. Separately, `users.set_admin` and `set_disabled`
 raise `LastAdmin` rather than removing the last admin **who can sign in** —
 enabled and holding a password, because an instance whose only admin is an
 unclaimed invite is locked out just as thoroughly.

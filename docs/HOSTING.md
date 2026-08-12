@@ -469,6 +469,7 @@ primary_region = "iad"          # pick the one nearest you
   MTGLAB_DECKS_DIR = "/app/decks"
   MTGLAB_REQUIRE_AUTH = "1"        # once the login screen exists; §6 step 5c
   MTGLAB_ADMIN_EMAIL = "you@example.com"   # who administers this instance
+  MTGLAB_ADMIN_USERNAME = "you"            # their handle; derived if unset
 
 [mounts]
   source = "mtglab_data"
@@ -864,7 +865,9 @@ here rather than rewriting the sections above.
         first-account-wins because the requirement is a standing invariant
         rather than a moment: `auth/bootstrap.py` reconciles the named address
         to admin-and-enabled at **every start** of the app and of every
-        `mtglab users` command, creating it unclaimed if absent. So a demotion,
+        `mtglab users` command, creating it unclaimed if absent —
+        `MTGLAB_ADMIN_USERNAME` names its handle, or one is derived from the
+        address. So a demotion,
         an accidental disable, or a backup restored from before the account was
         an admin are all repaired by a restart, and none of it depends on the
         volume surviving. **No mail is sent at boot** — the account is claimed

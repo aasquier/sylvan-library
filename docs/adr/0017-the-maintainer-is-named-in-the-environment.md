@@ -109,6 +109,18 @@ things true of the named address and logs whichever it had to change:
 - it is an admin;
 - it is not disabled.
 
+`MTGLAB_ADMIN_USERNAME` names the handle that account is created with, because
+deriving one from the address' local part is a guess and sometimes the wrong
+one. It is deliberately **not** reconciled: a username appears in URLs and in
+`mtglab users list`, and renaming somebody at boot is a surprise nothing here
+could warn them about, so an account found by address keeps the name it has.
+
+**There is no `MTGLAB_ADMIN_PASSWORD` and there will not be one.** ADR 16 is
+unconditional that no password is ever chosen by one person for another, and a
+password in the environment is additionally a password in `fly secrets list`,
+in a process listing, and in whatever file it was pasted into on the way there.
+The bootstrapped account is unclaimed; its holder chooses the password.
+
 **No mail is sent at boot.** A boot that depends on a mail provider is a boot
 that fails when the provider does, and the account is reachable without one:
 `send_reset` already serves unclaimed accounts deliberately, so the maintainer

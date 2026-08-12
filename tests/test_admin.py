@@ -287,6 +287,59 @@ def test_a_taken_username_does_not_rename_anybody(con, monkeypatch):
     assert not users.get(con, "aaron").is_admin
 
 
+def test_the_handle_can_be_configured(con, monkeypatch):
+    """`MTGLAB_ADMIN_USERNAME`, because the derived one is a guess.
+
+    `squieraaron@gmail.com` derives `squieraaron`; the maintainer of this
+    instance wants `gyome`. Without the variable that preference survives only
+    on volumes where somebody once typed it into the CLI.
+    """
+    monkeypatch.setenv("MTGLAB_ADMIN_EMAIL", "squieraaron@gmail.com")
+    monkeypatch.setenv("MTGLAB_ADMIN_USERNAME", "gyome")
+
+    made = bootstrap.ensure_maintainer(con)
+
+    assert made is not None
+    assert made.username == "gyome"
+    assert made.email == "squieraaron@gmail.com"
+    assert made.is_admin
+
+
+def test_an_unusable_handle_is_logged_and_derived_instead(con, monkeypatch,
+                                                          caplog):
+    """A misspelled preference is cosmetic; refusing to start would not be."""
+    monkeypatch.setenv("MTGLAB_ADMIN_EMAIL", "ada@example.com")
+    monkeypatch.setenv("MTGLAB_ADMIN_USERNAME", "not a username!")
+
+    with caplog.at_level("ERROR"):
+        made = bootstrap.ensure_maintainer(con)
+
+    assert made is not None
+    assert made.username == "ada"
+    assert "MTGLAB_ADMIN_USERNAME" in caplog.text
+
+
+def test_the_handle_never_renames_an_existing_account(con, monkeypatch):
+    """Reconciliation covers admin and enabled. It does not cover the handle.
+
+    A username appears in URLs and in `mtglab users list`; changing one at boot
+    is a surprise nothing here could warn its owner about. So an account found
+    by address keeps its name, whatever the variable says.
+    """
+    users.create(con, "squieraaron", password=PASSWORD,
+                 email="squieraaron@gmail.com")
+    monkeypatch.setenv("MTGLAB_ADMIN_EMAIL", "squieraaron@gmail.com")
+    monkeypatch.setenv("MTGLAB_ADMIN_USERNAME", "gyome")
+
+    reconciled = bootstrap.ensure_maintainer(con)
+
+    assert reconciled is not None
+    assert reconciled.username == "squieraaron"
+    assert reconciled.is_admin               # this part *is* reconciled
+    assert users.get(con, "gyome") is None
+    assert users.count(con) == 1
+
+
 @pytest.mark.parametrize("address,expected", [
     ("ada.lovelace@example.com", "ada.lovelace"),
     ("ada+mtg@example.com", "adamtg"),          # `+` is not a username character

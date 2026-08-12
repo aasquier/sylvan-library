@@ -193,6 +193,22 @@ def admin_email() -> str:
     return os.environ.get("MTGLAB_ADMIN_EMAIL", "").strip()
 
 
+def admin_username() -> str:
+    """The maintainer's login handle. `MTGLAB_ADMIN_USERNAME`, empty when unset.
+
+    Only consulted when `admin_email()` names an account that does not exist
+    yet; unset, the handle is derived from the address' local part. It exists
+    because that derivation is a guess — `squieraaron@gmail.com` becomes
+    `squieraaron`, which may not be the name its owner wants in URLs and log
+    lines on every instance they ever deploy.
+
+    It never renames an existing account. A username is a login handle that
+    appears in URLs and in `mtglab users list`, so changing one out from under
+    somebody at boot is a surprise this has no way to warn them about.
+    """
+    return os.environ.get("MTGLAB_ADMIN_USERNAME", "").strip()
+
+
 def base_url() -> str:
     """Where this instance answers, for links that have to work in an inbox.
 
