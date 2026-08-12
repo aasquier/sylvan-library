@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react'
-import { NavLink, Route, Routes } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import Admin from './routes/Admin'
 import CardSearch from './routes/CardSearch'
+import Claim from './routes/Claim'
 import DeckDetail from './routes/DeckDetail'
 import Import from './routes/Import'
 import Library from './routes/Library'
+import Login from './routes/Login'
 import NewDeck from './routes/NewDeck'
 import Simulator from './routes/Simulator'
-import { api, type AuthState, type Health } from './lib/api'
+import { Spinner } from './components/ui'
+import { api, onSessionLost, type AuthState, type Health } from './lib/api'
 
 const NAV = [
   { to: '/', label: 'Library', end: true },
@@ -21,6 +24,9 @@ const NAV = [
 // calls is refused to anybody else by the middleware, before routing (ADR 17),
 // so this decides what is offered and never what is allowed.
 const ADMIN_NAV = { to: '/admin', label: 'Accounts', end: false }
+
+/** Where the emailed link lands. Mirrors `auth.invites.CLAIM_PATH`. */
+const CLAIM_PATH = '/auth/claim'
 
 type Theme = 'light' | 'dark'
 
@@ -37,20 +43,147 @@ function useTheme(): [Theme, () => void] {
   return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))]
 }
 
+function ThemeButton({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
+  return (
+    <button onClick={onToggle}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            className="rounded-md px-2 py-1.5 text-sm"
+            style={{ color: 'var(--text-secondary)', border: '1px solid var(--hairline)' }}>
+      {theme === 'dark' ? '☀' : '☾'}
+    </button>
+  )
+}
+
+/**
+ * The chrome the two logged-out screens get: a wordmark, a theme toggle, and
+ * nothing else.
+ *
+ * No nav and no health line, deliberately. Every link in the nav goes somewhere
+ * the server is about to refuse, and a header that offers them is a header that
+ * lies about what this session can do.
+ */
+function AuthScreen({ theme, onToggleTheme, children }: {
+  theme: Theme
+  onToggleTheme: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-12">
+      <div className="mb-5 flex items-center justify-between">
+        <span className="flex items-center gap-2">
+          <span aria-hidden className="text-lg">🌳</span>
+          <span className="font-semibold tracking-tight">sylvan-library</span>
+        </span>
+        <ThemeButton theme={theme} onToggle={onToggleTheme} />
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * The app, with a gate in front of it that only exists on an instance that
+ * asked for one.
+ *
+ * `GET /api/auth/me` reports `auth_required` and `authenticated` separately, and
+ * this is what that separation is for. With auth off — which is how `mtglab ui`
+ * runs on a laptop, and the only way it has ever run — `auth_required` is false,
+ * the gate is not reached, and there is no login screen, no sign-out button and
+ * no sign of any of this. Collapsing the two flags into one boolean would put a
+ * sign-in form in front of a single-user local app that has no server for it.
+ *
+ * When auth *is* on, the gate replaces the whole shell rather than living
+ * beside it as a route, which mirrors what the server does: the middleware
+ * refuses every path outside `PUBLIC_PATHS` before routing, so there is no
+ * half-logged-in view for a nav bar to be useful in.
+ *
+ * The one thing that renders ahead of the gate is the claim page. Its whole
+ * audience is people who cannot log in yet — that is what the emailed link is
+ * for — so a gate in front of it would be a door locked with its own key
+ * inside.
+ */
 export default function App() {
   const [theme, toggleTheme] = useTheme()
   const [health, setHealth] = useState<Health | null>(null)
   const [auth, setAuth] = useState<AuthState | null>(null)
+  const [checked, setChecked] = useState(false)
+  const [prefill, setPrefill] = useState('')
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const refreshAuth = useCallback(async () => {
+    try {
+      // `is_admin` and not `user?.is_admin`: with auth off the caller is the
+      // local single user, who is an admin and is authenticated as nobody, so
+      // the nested flag is null exactly when the page is most usable.
+      setAuth(await api.me())
+    } catch {
+      // An instance that cannot answer the public endpoint cannot be logged
+      // into either. Falling through to the app is what it did before there
+      // was a login screen, and the individual routes report their own errors.
+      setAuth(null)
+    } finally {
+      setChecked(true)
+    }
+  }, [])
 
   useEffect(() => {
     api.health().then(setHealth).catch(() => setHealth(null))
-    // `is_admin` and not `user?.is_admin`: with auth off the caller is the
-    // local single user, who is an admin and is authenticated as nobody, so
-    // the nested flag is null exactly when the page is most usable.
-    api.me().then(setAuth).catch(() => setAuth(null))
-  }, [])
+    void refreshAuth()
+  }, [refreshAuth])
+
+  // A 401 anywhere means the session ended under us — expired, revoked from the
+  // Accounts page, or signed out in another tab. Re-ask rather than assume:
+  // `me` is public, so it answers when nothing else will, and it distinguishes
+  // "logged out" from "this instance stopped requiring a login".
+  useEffect(() => onSessionLost(() => { void refreshAuth() }), [refreshAuth])
+
+  async function signOut() {
+    try {
+      await api.logout()
+    } finally {
+      await refreshAuth()
+    }
+  }
+
+  if (location.pathname === CLAIM_PATH) {
+    return (
+      <AuthScreen theme={theme} onToggleTheme={toggleTheme}>
+        <Claim onClaimed={(username) => {
+          // Claiming issues no session, so this is a hand-off and not a
+          // redirect-after-login: the username travels to the form the gate is
+          // about to render.
+          setPrefill(username)
+          navigate('/')
+        }} />
+      </AuthScreen>
+    )
+  }
+
+  // Nothing at all until `me` has answered. A login form rendered for the half
+  // second before it lands would flash on every single load of the local app,
+  // which has no login.
+  if (!checked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner label="Loading…" />
+      </div>
+    )
+  }
+
+  if (auth?.auth_required && !auth.authenticated) {
+    return (
+      <AuthScreen theme={theme} onToggleTheme={toggleTheme}>
+        <Login initialUsername={prefill} onSignedIn={refreshAuth} />
+      </AuthScreen>
+    )
+  }
 
   const nav = auth?.is_admin ? [...NAV, ADMIN_NAV] : NAV
+  // Only ever true on an instance that requires a login. With auth off there is
+  // nobody to be signed out of, and offering it would be the regression this
+  // whole flag exists to avoid.
+  const signedIn = Boolean(auth?.auth_required && auth.authenticated)
 
   return (
     <div className="min-h-full">
@@ -60,7 +193,10 @@ export default function App() {
                 borderBottom: '1px solid var(--hairline)',
               }}>
         <div className="mx-auto flex max-w-7xl items-center gap-6 px-6 py-3">
-          <NavLink to="/" className="flex items-center gap-2">
+          {/* `shrink-0` and no wrapping: the signed-in name and Sign out add a
+              second cluster to this row, and without it a narrow window breaks
+              the wordmark across two lines before it touches anything else. */}
+          <NavLink to="/" className="flex shrink-0 items-center gap-2 whitespace-nowrap">
             <span aria-hidden className="text-lg">🌳</span>
             <span className="font-semibold tracking-tight">sylvan-library</span>
           </NavLink>
@@ -87,12 +223,20 @@ export default function App() {
                   : 'no corpus'}
               </span>
             )}
-            <button onClick={toggleTheme}
-                    aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                    className="rounded-md px-2 py-1.5 text-sm"
-                    style={{ color: 'var(--text-secondary)', border: '1px solid var(--hairline)' }}>
-              {theme === 'dark' ? '☀' : '☾'}
-            </button>
+            {signedIn && (
+              <span className="flex items-center gap-2">
+                <span className="hidden text-xs sm:inline" style={{ color: 'var(--text-muted)' }}>
+                  {auth?.user?.username}
+                </span>
+                <button onClick={() => void signOut()}
+                        className="whitespace-nowrap rounded-md px-2 py-1.5 text-sm"
+                        style={{ color: 'var(--text-secondary)',
+                                 border: '1px solid var(--hairline)' }}>
+                  Sign out
+                </button>
+              </span>
+            )}
+            <ThemeButton theme={theme} onToggle={toggleTheme} />
           </div>
         </div>
       </header>

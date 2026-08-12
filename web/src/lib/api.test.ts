@@ -1,4 +1,4 @@
-/** The job-polling state machine.
+/** The job-polling state machine, and what the client does with a refusal.
  *
  * `followJob` is the only genuine state machine in the frontend -- queued ->
  * running -> done/error, with a cancel path -- and it was entirely untested.
@@ -8,10 +8,15 @@
  *
  * Timers are faked, so a test that would take seconds of real polling takes
  * none, and the interval is asserted rather than waited out.
+ *
+ * The second half of the file is the 401 interceptor, which is the frontend's
+ * version of the argument `api/auth.py` makes for a middleware: one place, so
+ * no screen can forget. Its two carve-outs are the interesting part -- a 401
+ * from `login` is an answer about a password, not a session that ended.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { followJob, type Job } from './api'
+import { ApiError, api, followJob, onSessionLost, type Job } from './api'
 
 function job(overrides: Partial<Job> = {}): Job {
   return {
@@ -174,5 +179,137 @@ describe('followJob', () => {
 
     await vi.advanceTimersByTimeAsync(1)
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+/** Refuse every request with this status and body. */
+function refuseWith(status: number, detail: string, headers: Record<string, string> = {}) {
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: false,
+    status,
+    statusText: 'Refused',
+    headers: { get: (name: string) => headers[name] ?? null },
+    json: async () => ({ detail }),
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
+describe('a 401', () => {
+  const unsubscribes: (() => void)[] = []
+
+  /** Register a listener that is torn down after the test. The subscriber set
+   *  is module state, so a leaked listener would fire in every later test. */
+  function listen() {
+    const heard = vi.fn()
+    unsubscribes.push(onSessionLost(heard))
+    return heard
+  }
+
+  afterEach(() => {
+    for (const off of unsubscribes.splice(0)) off()
+  })
+
+  it('announces a lost session, from wherever the request was made', async () => {
+    refuseWith(401, 'authentication required')
+    const heard = listen()
+
+    await expect(api.decks()).rejects.toThrow('authentication required')
+
+    expect(heard).toHaveBeenCalledTimes(1)
+  })
+
+  it('announces it for a write as well as a read', async () => {
+    refuseWith(401, 'authentication required')
+    const heard = listen()
+
+    await expect(api.setNote('gyome-food', 'mulligan', 'keep two lands'))
+      .rejects.toThrow('authentication required')
+
+    expect(heard).toHaveBeenCalledTimes(1)
+  })
+
+  it('reaches every listener, not only the first', async () => {
+    refuseWith(401, 'authentication required')
+    const first = listen()
+    const second = listen()
+
+    await expect(api.decks()).rejects.toThrow()
+
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(second).toHaveBeenCalledTimes(1)
+  })
+
+  it('says nothing once the listener has unsubscribed', async () => {
+    refuseWith(401, 'authentication required')
+    const heard = vi.fn()
+    onSessionLost(heard)()
+
+    await expect(api.decks()).rejects.toThrow()
+
+    expect(heard).not.toHaveBeenCalled()
+  })
+
+  it('is not announced for a failed login', async () => {
+    // The 401 that means "wrong password" belongs in the form as the sentence
+    // the server wrote. Announcing a lost session here would re-render the
+    // screen somebody is mid-typing on, over an event that did not happen.
+    refuseWith(401, 'invalid username or password')
+    const heard = listen()
+
+    await expect(api.login({ username: 'root', password: 'nope' }))
+      .rejects.toThrow('invalid username or password')
+
+    expect(heard).not.toHaveBeenCalled()
+  })
+
+  it('is not announced for `me`, which is what the announcement re-asks', async () => {
+    // `me` is public and cannot 401 today. If that ever changed, announcing it
+    // here would be a loop: the listener's whole job is to call this endpoint.
+    refuseWith(401, 'authentication required')
+    const heard = listen()
+
+    await expect(api.me()).rejects.toThrow()
+
+    expect(heard).not.toHaveBeenCalled()
+  })
+
+  it('is not announced for a 403, which is a different answer', async () => {
+    // An admin route refused to a non-admin (ADR 17). The session is fine; it
+    // is the person who is not an admin, and bouncing them to a login form
+    // would suggest signing in again would help.
+    refuseWith(403, 'admin only')
+    const heard = listen()
+
+    await expect(api.accounts()).rejects.toThrow('admin only')
+
+    expect(heard).not.toHaveBeenCalled()
+  })
+})
+
+describe('a 429', () => {
+  it('carries Retry-After onto the error, in seconds', async () => {
+    refuseWith(429, 'too many attempts -- wait and try again', { 'Retry-After': '45' })
+
+    await expect(api.login({ username: 'root', password: 'nope' }))
+      .rejects.toMatchObject({ status: 429, retryAfter: 45 })
+  })
+
+  it('leaves it null when the header is absent', async () => {
+    refuseWith(429, 'too many attempts -- wait and try again')
+
+    const caught = await api.requestReset('someone@example.com').catch((e) => e)
+    expect(caught).toBeInstanceOf(ApiError)
+    expect(caught.retryAfter).toBeNull()
+  })
+
+  it('leaves it null for a header that is not a number of seconds', async () => {
+    // `Retry-After` also has an HTTP-date spelling. The API does not send one,
+    // but a proxy in front of it might, and a countdown from `NaN` is worse
+    // than no countdown.
+    refuseWith(429, 'too many requests', { 'Retry-After': 'Wed, 12 Aug 2026 09:00:00 GMT' })
+
+    const caught = await api.requestReset('someone@example.com').catch((e) => e)
+    expect(caught.retryAfter).toBeNull()
   })
 })

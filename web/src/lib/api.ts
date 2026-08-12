@@ -294,15 +294,106 @@ export interface AccountList {
   admins: number
 }
 
+/** `POST /api/auth/login`. The session is the cookie; this is who it belongs to. */
+export interface LoginResult {
+  user: { id: number; username: string; is_admin: boolean }
+}
+
+/** `POST /api/auth/claim`. Note what is *not* here: a session.
+ *
+ * Redeeming an emailed link sets a password and does not log anybody in — a
+ * cookie here would turn a link that arrived by mail into a session-minting
+ * endpoint, and what it would save is one trip through a login form that has to
+ * work anyway. The username comes back so that form can be filled in.
+ */
+export interface ClaimResult {
+  detail: string
+  username: string
+}
+
 export class ApiError extends Error {
   // Declared explicitly rather than as a constructor parameter property, which
   // tsconfig's erasableSyntaxOnly disallows.
   status: number
+  /** Seconds from `Retry-After`, on the 429s login, reset and claim can give. */
+  retryAfter: number | null
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, retryAfter: number | null = null) {
     super(message)
     this.status = status
+    this.retryAfter = retryAfter
   }
+}
+
+/* ------------------------------------------------------- the lost session */
+
+/**
+ * A 401 from anywhere means the session ended under us — expired, revoked from
+ * the Accounts page, or signed out in another tab.
+ *
+ * Handled here rather than in each route, and that is the same argument
+ * `api/auth.py` makes for a middleware over a per-route dependency: eleven
+ * routes each catching their own 401 is eleven chances to forget, and the one
+ * added in a year is the one that renders a blank page with an unexplained
+ * error. One place means every screen gets it, including the ones not written
+ * yet.
+ *
+ * The listener is deliberately *not* a redirect. This module knows nothing
+ * about the router, and the shell already re-asks `/api/auth/me` — which is
+ * public, so it answers when nothing else does — rather than assuming what a
+ * 401 meant.
+ */
+type SessionListener = () => void
+
+const sessionListeners = new Set<SessionListener>()
+
+/** Be told when a request was refused for want of a session. Returns the
+ *  unsubscribe, so a `useEffect` can return it directly. */
+export function onSessionLost(listener: SessionListener): () => void {
+  sessionListeners.add(listener)
+  return () => {
+    sessionListeners.delete(listener)
+  }
+}
+
+/**
+ * The two paths whose 401 is an answer rather than an expiry.
+ *
+ * `login` answers 401 for a wrong password, which belongs in the form as the
+ * sentence the server wrote — announcing a lost session there would clear the
+ * screen somebody is mid-typing on.
+ *
+ * `me` is public and cannot 401 today. It is listed anyway because the listener
+ * re-asks it: if that ever changed, an unlisted `me` would be a loop.
+ */
+const ANSWERS_WITH_401 = new Set(['/api/auth/login', '/api/auth/me'])
+
+function retryAfterOf(resp: Response): number | null {
+  // `?.` because a hand-built response stub in a test has no headers, and a
+  // missing `Retry-After` and an absent header bag mean the same thing here.
+  const raw = resp.headers?.get('Retry-After')
+  if (!raw) return null
+  const seconds = Number(raw)
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : null
+}
+
+/** Turn a failed response into the error to throw, announcing a lost session. */
+async function refuse(resp: Response, path: string): Promise<never> {
+  let detail = `${resp.status} ${resp.statusText}`
+  try {
+    const parsed = await resp.json()
+    // A refusal is a plain sentence the user should read as written — "a card
+    // in a curated deck needs a `why`". FastAPI's own validation errors arrive
+    // as an array, which has no such sentence, so those get stringified.
+    if (typeof parsed?.detail === 'string') detail = parsed.detail
+    else if (parsed?.detail) detail = JSON.stringify(parsed.detail)
+  } catch {
+    /* non-JSON error body; the status line is all we have */
+  }
+  if (resp.status === 401 && !ANSWERS_WITH_401.has(path.split('?')[0])) {
+    for (const listener of sessionListeners) listener()
+  }
+  throw new ApiError(detail, resp.status, retryAfterOf(resp))
 }
 
 /** The message to show for a caught value.
@@ -324,16 +415,7 @@ export function errorMessage(e: unknown): string {
 
 async function get<T>(path: string): Promise<T> {
   const resp = await fetch(path)
-  if (!resp.ok) {
-    let detail = `${resp.status} ${resp.statusText}`
-    try {
-      const body = await resp.json()
-      if (body?.detail) detail = body.detail
-    } catch {
-      /* non-JSON error body; the status line is all we have */
-    }
-    throw new ApiError(detail, resp.status)
-  }
+  if (!resp.ok) await refuse(resp, path)
   return resp.json() as Promise<T>
 }
 
@@ -343,20 +425,7 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body ?? {}),
   })
-  if (!resp.ok) {
-    let detail = `${resp.status} ${resp.statusText}`
-    try {
-      const parsed = await resp.json()
-      // A refusal is a plain sentence the user should read as written — "a
-      // card in a curated deck needs a `why`". FastAPI's own validation errors
-      // arrive as an array, which has no such sentence, so those get stringified.
-      if (typeof parsed?.detail === 'string') detail = parsed.detail
-      else if (parsed?.detail) detail = JSON.stringify(parsed.detail)
-    } catch {
-      /* keep the status line */
-    }
-    throw new ApiError(detail, resp.status)
-  }
+  if (!resp.ok) await refuse(resp, path)
   return resp.json() as Promise<T>
 }
 
@@ -596,8 +665,26 @@ export const api = {
   interview: (slug: string, body: { card: string; stance?: string; focus?: string }) =>
     post<InterviewReport>(`/api/decks/${slug}/interview`, body),
   // Public, so it is the one call that works before anything else does. The
-  // nav reads it to decide whether to offer the admin page at all.
+  // shell reads it to decide whether to ask for a login at all, and the nav to
+  // decide whether to offer the admin page.
   me: () => get<AuthState>('/api/auth/me'),
+  // The session is the cookie the server sets, which is `HttpOnly` — so this
+  // client never holds it, cannot read it, and has nothing to store. What comes
+  // back is who it belongs to; the shell re-asks `me` for the rest.
+  login: (body: { username: string; password: string }) =>
+    post<LoginResult>('/api/auth/login', body),
+  logout: () => post<{ authenticated: boolean }>('/api/auth/logout', {}),
+  // Answers the same fixed 202 for every address, and the UI must not add a
+  // confirmation the server carefully declined to give (ADR 16). Show
+  // `detail` as written; it is the whole of what anybody is allowed to learn.
+  requestReset: (email: string) =>
+    post<{ detail: string }>('/api/auth/reset', { email }),
+  // Redeem an emailed link. The token comes out of `location.hash` — never the
+  // query string, which would put a live credential in every access log along
+  // the way; see `auth/invites.py`. This POST is the only request that carries
+  // it, in a JSON body rather than a URL.
+  claim: (body: { token: string; password: string }) =>
+    post<ClaimResult>('/api/auth/claim', body),
   // Everything under here is refused to a non-admin by the middleware, before
   // routing (ADR 17). Hiding the nav entry is a courtesy to the person using
   // the app, never the protection — a 403 is what actually stops anybody.

@@ -111,14 +111,28 @@ raise `LastAdmin` rather than removing the last admin **who can sign in** —
 enabled and holding a password, because an instance whose only admin is an
 unclaimed invite is locked out just as thoroughly.
 
-One thing auth still does **not** have, and it is the blocker for deploying with
-auth on (`docs/HOSTING.md` §6 step 5c):
+The browser side is built (`docs/HOSTING.md` §6 step 5c), so auth is complete
+code-side and what is left before a deployment is infrastructure. **Auth is a
+gate, not a route**: with `MTGLAB_REQUIRE_AUTH` on and nobody signed in,
+`App.tsx` renders `routes/Login.tsx` in place of the header, the nav and the
+router — the client's version of a middleware that refuses everything outside
+`PUBLIC_PATHS` before routing. With auth off the gate is never reached and the
+app is unchanged: no login, no sign-out button, nothing. That is what
+`auth_required` and `authenticated` are two fields for, and `App.test.tsx`
+pins it.
 
-- **No login screen**, and no claim page for the emailed link. The token
-  arrives in the URL *fragment*, so the page must read `location.hash` — a
-  query string would put a live credential in every access log. Everything
-  else is built, including the Accounts page, which with auth on is behind a
-  door nobody can currently open.
+`routes/Claim.tsx` is the page the emailed link lands on. The token arrives in
+the URL *fragment*, so it reads `location.hash` and never the query string —
+which would put a live credential in every access log — and it is cleared from
+the address bar only once spent, because a refused attempt has to be
+retryable. **Claiming sets no session**; it hands the username to the login
+form. A 401 from any fetch is handled once, in `lib/api.ts`, which announces a
+lost session so the shell can re-ask `/api/auth/me` rather than each screen
+guessing. Login and reset are rate limited and answer 429 with `Retry-After`,
+which the forms count down. The reset answer is rendered **verbatim** and
+never as a confirmation: the endpoint says the same thing whether or not the
+address exists, and a cheerful "check your inbox" would leak from the client
+what ADR 16 built the server not to say.
 
 Keep `mana.py` and `sim/` dependency-light (stdlib + numpy). DuckDB stays
 behind `cards/db.py`. That boundary is what keeps the simulation core fast to

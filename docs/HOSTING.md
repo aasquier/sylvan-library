@@ -68,11 +68,15 @@ These are needed before any deployment works at all:
 > `MTGLAB_REQUIRE_AUTH` is set**, because the local single-user app is how this
 > runs today and putting a login in front of it would be a regression.
 >
-> **What is left is browser-side and administrative**, and both block a deploy
-> with auth on: a login screen (there is none, so the SPA 401s on every fetch),
-> and an **admin surface** — `is_admin` is stored on every account and carried
-> on the request scope, but nothing yet *requires* it, so an admin today is a
-> flag with no privileges attached. §6 steps 5c and 5d, and §7 tracks both.
+> **The browser side landed 2026-08-12 too**, and with it the last code-side
+> blocker on deploying with auth on. `web/src/routes/Login.tsx` and
+> `Claim.tsx` are the two logged-out screens; `App.tsx` is the gate that decides
+> whether either is ever shown, and it reads `auth_required` and `authenticated`
+> as the two separate flags this section's endpoint was careful to report. With
+> auth off nothing about the app changes — no login, no gate, no sign-in
+> affordance — which is the property that made a login safe to build at all.
+> §6 steps 5c and 5d, and §7 tracks both. What remains is infrastructure: a
+> `Dockerfile`, a `fly.toml`, a `RESEND_API_KEY` and a verified domain.
 
 ### Use Argon2id, sessions, and no self-signup
 
@@ -467,7 +471,7 @@ primary_region = "iad"          # pick the one nearest you
 [env]
   MTGLAB_DATA_DIR = "/data"
   MTGLAB_DECKS_DIR = "/app/decks"
-  MTGLAB_REQUIRE_AUTH = "1"        # once the login screen exists; §6 step 5c
+  MTGLAB_REQUIRE_AUTH = "1"        # the login screen exists; §6 step 5c
   MTGLAB_ADMIN_EMAIL = "you@example.com"   # who administers this instance
   MTGLAB_ADMIN_USERNAME = "you"            # their handle; derived if unset
 
@@ -756,9 +760,36 @@ Roughly ascending risk, each step independently useful:
    written with a note that a miss must answer identically to a hit.
    What it cannot prove locally is the half it was split out for —
    deliverability. No test sends mail.
-5c. **A login screen**, and the claim page behind the emailed link. The API is
-   finished and the frontend has not been touched. Deploying with auth on
-   before this exists gives an app that loads and 401s on every fetch.
+5c. ~~**A login screen**, and the claim page behind the emailed link.~~
+   **Done 2026-08-12.** `routes/Login.tsx`, `routes/Claim.tsx`, and the gate in
+   `App.tsx`. Four decisions worth finding here rather than in a diff:
+   - *A gate, not a route.* When auth is on, `App` renders the login screen in
+     place of the header, the nav and the router entirely — the same shape the
+     server has, where the middleware refuses everything outside
+     `PUBLIC_PATHS` before routing. There is no half-logged-in view for a nav
+     bar to be useful in, so there is none to render. The one thing that
+     renders *ahead* of the gate is `/auth/claim`, whose whole audience is
+     people the gate would otherwise stop.
+   - *One interceptor, not eleven catch blocks.* A 401 from any request
+     announces a lost session from `lib/api.ts`, and the shell re-asks
+     `/api/auth/me` rather than assuming what it meant. Same argument as the
+     middleware: a per-screen check is a check the twelfth screen will not
+     have. `login` and `me` are the two carve-outs, and a 401 from `login` is
+     an answer about a password rather than a session that ended.
+   - *The claim page reads `location.hash`.* Never the query string — see
+     `auth/invites.py`. The token is held in component state, posted in a JSON
+     body, and stripped from the address bar **on success only**, because a
+     422 for a short password leaves the link intact and the retry needs it.
+   - *The reset answer is rendered verbatim*, in a note that is neither green
+     nor a confirmation. The endpoint says the same thing for an address with
+     an account and one without; a UI that added "check your inbox!" would
+     give away from the client exactly what ADR 16 built the server not to say.
+     `routes/Login.test.tsx` pins it by asserting the rendered node's text
+     *equals* the server's sentence.
+
+   Auth off is untouched and pinned by `App.test.tsx`: no login, no gate, no
+   sign-out button, because `auth_required` and `authenticated` are separate
+   and only the first of them turns any of this on.
 5d. ~~**The admin surface — an admin UI, and the authorization that gives it
    teeth.**~~ **Done 2026-08-12**, and decided in
    [ADR 17](adr/0017-the-maintainer-is-named-in-the-environment.md). `is_admin`
@@ -840,16 +871,22 @@ here rather than rewriting the sections above.
 - [ ] **A refresh procedure.** Cron does not work — Fly volumes attach to
       exactly one machine, so a scheduled second Machine cannot mount the
       corpus. Monthly and by hand is the plan; write it down as a runbook.
-- [ ] **A login screen in the app**, and the claim page behind the emailed
-      link. Build-order step 5c. The API is finished and the frontend has not
-      been touched: with `MTGLAB_REQUIRE_AUTH` on, the SPA loads and every
-      fetch it makes returns 401. `GET /api/auth/me` answers `auth_required`
-      and `authenticated` separately so the client can tell "logged out" from
-      "this instance has no login" — that is the endpoint to build against.
+- [x] **A login screen in the app**, and the claim page behind the emailed
+      link. Build-order step 5c, landed 2026-08-12, and with it the last
+      code-side blocker on deploying with auth on. The gate lives in `App.tsx`
+      and is built on `GET /api/auth/me` answering `auth_required` and
+      `authenticated` separately: with auth off neither screen exists and the
+      app is byte-for-byte what it was, which is what `App.test.tsx` asserts
+      first. A 401 from anywhere is handled once, in `lib/api.ts`, and brings
+      the gate back rather than leaving a screen with an unexplained error.
       The claim page reads the token from `location.hash` (never the query
-      string — see `auth/invites.py` for why) and posts it to
-      `/api/auth/claim`. **Deploying with auth on before this exists gives you
-      an unusable app.**
+      string — see `auth/invites.py` for why), posts it to `/api/auth/claim`,
+      and clears it from the address bar once it is spent; claiming sets no
+      session, so it hands the username to the login form and stops there.
+      Verified end to end against a real server with `MTGLAB_REQUIRE_AUTH=1`
+      — invite, claim, sign in, reload, sign out, reset — not only under
+      Vitest. `.claude/launch.json` has an `mtglab-ui-auth` entry that runs
+      the app that way against a scratch `app.db`.
 - [x] **An admin UI, and admin authorization that means something.**
       Build-order step 5d, landed 2026-08-12 under
       [ADR 17](adr/0017-the-maintainer-is-named-in-the-environment.md). Admin
@@ -857,8 +894,9 @@ here rather than rewriting the sections above.
       non-admin before routing; `tests/test_isolation.py` has a fourth
       classification that is checked against that prefix in both directions and
       sweeps every admin route with a logged-in non-admin, expecting **403**.
-      The Accounts page does what `mtglab users` does. **What it does not tick
-      is reaching it with auth on** — that still needs the login screen above.
+      The Accounts page does what `mtglab users` does, and as of the login
+      screen above it is reachable with auth on — which it was not on the day
+      it shipped.
 - [x] **The maintainer is always an admin, on every instance.** All four parts,
       2026-08-12:
       - **A bootstrap admin.** `MTGLAB_ADMIN_EMAIL`, decided over
