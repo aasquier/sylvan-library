@@ -238,6 +238,82 @@ self-funded box, with four-player pod timings still unmeasured and a
 a decision on which of the two shapes above is worth having. Do the measurement
 first; it is an afternoon and it constrains everything else here.
 
+## 10. Assisted refactor — swap recommendations from three sources
+
+**Not started, recorded 2026-08-11.** The feature Aaron described: point it at a
+deck and get recommended card swaps, backed by Claude's analysis, Tier 1
+simulation, and possibly Forge games against control decks.
+
+This is the first thing that would compose all three systems, and that is both
+why it is valuable and where all of its difficulty is.
+
+### What already exists
+
+More than it looks. The mechanics of a refactor are **done** — `decks swap`,
+`add`, `remove`, `set` are surgical, self-verifying, and available from the CLI,
+the API and the deck page ([ADR 12](docs/adr/0012-decks-are-edited-by-surgical-operations.md)).
+`mtglab decks suggest` already produces a ranked replacement shortlist, and
+`decks/suggest.py` is explicit that it is *a measurement, not a recommendation*.
+Tier 1 answers consistency and land count. Forge plays games. The stance decides
+how much opinion the user wants.
+
+**So this goal is not new machinery. It is the layer that decides what to
+recommend, and the discipline about who said what.**
+
+### Three sources, three different epistemic statuses
+
+ADR 14's third boundary — *say which system answered* — stops being a style note
+here and becomes the central design constraint. A recommendation that blends
+these without labelling them is the failure mode:
+
+| Source | What it can settle | What it cannot |
+| --- | --- | --- |
+| **Deterministic Python** (`suggest.py`, the gate, `mana.py`, `analyze.py`) | legality, colour identity, similarity, curve, category balance, price | whether the deck *wants* the card |
+| **Tier 1** | consistency, land count, castability | anything about opponents, interaction, tutors, or card text beyond mana |
+| **Forge** | whether a line actually works in a real rules engine | see the bias problem below |
+| **Claude** | the meta, why a slot exists, what a card is *for*, whether a spoiler earns a place | any card fact — those come from corpus tools, never recall |
+
+**Every recommendation must carry its provenance**, not as a footnote but as
+part of the object: "the gate says this is illegal" and "Claude thinks this slot
+is weak" are different claims and a user must be able to act on them
+differently.
+
+### The three problems to solve before building
+
+1. **A swap needs a `why`, and Claude cannot write one.** This is the sharpest
+   constraint and it is a feature, not an obstacle. `replace_card` requires a
+   rationale unconditionally ([ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md)),
+   and no stance lifts that. So the output of an assisted refactor is a
+   **proposal**, and the user accepting it *is* them writing why — which is the
+   rationale interview's shape, arriving from the other direction. Build the
+   interview first and this goal inherits its answer.
+2. **Forge results against control decks are not a ranking.** Goal 7's measured
+   numbers apply directly: Forge's AI lost 8–2 with the bracket 5 cEDH deck
+   against a casual dinosaur list. A swap recommended because "Forge won more
+   games with it" is a swap recommended by a judge that plays aggro well and
+   combo badly. If Forge is used here at all it must be **within archetype**,
+   with the caveat attached to the recommendation, and never as the deciding
+   vote. Control decks would also have to be chosen and justified — an arbitrary
+   gauntlet silently defines what "better" means.
+3. **Tier 1 cannot see most of what a swap changes.** It models mana and
+   nothing else, so it can compare two cards' effect on castability and is
+   silent on everything a deckbuilder actually swaps for. Quoting a Tier 1
+   delta as evidence a swap is *good* would be the most authoritative-looking
+   wrong number this project could produce.
+
+### The shape that follows
+
+A recommendation is a **proposal object**, not a diff applied: the card out, the
+candidates in, and per candidate the evidence from each source that has an
+opinion, each labelled. The user picks, writes the rationale, and the existing
+surgical edit applies it — so the write path is unchanged and the gate still
+runs on the result.
+
+**Sequencing:** it sits behind the rationale interview (which solves problem 1)
+and behind the pod measurement (which decides whether problem 2 is answerable at
+all). Nothing about it is blocked *today* except that building it before those
+two would mean guessing at both.
+
 ---
 
 ## Deck migration status
@@ -759,6 +835,11 @@ Forge can run where the app runs**.
    player would notice: one 32-row dataset gives the guild/shard/wedge diagrams,
    the colour-pie lesson and 32 Deck Challenge tracking at once. No Claude, no
    auth, no network.
+6. **Assisted refactor** (goal 10) — swap recommendations from all three
+   sources. Deliberately last: it inherits the rationale interview's answer to
+   "who writes the `why`", and the pod measurement decides whether Forge can
+   contribute to it honestly. Building it before those two means guessing at
+   both.
 
 **Tier 2 is deliberately not on this list.** It waits behind Forge (goal 2).
 **Nor is the leaderboard** (goal 9), which is parked behind the pod measurement
