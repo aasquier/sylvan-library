@@ -67,9 +67,14 @@ which is a decade of work this project is not going to repeat, and `CLAUDE.md`
 already specifies how its results must be reported. That makes this goal the
 Tier 3 bridge rather than a separate build.
 
+**The Forge bridge exists as of 2026-08-11**: `mtglab sim forge <a> <b>` plays
+real Commander games headless and reports them per archetype. `sim/tier3/`,
+setup in [docs/FORGE.md](docs/FORGE.md).
+
 The remaining work is a board-state manager for the UI — still explicitly *not*
-a rules engine — plus the Forge bridge itself. **Whether Forge can be reached
-from a hosted instance at all is an open decision**; see below.
+a rules engine. **Whether Forge can be reached from a hosted instance is still
+an open decision**; the spike measured what it would cost, but did not pick a
+shape. See below.
 
 ## 4. Shopping, swaps, deals
 
@@ -616,9 +621,11 @@ Forge can run where the app runs**.
    without it hands them a gate and a goldfish sim with no opinion in them.
    Sonnet 5, on a separate API account, running locally first — see *The
    account, the model, and the order of work* above.
-3. **Forge feasibility research** — can `forge.jar sim` be driven from here at
-   all, and can it be reached from a hosted instance? Cheap to answer, and it
-   gates goals 2, 3 and 7 together. See the open decision below.
+3. ~~**Forge feasibility research**~~ — ✅ **done 2026-08-11.** `forge.jar sim`
+   is driven from Python, all six decks are fully covered, and the timings are
+   measured. `mtglab sim forge` works locally today. What is left of this item
+   is the *deployment shape*, which the numbers inform but do not decide — see
+   the open decision below.
 4. **Spoiler scan** and **deals/carts** — both self-contained.
 
 **Tier 2 is deliberately not on this list.** It waits behind Forge (goal 2).
@@ -629,30 +636,91 @@ Forge can run where the app runs**.
 
 ### Can Forge run where the app runs?
 
-**Open, recorded 2026-08-11, and it gates goals 2, 3 and 7.**
+**The prior question is answered; the deployment shape is still open.** Recorded
+2026-08-11, gates goals 2, 3 and 7.
 [ADR 14](docs/adr/0014-python-decides-claude-advises.md) makes Forge the thing
 that plays games. Forge is a JVM desktop application with its own card
 database, and `forge.jar sim -d ... -f commander` is a headless mode of it —
 not a library, not a service.
 
-That sits awkwardly against the hosted instance. A Fly.io image carrying a JVM
-plus Forge's card data is a large image with a real per-run CPU cost, and it
-lands straight back on the Fly-versus-Hetzner sizing question below.
+**The feasibility spike ran on 2026-08-11 and Forge works here.** All four
+deliverables landed: a `.dck` exporter, headless Commander games whose results
+parse, the card-coverage pre-flight, and per-game timings. `mtglab sim forge`
+is the surface; `sim/tier3/` is the code; [docs/FORGE.md](docs/FORGE.md) is the
+setup and the workarounds. What it found:
 
-Three shapes, none chosen:
+- **All six curated decks are fully covered.** Forge implements every card in
+  every one of them — 87, 89, 76, 85, 86 and 100 distinct names checked against
+  its own card scripts.
+- **A card Forge does not implement does not stop the game.** It prints a
+  warning and plays on. A deck with three bogus names produced a 96-card game,
+  a winner, and a turn count, with nothing in the result line saying anything
+  was wrong. This is the single most important finding of the spike and the
+  reason coverage is now checked twice, before and after every run.
+- **`brew install openjdk@21` does not work on this machine**, contrary to the
+  prerequisite recorded below. There is no bottle for it on the pinned
+  Homebrew, so it is a source build, and the build refuses: Xcode 12.4, needs
+  14.2. A prebuilt Temurin tarball needs no compiler and works.
+- **`-D` is a lie for single matches.** It is only wired into tournament mode.
+  Decks reach Forge through `forge.profile.properties` instead.
+
+**Timings, on the 2015 MBP, 8 logical CPUs.** Ten games per row, one JVM per
+row, `-c 300`:
+
+| Deck (heads-up vs a fixed opponent) | Median | Mean | Max | Wall for 10 |
+| --- | --- | --- | --- | --- |
+| Goreclaw stompy | 4.6s | 5.7s | 12.1s | 67s |
+| Atla Palani dinos | 4.8s | 6.3s | 17.8s | 72s |
+| Arahbo cats | 5.0s | 5.8s | 11.9s | 67s |
+| Gyome food | 5.8s | 10.2s | 37.8s | 110s |
+| Trostani tokens | 6.7s | **25.3s** | **134.5s** | 262s |
+| Tivit cEDH | 6.8s | 11.0s | 28.1s | 119s |
+
+**The median is not the number that matters; the tail is.** Medians cluster in
+a boring 4.6–6.8s band across every archetype. The means do not: Trostani's is
+four times its median because one game took 134 seconds, and a wide token board
+is combinatorially expensive for the AI to evaluate. Nothing hit the 300s clock,
+so 300 is currently a real ceiling rather than a source of fake draws — but
+120s, Forge's default, would have turned that Trostani game into a draw and
+quietly corrupted the row. **Quote medians and tails, never means.**
+
+JVM boot plus the card database is **~9s, flat**, and it amortises: it is paid
+once per `sim` invocation regardless of `-n`. That is the number that decides
+process shape more than per-game cost does.
+
+**Not yet measured: four-player pods**, which is the shape Commander actually
+plays and therefore the shape a hosted instance would be paying for. A partial
+run showed a Cats/Dinos/Goreclaw/Trostani pod still going after ~4 minutes for
+5 games, against ~67s for 10 heads-up games — so a pod game looks like tens of
+seconds, not seconds, and the token deck is again the driver. **Finish this
+measurement before choosing between server-side and a worker**; the heads-up
+numbers understate the hosted cost and should not be used for that decision on
+their own.
+
+Three shapes, still none chosen — but now with numbers against them:
 
 - **Local only.** Forge simulation is something you get when running `mtglab`
   on your own machine; the hosted instance has a documented feature gap. Keeps
   the deployment small and honest, and is the smallest thing that could work.
-- **Server-side.** Anyone logged in can run Forge sims. Heavier container, and
-  the CPU question reopens.
-- **A separate worker.** The app queues a job; something else runs Forge. Most
-  flexible, most moving parts, and probably premature.
+  *Supported by:* nothing in the spike argues against it, and it is the only
+  shape that needs no new infrastructure at all.
+- **Server-side.** Anyone logged in can run Forge sims. *Supported by:* the
+  ~9s startup amortising over a batch, and by the fact that the run is already
+  a subprocess with a timeout. *Argued against by:* a 470 MB image plus a JVM
+  on a 1 GB Fly instance that also runs DuckDB and numpy, and by 134-second
+  games at 100–200% CPU. This is the Fly-versus-Hetzner sizing question below,
+  and the tail says Hetzner.
+- **A separate worker.** The app queues a job; something else runs Forge.
+  *Supported by:* the tail. A minutes-long run with an unpredictable ceiling is
+  exactly what a queue is for, and `api/jobs.py` already has the shape.
+  *Argued against by:* it is the most moving parts, for a feature no one has
+  asked for yet.
 
-**Answer this with the feasibility spike, not by guessing.** The prior question
-is whether `forge.jar sim` can be driven from Python here at all, with the card
-coverage pre-flight `CLAUDE.md` requires. If it cannot, none of the above
-matters.
+Two things a hosted shape would have to solve that a local one does not:
+`ensure_profile` writes `forge.profile.properties` into the Forge install
+(fine in an image, baked at build time; not fine on a read-only mount decided
+later), and generated `.dck` files are named for the deck slug in one shared
+directory, which two concurrent runs would race on.
 
 #### The spike brief, researched 2026-08-11
 
@@ -683,24 +751,32 @@ winner and the match status, so the output is line-oriented text to parse — no
 JSON, and that parser is part of the spike.
 
 **Prerequisite, checked on this machine:** Forge needs **Java 17+**; the Mac has
-10.0.1 and 1.8. `brew install openjdk@21` resolves cleanly on the pinned
-Homebrew, so this is an install rather than a blocker, and it needs no OS
-upgrade — which matters, since the machine is at its macOS ceiling.
+10.0.1 and 1.8. ~~`brew install openjdk@21` resolves cleanly on the pinned
+Homebrew, so this is an install rather than a blocker~~ — **wrong, corrected
+2026-08-11 by the spike.** The formula resolves but has **no bottle**, so it is
+a source build, and the build refuses on Xcode 12.4 when it wants 14.2. The
+conclusion survives the correction: it needs no OS upgrade, because a prebuilt
+Temurin 21 tarball needs no compiler. See [docs/FORGE.md](docs/FORGE.md).
 
 **What the spike has to produce**, in order, stopping at the first thing that
-fails:
+fails — **all four done 2026-08-11**:
 
-1. A `.dck` exporter from `deck.yaml` — Forge's own deck format, and the first
-   place a mismatch will show up.
-2. One headless Commander game that completes and whose result parses.
-3. **The card-coverage pre-flight.** Non-negotiable per `CLAUDE.md`: Forge does
+1. ✅ A `.dck` exporter from `deck.yaml` — Forge's own deck format, and the first
+   place a mismatch will show up. `sim/tier3/dck.py`; format read off the 13,994
+   `.dck` files Forge ships rather than guessed.
+2. ✅ One headless Commander game that completes and whose result parses.
+   `sim/tier3/parse.py`, matching the literal format strings in
+   `forge.view.SimulateMatch`.
+3. ✅ **The card-coverage pre-flight.** Non-negotiable per `CLAUDE.md`: Forge does
    not implement every card, and silently dropping cards would poison every
    number that follows. Establish how a dropped card is reported *before*
-   trusting any result.
-4. A timing measurement per game, which is what makes the local-vs-hosted
-   question above answerable with a number.
+   trusting any result. **Established, and it is worse than assumed: a dropped
+   card is reported only as a log warning, and the game plays on.** Hence two
+   checks, `sim/tier3/coverage.py` before and `parse.py` after.
+4. ✅ A timing measurement per game, which is what makes the local-vs-hosted
+   question above answerable with a number. Table above.
 
-Only then does the deployment shape get chosen.
+Only then does the deployment shape get chosen — which is where this now sits.
 
 ### What a hosted Claude surface costs, and who pays
 
@@ -737,6 +813,11 @@ a spoiler scan across six decks.
 
 > Full maintainer setup guide, auth design, per-user data model and measured
 > compute analysis now live in [docs/HOSTING.md](docs/HOSTING.md). Summary below.
+>
+> **The running list of what is still missing is
+> [§7, Deployment readiness](docs/HOSTING.md#7-deployment-readiness--the-running-list)**,
+> started 2026-08-11 when hosting stopped being hypothetical. Tick items off
+> there rather than rewriting the plan here.
 
 Wanted: follow along remotely, and eventually point friends at it. Budget is
 not the binding constraint; a few dollars a month is fine.

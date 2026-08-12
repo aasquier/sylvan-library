@@ -330,7 +330,9 @@ updates and TLS.
 
 **Two things could change this sizing, both open decisions in `ROADMAP.md`.**
 Server-side Forge means a JVM plus a card database in the image, which is a
-different class of container than anything costed here. And a Claude surface
+different class of container than anything costed here — **measured on
+2026-08-11, and the numbers are in §7 below; the short version is that it does
+not fit on the 1 GB instance this section prices.** And a Claude surface
 (ADR 14) adds a per-request cost that is *not* CPU — it is somebody's API bill,
 and on a shared instance it is the maintainer's. The numbers above cover the
 app without either.
@@ -651,3 +653,108 @@ Roughly ascending risk, each step independently useful:
 
 Stopping after step 2 is a perfectly good outcome if the multi-user part turns
 out not to matter. Do not build auth until someone wants an account.
+
+---
+
+## 7. Deployment readiness — the running list
+
+Started 2026-08-11, when hosting stopped being hypothetical. Everything above
+is *how* to deploy; this is *what is still missing*, kept as a live list so
+deploy day is an afternoon rather than a discovery exercise. Tick things off
+here rather than rewriting the sections above.
+
+### Already true — do not re-solve these
+
+- [x] **Paths are environment-configurable.** `MTGLAB_DATA_DIR`,
+      `MTGLAB_DECKS_DIR`, and now `MTGLAB_FORGE_HOME` / `MTGLAB_FORGE_PROFILE`
+      / `MTGLAB_JAVA`. This was build-order step 1 and it is done.
+- [x] **Long simulations are already off the request path** — `api/jobs.py`
+      and `api/simruns.py` run them in the background and the UI polls.
+- [x] **The frontend is prebuilt and committed**, so the image needs no Node.
+- [x] **CI refuses to let the corpus or a key be committed** — by filename and
+      by scanning every tracked file's contents, the built bundle included.
+- [x] **Read-only DuckDB is safe across processes and threads**, verified in
+      §3, so `uvicorn --workers 2+` is fine for serving.
+
+### Does not exist yet — this is the actual build list
+
+- [ ] **`Dockerfile`** — §4 step 1 has a draft, but there is no file in the repo.
+- [ ] **`fly.toml`** — likewise.
+- [ ] **A documented corpus-seeding run** against the volume. Not a build step
+      and not a boot step: it needs several minutes and a ~500 MB download, and
+      with scale-to-zero putting boot on the request path it would turn a wake
+      into an outage.
+- [ ] **A refresh procedure.** Cron does not work — Fly volumes attach to
+      exactly one machine, so a scheduled second Machine cannot mount the
+      corpus. Monthly and by hand is the plan; write it down as a runbook.
+- [ ] **Auth.** Nothing today. Not needed for the six curated decks, and
+      **required before any collection feature ships** (rule 5's reasoning does
+      not stop at `git`). Cloudflare Access is free to 50 users and needs no
+      application change.
+- [ ] **Sim result caching** — build-order step 3, the biggest performance win.
+
+### Have these in hand before deploy day
+
+- [ ] Fly account with a card on file (the machine sizes are paid tier).
+- [ ] `SESSION_SECRET` generated (`openssl rand -base64 32`).
+- [ ] A domain, if you want one, plus the Fly TLS certificate step.
+- [ ] Cloudflare Access configured, if the instance is not to be public.
+- [ ] **A second home for `ANTHROPIC_API_KEY`.** One key, one environment, two
+      places once deployed: the gitignored `.env` here and `fly secrets` there.
+      A rotation is not done until both are updated. **The current key is
+      30-day and expires in early September 2026** — a `401` after that is the
+      expiry, not a bug, and there is no staging key to fail first. Consider
+      switching to a **Never**-expiring key once `fly secrets` is holding it,
+      which is the documented choice for a secrets manager you rotate yourself.
+- [ ] A spend limit set on the API workspace, as the backstop.
+
+### Decisions that must be made before, not during
+
+- [ ] **The Forge deployment shape** — local only, server-side, or a worker.
+      Open in `ROADMAP.md`, and the section below is what it costs.
+- [ ] **Fly or Hetzner.** §4 recommends Fly for the app alone. **If Forge goes
+      server-side that recommendation flips**: 1 GB RAM is already the number
+      to watch for DuckDB plus numpy, and Forge wants gigabytes of its own.
+- [ ] **Whether Claude research is gated per user.** The interview is cheap
+      (~$1–1.50 a draft on Sonnet 5); research is the unestimated half. ADR 15's
+      stance dial doubles as the control, and *off* is a defensible default.
+
+### If Forge goes server-side, this is what it adds
+
+Measured during the feasibility spike, 2026-08-11. See
+[FORGE.md](FORGE.md) for the mechanics.
+
+| | Cost |
+| --- | --- |
+| Forge distribution in the image | ~470 MB unpacked |
+| A JRE 17+ | ~190 MB more |
+| JVM boot + card database | **~9s per `sim` invocation**, flat, amortises over `-n` |
+| A heads-up game | median 4.6–6.8s across every archetype |
+| The tail | **one Trostani game took 134s** |
+| Four-player pods | **not yet measured, and heavier** — a pod was still running after ~4 min for 5 games |
+| Heap used in the spike | `-Xmx4096m` |
+
+Four things that are code changes, not just sizing:
+
+- [ ] **`forge.profile.properties` must be baked at image build.** `run.py`
+      writes it into the Forge install directory, because that is the only
+      place Forge reads it from. A read-only mount decided later would break
+      `ensure_profile` at runtime.
+- [ ] **Generated `.dck` files are named for the deck slug in one shared
+      directory.** Two concurrent runs race. Needs a per-run directory before
+      more than one person can press the button.
+- [ ] **Forge must run with its own directory as the working directory**, which
+      constrains how the process is launched in a container.
+- [ ] **Check the licensing before publishing an image.** Forge is GPL-licensed
+      and the image would contain it. Shipping it to a private single-tenant
+      host is one thing; publishing that image is redistribution and has
+      obligations attached. Answer this properly rather than assuming — it has
+      not been researched, and it is the kind of thing that is cheap to get
+      right up front and expensive to unwind.
+
+**The honest read right now:** local-only is unblocked and costs nothing.
+Server-side is affordable on a Hetzner box and not on the 1 GB Fly instance
+§3 prices. A worker is what the 134-second tail actually argues for, and
+`api/jobs.py` already has the shape — but it is the most moving parts for a
+feature nobody has asked for yet. **Measure the pods before choosing between
+the last two.**

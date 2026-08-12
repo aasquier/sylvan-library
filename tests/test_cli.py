@@ -456,3 +456,24 @@ def test_load_all_decks_reads_every_deck_in_the_configured_directory(decks):
     loaded = load_all_decks()
     assert [d.slug for d in loaded] == ["mini"]
     assert loaded[0].total_cards == 99, "qty must be counted, not entries"
+
+
+# -------------------------------------------------------------- sim forge
+
+def test_forge_without_the_distribution_exits_with_advice(decks, monkeypatch):
+    """A missing 467 MB download is a setup problem, not a traceback."""
+    monkeypatch.setenv("MTGLAB_FORGE_HOME", str(decks / "nowhere"))
+    code, msg = run(["sim", "forge", "mini", "mini", "--check-only"])
+    assert code == 1
+    assert "MTGLAB_FORGE_HOME" in msg
+
+
+def test_forge_check_only_names_the_cards_forge_lacks(decks, monkeypatch):
+    """The pre-flight has to fail loudly and say which card, because the
+    alternative -- Forge dropping it and playing on -- is silent."""
+    from mtglab.sim.tier3 import run as forge
+    monkeypatch.setattr(forge, "implemented_names",
+                        lambda *a, **k: frozenset({"Swamp", "Gyome, Master Chef"}))
+    code, msg = run(["sim", "forge", "mini", "mini", "--check-only"])
+    assert code == 1
+    assert "Sol Ring" in msg
