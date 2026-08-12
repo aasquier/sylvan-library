@@ -234,9 +234,15 @@ leaderboard on top of that needs *continuous* simulation compute — on a
 self-funded box, with four-player pod timings still unmeasured and a
 134-second game already observed.
 
-**What would unpark it:** the pod measurement from the Forge open decision, plus
-a decision on which of the two shapes above is worth having. Do the measurement
-first; it is an afternoon and it constrains everything else here.
+**What would unpark it — and what the measurement said.** The pod timings landed
+2026-08-11 (see the Forge open decision below) and they argue *against* a
+leaderboard rather than for one: a 5-game pod is ~18 minutes of near-saturated
+CPU, and **40% of pod games hit the 300s clock**, so a meaningful sample would
+be hours of compute producing a table where a large share of rows are the
+measurement giving up. Combined with the archetype bias, a leaderboard would be
+expensive *and* misleading. **Still parked**, now for a measured reason rather
+than an unknown one; what remains is a decision on which of the two shapes
+above is worth having at all.
 
 ## 10. Assisted refactor — swap recommendations from three sources
 
@@ -903,14 +909,47 @@ JVM boot plus the card database is **~9s, flat**, and it amortises: it is paid
 once per `sim` invocation regardless of `-n`. That is the number that decides
 process shape more than per-game cost does.
 
-**Not yet measured: four-player pods**, which is the shape Commander actually
-plays and therefore the shape a hosted instance would be paying for. A partial
-run showed a Cats/Dinos/Goreclaw/Trostani pod still going after ~4 minutes for
-5 games, against ~67s for 10 heads-up games — so a pod game looks like tens of
-seconds, not seconds, and the token deck is again the driver. **Finish this
-measurement before choosing between server-side and a worker**; the heads-up
-numbers understate the hosted cost and should not be used for that decision on
-their own.
+**Four-player pods, measured 2026-08-11** — the shape Commander actually plays,
+and therefore the shape a hosted instance would be paying for. Same machine,
+`-c 300`:
+
+| Pod | Games | Median | Mean | Max | **Clocked out** | Wall |
+| --- | --- | --- | --- | --- | --- | --- |
+| A — Cats / Dinos / Goreclaw / Trostani | 5 | **283s** | 210s | 300s | **2 of 5** | 17.7 min |
+| B — Tivit / Gyome / Cats / Dinos | 4 of 5 † | 126s | 158s | 300s | 1 of 4 | — |
+
+† Pod B was stopped after four games; treat its row as indicative, not a
+measurement. Pod A is complete.
+
+**The runtime is not the finding. The clock-out rate is.** Heads-up, nothing
+came within 100s of the 300s clock. In a pod, **40% of games hit it** — and a
+clocked game is the measurement giving up, not a result. They are recorded as
+`timed_out` and reported separately from draws, which is exactly why
+`CLAUDE.md` insisted on that distinction.
+
+That creates a bind: raising the clock to make pod games honest makes runs
+proportionally longer. A 600s clock plausibly puts one 5-game pod past half an
+hour. **There is no setting at which pod simulation is both honest and quick on
+this hardware.**
+
+**Why pods are slow, from Forge's own diagnostic.** When the clock trips Forge
+dumps the AI thread's stack under `AI eval thread at timeout:`, and it lands in
+`ComputerUtilCard.shouldPumpCard` / `PumpAllAi` — the AI evaluating a mass pump
+across a wide board, now with three opponents' boards to weigh instead of one.
+The same mechanism as the 134s Trostani heads-up outlier, multiplied by the
+table.
+
+Both runs were clean: **0 unsupported cards, 0 abandoned games.**
+
+One observation worth flagging rather than concluding from: in pod B's four
+games, Tivit and Gyome — the two decks Forge plays badly — won **none**, while
+the dinosaurs won three. Four games proves nothing, but it points the same way
+as the 8–2 heads-up result in goal 7.
+
+**What this does and does not settle.** It sizes the hosted question: a pod run
+is tens of minutes of near-saturated CPU, which is a background job on a
+dedicated box, not a request on a shared one. It does **not** choose the
+deployment shape — that stays open, and stays Aaron's call.
 
 Three shapes, still none chosen — but now with numbers against them:
 
