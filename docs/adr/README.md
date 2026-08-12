@@ -18,7 +18,7 @@ they differ.
 | [2](0002-duckdb-for-the-card-corpus.md) | DuckDB for the card corpus — not SQLite, not Postgres, not the API | Accepted |
 | [3](0003-tier-1-stays-python.md) | Tier 1 stays Python; a compiled port is deferred with a written trigger | Accepted |
 | [4](0004-two-embedded-databases.md) | Two embedded databases when hosting, and two tiers of deck | Proposed |
-| [5](0005-sessions-over-jwts-and-no-self-signup.md) | Sessions over JWTs, and no self-signup | Proposed |
+| [5](0005-sessions-over-jwts-and-no-self-signup.md) | Sessions over JWTs, and no self-signup | Proposed — "no self-signup" superseded by [16](0016-accounts-are-invited-and-passwords-are-self-served.md) |
 | [6](0006-never-redistribute-scryfall-bulk-data.md) | Never redistribute Scryfall bulk data; refresh it in place, on demand | Accepted |
 | [7](0007-card-facts-come-from-the-corpus.md) | Card facts come from the corpus, never from memory | Accepted |
 | [8](0008-the-gate-blocks.md) | The gate blocks, and an unevaluated rule warns rather than passing | Accepted |
@@ -29,9 +29,16 @@ they differ.
 | [13](0013-an-imported-deck-is-a-draft.md) | An imported deck is a draft until every card is justified | Accepted |
 | [14](0014-python-decides-claude-advises.md) | Python decides, Claude advises, and Forge plays the games | Accepted |
 | [15](0015-claude-surfaces-are-modes-with-capabilities.md) | Claude surfaces are modes with a user-set stance, and no stance may write a rationale | Accepted |
+| [16](0016-accounts-are-invited-and-passwords-are-self-served.md) | Accounts are invited, and passwords are self-served by email | Proposed |
 
 **Proposed** means the decision is made and argued but nothing implements it
-yet — 4 and 5 describe a deployment that does not exist.
+yet — 4, 5 and 16 describe a deployment that does not exist.
+
+16 supersedes exactly one paragraph of 5, which is the pattern this directory is
+for: 5's "no self-signup" was a good argument that lost to a better one a day
+before anybody wrote auth code, and both readings are worth having side by side.
+The rest of 5 — sessions over JWTs, Argon2id, the scoped accessor, the isolation
+test — is untouched.
 
 14 and 15 were Proposed for exactly one day, which was the point: they drew the
 boundary for a model integration before the first client call rather than after
