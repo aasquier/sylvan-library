@@ -467,6 +467,8 @@ primary_region = "iad"          # pick the one nearest you
 [env]
   MTGLAB_DATA_DIR = "/data"
   MTGLAB_DECKS_DIR = "/app/decks"
+  MTGLAB_REQUIRE_AUTH = "1"        # once the login screen exists; §6 step 5c
+  MTGLAB_ADMIN_EMAIL = "you@example.com"   # who administers this instance
 
 [mounts]
   source = "mtglab_data"
@@ -504,7 +506,14 @@ fly secrets set SESSION_SECRET="$(openssl rand -base64 32)"
 fly secrets set ANTHROPIC_API_KEY="paste-it-here"   # only once ADR 15's modes exist
 ```
 
-Never put either in `fly.toml` or the repo. Fly stores them encrypted, injects
+`MTGLAB_ADMIN_EMAIL` is **not** a secret and goes in `[env]` above rather than
+here — it is an address, not a credential. It is still worth guarding: whoever
+can change it is an admin on the next boot (ADR 17). That is already true of
+anybody who can run `fly secrets` or `fly deploy`, so it grants nothing new,
+and every change the reconciliation makes is written to the log.
+
+Never put either of the secrets in `fly.toml` or the repo. Fly stores them
+encrypted, injects
 them as environment variables at runtime, and setting one triggers a redeploy —
 so they are never in the image either. Rotating `SESSION_SECRET` logs everyone
 out, which is the correct emergency response to a suspected session leak.
@@ -639,6 +648,16 @@ fly certs show mtg.yourdomain.com
 
 ### Step 8 — create your account
 
+**Usually you do not.** `MTGLAB_ADMIN_EMAIL` from step 4 has already created it:
+the app reconciles that address to an enabled admin every time it starts
+(ADR 17), so a deployed instance comes up with your account in place and no
+password on it. Claim it from the sign-in page's "forgot password" link — an
+unclaimed account gets a reset link deliberately — and you are in without ever
+opening a shell.
+
+The shell path is the break-glass one, for a misconfigured mail provider or a
+`MTGLAB_ADMIN_EMAIL` you got wrong:
+
 ```bash
 fly ssh console -C "mtglab users add aaron --email you@example.com --admin"
 ```
@@ -648,9 +667,9 @@ no way to pass one as an argument, because command-line arguments land in shell
 history and in the process table.
 
 Everyone else gets an invite rather than an account you made a password for
-(ADR 16). Until that ships, `mtglab users add <name> --no-password` creates the
-account in exactly the state an invite leaves it — existing, unable to log in —
-and the holder claims it however you arrange.
+(ADR 16) — `mtglab users invite <email>`, or the Accounts page once you are in.
+Note that neither the CLI nor that page will demote or disable the last admin
+who can sign in; to hand the instance over, promote the successor first.
 
 ---
 
@@ -739,26 +758,32 @@ Roughly ascending risk, each step independently useful:
 5c. **A login screen**, and the claim page behind the emailed link. The API is
    finished and the frontend has not been touched. Deploying with auth on
    before this exists gives an app that loads and 401s on every fetch.
-5d. **The admin surface — an admin UI, and the authorization that gives it
-   teeth.** `is_admin` exists on the account, on `UserScope`, and in
-   `/api/auth/me`, and **nothing reads it to decide anything**. Two halves,
-   and the second is the one with the security argument in it:
-   - *Enforcement.* An `admin` classification alongside public/shared/
-     user-scoped in `tests/test_isolation.py`, so an admin route is refused to
-     a non-admin by the same generated sweep that already refuses an
-     unauthenticated one — and a new admin route that forgets the check fails
-     the suite rather than shipping.
-   - *A surface.* Accounts, invites, disable/enable, live sessions — the
-     `mtglab users` commands as a page, for the same reason the deck editor is
-     a page: a hosted app whose administration is SSH-only is one the
-     maintainer can only run from a laptop with the key on it.
+5d. ~~**The admin surface — an admin UI, and the authorization that gives it
+   teeth.**~~ **Done 2026-08-12**, and decided in
+   [ADR 17](adr/0017-the-maintainer-is-named-in-the-environment.md). `is_admin`
+   had been on the account, on `UserScope` and in `/api/auth/me` since the auth
+   core, with nothing reading it. Both halves landed together:
+   - *Enforcement.* Admin routes live under `/api/admin`, and `api/auth.py`'s
+     middleware refuses the whole prefix to a non-admin **before routing** —
+     the same mechanism as `PUBLIC_PATHS`, so a route is protected by where it
+     is mounted rather than by what its author remembered. `deps.Admin` is the
+     second check on the handlers themselves, which is what an admin route
+     mounted outside the prefix would have. `tests/test_isolation.py` gained an
+     `admin` classification alongside public/shared/user-scoped: it is checked
+     against the prefix in both directions, and the generated sweep logs in as
+     a non-admin and requires **403**. 403 rather than ADR 5's 404 is
+     deliberate — an admin route's existence is published in a public
+     repository, so there is nothing for a 404 to hide.
+   - *A surface.* `api/admin.py` — list, invite, promote/demote,
+     disable/enable, send a reset link, revoke sessions — and the **Accounts**
+     page behind it. No password field, and there will not be one: ADR 16 is
+     unconditional that nobody chooses a password for anybody else.
 
-   **The maintainer must always be an admin, on every instance** — see the
-   dedicated item in §7 for what that requires, because "there is always at
-   least one admin, and it is me" is a property nothing currently guarantees.
-   The CLI stays regardless: it is the bootstrap path (the first account on a
-   fresh deployment predates anyone who could log in to create it) and the
-   break-glass path when mail is misconfigured.
+   The maintainer requirement is met by `MTGLAB_ADMIN_EMAIL`; see §7. The CLI
+   stays regardless: it is the bootstrap path (the first account on a fresh
+   deployment predates anyone who could log in to create it) and the
+   break-glass path when mail is misconfigured. `mtglab users promote|demote`
+   landed with this, because `users.set_admin` had had no caller at all.
 6. **User decks** in `user_decks`, reusing the existing YAML parser, gate and
    artifact generator.
 7. **Process pool for sweeps** once anyone actually complains about the wait.
@@ -824,34 +849,47 @@ here rather than rewriting the sections above.
       string — see `auth/invites.py` for why) and posts it to
       `/api/auth/claim`. **Deploying with auth on before this exists gives you
       an unusable app.**
-- [ ] **An admin UI, and admin authorization that means something.**
-      Build-order step 5d, added 2026-08-12. `is_admin` is stored, carried on
-      `UserScope`, and reported by `/api/auth/me` — and **no route or function
-      requires it**, so today an admin differs from any other account only in
-      what `mtglab users list` prints beside their name. Needs both halves:
-      an enforced `admin` classification in `tests/test_isolation.py`, and a
-      page that does what `mtglab users` does. Administering a hosted app over
-      SSH only works while the maintainer is at the machine with the key.
-- [ ] **The maintainer is always an admin, on every instance.** Stated as a
-      requirement 2026-08-12, and nothing currently guarantees it. Four things
-      it needs, none of them large and all of them easier before there is data
-      to migrate:
-      - **A bootstrap admin.** A fresh deployment has an empty `users` table
-        and no way in. Either the first account created is admin
-        automatically, or an env var (`MTGLAB_ADMIN_EMAIL`) mints an invite for
-        it on first boot. The env-var form is the one that survives a volume
-        being recreated; the first-account form is the one with no new
-        configuration in it. **Decide before the first deploy, not after.**
-      - **No last-admin lockout.** `users.set_admin` and `set_disabled` will
-        both happily remove the only admin an instance has. Refuse that, in
-        the auth core rather than in a handler, so the CLI and any future
-        admin page inherit it.
-      - **A way to grant it after the fact.** `users.set_admin` exists and no
-        command calls it; `--admin` at creation is the only path today.
-      - **Recovery that does not depend on the app.** `mtglab users` against
-        the volume over `fly ssh console` is the answer, and it is a reason
-        the CLI stays after the admin UI ships rather than being replaced
-        by it.
+- [x] **An admin UI, and admin authorization that means something.**
+      Build-order step 5d, landed 2026-08-12 under
+      [ADR 17](adr/0017-the-maintainer-is-named-in-the-environment.md). Admin
+      routes live under `/api/admin` and the middleware refuses the prefix to a
+      non-admin before routing; `tests/test_isolation.py` has a fourth
+      classification that is checked against that prefix in both directions and
+      sweeps every admin route with a logged-in non-admin, expecting **403**.
+      The Accounts page does what `mtglab users` does. **What it does not tick
+      is reaching it with auth on** — that still needs the login screen above.
+- [x] **The maintainer is always an admin, on every instance.** All four parts,
+      2026-08-12:
+      - **A bootstrap admin.** `MTGLAB_ADMIN_EMAIL`, decided over
+        first-account-wins because the requirement is a standing invariant
+        rather than a moment: `auth/bootstrap.py` reconciles the named address
+        to admin-and-enabled at **every start** of the app and of every
+        `mtglab users` command, creating it unclaimed if absent. So a demotion,
+        an accidental disable, or a backup restored from before the account was
+        an admin are all repaired by a restart, and none of it depends on the
+        volume surviving. **No mail is sent at boot** — the account is claimed
+        from the sign-in page's reset link, which already serves unclaimed
+        accounts, or over `mtglab users invite`.
+      - **No last-admin lockout.** `users.set_admin` and `set_disabled` raise
+        `LastAdmin` rather than removing the last admin *who can sign in* —
+        enabled and holding a password, because an instance whose only admin is
+        an unclaimed invite is locked out just as thoroughly. In the auth core
+        and inside a `BEGIN IMMEDIATE` transaction, so the CLI, the routes and
+        anything written later inherit it and two concurrent callers cannot
+        walk through it together.
+      - **A way to grant it after the fact.** `mtglab users promote|demote`,
+        and the Promote/Demote buttons on the Accounts page. `set_admin` had
+        had no caller at all.
+      - **Recovery that does not depend on the app.** `mtglab users` over
+        `fly ssh console` still, and now a second path that needs no shell: fix
+        `MTGLAB_ADMIN_EMAIL` and restart.
+
+      One consequence to know before deploy day: **`MTGLAB_ADMIN_EMAIL` is
+      credential-adjacent.** Whoever can set it is an admin on the next boot.
+      That is already true of anybody who can run `fly secrets` or deploy, so
+      it grants nothing new — but it belongs in the same care as the rest of
+      the deployment config, and every change the reconciliation makes is
+      logged.
 - [ ] **A transactional email provider.** New with ADR 16. The *code* landed
       2026-08-12 and is ticked above; what is outstanding is the account and
       the DNS. Needs a `RESEND_API_KEY` in `fly secrets`, a **verified sending
@@ -868,10 +906,13 @@ here rather than rewriting the sections above.
 - [ ] Fly account with a card on file (the machine sizes are paid tier).
 - [x] ~~`SESSION_SECRET` generated (`openssl rand -base64 32`).~~ **Not
       needed** — see above. Sessions are opaque tokens, not signed ones.
-- [ ] `MTGLAB_REQUIRE_AUTH=1` in `fly.toml`, and an admin account created over
-      `fly ssh console` (§4 step 8) — *after* the login screen exists. Create
-      it with `mtglab users add <name> --admin`, which prompts; that account is
-      the maintainer's and the one the item above is about.
+- [ ] `MTGLAB_REQUIRE_AUTH=1` **and `MTGLAB_ADMIN_EMAIL`** in `fly.toml` —
+      the second is what makes the maintainer an admin on that instance, and
+      without it a fresh deployment has nobody who can administer it. Set it to
+      an address you can receive mail at, then claim the account from the
+      sign-in page's reset link once that page exists. `mtglab users add <name>
+      --admin` over `fly ssh console` (§4 step 8) still works and is the
+      break-glass path; it is no longer the only one.
 - [ ] `RESEND_API_KEY`, `MTGLAB_EMAIL_FROM` and `MTGLAB_BASE_URL` set, and one
       real invite sent to an address you control before anybody else is
       invited. Deliverability is the one part of the email half that no test
@@ -889,10 +930,14 @@ here rather than rewriting the sections above.
 
 ### Decisions that must be made before, not during
 
-- [ ] **How the maintainer becomes admin on a fresh instance** — first account
-      wins, or `MTGLAB_ADMIN_EMAIL`. See the readiness item above. This is a
-      decision because both answers are defensible and swapping later means
-      touching a populated `users` table.
+- [x] ~~**How the maintainer becomes admin on a fresh instance** — first
+      account wins, or `MTGLAB_ADMIN_EMAIL`.~~ **Decided 2026-08-12:
+      `MTGLAB_ADMIN_EMAIL`**, and implemented the same day. First-account-wins
+      was rejected for being a one-time event rather than a standing property,
+      and for a plausible order of operations that gives a friend the flag
+      silently: `mtglab users invite friend@example.com` on a fresh volume,
+      before the maintainer's own account exists. The full argument is
+      [ADR 17](adr/0017-the-maintainer-is-named-in-the-environment.md).
 - [ ] **The Forge deployment shape** — local only, server-side, or a worker.
       Open in `ROADMAP.md`, and the section below is what it costs.
 - [ ] **Fly or Hetzner.** §4 recommends Fly for the app alone. **If Forge goes

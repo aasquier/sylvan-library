@@ -177,6 +177,22 @@ def secure_cookies() -> bool:
     return _flag("MTGLAB_SECURE_COOKIES", default=require_auth())
 
 
+def admin_email() -> str:
+    """The maintainer's address. `MTGLAB_ADMIN_EMAIL`, empty when unset.
+
+    ADR 17. Set, `auth/bootstrap.py` reconciles the account at this address to
+    admin-and-enabled every time the app or a `mtglab users` command starts —
+    creating it unclaimed if it is absent. Unset, none of that happens, which is
+    what a laptop wants: `mtglab ui` with auth off has no accounts at all and
+    should not acquire one as a side effect of being run.
+
+    Deliberately an address rather than a username. It is the field an invite
+    and a reset are keyed on, so a bootstrapped account is claimable from the
+    sign-in page without anything else being configured first.
+    """
+    return os.environ.get("MTGLAB_ADMIN_EMAIL", "").strip()
+
+
 def base_url() -> str:
     """Where this instance answers, for links that have to work in an inbox.
 

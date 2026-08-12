@@ -8,7 +8,7 @@ precisely the endpoint that will not have been thought about. So the suite is
 appear in one of the three classifications below, and one that appears in none
 fails `test_every_route_is_classified` with instructions.
 
-The three classifications, and what each one is checked to actually do:
+The four classifications, and what each one is checked to actually do:
 
 - **public** — reachable with no session. Read straight out of
   `api/auth.py:PUBLIC_PATHS`, so the test and the middleware cannot disagree
@@ -20,13 +20,27 @@ The three classifications, and what each one is checked to actually do:
 - **user-scoped** — needs a session and belongs to one person. Checked
   adversarially: A creates it, B asks for it, B must get **404 and not 403**.
   403 confirms the resource exists, which is the leak.
+- **admin** — needs a session belonging to somebody who administers this
+  instance. Added by [ADR 17](../docs/adr/0017-the-maintainer-is-named-in-the-environment.md),
+  and checked from both ends: a logged-in non-admin must get **403**, and the
+  classification must agree with `api/auth.py:ADMIN_PREFIX` in both directions,
+  so neither an admin route filed as shared nor an admin route mounted outside
+  the prefix can pass.
 
 Every non-public route is also requested with no cookie at all and must answer
 401. That check is what catches an endpoint declared without protection, and it
 needs no per-route knowledge: the middleware refuses before routing, so the
 route does not have to know it is being protected.
+
+**A is an admin and B is not**, which is why the adversarial tests below say
+more than they used to: every one of them now also establishes that
+administering the instance is not the same thing as reaching another account's
+work. `test_an_admin_still_cannot_see_another_persons_job` is that stated
+directly, and it is the assertion that would catch somebody "fixing" the
+isolation filter by exempting admins from it.
 """
 
+import ast
 import sys
 from pathlib import Path
 
@@ -43,11 +57,13 @@ from fastapi.testclient import TestClient  # noqa: E402
 from mtglab import config  # noqa: E402
 from mtglab.api import jobs  # noqa: E402
 from mtglab.api.app import create_app  # noqa: E402
-from mtglab.api.auth import PUBLIC_PATHS  # noqa: E402
+from mtglab.api.auth import ADMIN_PREFIX, PUBLIC_PATHS  # noqa: E402
 from mtglab.auth import db, users  # noqa: E402
 
 PASSWORD_A = "correct-horse-battery-staple"
 PASSWORD_B = "a-different-long-passphrase"
+
+SRC = Path(__file__).resolve().parents[1] / "src" / "mtglab"
 
 # Needs a session; shows everyone the same thing once you have one. The value
 # is the justification -- if it does not read as a reason, the route is
@@ -80,15 +96,42 @@ USER_SCOPED = {
     "/api/jobs/{job_id}": "item",
 }
 
+# Needs a session belonging to an admin (ADR 17). The value is the
+# justification, same as SHARED -- an admin route is a route that administers
+# *the instance*, and anything that merely feels sensitive belongs in one of the
+# other three.
+#
+# Every entry must live under ADMIN_PREFIX and every route under that prefix
+# must appear here; `test_admin_classification_matches_the_prefix` checks both
+# directions. That is what makes the middleware and this file one statement
+# rather than two that can drift.
+ADMIN = {
+    "/api/admin/users": "every account on the instance, addresses included",
+    "/api/admin/users/{username}": "grants admin, disables and re-enables",
+    "/api/admin/users/{username}/reset": "mails somebody a password link",
+    "/api/admin/users/{username}/sessions": "signs an account out everywhere",
+}
+
+# The one place `include_email=True` is allowed to appear, now that ADR 17 has
+# widened it from "the CLI only". See `test_addresses_are_serialised_in_two_places`.
+EMAIL_CALLERS = frozenset({"cli.py", "api/admin.py"})
+
 
 @pytest.fixture
 def instance(tmp_path):
-    """An app with auth required, on a scratch `app.db`, holding A and B."""
+    """Auth on, a scratch `app.db`, and two accounts: A administers, B does not.
+
+    A being the admin is deliberate and it is what makes the adversarial tests
+    below stronger than their names suggest -- see the module docstring. It also
+    means every admin route can be checked from both sides with the accounts
+    that are already here.
+    """
     jobs.clear()
     with config.use_paths(data_dir=tmp_path / "data"):
         con = db.connect()
         try:
-            alice = users.create(con, "alice", password=PASSWORD_A)
+            alice = users.create(con, "alice", password=PASSWORD_A,
+                                 is_admin=True)
             bob = users.create(con, "bob", password=PASSWORD_B)
         finally:
             con.close()
@@ -109,6 +152,21 @@ def api_routes(client) -> list:
             if getattr(r, "path", "").startswith("/api")]
 
 
+def concrete(path: str) -> str:
+    """A templated route path with something plausible in every placeholder.
+
+    The values do not have to resolve to anything. Every check that uses this
+    asserts on a refusal that happens *before* the handler runs, so a real slug
+    and a nonsense one produce the same answer -- and one that produced a
+    different answer would be the bug.
+    """
+    return (path.replace("{slug}", "arahbo-cats")
+                .replace("{name}", "Forest")
+                .replace("{key}", "mulligan")
+                .replace("{job_id}", "deadbeef")
+                .replace("{username}", "alice"))
+
+
 # ------------------------------------------------------- the generated sweep
 
 def test_every_route_is_classified(instance):
@@ -119,15 +177,17 @@ def test_every_route_is_classified(instance):
     isolation tests are not looking at.
     """
     client, _, _ = instance
-    known = PUBLIC_PATHS | set(SHARED) | set(USER_SCOPED)
+    known = PUBLIC_PATHS | set(SHARED) | set(USER_SCOPED) | set(ADMIN)
     declared = {r.path for r in api_routes(client)}
     unclassified = declared - known
     assert not unclassified, (
         "these routes are not classified in tests/test_isolation.py:\n  "
         + "\n  ".join(sorted(unclassified))
         + "\n\nAdd each to PUBLIC_PATHS (in api/auth.py), to SHARED with the "
-          "reason it is the same for everyone, or to USER_SCOPED -- which "
-          "requires it to answer 404 for another user.")
+          "reason it is the same for everyone, to USER_SCOPED -- which "
+          "requires it to answer 404 for another user -- or to ADMIN, which "
+          "requires it to live under ADMIN_PREFIX and answer 403 to anybody "
+          "else.")
 
 
 def test_classification_has_no_ghosts(instance):
@@ -138,11 +198,44 @@ def test_classification_has_no_ghosts(instance):
     """
     client, _, _ = instance
     declared = {r.path for r in api_routes(client)}
-    stale = (set(SHARED) | set(USER_SCOPED) | {p for p in PUBLIC_PATHS}) - declared
+    classified = set(SHARED) | set(USER_SCOPED) | set(ADMIN) | set(PUBLIC_PATHS)
+    stale = classified - declared
     assert not stale, f"classified but not declared: {sorted(stale)}"
 
 
-@pytest.mark.parametrize("path", sorted(set(SHARED) | set(USER_SCOPED)))
+def test_admin_classification_matches_the_prefix(instance):
+    """The two ways an admin route can be wrong, checked in both directions.
+
+    An admin route filed as SHARED is one every logged-in account can reach. An
+    admin route mounted outside `ADMIN_PREFIX` is one the middleware never looks
+    at, and its only protection is a `deps.Admin` somebody remembered -- which
+    is exactly the thing ADR 17 refuses to rely on.
+
+    Neither is catchable by testing behaviour route by route, because both
+    failures look like a route that works.
+    """
+    client, _, _ = instance
+    misfiled = {p for p in ADMIN if not p.startswith(ADMIN_PREFIX)}
+    assert not misfiled, (
+        f"classified ADMIN but not under {ADMIN_PREFIX}, so the middleware "
+        f"does not enforce them: {sorted(misfiled)}")
+
+    under_prefix = {r.path for r in api_routes(client)
+                    if r.path.startswith(ADMIN_PREFIX)}
+    unclassified = under_prefix - set(ADMIN)
+    assert not unclassified, (
+        f"declared under {ADMIN_PREFIX} but not classified ADMIN: "
+        f"{sorted(unclassified)}")
+
+
+def test_admin_entries_carry_a_reason():
+    """As with SHARED: the classification is an argument, not a bucket."""
+    for path, reason in ADMIN.items():
+        assert len(reason) > 15, f"{path} is filed as admin without a reason"
+
+
+@pytest.mark.parametrize("path",
+                         sorted(set(SHARED) | set(USER_SCOPED) | set(ADMIN)))
 def test_no_session_is_refused(instance, path):
     """Every non-public route answers 401 without a cookie.
 
@@ -156,10 +249,7 @@ def test_no_session_is_refused(instance, path):
     the desired behaviour, since 405 would confirm the path exists.
     """
     client, _, _ = instance
-    response = client.get(path.replace("{slug}", "arahbo-cats")
-                                .replace("{name}", "Forest")
-                                .replace("{key}", "mulligan")
-                                .replace("{job_id}", "deadbeef"))
+    response = client.get(concrete(path))
     assert response.status_code == 401, (
         f"{path} answered {response.status_code} to a request with no session")
     assert "detail" in response.json()
@@ -253,6 +343,135 @@ def test_a_job_submitted_over_http_is_owned_by_the_caller(instance):
     client.post("/api/auth/logout")
     login(client, "bob", PASSWORD_B)
     assert client.get(f"/api/jobs/{job_id}").status_code == 404
+
+
+# ------------------------------------------------------------ admin routes
+
+@pytest.mark.parametrize("path", sorted(ADMIN))
+def test_an_admin_route_refuses_a_logged_in_non_admin(instance, path):
+    """The generated sweep ADR 17 asked for: B has a session and is not an admin.
+
+    A GET is enough for the same reason it is enough above -- the middleware
+    runs ahead of method matching, so a POST-only route answers 403 rather than
+    405, and 405 would itself be a small confirmation that the path exists.
+
+    403 and not 404 is checked deliberately, because it is a considered
+    exception to ADR 5 rather than an oversight, and a future reader
+    "correcting" it should have to change a test that says so.
+    """
+    client, _, _ = instance
+    login(client, "bob", PASSWORD_B)
+    response = client.get(concrete(path))
+    assert response.status_code == 403, (
+        f"{path} answered {response.status_code} to a logged-in non-admin")
+    assert response.json()["detail"] == "admin only"
+
+
+def test_an_admin_reaches_them(instance):
+    """The control. Without it, a middleware that 403s everybody passes above."""
+    client, _, _ = instance
+    login(client, "alice", PASSWORD_A)
+    response = client.get("/api/admin/users")
+    assert response.status_code == 200
+    assert {u["username"] for u in response.json()["users"]} == {"alice", "bob"}
+
+
+def test_an_admin_still_cannot_see_another_persons_job(instance):
+    """Administering the instance is not access to another account's work.
+
+    The direction nobody writes by accident. ADR 5's isolation is per-user and
+    admin is orthogonal to it: A can disable B's account, and cannot read B's
+    jobs. This is the test that fails if somebody ever "fixes" a support request
+    by exempting admins from the ownership filter.
+    """
+    client, _, bob = instance
+    theirs = jobs.submit("test", lambda progress: "bob's result",
+                         label="bob's deck", owner=bob.id)
+
+    login(client, "alice", PASSWORD_A)
+    assert client.get(f"/api/jobs/{theirs.id}").status_code == 404
+    assert theirs.id not in client.get("/api/jobs").text
+
+
+def test_the_admin_prefix_covers_paths_no_route_claims(instance):
+    """A path under the prefix that matches no route is still not for B.
+
+    The refusal must not depend on the route table. If it did, somebody who is
+    not an admin could learn which admin routes exist by seeing which ones
+    answered differently -- so the check runs before routing and answers the
+    same for a real path and an invented one.
+
+    Alice's half only asserts that she is *not* refused. What she actually gets
+    is the SPA shell: the catch-all in `api/app.py` serves `index.html` for any
+    unmatched path, `/api/...` included. That is a separate wart and not this
+    file's subject; asserting 404 here would be asserting something the app has
+    never done.
+    """
+    client, _, _ = instance
+    login(client, "bob", PASSWORD_B)
+    assert client.get("/api/admin/nothing-here").status_code == 403
+
+    login(client, "alice", PASSWORD_A)
+    assert client.get("/api/admin/nothing-here").status_code != 403
+
+
+def test_a_dotted_path_does_not_slip_past_the_prefix(instance):
+    """`/api/./admin/users` normalises to an admin path here and at the router.
+
+    `is_public` documents this trap for the allowlist and `is_admin_path`
+    inherits it: a check that is less strict than the router is a check with a
+    way around it.
+    """
+    client, _, _ = instance
+    login(client, "bob", PASSWORD_B)
+    assert client.get("/api/./admin/users").status_code == 403
+    assert client.get("/api//admin/users").status_code == 403
+
+
+def test_addresses_are_serialised_in_two_places(instance):
+    """ADR 17 widened the email rule from one caller to two. Pin the two.
+
+    CLAUDE.md rule 5 and ADR 16 keep addresses out of logs, artifacts and tool
+    results, and `User.as_dict` makes that opt-in. Until ADR 17 the only opt-in
+    was `mtglab users list`; now it is that plus the admin routes, and the rule
+    is "an address may be serialised only into a response an admin
+    authenticated for".
+
+    A grep rather than a behavioural check, for the reason
+    `test_claude_boundary.py` gives about its own subject: the failure being
+    guarded against is the caller somebody adds later, and a test that only
+    exercises today's call paths passes straight through it.
+    """
+    del instance
+    serialisers = {path.relative_to(SRC).as_posix()
+                   for path in SRC.rglob("*.py")
+                   if "include_email=True" in path.read_text(encoding="utf-8")}
+    assert serialisers == {"api/admin.py"}, (
+        f"`as_dict(include_email=True)` is called from {sorted(serialisers)}; "
+        "the only response an address belongs in is one an admin "
+        "authenticated for (ADR 17).")
+
+    # `mtglab users list` formats columns rather than serialising a dict, so it
+    # reaches the column directly and the check above cannot see it. This one
+    # can: any module outside the package that owns the column, naming an
+    # account's address at all.
+    readers = set()
+    for path in SRC.rglob("*.py"):
+        name = path.relative_to(SRC).as_posix()
+        if name.startswith("auth/"):
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        if any(isinstance(node, ast.Attribute) and node.attr == "email"
+               for node in ast.walk(tree)):
+            readers.add(name)
+    assert readers == EMAIL_CALLERS, (
+        "the set of modules that read an account's email address has changed.\n"
+        f"  expected: {sorted(EMAIL_CALLERS)}\n"
+        f"  found:    {sorted(readers)}\n"
+        "An address may be serialised only into a response an admin "
+        "authenticated for, or into the maintainer's own terminal (ADR 17). "
+        "If that is genuinely what the new caller does, add it here with the "
+        "argument; if not, it should not be touching the field.")
 
 
 # ----------------------------------------------------------- shared routes

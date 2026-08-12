@@ -91,19 +91,31 @@ single-use hashed links for both, `auth/mail.py` is the `EmailSender` seam, and
 (`password_hash IS NULL`), never a disabled one — `disabled_at` is the
 maintainer's revocation lever and redeeming a link must not undo it.
 
-Two things auth does **not** have, both blockers for deploying with auth on and
-both tracked in `docs/HOSTING.md` §7:
+Admin authorization is built (ADR 17). **Admin routes live under `/api/admin`,
+and the middleware refuses that prefix to a non-admin before routing** — the
+same mechanism as `PUBLIC_PATHS`, so a route is protected by where it is
+mounted. `deps.Admin` is the second check on the handlers. Adding an admin
+route means classifying it as `admin` in `tests/test_isolation.py`, which is
+checked against the prefix in *both* directions; the sweep then requires **403**
+from a logged-in non-admin. 403 and not ADR 5's 404 is deliberate and argued in
+ADR 17 — an admin route's existence is published in a public repository.
+
+`MTGLAB_ADMIN_EMAIL` names the maintainer, and `auth/bootstrap.py` reconciles
+that account to admin-and-enabled at every start of the app and of every
+`mtglab users` command, creating it unclaimed if absent. Unset, it does nothing,
+which is what a laptop wants. Separately, `users.set_admin` and `set_disabled`
+raise `LastAdmin` rather than removing the last admin **who can sign in** —
+enabled and holding a password, because an instance whose only admin is an
+unclaimed invite is locked out just as thoroughly.
+
+One thing auth still does **not** have, and it is the blocker for deploying with
+auth on (`docs/HOSTING.md` §6 step 5c):
 
 - **No login screen**, and no claim page for the emailed link. The token
   arrives in the URL *fragment*, so the page must read `location.hash` — a
-  query string would put a live credential in every access log.
-- **No admin surface, and `is_admin` has no teeth.** It is stored on the
-  account, carried on `UserScope` and reported by `/api/auth/me`, and **no
-  route reads it.** The standing requirement is that the maintainer is always
-  an admin on every instance; nothing currently guarantees that, and how the
-  first admin is minted on a fresh `users` table is an open decision. Do not
-  add an admin route without also adding an enforced `admin` classification to
-  `tests/test_isolation.py`.
+  query string would put a live credential in every access log. Everything
+  else is built, including the Accounts page, which with auth on is behind a
+  door nobody can currently open.
 
 Keep `mana.py` and `sim/` dependency-light (stdlib + numpy). DuckDB stays
 behind `cards/db.py`. That boundary is what keeps the simulation core fast to
@@ -174,9 +186,11 @@ locally, `fly secrets` deployed, and `.env.example` documents the names.
 `app.db` is gitignored for the same reason and one more: it holds password
 hashes and, since ADR 16, **email addresses — the first personal data this
 project stores.** An address must never reach a log line, an artifact, or a
-Claude tool result. `User.as_dict()` leaves it out unless asked, and the only
-caller that asks is `mtglab users list`, printing to the maintainer's own
-terminal.
+Claude tool result. `User.as_dict()` leaves it out unless asked, and ADR 17
+states the rule for who may ask: **an address may be serialised only into a
+response an admin authenticated for.** Two callers — `mtglab users list`,
+printing to the maintainer's own terminal, and `api/admin.py`. A third needs the
+argument made again; `tests/test_isolation.py` is where it is pinned.
 
 ## Workflow
 

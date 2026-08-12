@@ -16,6 +16,7 @@
     mtglab users list                   who exists, and who can log in
     mtglab users passwd <name>          set a password; ends every session
     mtglab users disable|enable <name>
+    mtglab users promote|demote <name>  admin, and never the last one
     mtglab claude check                 one real API call -- is the key live?
     mtglab claude interview <slug>      questions about a card's slot; you
                             --card X    write the rationale, it never does
@@ -601,6 +602,25 @@ def _auth():
     return db, passwords, sessions, users
 
 
+def _connect():
+    """`app.db`, with the maintainer reconciled to admin first (ADR 17).
+
+    Every `users` command goes through here rather than calling `db.connect`,
+    so the CLI and the app agree about who administers the instance no matter
+    which one ran last. It is a no-op unless `MTGLAB_ADMIN_EMAIL` is set.
+    """
+    db, _, _, _ = _auth()
+    from mtglab.auth import bootstrap
+
+    con = db.connect()
+    try:
+        bootstrap.ensure_maintainer(con)
+    except Exception:
+        con.close()
+        raise
+    return con
+
+
 def _prompt_new_password(who: str) -> str:
     """Read a password twice, from the terminal, never from an argument."""
     import getpass
@@ -620,7 +640,7 @@ def cmd_users_add(args):
     db, _, _, users = _auth()
 
     password = None if args.no_password else _prompt_new_password(args.username)
-    con = db.connect()
+    con = _connect()
     try:
         user = users.create(con, args.username, password=password,
                             email=args.email, is_admin=args.admin)
@@ -681,7 +701,7 @@ def cmd_users_invite(args):
     except mail.EmailNotConfigured as exc:
         sys.exit(f"refused: {exc}")
 
-    con = db.connect()
+    con = _connect()
     try:
         existing = users.get_by_email(con, address)
         if existing is not None:
@@ -719,7 +739,7 @@ def cmd_users_list(args):
     db, _, sessions, users = _auth()
     from mtglab.auth import tokens
 
-    con = db.connect()
+    con = _connect()
     try:
         everyone = users.all_users(con)
         if not everyone:
@@ -751,7 +771,7 @@ def cmd_users_passwd(args):
     """
     db, _, _, users = _auth()
 
-    con = db.connect()
+    con = _connect()
     try:
         user = users.get(con, args.username)
         if user is None:
@@ -769,12 +789,18 @@ def cmd_users_passwd(args):
 def _set_disabled(username: str, disabled: bool):
     db, _, _, users = _auth()
 
-    con = db.connect()
+    con = _connect()
     try:
         user = users.get(con, username)
         if user is None:
             sys.exit(f"refused: no account {username!r}")
-        ended = users.set_disabled(con, user.id, disabled)
+        try:
+            ended = users.set_disabled(con, user.id, disabled)
+        except users.LastAdmin as exc:
+            # The likelier of the two doors to a lockout (ADR 17): disabling is
+            # what somebody reaches for in a hurry, and `disable root` on this
+            # deployment would be the whole administration of it.
+            sys.exit(f"refused: {exc}")
     finally:
         con.close()
 
@@ -790,6 +816,54 @@ def cmd_users_disable(args):
 
 def cmd_users_enable(args):
     _set_disabled(args.username, False)
+
+
+def _set_admin(username: str, is_admin: bool):
+    """Grant or revoke admin. The caller `users.set_admin` never had (ADR 17).
+
+    `--admin` at creation was the only way to make one, so an account promoted
+    after the fact needed a hand-written `UPDATE`. The refusal it can hit is the
+    interesting part: an instance may not be left with no admin who can sign in,
+    and that rule lives in `auth/users.py` so this command and the admin page
+    inherit it rather than each implementing it.
+    """
+    db, _, _, users = _auth()
+
+    con = _connect()
+    try:
+        user = users.get(con, username)
+        if user is None:
+            sys.exit(f"refused: no account {username!r}")
+        if user.is_admin == is_admin:
+            print(f"  {user.username} is already "
+                  f"{'an admin' if is_admin else 'not an admin'}")
+            return
+        try:
+            users.set_admin(con, user.id, is_admin)
+        except users.LastAdmin as exc:
+            sys.exit(f"refused: {exc}")
+        remaining = len(users.usable_admin_ids(con))
+        claimed = users.has_password(con, user.id)
+    finally:
+        con.close()
+
+    print(f"  {user.username} is now "
+          f"{'an admin' if is_admin else 'not an admin'}")
+    if is_admin and not claimed:
+        # Worth saying, because it is the case where the command appears to
+        # have worked and the instance still has nobody who can administer it.
+        # The last-admin guard counts the same way, so promoting an unclaimed
+        # account is not a step towards being allowed to demote the real one.
+        print("  they have no password yet, so they cannot sign in to use it.")
+    print(f"  {remaining} admin(s) can sign in.")
+
+
+def cmd_users_promote(args):
+    _set_admin(args.username, True)
+
+
+def cmd_users_demote(args):
+    _set_admin(args.username, False)
 
 
 # -------------------------------------------------------------------- claude
@@ -1021,6 +1095,12 @@ def main(argv=None):
     ud.set_defaults(func=cmd_users_disable)
     ue = us.add_parser("enable"); ue.add_argument("username")
     ue.set_defaults(func=cmd_users_enable)
+    # `--admin` at creation was the only way to make one until ADR 17. Both
+    # refuse to leave the instance with no admin who can sign in.
+    upr = us.add_parser("promote", help="make an account an admin")
+    upr.add_argument("username"); upr.set_defaults(func=cmd_users_promote)
+    ude = us.add_parser("demote", help="take admin away")
+    ude.add_argument("username"); ude.set_defaults(func=cmd_users_demote)
 
     claude = sub.add_parser("claude").add_subparsers(dest="cmd", required=True)
     cc = claude.add_parser("check", help="one real call -- is the key working?")

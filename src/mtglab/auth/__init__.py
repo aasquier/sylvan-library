@@ -7,7 +7,7 @@ changed one paragraph of it. What is here is `docs/HOSTING.md` §6 steps 4, 5 an
 5b: `app.db`, the users table, Argon2id, sessions, the rate limiter guarding the
 endpoints that accept a password, and the invite and reset machinery.
 
-Eight modules and one job each:
+Nine modules and one job each:
 
 - `db.py`         the SQLite file, its schema, and its migration path
 - `passwords.py`  Argon2id at the OWASP minimum profile, and nothing else
@@ -17,6 +17,7 @@ Eight modules and one job each:
 - `tokens.py`     single-use invite and reset links, also stored hashed
 - `mail.py`       the `EmailSender` seam, a console sender and a Resend one
 - `invites.py`    issue a link and deliver it — the one path both doors take
+- `bootstrap.py`  the maintainer, reconciled to admin at every start (ADR 17)
 
 `mail.py` is the only module here that touches a network, and it is behind a
 protocol precisely so that nothing above it can tell. **No test in this project
