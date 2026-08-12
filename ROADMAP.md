@@ -813,6 +813,11 @@ a spoiler scan across six decks.
 
 > Full maintainer setup guide, auth design, per-user data model and measured
 > compute analysis now live in [docs/HOSTING.md](docs/HOSTING.md). Summary below.
+>
+> **The running list of what is still missing is
+> [§7, Deployment readiness](docs/HOSTING.md#7-deployment-readiness--the-running-list)**,
+> started 2026-08-11 when hosting stopped being hypothetical. Tick items off
+> there rather than rewriting the plan here.
 
 Wanted: follow along remotely, and eventually point friends at it. Budget is
 not the binding constraint; a few dollars a month is fine.
