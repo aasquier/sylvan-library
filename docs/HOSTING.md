@@ -745,12 +745,25 @@ Four things that are code changes, not just sizing:
       more than one person can press the button.
 - [ ] **Forge must run with its own directory as the working directory**, which
       constrains how the process is launched in a container.
-- [ ] **Check the licensing before publishing an image.** Forge is GPL-licensed
-      and the image would contain it. Shipping it to a private single-tenant
-      host is one thing; publishing that image is redistribution and has
-      obligations attached. Answer this properly rather than assuming — it has
-      not been researched, and it is the kind of thing that is cheap to get
-      right up front and expensive to unwind.
+- [x] **The licensing question is answered — and it is not a blocker.**
+      Researched 2026-08-11; the reasoning is in [NOTICE.md](../NOTICE.md).
+      **Forge is GPL-3.0, not AGPL-3.0**, so *running* it as a network service
+      is not distribution and a hosted instance owes nobody source. This
+      project stays MIT because `run.py` starts a separate process rather than
+      linking. And being noncommercial is irrelevant to the GPL either way —
+      its terms are identical sold or free. The one action that would trigger
+      obligations is **publishing a container image containing Forge**, so:
+- [ ] **Put Forge on the volume, not in the image.** The corpus already lives
+      there for a licensing reason of its own (Scryfall asks that bulk data not
+      be redistributed), and Forge fits the same slot for the same shape of
+      reason: an image that does not contain it cannot redistribute it. This
+      also keeps the image small and makes a Forge upgrade a volume operation
+      rather than a rebuild. Fold the download into the same manual runbook as
+      `data refresh`. **If Forge ever does go into a published image instead**,
+      pin the exact version and ship the corresponding source alongside it —
+      do not rely on a written offer, which is poorly suited to registry
+      distribution because there is no reliable way to present it to whoever
+      pulls the image.
 
 **The honest read right now:** local-only is unblocked and costs nothing.
 Server-side is affordable on a Hetzner box and not on the 1 GB Fly instance

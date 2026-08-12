@@ -36,6 +36,34 @@ The optional Tier 3 bridge shells out to [Forge](https://github.com/Card-Forge/f
 as a separate process. It is not bundled, linked, or redistributed here, and
 its own license applies to it. You install it yourself.
 
+**Forge is licensed GPL-3.0** — verified against the `LICENSE.txt` in its own
+distribution, not assumed. Three consequences, none of which bind this
+repository today but all of which bind a hosted instance that ships it:
+
+1. **This project stays MIT.** `sim/tier3/run.py` starts `forge.jar` as a
+   separate process and reads its stdout; nothing links to it and nothing
+   imports it. The FSF treats "pipes, sockets and command-line arguments" as
+   the communication mechanisms normally used *between two separate programs*,
+   which is exactly this boundary.
+2. **The GPL is triggered by distributing binaries, not by charging for them.**
+   Its requirements are identical whether software is sold or given away, so
+   this project being noncommercial — which the Fan Content Policy above
+   requires — neither creates nor removes any obligation. The two rule sets are
+   independent, and both are satisfied: the GPL permits noncommercial
+   distribution, and Wizards requires it.
+3. **Forge is GPL-3.0, not AGPL-3.0**, and the difference decides the hosted
+   case. Running GPL software as a network service is not distribution, so a
+   hosted instance that lets people *use* Forge over the web incurs no
+   source-sharing obligation. The AGPL is the licence that would have changed
+   that, and Forge is not under it.
+
+Where an obligation *would* attach is **publishing a container image with Forge
+inside it**, which is distribution in the ordinary way. `docs/HOSTING.md` §7
+records the practical route around that, and it is the same one already used
+for the card corpus: keep it on the volume, not in the image.
+
+Nothing here is legal advice.
+
 ## Prices
 
 Price data comes from the Scryfall printings feed. TCGplayer's developer API is
