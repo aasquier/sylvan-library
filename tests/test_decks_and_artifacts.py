@@ -229,21 +229,28 @@ def test_an_unrecognised_status_fails_the_gate():
     assert "deck-status" in codes
 
 
+#: The maintainer's six hand-written decks. Asserted **by name** rather than by
+#: enumerating `decks/`, because `decks/` stopped being a fixed set the moment
+#: the app could create a deck: a user who makes one should not fail the test
+#: suite. These six are the fixtures; anything else in the directory is theirs.
+CURATED_SIX = {
+    "arahbo-cats": "built",
+    "atla-palani-dinos": "built",
+    "goreclaw-stompy": "theoretical",
+    "gyome-food": "built",
+    "tivit-cedh": "theoretical",
+    "trostani-tokens": "built",
+}
+
+
 def test_the_curated_decks_declare_a_status():
     """Recorded 2026-08-11: Goreclaw and Tivit are lists Aaron is thinking
     about; the other four are sleeved up."""
     root = Path(__file__).resolve().parents[1] / "decks"
-    statuses = {p.parent.name: Deck.load(p).status
-                for p in sorted(root.glob("*/deck.yaml"))
-                if not p.parent.name.startswith("_")}
-    assert statuses == {
-        "arahbo-cats": "built",
-        "atla-palani-dinos": "built",
-        "goreclaw-stompy": "theoretical",
-        "gyome-food": "built",
-        "tivit-cedh": "theoretical",
-        "trostani-tokens": "built",
-    }
+    for slug, expected in CURATED_SIX.items():
+        path = root / slug / "deck.yaml"
+        assert path.exists(), f"{slug} is missing from decks/"
+        assert Deck.load(path).status == expected, slug
 
 
 # ---------------------------------------------------------------- deck stage
@@ -350,11 +357,15 @@ def test_a_dumped_draft_carries_a_blank_why_for_every_card():
 
 
 def test_the_curated_decks_are_all_curated():
-    """None of the six is a draft, which is what makes the default safe."""
+    """None of the six is a draft, which is what makes the default safe.
+
+    Scoped to the six by name for the reason `CURATED_SIX` gives: a deck the
+    user created through the app is a draft on purpose (ADR 13), and it would
+    otherwise fail this.
+    """
     root = Path(__file__).resolve().parents[1] / "decks"
-    stages = {p.parent.name: Deck.load(p).stage
-              for p in sorted(root.glob("*/deck.yaml"))
-              if not p.parent.name.startswith("_")}
+    stages = {slug: Deck.load(root / slug / "deck.yaml").stage
+              for slug in CURATED_SIX}
     assert set(stages.values()) == {"curated"}, stages
 
 

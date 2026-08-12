@@ -582,8 +582,15 @@ def test_an_empty_note_is_refused():
 
 def real_decks() -> list[Path]:
     root = Path(__file__).resolve().parents[1] / "decks"
+    # Decks with no cards are skipped, not an oversight. `decks/` stopped being
+    # a fixed set of hand-written files when the app could create a deck, and a
+    # brand-new deck is legitimately empty (ADR 13) -- there is no "first card"
+    # to replace and no "last card" to remove, so these operations have nothing
+    # to be small about. The point of this module is the *hand-written* files
+    # with their folded scalars, and an empty deck has none.
     return [p for p in sorted(root.glob("*/deck.yaml"))
-            if not p.parent.name.startswith("_")]
+            if not p.parent.name.startswith("_")
+            and (yaml.safe_load(p.read_text(encoding="utf-8")) or {}).get("cards")]
 
 
 def test_every_curated_deck_can_be_edited_without_collateral_damage():
