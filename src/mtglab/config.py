@@ -88,6 +88,7 @@ DATA_DIR: Path
 DECKS_DIR: Path
 DB_PATH: Path
 APP_DB_PATH: Path
+SCRYFALL_DIR: Path
 
 
 def _read_env() -> tuple[Path, Path]:
@@ -96,7 +97,7 @@ def _read_env() -> tuple[Path, Path]:
 
 
 def _apply(data_dir: Path, decks_dir: Path) -> None:
-    global DATA_DIR, DECKS_DIR, DB_PATH, APP_DB_PATH
+    global DATA_DIR, DECKS_DIR, DB_PATH, APP_DB_PATH, SCRYFALL_DIR
     DATA_DIR = data_dir
     DECKS_DIR = decks_dir
     # Derived, never set independently -- that is the whole reason this lives
@@ -107,6 +108,14 @@ def _apply(data_dir: Path, decks_dir: Path) -> None:
     # lifecycle -- the corpus is regenerable and gitignored, `app.db` is the
     # irreplaceable half and the thing that gets backed up.
     APP_DB_PATH = data_dir / "app.db"
+    # The raw Scryfall bulk downloads `data refresh` ingests from. Derived here
+    # for the reason this module exists at all: it was a relative default in
+    # two places -- `cards.db.download_bulk` and `service.health` -- so with
+    # `MTGLAB_DATA_DIR=/data` the DuckDB went to the volume and the ~500MB of
+    # JSON it was built from went to the container's working directory, which
+    # is ephemeral and much smaller. `docs/HOSTING.md` sizes the volume to hold
+    # both; this is what makes that true.
+    SCRYFALL_DIR = data_dir / "scryfall"
 
 
 _apply(*_read_env())

@@ -1,0 +1,64 @@
+# What must never reach the build context.
+#
+# The first two entries are the ones that matter, and they are the same two
+# rules CLAUDE.md rule 5 states for git: no corpus, no credentials. `.git`
+# would carry both back in through history, which is why it is excluded rather
+# than merely unused.
+
+# The corpus and everything derived from it. Scryfall asks that bulk data not
+# be redistributed, and the volume is where it lives. A local `data/` here is
+# ~600MB, so this is also the difference between a fast build and a slow one.
+data/
+
+# Credentials. `.env` is gitignored, so it exists only locally — which is
+# exactly the file a build context would otherwise pick up and bake in.
+.env
+.env.*
+!.env.example
+
+# History carries deleted files. Nothing in the image needs it.
+.git/
+.github/
+
+# Node's tree and the frontend source. The image installs the *committed*
+# bundle at `src/mtglab/web_dist/`; `web/` is what CI rebuilds it from.
+web/
+
+# Local Python state. `.venv` is a macOS x86 virtualenv and would be both huge
+# and useless in a linux/arm64 image.
+.venv/
+**/__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Tests, docs and planning documents. The image runs the app; CI runs the
+# suite, from a checkout rather than from a layer.
+#
+# `*.md` is root-level only — a single `*` does not cross a `/` — which is the
+# intent: CLAUDE.md and ROADMAP.md go, and the generated artifacts inside
+# `decks/<slug>/artifacts/` stay, since those belong to the decks being seeded.
+tests/
+docs/
+*.md
+
+# Deleted decks. `mtglab decks delete` moves a deck here rather than unlinking
+# it, and a trashed deck is not something to ship.
+decks/.trash/
+
+# Forge's distribution, if it was ever unpacked in-tree. Several hundred MB,
+# and `res/cardsfolder` is card corpus data by another name.
+forge/
+*.jar
+
+# Editor and OS noise.
+.DS_Store
+.idea/
+.vscode/

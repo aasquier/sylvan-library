@@ -16,6 +16,12 @@ data/app.db-*
 *.db-wal
 *.db-shm
 
+# Backups pulled off a deployed instance (docs/HOSTING.md §5). An `app.db`
+# backup is an `app.db` — password hashes and email addresses — and the deck
+# copies alongside it are somebody else's writing. The filename check in CI
+# catches `app.db` by name; this keeps the whole directory out by intent.
+backups/
+
 # --- Never commit: Forge's distribution, its card data, or a JVM ------------
 # Tier 3 keeps all of this outside the repository on purpose (see
 # `config.forge_home`), so these patterns should never match anything. They are
