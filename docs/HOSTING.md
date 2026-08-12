@@ -486,11 +486,31 @@ A key's expiration is set **at creation and cannot be changed afterwards** —
 3 hours, 1 day, 7 days, 30 days, a custom duration, or **Never**. "Never" is
 the documented choice "for keys you store in a secrets manager and rotate
 yourself", which is what `fly secrets` is. A short-lived key is the better
-choice for a laptop, where the blast radius of a leak is a stolen file rather
-than a breached host. Anthropic emails the creator before expiry on keys with a
-lifetime of a week or more, and an expired key returns `401` with no way to
-reactivate it — so use separate keys per environment (workspaces scope them),
-and the local one expiring can never take production down.
+choice while the key lives mainly on a laptop, where the blast radius of a leak
+is a stolen file rather than a breached host.
+
+Anthropic emails the key's creator before expiry — 7 days ahead for a key with
+a lifetime of at least 14 days — and an **expired key returns `401` with no way
+to reactivate it**. Rotating means creating a new key and replacing it
+everywhere it lives.
+
+**This project runs a single environment**, so there is one key rather than one
+per stage. That is the right call at this size — two keys is two things to keep
+in sync for a benefit that only appears once other people have accounts — but
+it has two consequences worth stating plainly:
+
+- Once deployed, one key lives in **two places**: the gitignored `.env` on the
+  maintainer's machine and `fly secrets` on the host. A rotation is not done
+  until both are updated, and the second one is the easy one to forget.
+- There is no staging key to fail first. The expiry date is therefore an
+  operational date, not a background detail, and a short-lived key wants either
+  a calendar reminder or a switch to **Never** once `fly secrets` is holding it.
+
+**Make the failure legible in code.** When the Claude surface lands, a `401`
+from the API should say *the key was rejected and may have expired* rather than
+surfacing as a generic error — that message is worth writing on the day the
+integration is built, because it will be read a month later by someone who has
+forgotten the key had a lifetime at all.
 
 Three ways this leaks that are worth naming, because two of them are specific
 to this app:
