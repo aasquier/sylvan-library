@@ -61,6 +61,7 @@ src/mtglab/
   api/jobs.py             the job registry; two pools, CPU and NET
   api/simruns.py          Tier 1 planned in the request, run in a job
   api/themeruns.py        the theme proposal, same shape (226s, ADR 20)
+  api/dossierruns.py      the commander dossier, same shape (236s, ADR 19)
   api/auth.py             the deny-by-default middleware and login routes
   api/deps.py             the request scope: who is asking, what they see
   web_dist/               built frontend, committed so `mtglab ui` needs no Node
@@ -338,6 +339,21 @@ socket goes in `NET`, so a thirty-second sweep never queues behind four minutes
 of somebody's conversation. Nothing is cached — a proposal is not reproducible
 and its subject does not outlive the conversation — but the **client keeps the
 job id**, so a reload reattaches rather than paying twice.
+
+**So is the dossier** (`api/dossierruns.py`), and the reason it took a second
+session to get there is worth keeping. It was measured at **236 seconds on the
+deployed instance** — *longer* than the proposal that pattern was built for —
+and stayed a synchronous POST because nobody re-measured it when ADR 20 was
+written. Deployed, it presented as a spinner and then Safari's `Load failed`: a
+**transport** error, so no status code reached the client, and no access-log
+line was written either, because uvicorn writes one when a response completes
+and this one never did. The work itself was fine and sat in `dossier_cache`
+while the page showed a failure. Two lessons rather than one — **a duration
+measured for one surface is a question to ask of every sibling surface**, and
+**the HTTP surface had no tests at all**, which is how it shipped: the 42 tests
+matching "dossier" all exercised the module and none asked what the route did.
+Unlike the proposal it *is* cached (ADR 19, on the commander's `oracle_id`), so
+a hit is a job born finished.
 
 **The dossier is the first mode whose facts are not all the corpus's**, so it
 carries rules the interview did not need. Card facts still come from the corpus,

@@ -23,16 +23,40 @@ vi.mock('../lib/api', async () => ({
     '../lib/api')).errorMessage,
   hasDossier: (await vi.importActual<typeof import('../lib/api')>(
     '../lib/api')).hasDossier,
+  // Real, because the dossier panel narrows on it: a job that 404s says "that
+  // run is gone" rather than showing a bare status code.
+  ApiError: (await vi.importActual<typeof import('../lib/api')>(
+    '../lib/api')).ApiError,
+  // Stubbed rather than real, and not for convenience. The actual `followJob`
+  // closes over the module's own `api` binding, so importing it here would
+  // reach past this mock and poll for real. Its polling is pinned in
+  // `lib/api.test.ts`; what belongs here is what the panel does with the job.
+  followJob: vi.fn(),
   api: {
     deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
     swapCard: vi.fn(), addCard: vi.fn(), removeCard: vi.fn(),
     setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),
     claudeStatus: vi.fn(), interview: vi.fn(), commander: vi.fn(),
     dossier: vi.fn(), writeDossier: vi.fn(), printings: vi.fn(),
+    job: vi.fn(),
   },
 }))
 
-const { api } = await import('../lib/api')
+const { api, followJob } = await import('../lib/api')
+
+/** A finished job carrying `result`.
+ *
+ * Writing a dossier answers with a **job** now, not a dossier — it was
+ * measured at 236 seconds on the deployed instance, where a synchronous POST
+ * died in transit and took the answer with it.
+ */
+const job = (result: unknown, status: 'queued' | 'done' = 'done') => ({
+  id: 'job-dossier', kind: 'claude.dossier', status,
+  done: status === 'done' ? 1 : 0, total: 1,
+  percent: status === 'done' ? 100 : 0,
+  label: 'dossier: Goreclaw, Terror of Qal Sisma',
+  result, error: null, created_at: '2026-08-13T18:40:00+00:00',
+})
 
 const DECK = {
   slug: 'goreclaw-stompy',
@@ -260,8 +284,18 @@ beforeEach(() => {
   // No dossier stored by default — the ordinary state for five of the six
   // decks, and the one the collapsed panel has to handle without noise.
   vi.mocked(api.dossier).mockReset().mockResolvedValue(NO_DOSSIER)
-  vi.mocked(api.writeDossier).mockReset().mockResolvedValue(WRITTEN_DOSSIER)
+  // Queued by default, so the ordinary path through these tests is the real
+  // one: submit, poll, render. A job born `done` is the cache hit, and gets
+  // its own test rather than being the default that hides the polling.
+  vi.mocked(api.writeDossier).mockReset().mockResolvedValue(job(null, 'queued'))
+  vi.mocked(followJob).mockReset().mockReturnValue({
+    promise: Promise.resolve(job(WRITTEN_DOSSIER)),
+    cancel: () => {},
+  })
   vi.mocked(api.printings).mockReset().mockResolvedValue(PRINTINGS)
+  // A run's id is parked here so a reload can reattach; without this a test
+  // that leaves one behind makes the next one reattach to a job it never made.
+  localStorage.clear()
 })
 
 afterEach(cleanup)
@@ -840,9 +874,12 @@ describe('DeckDetail commander dossier', () => {
   it('shows what was discarded rather than hiding it', async () => {
     // A number that climbs is a prompt inventing citations. Nobody checks a
     // number they cannot see.
-    vi.mocked(api.writeDossier).mockResolvedValue({
-      ...WRITTEN_DOSSIER,
-      dossier: { ...WRITTEN_DOSSIER.dossier, sources_dropped: 2, rivals_dropped: 1 },
+    vi.mocked(followJob).mockReturnValue({
+      promise: Promise.resolve(job({
+        ...WRITTEN_DOSSIER,
+        dossier: { ...WRITTEN_DOSSIER.dossier, sources_dropped: 2, rivals_dropped: 1 },
+      })),
+      cancel: () => {},
     })
     renderDeck()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
@@ -867,15 +904,71 @@ describe('DeckDetail commander dossier', () => {
   it('reports a refusal rather than rendering an unsourced dossier', async () => {
     // The server refuses when no cited page survived checking. The UI must
     // show that refusal, not an empty panel that looks like nothing happened.
-    vi.mocked(api.writeDossier).mockResolvedValue({
-      ...NO_DOSSIER,
-      reason: 'No source survived checking, so there is nothing to stand '
-              + 'behind the claims.',
+    vi.mocked(followJob).mockReturnValue({
+      promise: Promise.resolve(job({
+        ...NO_DOSSIER,
+        reason: 'No source survived checking, so there is nothing to stand '
+                + 'behind the claims.',
+      })),
+      cancel: () => {},
     })
     renderDeck()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
     expect(await screen.findByText(/no source survived checking/i)).toBeTruthy()
+  })
+
+  it('parks the run id while it works, and clears it once it settles', async () => {
+    // The failure this replaced: a 236-second POST died in transit, the page
+    // showed Safari's `Load failed`, and the finished dossier sat in the
+    // server's cache with nothing left pointing at it.
+    const seen: { at: string | null } = { at: null }
+    vi.mocked(followJob).mockImplementation(() => {
+      seen.at = localStorage.getItem('mtglab-dossier-job:goreclaw-stompy')
+      return { promise: Promise.resolve(job(WRITTEN_DOSSIER)), cancel: () => {} }
+    })
+
+    renderDeck()
+    fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
+    fireEvent.click(await screen.findByText(/write the dossier/i))
+    expect(await screen.findByText(/bear god of qal sisma/i)).toBeTruthy()
+
+    expect(seen.at).toBe('job-dossier')
+    // And gone once it landed, so a later visit does not chase a run that has
+    // already finished and been evicted.
+    await waitFor(() => expect(
+      localStorage.getItem('mtglab-dossier-job:goreclaw-stompy')).toBeNull())
+  })
+
+  it('reattaches to a run already in flight rather than paying twice', async () => {
+    // The reattach path: this tab is a reload, arriving with the id in storage
+    // and no memory of having asked. It must follow that run and must not
+    // submit a second one.
+    localStorage.setItem('mtglab-dossier-job:goreclaw-stompy', 'job-dossier')
+
+    renderDeck()
+    // No click anywhere: it finds the id on mount, follows it, and opens
+    // itself when it settles — a run that finishes into a collapsed panel has
+    // produced nothing anybody can see.
+    expect(await screen.findByText(/bear god of qal sisma/i)).toBeTruthy()
+    expect(vi.mocked(api.writeDossier)).not.toHaveBeenCalled()
+    // Two seconds, not the 400ms default: this runs for minutes, and polling
+    // four times a second would be six hundred requests to watch one job.
+    expect(vi.mocked(followJob)).toHaveBeenCalledWith(
+      'job-dossier', expect.any(Function), 2000)
+  })
+
+  it('renders a stored dossier without polling for it at all', async () => {
+    // A job born finished. ADR 19 caches on the commander's `oracle_id`, so a
+    // hit is the answer rather than a substitute for one, and there is nothing
+    // to watch.
+    vi.mocked(api.writeDossier).mockResolvedValue(job(WRITTEN_DOSSIER))
+
+    renderDeck()
+    fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
+    fireEvent.click(await screen.findByText(/write the dossier/i))
+    expect(await screen.findByText(/bear god of qal sisma/i)).toBeTruthy()
+    expect(vi.mocked(followJob)).not.toHaveBeenCalled()
   })
 
   it('keeps the counted strip and the written prose apart', async () => {

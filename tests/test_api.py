@@ -1784,6 +1784,118 @@ def test_a_queued_proposal_waits_on_the_network_lane(client, monkeypatch):
     assert await_job(client, r.json()["id"])["status"] == "done"
 
 
+# The commander dossier, which moved to a job for the same reason and one
+# session later. It had **no route tests at all** until this block, which is a
+# large part of how a 236-second synchronous endpoint reached production: the
+# 42 tests matching "dossier" all exercise the module, and none of them ever
+# asked what the HTTP surface did with it.
+
+@pytest.fixture
+def dossier_client(in_memory_client, corpus):
+    """A deck whose commander the corpus can actually resolve.
+
+    The planning half looks the commander up before anything is queued -- that
+    is what makes a bad deck a 422 in the request rather than four minutes
+    later -- so this needs a real corpus behind a real deck, the same shape
+    `sim_client` needs for compilation.
+    """
+    jobs.clear()
+    with in_memory_client([tiny_corpus.mono_green_deck(clean=True)]) as c:
+        yield c
+
+
+def test_writing_a_dossier_is_a_job_and_not_a_four_minute_post(dossier_client,
+                                                               monkeypatch):
+    """The regression the whole of `api/dossierruns.py` exists for.
+
+    Measured at 236 seconds on the deployed instance, where it presented as a
+    spinner and then Safari's `Load failed` — a *transport* error, so no status
+    code ever reached the client, and no access-log line was written either,
+    because uvicorn writes one when a response completes. The call is stubbed;
+    what is asserted is that the answer is a **job**, filed on the network
+    lane, whose result is the report.
+    """
+    import mtglab.claude.client as cc
+    from mtglab.claude import dossier
+
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(dossier, "run_dossier",
+                        lambda request, on_turn=None: {
+                            "commander": request.commander, "asked": True})
+
+    lanes = []
+    real_submit = jobs.submit
+    monkeypatch.setattr(jobs, "submit",
+                        lambda *a, **kw: (lanes.append(kw.get("lane")),
+                                          real_submit(*a, **kw))[1])
+
+    r = dossier_client.post("/api/decks/mono-green/dossier", json={})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "claude.dossier"
+    assert lanes == [jobs.NET], "a socket wait must not queue behind Tier 1"
+
+    done = await_job(dossier_client, body["id"])
+    assert done["status"] == "done"
+    assert done["result"]["commander"] == "Goreclaw, Terror of Qal Sisma"
+
+
+def test_a_dossier_without_a_key_is_a_503_rather_than_a_failed_job(
+        dossier_client, monkeypatch):
+    """Answerable locally — set a key — so it is answered from the route.
+
+    Discovered four minutes into a job it would be the same fact wearing a
+    job-error's clothes, and the UI already knows what to do with a 503.
+    """
+    import mtglab.claude.client as cc
+    monkeypatch.setattr(cc, "credential_present", lambda: False)
+
+    r = dossier_client.post("/api/decks/mono-green/dossier", json={})
+    assert r.status_code == 503
+    assert "ANTHROPIC_API_KEY" in r.json()["detail"]
+    assert jobs.all_jobs() == [], "nothing should have been queued"
+
+
+def test_a_stored_dossier_is_a_job_born_finished(dossier_client, monkeypatch):
+    """ADR 19 caches on the commander's `oracle_id`, so a hit is the answer and
+    not a substitute for it. It comes back already `done` — the response shape
+    does not fork — and the client is sabotaged so any attempt to call fails."""
+    import mtglab.claude.client as cc
+    from mtglab.claude import dossier
+
+    monkeypatch.setattr(dossier, "get", lambda key, path=None: {
+        "result": {"who": {"prose": "A bear.", "source_ids": []},
+                   "sources": [], "rivals": [], "searched": 0},
+        "created_at": "2026-08-13T18:08:16+00:00"})
+    monkeypatch.setattr(cc, "connect",
+                        lambda: pytest.fail("a stored dossier must make no call"))
+
+    r = dossier_client.post("/api/decks/mono-green/dossier", json={})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "done", "no worker needed to answer this"
+    assert body["kind"] == "claude.dossier"
+    assert body["result"]["asked"] is False
+    assert body["result"]["cached"] is True, "quote a cached dossier as cached"
+
+
+def test_a_deck_with_no_commander_the_corpus_knows_is_a_422_before_any_job(
+        dossier_client, monkeypatch):
+    """A fact about the deck, not a failure of the model — and a poor thing to
+    wait four minutes to be told."""
+    from mtglab.claude import dossier
+
+    def no_commander(slug, source=None):
+        raise dossier.NoCommander("no commander this corpus knows")
+
+    monkeypatch.setattr(dossier, "brief", no_commander)
+
+    r = dossier_client.post("/api/decks/mono-green/dossier", json={})
+    assert r.status_code == 422
+    assert jobs.all_jobs() == [], "nothing should have been queued"
+
+
 def test_an_unknown_job_lane_is_refused_before_a_job_is_recorded():
     """A typo must not become a job that sits `queued` forever.
 

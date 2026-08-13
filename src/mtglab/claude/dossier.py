@@ -50,6 +50,8 @@ import hashlib
 import json
 import logging
 import sqlite3
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -447,15 +449,49 @@ def _report(turn: Turn | None, *, slug: str, commander: str,
     }
 
 
-def ask(slug: str, *, requested: Any = None, refresh: bool = False,
-        source: DeckSource | None = None,
-        path: Path | str | None = None) -> dict[str, Any]:
-    """The dossier for this deck's commander, cached or freshly written.
+@dataclass
+class DossierRequest:
+    """What `check_dossier` settled, and everything `run_dossier` needs.
 
-    **At `initiative: off` this makes no call and says so**, the same as the
-    interview -- but it will still serve a dossier somebody else generated,
-    because reading a stored row is not a call. Off means no requests to
-    Anthropic, not a feature that hides what already exists.
+    The split exists for one measured reason. Writing a dossier took **236
+    seconds** on the deployed instance, which is longer than the theme proposal
+    that `api/themeruns.py` was built for, and a four-minute synchronous POST
+    does not survive a hosted proxy. So the same division applies here:
+    everything free and everything refusable is decided in the request, and
+    only the Anthropic call is left for a worker.
+
+    `answer` set means there is nothing to call for -- a stored dossier, or a
+    stance that forbids calls. Those are answers, not refusals, which is why
+    they travel as a result rather than as an exception: `jobs.completed` turns
+    them into a job born finished and the client's response shape never forks.
+    """
+
+    slug: str
+    facts: dict[str, Any]
+    commander: str
+    oracle_id: str
+    key: str
+    effective: stance_mod.Stance
+    #: Carried rather than re-derived. A `DeckSource` is a locator and not a
+    #: connection, which is exactly what makes it safe for a job to hold one
+    #: after the request that made it has gone.
+    source: DeckSource | None = None
+    path: Path | str | None = None
+    answer: dict[str, Any] | None = None
+
+    @property
+    def needs_call(self) -> bool:
+        """Whether anything still has to be asked of Anthropic."""
+        return self.answer is None
+
+
+def check_dossier(slug: str, *, requested: Any = None, refresh: bool = False,
+                  source: DeckSource | None = None,
+                  path: Path | str | None = None) -> DossierRequest:
+    """Everything that can be decided without spending anything.
+
+    Raises `NoCommander` and `DeckNotFound` to the caller, which is what keeps
+    their 422 rather than collapsing them into a job error four minutes later.
     """
     facts = brief(slug, source=source)
     card = facts["card"]
@@ -466,34 +502,58 @@ def ask(slug: str, *, requested: Any = None, refresh: bool = False,
         slug, source=source)["status"]})()
     effective = stance_mod.resolve(requested, deck=deck_obj)
 
-    key = cache_key(oracle_id)
+    request = DossierRequest(
+        slug=slug, facts=facts, commander=name, oracle_id=oracle_id,
+        key=cache_key(oracle_id), effective=effective, source=source, path=path)
+
     if not refresh:
-        hit = get(key, path=path)
+        hit = get(request.key, path=path)
         if hit is not None:
             # `asked=False`, because nothing was asked. A cache hit that
             # reported otherwise would make the usage figures below read as a
             # free call rather than as no call, which is the same species of
             # dishonesty as quoting a cached simulation as fresh (ADR 18).
-            return _report(None, slug=slug, commander=name, effective=effective,
-                           body=hit["result"], asked=False,
-                           cached_at=hit["created_at"],
-                           reason="Served from the store; no call was made. "
-                                  "Regenerate to write it again.")
+            request.answer = _report(
+                None, slug=slug, commander=name, effective=effective,
+                body=hit["result"], asked=False, cached_at=hit["created_at"],
+                reason="Served from the store; no call was made. "
+                       "Regenerate to write it again.")
+            return request
 
     if not effective.allows_calls:
-        return _report(None, slug=slug, commander=name, effective=effective,
-                       asked=False,
-                       reason="The stance is off, so no call was made. "
-                              "Nothing else about this deck is affected.")
+        request.answer = _report(
+            None, slug=slug, commander=name, effective=effective, asked=False,
+            reason="The stance is off, so no call was made. "
+                   "Nothing else about this deck is affected.")
+    return request
+
+
+def run_dossier(request: DossierRequest, *,
+                on_turn: Callable[[int, int], None] | None = None,
+                ) -> dict[str, Any]:
+    """Make the call, check what came back, and store it if it survived.
+
+    `on_turn` is handed straight to `converse` and exists because this runs as
+    a background job: four minutes reporting nothing is indistinguishable from
+    a wedged worker.
+    """
+    if request.answer is not None:
+        return request.answer
+
+    facts = request.facts
+    slug, name = request.slug, request.commander
+    effective, oracle_id, key = request.effective, request.oracle_id, request.key
+    path = request.path
 
     turn = converse(
         COMMANDER_DOSSIER,
         messages=[{"role": "user", "content": _ask_for(facts)}],
         stance=effective,
-        source=source,
+        source=request.source,
         # A search, a look at what came back, a second search and the write-up.
         # The interview's six is tight once a paused turn can spend one.
         max_turns=8,
+        on_turn=on_turn,
     )
 
     if turn.refused:
@@ -542,6 +602,25 @@ def ask(slug: str, *, requested: Any = None, refresh: bool = False,
     put(key, oracle_id=oracle_id, commander=name, result=body, path=path)
     return _report(turn, slug=slug, commander=name, effective=effective,
                    body=body)
+
+
+def ask(slug: str, *, requested: Any = None, refresh: bool = False,
+        source: DeckSource | None = None,
+        path: Path | str | None = None) -> dict[str, Any]:
+    """The dossier for this deck's commander, cached or freshly written.
+
+    **At `initiative: off` this makes no call and says so**, the same as the
+    interview -- but it will still serve a dossier somebody else generated,
+    because reading a stored row is not a call. Off means no requests to
+    Anthropic, not a feature that hides what already exists.
+
+    Both halves, back to back. This is what `mtglab claude dossier` wants -- a
+    terminal holds a connection open for four minutes perfectly happily, so the
+    CLI has no reason to poll a job. The API does, and reaches for the two
+    halves separately through `api/dossierruns.py`.
+    """
+    return run_dossier(check_dossier(slug, requested=requested, refresh=refresh,
+                                     source=source, path=path))
 
 
 # ---------------------------------------------------------------- the cache
