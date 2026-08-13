@@ -367,12 +367,29 @@ checklist that shaped the files.
       under `setpriv`. A bare `USER` would look stricter and leave the app
       unable to write its own volume. CI asserts the owner of PID 1 in the
       running container, which is the claim that matters.
-- [ ] **Read-only root filesystem.** Not done, and now *possible* rather than
-      contradictory: it required decks to stop living in the image, which they
-      have. Everything the app writes is under `/data`. Left off because Fly's
-      `fly.toml` has no switch for it, so it would only bind a plain
-      `docker run`, and an untested claim in a deployment file is worse than an
-      absent one.
+- [x] **Read-only root filesystem.** Done 2026-08-13, and *not* by writing it
+      into a deployment file. The objection recorded here was that Fly's
+      `fly.toml` has no switch for it — still true, re-checked against Fly's
+      configuration reference the day this landed, where the nearest option is
+      `persist_rootfs` and that is about persistence — so an entry there would
+      have been an untested claim, which was rightly judged worse than an absent
+      one. The answer is that the claim is now **tested**: the `image` job runs
+      a second container with `--read-only --tmpfs /tmp` and fails if it does
+      not answer `/api/health`.
+
+      **So the deployed instance does not run this way and this section should
+      not be read as saying it does.** What the check is actually worth is the
+      invariant underneath it — *everything this app writes lives under `/data`*
+      — which stops being a sentence somebody has to keep remembering and
+      becomes a red build. That invariant is what decks-on-the-volume rests on,
+      and its failure mode is silent: a write into the image layer works
+      perfectly until the next deploy throws it away. The hardening for other
+      runtimes is real but secondary.
+
+      Two things found doing it, both by running rather than reasoning: `/tmp`
+      *is* written at runtime, so `--tmpfs /tmp` is load-bearing rather than
+      defensive; and the entrypoint's root-side `chown` of the volume is
+      unaffected, since `/data` is a mount and never the read-only layer.
 - [x] **`HEALTHCHECK` hitting `/api/health`**, using stdlib `urllib` rather
       than installing `curl` for one request. That path is on `PUBLIC_PATHS`,
       so it answers with auth on, and CI pins that it reports `"corpus": false`
