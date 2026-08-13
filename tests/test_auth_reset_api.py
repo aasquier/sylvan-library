@@ -353,6 +353,116 @@ def test_claiming_is_logged_by_username_and_not_by_address(secured, mailbox,
     assert NEW_PASSWORD not in caplog.text
 
 
+# ------------------------------------------- naming yourself as you claim it
+
+def invite_grace(mailbox):
+    """Mail grace an invite and hand back its token."""
+    from mtglab.auth import invites
+
+    with db.connection() as con:
+        invites.send_invite(con, users.get(con, "grace"), sender=mailbox)
+    return mailbox.tokens[-1]
+
+
+def preview(client, token: str):
+    return client.post("/api/auth/claim/preview", json={"token": token})
+
+
+def test_the_preview_says_which_kind_of_link_it_is(secured, mailbox):
+    """The claim screen holds a token and nothing else, and an invite offers a
+    username field where a reset must not."""
+    invite = invite_grace(mailbox)
+    looked = preview(secured, invite)
+
+    assert looked.status_code == 200
+    assert looked.json() == {"purpose": "invite", "username": "grace"}
+
+    reset(secured, "ada@example.com")
+    assert preview(secured, mailbox.tokens[-1]).json()["purpose"] == "reset"
+
+
+def test_a_preview_spends_nothing(secured, mailbox):
+    """Previewing is not redeeming. A link looked at ten times still works."""
+    invite = invite_grace(mailbox)
+    for _ in range(10):
+        assert preview(secured, invite).status_code == 200
+
+    assert claim(secured, invite).status_code == 200
+
+
+def test_the_preview_never_returns_an_email_address(secured, mailbox):
+    """ADR 16: an address is serialised only into a response an admin
+    authenticated for, and nobody has authenticated for this one."""
+    body = preview(secured, invite_grace(mailbox)).text
+
+    assert "grace@example.com" not in body
+    assert "@" not in body
+
+
+def test_an_invented_token_previews_as_a_refusal(secured):
+    assert preview(secured, "made-up-token").status_code == 400
+    assert preview(secured, "").status_code == 422
+
+
+def test_the_preview_is_public(secured):
+    from mtglab.api.auth import PUBLIC_PATHS
+    assert "/api/auth/claim/preview" in PUBLIC_PATHS
+
+
+def test_claiming_an_invite_can_choose_a_username(secured, mailbox):
+    invite = invite_grace(mailbox)
+
+    claimed = secured.post("/api/auth/claim",
+                           json={"token": invite, "password": NEW_PASSWORD,
+                                 "username": "countess"})
+
+    assert claimed.status_code == 200
+    assert claimed.json()["username"] == "countess"
+    assert secured.post("/api/auth/login",
+                        json={"username": "countess",
+                              "password": NEW_PASSWORD}).status_code == 200
+
+
+def test_a_taken_username_is_409_and_the_link_still_works(secured, mailbox):
+    """The failure worth having a status code for: a collision must not spend
+    the invite, or "that name is taken" locks somebody out permanently."""
+    invite = invite_grace(mailbox)
+
+    clash = secured.post("/api/auth/claim",
+                         json={"token": invite, "password": NEW_PASSWORD,
+                               "username": "ada"})
+    assert clash.status_code == 409
+
+    retry = secured.post("/api/auth/claim",
+                         json={"token": invite, "password": NEW_PASSWORD,
+                               "username": "countess"})
+    assert retry.status_code == 200, "the link survived the collision"
+    assert retry.json()["username"] == "countess"
+
+
+def test_a_reset_refuses_a_username_over_http(secured, mailbox):
+    reset(secured, "ada@example.com")
+    token = mailbox.tokens[-1]
+
+    refused = secured.post("/api/auth/claim",
+                           json={"token": token, "password": NEW_PASSWORD,
+                                 "username": "countess"})
+
+    assert refused.status_code == 422
+    assert claim(secured, token).status_code == 200, "the link is untouched"
+
+
+def test_an_unusable_username_is_422_and_keeps_the_link(secured, mailbox):
+    invite = invite_grace(mailbox)
+
+    refused = secured.post("/api/auth/claim",
+                           json={"token": invite, "password": NEW_PASSWORD,
+                                 "username": "no spaces"})
+
+    assert refused.status_code == 422
+    assert claim(secured, invite).status_code == 200
+
+
 # -------------------------------------------------- the local configuration
 
 def test_the_routes_exist_with_auth_off(tmp_path, mailbox):

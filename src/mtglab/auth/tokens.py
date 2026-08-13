@@ -87,6 +87,19 @@ class UsedToken(TokenError):
     """Real, and already redeemed. Single use is the rule; this is it holding."""
 
 
+class WrongPurpose(ValueError):
+    """The token is fine; what was asked of it is not.
+
+    **Deliberately not a `TokenError`.** Everything above means "this link
+    cannot be redeemed", and the endpoint answers those with a 400 and a
+    counted rate-limit failure, because a stream of them is somebody guessing.
+    This one means the link is perfectly good and the request asked it to do
+    something that kind of link does not do — renaming an account from a reset
+    link. Spending the token or counting a failure for that would punish the
+    holder for their client's bug.
+    """
+
+
 @dataclass(frozen=True)
 class Token:
     """A resolved token. Never carries the secret -- only what it resolved to."""
@@ -175,8 +188,17 @@ def lookup(con: sqlite3.Connection, token: str,
 
 
 def redeem(con: sqlite3.Connection, token: str, password: str,
-           purpose: Purpose | None = None) -> users.User:
+           purpose: Purpose | None = None,
+           username: str | None = None) -> users.User:
     """Consume a token and set that account's password. One transaction.
+
+    `username` renames the account as it is claimed, and is **refused on a
+    reset**. An invite's holder is naming themselves for the first time; a
+    reset's holder already has a name that other people have seen, and a
+    forgotten password is not a reason to be handed a rename — worse, it makes
+    "somebody got into my email" and "somebody took over my identity here" the
+    same incident. The gate is the token's own `purpose`, read from the
+    database, so a client that sends the field anyway cannot widen it.
 
     Everything that must not happen separately happens here: the token is
     marked used, the password is written, and every session for the account is
@@ -203,6 +225,17 @@ def redeem(con: sqlite3.Connection, token: str, password: str,
     if account.disabled:
         raise InvalidToken("that link is not valid")
 
+    if username is not None and resolved.purpose is not Purpose.INVITE:
+        raise WrongPurpose("a reset link cannot change your username")
+
+    # Shape-checked before the transaction, for the same reason the password
+    # is: a name the rules refuse should cost a regex and not a write. The
+    # *uniqueness* of it cannot be settled here — only the UNIQUE index can do
+    # that without a race — so the rename happens inside, where a collision
+    # rolls the token spend back with it.
+    if username is not None:
+        users.normalise_username(username)
+
     password_hash = passwords.hash_password(password)
     with con:
         marked = con.execute(
@@ -214,6 +247,12 @@ def redeem(con: sqlite3.Connection, token: str, password: str,
             # `UPDATE ... WHERE used_at IS NULL` is what makes single-use a
             # property of the database rather than of the check order.
             raise UsedToken("that link has already been used")
+        if username is not None:
+            # Raising here rolls back the `used_at` above with it, which is the
+            # whole reason this is not two transactions: a taken name must
+            # leave a *retryable* invite rather than a spent link and an
+            # account nobody can get into.
+            users.apply_username(con, resolved.user_id, username)
         con.execute("UPDATE users SET password_hash = ? WHERE id = ?",
                     (password_hash, resolved.user_id))
         con.execute("DELETE FROM sessions WHERE user_id = ?",

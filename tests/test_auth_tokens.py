@@ -295,6 +295,98 @@ def test_a_used_token_says_so_rather_than_saying_nothing(con, ada):
         tokens.lookup(con, token)
 
 
+# ------------------------------------------------- naming yourself on the way in
+
+def test_an_invite_may_choose_its_own_username(con, ada):
+    """The point of the whole change: the handle derived from an email address
+    at invite time is a suggestion, not a sentence."""
+    token = tokens.issue(con, ada.id, tokens.Purpose.INVITE)
+
+    redeemed = tokens.redeem(con, token, PASSWORD, username="countess")
+
+    assert redeemed.username == "countess"
+    assert redeemed.id == ada.id, "the same account, renamed"
+    assert users.authenticate(con, "countess", PASSWORD) is not None
+    assert users.get(con, "ada") is None
+
+
+def test_a_reset_link_cannot_rename_the_account(con, ada):
+    """A forgotten password is not a reason to be handed a rename. Otherwise
+    "somebody reached my email" and "somebody took my identity here" become the
+    same incident."""
+    token = tokens.issue(con, ada.id, tokens.Purpose.RESET)
+
+    with pytest.raises(tokens.WrongPurpose, match="cannot change your username"):
+        tokens.redeem(con, token, PASSWORD, username="countess")
+
+    assert users.get(con, "ada") is not None, "still called ada"
+    assert tokens.lookup(con, token), "and the link is unspent"
+
+
+def test_a_taken_username_leaves_the_invite_retryable(con, ada):
+    """The failure this is written against: a name collision that spends the
+    link anyway turns an invite into an account nobody can get into.
+
+    All three effects must roll back together -- the token, the rename and the
+    password -- because they are one transaction.
+    """
+    users.create(con, "grace", email="grace@example.com")
+    token = tokens.issue(con, ada.id, tokens.Purpose.INVITE)
+
+    with pytest.raises(users.UserExists, match="already taken"):
+        tokens.redeem(con, token, PASSWORD, username="grace")
+
+    assert users.authenticate(con, "ada", PASSWORD) is None, \
+        "the password must not have been set by a failed attempt"
+    assert tokens.lookup(con, token), "the link must still work"
+
+    # And it does work, second time, with a name that is free.
+    redeemed = tokens.redeem(con, token, PASSWORD, username="countess")
+    assert redeemed.username == "countess"
+
+
+def test_an_unusable_username_costs_no_write(con, ada):
+    """Shape is checked before the transaction opens, so a refused name is a
+    regex rather than a spent link."""
+    token = tokens.issue(con, ada.id, tokens.Purpose.INVITE)
+
+    with pytest.raises(users.InvalidUsername):
+        tokens.redeem(con, token, PASSWORD, username="no spaces allowed")
+
+    assert tokens.lookup(con, token)
+    assert users.authenticate(con, "ada", PASSWORD) is None
+
+
+def test_claiming_without_a_username_keeps_the_derived_one(con, ada):
+    """The lazy path stays the old path: omit it and nothing is renamed."""
+    token = tokens.issue(con, ada.id, tokens.Purpose.INVITE)
+
+    redeemed = tokens.redeem(con, token, PASSWORD)
+
+    assert redeemed.username == "ada"
+
+
+def test_changing_only_the_capitalisation_is_not_a_collision(con, ada):
+    """`COLLATE NOCASE` makes `Ada` collide with `ada` -- but not when `ada` is
+    the account doing the renaming."""
+    token = tokens.issue(con, ada.id, tokens.Purpose.INVITE)
+
+    redeemed = tokens.redeem(con, token, PASSWORD, username="Ada")
+
+    assert redeemed.username == "Ada"
+
+
+def test_renaming_does_not_sign_you_out_elsewhere(con, ada):
+    """A username is an identifier, not a credential -- sessions key on the
+    account id. This is the deliberate difference from `set_password`."""
+    users.set_password(con, ada.id, PASSWORD)
+    live = sessions.create(con, ada.id)
+
+    users.set_username(con, ada.id, "countess")
+
+    assert sessions.lookup(con, live) is not None
+
+
 def test_redeeming_ends_every_session_for_that_account(con, ada):
     """ADR 16: a reset is usually somebody who suspects compromise, and one
     that leaves the attacker logged in has answered the wrong question."""

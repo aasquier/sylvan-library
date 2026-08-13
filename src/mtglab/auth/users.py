@@ -320,6 +320,48 @@ def set_password(con: sqlite3.Connection, user_id: int, password: str) -> int:
     return revoked
 
 
+def apply_username(con: sqlite3.Connection, user_id: int,
+                   username: str) -> str:
+    """Rename an account **without opening a transaction of its own.**
+
+    For callers that already hold one. `tokens.redeem` is the reason it exists:
+    a name and a password chosen on the same form have to land in the same
+    transaction as the token being spent, or a rejected name leaves a spent
+    link behind — an invite that cannot be retried, which is the exact failure
+    that function's docstring is written against. `set_password` records the
+    same constraint from the other side: sqlite3's connection context manager
+    does not nest, so an inner `with con:` would commit the outer one.
+
+    Returns the normalised name. Raises `UserExists` if it is taken, which
+    `COLLATE NOCASE` on the column makes case-insensitive — so `Ada` collides
+    with `ada`, while *this* account changing its own capitalisation does not
+    collide with itself.
+    """
+    name = normalise_username(username)
+    try:
+        cur = con.execute("UPDATE users SET username = ? WHERE id = ?",
+                          (name, user_id))
+    except sqlite3.IntegrityError as exc:
+        raise UserExists("that username is already taken") from exc
+    if cur.rowcount == 0:
+        raise NoSuchUser(str(user_id))
+    return name
+
+
+def set_username(con: sqlite3.Connection, user_id: int, username: str) -> str:
+    """Rename an account, in a transaction of its own.
+
+    **Sessions are deliberately left alone.** A username is an identifier, not
+    a credential: nothing is authenticated by it once a session exists, since
+    `sessions` keys on `user_id`. That is the opposite of `set_password`, which
+    revokes everything, and the difference is worth stating rather than
+    inferring — changing your handle should not sign you out of your other
+    browser.
+    """
+    with con:
+        return apply_username(con, user_id, username)
+
+
 def set_disabled(con: sqlite3.Connection, user_id: int, disabled: bool) -> int:
     """Disable or re-enable an account. Returns sessions ended.
 
