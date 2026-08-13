@@ -31,6 +31,42 @@ Decks = Annotated[DeckSource, Depends(deck_source)]
 
 WEB_DIST = Path(__file__).resolve().parent.parent / "web_dist"
 
+#: Revalidate before reuse, every time.
+#:
+#: **`no-cache` does not mean "do not store".** It means "do not reuse without
+#: asking", which is exactly what a committed bundle with stable filenames
+#: needs. `web/vite.config.ts` emits `assets/app.js` rather than
+#: `assets/app.<hash>.js` deliberately — the bundle is in git so that `mtglab
+#: ui` needs no Node, and hashed names would add two files to the repository on
+#: every rebuild — and its comment says freshness comes from the etag and
+#: last-modified Starlette already sends.
+#:
+#: It does, but **only if the browser asks**, and with no `Cache-Control` at all
+#: a browser may assign its own heuristic freshness lifetime (RFC 9111 §4.2.2)
+#: and skip the question entirely. Safari did. After the deploy of 2026-08-13 a
+#: reload re-fetched `app.js` and never requested `DeckDetail.js`, so an old
+#: dossier panel met a new server contract, was handed a job where it expected
+#: a report, and the page went black.
+#:
+#: The cost of getting this wrong is not one bad reload: it is **a returning
+#: visitor running two halves of two different versions**, silently, after any
+#: deploy that changes the contract between them. What it trades for that is
+#: one conditional request per asset per load, answered `304` with no body.
+NO_CACHE = {"Cache-Control": "no-cache"}
+
+
+class Revalidated(StaticFiles):
+    """`StaticFiles` that asks the browser to check first. See `NO_CACHE`.
+
+    `setdefault` rather than assignment so a future explicit header on a
+    particular file wins over this blanket one.
+    """
+
+    async def get_response(self, path: str, scope: Any) -> Any:
+        response = await super().get_response(path, scope)
+        response.headers.setdefault("cache-control", NO_CACHE["Cache-Control"])
+        return response
+
 
 def _job_for(plan: jobs.Plan, caller: UserScope) -> jobs.Job:
     """A finished job when the answer was already known, a queued one otherwise.
@@ -640,7 +676,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     if WEB_DIST.is_dir():
         assets = WEB_DIST / "assets"
         if assets.is_dir():
-            app.mount("/assets", StaticFiles(directory=assets), name="assets")
+            app.mount("/assets", Revalidated(directory=assets), name="assets")
 
         @app.get("/{full_path:path}")
         def spa(full_path: str):
@@ -663,8 +699,10 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                                     detail=f"no such endpoint: {normalised}")
             candidate = WEB_DIST / full_path
             if full_path and candidate.is_file():
-                return FileResponse(candidate)
-            return FileResponse(WEB_DIST / "index.html")
+                return FileResponse(candidate, headers=NO_CACHE)
+            # The shell above all: it is what names the asset files, so a
+            # stale one pins every other stale thing in place.
+            return FileResponse(WEB_DIST / "index.html", headers=NO_CACHE)
 
     return app
 
