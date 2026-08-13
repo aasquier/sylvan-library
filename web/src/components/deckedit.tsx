@@ -15,7 +15,7 @@
  * questions belong in that same column, for the same reason and under the same
  * rule: they may ask, they may argue, they may not type into the field.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   api, type Card, type ClaudeStatus, type EditResult, type InterviewReport,
 } from '../lib/api'
@@ -65,7 +65,13 @@ function QuietButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButto
  * their key is missing when they simply have not installed the extra:
  * not installed, not configured, and nothing asked yet.
  */
-function InterviewPanel({ slug, card }: { slug: string; card: string }) {
+function InterviewPanel({ slug, card, askNow = false }: {
+  slug: string
+  card: string
+  /** Opened from a control that already said "ask Claude", so asking again
+   *  here would be a second click for a decision already made. */
+  askNow?: boolean
+}) {
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
   const [report, setReport] = useState<InterviewReport | null>(null)
   const [busy, setBusy] = useState(false)
@@ -86,7 +92,7 @@ function InterviewPanel({ slug, card }: { slug: string; card: string }) {
   // thing this panel could do.
   useEffect(() => { setReport(null); setError(null) }, [card])
 
-  async function askIt() {
+  const askIt = useCallback(async () => {
     setBusy(true)
     setError(null)
     try {
@@ -99,7 +105,18 @@ function InterviewPanel({ slug, card }: { slug: string; card: string }) {
     } finally {
       setBusy(false)
     }
-  }
+  }, [slug, card])
+
+  // Opened by somebody who clicked "Ask Claude" on the card itself. Firing
+  // once per card rather than once per mount: the guard is the card name, so
+  // switching cards re-asks and re-rendering does not.
+  const asked = useRef('')
+  useEffect(() => {
+    if (!askNow || !status?.installed || !status.configured) return
+    if (asked.current === card) return
+    asked.current = card
+    void askIt()
+  }, [askNow, status, card, askIt])
 
   if (!status) return null
   if (!status.installed) {
@@ -190,12 +207,15 @@ function InterviewPanel({ slug, card }: { slug: string; card: string }) {
  * between that and a generate button is one keystroke.
  */
 export function RationaleEditor({
-  slug, card, onSave, onCancel,
+  slug, card, onSave, onCancel, askNow = false,
 }: {
   slug: string
   card: Card
   onSave: (why: string) => Promise<void>
   onCancel: () => void
+  /** True when opened from the deck page's "Ask Claude", which is the control
+   *  that exists because nothing on that page said this was here. */
+  askNow?: boolean
 }) {
   const [why, setWhy] = useState(card.why)
   const [error, setError] = useState<string | null>(null)
@@ -268,7 +288,7 @@ export function RationaleEditor({
           : <p style={{ color: 'var(--text-muted)' }}>
               No corpus text for this card.
             </p>}
-        <InterviewPanel slug={slug} card={card.name} />
+        <InterviewPanel slug={slug} card={card.name} askNow={askNow} />
       </aside>
     </div>
   )

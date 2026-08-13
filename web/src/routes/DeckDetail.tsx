@@ -324,6 +324,10 @@ export default function DeckDetail() {
   // The card whose rationale is being written, and whether the list is filtered
   // down to the ones a draft still owes.
   const [editing, setEditing] = useState<string | null>(null)
+  // Whether the editor about to open should ask Claude straight away. Set by
+  // the "Ask Claude" control and cleared by "Write why", so opening the editor
+  // the ordinary way still costs nothing.
+  const [askNow, setAskNow] = useState(false)
   const [onlyUnjustified, setOnlyUnjustified] = useState(false)
   // Two error slots, not one: a refused removal belongs next to the cards and a
   // refused promotion belongs next to the button that asked for it. Sharing one
@@ -463,6 +467,12 @@ export default function DeckDetail() {
     { id: 'notes', label: 'Notes' },
   ]
 
+  // The same three-part answer the dossier button uses: installed, configured,
+  // and not switched off. A control that appears and then refuses is worse
+  // than one that is honestly absent (ADR 15).
+  const claudeReady = !!claude?.installed && !!claude.configured
+    && claude.stance.axes[0]?.level !== 'off'
+
   return (
     <div className="space-y-6">
       <DeckHero deck={deck} report={report} dossier={dossier} claude={claude}
@@ -592,6 +602,21 @@ export default function DeckDetail() {
             )}
           </div>
 
+          {/* Announcing the feature, once, where the work is. The interview has
+              existed since ADR 15 and the deck page never mentioned it — which
+              is the finding that moved this whole branch to the front of the
+              queue, so the fix is a sentence rather than a redesign. It says
+              what the rule is at the same time, because the first question
+              anybody asks about this is whether it writes the answer. */}
+          {claudeReady && (
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Stuck on a <code>why</code>? <strong>Ask Claude</strong> on any card
+              and it will interview you about that slot — corpus text, the gate’s
+              verdict and the neighbours it competes with. It asks; you answer.
+              No stance lets it write the rationale.
+            </p>
+          )}
+
           <div className="flex flex-wrap items-center gap-3">
             <AddCardForm slug={slug} stage={deck.stage} onDone={() => void refresh()} />
           </div>
@@ -645,8 +670,33 @@ export default function DeckDetail() {
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
+                      {/* The discoverability fix, and the smallest honest
+                          version of it. The rationale interview has worked
+                          since ADR 15 and was reachable only by opening the
+                          editor and finding a second button inside it, so
+                          nothing on this page said it existed. This says it,
+                          per card, where the work actually is — and it opens
+                          the editor already asking, because clicking a control
+                          that says "ask" and then being shown another one that
+                          says "ask" is the same problem one layer down. */}
+                      {claudeReady && (
+                        <button
+                          onClick={() => {
+                            setAskNow(true)
+                            setEditing(card.name)
+                          }}
+                          title={`Have Claude ask you about ${card.name}'s slot`}
+                          className="rounded-md px-2 py-1 text-[11px]"
+                          style={{ border: '1px solid var(--hairline)',
+                                   color: 'var(--text-secondary)' }}>
+                          Ask Claude
+                        </button>
+                      )}
                       <button
-                        onClick={() => setEditing(editing === card.name ? null : card.name)}
+                        onClick={() => {
+                          setAskNow(false)
+                          setEditing(editing === card.name ? null : card.name)
+                        }}
                         className="rounded-md px-2 py-1 text-[11px] font-medium"
                         style={{ background: 'var(--gridline)',
                                  color: 'var(--text-primary)' }}>
@@ -665,6 +715,7 @@ export default function DeckDetail() {
                      <RationaleEditor
                        slug={slug}
                        card={card}
+                       askNow={askNow}
                        onSave={(why) => saveRationale(card.name, why)}
                        onCancel={() => setEditing(null)} />
                    )}
