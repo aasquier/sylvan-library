@@ -33,6 +33,7 @@ they differ.
 | [17](0017-the-maintainer-is-named-in-the-environment.md) | The maintainer is named in the environment, and admin routes live behind a prefix | Accepted |
 | [18](0018-a-cached-simulation-is-keyed-on-its-compiled-input.md) | A cached simulation is keyed on its compiled input, not on the deck file | Accepted |
 | [19](0019-the-dossier-cites-three-sources.md) | The commander dossier cites three sources, and the page shows the seams | Accepted |
+| [20](0020-the-theme-interview-reads-a-person.md) | The theme interview reads a person, and Python decides when it may propose | Accepted |
 
 **Proposed** means the decision is made and argued but nothing implements it
 yet — 4 and 5 still describe a deployment that does not exist. 16 was Proposed
@@ -63,6 +64,15 @@ named four modes; the dossier is a fifth, and the first whose facts cannot all
 come from the corpus — so the rule it needed was not "facts come from the
 corpus" but a statement of which source may support which kind of claim. Read it
 next to 7, which is the rule it is bending around rather than breaking.
+
+20 is the third written ahead of its code, and it is where 15's frame gets its
+hardest test: the first **conversational** surface in the project, so the first
+with state between requests and no natural place to stop. Read it next to 19,
+whose instruments it borrows and extends — a claimed source is intersected with
+what the search returned, and now a claimed *preference* is intersected with
+what the user actually typed. It also declines to inherit one of 19's rules:
+an unsourced dossier is refused, an unsourced proposal is not, because a
+proposal's load-bearing content is corpus facts and survives the loss.
 
 16 supersedes exactly one paragraph of 5, which is the pattern this directory is
 for: 5's "no self-signup" was a good argument that lost to a better one a day
