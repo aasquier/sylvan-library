@@ -77,17 +77,19 @@ class Revalidated(StaticFiles):
 def _job_for(plan: jobs.Plan, caller: UserScope) -> jobs.Job:
     """A finished job when the answer was already known, a queued one otherwise.
 
-    Both producers of a `Plan` come through here -- `api/simruns.py` for Tier 1
-    and `api/themeruns.py` for the theme proposal -- and neither route decides
-    which pool the work belongs in. The plan carries its own `lane` because
-    that is a property of the work rather than of the route, and a route is
-    exactly the place somebody would eventually forget to pass it.
+    Every producer of a `Plan` comes through here -- `api/simruns.py` for
+    Tier 1, `api/themeruns.py` for the theme proposal, `api/dossierruns.py`
+    for the dossier -- and no route decides which pool the work belongs in.
+    The plan carries its own `lane` because that is a property of the work
+    rather than of the route, and a route is exactly the place somebody would
+    eventually forget to pass it. `key` rides along for the same reason: what
+    counts as "the same work" is the planner's to know.
     """
     if plan.result is not None:
         return jobs.completed(plan.kind, result=plan.result,
                               label=plan.label, owner=caller.user_id)
     return jobs.submit(plan.kind, plan.run, label=plan.label,
-                       owner=caller.user_id, lane=plan.lane)
+                       owner=caller.user_id, lane=plan.lane, key=plan.key)
 
 
 def create_app(*, dev: bool = False, require_auth: bool | None = None,

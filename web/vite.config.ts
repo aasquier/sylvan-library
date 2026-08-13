@@ -8,7 +8,17 @@ export default defineConfig({
     port: 5173,
     // Dev server talks to the real API, so the frontend never needs a mock
     // and the two can never drift apart.
-    proxy: { '/api': 'http://127.0.0.1:8765' },
+    //
+    // `/tarot` too, and it is not an API path: the 78 pictures ship as Python
+    // package data rather than through `web/public`, which would store 4.6MB
+    // twice in git — once there and once in the committed bundle Vite writes
+    // (ADR 21). The consequence is that Vite has nothing to serve them from,
+    // so the card backs would flip over onto three broken images in dev and
+    // only in dev.
+    proxy: {
+      '/api': 'http://127.0.0.1:8765',
+      '/tarot': 'http://127.0.0.1:8765',
+    },
   },
   build: {
     // Built straight into the Python package, so `mtglab ui` serves it and a

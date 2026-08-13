@@ -860,6 +860,9 @@ export interface ThemeReport {
   asked: boolean
   reason: string
   stance: StanceView
+  /** Which voice answered. Echoed back rather than assumed, so a client that
+   *  sent nothing can still see it got the plain one. */
+  persona: string
   question: string
   fact: ThemeFact | null
   slots: ThemeSlot[]
@@ -930,6 +933,63 @@ export interface ThemeProposal {
   slots: ThemeSlot[]
   usage: { input_tokens: number; output_tokens: number }
   never?: string
+}
+
+/* ------------------------------------ personas and the tarot deal (ADR 21) */
+
+/**
+ * A voice the theme interview can adopt.
+ *
+ * `voice` is deliberately absent: the server keeps the prompt itself, because
+ * a client that received one would eventually send one back and "the persona
+ * is one of a fixed set" is worth keeping structural.
+ *
+ * The roster is fetched rather than written here, and that is the whole payoff
+ * of ADR 21's shape — adding a reader is a `Persona` and a prompt server-side,
+ * and this door grows a panel for it with nothing rebuilt.
+ */
+export interface Persona {
+  key: string
+  label: string
+  blurb: string
+  /** Whether this reader is dealt a spread before the conversation starts.
+   *  Only the fortune teller is, today. */
+  deals: boolean
+}
+
+export interface PersonaRoster {
+  personas: Persona[]
+  default: string
+}
+
+/**
+ * One dealt card. `slot` is the load-bearing field and it is not decorative:
+ * it is `taste` | `temperament` | `posture`, which are ADR 20's first three
+ * slot kinds, so a card is dealt *for* a slot and the readiness instrument is
+ * untouched. `position` is what the reader calls that place out loud.
+ *
+ * There is no `meaning`, here or on the server. Python shuffles; the reader
+ * reads.
+ */
+export interface TarotDrawn {
+  key: string
+  name: string
+  /** major | minor */
+  arcana: string
+  suit: string | null
+  number: number
+  /** `/tarot/<key>.webp` — package data, served beside the API. */
+  image: string
+  reversed: boolean
+  slot: string
+  position: string
+}
+
+export interface TarotReading {
+  /** Carried by the client and re-sent every turn, so a reload deals the same
+   *  three cards. The same stateless trick the transcript uses. */
+  seed: number
+  cards: TarotDrawn[]
 }
 
 export const api = {
@@ -1047,8 +1107,19 @@ export const api = {
   // runs before a deck exists and never sees one, which is what makes "it
   // builds, it does not critique" structural rather than a request. The whole
   // conversation goes up every turn because this client is where it lives.
-  themeAsk: (body: { transcript: ThemeTurn[]; slots: ThemeSlot[]; stance?: string }) =>
-    post<ThemeReport>('/api/claude/theme', body),
+  //
+  // `persona` and `seed` are client-held for exactly the reason the transcript
+  // is: the server stores no conversation, so everything that makes this one
+  // the same conversation as last turn has to travel with it. `seed` re-deals
+  // the identical spread rather than carrying the cards, which is why three
+  // pictures cost one integer.
+  themeAsk: (body: {
+    transcript: ThemeTurn[]
+    slots: ThemeSlot[]
+    stance?: string
+    persona?: string
+    seed?: number
+  }) => post<ThemeReport>('/api/claude/theme', body),
   // Returns a **job**, not a proposal — this one was measured at 226 seconds
   // and no hosted proxy holds a POST open that long. Follow it with
   // `followJob` and read `job.result` as a `ThemeProposal`, exactly as the
@@ -1061,7 +1132,20 @@ export const api = {
     budget?: number
     avoid?: string
     stance?: string
+    persona?: string
+    seed?: number
   }) => post<Job>('/api/claude/theme/proposal', body),
+  // The reader roster (ADR 21). Free, deterministic, and reaching nothing —
+  // the same class of thing as `/api/colors`. It answers with no key set and
+  // no corpus, which is what lets the door render its whole first screen
+  // before anybody has committed to spending a penny.
+  personas: () => get<PersonaRoster>('/api/claude/personas'),
+  // Deal three cards. No model, no corpus, no network, no cost: a shuffle has
+  // a right answer, so Python does it (ADR 14). Pass the seed back to re-deal
+  // the same spread — which is what a reload does.
+  tarotReading: (seed?: number) =>
+    get<TarotReading>(
+      seed === undefined ? '/api/tarot/reading' : `/api/tarot/reading?seed=${seed}`),
   // Public, so it is the one call that works before anything else does. The
   // shell reads it to decide whether to ask for a login at all, and the nav to
   // decide whether to offer the admin page.

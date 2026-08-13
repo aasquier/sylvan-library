@@ -1938,6 +1938,103 @@ def test_a_deck_with_no_commander_the_corpus_knows_is_a_422_before_any_job(
     assert jobs.all_jobs() == [], "nothing should have been queued"
 
 
+@pytest.fixture
+def held_dossier(dossier_client, monkeypatch):
+    """A dossier run that blocks until the test lets it finish.
+
+    Four minutes is the window the dedupe exists to cover, and a test cannot
+    wait four minutes -- so the run is stopped in the middle instead, which is
+    the same shape and the only way to have two requests overlap on purpose.
+    """
+    import threading
+
+    import mtglab.claude.client as cc
+    from mtglab.claude import dossier
+
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+
+    started, release, calls = threading.Event(), threading.Event(), []
+
+    def held(request, on_turn=None):
+        calls.append(request.commander)
+        started.set()
+        release.wait(10)
+        return {"commander": request.commander, "asked": True}
+
+    monkeypatch.setattr(dossier, "run_dossier", held)
+    try:
+        yield dossier_client, started, release, calls
+    finally:
+        # Always, even when an assertion fired: a worker still parked on this
+        # event would hold a NET slot for the next test in the file.
+        release.set()
+
+
+def test_a_second_ask_joins_the_run_already_going(held_dossier):
+    """The money bug, and the one on the punchlist worth doing first.
+
+    A dossier takes about four minutes and pays for a web search. Nothing
+    stopped a second click, a second tab or a second device inside that window
+    from starting a **second paid run for the same commander**, and on
+    2026-08-13 two went concurrently on the deployed instance for exactly that
+    reason. The reattach built alongside it lives in one tab's localStorage and
+    so only ever covered one tab; this is the server knowing.
+    """
+    client, started, release, calls = held_dossier
+
+    first = client.post("/api/decks/mono-green/dossier", json={}).json()
+    assert started.wait(10), "the first run never started"
+    second = client.post("/api/decks/mono-green/dossier", json={}).json()
+
+    assert second["id"] == first["id"], "a second ask must join, not pay again"
+    release.set()
+
+    assert await_job(client, first["id"])["status"] == "done"
+    assert calls == ["Goreclaw, Terror of Qal Sisma"], "one run, one bill"
+    assert len(jobs.all_jobs()) == 1, "and one job in the list, not two"
+
+
+def test_a_finished_run_is_not_joined(held_dossier):
+    """Only a *live* job is reused. What covers "somebody asked before" is the
+    cache (ADR 19), one step earlier in time and with a stored answer to hand
+    back; joining a finished job would hand over a result whose freshness
+    nothing had checked."""
+    client, started, release, _calls = held_dossier
+
+    first = client.post("/api/decks/mono-green/dossier", json={}).json()
+    assert started.wait(10)
+    release.set()
+    assert await_job(client, first["id"])["status"] == "done"
+
+    second = client.post("/api/decks/mono-green/dossier", json={}).json()
+    assert second["id"] != first["id"]
+
+
+def test_two_accounts_asking_at_once_do_not_share_a_job():
+    """Matching is per owner as well as per key, and that is not caution.
+
+    A job belongs to a person (ADR 5) and `get` reports somebody else's as
+    absent -- so handing two accounts one id would give the second a 404 for a
+    job it had just been told about. Every case the bug actually covers is one
+    person with two tabs.
+    """
+    jobs.clear()
+    mine = jobs.submit("claude.dossier", lambda _p: None, owner=1, key="k")
+    theirs = jobs.submit("claude.dossier", lambda _p: None, owner=2, key="k")
+    assert mine.id != theirs.id
+    assert jobs.get(theirs.id, owner=1) is None
+
+
+def test_work_with_no_key_is_never_deduplicated():
+    """The default, and right for anything not reproducible. A theme proposal
+    is a conversation nobody else is having; two at once are two proposals."""
+    jobs.clear()
+    one = jobs.submit("claude.theme.proposal", lambda _p: None)
+    two = jobs.submit("claude.theme.proposal", lambda _p: None)
+    assert one.id != two.id
+
+
 def test_an_unknown_job_lane_is_refused_before_a_job_is_recorded():
     """A typo must not become a job that sits `queued` forever.
 

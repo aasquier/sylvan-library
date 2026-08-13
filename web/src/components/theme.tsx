@@ -65,24 +65,44 @@ interface Saved {
   /** And the answer once it lands, which is the same argument one step on —
    *  four minutes of waiting should not be undone by a refresh. */
   proposal: ThemeProposal | null
+  /** Who was speaking, and which three cards were on the table.
+   *
+   *  Stashed because **a persona is fixed for a conversation** (ADR 21): the
+   *  transcript is resent whole every turn, so a voice swapped halfway leaves
+   *  every earlier answer speaking in the old one. Restoring a conversation
+   *  under a different reader is the same fault with a reload in the middle,
+   *  so a stash whose persona or seed does not match what the door is offering
+   *  is discarded rather than adopted. */
+  persona: string
+  seed: number | null
 }
 
-const EMPTY: Saved = { transcript: [], slots: [], job: null, proposal: null }
+const EMPTY: Saved = {
+  transcript: [], slots: [], job: null, proposal: null,
+  persona: 'plain', seed: null,
+}
 
-function load(): Saved {
+function load(persona: string, seed: number | null): Saved {
+  const empty: Saved = { ...EMPTY, persona, seed }
   try {
     const raw = localStorage.getItem(SAVED)
-    if (!raw) return EMPTY
+    if (!raw) return empty
     const parsed = JSON.parse(raw) as Partial<Saved>
+    // A conversation belongs to one reader and one spread. Anything else is
+    // somebody else's conversation wearing this one's costume.
+    const was = typeof parsed.persona === 'string' ? parsed.persona : 'plain'
+    const dealt = typeof parsed.seed === 'number' ? parsed.seed : null
+    if (was !== persona || dealt !== seed) return empty
     return {
       transcript: Array.isArray(parsed.transcript) ? parsed.transcript : [],
       slots: Array.isArray(parsed.slots) ? parsed.slots : [],
       job: typeof parsed.job === 'string' ? parsed.job : null,
       proposal: parsed.proposal ?? null,
+      persona, seed,
     }
   } catch {
     // A corrupted stash is not worth an error message. Start again.
-    return EMPTY
+    return empty
   }
 }
 
@@ -234,12 +254,25 @@ function CombinationPanel({ combo, rank, sources, onPick }: {
 
 /* --------------------------------------------------------------- the page */
 
-export function ThemeInterview({ onPick, onLeave }: {
+export function ThemeInterview({
+  onPick, onLeave, persona = 'plain', seed = null, intro, leaveLabel,
+}: {
   onPick: (key: string, card: ThemeCommander) => void
   onLeave: () => void
+  /** Which voice is asking (ADR 21). Fixed for the life of the conversation —
+   *  the tarot door remounts this component when the reader changes, which is
+   *  what makes "changing it restarts" a fact rather than a request. */
+  persona?: string
+  /** The spread's seed, when the reader was dealt one. Re-deals the identical
+   *  three cards server-side, so the conversation and the table can never
+   *  disagree about what is face up. */
+  seed?: number | null
+  /** The reader's own framing, when somebody else is setting the scene. */
+  intro?: { title: string; blurb: string }
+  leaveLabel?: string
 }) {
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
-  const [saved, setSaved] = useState<Saved>(load)
+  const [saved, setSaved] = useState<Saved>(() => load(persona, seed))
   const { transcript, slots, proposal } = saved
   const [report, setReport] = useState<ThemeReport | null>(null)
   const [answer, setAnswer] = useState('')
@@ -263,7 +296,10 @@ export function ThemeInterview({ onPick, onLeave }: {
     setBusy('asking')
     setError(null)
     try {
-      const got = await api.themeAsk({ transcript: next, slots: carried })
+      const got = await api.themeAsk({
+        transcript: next, slots: carried,
+        persona, seed: seed ?? undefined,
+      })
       setReport(got)
       setSaved((s) => ({
         ...s,
@@ -278,7 +314,7 @@ export function ThemeInterview({ onPick, onLeave }: {
       setBusy('')
       box.current?.focus()
     }
-  }, [])
+  }, [persona, seed])
 
   // Fetch a question whenever there isn't one pending. That covers the opening
   // turn, and it also covers the case a plain `length > 0` guard got wrong: a
@@ -382,6 +418,7 @@ export function ThemeInterview({ onPick, onLeave }: {
       const job = await api.themePropose({
         transcript, slots,
         budget: budget ? Number(budget) : undefined,
+        persona, seed: seed ?? undefined,
       })
       setSaved((s) => ({ ...s, job: job.id }))
     } catch (e) {
@@ -398,7 +435,10 @@ export function ThemeInterview({ onPick, onLeave }: {
     poller.current?.cancel()
     awaited.current = -1
     followed.current = null
-    setSaved(EMPTY)
+    // Starting over keeps the reader and the cards. Those were chosen on the
+    // way in and are the door's to change, not this button's — "start over"
+    // means these answers, not this table.
+    setSaved({ ...EMPTY, persona, seed })
     setReport(null)
     setError(null)
     setBusy('')
@@ -420,7 +460,7 @@ export function ThemeInterview({ onPick, onLeave }: {
         <button onClick={onLeave} className="mt-3 rounded-md px-3 py-1.5 text-sm"
                 style={{ border: '1px solid var(--hairline)',
                          color: 'var(--text-secondary)' }}>
-          ← Pick colours myself
+          {leaveLabel ?? '← Pick colours myself'}
         </button>
       </div>
     )
@@ -444,12 +484,12 @@ export function ThemeInterview({ onPick, onLeave }: {
       <div className="flex flex-wrap items-center gap-3">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">
-            Let’s work out what you want
+            {intro?.title ?? 'Let’s work out what you want'}
           </h2>
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            No Magic knowledge needed — the questions are about you. Magic’s
-            five colours started life as five philosophies, so this is less of
-            a detour than it sounds.
+            {intro?.blurb ?? 'No Magic knowledge needed — the questions are '
+              + 'about you. Magic’s five colours started life as five '
+              + 'philosophies, so this is less of a detour than it sounds.'}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -463,7 +503,7 @@ export function ThemeInterview({ onPick, onLeave }: {
           <button onClick={onLeave} className="rounded-md px-3 py-1.5 text-sm"
                   style={{ border: '1px solid var(--hairline)',
                            color: 'var(--text-secondary)' }}>
-            ← Pick colours myself
+            {leaveLabel ?? '← Pick colours myself'}
           </button>
         </div>
       </div>

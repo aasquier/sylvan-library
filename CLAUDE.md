@@ -34,6 +34,10 @@ src/mtglab/
   config.py               where decks and the corpus live; env-overridable
   colors.py               the 32 combinations, and the teaching depth
   glossary.py             the vocabulary, Magic's and this tool's own
+  tarot.py                the 78-card deck, the shuffle, and the three-card
+                          spread; stdlib, and no card's meaning
+  assets/tarot/           the 78 pictures, package-data; PROVENANCE.md argues
+                          the licence and is not optional reading
   mana.py                 cost parsing + castability solver
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema
@@ -51,14 +55,16 @@ src/mtglab/
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
   artifacts/generate.py   the five deliverables
-  claude/                 client, tools, stance, and four modes across three
-                          features: interview.py (a card's `why`), dossier.py
-                          (the commander), theme.py (two — a conversation
-                          about you, then a proposal)
+  claude/                 client, tools, stance, persona, and four modes across
+                          three features: interview.py (a card's `why`),
+                          dossier.py (the commander), theme.py (two — a
+                          conversation about you, then a proposal)
+  claude/persona.py       who a mode sounds like; a voice, never a stance
   auth/                   app.db, Argon2id, accounts, sessions, rate limit,
                           invite/reset tokens, the EmailSender seam
   api/                    FastAPI app, services, background jobs
-  api/jobs.py             the job registry; two pools, CPU and NET
+  api/jobs.py             the job registry; two pools, CPU and NET, and a
+                          `key` that makes asking twice at once one job
   api/simruns.py          Tier 1 planned in the request, run in a job
   api/themeruns.py        the theme proposal, same shape (226s, ADR 20)
   api/dossierruns.py      the commander dossier, same shape (236s, ADR 19)
@@ -327,6 +333,39 @@ run the first two, and the deck page runs both. The other three modes ADR 15
 names, the activity log, and any UI for the stance dial do not exist — check
 what is actually there before assuming either way.
 
+**A mode also has a voice, and a voice is not a stance**
+([ADR 21](docs/adr/0021-a-persona-is-a-voice-and-the-spread-is-the-slots.md)).
+`stance.py`'s three axes are all about *how much the model does*; a
+**persona** (`claude/persona.py`) is *who it sounds like*, which is
+orthogonal, so it is its own field on the wire and inherits ADR 15's
+constraint verbatim — same tools, same write scope, same schema. The voice is
+**appended** to `CONVERSATION_INSTRUCTIONS`, never substituted, which is what
+keeps the interview's own rules out of a persona's reach; a parametrised test
+asserts each of them still appears in *every* persona's prompt.
+`CONVERSATION_MODES["plain"] is THEME_CONVERSATION` — identity, not equality,
+because that block is what `converse` caches. Two voices are built, `plain`
+and `fortune-teller`; storyteller, scientist and confessor are not, and each
+is a `Persona` and a prompt with nothing else to move.
+
+**The tarot door is the fourth entry on "Start a deck", and it is the theme
+interview wearing a costume.** `tarot.py` is stdlib, holds all 78 cards and
+**no card's meaning** — Python shuffles, the reader reads. The load-bearing
+decision is that `tarot.SPREAD`'s three positions **are** `SLOT_KINDS[:3]`
+(taste, temperament, posture) with `len(SPREAD) == FLOOR`: a card is dealt
+*for* a slot, so ADR 20's grounded-quote readiness works untouched and **the
+querent's own words stay the only evidence — a card is not something they
+said.** A test pins the coupling because its failure is silent: drift, and the
+proposal button simply never lights up. The deal is seeded and returns its
+seed, so the client carries one integer and a reload deals the same three
+cards; the dealt cards ride in the frame **message**, never the system prompt,
+which is what `converse` caches on. `persona` and `seed` are client-held
+exactly as the transcript is, and **a persona is fixed for a conversation** —
+`components/tarot.tsx` remounts the interview on its key rather than warning
+about it. The art is the 1909 Rider printing and the licence was checked per
+file; the 1971 recolouring everybody pictures is still in copyright and is not
+this. Because the pictures are package-data, the `image` CI job is the only
+place a packaging mistake is visible, and it counts them.
+
 **The theme proposal is a background job** (`api/themeruns.py`), because it was
 measured at 226 seconds and no hosted proxy holds a POST open that long. The
 division is the one `api/simruns.py` already makes and it is load-bearing here:
@@ -354,6 +393,18 @@ measured for one surface is a question to ask of every sibling surface**, and
 matching "dossier" all exercised the module and none asked what the route did.
 Unlike the proposal it *is* cached (ADR 19, on the commander's `oracle_id`), so
 a hit is a job born finished.
+
+And it is **deduplicated in flight**, which is the same argument one step
+earlier in time: the cache covers "somebody asked before", `Plan.key` covers
+"somebody is asking right now". Both were needed and only the first was built
+at first — two paid runs for the same commander went concurrently on the
+instance because a second click inside the four-minute window had nothing to
+collide with. `jobs.submit(key=…)` does the lookup and the insert in one locked
+step, matches per **owner** as well as per key (two accounts sharing an id would
+give the second a 404 for a job it had just been handed — ADR 5), and joins only
+a **live** job, because a finished one is the cache's business and a failed one
+must stay retryable. `key=None` is the default and opts out, which is right for
+a theme proposal: two at once are two different conversations.
 
 **The dossier is the first mode whose facts are not all the corpus's**, so it
 carries rules the interview did not need. Card facts still come from the corpus,

@@ -81,6 +81,12 @@ class Job:
     # auth is off. Never serialised: a caller who can see a job already knows
     # whose it is, and one who cannot must not learn it exists.
     owner: int | None = None
+    #: What this job *is*, for work where asking twice at once is a mistake
+    #: rather than a request. `None` opts out and is the default; see `submit`.
+    #: Not serialised — it is an internal identity, and for the dossier it is
+    #: the cache key, which names a card the caller already knows they asked
+    #: about.
+    key: str | None = None
     created_at: str = field(
         default_factory=lambda: datetime.now(UTC).isoformat())
 
@@ -121,16 +127,34 @@ class Plan:
     result: dict[str, Any] | None
     run: Callable[[Progress], dict[str, Any]]
     lane: str = CPU
+    #: What this work *is*, when two simultaneous requests for it are the same
+    #: request. Decided by the planner because only the planner knows what
+    #: identity means for its own work — for the dossier it is the commander,
+    #: not the deck. `None` means "start a second one", which is right for
+    #: anything not reproducible; see `submit`.
+    key: str | None = None
+
+
+#: A job that has not finished. Two of these for the same `key` is the bug
+#: `submit` exists to prevent; a finished one is a cache's problem, not this
+#: module's.
+LIVE = ("queued", "running")
+
+
+def _keep_locked() -> None:
+    """Evict finished jobs if the registry is over its bound. `_LOCK` held."""
+    if len(_JOBS) <= MAX_JOBS:
+        return
+    finished = [j for j in _JOBS.values() if j.status not in LIVE]
+    for old in sorted(finished, key=lambda j: j.created_at)[:len(_JOBS) - MAX_JOBS]:
+        _JOBS.pop(old.id, None)
 
 
 def _record(job: Job) -> Job:
     """Register a job, evicting finished ones if the registry is over its bound."""
     with _LOCK:
         _JOBS[job.id] = job
-        if len(_JOBS) > MAX_JOBS:
-            finished = [j for j in _JOBS.values() if j.status in ("done", "error")]
-            for old in sorted(finished, key=lambda j: j.created_at)[:len(_JOBS) - MAX_JOBS]:
-                _JOBS.pop(old.id, None)
+        _keep_locked()
     return job
 
 
@@ -155,21 +179,55 @@ def completed(kind: str, *, result: Any, label: str = "",
 
 def submit(kind: str, fn: Callable[[Progress], Any],
            *, label: str = "", owner: int | None = None,
-           lane: str = CPU) -> Job:
+           lane: str = CPU, key: str | None = None) -> Job:
     """Queue `fn`, handing it a `progress(done, total)` callback to report with.
 
     `lane` picks the pool -- `CPU` for work that computes, `NET` for work that
     waits on Anthropic. Checked before the job is recorded, so a typo is an
     exception out of the route rather than a job that sits `queued` forever
     because nothing was ever going to run it.
+
+    **`key` makes asking twice at once return the same job, and that is a
+    money bug rather than a tidiness one.** A dossier takes about four minutes
+    and pays for a web search; nothing stopped a second click, a second tab or
+    a second device inside that window from starting a *second* paid run for
+    the same commander, and on 2026-08-13 two ran concurrently on the deployed
+    instance for exactly that reason. The client-side reattach that was built
+    first only ever covered one tab, because it lives in that tab's
+    localStorage; this covers every case at once by making the server the
+    thing that knows a run is already going.
+
+    Matching is per **owner** as well as per key, which is deliberate rather
+    than cautious: a job belongs to a person (ADR 5) and `get` refuses one that
+    is not yours, so handing two accounts the same id would give the second a
+    404 for a job it had just been told about. Every case the bug actually
+    covers -- one person, two tabs -- is one owner.
+
+    Only a *live* job is reused. A finished one is what a cache is for, and the
+    dossier has one (ADR 19); a failed one must be retryable or a transient
+    Anthropic error would be permanent until the process restarted.
+
+    The lookup and the insert are one locked step, because the window this
+    closes is exactly the window two concurrent requests race in.
     """
     pool = _LANES.get(lane)
     if pool is None:
         raise ValueError(
             f"unknown job lane {lane!r}; expected one of {sorted(_LANES)}")
 
-    job = _record(Job(id=uuid.uuid4().hex[:12], kind=kind, label=label,
-                      owner=owner))
+    with _LOCK:
+        if key:
+            already = next(
+                (j for j in _JOBS.values()
+                 if j.key == key and j.kind == kind and j.owner == owner
+                 and j.status in LIVE),
+                None)
+            if already is not None:
+                return already
+        job = Job(id=uuid.uuid4().hex[:12], kind=kind, label=label,
+                  owner=owner, key=key)
+        _JOBS[job.id] = job
+        _keep_locked()
 
     def progress(done: int, total: int) -> None:
         job.done, job.total = done, total

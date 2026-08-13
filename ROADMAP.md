@@ -509,8 +509,10 @@ arc; this is what the next few sessions actually do.
      `plain` and `fortune-teller` are built. **Storyteller, scientist and
      confessor/therapist are not**, and each is now a `Persona` and a prompt
      with nothing else to move.
-   - **A tarot reading as a door of its own.** *Backend landed 2026-08-13; the
-     door itself is still to build.* The decision that made it possible rather
+   - ~~**A tarot reading as a door of its own.**~~ **Built 2026-08-13** —
+     backend first, then the door: a fourth entry on "Start a deck" that picks
+     a reader from the roster, shuffles, deals three cards face down, and turns
+     them over. The decision that made it possible rather
      than a rewrite: **the spread's three positions are `SLOT_KINDS[:3]`**, so
      a card is dealt *for* a slot and ADR 20's grounded-quote readiness works
      untouched — a card is not something the querent said, and the cards colour
@@ -524,6 +526,31 @@ arc; this is what the next few sessions actually do.
      through the Commons API; `src/mtglab/assets/tarot/PROVENANCE.md` is the
      argument. 4.6MB of WebP, shipped as package-data rather than through the
      committed bundle, which is why the `image` CI job now counts the cards.
+
+     The door's own decisions, all small and all load-bearing. **The reader
+     roster is fetched, never written in the client** — `/api/claude/personas`
+     is free and needs no key, so the first screen of the most expensive door
+     costs nothing, and the three unbuilt voices will appear there with no
+     frontend change (a test pins that by putting a reader in the mock that
+     exists nowhere in the app's source). **The card back is drawn**, for the
+     reason the mana symbols are: 78 faces have a provenance file behind them
+     and a back lifted off the internet would be a 79th image with no argument
+     attached. **Persona is fixed for a conversation**, enforced by remounting
+     the interview on its key rather than by a warning nobody reads, and a
+     stash left by a different reader is discarded rather than adopted.
+     **A reversal is a rotation on the `<img>`, never on the face** — the face
+     is already rotated 180° about Y to hide behind the back, so putting both
+     on one element makes a reversed card spend the flip un-reversing itself
+     and land upright, which looks exactly like nothing going wrong. And the
+     reveal gets a beat before the spread folds away, because the first version
+     shrank the cards 840ms into a 1.6s stagger and resized the climax.
+
+     Driven in a browser and screenshotted rather than described, per the
+     habit that has caught eight bugs in eight branches. What it turned up:
+     Vite proxies `/api` and nothing else, so package-data art 404s in dev and
+     only in dev; a card back needs a hairline of light in dark mode, where a
+     drop shadow against `#0d0d0d` says nothing; and "Your spread" was labelling
+     an empty table for the reader who deals no cards.
    - **An interview for somebody who already has a theme.** The current one
      discovers a theme; this one would take a given theme and follow it. "That
      would be a fun alternative interview style."
@@ -599,6 +626,65 @@ arc; this is what the next few sessions actually do.
    day (machine suspended, volume on the same host, `no snapshots available`)
    and came back intact. **One machine, one volume, no snapshot** is the shape
    that was exposed — worth a decision before it matters.
+
+   **The evening of 2026-08-13 put the first Claude output on the instance.**
+   A dossier ran there — `claude-sonnet-5`, 77 pages searched, 5 cited, ~236
+   seconds — and finding that out cost two more deployment-only bugs, merged as
+   [#71](https://github.com/aasquier/sylvan-library/pull/71) and
+   [#72](https://github.com/aasquier/sylvan-library/pull/72): a synchronous POST
+   nothing had re-measured since ADR 20, and a bundle a browser cached
+   heuristically and then black-screened on. Six dossiers are cached now;
+   the reattach-after-reload contract is proven in Safari against the access
+   log, which is the instrument for it — what you are looking for is one job id
+   continuing across a document request, and a screenshot cannot show that.
+
+   ### The punchlist, 2026-08-13
+
+   Five items, written down here rather than left in a session's memory. The
+   first is fixed on the branch that carries this paragraph; the rest are open.
+
+   1. ~~**No in-flight dedupe on the dossier.**~~ **Fixed 2026-08-13.**
+      `plan_dossier` answered a *stored* dossier as a job born done, but nothing
+      checked for a run already going for that `oracle_id` — so a second click
+      inside the four-minute window started a second paid job with a second web
+      search, and two ran concurrently on the instance that day. `Plan.key` and
+      `jobs.submit(key=…)` are the fix: the lookup and the insert are one locked
+      step, matching is per owner as well as per key (ADR 5 — two accounts
+      sharing an id would give the second a 404 for a job it had just been
+      handed), and only a *live* job is joined, because a finished one is what
+      the cache is for and a failed one has to stay retryable. **This is the
+      robust half of the reattach story** — the localStorage id only ever
+      covered one tab; this covers a reload, a second tab, another device and a
+      cleared cache, because the server is the thing that knows.
+   2. **Learn/Vocabulary renders `long` only.** `Learn.tsx:347` shows
+      `term.long`; `term.short` is used at `:395` *solely* to match the search
+      box, and `components/term.tsx:106` is the only place it is ever displayed.
+      A `Term` is defined twice at two lengths and the page shows one of them.
+      35 of the 37 longs stand alone, but **Commander tax** and **Mana base**
+      were written as sentence *two* — "The cost is cumulative and it does not
+      reset…", "Two jobs, and they are not the same job…" — so the page never
+      defines them at all. Two fixes and they are not equivalent: render `short`
+      as a lead line, which uses the data the way it was designed and touches
+      all 37, or rewrite those two longs, which touches two. **The maintainer's
+      call**, because it is a decision about what a glossary entry is.
+   3. **iOS Safari private tab lost the dossier reattach.** Unexplained — zero
+      polls after the reload, while the theme key survived a reload in that same
+      tab and planting a job id locally proved the read half works. P3, and (1)
+      covers it in practice.
+   4. **Fly volume snapshots still unconfirmed.** Volume created 13 Aug 14:11
+      UTC with `snapshot_retention: 5` and `Scheduled snapshots: true`; the list
+      was empty at 19:45Z. **Re-check any time after 14:11 UTC on 2026-08-14** —
+      before that an empty list proves nothing, which is the same trap as the
+      morning of the 13th.
+   5. **`users.id` → `AUTOINCREMENT`** migration still owed. #68 fixed the
+      instance; it did not fix the class. `jobs.forget_owner` covers the one
+      caller that exists today, and anything future keyed on a user id inherits
+      the trap again.
+
+   Still owed from the test list itself, and none of it done: **the theme
+   interview on the instance** (both modes, and now both readers), **a deck edit
+   surviving a machine restart**, and **delete → re-invite → claim with a chosen
+   username**, which #67 and #68 built and nobody has run end to end.
 6. **After that, next build work in order:** re-price automated PR review
    (ENGINEERING §5, parked), the stance dial UI, then the remaining Claude
    modes ADR 15 names and branch 5 does not build (argue a slot, deck
