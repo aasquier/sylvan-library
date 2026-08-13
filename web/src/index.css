@@ -298,6 +298,229 @@ body {
   }
 }
 
+/* The tarot table (`components/tarot.tsx`, ADR 21).
+ *
+ * Four things live here rather than inline, and each is something a style
+ * attribute cannot say.
+ *
+ * **The hinge.** A flip needs `perspective` on an ancestor, `preserve-3d` on
+ * the element that turns, and `backface-visibility: hidden` on both faces —
+ * three properties on three different elements that only mean anything
+ * together. Split across inline styles they would be four unrelated-looking
+ * lines that break the moment one is dropped.
+ *
+ * **The reversal is on the image, never on the face.** A reversed card is the
+ * same picture with the light coming from somewhere else, so it is a 180°
+ * rotation — and the face it sits on is *already* rotated 180° about Y to hide
+ * behind the back. Put both on one element and a reversed card spends the
+ * flip un-reversing itself and lands upright, which looks like nothing at all
+ * going wrong. Hence `.tarot-face-front img.is-reversed`, one level in.
+ *
+ * **Keyframes.** The deal is a stagger, and a stagger is one animation with N
+ * delays rather than N animations.
+ *
+ * **Reduced motion.** Every one of these is ceremony, which is exactly the
+ * class of animation somebody may have turned off. The cards still deal, turn
+ * and read; they simply arrive already there.
+ */
+.tarot-spread {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.tarot-spread.is-small {
+  justify-content: flex-start;
+  gap: 1rem;
+}
+
+.tarot-slot {
+  width: 168px;
+  /* The scans are 400x693-700 — a percent or so apart, because they are
+     photographs of ninety-year-old cardboard rather than renders. A fixed box
+     with `cover` on the image keeps the three the same size; the alternative,
+     `contain`, letterboxes each one differently and the row stops looking
+     like a spread. */
+  animation: tarot-deal 620ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: var(--deal-delay, 0ms);
+  /* The fold-away, once the reading is over and the cards become context for
+     the conversation. Animated rather than snapped because the same three
+     elements are still on screen — a jump reads as a re-render, and a slide
+     reads as the table being cleared. */
+  transition: width 520ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tarot-spread.is-small .tarot-slot {
+  width: 96px;
+}
+
+.tarot-hinge {
+  display: block;
+  width: 100%;
+  aspect-ratio: 400 / 695;
+  perspective: 1100px;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+button.tarot-hinge {
+  cursor: pointer;
+}
+
+.tarot-card {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  transform-style: preserve-3d;
+  transition: transform 760ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tarot-card.is-face-up {
+  transform: rotateY(180deg);
+}
+
+/* A face-down card lifts slightly under the pointer — the only affordance
+   saying it is a thing you may touch. Suppressed once it is face up, where
+   there is nothing left to do to it. */
+button.tarot-hinge:hover .tarot-card:not(.is-face-up),
+button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
+  transform: translateY(-8px) rotateZ(-1.2deg);
+}
+
+.tarot-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 9px;
+  overflow: hidden;
+  box-shadow: 0 10px 26px rgb(0 0 0 / 0.32);
+}
+
+/* A drop shadow is how a card sits above a table in light mode, and it does
+   nothing at all on a near-black page — the back's own field is #141d33, which
+   against #0d0d0d is barely an edge. So dark mode gets a hairline of light
+   round the card instead, which is the same claim ("this is an object lying on
+   something else") made with the only contrast available. */
+:root[data-theme='dark'] .tarot-face,
+:root:where(:not([data-theme='light'])) .tarot-face {
+  box-shadow:
+    0 10px 26px rgb(0 0 0 / 0.55),
+    0 0 0 1px rgb(255 255 255 / 0.12);
+}
+
+.tarot-face-front {
+  transform: rotateY(180deg);
+  background: #efe7d4;
+}
+
+.tarot-face-front img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* The whole point of a reversed card, and the one thing in this file worth
+   checking with your own eyes rather than trusting. */
+.tarot-face-front img.is-reversed {
+  transform: rotate(180deg);
+}
+
+/* The deck, while it is being shuffled. Three backs a couple of degrees
+   apart, riffling in place. */
+.tarot-deck {
+  position: relative;
+  width: 140px;
+  aspect-ratio: 400 / 695;
+}
+
+.tarot-deck-card {
+  position: absolute;
+  inset: 0;
+  border-radius: 9px;
+  overflow: hidden;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.3);
+  animation: tarot-riffle 900ms ease-in-out infinite;
+  animation-delay: calc(var(--deck-index) * 140ms);
+}
+
+/* The fan on a reader's panel: three backs spread from a common corner. */
+.tarot-fan {
+  position: relative;
+  height: 84px;
+  width: 96px;
+}
+
+.tarot-fan-card {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  height: 84px;
+  width: 48px;
+  margin-left: -24px;
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.28);
+  transform-origin: 50% 130%;
+  transform: rotate(calc(var(--fan-index) * 15deg));
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+button:hover .tarot-fan-card {
+  transform: rotate(calc(var(--fan-index) * 24deg)) translateY(-4px);
+}
+
+.tarot-fan-empty {
+  border-radius: 5px;
+  border: 1px dashed var(--baseline);
+  height: 84px;
+  width: 48px;
+  margin: 0 auto;
+}
+
+@keyframes tarot-deal {
+  from {
+    opacity: 0;
+    transform: translate(-38px, -54px) rotate(-9deg) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tarot-riffle {
+  0%,
+  100% {
+    transform: translateY(0) rotate(calc((var(--deck-index) - 1) * 2deg));
+  }
+  50% {
+    transform: translateY(-10px) rotate(calc((var(--deck-index) - 1) * -5deg));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tarot-slot {
+    animation: none;
+    transition: none;
+  }
+  .tarot-card,
+  .tarot-fan-card {
+    transition: none;
+  }
+  .tarot-deck-card {
+    animation: none;
+  }
+  button.tarot-hinge:hover .tarot-card:not(.is-face-up),
+  button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
+    transform: none;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

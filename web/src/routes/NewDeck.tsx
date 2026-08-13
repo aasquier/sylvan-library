@@ -33,6 +33,13 @@
  * step 3 and the button that makes the deck is the one that was already there.
  * It is the one mode that is **not** remembered: entering it starts a
  * conversation that costs money, and that should be a click every time.
+ *
+ * **And a fourth, which is the third wearing a costume** (ADR 21). `tarot`
+ * runs the same interview under a different voice, with three cards dealt for
+ * its first three slots — so a card is dealt *for* something you are about to
+ * be asked, the readiness instrument is untouched, and this door lands on step
+ * 3 by exactly the route the other three do. Not remembered either, and for
+ * the same reason.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -47,6 +54,7 @@ import {
 import { COLOR_VAR } from '../lib/mtg'
 import { CardHover, ColorRing, ManaText } from '../components/ui'
 import { ColorPentagram, TierGlyph } from '../components/pentagram'
+import { TarotTable } from '../components/tarot'
 import { ThemeInterview } from '../components/theme'
 
 /** The era whose story named a tier, so the lesson has its setting attached. */
@@ -67,16 +75,21 @@ function keyFor(identity: string[] | undefined): string {
   return key || 'C'
 }
 
-/** The three ways in, least-assuming first. */
+/** The four ways in, least-assuming first. */
 const DOORS = [
   { key: 'theme', label: 'Help me decide' },
+  { key: 'tarot', label: 'Read my cards' },
   { key: 'guided', label: 'Take me through the colours' },
   { key: 'direct', label: 'I know what I want' },
 ] as const
 
-const DOOR_BLURBS: Record<'guided' | 'direct' | 'theme', string> = {
+type Mode = (typeof DOORS)[number]['key']
+
+const DOOR_BLURBS: Record<Mode, string> = {
   theme: 'A few questions about you — none of them about Magic — and then a '
        + 'suggestion you are free to ignore.',
+  tarot: 'Pick a reader, turn over three cards, and answer what they ask. '
+       + 'The cards colour the questions; the answers are still yours.',
   guided: 'Pick a colour combination, then a commander. There are 32 '
         + 'combinations in Magic, and building one of each is a challenge '
         + 'people spend years on.',
@@ -103,14 +116,17 @@ export default function NewDeck() {
   const [taxonomyError, setTaxonomyError] = useState<string | null>(null)
 
   // Remembered, so the tutorial is offered once rather than every visit —
-  // except for `theme`, which is not stored. Landing straight back in a Claude
-  // conversation because you tried one last week is a bill nobody asked for.
-  const [mode, setMode] = useState<'guided' | 'direct' | 'theme'>(
+  // except for the two Claude doors, which are not stored. Landing straight
+  // back in a conversation because you tried one last week is a bill nobody
+  // asked for, and that goes double for the one that opens with a shuffle.
+  const [mode, setMode] = useState<Mode>(
     () => (localStorage.getItem('mtglab-new-deck-mode') === 'direct'
       ? 'direct' : 'guided'),
   )
   useEffect(() => {
-    if (mode !== 'theme') localStorage.setItem('mtglab-new-deck-mode', mode)
+    if (mode !== 'theme' && mode !== 'tarot') {
+      localStorage.setItem('mtglab-new-deck-mode', mode)
+    }
   }, [mode])
 
   const [tier, setTier] = useState('guild')
@@ -343,9 +359,9 @@ export default function NewDeck() {
             {DOOR_BLURBS[mode]}
           </p>
         </div>
-        {/* Three ways in, and the order is deliberate: the one that assumes
-            least goes first. Both of the others open onto "which of the 32 do
-            you want", which is a question somebody who has never played cannot
+        {/* Four ways in, and the order is deliberate: the one that assumes
+            least goes first. The last two open onto "which of the 32 do you
+            want", which is a question somebody who has never played cannot
             answer (ADR 20). */}
         {!chosen && !commander && (
           <div className="flex flex-wrap gap-1">
@@ -370,6 +386,14 @@ export default function NewDeck() {
       {/* ------------------------------------- step 1, theme: ask about them */}
       {!chosen && !commander && mode === 'theme' && (
         <ThemeInterview onPick={takeProposal} onLeave={() => setMode('guided')} />
+      )}
+
+      {/* ---------------------- step 1, tarot: the same interview, with a
+          reader and three cards in front of it (ADR 21). The spread's three
+          positions *are* the slot kinds, so this reaches step 3 by exactly the
+          route the plain interview does — one door, dressed. */}
+      {!chosen && !commander && mode === 'tarot' && (
+        <TarotTable onPick={takeProposal} onLeave={() => setMode('guided')} />
       )}
 
       {/* ------------------------------- step 1, direct: no lesson, just 32 */}

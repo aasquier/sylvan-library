@@ -36,6 +36,16 @@ commander leads shares one -- so a hit is the answer rather than a substitute
 for it, and `jobs.completed` is the shape that says "this job took no time"
 without forking the response.
 
+**And a dossier already being written is answered with that job**, which is
+the same argument moved one step earlier in time: the cache covers "somebody
+asked before", and `Plan.key` covers "somebody is asking right now". Both were
+needed, and only the first was built at first -- on 2026-08-13 two paid runs
+for the same commander went concurrently on the deployed instance because a
+second click inside the four-minute window had nothing to collide with. The
+client-side reattach built alongside it only ever covered one tab, since it
+lives in that tab's localStorage; this covers a reload, a second tab, another
+device and a cleared cache, because the server is the thing that knows.
+
 The `NET` lane, for the reason `themeruns` gives: a Claude call waits on a
 socket with the GIL released, and queueing it behind a Tier 1 sweep would be
 minutes of stall for nothing.
@@ -98,4 +108,15 @@ def plan_dossier(*, slug: str, requested: Any = None, refresh: bool = False,
             # may have expired" rather than a stack trace in a job's error field.
             raise ClaudeFailed(claude_client.explain(exc)) from exc
 
-    return Plan(KIND, label, None, run, lane=NET)
+    # `request.key` is the cache key -- the commander's `oracle_id` plus the
+    # prompt fingerprint -- and it is exactly the right identity for "somebody
+    # is already writing this". A dossier is about a *character*, so two decks
+    # led by Gyome asked at the same moment are one four-minute web search
+    # rather than two, the same claim ADR 19 makes about the cache one step
+    # earlier in time.
+    #
+    # It is `""` when the corpus has no oracle id for the commander, which
+    # disables the dedupe exactly as it disables the caching. That is the
+    # honest behaviour and not an oversight: without an id there is nothing to
+    # say two requests are for the same thing.
+    return Plan(KIND, label, None, run, lane=NET, key=request.key or None)

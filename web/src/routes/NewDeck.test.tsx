@@ -31,7 +31,7 @@ vi.mock('../lib/api', () => ({
   api: {
     colors: vi.fn(), searchCards: vi.fn(), createDeck: vi.fn(),
     claudeStatus: vi.fn(), themeAsk: vi.fn(), themePropose: vi.fn(),
-    job: vi.fn(),
+    job: vi.fn(), personas: vi.fn(), tarotReading: vi.fn(),
   },
   // The proposal is a background job now — it was measured at 226 seconds and
   // no hosted proxy holds a POST open that long. Faked rather than imported
@@ -133,6 +133,43 @@ const PROPOSAL = {
   never: 'The reading is Claude’s interpretation of what you said, not a finding.',
 }
 
+/**
+ * The reader roster, as `/api/claude/personas` serves it — plus a third voice
+ * nobody has written a line of TypeScript for.
+ *
+ * That third one is the assertion. ADR 21's claim is that adding a reader is a
+ * `Persona` and a prompt server-side and *nothing else moves*; the moment this
+ * list is hard-coded in the client again, `storyteller` stops appearing and
+ * the test that looks for it fails.
+ */
+const ROSTER = {
+  personas: [
+    { key: 'plain', label: 'Just talk to me',
+      blurb: 'A few questions, and a suggestion at the end.', deals: false },
+    { key: 'fortune-teller', label: 'Read my cards',
+      blurb: 'Three cards, and close attention.', deals: true },
+    { key: 'storyteller', label: 'Tell me a story',
+      blurb: 'A voice this file has never heard of.', deals: false },
+  ],
+  default: 'plain',
+}
+
+/** A dealt spread, with the first card reversed. */
+const READING = {
+  seed: 4242,
+  cards: [
+    { key: '13-death', name: 'Death', arcana: 'major', suit: null, number: 13,
+      image: '/tarot/13-death.webp', reversed: true,
+      slot: 'taste', position: 'The Root' },
+    { key: 'swords-03', name: 'Three of Swords', arcana: 'minor',
+      suit: 'swords', number: 3, image: '/tarot/swords-03.webp',
+      reversed: false, slot: 'temperament', position: 'The Turning' },
+    { key: 'wands-03', name: 'Three of Wands', arcana: 'minor',
+      suit: 'wands', number: 3, image: '/tarot/wands-03.webp',
+      reversed: false, slot: 'posture', position: 'The Table' },
+  ],
+}
+
 function open() {
   return render(<MemoryRouter><NewDeck /></MemoryRouter>)
 }
@@ -143,6 +180,29 @@ async function enterTheme() {
   fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
   return screen.findByText(PARTWAY.question)
 }
+
+/**
+ * Walk in through the fourth, and sit down with a named reader.
+ *
+ * The door pill and the fortune teller's own panel are both called "Read my
+ * cards" — deliberately, because that is what the door promises and what the
+ * reader delivers — so the reader is found by its blurb rather than by a name
+ * that matches two things.
+ */
+async function enterTarot(reader = 'fortune-teller') {
+  open()
+  const doors = await screen.findAllByRole('button', { name: /read my cards/i })
+  fireEvent.click(doors[0])
+  const persona = ROSTER.personas.find((p) => p.key === reader)!
+  const panel = (await screen.findByText(persona.blurb)).closest('button')!
+  fireEvent.click(panel)
+  return panel
+}
+
+/** The shuffle is a real 1.1s beat before the cards land, so anything waiting
+ *  on the deal has to outlast it — `waitFor`'s default second would expire on
+ *  the ceremony rather than on a failure. */
+const PAST_THE_SHUFFLE = { timeout: 3000 }
 
 beforeEach(() => {
   localStorage.clear()
@@ -159,11 +219,13 @@ beforeEach(() => {
       { id, status: 'done', result: PROPOSAL } as never),
     cancel: () => {},
   }))
+  vi.mocked(api.personas).mockReset().mockResolvedValue(ROSTER as never)
+  vi.mocked(api.tarotReading).mockReset().mockResolvedValue(READING as never)
 })
 
 afterEach(cleanup)
 
-describe('the three doors', () => {
+describe('the four doors', () => {
   it('offers the one that assumes least first', async () => {
     open()
     const doors = await screen.findAllByRole('button',
@@ -178,6 +240,13 @@ describe('the three doors', () => {
     expect(localStorage.getItem('mtglab-new-deck-mode')).not.toBe('theme')
   })
 
+  it('does not remember the tarot door either', async () => {
+    // Same argument, and more so: this one opens with a shuffle and then
+    // spends money on the first question.
+    await enterTarot()
+    expect(localStorage.getItem('mtglab-new-deck-mode')).not.toBe('tarot')
+  })
+
   it('still remembers the other two', async () => {
     open()
     fireEvent.click(await screen.findByRole('button', { name: /i know what i want/i }))
@@ -186,11 +255,125 @@ describe('the three doors', () => {
   })
 })
 
+describe('the tarot door', () => {
+  it('renders whatever readers the server has, not a list of its own', async () => {
+    // ADR 21's payoff, as a test: `storyteller` exists nowhere in this app's
+    // source. If it stops appearing, somebody has hard-coded the roster and
+    // adding a voice is a frontend change again.
+    open()
+    const doors = await screen.findAllByRole('button', { name: /read my cards/i })
+    fireEvent.click(doors[0])
+    expect(await screen.findByText('Tell me a story')).toBeTruthy()
+    expect(screen.getByText('A voice this file has never heard of.')).toBeTruthy()
+  })
+
+  it('deals face down, and names nothing until it is turned over', async () => {
+    await enterTarot()
+    // The places are announced; the cards are not. A spread that told you what
+    // it had dealt before you turned it over would be a form with candles on.
+    await screen.findByText('The Root', {}, PAST_THE_SHUFFLE)
+    expect(screen.getByText('The Turning')).toBeTruthy()
+    expect(screen.queryByText('Death')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Turn over The Root' })).toBeTruthy()
+  })
+
+  it('turns one card without turning the others', async () => {
+    await enterTarot()
+    fireEvent.click(await screen.findByRole(
+      'button', { name: 'Turn over The Root' }, PAST_THE_SHUFFLE))
+    expect(await screen.findByText('Death')).toBeTruthy()
+    expect(screen.queryByText('Three of Swords')).toBeNull()
+  })
+
+  it('renders a reversed card the other way up', async () => {
+    // The one claim in this whole door that a screenshot proves and a DOM
+    // cannot: jsdom computes no transforms, so what is pinned here is the hook
+    // the stylesheet rotates — `.tarot-face-front img.is-reversed` — sitting on
+    // the image and only on the image. Put it on the face instead and a
+    // reversed card spends the flip un-reversing itself and lands upright,
+    // which looks exactly like nothing going wrong.
+    await enterTarot()
+    fireEvent.click(await screen.findByRole(
+      'button', { name: 'Turn over The Root' }, PAST_THE_SHUFFLE))
+    fireEvent.click(screen.getByRole('button', { name: 'Turn over The Turning' }))
+
+    const death = await screen.findByAltText('Death')
+    const swords = screen.getByAltText('Three of Swords')
+    expect(death.className).toContain('is-reversed')
+    expect(swords.className).not.toContain('is-reversed')
+    expect(screen.getByText('reversed')).toBeTruthy()
+  })
+
+  it('sends the reader and the seed with every turn', async () => {
+    // Both are client-held, for the reason the transcript is: the server keeps
+    // no conversation. The seed is what makes three pictures cost one integer
+    // — it re-deals the identical spread rather than carrying the cards.
+    await enterTarot()
+    for (const place of ['The Root', 'The Turning', 'The Table']) {
+      fireEvent.click(await screen.findByRole(
+        'button', { name: `Turn over ${place}` }, PAST_THE_SHUFFLE))
+    }
+    await waitFor(() => expect(api.themeAsk).toHaveBeenCalledWith({
+      transcript: [], slots: [], persona: 'fortune-teller', seed: 4242,
+    }), PAST_THE_SHUFFLE)
+  })
+
+  it('deals nothing for a reader who reads no cards', async () => {
+    await enterTarot('plain')
+    await screen.findByText(PARTWAY.question)
+    expect(api.tarotReading).not.toHaveBeenCalled()
+    expect(screen.queryByText('The Root')).toBeNull()
+    expect(api.themeAsk).toHaveBeenCalledWith(
+      { transcript: [], slots: [], persona: 'plain', seed: undefined })
+  })
+
+  it('will not carry one reader’s conversation into another’s', async () => {
+    // A persona is fixed for a conversation (ADR 21): the transcript is resent
+    // whole every turn, so a voice swapped halfway leaves every earlier answer
+    // speaking in the old one. A stash left by a different reader is discarded
+    // rather than adopted.
+    localStorage.setItem('mtglab-theme-conversation', JSON.stringify({
+      transcript: [{ role: 'assistant', text: 'A question the plain one asked' }],
+      slots: PARTWAY.slots, job: null, proposal: null,
+      persona: 'plain', seed: null,
+    }))
+    await enterTarot()
+    for (const place of ['The Root', 'The Turning', 'The Table']) {
+      fireEvent.click(await screen.findByRole(
+        'button', { name: `Turn over ${place}` }, PAST_THE_SHUFFLE))
+    }
+    await waitFor(() => expect(api.themeAsk).toHaveBeenCalled(), PAST_THE_SHUFFLE)
+    expect(screen.queryByText('A question the plain one asked')).toBeNull()
+    expect(vi.mocked(api.themeAsk).mock.calls[0][0].transcript).toEqual([])
+  })
+
+  it('re-deals the same spread rather than remembering the cards', async () => {
+    // What survives a reload is three integers' worth: who is reading, which
+    // seed, and which places have been turned. The pictures come back from the
+    // server, which is why a reading needs no table anywhere.
+    await enterTarot()
+    await screen.findByText('The Root', {}, PAST_THE_SHUFFLE)
+    const stashed = JSON.parse(localStorage.getItem('mtglab-tarot-table')!)
+    expect(stashed).toEqual({ persona: 'fortune-teller', seed: 4242, turned: [] })
+
+    cleanup()
+    open()
+    fireEvent.click((await screen.findAllByRole(
+      'button', { name: /read my cards/i }))[0])
+    await screen.findByText('The Root')
+    expect(api.tarotReading).toHaveBeenLastCalledWith(4242)
+  })
+})
+
 describe('the theme conversation', () => {
   it('opens itself rather than waiting to be prompted', async () => {
     await enterTheme()
+    // `persona` rides along even on the door that never offers a choice, and
+    // `seed` is absent because this reader is dealt no cards (ADR 21). Both
+    // are client-held for the reason the transcript is: the server keeps no
+    // conversation, so everything that makes this the same one has to travel.
     expect(api.themeAsk).toHaveBeenCalledWith(
-      { transcript: [], slots: [] })
+      { transcript: [], slots: [], persona: 'plain', seed: undefined })
   })
 
   it('asks about you, and this one is not about Magic', async () => {
@@ -222,6 +405,8 @@ describe('the theme conversation', () => {
       transcript: [{ role: 'assistant', text: PARTWAY.question },
                    { role: 'user', text: 'Dune, easily' }],
       slots: PARTWAY.slots,
+      persona: 'plain',
+      seed: undefined,
     }))
   })
 
