@@ -947,3 +947,84 @@ describe('DeckDetail art picker', () => {
     expect(await screen.findByText(/is not a printing of/i)).toBeTruthy()
   })
 })
+
+/**
+ * The complaint that moved this whole branch to the front of the queue.
+ *
+ * The rationale interview has worked since ADR 15 and the deck page never
+ * said so — it was reachable only by opening the editor and finding a second
+ * button inside it. These pin the fix: the page announces it, and the control
+ * that announces it does the thing rather than revealing another control that
+ * does the thing.
+ */
+describe('DeckDetail rationale interview discoverability', () => {
+  function rowFor(card: string) {
+    return screen.getByTitle(`Remove ${card} from the deck`).closest('li')!
+  }
+
+  it('says the interview exists', async () => {
+    renderDeck()
+    expect(await screen.findByText(/stuck on a/i)).toBeTruthy()
+  })
+
+  it('says what the rule is in the same breath', async () => {
+    // The first question anybody asks is whether it writes the answer, and
+    // rule 4 is easier to keep when the UI states it unprompted.
+    renderDeck()
+    expect(await screen.findByText(/no stance lets it write the rationale/i))
+      .toBeTruthy()
+  })
+
+  it('offers the interview on each card', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(within(rowFor('Primeval Titan'))
+      .getByRole('button', { name: /ask claude/i })).toBeTruthy()
+  })
+
+  it('asks straight away rather than revealing a second button', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    fireEvent.click(within(rowFor('Primeval Titan'))
+      .getByRole('button', { name: /ask claude/i }))
+
+    await waitFor(() => expect(api.interview).toHaveBeenCalledWith(
+      'goreclaw-stompy', { card: 'Primeval Titan' }))
+  })
+
+  it('still opens the editor without spending anything', async () => {
+    // "Write why" must stay free. A page where opening a text box costs a call
+    // is a page nobody opens a text box on.
+    renderDeck()
+    await screen.findByText(DECK.name)
+    fireEvent.click(within(rowFor('Primeval Titan'))
+      .getByRole('button', { name: /edit why/i }))
+
+    await screen.findByRole('button', { name: /save rationale/i })
+    expect(api.interview).not.toHaveBeenCalled()
+  })
+
+  it('is honestly absent when the surface is switched off', async () => {
+    // ADR 15: a control that appears and then refuses is worse than one that
+    // is not there. `off` means no calls, so it means no button.
+    const off = { ...STANCE, preset: 'off', allows_calls: false,
+                  axes: [{ ...STANCE.axes[0], level: 'off' },
+                         STANCE.axes[1], STANCE.axes[2]] }
+    vi.mocked(api.claudeStatus).mockResolvedValue(
+      { ...CLAUDE_STATUS, stance: off } as never)
+    renderDeck()
+    await screen.findByText(DECK.name)
+
+    expect(screen.queryByRole('button', { name: /ask claude/i })).toBeNull()
+    expect(screen.queryByText(/stuck on a/i)).toBeNull()
+  })
+
+  it('is honestly absent when there is no key', async () => {
+    vi.mocked(api.claudeStatus).mockResolvedValue(
+      { ...CLAUDE_STATUS, configured: false } as never)
+    renderDeck()
+    await screen.findByText(DECK.name)
+
+    expect(screen.queryByRole('button', { name: /ask claude/i })).toBeNull()
+  })
+})

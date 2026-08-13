@@ -270,6 +270,23 @@ def test_a_missing_required_argument_is_rejected(source):
         tools.run("get_deck", {}, source=source)
 
 
+def test_a_mode_can_ask_for_legends_of_exactly_these_colours(corpus):
+    """The two arguments ADR 20 needed and the tool schema did not have.
+
+    `commanders_only` and `identity_exact` existed on the service and not in
+    the registry, and `run()` refuses unknown arguments — so a mode asking the
+    one question the theme proposal is built around got a rejection rather than
+    a shortlist. Found by writing the ADR before the code.
+    """
+    result = tools.run("search_cards", {"identity": "BG",
+                                        "identity_exact": True,
+                                        "commanders_only": True, "limit": 20})
+    names = {c["name"] for c in result["cards"]}
+    assert "Gyome, Master Chef" in names
+    # Mono-green is legal in a Golgari deck and does not *make* one.
+    assert "Goreclaw, Terror of Qal Sisma" not in names
+
+
 def test_an_explicit_null_is_dropped_rather_than_forwarded():
     """A model writing `"price_max": null` means "no filter", which is what the
     service function's own default already says -- more clearly."""

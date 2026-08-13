@@ -375,6 +375,64 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    @app.post("/api/claude/theme")
+    def claude_theme(payload: dict[str, Any]) -> dict[str, Any]:
+        """One turn of the theme interview (ADR 20).
+
+        Takes no deck and no `Decks` dependency, and that absence is the
+        feature: this surface exists to help somebody *start* a deck, and a
+        mode that cannot reach a deck cannot critique one.
+
+        The transcript is the client's — ADR 20 keeps conversation state off
+        the server — so this endpoint is the door. It takes plain
+        `{role, text}` turns and never Anthropic message blocks; an endpoint
+        that accepted those would be a free proxy for somebody else's spend.
+        `check_transcript` refuses everything else as a 422.
+        """
+        from mtglab.claude.client import ClaudeUnavailable
+        from mtglab.claude.theme import TranscriptRejected
+
+        try:
+            return service.claude_theme_ask(
+                transcript=payload.get("transcript"),
+                slots=payload.get("slots"),
+                requested=payload.get("stance") or None)
+        except (TranscriptRejected, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ClaudeUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except service.ClaudeFailed as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post("/api/claude/theme/proposal")
+    def claude_theme_proposal(payload: dict[str, Any]) -> dict[str, Any]:
+        """Two colour combinations and six commanders, from the conversation.
+
+        409 when the floor has not been reached, which is its own status on
+        purpose: nothing is malformed and nothing failed, there simply is not
+        enough yet. A 422 would read as "you sent something wrong" to a client
+        that sent exactly the right thing too early.
+        """
+        from mtglab.claude.client import ClaudeUnavailable
+        from mtglab.claude.theme import NotReady, TranscriptRejected
+
+        budget = payload.get("budget")
+        try:
+            return service.claude_theme_propose(
+                transcript=payload.get("transcript"),
+                slots=payload.get("slots"),
+                requested=payload.get("stance") or None,
+                budget=float(budget) if budget else None,
+                avoid=str(payload.get("avoid") or ""))
+        except NotReady as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except (TranscriptRejected, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ClaudeUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except service.ClaudeFailed as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
     @app.post("/api/decks/{slug}/interview")
     def claude_interview(slug: str, payload: dict[str, Any],
                          decks: Decks) -> dict[str, Any]:

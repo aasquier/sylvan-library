@@ -32,9 +32,22 @@ arc; this is what the next few sessions actually do.
    stands between here and deploy. The list came from the maintainer on
    2026-08-12 and is written out below so it survives a fresh session; it is
    his list, so **an item is done when he says it is, not when it compiles.**
-   Five branches, in order, each green before the next starts. Branch 2 was
-   not on the original list — it came out of reviewing branch 1's deck page
-   and displaced the rest by one.
+   Five branches, each green before the next starts. Branch 2 was not on the
+   original list — it came out of reviewing branch 1's deck page and displaced
+   the rest by one.
+
+   **The order is now 1, 2, 5, 3, 4**, changed 2026-08-12 after the branch 2
+   review; 1, 2 and 5 have landed. The numbers are identities, not positions, so nothing renumbers.
+   What moved 5 to the front is worth recording because it is a finding rather
+   than a preference: asked to test branch 2, the maintainer went looking for
+   an *interactive* Claude assist in the deck builder and found none. He was
+   right — "Start a deck" has no Claude in it at all, and the one interactive
+   surface that does exist, the rationale interview, is reachable only by
+   opening a deck, clicking *Edit why* on a card, and then *Ask for questions*.
+   Nothing announces it. So the four modes built or planned so far are a read
+   surface and a hidden one, and the thing that would make the app feel like it
+   has an assistant in it is branch 5. Visual identity and teaching are worth
+   doing and neither of them changes that.
 
    **1 — Bugs and quick wins.** Landed 2026-08-12 in
    [#55](https://github.com/aasquier/sylvan-library/pull/55).
@@ -61,9 +74,9 @@ arc; this is what the next few sessions actually do.
      four that never had one. A blurb is mechanical and never names a plane;
      an era is a setting and never restates the mechanics.
 
-   **2 — The commander dossier, and alternative arts.** Landed 2026-08-12,
-   with [ADR 19](docs/adr/0019-the-dossier-cites-three-sources.md) written
-   first. Branch 1 answered "what does this card do" with corpus counts; this
+   **2 — The commander dossier, and alternative arts.** Landed 2026-08-12 in
+   [#57](https://github.com/aasquier/sylvan-library/pull/57), with
+   [ADR 19](docs/adr/0019-the-dossier-cites-three-sources.md) written first. Branch 1 answered "what does this card do" with corpus counts; this
    is the *interesting* half — who this character is, what archetype they
    define and where it came from, their rivals, where they sit in Magic's
    history. The second Claude mode, and the first whose facts do not all come
@@ -138,7 +151,7 @@ arc; this is what the next few sessions actually do.
      query can know). A set code with several printings — `MUL` has four
      Goreclaws — lists them and refuses rather than picking one.
 
-   **3 — Visual identity.** Next. The splash and the Sylvan Library art (which is
+   **3 — Visual identity.** After 5. The splash and the Sylvan Library art (which is
    only rendered on an *empty* library today, so the maintainer has never
    seen it), an interactive colour pentagram for the mono tier, and the
    builder's tier headers, which are plain grey panels. Decided: the card art
@@ -151,10 +164,111 @@ arc; this is what the next few sessions actually do.
    and real depth behind the guilds, shards, clans and colours — champions,
    plot lines, classic cards.
 
-   **5 — Claude in the builder.** A guided, adaptive interview that helps pick
-   a theme and a commander, and a refactor pass over an existing deck. Both
-   are modes ADR 15's table does not name. Rule 4 is untouched by either: no
-   mode writes a `why`.
+   **5 — Claude in the builder.** Built 2026-08-12, with
+   [ADR 20](docs/adr/0020-the-theme-interview-reads-a-person.md) written first.
+   Moved ahead of 3 and 4 for the reason recorded above. A guided, adaptive
+   interview that helps pick a theme and a commander, plus the discoverability
+   fix below. The refactor pass stayed out and remains goal 10. Rule 4 is
+   untouched: no mode writes a `why`.
+
+   What the build settled, beyond the decisions below:
+
+   - **The questions are not about Magic, and that is the whole feature.** The
+     first draft asked "when you picture yourself winning, what is on the
+     table" — a Magic question wearing a friendly hat, unanswerable by exactly
+     the person this is for. It asks about a film, a period, a star sign, how
+     somebody is at game night, and translates. That works because the colour
+     pie is a personality taxonomy before it is a set of mechanics, which is
+     also why `colors.py` is a **fourth source** alongside ADR 19's three:
+     checked in, carrying `verified_by`, and free.
+   - **Readiness is a grounded-slot count.** Every reading the mode takes
+     carries a quote, Python checks the quote against the user's own turns, and
+     three surviving kinds opens the proposal. Third instrument after
+     `only_questions()` and `keep_sources()`, pointed at a model reporting back
+     a preference nobody expressed.
+   - **Three bugs that only appear when you run it**, none visible from reading
+     the shapes. The interviewer speaks first, so the transcript starts with an
+     assistant turn and the request needs a synthetic user frame or every
+     answer is a 400. Alternation was enforced on a false premise — the API
+     combines consecutive same-role turns — and enforcing it wedged any
+     conversation where a turn came back without a usable question. And the
+     proposal ran **zero searches** on its first outing, resting archetype
+     claims on nothing, until the prompt was made prescriptive about when to
+     call the tool.
+   - **A dropped commander can cost a whole suggestion.** A legend of a
+     *subset* identity is legal in those colours and does not make a deck that
+     fills that slot, so it is dropped — and when all three go, the combination
+     goes with them. Observed live: one run returned two combinations and the
+     next returned one. Counted and surfaced now rather than silently thin.
+   - **Cost and time:** a conversation turn is a few seconds and heavily
+     prompt-cached (~48k cached tokens by turn three). The proposal is the
+     expensive half — **measured at 226 seconds** end to end with `max_uses: 4`,
+     ~79k input / 8k output, since it reads a dozen-odd pages and checks every
+     legend. Trimmed to three searches, and the UI now says it takes a few
+     minutes. **This is a deploy blocker in its current shape**: a
+     four-minute synchronous POST will not survive a hosted proxy, and the fix
+     is to run it as a background job the way `api/simruns.py` already runs
+     Tier 1. Worth doing before item 4, not after.
+
+   Three things are already settled and should not be re-opened:
+
+   - **It proposes; the user creates.** Nothing under `src/mtglab/claude/` can
+     reach a write path, and `create_deck` is on the write surface
+     `tests/test_claude_boundary.py` forbids naming. So the interview's output
+     is a *proposal* — colours, then commanders — and the existing create flow
+     is what makes a deck. That is the same shape the rationale interview has,
+     arrived at from the other direction, and it is a feature: the deck is
+     made by the person whose deck it is.
+   - **Every commander it names comes from the corpus.** The theme half is
+     opinion and is exactly what Claude is for; the moment it starts naming
+     cards, rule 1 binds. `search_cards` with `commanders_only` and an identity
+     filter is the tool, and a name that does not resolve gets dropped and
+     counted — the instrument the dossier's rivals already use.
+   - **A theme is not a `why`.** Asking what historical period somebody relates
+     to engages no part of rule 4, and the mode still may not pre-fill a
+     rationale for any card it suggests.
+
+   **Conversational, not one-shot** — decided 2026-08-12. A multi-turn
+   interview that adapts to the answers, rather than a form of fixed questions
+   followed by a proposal. It is the more expensive thing to build and it is
+   the reason the feature is interesting: a form could have been a form
+   without a language model in it.
+
+   That choice is what makes this mode genuinely new rather than the rationale
+   interview with different words, and it is the part the ADR has to think
+   about hardest. Three consequences that are not obvious:
+
+   - **The interview holds state across turns, and `converse` currently does
+     not.** Every mode so far is one question and one answer; this one is a
+     conversation whose history has to survive between HTTP requests. Where
+     that history lives — client-held and resent, or server-side and keyed —
+     is a real decision with a cost either way, and it is the first thing to
+     settle.
+   - **A multi-turn mode has no natural stopping point**, which is exactly
+     where `MAX_TOOL_TURNS` came from for the single-shot ones. It needs a
+     ceiling that is about the *conversation*, not the tool loop, and a way
+     to say "I have enough to propose now" that is checkable in Python rather
+     than trusted from the model.
+   - **The proposal is a schema, the conversation is prose.** Those want
+     different response shapes, so a mode that does both is either two modes
+     or one mode with a mode switch — and ADR 15 says a mode is a prompt, a
+     tool set and a capability declaration, so two is probably the honest
+     answer.
+
+   **The refactor pass stays out**, confirmed 2026-08-12, and the reason is now
+   a design one rather than only sequencing: it is a *critique* surface over an
+   existing deck, and this branch's whole argument is that the deckbuilding
+   surface must not reach a deck. Shipping both together would blur the
+   boundary on the branch that draws it. It also still inherits the rationale
+   interview's answer to who writes the `why`, and the pod measurement still
+   decides whether Forge can contribute to it honestly. Goal 10.
+
+   **Also in scope, and cheap:** the rationale interview was undiscoverable —
+   it worked, and nothing on the deck page said so. *Done:* every card carries
+   an **Ask Claude** control beside *Write why*, which opens the editor already
+   asking rather than revealing a second button that asks; the cards tab says
+   the feature exists and states rule 4 in the same breath; and all of it is
+   honestly absent when the surface is off, unconfigured or uninstalled.
 
    Two things from the cleanup pass are worth knowing while working through
    it: the four-colour names come from `colors.py`'s taxonomy (Artifice,
@@ -167,8 +281,9 @@ arc; this is what the next few sessions actually do.
    DNS early), `fly secrets`, seed the corpus and decks, then the refresh
    runbook.
 5. **After deploy, next build work in order:** re-price automated PR review
-   (ENGINEERING §5, parked), the stance dial UI, then the remaining three
-   Claude modes (argue a slot, deck conversation, research).
+   (ENGINEERING §5, parked), the stance dial UI, then the remaining Claude
+   modes ADR 15 names and branch 5 does not build (argue a slot, deck
+   conversation, research).
 
 ---
 

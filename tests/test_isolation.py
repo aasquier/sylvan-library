@@ -91,6 +91,12 @@ SHARED = {
     "/api/colors": "a fixed taxonomy, no data at all",
     "/api/colors/progress": "scored over the shared library",
     "/api/claude": "whether the surface is configured on this instance",
+    # ADR 20's two. Neither takes a deck or a slug — the conversation is about
+    # the person and is held by their browser, so there is nothing here
+    # belonging to one account for another to reach. What comes back is a
+    # suggestion; making the deck goes through the shared create route.
+    "/api/claude/theme": "a conversation the client holds; no stored state",
+    "/api/claude/theme/proposal": "colours and commanders out of the shared corpus",
     "/api/sim/mana": "submits a job against a shared deck; the job is scoped",
     "/api/sim/lands": "submits a job too, and the job it returns is scoped",
 }

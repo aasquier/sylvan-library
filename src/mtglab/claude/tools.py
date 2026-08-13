@@ -225,18 +225,40 @@ READ_ONLY: dict[str, Tool] = {
         Tool(
             name="search_cards",
             fn=service.search_cards,
-            required=("q",),
+            # Nothing is required, which mirrors the service function rather
+            # than guessing at it. `q` was required here and is not there, and
+            # the gap had a cost: "which legends have exactly this colour
+            # identity" is a search with no text in it at all, and it is the
+            # question ADR 20's proposal is built around.
             properties={
                 "q": {"type": "string",
                       "description": ("Matched against card name and rules "
                                       "text, e.g. 'destroy target creature' "
-                                      "or 'Cat'.")},
+                                      "or 'Cat'. Optional -- omit it when the "
+                                      "filters below are the whole question.")},
                 "identity": {"type": "string",
                              "description": ("Colour identity filter as WUBRG "
                                              "letters, e.g. 'GW'. A subset "
                                              "filter: 'BG' returns everything "
                                              "legal in a Golgari deck, "
                                              "including colourless.")},
+                "identity_exact": {
+                    "type": "boolean",
+                    "description": (
+                        "Turn `identity` into an exact match instead of a "
+                        "subset. Use this when the question is 'which "
+                        "commander makes *these* colours': a mono-white legend "
+                        "is legal in a Selesnya deck, but a deck it leads is a "
+                        "mono-white deck and fills a different slot."),
+                },
+                "commanders_only": {
+                    "type": "boolean",
+                    "description": (
+                        "Return only cards that may actually lead a Commander "
+                        "deck. Checked with the same rule the gate uses, not a "
+                        "type-line guess, so it includes the cards that can "
+                        "command without being Legendary Creatures."),
+                },
                 "type_line": {"type": "string",
                               "description": "Substring of the type line, e.g. 'Instant'."},
                 "cmc_max": {"type": "number",
@@ -254,8 +276,10 @@ READ_ONLY: dict[str, Tool] = {
                 "rules text, colour identity, type, mana value and price. "
                 "This is the discovery tool: use it for 'what else could go "
                 "here', 'what green cards do X', 'cheaper alternatives to "
-                "this'. It searches the whole history of the game, so deep "
-                "cuts are reachable, not only staples. "
+                "this', and — with commanders_only and identity_exact — "
+                "'which legends lead these colours'. It searches the whole "
+                "history of the game, so deep cuts are reachable, not only "
+                "staples. "
                 "**It returns only Commander-legal cards, so it is not a "
                 "lookup tool** -- a banned card will simply be missing, and "
                 "absence here is not evidence a card does not exist. When you "

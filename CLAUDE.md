@@ -408,6 +408,22 @@ install and Homebrew is too stale to build Colima, so CI is the only place the
 `Dockerfile` is ever built. Treat a red `image` job as the first real feedback
 on a container change rather than as a surprise.
 
+**Do not open a documentation-only pull request.** Updating `ROADMAP.md` when
+direction changes is required and the rule above still holds — but a PR whose
+whole diff is a few paragraphs costs six CI jobs, a review round trip and a
+squash commit to land prose nobody was blocked on. Three of them went in over
+2026-08-12 alone ([#54](https://github.com/aasquier/sylvan-library/pull/54),
+[#56](https://github.com/aasquier/sylvan-library/pull/56), and #58, which was
+closed rather than merged once the pattern was named).
+
+So: **commit the doc change on the branch that does the work it describes, and
+let it ride along.** Write it *when the decision is made* rather than
+afterwards — the point of these files is that they survive a fresh session, and
+a paragraph sitting uncommitted on a branch still survives one. A doc change
+earns its own PR only when nothing else is coming: a correction to something
+already merged and wrong, or a decision recorded at the end of a phase with no
+next branch to carry it.
+
 ## Planning documents
 
 `ROADMAP.md` (goals vs reality, open decisions), `docs/ENGINEERING.md` (the
