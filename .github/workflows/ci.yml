@@ -294,6 +294,55 @@ jobs:
         if: always()
         run: docker rm -f mtglab-ci || true
 
+      # ENGINEERING §3: everything this app writes lives under `/data`.
+      # `--read-only` is what turns that sentence from a claim into a test. A
+      # change that starts writing into the image layer fails here, loudly,
+      # instead of succeeding locally and then silently losing every write at
+      # the next deploy -- which is the exact failure decks-on-the-volume was
+      # moved to avoid.
+      #
+      # **This does not harden the Fly deployment.** Fly's configuration
+      # reference has no read-only root option (checked 2026-08-13; the nearest
+      # thing, `persist_rootfs`, is about persistence), so `fly.toml` cannot ask
+      # for it and the deployed machine does not run this way. What it hardens
+      # is the image on any runtime that *can* express it -- plain `docker run`,
+      # podman, Kubernetes -- and, more usefully here, the invariant above.
+      #
+      # Deliberately a second container rather than a flag on the one above:
+      # that one asserts the shape the instance actually runs in, and folding
+      # these together would mean neither was tested as deployed.
+      #
+      # `--tmpfs /tmp` because the standard library expects a writable temp
+      # directory and does use it. `/data` is a volume, writable exactly as it
+      # is in production, which is the point -- read-only root, writable state.
+      - name: It runs with a read-only root filesystem
+        run: |
+          docker volume create mtglab-ci-ro
+          docker run -d --name mtglab-ci-ro -p 8081:8080 \
+            --read-only --tmpfs /tmp \
+            -e MTGLAB_REQUIRE_AUTH=1 \
+            -v mtglab-ci-ro:/data \
+            sylvan-library:ci
+          for _ in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8081/api/health -o health-ro.json; then
+              echo "up with a read-only root"; cat health-ro.json
+              # The entrypoint chowns the volume as root and execs the app as
+              # mtglab. Both still have to work with the root read-only, so
+              # assert the write it needs rather than trusting a 200.
+              docker exec --user mtglab mtglab-ci-ro touch /data/.write-probe
+              echo "and /data is still writable"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::the container did not come up with a read-only root filesystem"
+          docker logs mtglab-ci-ro || true
+          exit 1
+
+      - name: Stop the read-only one
+        if: always()
+        run: docker rm -f mtglab-ci-ro || true
+
       # Fails the build on HIGH/CRITICAL, per ENGINEERING §3. `ignore-unfixed`
       # because a CVE with no available patch is not something this build can
       # act on -- it would turn the gate into noise that gets disabled.

@@ -1108,18 +1108,40 @@ the instance and not yet pulled back into git — the rationales your friends
 wrote, which by rule 4 nobody may regenerate on their behalf.
 
 Back `app.db` up with SQLite's online backup, which is safe to run against a
-live database:
+live database. **There is no `sqlite3` binary in the image** — the same class of
+absence as `curl`, and for the same reason: nothing in the runtime needs one.
+Python's `sqlite3` module has the identical online-backup API and is present by
+definition, so that is what the procedure uses:
 
 ```bash
-fly ssh console -C "sqlite3 /data/app.db \".backup /data/app-backup.db\""
+fly ssh console -C "python3 -c \"import sqlite3; s = sqlite3.connect('/data/app.db'); d = sqlite3.connect('/data/app-backup.db'); s.backup(d); d.close(); s.close()\""
 fly ssh sftp get /data/app-backup.db ./backups/app-$(date +%F).db
+fly ssh console -C "rm /data/app-backup.db"
 ```
+
+`python3 -m sqlite3` looks like a drop-in for the missing binary and is not
+one: Python 3.12 does ship a `sqlite3` CLI, but it only executes SQL. It has no
+`.backup` dot-command and answers `near ".": syntax error`.
+
+**The third line is not tidiness.** Left behind, `/data/app-backup.db` is a
+second complete copy of every password hash and every email address, sitting on
+the volume indefinitely. Take the backup, pull it down, remove it.
+
+`fly ssh sftp get` works. It is `put` that Fly's permission classifier refuses
+— worth knowing when you want a script *on* the machine, where inline
+`python3 -c` is the way in.
 
 Do not simply `cp` a live SQLite file — with WAL enabled you can capture a torn
 copy. Keep these backups private: they contain password hashes **and email
 addresses**, which is the same reason `app.db` is gitignored (ADR 16). A
 backup directory that ends up in git is the leak this whole rule exists to
 prevent, so keep `backups/` out of the repository.
+
+This procedure was executed against the live instance on 2026-08-13 and
+verified end to end: online backup, `integrity_check: ok`, pulled down with
+`sftp get`, restored into a scratch `MTGLAB_DATA_DIR`, and opened by the app's
+own `auth/db.connect()` — with `foreign_keys` on, so ADR 16's
+`ON DELETE CASCADE` survives a restore.
 
 The decks need no such ceremony — they are plain YAML — but they do need
 copying, which is the same operation as pulling instance-side work back into
