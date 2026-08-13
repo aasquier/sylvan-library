@@ -1,14 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
 import { COLOR_NAMES, COLOR_VAR, manaSymbols, splitManaText } from '../lib/mtg'
+import { ManaGlyph } from './manasymbol'
+import { hasGlyph } from '../lib/managlyphs'
 
 /* ------------------------------------------------------------------ pips */
 
-/** One mana symbol. Shared so a cost and a pip in prose cannot drift apart. */
+/**
+ * One mana symbol. Shared so a cost and a pip in prose cannot drift apart.
+ *
+ * The five colours are drawn as their real icons — sun, drop, skull, flame,
+ * tree — and everything else keeps its character, because everything else *is*
+ * a character: a generic cost is a numeral, `{X}` is a letter, and a hybrid
+ * like `{G/W}` is two colours in one pip that no single glyph says. So the
+ * branch is on `hasGlyph` rather than on "is this a colour", and the text path
+ * stays exactly as it was.
+ *
+ * The glyph is inset slightly rather than filling the disc, so the ink has a
+ * ring of colour around it. Flush to the edge, adjacent pips in a cost read as
+ * one dark smear at 13px.
+ */
 function Pip({ sym, size }: { sym: string; size: number }) {
   const solid = COLOR_VAR[sym]
+  const glyph = hasGlyph(sym)
   return (
     <span
       title={COLOR_NAMES[sym] ?? sym}
+      // A lettered pip was its own text: `{G}` in a sentence reached the
+      // accessibility tree as the character "G", which is thin but real. A
+      // drawn one contributes nothing, so the name has to be stated. `img`
+      // rather than nothing, because a pip is one indivisible mark and a
+      // screen reader should say "Green" rather than walking into an SVG.
+      role={glyph ? 'img' : undefined}
+      aria-label={glyph ? COLOR_NAMES[sym] ?? sym : undefined}
       className="inline-flex items-center justify-center rounded-full align-middle font-semibold text-[#141414]"
       style={{
         width: size,
@@ -20,7 +43,7 @@ function Pip({ sym, size }: { sym: string; size: number }) {
         boxShadow: '0 0 0 1px var(--hairline)',
       }}
     >
-      {sym.replace('/', '')}
+      {glyph ? <ManaGlyph symbol={sym} size={size * 0.74} /> : sym.replace('/', '')}
     </span>
   )
 }
@@ -115,12 +138,27 @@ export function ColorRing({ colors, size = 34 }: { colors: string[]; size?: numb
             background: COLOR_VAR[c], color: '#141414',
             boxShadow: '0 0 0 1px var(--hairline)',
           }}
-        >{c}</span>
+        >
+          {/* The identity headline, so it gets the real icons for the same
+              reason `Pip` does. `title` still carries the colour's name, which
+              is what a glyph cannot say to a screen reader. */}
+          {hasGlyph(c) ? <ManaGlyph symbol={c} size={size * 0.7} /> : c}
+        </span>
       ))}
     </span>
   )
 }
 
+/**
+ * A colour identity at list density — the deck shelf, a table row.
+ *
+ * These were bare dots, which was defensible while a `Pip` was a lettered disc
+ * (a 12px letter is unreadable, so a dot said strictly more). Now that a pip
+ * carries the real icon the dots are the odd mark out, and a shelf where every
+ * deck shows two pale circles is not saying which two colours. 14px is the
+ * floor found by checking the glyphs down the sizes: the five stay apart by
+ * silhouette well below where their interior detail gives up.
+ */
 export function ColorPips({ identity }: { identity: string[] }) {
   if (!identity.length) {
     return <span className="text-xs" style={{ color: 'var(--text-muted)' }}>colorless</span>
@@ -131,9 +169,11 @@ export function ColorPips({ identity }: { identity: string[] }) {
         <span
           key={c}
           title={COLOR_NAMES[c] ?? c}
-          className="inline-block h-3 w-3 rounded-full"
+          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full"
           style={{ background: COLOR_VAR[c], boxShadow: '0 0 0 1px var(--hairline)' }}
-        />
+        >
+          {hasGlyph(c) && <ManaGlyph symbol={c} size={10} />}
+        </span>
       ))}
     </span>
   )

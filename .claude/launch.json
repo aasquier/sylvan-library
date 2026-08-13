@@ -33,6 +33,22 @@
         "MTGLAB_DECKS_DIR=$(mktemp -d) .venv/bin/mtglab ui --no-open --port 8768"
       ],
       "port": 8768
+    },
+    {
+      "// web-dev": [
+        "Vite with HMR, for visual work. `vite.config.ts` proxies /api to",
+        "127.0.0.1:8765, so `mtglab-ui` has to be running alongside it — this",
+        "entry serves the frontend, that one serves the data.",
+        "",
+        "The other four entries serve the *committed* bundle out of",
+        "`src/mtglab/web_dist`, so a change under `web/src` is invisible to",
+        "them until `npm --prefix web run build`. That is the right thing for",
+        "testing what ships and the wrong thing for iterating on a colour."
+      ],
+      "name": "web-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-lc", "npm --prefix web run dev"],
+      "port": 5173
     }
   ]
 }

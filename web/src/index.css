@@ -136,6 +136,33 @@ body {
   height: 100%;
   width: 100%;
   object-fit: cover;
+  /* Anchored low rather than centred. The band is about 3:1 over a 1.36:1
+     painting, so 44% of the height survives, and centring takes that 44% out
+     of the middle — which on this one is bare wall. Low keeps the path, the
+     canyon floor and the three figures that give the place its scale. Not a
+     fix for the crop, which nothing at this ratio is; a choice about which
+     part is worth keeping. `LibraryMasthead` is where the whole painting is
+     actually visible. */
+  object-position: 50% 78%;
+}
+
+/* The nameplate's copy of the painting, shown whole rather than cropped.
+ *
+ * A much gentler lift than `.hero-art` gets, and the difference is the point:
+ * that one is a wash behind text and can take a heavy hand, this one is the
+ * picture itself and the same treatment bleached it. `Sylvan Library` is a
+ * bright yellow-green forest to begin with — the assumption baked into the
+ * 1.75 below, that card paintings are dark and vanish against a near-black
+ * panel, is exactly wrong for this painting, which is the app's own and the
+ * only one this rule was never checked against. */
+.masthead-art {
+  aspect-ratio: 616 / 452;
+  filter: saturate(1.05);
+}
+
+:root[data-theme='dark'] .masthead-art,
+:root:where(:not([data-theme='light'])) .masthead-art {
+  filter: brightness(1.12) saturate(1.1);
 }
 
 .hero-scrim {
@@ -149,9 +176,15 @@ body {
   );
 }
 
+/* 1.75 was tuned against the dark commander paintings on the deck page and
+   never checked against the one painting that is always here. On a bright
+   forest it blew the highlights out to a flat yellow-green haze — the failure
+   nobody caught, because the only screen that renders it is the one an
+   instance with decks on it never shows. 1.3 still lifts a dark painting off a
+   near-black page without bleaching a light one. */
 :root[data-theme='dark'] .hero-art,
 :root:where(:not([data-theme='light'])) .hero-art {
-  filter: brightness(1.75) saturate(1.15);
+  filter: brightness(1.3) saturate(1.1);
 }
 
 :root[data-theme='dark'] .hero-scrim,
@@ -210,6 +243,44 @@ body {
     color-mix(in srgb, var(--surface-1) 45%, transparent) 22%,
     transparent 55%
   );
+}
+
+/* The colour wheel in `components/pentagram.tsx`.
+ *
+ * Two things the component cannot express inline. First, hit-testing: a guild
+ * line is 4px of stroke, which is not a target anybody can hit, so each line is
+ * drawn twice — a visible thin one and an invisible 20px one underneath. The
+ * visible stroke has to stop claiming the pointer or it wins the hit test
+ * against its own wider sibling near the middle of the line and the target is
+ * back to 4px.
+ *
+ * Second, focus. The default focus ring is drawn on the `<g>`'s bounding box,
+ * which for a chord running corner to corner is most of the diagram — a
+ * rectangle round half the star is worse than no indicator at all. The
+ * component paints its own halo and thickens the line instead, so the ring is
+ * suppressed here rather than in five places inline.
+ */
+.pentagram line {
+  transition: stroke-width 140ms ease, opacity 140ms ease;
+}
+
+.pentagram-edge line:first-child {
+  pointer-events: none;
+}
+
+.pentagram-vertex circle {
+  transition: r 140ms ease, opacity 140ms ease;
+}
+
+.pentagram :focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pentagram line,
+  .pentagram-vertex circle {
+    transition: none;
+  }
 }
 
 /* Card art fades in rather than popping, since a deck view loads ~90 at once. */

@@ -37,7 +37,7 @@ arc; this is what the next few sessions actually do.
    the rest by one.
 
    **The order is now 1, 2, 5, 3, 4**, changed 2026-08-12 after the branch 2
-   review; 1, 2 and 5 have landed. The numbers are identities, not positions, so nothing renumbers.
+   review; 1, 2, 5 and 3 have landed, so only teaching is left. The numbers are identities, not positions, so nothing renumbers.
    What moved 5 to the front is worth recording because it is a finding rather
    than a preference: asked to test branch 2, the maintainer went looking for
    an *interactive* Claude assist in the deck builder and found none. He was
@@ -151,13 +151,69 @@ arc; this is what the next few sessions actually do.
      query can know). A set code with several printings — `MUL` has four
      Goreclaws — lists them and refuses rather than picking one.
 
-   **3 — Visual identity.** After 5. The splash and the Sylvan Library art (which is
-   only rendered on an *empty* library today, so the maintainer has never
-   seen it), an interactive colour pentagram for the mono tier, and the
-   builder's tier headers, which are plain grey panels. Decided: the card art
-   stays a Scryfall hotlink and everything else is **drawn in SVG/CSS** — no
-   new binary assets, no licensing question, and the pentagram is a diagram
-   anyway.
+   **3 — Visual identity.** Built 2026-08-13. No ADR: the one decision that
+   needed making had already been made — card art stays a Scryfall hotlink and
+   everything else is **drawn in SVG/CSS**, no new binary assets, no licensing
+   question — and nothing in the build moved it. The scope was the splash and
+   the Sylvan Library art (rendered only on an *empty* library, so the
+   maintainer had never seen it), an interactive colour pentagram for the mono
+   tier, and the builder's tier headers, which were plain grey panels.
+
+   What the build settled:
+
+   - **The five mana symbols are drawn now**, which was not on the list — the
+     maintainer raised it mid-branch, and it is the change that touches the
+     most screens because `Pip` is shared by every cost, every prose pip and
+     every identity ring. A lettered disc was a placeholder that had stopped
+     looking like one. Drawn rather than hotlinked from Scryfall, and the
+     reason is not licensing: **a pip is inline in a sentence**. The deck files
+     carry 174 across `why`, `strategy` and `notes`, the gate's own errors are
+     the densest of them, and `/api/colors` is the one page that works with no
+     corpus and no network. Card art is decorative and lazy; prose is neither.
+     Checking Scryfall's own path data in would also be redistributing their
+     asset rather than hotlinking it, which is the line rule 5 draws. ~2 kB,
+     no requests, works offline.
+   - **Only the five colours get an icon.** A numeral is a numeral, `{X}` is a
+     letter, a hybrid is two colours no single glyph states — so the branch is
+     `hasGlyph` and the text path is untouched. `{C}` is the one that is merely
+     not done rather than argued against.
+   - **A drawn pip had to be given a name.** A lettered one reached the
+     accessibility tree as the character "G"; a drawing contributes nothing, so
+     `role="img"` and the colour's name are explicit. Caught by an existing
+     test that read the letters out of `textContent` — the failure was the
+     feature working.
+   - **The pentagram's geometry is derived, not tabulated.** Five vertices in
+     WUBRG order; adjacent is allied, two apart is enemy. That yields exactly
+     the ten guilds, once each, and the chords are what draw the star. Every
+     name comes from the taxonomy the page already fetched, so there is no
+     second copy of `colors.py` — pinned from both sides, by
+     `tests/test_colors.py` against the table and by a frontend test that
+     renames a guild in the data and watches the diagram rename it.
+   - **The tier badges are the same wheel at 26px**, each with its own shape
+     lit, which makes the two tiers people confuse self-explaining: a shard is
+     an arc and mostly solid, a wedge is a span and mostly dashed. Same three
+     dots, opposite texture.
+   - **The `art_crop` ratio lesson has now been learned three times.** The
+     hero band on the empty library is 3.08:1 over a 1.36:1 painting, so it
+     kept **44% of the height from the middle** — bare wall, with the sky, the
+     path and the three figures that give the canyon scale all cropped away.
+     Branch 1 fixed exactly this on the deck hero and the library tiles and
+     could not have caught this one, because the only screen that renders it is
+     one an instance with decks on it never shows. The nameplate therefore
+     shows the painting **whole, beside the title**, which is branch 1's own
+     answer; the empty-library band keeps its crop but is anchored low, where
+     the subject is.
+   - **A dark-mode filter tuned on the wrong sample.** `brightness(1.75)`
+     assumes card paintings are dark and vanish against a near-black panel.
+     *Sylvan Library* is a bright yellow-green forest and it bleached — the
+     app's own art was the one image the rule was never checked against. 1.3
+     now, and the nameplate's copy gets 1.12 because it is the picture rather
+     than a wash behind text.
+   - **Moving the title into the nameplate took the empty library's `h1` with
+     it**, found by running the app rather than by the suite. Fixed and pinned:
+     exactly one `h1` and exactly one copy of the painting in both states.
+   - **Cost:** entry chunk 262 kB → 266 kB (84 kB gzipped). The pentagram rides
+     in the lazy `NewDeck` chunk; only the glyphs are in the entry.
 
    **4 — Teaching.** A vocabulary section for beginners; hover help in the
    simulator, whose parameters are words and numbers divorced from meaning;
