@@ -1032,8 +1032,14 @@ export const api = {
   // load; the POST spends money and reaches the network. One function with a
   // flag is how the free one ends up in a polling loop that is not free.
   dossier: (slug: string) => get<DossierReport>(`/api/decks/${slug}/dossier`),
+  // Returns a **job**, not a dossier. Measured at 236 seconds on the deployed
+  // instance — longer than the theme proposal below, which has been a job
+  // since #60 — and what a four-minute POST looks like on a phone is a spinner
+  // and then `Load failed`, a transport error carrying no status code to show.
+  // Follow it with `followJob` and read `job.result` as a `DossierReport`.
+  // A stored dossier comes back already `done`, so a hit still costs nothing.
   writeDossier: (slug: string, body: { stance?: string; refresh?: boolean } = {}) =>
-    post<DossierReport>(`/api/decks/${slug}/dossier`, body),
+    post<Job>(`/api/decks/${slug}/dossier`, body),
   // Every non-digital printing of the commander, newest first. Its own call
   // because most visits never open the picker and Goreclaw has twelve.
   printings: (slug: string) => get<PrintingList>(`/api/decks/${slug}/printings`),

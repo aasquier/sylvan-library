@@ -505,18 +505,35 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
     @app.post("/api/decks/{slug}/dossier")
     def claude_dossier(slug: str, payload: dict[str, Any],
-                       decks: Decks) -> dict[str, Any]:
-        """Write the commander dossier (ADR 19). Costs a call and a search.
+                       decks: Decks, caller: Scope) -> dict[str, Any]:
+        """Write the commander dossier (ADR 19). Returns a **job**, not a dossier.
 
-        Same status-code split as the interview, plus one: 422 when the deck
-        has no commander the corpus can find, which is a fact about the deck
-        rather than a failure of the model.
+        Measured at 236 seconds on the deployed instance — longer than the
+        theme proposal above, which has been a job since #60. This one was left
+        synchronous because nobody re-measured it, and what that looked like in
+        a browser was a spinner and then `Load failed`: a transport error, with
+        no line in the access log, because uvicorn writes one when a response
+        completes and this one never did. The work itself was fine — it was
+        sitting in `dossier_cache` while the page showed a failure. See
+        `api/dossierruns.py`.
+
+        The refusals stay here, which is the whole point of planning in the
+        request. 422 when the deck has no commander the corpus can find, which
+        is a fact about the deck rather than a failure of the model and a poor
+        thing to wait four minutes to be told; 503 when there is no key. What
+        is *no longer* here is the 502: a call that came back unusable is now a
+        job in state `error`, which is the right place for it, because by then
+        the response has long since been sent.
+
+        A stored dossier still answers instantly, as a job born finished — the
+        `GET` beside this remains the free way to ask.
         """
+        from mtglab.api.dossierruns import plan_dossier
         from mtglab.claude.client import ClaudeUnavailable
         from mtglab.claude.dossier import NoCommander
 
         try:
-            return service.claude_dossier(
+            plan = plan_dossier(
                 slug=slug,
                 requested=payload.get("stance") or None,
                 refresh=bool(payload.get("refresh")),
@@ -527,8 +544,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ClaudeUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
-        except service.ClaudeFailed as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return _job_for(plan, caller).as_dict()
 
     # ---------------------------------------------------------- colours
 

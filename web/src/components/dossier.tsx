@@ -1,9 +1,19 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  api, errorMessage, hasDossier,
-  type DossierBody, type DossierReport, type DossierSection,
+  ApiError, api, errorMessage, followJob, hasDossier,
+  type DossierBody, type DossierReport, type DossierSection, type Job,
 } from '../lib/api'
 import { CardHover, ManaCost, Spinner } from './ui'
+
+/**
+ * Where a run's id is parked so a reload can reattach to it.
+ *
+ * Keyed by slug because two deck pages are two runs, and the failure this
+ * fixes was precisely that a reload lost the connection to work that was still
+ * happening — the dossier was written and cached while the page showed
+ * `Load failed`.
+ */
+const jobKey = (slug: string) => `mtglab-dossier-job:${slug}`
 
 /**
  * The commander dossier, and the seams it is required to show.
@@ -43,9 +53,17 @@ export function CommanderDossierPanel({
 }) {
   const [report, setReport] = useState<DossierReport | null>(null)
   const [open, setOpen] = useState(false)
-  const [busy, setBusy] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  // Read from storage on mount, so a tab that comes back finds the run it left.
+  const [jobId, setJobId] = useState<string | null>(
+    () => localStorage.getItem(jobKey(slug)))
+  const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [fetched, setFetched] = useState(false)
+  const poller = useRef<{ cancel: () => void } | null>(null)
+  const followed = useRef<string | null>(null)
+
+  const busy = submitting || jobId !== null
 
   // The free half. Reads a stored row and reaches no network beyond this app,
   // so opening the panel can ask for it without costing anything.
@@ -62,18 +80,83 @@ export function CommanderDossierPanel({
     }
   }
 
+  const settle = useCallback((job: Job) => {
+    const got = job.result as DossierReport
+    setReport(got)
+    onLoaded?.(got)
+    // A run that finishes into a collapsed panel has produced nothing anybody
+    // can see. This matters on the reattach path, where the tab was reloaded
+    // and the panel came back closed.
+    setOpen(true)
+    // A report with no dossier in it is the mode declining and saying why —
+    // no source survived checking, the stance is off. That is a sentence to
+    // show, not an error to swallow.
+    if (!hasDossier(got) && got.reason) setError(got.reason)
+  }, [onLoaded])
+
+  const follow = useCallback((id: string) => {
+    poller.current?.cancel()
+    // How old the *run* is, not how long this tab has been watching it — the
+    // two differ exactly when it matters, which is after a reload.
+    const started = { at: Date.now() }
+    setElapsed(0)
+    const clock = setInterval(
+      () => setElapsed(Math.round((Date.now() - started.at) / 1000)), 1000)
+    // Two seconds, not the 400ms default: this runs for minutes, and polling
+    // four times a second would be six hundred requests to watch one job.
+    const run = followJob(id, (job) => {
+      const born = Date.parse(job.created_at)
+      if (!Number.isNaN(born)) started.at = born
+    }, 2000)
+    poller.current = { cancel: () => { run.cancel(); clearInterval(clock) } }
+    run.promise
+      .then(settle)
+      .catch((e) => {
+        setError(e instanceof ApiError && e.status === 404
+          // Jobs live in the server's memory and die with it (`api/jobs.py`).
+          // Say that rather than showing a bare 404 for something nobody asked
+          // to look up.
+          ? 'That run is gone — the server restarted while it was working. Ask again.'
+          : errorMessage(e))
+      })
+      .finally(() => {
+        clearInterval(clock)
+        localStorage.removeItem(jobKey(slug))
+        setJobId(null)
+      })
+  }, [slug, settle])
+
+  // One place decides to follow a job: a fresh submission and a restored tab
+  // both arrive here with the id in state, so there is no second path that
+  // could double-poll.
+  useEffect(() => {
+    if (!jobId || followed.current === jobId) return
+    followed.current = jobId
+    follow(jobId)
+  }, [jobId, follow])
+
+  useEffect(() => () => poller.current?.cancel(), [])
+
   async function write(refresh: boolean) {
-    setBusy(true)
+    setSubmitting(true)
     setError(null)
     try {
-      const got = await api.writeDossier(slug, { refresh })
-      setReport(got)
-      onLoaded?.(got)
-      if (!hasDossier(got) && got.reason) setError(got.reason)
+      const job = await api.writeDossier(slug, { refresh })
+      if (job.status === 'done') {
+        // A stored dossier, or a stance of `off`: a job born finished, so
+        // there is nothing to poll for and no spinner to earn.
+        settle(job)
+        return
+      }
+      localStorage.setItem(jobKey(slug), job.id)
+      setJobId(job.id)
     } catch (err) {
+      // 422 with no commander, 503 with no key — both still answered by the
+      // POST itself, which is why they read as sentences rather than as a job
+      // that failed.
       setError(errorMessage(err))
     } finally {
-      setBusy(false)
+      setSubmitting(false)
     }
   }
 
@@ -135,7 +218,12 @@ export function CommanderDossierPanel({
       {open && (
         <div className="px-5 pb-5 sm:px-6">
           {busy && !body && (
-            <Spinner label="reading the web and the corpus…" />
+            // A clock rather than a bar. This takes minutes, the job reports a
+            // turn out of a ceiling it usually does not reach, and seconds are
+            // what somebody deciding whether to wait actually wants.
+            <Spinner label={elapsed
+              ? `reading the web and the corpus… ${elapsed}s`
+              : 'reading the web and the corpus…'} />
           )}
           {error && (
             <p className="text-sm" style={{ color: 'var(--status-critical)' }}>
