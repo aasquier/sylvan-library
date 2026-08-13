@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from mtglab import colors, config
+from mtglab import glossary as gloss
 from mtglab.cards import db
 from mtglab.decks import decklist, edit, importer, partners, suggest
 from mtglab.decks.analyze import deck_stats
@@ -1124,8 +1125,99 @@ def color_taxonomy() -> dict[str, Any]:
             "history": c.history,
             "aliases": list(c.aliases),
             "verified_by": c.verified_by,
+            "lore": c.lore,
+            # Names and roles only. The cards themselves come from
+            # `combination_detail` below, which needs a corpus -- this payload
+            # deliberately still does not.
+            "champions": [{"card": ch.card, "role": ch.role}
+                          for ch in c.champions],
+            "signature": list(c.signature),
         } for c in colors.COMBINATIONS],
     }
+
+
+def glossary() -> dict[str, Any]:
+    """The vocabulary. Same properties as the taxonomy above: reference data,
+    no corpus, no deck source, no network."""
+    return {
+        "sections": [{"key": s, "label": gloss.SECTION_LABELS[s],
+                      "blurb": gloss.SECTION_BLURBS[s]}
+                     for s in gloss.SECTIONS],
+        "terms": [{"key": t.key, "term": t.term, "short": t.short,
+                   "long": t.long, "section": t.section,
+                   "see_also": list(t.see_also)} for t in gloss.TERMS],
+    }
+
+
+def combination_detail(key: str) -> dict[str, Any]:
+    """One of the 32, with its champions and signature cards resolved.
+
+    The split from `color_taxonomy` is the point. That payload is the table and
+    works on a fresh clone; this one asks the corpus, so it is where every card
+    fact enters. A named card that does not resolve is **dropped and counted**
+    rather than rendered from the name alone -- the instrument ADR 19 built for
+    the dossier's rivals, pointed at reference data this time, because a
+    misspelled name here would otherwise render as a confident empty card.
+
+    `exact_total` is counted rather than stored, and it teaches something the
+    prose cannot: exactly two cards in the corpus have the Artifice identity,
+    which is a sharper statement of what a four-colour slot is than any
+    paragraph about refusing green.
+    """
+    # `key_for` canonicalises, so "GW" and "WG" are the same slot and a stray
+    # lower-case URL still lands. Anything that is not five letters of WUBRG
+    # collapses to "C", so an unknown key is answered by Colourless rather than
+    # a 404 -- which would be wrong, so the spelling is checked afterwards.
+    combo = colors.BY_KEY.get(colors.key_for(key.upper()))
+    if combo is None or set(combo.colors) != set(key.upper()) - {"C"}:
+        raise KeyError(key)
+
+    base = {
+        "key": combo.key, "name": combo.name, "tier": combo.tier,
+        "colors": list(combo.colors), "size": combo.size,
+        "tagline": combo.tagline, "history": combo.history,
+        "lore": combo.lore, "aliases": list(combo.aliases),
+        "verified_by": combo.verified_by,
+    }
+    con = _connect()
+    if con is None:
+        return {**base, "corpus": False, "champions": [], "signature": [],
+                "dropped": 0, "exact_total": None}
+    try:
+        wanted = [ch.card for ch in combo.champions] + list(combo.signature)
+        found = db.get_cards(con, wanted)
+
+        def as_card(rec: db.CardRecord) -> dict[str, Any]:
+            return {
+                "name": rec.name, "mana_cost": rec.mana_cost,
+                "type_line": rec.type_line, "oracle_text": rec.oracle_text,
+                "color_identity": sorted(rec.color_identity),
+                "image": rec.image_normal,
+                "art_crop": getattr(rec, "image_art_crop", None),
+            }
+
+        champions = [{"role": ch.role, **as_card(found[ch.card])}
+                     for ch in combo.champions if ch.card in found]
+        signature = [as_card(found[name])
+                     for name in combo.signature if name in found]
+        dropped = len(wanted) - len(champions) - len(signature)
+
+        # Interpolated rather than parameterised because both values are
+        # derived from the table above and neither is caller input: `listed` is
+        # single letters of WUBRG and `size` is their count.
+        listed = ", ".join(f"'{c}'" for c in combo.colors) or "''"
+        row = con.execute(
+            "SELECT count(*) FROM oracle_cards WHERE "
+            "json_extract_string(legalities, 'commander') = 'legal' AND "
+            f"len(list_filter(color_identity, x -> x NOT IN ({listed}))) = 0 "
+            f"AND len(color_identity) = {combo.size}").fetchone()
+        total = int(row[0]) if row else 0
+    finally:
+        con.close()
+
+    return {**base, "corpus": True, "champions": champions,
+            "signature": signature, "dropped": dropped,
+            "exact_total": total}
 
 
 def challenge_progress(*, source: DeckSource | None = None) -> dict[str, Any]:

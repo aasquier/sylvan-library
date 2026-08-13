@@ -90,6 +90,8 @@ SHARED = {
     "/api/sets/upcoming": "Scryfall's own release calendar",
     "/api/colors": "a fixed taxonomy, no data at all",
     "/api/colors/progress": "scored over the shared library",
+    "/api/colors/{key}": "a fixed taxonomy plus public corpus cards",
+    "/api/glossary": "fixed reference prose, no data at all",
     "/api/claude": "whether the surface is configured on this instance",
     # ADR 20's two. Neither takes a deck or a slug — the conversation is about
     # the person and is held by their browser, so there is nothing here
