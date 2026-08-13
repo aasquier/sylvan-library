@@ -539,10 +539,32 @@ arc; this is what the next few sessions actually do.
    first check that reads the *image* rather than the code.
 
    What is left: driving the app itself — the Learn page, the theme interview,
-   the dossier, a deck edit surviving a restart. **The Claude surfaces have
-   only just become reachable and are entirely unexercised on the instance.**
-   One punchlist item is already open: letting an invited person choose their
-   own username, rather than wearing the local part of their email address.
+   the dossier, a deck edit surviving a restart. **The Claude surfaces became
+   reachable on 2026-08-13** (`mtglab claude check` answers `pipe open` on the
+   machine) and are still entirely unexercised there.
+
+   Two punchlist items came out of the first real claim, both now built:
+   choosing your own username at sign-up (#67), and **deleting an account**,
+   which the first one turned up rather than predicted. `disable` was the whole
+   revocation story and it does not release anything: `username` and `email` are
+   `UNIQUE`, so a disabled row keeps both and an address cannot be invited twice.
+   `users.delete` is the third door to a lockout and carries the same
+   `LastAdmin` guard as `disable` and `demote`, with nothing to walk it back.
+
+   The find worth keeping is not the feature. `users.id` is `INTEGER PRIMARY
+   KEY` **without `AUTOINCREMENT`, so SQLite reissues a deleted account's rowid**
+   — and jobs are held in memory keyed on exactly that integer. Delete the
+   newest account, invite a replacement, and the new holder of the id inherits
+   the dead account's jobs. `jobs.forget_owner` is the fix, and the class is
+   worth naming: an isolation filter that is written correctly and defeated by
+   arithmetic underneath it. Anything future keyed on a user id inherits the
+   same trap; the alternative considered and not taken was a migration to
+   `AUTOINCREMENT`.
+
+   Also of note: the instance's host went unreachable for several minutes that
+   day (machine suspended, volume on the same host, `no snapshots available`)
+   and came back intact. **One machine, one volume, no snapshot** is the shape
+   that was exposed — worth a decision before it matters.
 6. **After that, next build work in order:** re-price automated PR review
    (ENGINEERING §5, parked), the stance dial UI, then the remaining Claude
    modes ADR 15 names and branch 5 does not build (argue a slot, deck

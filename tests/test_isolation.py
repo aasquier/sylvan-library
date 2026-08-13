@@ -126,7 +126,8 @@ USER_SCOPED = {
 # rather than two that can drift.
 ADMIN = {
     "/api/admin/users": "every account on the instance, addresses included",
-    "/api/admin/users/{username}": "grants admin, disables and re-enables",
+    "/api/admin/users/{username}": "grants admin, disables and re-enables, "
+                                   "and deletes an account outright",
     "/api/admin/users/{username}/reset": "mails somebody a password link",
     "/api/admin/users/{username}/sessions": "signs an account out everywhere",
 }

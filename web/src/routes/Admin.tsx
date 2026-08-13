@@ -24,6 +24,13 @@ import { Badge, ErrorNote, Spinner } from '../components/ui'
  * - **No password is ever chosen by one person for another** (ADR 16). There is
  *   no password field on this page and there will not be one. "Send reset link"
  *   is the whole of what an admin can do about a forgotten password.
+ * - **Nobody deletes the account they are signed in as.** Greyed here with the
+ *   reason, refused with a 409 there. `mtglab users delete` will do it, which is
+ *   the right place for it: there is no session on the machine to sign out of.
+ *
+ * Delete is the only irreversible control here, and the only one that asks for
+ * something to be typed. `DeleteAccount` says why the confirmation is the
+ * username rather than a y/n.
  */
 
 const STATE_TONE: Record<string, 'good' | 'warning' | 'critical' | 'neutral'> = {
@@ -71,6 +78,88 @@ function RowAction({ label, busyLabel, disabled, title, onRun, danger }: {
     >
       {busy ? busyLabel : label}
     </button>
+  )
+}
+
+/** Delete, behind a typed username. The one irreversible control on the page.
+ *
+ * `decks delete` asks for a word back rather than a y/n, and this is the same
+ * rule for the same reason: the answer has to be *produced*, and only somebody
+ * looking at the right row can produce it. The server requires it too — it is
+ * not a nicety this component could drop — so the confirmation is real rather
+ * than decorative.
+ *
+ * It expands in place instead of opening a dialog. A modal that appears over
+ * the table hides the row being deleted, which is the one thing worth looking
+ * at while deciding.
+ */
+function DeleteAccount({ account, disabled, title, onRun }: {
+  account: Account
+  disabled?: boolean
+  title?: string
+  onRun: (confirm: string) => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const matches = typed.trim().toLowerCase() === account.username.toLowerCase()
+
+  if (!open) {
+    return (
+      <RowAction
+        label="Delete"
+        busyLabel="Deleting…"
+        danger
+        disabled={disabled}
+        title={title}
+        onRun={() => { setOpen(true); return Promise.resolve() }}
+      />
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <label className="sr-only" htmlFor={`confirm-${account.username}`}>
+        Type {account.username} to delete this account
+      </label>
+      <input
+        id={`confirm-${account.username}`}
+        autoFocus
+        value={typed}
+        onChange={(event) => setTyped(event.target.value)}
+        placeholder={`type ${account.username}`}
+        className="rounded-md px-2 py-1 text-xs"
+        style={{ border: '1px solid var(--hairline)',
+                 background: 'var(--surface)', color: 'var(--text-primary)' }}
+      />
+      <button
+        type="button"
+        disabled={!matches || busy}
+        className="rounded-md px-2.5 py-1 text-xs font-medium transition disabled:opacity-40"
+        style={{ border: '1px solid var(--hairline)',
+                 color: 'var(--status-critical)' }}
+        onClick={async () => {
+          setBusy(true)
+          try {
+            await onRun(typed.trim())
+          } finally {
+            setBusy(false)
+            setOpen(false)
+            setTyped('')
+          }
+        }}
+      >
+        {busy ? 'Deleting…' : 'Delete for good'}
+      </button>
+      <button
+        type="button"
+        className="rounded-md px-2 py-1 text-xs transition"
+        style={{ color: 'var(--text-muted)' }}
+        onClick={() => { setOpen(false); setTyped('') }}
+      >
+        Cancel
+      </button>
+    </span>
   )
 }
 
@@ -159,10 +248,12 @@ function InviteForm({ onInvited, onError }: {
   )
 }
 
-function AccountRow({ account, lastAdmin, onChanged, onNote, onError }: {
+function AccountRow({ account, lastAdmin, isSelf, onChanged, onNote, onError }: {
   account: Account
   /** True when this is the only admin who can sign in. */
   lastAdmin: boolean
+  /** True when this row is the account the caller is signed in as. */
+  isSelf: boolean
   onChanged: () => Promise<void>
   onNote: (message: string) => void
   onError: (message: string) => void
@@ -247,6 +338,21 @@ function AccountRow({ account, lastAdmin, onChanged, onNote, onError }: {
               return `${answer.revoked} session(s) ended for ${answer.username}.`
             })}
           />
+          <DeleteAccount
+            account={account}
+            disabled={isSelf || (account.is_admin && lastAdmin)}
+            title={isSelf
+              ? 'You cannot delete the account you are signed in as. '
+                + 'Use `mtglab users delete` on the machine.'
+              : (account.is_admin && lastAdmin ? protection : undefined)}
+            onRun={(confirm) => run(async () => {
+              const answer = await api.deleteAccount(account.username, confirm)
+              const jobs = answer.jobs_dropped
+                ? `, ${answer.jobs_dropped} job(s) dropped` : ''
+              return `${answer.username} is gone `
+                + `(${answer.revoked} session(s) ended${jobs}).`
+            })}
+          />
         </div>
       </td>
     </tr>
@@ -257,6 +363,11 @@ export default function Admin() {
   const [data, setData] = useState<AccountList | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
+  // Who the caller is, only so the delete button on their own row can be greyed
+  // out with a reason. The server refuses it either way (409); this is the same
+  // courtesy the last-admin buttons get. `null` with auth off, where there is
+  // no account to be signed in as and every row is somebody else's.
+  const [me, setMe] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -268,6 +379,14 @@ export default function Admin() {
   }, [])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    // Failure is deliberately silent: not knowing who you are costs a greyed
+    // button, and an error banner about it would be about nothing the person
+    // reading this page came here to do.
+    void api.me().then((state) => setMe(state.user?.username ?? null))
+      .catch(() => setMe(null))
+  }, [])
 
   function report(message: string) {
     setNote(message)
@@ -330,6 +449,7 @@ export default function Admin() {
                   account={account}
                   lastAdmin={data.admins === 1 && account.is_admin
                     && account.state === 'active'}
+                  isSelf={me !== null && me === account.username}
                   onChanged={load}
                   onNote={report}
                   onError={complain}

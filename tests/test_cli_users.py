@@ -494,6 +494,61 @@ def test_a_claimed_maintainer_is_protected_by_the_guard_as_well(app_db, typed,
     assert "only admin" in message
 
 
+# ---------------------------------------------------------------- users delete
+
+def test_delete_wants_the_username_typed_back(app_db, typed, monkeypatch):
+    """`decks delete`'s shape: a word produced, not a prompt clicked past."""
+    typed.extend([PASSWORD, PASSWORD])
+    run(["users", "add", "ada"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": "adam")
+
+    code, message = run(["users", "delete", "ada"])
+
+    assert code == 1
+    assert "not the username" in message
+    assert account("ada") is not None
+
+
+def test_delete_removes_the_account_when_confirmed(app_db, typed, monkeypatch):
+    typed.extend([PASSWORD, PASSWORD])
+    run(["users", "add", "ada"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": "ada")
+
+    assert run(["users", "delete", "ada"]) == (0, "")
+    assert account("ada") is None
+
+
+def test_delete_yes_skips_the_prompt(app_db, typed):
+    """For scripts. The name is still on the command line, so nothing is
+    deleted that the caller did not type out."""
+    typed.extend([PASSWORD, PASSWORD])
+    run(["users", "add", "ada"])
+
+    assert run(["users", "delete", "ada", "--yes"]) == (0, "")
+    assert account("ada") is None
+
+
+def test_delete_refuses_the_last_admin(app_db, typed, monkeypatch):
+    """The guard lives in `auth/users.py`, so the CLI inherits it rather than
+    implementing a second opinion about it (ADR 17)."""
+    monkeypatch.setenv("MTGLAB_ADMIN_EMAIL", "maintainer@example.com")
+    run(["users", "list"])
+    typed.extend([PASSWORD, PASSWORD])
+    run(["users", "passwd", "maintainer"])
+
+    code, message = run(["users", "delete", "maintainer", "--yes"])
+
+    assert code == 1
+    assert "only admin" in message
+    assert account("maintainer") is not None
+
+
+def test_delete_refuses_somebody_who_is_not_there(app_db):
+    code, message = run(["users", "delete", "nobody", "--yes"])
+    assert code == 1
+    assert "no account" in message
+
+
 # ------------------------------------------------------------------- the file
 
 def test_the_commands_write_where_config_points(app_db, typed, capsys):

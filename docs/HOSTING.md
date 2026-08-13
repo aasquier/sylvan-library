@@ -132,7 +132,15 @@ mtglab users add ada --no-password    # the state an invite leaves behind
 mtglab users passwd ada               # prompts; ends every session
 mtglab users list                     # who exists, and who can log in
 mtglab users disable|enable ada
+mtglab users delete ada               # irreversible; type the name back
 ```
+
+`disable` is almost always the one you want: it revokes every session and can
+be undone. `delete` exists for the one thing disabling cannot do — a disabled
+row still holds its `username` and `email`, both `UNIQUE`, so **an address
+cannot be invited again until the account is gone.** It asks for the username
+to be typed back (`--yes` for scripts), and it will delete the account you are
+using, which the Accounts page deliberately refuses to do.
 
 The invitee follows the link and sets their own password. Password reset is the
 same token machinery behind a second entry point — one implementation, because
@@ -944,14 +952,18 @@ Resend works, or you use the shell.
 
 **Clean up the placeholder account if one was created.** If the instance ever
 booted with `MTGLAB_ADMIN_EMAIL` unset or still reading `you@example.com`, an
-admin account exists for it. There is no `users delete` — deliberately, since
-an account is referenced by sessions and tokens — so it is disabled rather than
-removed, and only *after* your real account has a password, or the last-admin
-guard refuses:
+admin account exists for it. Disabling is the right lever here and `delete`
+would be the wrong one: the placeholder holds no address anybody wants back,
+and a row that stays is a record of what the bootstrap did. Do it only *after*
+your real account has a password, or the last-admin guard refuses:
 
 ```bash
 mtglab users disable you
 ```
+
+(`mtglab users delete` does exist, and sessions and tokens are not the obstacle
+they once looked like — both cascade. It is for releasing a `username` or an
+`email` so it can be invited again, which is the one thing disabling cannot do.)
 
 Everyone else gets an invite rather than an account you made a password for
 (ADR 16) — `mtglab users invite <email>`, or the Accounts page once you are in.

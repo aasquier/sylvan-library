@@ -572,5 +572,149 @@ def test_revoking_sessions_signs_an_account_out_without_disabling_it(client):
     assert friend_row["state"] == "active"       # still able to log back in
 
 
+# -------------------------------------------------------- deleting an account
+
+def test_deleting_takes_the_sessions_and_the_tokens_with_it(con):
+    """The cascade, which is only real because `db.py` turns `foreign_keys` on.
+
+    Written against the pragma rather than the clause: with foreign keys off,
+    both `REFERENCES ... ON DELETE CASCADE` declarations are comments and this
+    test is what notices.
+    """
+    users.create(con, "root", password=PASSWORD, is_admin=True)
+    doomed = users.create(con, "friend", password=OTHER,
+                          email="friend@example.com")
+    sessions.create(con, doomed.id)
+    sessions.create(con, doomed.id)
+    tokens.issue(con, doomed.id, tokens.Purpose.RESET)
+
+    ended = users.delete(con, doomed.id)
+
+    assert ended == 2
+    assert users.get(con, "friend") is None
+    assert sessions.count_for_user(con, doomed.id) == 0
+    assert not tokens.outstanding(con, doomed.id, tokens.Purpose.RESET)
+
+
+def test_deleting_frees_the_username_and_the_address(con):
+    """The whole reason this exists, and what `disable` cannot do.
+
+    `username` and `email` are `UNIQUE COLLATE NOCASE`, so a disabled row still
+    occupies both and the address cannot be invited again.
+    """
+    users.create(con, "root", password=PASSWORD, is_admin=True)
+    first = users.create(con, "friend", password=OTHER,
+                         email="friend@example.com")
+
+    users.set_disabled(con, first.id, True)
+    with pytest.raises(users.UserExists):
+        users.create(con, "friend", password=OTHER, email="other@example.com")
+
+    users.delete(con, first.id)
+
+    again = users.create(con, "friend", password=OTHER,
+                         email="friend@example.com")
+    assert again.username == "friend"
+
+
+def test_the_only_admin_cannot_be_deleted(con):
+    """The third door to a lockout, and the one with nothing to undo it."""
+    root = users.create(con, "root", password=PASSWORD, is_admin=True)
+
+    with pytest.raises(users.LastAdmin):
+        users.delete(con, root.id)
+
+    assert users.get(con, "root") is not None
+
+
+def test_a_refused_delete_leaves_the_account_whole(con):
+    """`_exclusive` again: the guard runs inside the write lock, so a refusal
+    cannot half-delete the row it declined to remove."""
+    root = users.create(con, "root", password=PASSWORD, is_admin=True)
+    sessions.create(con, root.id)
+
+    with pytest.raises(users.LastAdmin):
+        users.delete(con, root.id)
+
+    assert sessions.count_for_user(con, root.id) == 1
+    assert users.authenticate(con, "root", PASSWORD) is not None
+
+
+def test_deleting_somebody_who_is_not_there(con):
+    users.create(con, "root", password=PASSWORD, is_admin=True)
+
+    with pytest.raises(users.NoSuchUser):
+        users.delete(con, 9999)
+
+
+def test_the_route_needs_the_username_typed_back(client):
+    """`decks delete`'s rule, moved to the client. A bare verb deletes nothing."""
+    assert client.request(
+        "DELETE", "/api/admin/users/friend", json={}
+    ).status_code == 422
+    assert client.request(
+        "DELETE", "/api/admin/users/friend", json={"confirm": "freind"}
+    ).status_code == 422
+
+    body = client.get("/api/admin/users").json()
+    assert any(u["username"] == "friend" for u in body["users"])
+
+
+def test_the_route_deletes_when_the_name_is_typed(client):
+    response = client.request("DELETE", "/api/admin/users/friend",
+                              json={"confirm": "friend"})
+
+    assert response.status_code == 200
+    assert response.json()["username"] == "friend"
+    body = client.get("/api/admin/users").json()
+    assert not any(u["username"] == "friend" for u in body["users"])
+
+
+def test_an_admin_cannot_delete_the_account_they_are_signed_in_as(client):
+    """`LastAdmin` covers the lockout; this covers being signed out by yourself.
+
+    Refused even with a second admin available, which is the case the last-admin
+    guard would happily allow.
+    """
+    with db.connection() as connection:
+        second = users.create(connection, "deputy", password=OTHER,
+                              is_admin=True)
+        assert second is not None
+
+    response = client.request("DELETE", "/api/admin/users/root",
+                              json={"confirm": "root"})
+
+    assert response.status_code == 409
+    assert "signed in" in response.json()["detail"]
+    assert client.get("/api/auth/me").json()["authenticated"] is True
+
+
+def test_deleting_drops_that_accounts_jobs(client):
+    """SQLite reissues rowids, so a job left behind finds a new owner.
+
+    The failure this prevents is not a missing filter -- `jobs.get` filters
+    correctly -- it is the id itself being handed to somebody else.
+    """
+    with db.connection() as connection:
+        friend = users.get(connection, "friend")
+        assert friend is not None
+    jobs.completed("sim", result={"ok": True}, label="friend's deck",
+                   owner=friend.id)
+    assert len(jobs.all_jobs(owner=friend.id)) == 1
+
+    response = client.request("DELETE", "/api/admin/users/friend",
+                              json={"confirm": "friend"})
+
+    assert response.status_code == 200
+    assert response.json()["jobs_dropped"] == 1
+    assert jobs.all_jobs(owner=friend.id) == []
+
+
+def test_deleting_an_account_that_is_not_there(client):
+    assert client.request(
+        "DELETE", "/api/admin/users/nobody", json={"confirm": "nobody"}
+    ).status_code == 404
+
+
 if __name__ == "__main__":                                    # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))

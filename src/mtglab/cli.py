@@ -894,6 +894,48 @@ def cmd_users_enable(args):
     _set_disabled(args.username, False)
 
 
+def cmd_users_delete(args):
+    """Delete an account for good. The break-glass path the browser refuses.
+
+    Interactive by default and shaped like `decks delete`: it prints what is
+    about to go and asks for the username back. `--yes` is for scripts and still
+    requires the name on the command line, so there is no spelling of this that
+    deletes an account nobody typed out.
+
+    This command will delete the account you are using, which the admin route
+    deliberately will not -- there is no session here to sign out of, and
+    somebody standing at the machine with the key is the one caller for whom
+    "remove this account" is unambiguous. The last-admin guard still applies.
+    """
+    _, _, sessions, users = _auth()
+
+    con = _connect()
+    try:
+        user = users.get(con, args.username)
+        if user is None:
+            sys.exit(f"refused: no account {args.username!r}")
+        print(f"  {user.username}{' (admin)' if user.is_admin else ''}, "
+              f"{sessions.count_for_user(con, user.id)} session(s)")
+        print("  deleted for good -- there is no undo and no trash")
+        if not args.yes:
+            typed = input(f"  type '{user.username}' to delete it: ").strip()
+            if typed.casefold() != user.username.casefold():
+                sys.exit("refused: that is not the username")
+        try:
+            ended = users.delete(con, user.id)
+        except users.LastAdmin as exc:
+            # The third and worst door to a lockout: `disable` and `demote` can
+            # be walked back from another admin's session, and this cannot be
+            # walked back at all.
+            sys.exit(f"refused: {exc}")
+    finally:
+        con.close()
+
+    print(f"  {user.username} is gone")
+    if ended:
+        print(f"  {ended} session(s) ended.")
+
+
 def _set_admin(username: str, is_admin: bool):
     """Grant or revoke admin. The caller `users.set_admin` never had (ADR 17).
 
@@ -1284,6 +1326,13 @@ def main(argv=None):
     upr.add_argument("username"); upr.set_defaults(func=cmd_users_promote)
     ude = us.add_parser("demote", help="take admin away")
     ude.add_argument("username"); ude.set_defaults(func=cmd_users_demote)
+    # The only irreversible one. `disable` is what you almost always want; this
+    # is for releasing a username or an address so it can be invited again.
+    udel = us.add_parser("delete", help="remove an account for good")
+    udel.add_argument("username")
+    udel.add_argument("--yes", action="store_true",
+                      help="skip the typed confirmation")
+    udel.set_defaults(func=cmd_users_delete)
 
     claude = sub.add_parser("claude").add_subparsers(dest="cmd", required=True)
     cc = claude.add_parser("check", help="one real call -- is the key working?")

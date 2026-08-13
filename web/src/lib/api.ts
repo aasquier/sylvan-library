@@ -1098,6 +1098,12 @@ export const api = {
   revokeSessions: (username: string) =>
     send<{ username: string; revoked: number }>(
       'DELETE', `/api/admin/users/${encodeURIComponent(username)}/sessions`),
+  // The irreversible one, and the only call in this client that asks the caller
+  // to type something back. `confirm` must equal the username: the server
+  // refuses with 422 otherwise, so a mis-aimed request deletes nothing.
+  deleteAccount: (username: string, confirm: string) =>
+    send<{ username: string; revoked: number; jobs_dropped: number }>(
+      'DELETE', `/api/admin/users/${encodeURIComponent(username)}`, { confirm }),
   simMana: (payload: Record<string, unknown>) => post<Job>('/api/sim/mana', payload),
   simLands: (payload: Record<string, unknown>) => post<Job>('/api/sim/lands', payload),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),

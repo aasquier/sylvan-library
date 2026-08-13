@@ -18,14 +18,17 @@ What is deliberately **not** here:
   chosen by one person for another, because an admin-set password is a password
   that has existed in plaintext in a chat window. `POST .../reset` mails a link
   instead, which is the same intent routed through the account holder.
-- **Deleting an account.** Disabling revokes every session and is reversible;
-  a `DELETE` would cascade through `sessions` and `auth_tokens` and cannot be
-  undone from a browser. If it is ever wanted, it wants a typed confirmation
-  like `decks delete` has.
 - **Any leak-shaped difference between accounts.** ADR 5's 404-not-403 rule is
   about resources that belong to one person; an admin listing accounts is the
   one caller for whom every account is in scope, so `404` here means what it
   says — no such username.
+
+`DELETE .../users/{username}` was on this list until an address needed
+re-inviting and disabling turned out not to free one — `username` and `email`
+are `UNIQUE`, so the row holds them either way. The conditions the entry set
+are the ones it now ships under: a typed confirmation, as `decks delete` has,
+and it is the *client* that types it, because a route that deletes on a bare
+verb is one a mis-aimed `fetch` can fire.
 
 **Addresses are returned from these routes**, which ADR 17 decided explicitly
 and which is why `_account` passes `include_email=True`. The rule that replaced
@@ -43,6 +46,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
+from mtglab.api import jobs
 from mtglab.api.deps import Admin
 from mtglab.auth import db, invites, mail, sessions, tokens, users
 
@@ -264,6 +268,54 @@ def install(app: FastAPI, *,
 
         _LOG.info("a reset link was sent to %r", user.username)
         return {"detail": f"a reset link is on its way to {user.username}"}
+
+    @app.delete("/api/admin/users/{username}")
+    def delete_account(username: str, payload: dict[str, Any],
+                       caller: Admin) -> dict[str, Any]:
+        """Delete an account, its sessions, its tokens and its jobs.
+
+        The one irreversible thing an admin can do from a browser, and it
+        carries the two guards that earns.
+
+        **The caller types the username back.** `confirm` must equal the account
+        being deleted, which is `decks delete`'s rule moved to the client: only
+        somebody looking at the right account can produce it, and a `fetch`
+        aimed at the wrong URL cannot. 422, not 400 -- the body is the thing
+        that is wrong.
+
+        **An admin may not delete themselves.** `LastAdmin` already prevents the
+        lockout, but it permits the confusing case it does not cover: an admin
+        with a colleague, deleting the account their own session belongs to and
+        being signed out by their own request. 409, and `mtglab users delete`
+        from the machine is the way to remove that account if it is really
+        meant.
+
+        Jobs are dropped rather than left, and `jobs.forget_owner` says why:
+        `users.id` is reissued by SQLite, so the next account created could
+        otherwise be handed this one's results.
+        """
+        typed = str(payload.get("confirm") or "").strip()
+        with db.connection() as con:
+            user = _find(con, username)
+            if typed.casefold() != user.username.casefold():
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"type {user.username!r} in confirm to delete it")
+            if user.id == caller.user_id:
+                raise HTTPException(
+                    status_code=409,
+                    detail="you cannot delete the account you are signed in "
+                           "as -- use `mtglab users delete` on the machine")
+            try:
+                ended = users.delete(con, user.id)
+            except users.LastAdmin as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        forgotten = jobs.forget_owner(user.id)
+        _LOG.warning("%r deleted the account %r (%d session(s), %d job(s))",
+                     caller.username, user.username, ended, forgotten)
+        return {"username": user.username, "revoked": ended,
+                "jobs_dropped": forgotten}
 
     @app.delete("/api/admin/users/{username}/sessions")
     def revoke_sessions(username: str, caller: Admin) -> dict[str, Any]:

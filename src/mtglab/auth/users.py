@@ -401,6 +401,36 @@ def set_admin(con: sqlite3.Connection, user_id: int, is_admin: bool) -> None:
             raise NoSuchUser(str(user_id))
 
 
+def delete(con: sqlite3.Connection, user_id: int) -> int:
+    """Delete an account outright. Returns the number of sessions ended.
+
+    The irreversible sibling of `set_disabled`, and wanted for the case
+    disabling cannot serve: `username` and `email` are `UNIQUE COLLATE NOCASE`,
+    so a disabled account still holds both, and an address cannot be re-invited
+    while a row is sitting on it. Disabling revokes; this releases.
+
+    **Sessions and tokens go with it, and not by a `DELETE` written here.**
+    Both tables declare `ON DELETE CASCADE`, and `db.py` turns `foreign_keys`
+    on, which is what makes those clauses more than a comment. The count is
+    taken first only so the caller has something true to print.
+
+    Raises `LastAdmin` rather than deleting the only admin who can sign in --
+    the same guard `set_disabled` and `set_admin` use, for the reason ADR 17
+    gives: the rule belongs in the core so the CLI and the admin route cannot
+    disagree about it. Deleting is the third door to a lockout and the only one
+    with nothing to undo it.
+    """
+    with _exclusive(con):
+        _refuse_if_last_admin(con, user_id, "delete that account")
+        revoked = int(con.execute(
+            "SELECT count(*) AS n FROM sessions WHERE user_id = ?",
+            (user_id,)).fetchone()["n"])
+        cur = con.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        if cur.rowcount == 0:
+            raise NoSuchUser(str(user_id))
+    return revoked
+
+
 def authenticate(con: sqlite3.Connection, username: str,
                  password: str) -> User | None:
     """The one place a password becomes an identity. `None` means no.
