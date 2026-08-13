@@ -106,6 +106,82 @@ describe('where the token comes from', () => {
   })
 })
 
+describe('when the fragment did not survive the trip', () => {
+  /** The failure this whole path exists for, observed on the instance
+   *  2026-08-13: the click arrives at the claim page with an empty hash, and
+   *  the server cannot see that it happened. */
+  function arriveStripped() {
+    arriveAt('/auth/claim')
+    render(<Claim onClaimed={vi.fn()} />)
+    return screen.getByLabelText('Link from your email')
+  }
+
+  it('takes the whole address, fragment and all', async () => {
+    const field = arriveStripped()
+    fireEvent.change(field, {
+      target: { value: 'https://sylvan-libraries.com/auth/claim#token=a-real-token' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    // The password form, which means the token was accepted and the normal
+    // flow resumed — including the preview that decides invite from reset.
+    expect(await screen.findByLabelText('New password')).toBeTruthy()
+    await waitFor(() => {
+      expect(api.claimPreview).toHaveBeenCalledWith({ token: 'a-real-token' })
+    })
+  })
+
+  it('takes a bare token, for somebody who already picked it out', async () => {
+    const field = arriveStripped()
+    fireEvent.change(field, { target: { value: 'UOrtOlsXjkkyez2PJhy5JO3nAJvDV' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(await screen.findByLabelText('New password')).toBeTruthy()
+  })
+
+  it('trims what was pasted, because selecting a line picks up spaces', async () => {
+    const field = arriveStripped()
+    fireEvent.change(field, {
+      target: { value: '  https://x.test/auth/claim#token=spaced-token \n' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => {
+      expect(api.claimPreview).toHaveBeenCalledWith({ token: 'spaced-token' })
+    })
+  })
+
+  it('names the actual problem when the pasted link is the stripped one', () => {
+    const field = arriveStripped()
+    // Precisely what somebody copies out of the address bar after clicking a
+    // link a mail app cut short. Saying "invalid" here would send them back to
+    // ask for another link, which fails the same way.
+    fireEvent.change(field, {
+      target: { value: 'https://sylvan-libraries.com/auth/claim' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(screen.getByText(/no token in it/)).toBeTruthy()
+    expect(screen.queryByLabelText('New password')).toBeNull()
+    expect(api.claimPreview).not.toHaveBeenCalled()
+  })
+
+  it('never sends a pasted token anywhere but the body', async () => {
+    const field = arriveStripped()
+    fireEvent.change(field, {
+      target: { value: 'https://x.test/auth/claim#token=stays-out-of-the-url' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByLabelText('New password')
+
+    // The recovery must not undo what the fragment was for: nothing that lands
+    // in an access log may carry the token, including the address bar of the
+    // page it was pasted into.
+    expect(window.location.href).not.toContain('stays-out-of-the-url')
+    expect(window.location.search).toBe('')
+  })
+})
+
 describe('choosing a password', () => {
   it('will not spend the link on one the server would refuse', async () => {
     arriveAt('/auth/claim#token=a-256-bit-token')

@@ -488,6 +488,28 @@ def test_an_invite_carries_a_link_with_the_token_in_the_fragment(con, ada):
     assert tokens.lookup(con, token, tokens.Purpose.INVITE).user_id == ada.id
 
 
+def test_both_messages_say_what_to_do_when_the_link_is_cut_short(con, ada):
+    """The recovery has to travel in the message, not live on the page.
+
+    A fragment lost between the mail app and the browser is invisible to the
+    server, indistinguishable from no link at all, and a replacement link fails
+    identically -- so "ask for a new one" is advice that cannot work. Observed
+    on the deployed instance 2026-08-13. The claim screen takes a pasted
+    address; this sentence is the only thing that tells somebody to try it, and
+    it is checked on **both** doors because ADR 16's whole argument is that a
+    second path is how one of the two ends up weaker.
+    """
+    users.set_password(con, ada.id, PASSWORD)
+    recorder = Recorder()
+    invites.send_invite(con, ada, sender=recorder)
+    invites.send_reset(con, "ada@example.com", sender=recorder)
+
+    invite, reset = recorder.sent
+    for message in (invite, reset):
+        assert "part after the #" in message.body
+        assert "paste" in message.body.lower()
+
+
 def test_a_reset_resolves_the_address_and_sends(con, ada):
     users.set_password(con, ada.id, PASSWORD)
     recorder = Recorder()

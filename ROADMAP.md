@@ -561,6 +561,26 @@ arc; this is what the next few sessions actually do.
    same trap; the alternative considered and not taken was a migration to
    `AUTOINCREMENT`.
 
+   **The reset path is now proven end to end too** — a real reset mail, Gmail,
+   the link, a new password, sessions revoked — but proving it turned up a third
+   deployment-only failure. **A mail app can drop the URL fragment when you
+   click.** The message left the server whole and the *visible* URL was whole;
+   the click arrived at `/auth/claim` with an empty hash, which the server
+   cannot see, because keeping the token out of every access log is exactly what
+   the fragment is for (ADR 16).
+
+   That made the failure terminal rather than annoying: a stripped link is
+   indistinguishable from no link, so **"ask for a new one" produces one that
+   fails identically, forever.** The fix is a paste field on the claim screen
+   and a sentence in both messages pointing at it. The token still never rides
+   in a URL — a paste is read on the client and posted in the body, which is
+   the same rule the fragment was serving rather than an exception to it.
+
+   The pattern across all three is worth naming: **every one lived below a seam
+   the suite cannot reach** — a faked mail `Transport`, a stubbed SDK, and now a
+   mail client's linkifier, which no test anywhere can exercise. What each
+   needed was somebody using the thing for real.
+
    Also of note: the instance's host went unreachable for several minutes that
    day (machine suspended, volume on the same host, `no snapshots available`)
    and came back intact. **One machine, one volume, no snapshot** is the shape
