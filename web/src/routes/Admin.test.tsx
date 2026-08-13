@@ -29,6 +29,8 @@ vi.mock('../lib/api', async () => {
       updateAccount: vi.fn(),
       sendReset: vi.fn(),
       revokeSessions: vi.fn(),
+      deleteAccount: vi.fn(),
+      me: vi.fn(),
     },
   }
 })
@@ -61,6 +63,13 @@ function rowFor(username: string) {
 
 beforeEach(() => {
   vi.mocked(api.accounts).mockResolvedValue(SOLO)
+  // Signed in as `root`, which is what makes the self-delete guard testable.
+  vi.mocked(api.me).mockResolvedValue({
+    auth_required: true,
+    authenticated: true,
+    is_admin: true,
+    user: { id: 4, username: 'root', is_admin: true },
+  })
 })
 
 afterEach(() => {
@@ -223,6 +232,91 @@ describe('inviting', () => {
     fireEvent.click(screen.getByText('Send invite'))
 
     expect(await screen.findByText(/already claimed/)).toBeTruthy()
+  })
+})
+
+describe('deleting an account', () => {
+  it('does not delete on the first click — it asks for the username', async () => {
+    render(<Admin />)
+    await screen.findByText('friend')
+
+    fireEvent.click(within(rowFor('friend')).getByText('Delete'))
+
+    expect(api.deleteAccount).not.toHaveBeenCalled()
+    expect(within(rowFor('friend')).getByPlaceholderText('type friend')).toBeTruthy()
+  })
+
+  it('keeps the confirm button dead until the name matches', async () => {
+    render(<Admin />)
+    await screen.findByText('friend')
+    fireEvent.click(within(rowFor('friend')).getByText('Delete'))
+
+    const row = rowFor('friend')
+    const confirm = within(row).getByText('Delete for good') as HTMLButtonElement
+    expect(confirm.disabled).toBe(true)
+
+    fireEvent.change(within(row).getByPlaceholderText('type friend'),
+                     { target: { value: 'freind' } })
+    expect((within(row).getByText('Delete for good') as HTMLButtonElement).disabled).toBe(true)
+
+    fireEvent.change(within(row).getByPlaceholderText('type friend'),
+                     { target: { value: 'friend' } })
+    expect((within(row).getByText('Delete for good') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('sends the typed name and reports what went with the account', async () => {
+    vi.mocked(api.deleteAccount).mockResolvedValue({
+      username: 'friend', revoked: 2, jobs_dropped: 1,
+    })
+    render(<Admin />)
+    await screen.findByText('friend')
+    fireEvent.click(within(rowFor('friend')).getByText('Delete'))
+    fireEvent.change(within(rowFor('friend')).getByPlaceholderText('type friend'),
+                     { target: { value: 'friend' } })
+    fireEvent.click(within(rowFor('friend')).getByText('Delete for good'))
+
+    await waitFor(() => {
+      expect(api.deleteAccount).toHaveBeenCalledWith('friend', 'friend')
+    })
+    expect(await screen.findByText(/friend is gone/)).toBeTruthy()
+    expect(await screen.findByText(/2 session\(s\) ended, 1 job\(s\) dropped/)).toBeTruthy()
+  })
+
+  it('can be cancelled without deleting anything', async () => {
+    render(<Admin />)
+    await screen.findByText('friend')
+    fireEvent.click(within(rowFor('friend')).getByText('Delete'))
+    fireEvent.click(within(rowFor('friend')).getByText('Cancel'))
+
+    expect(api.deleteAccount).not.toHaveBeenCalled()
+    expect(within(rowFor('friend')).getByText('Delete')).toBeTruthy()
+  })
+
+  it('does not offer it on the row the caller is signed in as', async () => {
+    render(<Admin />)
+    await screen.findByText('root')
+
+    // The server answers 409 to this too; greying it is the courtesy, and the
+    // title is where the CLI alternative is named.
+    await waitFor(() => {
+      const own = within(rowFor('root')).getByText('Delete') as HTMLButtonElement
+      expect(own.disabled).toBe(true)
+    })
+    expect((within(rowFor('friend')).getByText('Delete') as HTMLButtonElement).disabled)
+      .toBe(false)
+  })
+
+  it('reports a refusal against the row it was about', async () => {
+    vi.mocked(api.deleteAccount).mockRejectedValue(
+      new Error('refusing to delete that account: this is the only admin who can sign in.'))
+    render(<Admin />)
+    await screen.findByText('friend')
+    fireEvent.click(within(rowFor('friend')).getByText('Delete'))
+    fireEvent.change(within(rowFor('friend')).getByPlaceholderText('type friend'),
+                     { target: { value: 'friend' } })
+    fireEvent.click(within(rowFor('friend')).getByText('Delete for good'))
+
+    expect(await screen.findByText(/only admin who can sign in/)).toBeTruthy()
   })
 })
 

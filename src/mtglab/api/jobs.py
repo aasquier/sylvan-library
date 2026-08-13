@@ -208,6 +208,32 @@ def all_jobs(*, owner: int | None = None) -> list[Job]:
     return sorted(mine, key=lambda j: j.created_at, reverse=True)
 
 
+def forget_owner(owner: int) -> int:
+    """Drop every job belonging to one account. Returns how many went.
+
+    Called when an account is deleted, and the reason is `users.id`: it is
+    `INTEGER PRIMARY KEY` without `AUTOINCREMENT`, so SQLite is free to re-issue
+    a deleted account's rowid to the next account created. Jobs are keyed on
+    that integer and held in memory, so without this the next holder of the id
+    would inherit the dead account's jobs -- results, and the deck names in
+    their labels. That is the isolation `get` and `all_jobs` are written to
+    enforce, defeated by arithmetic rather than by a missing filter.
+
+    A running job is dropped from the registry but not cancelled; its thread
+    finishes into a record nothing points at. That is the honest trade -- the
+    pools have no cancellation and inventing one here would be a worse lie than
+    a few seconds of orphaned CPU.
+
+    `owner` is never `None` here: that is the no-auth local case, where there is
+    one person and no account to delete.
+    """
+    with _LOCK:
+        doomed = [k for k, j in _JOBS.items() if j.owner == owner]
+        for key in doomed:
+            del _JOBS[key]
+    return len(doomed)
+
+
 def clear() -> None:
     """Test helper -- drops every recorded job."""
     with _LOCK:
