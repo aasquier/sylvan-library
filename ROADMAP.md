@@ -699,10 +699,36 @@ arc; this is what the next few sessions actually do.
       was empty at 19:45Z. **Re-check any time after 14:11 UTC on 2026-08-14** —
       before that an empty list proves nothing, which is the same trap as the
       morning of the 13th.
-   5. **`users.id` → `AUTOINCREMENT`** migration still owed. #68 fixed the
-      instance; it did not fix the class. `jobs.forget_owner` covers the one
-      caller that exists today, and anything future keyed on a user id inherits
-      the trap again.
+   5. ~~**`users.id` → `AUTOINCREMENT`** migration still owed.~~ **Done
+      2026-08-13**, as schema version 5. #68 fixed the instance;
+      `jobs.forget_owner` covers the one caller that exists today, and this
+      closes the class, so the next thing keyed on a user id does not have to
+      rediscover it.
+
+      AUTOINCREMENT cannot be added by `ALTER TABLE`, so it is SQLite's
+      documented table rebuild — and **the rebuild is more dangerous than the
+      thing it fixes.** `sessions` and `auth_tokens` reference `users`
+      `ON DELETE CASCADE`, and `connect()` turns `foreign_keys` on *before* the
+      ladder runs, so the obvious migration signs every account out and voids
+      every unspent invite. Silently: a cascade is not an error. On the instance
+      as it stands that is five live sessions and one outstanding invite.
+
+      So `_apply_migrations` now turns the pragma off around the whole ladder,
+      runs `PRAGMA foreign_key_check` before giving it back, and raises
+      `MigrationFailed` rather than serving requests on a file that did not pass
+      — the pragma is a no-op inside a transaction, which is why it cannot live
+      in the migration script that needs it. The migration carries its own
+      `BEGIN`/`COMMIT` for a second reason: `executescript` performs no
+      transaction control, so a failure between the `DROP` and the `RENAME`
+      would leave a half-built table and a version still at 4, and the next
+      start would fail on a table that already exists — an app that never boots.
+
+      Worth recording that the first draft of the *test* destroyed the rows it
+      was written to protect, in its own setup, for exactly this reason.
+
+      What it does not do is repair ids already handed out: the high-water mark
+      is `max(id)` over rows that exist, and a deleted id is not one of them. It
+      stops the next reissue, not the last one.
 
    Still owed from the test list itself, and none of it done: **the theme
    interview on the instance** (both modes, and now both readers), **a deck edit
