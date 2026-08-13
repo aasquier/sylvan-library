@@ -579,7 +579,7 @@ with the same "derived, never set independently" rule as `DB_PATH`.
 
 ```bash
 fly secrets set RESEND_API_KEY="paste-it-here"
-fly secrets set ANTHROPIC_API_KEY="paste-it-here"   # only once ADR 15's modes exist
+fly secrets set ANTHROPIC_API_KEY="paste-it-here"   # four modes exist; see below
 ```
 
 **If you set them in the dashboard instead, they are `Staged` and not live.**
@@ -618,6 +618,22 @@ into Fly's logs and ADR 16 forbids it. It is read at call time rather than at
 import, so the app still *starts* without it — what fails is the first invite or
 password reset, which is to say the first thing you will try to do.
 
+**If a send is refused with a bare `HTTP 403`, suspect the request before you
+suspect the account.** `api.resend.com` is behind Cloudflare, and the first
+real invite ever sent from this instance (2026-08-13) was refused with 403 and
+Cloudflare's error code 1010 — the banned-browser-signature page — because
+`ResendSender` was sending Python's default `Python-urllib/3.12` User-Agent.
+The domain was verified, the key was valid, and the same request from
+`http.client`, which sets no User-Agent at all, was answered 200. `mail.py`
+now sends its own agent and a test pins it.
+
+What is worth carrying forward is the diagnostic: **a 403 whose body is not
+Resend's JSON did not come from Resend.** Their refusals carry
+`{"name": "...", "message": "..."}`; a WAF's do not, so the error message now
+says which kind it got. The two want completely different fixes, and an hour
+went into the domain and the API key — both healthy — before that distinction
+existed.
+
 `MTGLAB_ADMIN_EMAIL` is **not** a secret and belongs in `[env]` — it is an
 address, not a credential. (It may still be set with `fly secrets` to keep it
 out of a public repository, as step 2 notes; that is a privacy choice, not a
@@ -635,6 +651,22 @@ out, which is the correct emergency response to a suspected session leak.
 `ANTHROPIC_API_KEY` is read by the Anthropic SDK directly; the app never binds
 it to a variable, and asks only whether it is set. Locally the same variable
 comes from a gitignored `.env` (see `.env.example`) rather than from Fly.
+
+**The key alone is not enough, and the failure is silent.** The image must also
+carry the SDK, which is the `claude` extra. On the first deployment it did not:
+the Dockerfile installed `.[api]` on the then-true grounds that no ADR 15 mode
+was built, so the instance had the secret set and nothing that could read it.
+Nothing looked broken from outside — the app was healthy, the UI rendered the
+dossier and theme-interview controls, and every one of them was a 503.
+`mtglab claude check` on the machine is what says so:
+
+```bash
+fly ssh console -C "mtglab claude check"     # status: available
+```
+
+`tests/test_packaging.py` now pins the image's extras against the surfaces that
+need them, because no other test can see this: they all stub the SDK, so they
+pass whether or not it is installed.
 
 #### Why a static key here, and when to stop using one
 

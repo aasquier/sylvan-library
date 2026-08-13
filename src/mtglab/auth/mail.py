@@ -50,6 +50,28 @@ from mtglab import config
 
 RESEND_ENDPOINT = "https://api.resend.com/emails"
 
+# Sent on every request, and it is not a courtesy -- it is the difference
+# between mail working and not.
+#
+# `api.resend.com` is behind Cloudflare, which answers the default
+# `Python-urllib/3.12` with **403 and error code 1010**, the "banned browser
+# signature" page. Measured on the instance 2026-08-13, on the first real
+# invite ever sent: the same GET was 200 from `http.client` (which sets no
+# User-Agent at all) and 403 from `urllib` (which sets that one). The domain
+# was verified and the key was valid the whole time.
+#
+# Two things that made it expensive to find, both now fixed here. The block is
+# a WAF page rather than the provider's JSON, so `_describe` found no `name`
+# and reported a bare `HTTP 403` -- which reads exactly like a Resend
+# permission problem. And no test could have caught it: the `Transport` seam
+# below means every test builds the request without ever putting it on a
+# socket, which is the right trade and this is the residue of it.
+#
+# `cards/db.py` and `api/service.py` have set one since the beginning, because
+# Scryfall asks for it in writing. This module was the only outbound caller in
+# the project that did not.
+USER_AGENT = "mtg-lab/0.1 (personal deckbuilding tool; transactional mail)"
+
 # Long enough that a slow provider is not mistaken for a hung one, short enough
 # that a hung one does not hold a worker for the length of a coffee break. The
 # reset endpoint sends in a background task, so this is never on the path of a
@@ -168,6 +190,12 @@ class ResendSender:
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
+            # Built here rather than in `_urllib_post` on purpose: the headers
+            # this method assembles are what an injected transport is handed,
+            # so a test can pin the User-Agent. Put it in the transport and the
+            # one thing that broke delivery would be the one thing below the
+            # seam and therefore untestable.
+            "User-Agent": USER_AGENT,
         }
         try:
             status, response = self._post(RESEND_ENDPOINT, headers, body)
@@ -189,16 +217,25 @@ def _describe(status: int, body: bytes) -> str:
     "name": "validation_error"}` and the message quotes the address back. The
     name is the part that says what went wrong; the message is the part that
     would put somebody's address in the application log.
+
+    **A body that is not their JSON is worth saying so**, rather than falling
+    back to a bare status. That case is not the provider refusing at all — it
+    is something in front of the provider, and the two want completely
+    different fixes. See `USER_AGENT`: a bare `HTTP 403` sent the first real
+    diagnosis at the API key and the domain, both of which were fine. The body
+    itself is still never quoted, because this string is logged.
     """
     name = ""
+    shape = "no error name"
     try:
         parsed = json.loads(body.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
-        parsed = {}
+        parsed = None
+        shape = "and the body was not the provider's JSON"
     if isinstance(parsed, dict):
         name = str(parsed.get("name", "") or "")
-    detail = f" ({name})" if name else ""
-    return f"the mail provider refused the message: HTTP {status}{detail}"
+    return (f"the mail provider refused the message: HTTP {status} "
+            f"({name or shape})")
 
 
 def sender_from_env(*, transport: Transport | None = None) -> EmailSender:
