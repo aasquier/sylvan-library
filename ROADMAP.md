@@ -314,6 +314,85 @@ arc; this is what the next few sessions actually do.
    Chaos, Aggression, Altruism, Growth) and any new copy of that table has to
    agree with it, and the six non-landing routes are lazy, so a new screen
    wants a `React.lazy` line rather than a top-level import.
+
+   **Added 2026-08-13, from play-testing branch 5.**
+   Eleven more from the maintainer, unprompted, after he drove the theme
+   interview. **None of it is started, none of it is scheduled**, and it does
+   not displace branches 3 and 4 — it is written here rather than left in a
+   conversation because that is the whole point of this file. Three of them
+   already have a home elsewhere and say so.
+
+   *Deckbuilding surface:*
+
+   - **An opening-hand randomiser/visualiser for a built deck** — "pretty
+     standard and a fun addition to help people get a feel for opening hands."
+     Bonus: randomise which printing's art each card shows. Further bonus: a
+     **mulligan-confidence suggestion**, which is the part to be careful with —
+     confidence about a keep is a claim, and Tier 1 is the only thing here that
+     could back one. Either put a real simulation behind it or do not call it
+     confidence.
+   - **Two-sided cards show one face.** Scryfall renders a small flip control;
+     this app does not, anywhere. The most concrete item in the list — the
+     corpus already carries both faces, and `CardRecord.front_type_line` exists
+     because the commander dossier already had to care.
+   - **"Entomb" as the delete button's label for commanders.** The label only:
+     the typed confirmation **stays `bury`** (`service.DELETE_WORD`, branch 1),
+     confirmed by him — "still fine to ask for them to type 'bury' to be sure."
+
+   *Content depth:*
+
+   - **The guild, clan and shard descriptions are bland**, at the macro level
+     too — "the guilds of Ravnica are pretty famous. We can do better."
+     **This is branch 4** (teaching) and needs no new slot; it is recorded here
+     as evidence for what branch 4 is actually for.
+   - **Lore rivals on the commander dossier.** He likes ADR 19's Rivals, and
+     reads them as *strategic* rivals; he also wants **story** rivals — "like
+     Bolas and Ugin, for instance." A second, separately-labelled kind rather
+     than a replacement, and it inherits ADR 19's rules: a rival that is a card
+     resolves through `get_cards` or is dropped, and a claim about the story
+     rests on a cited page.
+   - **Searchable infinite combos**, linked to a deck's wincons or its
+     breakdown — "that is good info to know and I think there are websites
+     devoted to it." There are, and **the no-crawler rule is what shapes this**:
+     hosted web search per question, or a small hand-curated set of our own.
+     Not an ingest of somebody's combo database.
+
+   *Storage:*
+
+   - **"Are we ready for multi-user deck storage? Seems like we just throw
+     things in `/decks`."** Not yet, and the answer is already designed: that
+     is `user_decks`, [docs/HOSTING.md](docs/HOSTING.md) §6 step 6, and
+     `decks/source.py`'s `DeckSource` protocol plus `api/deps.py` exist so it
+     is one dependency to swap rather than thirteen handlers to edit.
+
+   *The theme interview, which is where most of his thinking went:*
+
+   - **Personas instead of a fixed question battery.** "I don't want to get too
+     locked into our question battery. Books, art, tv, movies, star signs, all
+     good stuff, but we almost want personas" — a **storyteller**, a **tarot
+     reader**, a **confessor**, as characters the interviewer adopts. In ADR 15
+     terms this is a mode's prompt varying while its tools and its write scope
+     do not, which is the cheapest possible version of it.
+   - **A tarot reading as a door of its own.** The Rider–Waite deck's original
+     art is public domain: deal somebody a hand, let Claude be the oracle, and
+     interpret the spread into a colour identity and a commander — "It could be
+     fun with animations, crystal balls, etc." Note this is the one item that
+     wants **binary assets**, which branch 3 deliberately avoided; the licence
+     is the reason it is possible at all and should be checked rather than
+     assumed.
+   - **An interview for somebody who already has a theme.** The current one
+     discovers a theme; this one would take a given theme and follow it. "That
+     would be a fun alternative interview style."
+   - **Claude's suggestions should go past interpretation.** Today it reads you
+     and describes; he wants it advising specific commanders and **tied into
+     the rest of the analysis** the tool already does. That is the item most
+     likely to collide with ADR 20's "it proposes, you create" and with rule 4,
+     so it wants reading against both before it is designed.
+
+   **The register is the requirement, not decoration.** The theme interview
+   exists because he rejected a first draft that asked Magic questions in a
+   friendly voice; the tarot and persona ideas are that same instinct. A
+   version of these that arrives sensible and dull has missed them.
 4. **Deploy** — [docs/HOSTING.md](docs/HOSTING.md) §7 is the checklist. What
    remains is an account, a card, a DNS record and the seeding run: the Fly
    app + volume, the Resend account and verified sending domain (start the
