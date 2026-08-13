@@ -469,8 +469,9 @@ COMBINATIONS: tuple[Combination, ...] = (
              "a dragon, the most intelligent being on Ravnica, and he has "
              "been personally in charge for ten thousand years — a guild "
              "whose entire culture is 'try it and see' answering to somebody "
-             "who has already worked out the answer. He eventually solved the "
-             "Implicit Maze, and the Guildpact was rebuilt inside him.",
+             "who has already worked out the answer. When the maze that "
+             "reordered Ravnica's politics was finally run, the Guildpact was "
+             "rebuilt inside him.",
         champions=(
             Champion("Niv-Mizzet, Parun",
                      "The founder, still running it, and the smartest thing "
@@ -602,9 +603,9 @@ COMBINATIONS: tuple[Combination, ...] = (
         "Losing red and green cost it spontaneity and growth, which Esper "
         "regards as an upgrade.",
         verified_by="Esper Charm",
-        lore="Esper replaced itself. A mage called Crucius invented etherium "
-             "— a metal that improves whatever it is grafted to — and the "
-             "shard took that literally, until having flesh left was a "
+        lore="Esper replaced itself. Etherium — a metal that improves "
+             "whatever it is grafted to — was invented there, and the shard "
+             "took that literally, until having flesh left was a "
              "statement about your standing. The catch was arithmetic: there "
              "was only ever so much etherium, and a society that measures "
              "worth in a finite substance has decided in advance who loses.",
@@ -625,12 +626,13 @@ COMBINATIONS: tuple[Combination, ...] = (
         "necromancy, scarcity and a politics of pure leverage — reanimation, "
         "theft, and the cheerful assumption that a corpse is a resource.",
         verified_by="Grixis Charm",
-        lore="Grixis is Nicol Bolas's shard, and the shattering of Alara is "
-             "his fault: an elder dragon stripped of most of his power "
-             "engineered a world he could farm, then engineered the shards "
-             "back together to get the rest of it back. The place ran out of "
-             "living things long ago. What is left rules by necromancy, "
-             "because a corpse is the only resource that has not run out.",
+        lore="Grixis is Nicol Bolas's shard, and the Conflux that put Alara "
+             "back together is his doing: an elder dragon stripped of most of "
+             "his power spent a very long time arranging for the five "
+             "fragments to collide, because what that released was what he "
+             "wanted back. The place had run out of living things long "
+             "before. What is left rules by necromancy, because a corpse is "
+             "the only resource that has not run out.",
         champions=(
             Champion("Nicol Bolas, Planeswalker",
                      "The elder dragon whose shard this is, and who arranged "
