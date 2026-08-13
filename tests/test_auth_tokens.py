@@ -528,6 +528,43 @@ def test_a_junk_error_body_still_produces_a_usable_message():
             mail.Message(to="ada@example.com", subject="Hi", body="x"))
 
 
+def test_a_body_that_is_not_the_providers_json_says_so():
+    """The 403 that broke the first real invite was a Cloudflare block page,
+    not a Resend refusal, and a bare status sent the diagnosis at the API key
+    and the domain instead. The two failures need different fixes, so the
+    message has to tell them apart."""
+    def transport(url, headers, body):
+        return 403, b"error code: 1010"
+
+    with pytest.raises(mail.EmailNotSent) as caught:
+        mail.ResendSender("re_secret", "a@b.c", transport=transport).send(
+            mail.Message(to="ada@example.com", subject="Hi", body="x"))
+
+    assert "403" in str(caught.value)
+    assert "not the provider's JSON" in str(caught.value)
+    assert "1010" not in str(caught.value), "the body itself is never quoted"
+
+
+def test_the_resend_sender_identifies_itself():
+    """Cloudflare sits in front of `api.resend.com` and answers the default
+    `Python-urllib/x.y` with 403 error 1010, so an unset User-Agent means no
+    mail is ever delivered. Measured against the live API 2026-08-13; this is
+    the one property of the request that a working invite depends on and that
+    nothing else in the suite would notice."""
+    seen: dict[str, object] = {}
+
+    def transport(url, headers, body):
+        seen.update(headers)
+        return 200, b'{"id": "abc"}'
+
+    mail.ResendSender("re_secret", "a@b.c", transport=transport).send(
+        mail.Message(to="ada@example.com", subject="Hi", body="x"))
+
+    agent = str(seen.get("User-Agent", ""))
+    assert agent, "an absent User-Agent is a 403 from the WAF, not from Resend"
+    assert "urllib" not in agent, "the default is precisely what is blocked"
+
+
 def test_an_empty_key_is_refused_at_construction():
     with pytest.raises(mail.EmailNotConfigured):
         mail.ResendSender("   ", "a@b.c")

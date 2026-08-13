@@ -618,6 +618,22 @@ into Fly's logs and ADR 16 forbids it. It is read at call time rather than at
 import, so the app still *starts* without it — what fails is the first invite or
 password reset, which is to say the first thing you will try to do.
 
+**If a send is refused with a bare `HTTP 403`, suspect the request before you
+suspect the account.** `api.resend.com` is behind Cloudflare, and the first
+real invite ever sent from this instance (2026-08-13) was refused with 403 and
+Cloudflare's error code 1010 — the banned-browser-signature page — because
+`ResendSender` was sending Python's default `Python-urllib/3.12` User-Agent.
+The domain was verified, the key was valid, and the same request from
+`http.client`, which sets no User-Agent at all, was answered 200. `mail.py`
+now sends its own agent and a test pins it.
+
+What is worth carrying forward is the diagnostic: **a 403 whose body is not
+Resend's JSON did not come from Resend.** Their refusals carry
+`{"name": "...", "message": "..."}`; a WAF's do not, so the error message now
+says which kind it got. The two want completely different fixes, and an hour
+went into the domain and the API key — both healthy — before that distinction
+existed.
+
 `MTGLAB_ADMIN_EMAIL` is **not** a secret and belongs in `[env]` — it is an
 address, not a credential. (It may still be set with `fly secrets` to keep it
 out of a public repository, as step 2 notes; that is a privacy choice, not a
