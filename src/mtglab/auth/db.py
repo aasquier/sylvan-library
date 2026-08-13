@@ -39,7 +39,7 @@ from mtglab import config
 
 # Bumped when `_MIGRATIONS` grows. Stored in SQLite's own `user_version`, which
 # costs no table and cannot be forgotten in a schema dump.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # One entry per version, applied in order to whatever the file is at. A fresh
 # database runs all of them; an existing one runs the tail. The invite and
@@ -148,6 +148,34 @@ _MIGRATIONS: tuple[str, ...] = (
     );
 
     CREATE INDEX sim_cache_by_use ON sim_cache(last_used_at);
+    """,
+    # -- 4 ------------------------------------------------------------------
+    # Commander dossiers (ADR 19). Derived like `sim_cache` above and droppable
+    # for the same reason, but the contract is deliberately weaker and the
+    # column list is where that shows.
+    #
+    # A cached simulation must never be stale, because it is reproducible: the
+    # key is the whole input, so a changed input is a miss. A dossier is an
+    # opinion assembled over web writing that moves on its own, and no hash of
+    # anything here could tell you it has gone out of date. So the row carries
+    # `created_at` and the app *shows* it, which is the honest version of the
+    # same promise -- generated once, dated, regenerable on demand.
+    """
+    CREATE TABLE dossier_cache (
+        -- The commander's Scryfall `oracle_id` plus a fingerprint of the mode
+        -- (its prompt, its schema, the model id). Not the deck slug: a dossier
+        -- is about a character, so every deck that commander leads shares one,
+        -- including across users on a hosted instance.
+        key         TEXT PRIMARY KEY,
+        oracle_id   TEXT NOT NULL,
+        -- Carried for `mtglab claude dossier --list`, which otherwise could
+        -- only show hashes. The name is on the card, not personal data.
+        commander   TEXT NOT NULL,
+        result_json TEXT NOT NULL,
+        created_at  TEXT NOT NULL
+    );
+
+    CREATE INDEX dossier_cache_by_oracle ON dossier_cache(oracle_id);
     """,
 )
 

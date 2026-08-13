@@ -49,6 +49,8 @@ src/mtglab/
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
   artifacts/generate.py   the five deliverables
+  claude/                 client, tools, stance, and two modes: interview.py
+                          (a card's `why`) and dossier.py (the commander)
   auth/                   app.db, Argon2id, accounts, sessions, rate limit,
                           invite/reset tokens, the EmailSender seam
   api/                    FastAPI app, services, background sim jobs
@@ -255,6 +257,7 @@ mtglab decks remove <slug> --card X
 mtglab decks set <slug> --card X --why '...'        # or --category / --qty
 mtglab decks set <slug> --status built              # no --card: a deck field
 mtglab decks note <slug> --key mulligan --value '...'
+mtglab decks set <slug> --art <set-code>   # which printing's art the deck shows
 mtglab decks promote <slug>       # draft -> curated, once every card is justified
 mtglab decks delete <slug>        # confirm by typing the slug; moves to decks/.trash/
 mtglab decks build <slug> --against <(git show HEAD:decks/<slug>/deck.yaml)
@@ -271,13 +274,37 @@ research.**
 
 **Started, not finished.** `src/mtglab/claude/` is the pipe — a client on
 `ANTHROPIC_API_KEY` and seven read-only tool schemas over `api/service.py` —
-plus the stance (`stance.py`, three axes, off by default) and one mode: the
-**rationale interview** (`modes.py`, `interview.py`), which asks about a card's
-slot so you can write its `why`. `mtglab claude check` proves the key;
-`mtglab claude interview <slug> --card X` runs the mode, and the deck page runs
-it beside the rationale box. The other three modes ADR 15 names, the activity
-log, and any UI for the stance dial do not exist — check what is actually there
-before assuming either way.
+plus the stance (`stance.py`, three axes, off by default) and **two** modes.
+The **rationale interview** (`interview.py`) asks about a card's slot so you
+can write its `why`. The **commander dossier** (`dossier.py`,
+[ADR 19](docs/adr/0019-the-dossier-cites-three-sources.md)) says who a deck's
+commander is, what archetype they define, who their rivals are and where they
+sit in Magic's history. `mtglab claude check` proves the key;
+`mtglab claude interview <slug> --card X` and `mtglab claude dossier <slug>`
+run the modes, and the deck page runs both. The other three modes ADR 15 names,
+the activity log, and any UI for the stance dial do not exist — check what is
+actually there before assuming either way.
+
+**The dossier is the first mode whose facts are not all the corpus's**, so it
+carries rules the interview did not need. Card facts still come from the corpus,
+always. The meta and the history come from **Anthropic-hosted web search**
+(`web_search_20260209`) — not a crawler, and not a way around the ban: it reads
+at request time, for one commander, and shows the link. Claude supplies voice
+and carries no factual weight. Three things enforce that and none is the prompt:
+the schema keeps prose and sources in different fields; **every cited page is
+checked against what the search actually returned** (a response schema
+suppresses the API's own citations, so a URL in the payload is otherwise just a
+string the model typed); and every rival is resolved through `get_cards` or
+dropped. **If no source survives, the dossier is refused rather than shown.**
+Cached on the commander's `oracle_id` — a dossier is about a character, so every
+deck that commander leads shares one — and stamped with the date it was written,
+which is the honest substitute for a freshness guarantee it cannot make.
+
+Two things about `converse` that only bite with a server tool: the dated search
+filters inside a code-execution container, so the container id must ride along
+on every turn after the first, and a `pause_turn` must be **resumed**, never
+returned — it carries text that reads finished, which is the Forge-with-96-cards
+failure wearing a different hat.
 
 [ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md) says
 what a surface *is*: a **mode** (a system prompt, a tool set, and what it may

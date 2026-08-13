@@ -32,6 +32,7 @@ they differ.
 | [16](0016-accounts-are-invited-and-passwords-are-self-served.md) | Accounts are invited, and passwords are self-served by email | Accepted |
 | [17](0017-the-maintainer-is-named-in-the-environment.md) | The maintainer is named in the environment, and admin routes live behind a prefix | Accepted |
 | [18](0018-a-cached-simulation-is-keyed-on-its-compiled-input.md) | A cached simulation is keyed on its compiled input, not on the deck file | Accepted |
+| [19](0019-the-dossier-cites-three-sources.md) | The commander dossier cites three sources, and the page shows the seams | Accepted |
 
 **Proposed** means the decision is made and argued but nothing implements it
 yet — 4 and 5 still describe a deployment that does not exist. 16 was Proposed
@@ -55,6 +56,13 @@ description was wrong in a way that would have shipped stale numbers, because
 card facts come from the corpus rather than from the deck file. Writing it down
 as its own record rather than as a correction to 4 is the directory's own rule:
 the sentence that was almost right is more useful visible than edited away.
+
+19 is the first ADR written *ahead* of the code it constrains since 14 and 15,
+and for the same reason: it is where a boundary is easiest to lose. 15's table
+named four modes; the dossier is a fifth, and the first whose facts cannot all
+come from the corpus — so the rule it needed was not "facts come from the
+corpus" but a statement of which source may support which kind of claim. Read it
+next to 7, which is the rule it is bending around rather than breaking.
 
 16 supersedes exactly one paragraph of 5, which is the pattern this directory is
 for: 5's "no self-signup" was a good argument that lost to a better one a day

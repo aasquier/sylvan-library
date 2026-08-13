@@ -59,14 +59,22 @@ SETTABLE_FIELDS = ("category", "qty", "why")
 # What `set_deck_field` will write: the deck's own scalars. `strategy` and
 # `notes` are prose and belong to `set_note`; `commander` and `companion` change
 # what the whole deck is legal to contain and are a rebuild, not a field edit.
-SETTABLE_DECK_FIELDS = ("stage", "status", "bracket")
+SETTABLE_DECK_FIELDS = ("stage", "status", "bracket", "commander_art")
 
 # The order `Deck.dump` writes top-level keys in. Used to place a key the file
 # does not have yet -- `stage` is absent from every deck written before ADR 13,
 # and appending it to the bottom of the file would be legal YAML and unlike
 # every deck in the repository.
-_DECK_KEY_ORDER = ("slug", "name", "status", "stage", "commander", "companion",
-                   "bracket", "strategy", "notes", "cards", "swap_board")
+_DECK_KEY_ORDER = ("slug", "name", "status", "stage", "commander",
+                   "commander_art", "companion", "bracket", "strategy",
+                   "notes", "cards", "swap_board")
+
+# A Scryfall printing id: a plain UUID. Checked by shape rather than against
+# the corpus, because `edit.py` is pure text surgery over YAML and reaching for
+# DuckDB here would give the editor a database dependency it has never had.
+# The corpus check happens one layer up, in `service.set_deck_field`, which is
+# where the connection already is.
+_PRINTING_ID = re.compile(r"^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$")
 
 # `status: built  # built: the cards are sleeved up` -- a scalar with a trailing
 # comment. The comment is the author's, not the value's, so changing one must
@@ -671,9 +679,24 @@ def set_deck_field(text: str, *, field: str, value: Any) -> str:
             raise EditFailed(f"bracket must be a number, not {value!r}") from exc
         if not 1 <= value <= 5:
             raise EditFailed("bracket runs from 1 to 5")
+    elif field == "commander_art":
+        # A Scryfall printing id, so free text with no enum to check it
+        # against. Case is preserved rather than lowered: the value is an
+        # opaque identifier belonging to somebody else's system, and this is
+        # the one settable field where lowering it would corrupt the value.
+        # Emptying it is a real operation -- it means "back to the default
+        # printing" -- so a blank is allowed through rather than refused.
+        value = str(value or "").strip()
+        if value and not _PRINTING_ID.match(value):
+            raise EditFailed(
+                f"{value!r} is not a Scryfall printing id. It should look like "
+                f"a UUID; the deck page's art picker sets this for you, and "
+                f"`mtglab decks set <slug> --art <set-code>` takes a set code "
+                f"and looks the id up.")
     else:
         value = str(value).strip().lower()
-        allowed = {"stage": DECK_STAGES, "status": DECK_STATUSES}[field]
+        allowed: tuple[str, ...] = {"stage": DECK_STAGES,
+                                    "status": DECK_STATUSES}[field]
         if value not in allowed:
             raise EditFailed(
                 f"{field} must be one of {', '.join(allowed)}, not {value!r}")

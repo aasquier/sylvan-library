@@ -4,6 +4,7 @@ import {
   api,
   errorMessage,
   type Card,
+  type ClaudeStatus,
   type CommanderDossier,
   type DeckDetail as Deck,
   type DeckStats,
@@ -21,6 +22,8 @@ import {
 import {
   AddCardForm, AddNoteForm, NoteEditor, RationaleEditor,
 } from '../components/deckedit'
+import { ArtPicker } from '../components/artpicker'
+import { CommanderDossierPanel } from '../components/dossier'
 
 type Tab = 'cards' | 'stats' | 'validation' | 'notes'
 
@@ -55,10 +58,15 @@ type Tab = 'cards' | 'stats' | 'validation' | 'notes'
  * the place it would have been easiest to ignore: "one of eight legendary
  * Trolls" is exactly the sentence a model writes fluently and wrongly.
  */
-function DeckHero({ deck, report, dossier }: {
+function DeckHero({ deck, report, dossier, claude, onRefresh }: {
   deck: Deck
   report: ValidationReport
   dossier: CommanderDossier | null
+  /** Null until known. `stance.axes[0].level === 'off'` is what decides
+   *  whether the dossier offers a button at all — ADR 15's "off is a real
+   *  position" rendered as an absent control rather than a refusing one. */
+  claude: ClaudeStatus | null
+  onRefresh: () => void
 }) {
   const card = deck.commander_card
   const stats = card?.power != null && card?.toughness != null
@@ -156,9 +164,15 @@ function DeckHero({ deck, report, dossier }: {
                   style={{ background: 'var(--series-1)', color: '#fff' }}>
               Simulate this deck
             </Link>
+            <ArtPicker slug={deck.slug} onPicked={onRefresh} />
             {card?.artist && (
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {/* The artist belongs to the printing being shown, so when a
+                    deck has picked one, name it. Otherwise two decks on the
+                    same commander credit the same painter for different
+                    paintings. */}
                 Art by {card.artist}
+                {card.printing?.set_name && ` · ${card.printing.set_name}`}
               </span>
             )}
           </div>
@@ -166,6 +180,25 @@ function DeckHero({ deck, report, dossier }: {
       </div>
 
       {dossier && <CommanderFacts dossier={dossier} />}
+
+      {/* Below the counted strip, deliberately and permanently. The order on
+          the page is the order of authority: what was counted, then what was
+          read and written. ADR 19's "the page shows the seams" is this
+          adjacency plus the label the panel carries. */}
+      {/* Gated on the deck's own commander list, not on `commander_card`.
+          The dossier is about the character, and the deck knows its name
+          without a corpus — on a fresh clone the panel should still say what
+          it is rather than vanish along with the card row. */}
+      {deck.commander.length > 0 && (
+        <CommanderDossierPanel
+          slug={deck.slug}
+          commander={deck.commander[0]}
+          canGenerate={
+            !!claude?.installed && !!claude?.configured
+            && claude.stance.axes[0]?.level !== 'off'
+          }
+        />
+      )}
     </div>
   )
 }
@@ -278,6 +311,9 @@ export default function DeckDetail() {
   // queries, so a slow one must not hold up the 99. A failure is silent for
   // the same reason — the deck is still perfectly usable without trivia.
   const [dossier, setDossier] = useState<CommanderDossier | null>(null)
+  // Whether a Claude surface exists on this instance at all, and whether the
+  // stance permits a call. Fetched once per deck; reaches no network itself.
+  const [claude, setClaude] = useState<ClaudeStatus | null>(null)
   const requested = useRef<string | null>(null)
   // The card the user is proposing to swap in, and the rationale they are
   // writing for it. Null means no swap is being composed.
@@ -370,6 +406,8 @@ export default function DeckDetail() {
       .catch((e) => setError(errorMessage(e)))
     setDossier(null)
     api.commander(slug).then(setDossier).catch(() => setDossier(null))
+    setClaude(null)
+    api.claudeStatus({ slug }).then(setClaude).catch(() => setClaude(null))
     setSuggestions(null)
     requested.current = null
   }, [slug])
@@ -427,7 +465,8 @@ export default function DeckDetail() {
 
   return (
     <div className="space-y-6">
-      <DeckHero deck={deck} report={report} dossier={dossier} />
+      <DeckHero deck={deck} report={report} dossier={dossier} claude={claude}
+                onRefresh={() => { void refresh() }} />
 
       {/* A draft is a to-do list with a number on it (ADR 13), so the number
           leads. The cards themselves are marked below, but the count is what

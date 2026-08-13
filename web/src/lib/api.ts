@@ -63,6 +63,10 @@ export interface Card {
   // cards legitimately have none.
   flavor_text?: string | null
   artist?: string | null
+  /** Set only when the deck picked a specific printing for its commander, so
+   *  the header can name which painting it is showing. Its absence means the
+   *  corpus's default printing. */
+  printing?: { set_name: string | null; set_code: string } | null
 }
 
 export interface DeckDetail extends DeckSummary {
@@ -71,6 +75,32 @@ export interface DeckDetail extends DeckSummary {
   cards: Card[]
   swap_board: Card[]
   corpus_available: boolean
+  /** The Scryfall printing id whose art this deck shows, or '' for the
+   *  default. A deck property rather than a viewer preference: it lives in
+   *  `deck.yaml` and travels with the deck through git. */
+  commander_art: string
+}
+
+/** One printing of the commander, as the art picker offers it. */
+export interface Printing {
+  id: string
+  set_code: string
+  set_name: string | null
+  collector_number: string | null
+  rarity: string | null
+  released_at: string | null
+  promo: boolean
+  image: string | null
+  art_crop: string | null
+  price_usd: number | null
+  selected: boolean
+}
+
+export interface PrintingList {
+  slug: string
+  commander: string
+  selected: string
+  printings: Printing[]
 }
 
 export interface Issue {
@@ -628,6 +658,78 @@ export interface InterviewReport {
   never: string
 }
 
+/**
+ * The commander dossier (ADR 19) — the half of the header the corpus cannot
+ * count.
+ *
+ * The shape is the ADR made into fields, and the reason it is not four strings
+ * is provenance: every passage carries the ids of the pages it rests on, and
+ * `sources` carries the pages themselves. A renderer that dropped
+ * `source_ids` would produce exactly the unattributed prose the design
+ * rejected, so the UI treats a passage and its citations as one thing.
+ *
+ * `sources` has already been checked server-side against the pages the search
+ * actually returned; anything the model cited but never read is gone before it
+ * reaches here, and `sources_dropped` counts what went.
+ */
+export interface DossierSection {
+  prose: string
+  source_ids: string[]
+}
+
+export interface DossierRival extends DossierSection {
+  name: string
+  mana_cost?: string | null
+  type_line?: string | null
+  color_identity?: string[]
+  image?: string | null
+  art_crop?: string | null
+  legal_commander?: boolean
+  /** The corpus's own text for the rival, so the real card sits next to the
+   *  sentence comparing it. */
+  oracle_text?: string | null
+}
+
+export interface DossierBody {
+  who: DossierSection
+  archetype: DossierSection & { name: string }
+  rivals: DossierRival[]
+  standing: DossierSection
+  sources: { id: string; title: string; url: string }[]
+  /** Cited pages the search never returned. A number that climbs is a prompt
+   *  inventing citations, which is why it is rendered rather than logged. */
+  sources_dropped: number
+  /** Named rivals the corpus does not have. */
+  rivals_dropped: number
+  /** How many pages were read to produce this. */
+  searched: number
+}
+
+export interface DossierReport {
+  answered_by: string
+  slug: string
+  commander: string
+  /** Empty when there is none — never a missing key, so a caller never has to
+   *  tell "absent" from "not yet fetched". */
+  dossier: DossierBody | Record<string, never>
+  cached: boolean
+  generated_at: string | null
+  /** False when no call was made: the stance was off, or a stored dossier was
+   *  served. Only on the POST response. */
+  asked?: boolean
+  reason?: string
+  model?: string
+  stance?: StanceView
+  usage?: { input_tokens: number; output_tokens: number }
+  never?: string
+}
+
+export function hasDossier(
+  report: DossierReport | null,
+): report is DossierReport & { dossier: DossierBody } {
+  return !!report && 'who' in report.dossier
+}
+
 export const api = {
   health: () => get<Health>('/api/health'),
   decks: () => get<DeckSummary[]>('/api/decks'),
@@ -665,7 +767,8 @@ export const api = {
       { value }),
   // The deck's own scalars. `stage: curated` is promotion, and the server
   // refuses it while any card is blank rather than writing a deck the gate
-  // would immediately reject.
+  // would immediately reject. `commander_art` goes through here too, and is
+  // refused unless the id is a printing of *this* deck's commander.
   setDeckField: (slug: string, field: string, value: string | number) =>
     send<EditResult>('PATCH', `/api/decks/${slug}`, { field, value }),
   importDeck: (body: {
@@ -715,6 +818,16 @@ export const api = {
   // response for a rationale even if it wanted to hand one over.
   interview: (slug: string, body: { card: string; stance?: string; focus?: string }) =>
     post<InterviewReport>(`/api/decks/${slug}/interview`, body),
+  // The commander dossier, in two halves that are deliberately different verbs.
+  // The GET is free and reads a stored row, so the deck page can ask on every
+  // load; the POST spends money and reaches the network. One function with a
+  // flag is how the free one ends up in a polling loop that is not free.
+  dossier: (slug: string) => get<DossierReport>(`/api/decks/${slug}/dossier`),
+  writeDossier: (slug: string, body: { stance?: string; refresh?: boolean } = {}) =>
+    post<DossierReport>(`/api/decks/${slug}/dossier`, body),
+  // Every non-digital printing of the commander, newest first. Its own call
+  // because most visits never open the picker and Goreclaw has twelve.
+  printings: (slug: string) => get<PrintingList>(`/api/decks/${slug}/printings`),
   // Public, so it is the one call that works before anything else does. The
   // shell reads it to decide whether to ask for a login at all, and the nav to
   // decide whether to offer the admin page.

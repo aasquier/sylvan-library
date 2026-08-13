@@ -26,6 +26,18 @@ pins and this module depends on: `output_config` carries **both** the effort
 and the response format, and adaptive thinking runs by default -- so
 `max_tokens` is a ceiling over thinking and answer together and needs headroom
 that a non-thinking model would not have wanted.
+
+**Server tools are a second kind of tool and the loop treats them differently.**
+`tool_names` are this package's own, dispatched through `tools.run`;
+`server_tools` run on Anthropic's side and never reach that door. They arrive
+with the dossier ([ADR 19](../../../docs/adr/0019-the-dossier-cites-three-sources.md))
+and bring two things the loop did not previously handle. Their results are
+*evidence* -- with a response schema in play the API attaches no citations, so
+the pages a search actually returned are collected here and are the only thing
+a caller can check an answer's sources against. And a server-side tool loop
+that hits its own limit stops with `pause_turn`, carrying text that looks like
+a finished answer; that is resumed rather than returned, for the same reason
+`sim/tier3` refuses to report a game Forge played with 96 cards.
 """
 
 from __future__ import annotations
@@ -59,6 +71,13 @@ class Mode:
     #: A subset of `tools.READ_ONLY`. Naming one that does not exist is a
     #: `ToolNotAllowed` at construction rather than a surprise at call time.
     tool_names: tuple[str, ...]
+    #: Anthropic-hosted tools, passed through verbatim. These run on Anthropic's
+    #: side and produce no round trip here, which is exactly why they are a
+    #: separate field from `tool_names`: `tools.run` is the door this package
+    #: controls, and a server tool does not go through it. Only the dossier uses
+    #: one (`web_search_20260209`, ADR 19), and `CLAUDE.md`'s no-crawler rule is
+    #: the reason it is a *hosted* search rather than something here that fetches.
+    server_tools: tuple[dict[str, Any], ...] = ()
     #: What this mode may change. Empty, and checked empty -- see the module
     #: docstring for why the field exists at all.
     may_write: tuple[str, ...] = ()
@@ -85,7 +104,14 @@ class Mode:
         tools.schemas(self.tool_names)
 
     def schemas(self) -> list[dict[str, Any]]:
-        return tools.schemas(self.tool_names)
+        """Everything for the request's `tools`: ours, then Anthropic's.
+
+        Server tools go last and in declaration order so the rendered block
+        stays byte-stable -- tools render first in the prompt, so an unstable
+        order would invalidate the prompt cache on every call, for free and
+        invisibly. `tools.schemas` already sorts our half for the same reason.
+        """
+        return [*tools.schemas(self.tool_names), *(dict(t) for t in self.server_tools)]
 
     def system(self, stance: Stance) -> str:
         """The system prompt, with what the stance widens appended.
@@ -145,6 +171,17 @@ class Turn:
     tool_calls: list[dict[str, Any]]
     input_tokens: int
     output_tokens: int
+    #: Every page a server-side search actually returned, in the order it came
+    #: back. This is evidence, not decoration: with a response schema in play
+    #: the API attaches no citations to the answer, so the only way to tell a
+    #: page the model read from a URL it composed is to check the answer's
+    #: citations against this list. ADR 19 makes that check mandatory, and
+    #: `dossier.py` is where it happens.
+    searched: list[dict[str, Any]] = field(default_factory=list)
+    #: Search errors, kept rather than dropped. A search that returned nothing
+    #: and a search that failed look identical from an empty `searched`, and
+    #: they want different answers.
+    search_errors: list[str] = field(default_factory=list)
     refused: bool = False
     #: How many of `input_tokens`' worth of prompt were served from the prompt
     #: cache (at ~a tenth of the price). Zero on a cold call; if it stays zero
@@ -162,6 +199,32 @@ class Turn:
 #: finished by then is looping rather than working, and the ceiling turns that
 #: into an exception instead of a bill.
 MAX_TOOL_TURNS = 6
+
+
+def _server_results(content: Any) -> tuple[list[dict[str, Any]], list[str]]:
+    """Pages a hosted search returned this turn, and any search that failed.
+
+    Two shapes matter and they are easy to confuse. On success a
+    `web_search_tool_result` block's `content` is a **list** of results; on
+    failure it is a single **error object**. Indexing the second as the first
+    is how a failed search becomes an empty page list that reads as "found
+    nothing" -- so the type is checked rather than assumed.
+    """
+    pages: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for block in content:
+        if getattr(block, "type", None) != "web_search_tool_result":
+            continue
+        results = getattr(block, "content", None)
+        if not isinstance(results, list):
+            errors.append(str(getattr(results, "error_code", None) or results))
+            continue
+        for item in results:
+            url = getattr(item, "url", None)
+            if url:
+                pages.append({"url": url,
+                              "title": getattr(item, "title", "") or url})
+    return pages, errors
 
 
 def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
@@ -184,12 +247,27 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
 
     history = list(messages)
     calls: list[dict[str, Any]] = []
+    pages: list[dict[str, Any]] = []
+    search_errors: list[str] = []
+    seen_urls: set[str] = set()
+    container: str | None = None
     tokens_in = tokens_out = tokens_cached = 0
 
     for _ in range(max_turns):
+        # `container` only ever has a value once a *server* tool has run, and
+        # it is required rather than optional after that: the dated web search
+        # does its own result filtering inside a code-execution container, so
+        # a second request carrying that first turn's blocks is refused with
+        # "container_id is required when there are pending tool uses generated
+        # by code execution" unless the container comes with it. Found by
+        # running the dossier rather than by reading the shapes -- the failure
+        # needs both a server tool *and* a second turn, so a single-turn probe
+        # never sees it.
+        extra: dict[str, Any] = {"container": container} if container else {}
         resp = con.messages.create(
             model=client.model(),
             max_tokens=mode.max_tokens,
+            **extra,
             # A cache breakpoint on the system block caches the tools and the
             # system prompt together (tools render first, so the marker covers
             # both). That boundary is byte-stable for a given mode and stance
@@ -211,6 +289,7 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
         # `or 0`: the SDK types the field `int | None`, and None means the
         # platform did not report cache reads, not that zero were served.
         tokens_cached += resp.usage.cache_read_input_tokens or 0
+        container = getattr(getattr(resp, "container", None), "id", None) or container
 
         # Checked before `content` is read, because a refusal can carry an
         # empty content list and indexing into it is how this becomes an
@@ -219,11 +298,34 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
             return Turn(mode=mode.name, model=resp.model,
                         stop_reason=resp.stop_reason, text="", tool_calls=calls,
                         input_tokens=tokens_in, output_tokens=tokens_out,
+                        searched=pages, search_errors=search_errors,
                         refused=True, cache_read_tokens=tokens_cached)
+
+        # Harvested before the stop-reason branch, so a turn that pauses or
+        # ends still contributes what its searches found. Deduplicated on URL:
+        # a mode that searches twice around a topic gets overlapping pages back
+        # and the same source listed twice is noise in the evidence list.
+        found, failed = _server_results(resp.content)
+        for page in found:
+            if page["url"] not in seen_urls:
+                seen_urls.add(page["url"])
+                pages.append(page)
+        search_errors.extend(failed)
 
         # Appended whole, thinking blocks included. Sonnet 5 returns them with
         # empty text by default and they still have to go back unedited.
         history.append({"role": "assistant", "content": resp.content})
+
+        # A server-side tool loop that hits its own iteration limit stops with
+        # `pause_turn` and hands back text that reads finished. Returning it
+        # here would be this project's own worst failure mode -- the Forge run
+        # that plays on with 96 cards and reports a plausible winner. So it is
+        # resumed instead: re-send with the paused turn last and the server
+        # picks up where it stopped. Nothing is appended to nudge it along; a
+        # trailing "continue" would be a new instruction rather than a
+        # resumption. The loop's own ceiling is what stops this recurring.
+        if resp.stop_reason == "pause_turn":
+            continue
 
         if resp.stop_reason != "tool_use":
             text = "".join(b.text for b in resp.content
@@ -231,7 +333,8 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
             return Turn(mode=mode.name, model=resp.model,
                         stop_reason=resp.stop_reason, text=text,
                         tool_calls=calls, input_tokens=tokens_in,
-                        output_tokens=tokens_out,
+                        output_tokens=tokens_out, searched=pages,
+                        search_errors=search_errors,
                         cache_read_tokens=tokens_cached)
 
         results = []
