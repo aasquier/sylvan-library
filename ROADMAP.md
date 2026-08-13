@@ -497,19 +497,33 @@ arc; this is what the next few sessions actually do.
 
    *The theme interview, which is where most of his thinking went:*
 
-   - **Personas instead of a fixed question battery.** "I don't want to get too
-     locked into our question battery. Books, art, tv, movies, star signs, all
-     good stuff, but we almost want personas" — a **storyteller**, a **tarot
-     reader**, a **confessor**, as characters the interviewer adopts. In ADR 15
-     terms this is a mode's prompt varying while its tools and its write scope
-     do not, which is the cheapest possible version of it.
-   - **A tarot reading as a door of its own.** The Rider–Waite deck's original
-     art is public domain: deal somebody a hand, let Claude be the oracle, and
-     interpret the spread into a colour identity and a commander — "It could be
-     fun with animations, crystal balls, etc." Note this is the one item that
-     wants **binary assets**, which branch 3 deliberately avoided; the licence
-     is the reason it is possible at all and should be checked rather than
-     assumed.
+   - ~~**Personas instead of a fixed question battery.**~~ **Started
+     2026-08-13, [ADR 21](docs/adr/0021-a-persona-is-a-voice-and-the-spread-is-the-slots.md).**
+     The complaint turned out to be half right and the half that was wrong is
+     the useful part: `SLOT_KINDS` is a taxonomy handed to the model, not a
+     script, so every sentence anybody reads was already generated. What was
+     fixed was the *register*. So a **persona** is a voice and explicitly not a
+     fourth stance axis — stance is how much the model does, persona is who it
+     sounds like — and the voice is *appended* to the interview's instructions
+     rather than replacing them, so its rules stay out of a persona's reach.
+     `plain` and `fortune-teller` are built. **Storyteller, scientist and
+     confessor/therapist are not**, and each is now a `Persona` and a prompt
+     with nothing else to move.
+   - **A tarot reading as a door of its own.** *Backend landed 2026-08-13; the
+     door itself is still to build.* The decision that made it possible rather
+     than a rewrite: **the spread's three positions are `SLOT_KINDS[:3]`**, so
+     a card is dealt *for* a slot and ADR 20's grounded-quote readiness works
+     untouched — a card is not something the querent said, and the cards colour
+     the questions rather than replacing the evidence. `tarot.py` holds all 78
+     cards and no card's meaning; Python shuffles, the reader reads.
+
+     **The licence was checked rather than assumed, and it matters.** The
+     original 1909 Rider "Roses & Lilies" printing is public domain in both the
+     US and the UK — but **US Games Systems' 1971 recolouring, which is the
+     deck everybody pictures, is not.** All 78 files were verified per file
+     through the Commons API; `src/mtglab/assets/tarot/PROVENANCE.md` is the
+     argument. 4.6MB of WebP, shipped as package-data rather than through the
+     committed bundle, which is why the `image` CI job now counts the cards.
    - **An interview for somebody who already has a theme.** The current one
      discovers a theme; this one would take a given theme and follow it. "That
      would be a fun alternative interview style."

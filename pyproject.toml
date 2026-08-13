@@ -69,7 +69,11 @@ where = ["src"]
 # without a Node toolchain present. `py.typed` marks the package as carrying
 # inline annotations, so a consumer's own type checker reads them instead of
 # treating every import from mtglab as `Any` (PEP 561).
-mtglab = ["web_dist/**/*", "py.typed"]
+# `assets/` is static data rather than built output, which is why it is not
+# under `web_dist/`: that directory is Vite's to overwrite, and 4.6MB of
+# public-domain tarot art would then live twice in git (once in `web/public`,
+# once in the committed bundle). Served from `/tarot` by `api/app.py`.
+mtglab = ["web_dist/**/*", "assets/**/*", "py.typed"]
 
 [tool.coverage.run]
 source = ["src/mtglab"]

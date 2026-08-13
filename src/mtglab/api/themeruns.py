@@ -51,7 +51,8 @@ KIND = "claude.theme.proposal"
 
 def plan_proposal(*, transcript: Any = None, slots: Any = None,
                   requested: Any = None, budget: float | None = None,
-                  avoid: str = "") -> Plan:
+                  avoid: str = "", persona: Any = None,
+                  seed: Any = None) -> Plan:
     """Refuse now if it is refusable; otherwise hand back the work.
 
     Raises `TranscriptRejected`, `NotReady` and `ClaudeUnavailable` to the
@@ -64,7 +65,8 @@ def plan_proposal(*, transcript: Any = None, slots: Any = None,
     from mtglab.claude.modes import ModeExhausted
 
     request = theme.check_proposal(transcript, slots, requested=requested,
-                                   budget=budget, avoid=avoid)
+                                   budget=budget, avoid=avoid,
+                                   persona=persona, seed=seed)
 
     label = (f"theme: colours and commanders, from "
              f"{len(request.grounded)} thing"
