@@ -329,10 +329,13 @@ arc; this is what the next few sessions actually do.
      fills that slot, so it is dropped — and when all three go, the combination
      goes with them. Observed live: one run returned two combinations and the
      next returned one. Counted and surfaced now rather than silently thin.
-   - **Cost and time:** a conversation turn is a few seconds and heavily
-     prompt-cached (~48k cached tokens by turn three). The proposal is the
-     expensive half — **measured at 226 seconds** end to end with `max_uses: 4`,
-     ~79k input / 8k output, since it reads a dozen-odd pages and checks every
+   - **Cost and time:** a conversation turn is heavily prompt-cached (~48k
+     cached tokens by turn three). It was described here as "a few seconds"
+     until somebody measured it: **4.3–37.7s across eleven turns on the
+     instance, with one at 133.8s**, and 27.7s for an ordinary turn driven
+     locally. That sentence is why 5c exists. The proposal is the expensive
+     half — **measured at 226 seconds** end to end with `max_uses: 4`, ~79k
+     input / 8k output, since it reads a dozen-odd pages and checks every
      legend. Trimmed to three searches, and the UI says it takes a few minutes.
      That was **the deploy blocker**, and it is fixed — see 5b below.
 
@@ -377,6 +380,52 @@ arc; this is what the next few sessions actually do.
    - **Measured on the real surface, twice:** 15 pages read, 4 cited, 0 sources
      dropped, 0 commanders dropped, ~72k in / 5.8k out with 53k served from the
      prompt cache. A reload mid-run reattached to the same job both times.
+
+   **5c — The conversation turn is a background job too.** Landed 2026-08-13,
+   the third surface to make the same move and the one that had the weakest
+   case on its own numbers. No ADR: as with 5b, nothing ADR 20 settled moved.
+
+   - **The reason is not the outlier.** One turn in eleven at 133.8s did not
+     reproduce, and restructuring a chat box on a single data point would be
+     wrong. The reason is that `api/app.py` justified keeping it synchronous
+     with *"it is a few seconds"* — **word for word the sentence that left the
+     dossier synchronous until it broke deployed at 236s.** A duration measured
+     for one surface is a question to ask of every sibling surface, and this
+     was the sibling nobody asked.
+   - **The ceiling is unknown, and that is the argument.** All anybody knows is
+     that it is *at or below* 236s, because that is where the dossier failed.
+     133.8s sits inside the unmeasured region below it. Measuring it properly
+     would take a throwaway endpoint that holds a response open, a deploy to
+     put it there, a binary search, and a deploy to remove it — for a number
+     that is multi-hop (Fly's proxy, then Safari, then whatever network), that
+     Fly can change without telling anybody, and that would not change the
+     decision unless it came back above ~240s. Considered and rejected on
+     2026-08-13; the fix costs less than the measurement.
+   - **The failure being avoided is the bad kind.** A transport error carries
+     no status code, writes no access-log line — uvicorn logs a response when
+     it *completes* — and discards work that finished fine. That is exactly
+     what the dossier looked like from a browser: a spinner, then `Load failed`.
+   - **The cheap case stays one request.** A turn that reaches nobody — stance
+     `off`, or a conversation past `MAX_EXCHANGES` — comes back as a job
+     already `done`, and the client hands it straight to `followJob` as
+     `initial`, which resolves without a single poll. Only a turn that actually
+     calls Anthropic pays the 400ms poll.
+   - **`key=None`, and that is the opposite of the dossier's call.**
+     `jobs.submit(key=…)` collapses concurrent duplicates, which is right when
+     two clicks inside four minutes are one question asked twice. A transcript
+     is client-held, so two turns in flight are two *conversations*, and
+     joining them would hand one of them the other's question.
+   - **The route had no tests, which is how the dossier shipped and was very
+     nearly how this did.** The proposal route had five; `/api/claude/theme`
+     had zero, and all 259 tests matching "theme" passed against a module. Nine
+     now cover the HTTP surface. Worth recording separately: the first draft of
+     the born-finished test **passed against a mutation that removed the
+     short-circuit**, because it asserted `status == "done"` on the response
+     and a queued job satisfies that whenever the worker wins the race — which
+     it always does when the work makes no call. The honest seam is
+     `jobs.submit` never being reached at all, and the `no_worker` fixture is
+     that. The identical weakness in the *proposal's* equivalent test was
+     inherited and is fixed with it.
 
    Three things are already settled and should not be re-opened:
 

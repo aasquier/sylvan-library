@@ -290,16 +290,37 @@ export function ThemeInterview({
     localStorage.setItem(SAVED, JSON.stringify(saved))
   }, [saved])
 
+  // The turn is a background job too now, for the reason `api.themeAsk` gives:
+  // measured at 4.3–37.7s with one at 133.8s, against a transport ceiling
+  // nobody has measured and that is known only to be at or below 236s.
+  //
+  // Unlike the proposal the id is **not** saved. That one persists it because
+  // a reload inside four minutes would otherwise pay twice; a turn is seconds,
+  // and persisting it here would put a second claimant on the transcript
+  // alongside the auto-ask effect below — two paths that could both decide
+  // what the pending question is. A reload mid-turn re-asks, which is what it
+  // did when this was a plain POST.
+  const asker = useRef<{ cancel: () => void } | null>(null)
+
   // Stable, so the opening effect below can depend on it honestly rather than
   // being told to ignore it.
   const send = useCallback(async (next: ThemeTurn[], carried: ThemeSlot[]) => {
     setBusy('asking')
     setError(null)
+    asker.current?.cancel()
     try {
-      const got = await api.themeAsk({
+      const job = await api.themeAsk({
         transcript: next, slots: carried,
         persona, seed: seed ?? undefined,
       })
+      // `initial` is what keeps the cheap case cheap: stance `off` and a
+      // finished conversation come back already `done`, and this resolves with
+      // no poll at all. 400ms otherwise — this is somebody waiting on a
+      // question, not a four-minute proposal, so the 2s the proposal polls at
+      // would be most of the latency on a fast turn.
+      const run = followJob(job.id, () => {}, 400, job)
+      asker.current = { cancel: run.cancel }
+      const got = (await run.promise).result as ThemeReport
       setReport(got)
       setSaved((s) => ({
         ...s,
@@ -309,7 +330,11 @@ export function ThemeInterview({
         slots: got.slots,
       }))
     } catch (e) {
-      setError(String((e as Error).message ?? e))
+      setError(e instanceof ApiError && e.status === 404
+        // Same sentence the proposal shows, and the same cause: jobs live in
+        // the server's memory and die with it (`api/jobs.py`).
+        ? 'That question is gone — the server restarted while it was working. Say something and it will ask again.'
+        : String((e as Error).message ?? e))
     } finally {
       setBusy('')
       box.current?.focus()
@@ -408,7 +433,13 @@ export function ThemeInterview({
     follow(saved.job)
   }, [saved.job, follow])
 
-  useEffect(() => () => poller.current?.cancel(), [])
+  // Both pollers. The tarot door remounts this component when the reader
+  // changes (ADR 21 — a persona is fixed for a conversation), so an unmount
+  // here is a live turn somebody has walked away from, not just a closing tab.
+  useEffect(() => () => {
+    poller.current?.cancel()
+    asker.current?.cancel()
+  }, [])
 
   async function proposeIt() {
     setBusy('proposing')
@@ -433,6 +464,10 @@ export function ThemeInterview({
   function startOver() {
     localStorage.removeItem(SAVED)
     poller.current?.cancel()
+    // The turn in flight goes too, or its question lands in the conversation
+    // that was just cleared — the empty transcript would gain an assistant
+    // turn nobody asked for and the auto-ask effect would never fire.
+    asker.current?.cancel()
     awaited.current = -1
     followed.current = null
     // Starting over keeps the reader and the cards. Those were chosen on the
