@@ -1143,6 +1143,20 @@ verified end to end: online backup, `integrity_check: ok`, pulled down with
 own `auth/db.connect()` — with `foreign_keys` on, so ADR 16's
 `ON DELETE CASCADE` survives a restore.
 
+**Take one before a deploy that carries a schema migration.** `app.db` migrates
+itself on the first connection after a deploy, which is usually invisible and
+occasionally not: schema version 5 *rebuilds the `users` table* to add
+`AUTOINCREMENT`, because SQLite cannot `ALTER` a column into it. The rebuild is
+guarded — `foreign_keys` off around the ladder, `PRAGMA foreign_key_check`
+before it is given back, and a refusal to serve from a file that fails it — but
+"the migration is careful" and "there is a copy of the file from before it ran"
+are not the same assurance, and only one of them is yours. `PRAGMA user_version`
+tells you where a file is:
+
+```bash
+fly ssh console -C "python3 -c \"import sqlite3; print(sqlite3.connect('/data/app.db').execute('PRAGMA user_version').fetchone()[0])\""
+```
+
 The decks need no such ceremony — they are plain YAML — but they do need
 copying, which is the same operation as pulling instance-side work back into
 git above:
