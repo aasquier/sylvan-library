@@ -36,18 +36,24 @@ primary_region = "iad"          # change to the region nearest you
   # screen in place of the app.
   MTGLAB_REQUIRE_AUTH = "1"
 
-  # ---- CHANGE THESE FOUR BEFORE THE FIRST DEPLOY -------------------------
+  # ---- CHANGE THESE TWO BEFORE THE FIRST DEPLOY --------------------------
   #
-  # Placeholders on purpose. This repository is public, and an email address is
-  # the one piece of personal data the project handles — CLAUDE.md keeps it out
-  # of logs, artifacts and tool results, and a tracked file is a weaker place
-  # to put it than any of those. The real values live in the gitignored `.env`.
+  # Placeholders on purpose, and they are the two that stay placeholders. This
+  # repository is public, and an email address is the one piece of personal
+  # data the project handles — CLAUDE.md keeps it out of logs, artifacts and
+  # tool results, and a tracked file is a weaker place to put it than any of
+  # those. The real values live in the gitignored `.env`.
   #
   # Two ways to supply them, and the second keeps the address out of git for
   # good: edit the lines below, **or** `fly secrets set MTGLAB_ADMIN_EMAIL=...`,
   # which is injected as an environment variable and takes precedence over
   # `[env]`. Neither is a credential; the second is just a private place to put
-  # configuration.
+  # configuration, and it is the one to use here.
+  #
+  # **A deploy with these still reading `you@example.com` creates that account
+  # and not yours** — which is a real failure mode rather than a hypothetical
+  # one, because the app comes up looking entirely healthy and the sign-in page
+  # simply has nobody behind it who is you.
 
   # Who administers this instance (ADR 17). `auth/bootstrap.py` reconciles this
   # account to admin-and-enabled at every boot, creating it unclaimed if
@@ -62,17 +68,55 @@ primary_region = "iad"          # change to the region nearest you
   MTGLAB_ADMIN_USERNAME = "you"
 
   # Where emailed invite and reset links point. Without it every link in every
-  # message says `127.0.0.1` and nobody can claim an account. Change it to the
-  # custom domain once §4 step 7 is done.
-  MTGLAB_BASE_URL = "https://sylvan-library.fly.dev"
+  # message says `127.0.0.1` and nobody can claim an account, and it is never
+  # derived from the request — a Host header is client-supplied, and building a
+  # password-reset link out of one is how the link ends up pointing at
+  # somebody else's domain.
+  #
+  # Real rather than a placeholder, unlike the two lines above: a public URL is
+  # not personal data, and the alternative is a value nobody can verify until a
+  # reset link has already gone out wrong. `send.` is the mail subdomain and is
+  # not this.
+  MTGLAB_BASE_URL = "https://sylvan-libraries.com"
 
   # The sending address, which must be on the domain verified with Resend.
   # `RESEND_API_KEY` is a secret and is not here; `sender_from_env()` refuses
   # to start without it when auth is on, deliberately — the console fallback
   # would print recipient addresses into Fly's logs, which ADR 16 forbids.
-  MTGLAB_EMAIL_FROM = "sylvan-library@example.com"
+  #
+  # No mailbox is behind this. Nothing reads replies, which is what `no-reply`
+  # is for.
+  MTGLAB_EMAIL_FROM = "sylvan-library <no-reply@send.sylvan-libraries.com>"
 
-[mounts]
+  # The header naming the real client, for login rate limiting.
+  #
+  # **Not optional here, and its absence is worse than it looks.** Unset,
+  # `auth.client_address` falls back to the socket address — which behind Fly's
+  # proxy is the proxy, so every login attempt from everybody shares one bucket
+  # and one person mistyping their password 429s the whole instance. The
+  # default is off because a header any client can set is a rate limit any
+  # client can opt out of.
+  #
+  # **What Fly documents, stated exactly.** `Fly-Client-IP` is "the IP address
+  # of the client from the perspective of Fly Proxy" — the proxy sets it from
+  # what it sees, which is the property this needs. What their page does *not*
+  # say in as many words is that it overwrites a value a client sent, so treat
+  # that as strongly implied rather than guaranteed, and worth one check after
+  # the first deploy: send a request with a `Fly-Client-IP` of your own and see
+  # whether the auth log records it or the real address.
+  #
+  # Trading up rather than down either way. Unset, *everyone* shares the
+  # proxy's bucket and one mistyped password locks out the instance; the worst
+  # case here is that a caller who knows to send the header gets its own, which
+  # is where it started.
+  #
+  # Two things that would break it, both on §7's list already: putting
+  # Cloudflare Access in front makes this Cloudflare's addresses rather than
+  # the visitor's — Fly documents that outright — and so would any other
+  # reverse proxy. Moving off Fly means removing this line, not renaming it.
+  MTGLAB_CLIENT_IP_HEADER = "Fly-Client-IP"
+
+[[mounts]]
   source = "mtglab_data"
   destination = "/data"
   # 3GB, sized in §4 step 3 to hold the ~63MB corpus, the ~98MB of Scryfall
