@@ -79,6 +79,7 @@ SHARED = {
     "/api/decks/{slug}/cards/{name}": "edits a shared deck",
     "/api/decks/{slug}/notes/{key}": "edits a shared deck",
     "/api/decks/{slug}/suggestions": "derived from a shared deck and the corpus",
+    "/api/decks/{slug}/commander": "corpus facts about a shared deck's commander",
     "/api/decks/{slug}/interview": "questions about a shared deck's card",
     "/api/cards/search": "the public Scryfall corpus",
     "/api/sets/upcoming": "Scryfall's own release calendar",

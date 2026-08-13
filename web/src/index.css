@@ -164,6 +164,54 @@ body {
   );
 }
 
+/* The deck page's hero backdrop.
+ *
+ * This is the answer to a problem that has no good answer at full sharpness.
+ * `art_crop` is 626x457 — about 1.37:1 — so a full-bleed band on a 1400px
+ * page can only show a horizontal slice of it, and on a card drawn head-up
+ * the slice that survives is the one without the head. Every ratio is a
+ * choice about which part of the painting to throw away.
+ *
+ * So the backdrop stops being a picture. Blurred this far it is a wash of the
+ * commander's own colours, and a wash cannot be cropped wrong — there is no
+ * subject left to cut in half. `scale` hides the soft transparent edge blur
+ * leaves behind, and the whole thing sits under a scrim so text on top keeps
+ * its contrast in both themes. The commander is shown properly beside it, as
+ * a whole card.
+ */
+/* Only the bottom of the band, and only enough to land on.
+ *
+ * A different job from `.hero-scrim`, which clears a *side* of a full-bleed
+ * image so prose can sit on it. Nothing is read off this band — the text is
+ * underneath it, not over it — so all this has to do is stop the painting
+ * ending in a hard horizontal line against the panel. Hence a short fade at
+ * the bottom and nothing at all across the top two thirds, which is the part
+ * worth actually seeing.
+ *
+ * Dark mode lifts the art instead of dimming it, for the reason written out
+ * above `.hero-art`: most of these paintings are dark, and a dark painting
+ * against a near-black panel is mud.
+ */
+.deck-hero-band img {
+  filter: saturate(1.08);
+}
+
+:root[data-theme='dark'] .deck-hero-band img,
+:root:where(:not([data-theme='light'])) .deck-hero-band img {
+  filter: brightness(1.45) saturate(1.15);
+}
+
+.deck-hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    var(--surface-1) 0%,
+    color-mix(in srgb, var(--surface-1) 45%, transparent) 22%,
+    transparent 55%
+  );
+}
+
 /* Card art fades in rather than popping, since a deck view loads ~90 at once. */
 .art-fade {
   opacity: 0;

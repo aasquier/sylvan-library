@@ -4,6 +4,7 @@ import {
   api,
   errorMessage,
   type Card,
+  type CommanderDossier,
   type DeckDetail as Deck,
   type DeckStats,
   type Suggestions,
@@ -11,7 +12,7 @@ import {
 } from '../lib/api'
 import { categoryLabel, identityName } from '../lib/mtg'
 import {
-  Badge, CardArt, CardHover, Caveat, ColorPips, ErrorNote, ManaCost, ManaText,
+  Badge, CardArt, CardHover, Caveat, ColorRing, ErrorNote, ManaCost, ManaText,
   Select, Spinner, StatTile,
 } from '../components/ui'
 import {
@@ -23,6 +24,246 @@ import {
 
 type Tab = 'cards' | 'stats' | 'validation' | 'notes'
 
+/**
+ * The deck's header: who leads it, what that card says, and who they are.
+ *
+ * Three shapes were tried here and the middle one is why the third looks like
+ * this. `art_crop` is 626x457 — about 1.37:1 — so a full-bleed band across a
+ * wide page can only show a horizontal slice of the painting, and the first
+ * version's 1200/260 band kept under a third of the height out of the middle:
+ * on a commander drawn head-up, the head was what got cropped. The second
+ * version reacted by throwing the band away and blurring it into a colour
+ * wash, which fixed the cropping by removing the picture — sterile, and it
+ * gave up the thing that made the page feel like a deck rather than a
+ * spreadsheet.
+ *
+ * So: the band is back and it is the centrepiece, framed at `center 22%`
+ * because card art is composed with its subject high far more often than low,
+ * and tall enough (1200/300) to keep a real slice rather than a stripe. The
+ * card itself is no longer *in* the band — it sits beside the text underneath,
+ * whole and unclipped, which is what it was colliding with before.
+ *
+ * The text is the other half. A page that named its commander and showed
+ * nothing else made the reader hover a thumbnail to find out what the card
+ * does. The identity leads, lettered and large, because it is the fact that
+ * governs the other 99; then the printed cost, type line and stats; then the
+ * oracle text; then flavour, which belongs to a printing and which four of
+ * these six commanders do not have.
+ *
+ * Everything below the fold is `CommanderDossier`, and every number in it was
+ * counted over the corpus by `service.commander_dossier`. That is rule 1 in
+ * the place it would have been easiest to ignore: "one of eight legendary
+ * Trolls" is exactly the sentence a model writes fluently and wrongly.
+ */
+function DeckHero({ deck, report, dossier }: {
+  deck: Deck
+  report: ValidationReport
+  dossier: CommanderDossier | null
+}) {
+  const card = deck.commander_card
+  const stats = card?.power != null && card?.toughness != null
+    ? `${card.power}/${card.toughness}`
+    : null
+
+  return (
+    <div className="card-surface overflow-hidden rounded-xl">
+      {/* Decorative, and marked so: the commander's name is already the
+          heading and the card's own alt text below. */}
+      {card?.art_crop && (
+        <div className="deck-hero-band relative" aria-hidden>
+          {/* `top`, not a percentage. The band is 4:1 over a 1.37:1 crop, so
+              it can only show about a third of the painting's height and the
+              only question is which third. Centring took it out of the
+              middle and decapitated head-up compositions; 22% still shaved
+              the tops of heads. Anchoring to the top cannot clip upward at
+              all — it gives up the bottom instead, which on card art is
+              ground, robes and negative space far more often than it is the
+              subject. */}
+          <CardArt src={card.art_crop} alt="" ratio="aspect-[1200/300]"
+                   className="rounded-none" position="center top" />
+          <div className="deck-hero-scrim" />
+        </div>
+      )}
+
+      <div className="relative flex flex-col gap-6 p-5 sm:flex-row sm:p-6">
+        {card?.image && (
+          <CardHover card={card}>
+            {/* Beside the text, not lifted into the band. Overlapping the art
+                was what "the card preview is clipped by the hero art" meant,
+                and there is no negative margin here for that reason. */}
+            <img src={card.image} alt={card.name}
+                 className="w-40 shrink-0 cursor-help self-start rounded-xl sm:w-44"
+                 style={{ boxShadow: '0 14px 40px rgba(0,0,0,0.45)' }} />
+          </CardHover>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">{deck.name}</h1>
+            {deck.bracket && <Badge>Bracket {deck.bracket}</Badge>}
+            {deck.status === 'theoretical' && <Badge>theory</Badge>}
+            {deck.stage === 'draft' && <Badge tone="warning">draft</Badge>}
+            {report.ok
+              ? <Badge tone="good">valid</Badge>
+              : <Badge tone="critical">{report.errors.length} error(s)</Badge>}
+          </div>
+
+          {/* The identity, loud — it constrains all 99 other cards and it used
+              to be a row of 12px dots. The mana cost deliberately sits on the
+              card's line below instead of next to this: both are rows of
+              coloured pips, and side by side they asked the reader to tell
+              "this deck may play white" from "this costs two white" by pip
+              size alone. */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <ColorRing colors={deck.color_identity} size={28} />
+            <span className="text-lg font-medium">
+              {identityName(deck.color_identity)}
+            </span>
+            <span className="text-xs uppercase tracking-wide"
+                  style={{ color: 'var(--text-muted)' }}>
+              colour identity
+            </span>
+          </div>
+
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-sm"
+             style={{ color: 'var(--text-secondary)' }}>
+            <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+              {deck.commander.join(' & ')}
+            </span>
+            {card?.mana_cost && <ManaCost cost={card.mana_cost} size={16} />}
+            {card?.type_line && <span>{card.type_line}</span>}
+            {stats && <span className="tabular">{stats}</span>}
+            {deck.companion && <span>· companion: {deck.companion}</span>}
+          </p>
+
+          {card?.oracle_text && (
+            <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-relaxed"
+               style={{ color: 'var(--text-secondary)' }}>
+              <ManaText>{card.oracle_text}</ManaText>
+            </p>
+          )}
+
+          {card?.flavor_text && (
+            <p className="mt-3 max-w-2xl border-l-2 pl-3 text-sm italic leading-relaxed"
+               style={{ borderColor: 'var(--baseline)', color: 'var(--text-muted)' }}>
+              {card.flavor_text}
+            </p>
+          )}
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <Link to={`/simulate?deck=${deck.slug}`}
+                  className="rounded-lg px-4 py-2 text-sm font-medium"
+                  style={{ background: 'var(--series-1)', color: '#fff' }}>
+              Simulate this deck
+            </Link>
+            {card?.artist && (
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Art by {card.artist}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {dossier && <CommanderFacts dossier={dossier} />}
+    </div>
+  )
+}
+
+/**
+ * The strip of corpus facts under the header.
+ *
+ * Renders nothing at all when it has nothing to say — a deck on a clone with
+ * no corpus, or a commander whose type line has no subtypes and whose name
+ * matches no other card. An empty "About" heading is worse than no heading.
+ */
+function CommanderFacts({ dossier }: { dossier: CommanderDossier }) {
+  const { subtypes, other_cards: others, printings } = dossier
+  const first = printings?.first_released
+    ? new Date(printings.first_released).getUTCFullYear()
+    : null
+  if (!subtypes.length && !others.length && !first) return null
+
+  return (
+    <div className="border-t px-5 py-4 sm:px-6"
+         style={{ borderColor: 'var(--hairline)' }}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+        <span className="text-xs font-medium uppercase tracking-wide"
+              style={{ color: 'var(--text-muted)' }}>
+          About this commander
+        </span>
+
+        {/* Read as a sentence rather than as a stat block: "a Troll, one of 8
+            legendary ones" is a fact you can feel the size of, where "Troll:
+            8" is a number you have to interpret. */}
+        {subtypes.map((s) => (
+          <span key={s.name} className="text-sm"
+                style={{ color: 'var(--text-secondary)' }}>
+            <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+              {s.name}
+            </span>
+            <span style={{ color: 'var(--text-muted)' }}>
+              {' '}— {s.legendary.toLocaleString()} legendary,{' '}
+              {s.total.toLocaleString()} in all
+            </span>
+          </span>
+        ))}
+
+        {first && (
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            First printed{' '}
+            <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+              {first}
+            </span>
+            {printings?.first_set && (
+              <span style={{ color: 'var(--text-muted)' }}> in {printings.first_set}</span>
+            )}
+            {printings && printings.count > 1 && (
+              <span style={{ color: 'var(--text-muted)' }}>
+                {' '}· {printings.count} printings
+              </span>
+            )}
+          </span>
+        )}
+      </div>
+
+      {others.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {/* Deliberately hedged. The match is on the name, so this finds
+                the character's other cards and also anything that merely
+                shares the word — offered to look at, not asserted. */}
+            Other cards carrying this name — the same character, printed again
+            with different mechanics:
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {others.map((o) => (
+              <CardHover key={o.name} card={{ name: o.name, image: o.image }}>
+                <span className="flex cursor-help items-center gap-2 rounded-lg px-2 py-1.5 text-xs"
+                      style={{ border: '1px solid var(--hairline)',
+                               background: 'var(--page)' }}>
+                  {o.art_crop && (
+                    <img src={o.art_crop} alt="" loading="lazy"
+                         className="h-7 w-12 rounded object-cover" />
+                  )}
+                  <span>
+                    <span className="font-medium">{o.name}</span>
+                    {o.mana_cost && (
+                      <span className="ml-1 align-middle">
+                        <ManaCost cost={o.mana_cost} size={12} />
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </CardHover>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DeckDetail() {
   const { slug = '' } = useParams()
   const [deck, setDeck] = useState<Deck | null>(null)
@@ -32,6 +273,11 @@ export default function DeckDetail() {
   const [tab, setTab] = useState<Tab>('cards')
   const [groupBy, setGroupBy] = useState('category')
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null)
+  // Fetched alongside the deck rather than with it, and never awaited with
+  // it: the panel it fills is decorative and runs several extra corpus
+  // queries, so a slow one must not hold up the 99. A failure is silent for
+  // the same reason — the deck is still perfectly usable without trivia.
+  const [dossier, setDossier] = useState<CommanderDossier | null>(null)
   const requested = useRef<string | null>(null)
   // The card the user is proposing to swap in, and the rationale they are
   // writing for it. Null means no swap is being composed.
@@ -122,6 +368,8 @@ export default function DeckDetail() {
         setReport(v)
       })
       .catch((e) => setError(errorMessage(e)))
+    setDossier(null)
+    api.commander(slug).then(setDossier).catch(() => setDossier(null))
     setSuggestions(null)
     requested.current = null
   }, [slug])
@@ -179,44 +427,7 @@ export default function DeckDetail() {
 
   return (
     <div className="space-y-6">
-      {/* hero */}
-      <div className="card-surface overflow-hidden rounded-xl">
-        <div className="relative">
-          <CardArt src={deck.commander_card?.art_crop} alt={deck.commander[0] ?? ''}
-                   ratio="aspect-[1200/260]" className="rounded-none" />
-        </div>
-        <div className="flex flex-wrap items-end justify-between gap-4 p-5">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{deck.name}</h1>
-              {deck.bracket && <Badge>Bracket {deck.bracket}</Badge>}
-              {deck.status === 'theoretical' && <Badge>theory</Badge>}
-              {deck.stage === 'draft' && <Badge tone="warning">draft</Badge>}
-              {report.ok
-                ? <Badge tone="good">valid</Badge>
-                : <Badge tone="critical">{report.errors.length} error(s)</Badge>}
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm"
-                 style={{ color: 'var(--text-secondary)' }}>
-              <ColorPips identity={deck.color_identity} />
-              <span>{identityName(deck.color_identity)}</span>
-              <span aria-hidden>·</span>
-              <span>{deck.commander.join(', ')}</span>
-              {deck.companion && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>companion: {deck.companion}</span>
-                </>
-              )}
-            </div>
-          </div>
-          <Link to={`/simulate?deck=${deck.slug}`}
-                className="rounded-lg px-4 py-2 text-sm font-medium"
-                style={{ background: 'var(--series-1)', color: '#fff' }}>
-            Simulate this deck
-          </Link>
-        </div>
-      </div>
+      <DeckHero deck={deck} report={report} dossier={dossier} />
 
       {/* A draft is a to-do list with a number on it (ADR 13), so the number
           leads. The cards themselves are marked below, but the count is what

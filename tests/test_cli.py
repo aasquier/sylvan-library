@@ -495,6 +495,14 @@ def test_delete_prompts_for_the_slug_when_not_given_yes(decks, monkeypatch, caps
     assert not (decks / "mini").exists()
 
 
+def test_delete_takes_the_magic_word_too(decks, monkeypatch, capsys):
+    """The shell and the app ask for the same word. A confirmation that is
+    only spelled one way in one surface is one people learn twice."""
+    monkeypatch.setattr("builtins.input", lambda _: "bury")
+    main(["decks", "delete", "mini"])
+    assert not (decks / "mini").exists()
+
+
 def test_a_mistyped_confirmation_deletes_nothing(decks, monkeypatch, capsys):
     monkeypatch.setattr("builtins.input", lambda _: "")
     with pytest.raises(SystemExit) as exc:

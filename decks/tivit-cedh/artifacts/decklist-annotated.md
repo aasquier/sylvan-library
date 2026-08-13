@@ -60,7 +60,7 @@ Esper midrange-control at cEDH speed. Fast mana plus free interaction plus hard 
 - **Orcish Bowmasters** `{1}{B}` — Kills Thassa's Oracle and hatebears at flash speed while punishing every draw engine.
 
 - **Path to Exile** `{W}` — Second Swords; the land given up rarely decides a cEDH game.
-- **Sink into Stupor** — Bounces a spell or a nonland permanent, and it is a land when you are short — one of the best flex slots printed.
+- **Sink into Stupor** `{1}{U}{U}` — Bounces a spell or a nonland permanent, and it is a land when you are short — one of the best flex slots printed.
 
 - **Swords to Plowshares** `{W}` — One mana, exiles anything relevant.
 - **Toxic Deluge** `{2}{B}` — Your only sweeper — answers Opposition Agent, Bowmasters and go-wide boards for three mana at any life total you choose to pay.
@@ -170,4 +170,4 @@ Esper midrange-control at cEDH speed. Fast mana plus free interaction plus hard 
 - **Urza, Lord High Artificer** — In for Necropotence. Makes mana from your artifact pile and doubles as a Time Sieve enabler.
 
 ---
-_Generated 2026-08-10 from `deck.yaml`._
+_Generated 2026-08-12 from `deck.yaml`._

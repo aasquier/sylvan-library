@@ -314,6 +314,19 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                          limit: int = Query(5, ge=1, le=20)) -> dict[str, Any]:
         return service.suggestions_for(slug, source=decks, limit=limit)
 
+    @app.get("/api/decks/{slug}/commander")
+    def deck_commander(slug: str, decks: Decks) -> dict[str, Any]:
+        """Who leads this deck, and what the corpus knows about them.
+
+        Its own route rather than more fields on `GET /api/decks/{slug}`,
+        for two reasons. It runs several extra queries — a count per subtype,
+        a name search, a printing lookup — to fill a panel that is decorative,
+        and the deck page should not wait on any of that to render its 99.
+        And it answers with `card: null` rather than a 404 when there is no
+        corpus, which is a different contract from the deck itself.
+        """
+        return service.commander_dossier(slug, source=decks)
+
     # ------------------------------------------------------------ cards
 
     @app.get("/api/cards/search")

@@ -52,6 +52,17 @@ export interface Card {
   edhrec_rank?: number | null
   reserved?: boolean
   price_usd?: number | null
+  // Printed stats, so a claim about "a 6/6" is checkable against the card.
+  power?: string | null
+  toughness?: string | null
+  loyalty?: string | null
+  game_changer?: boolean
+  // Only on `commander_card`, which is the only place the hero panel reads
+  // them from — `service._card_json` sends these under `full=True` rather
+  // than on all 99 rows. Flavour text belongs to a printing, so plenty of
+  // cards legitimately have none.
+  flavor_text?: string | null
+  artist?: string | null
 }
 
 export interface DeckDetail extends DeckSummary {
@@ -470,9 +481,33 @@ export interface Combination {
 
 export interface ColorTaxonomy {
   colors: { code: string; name: string; wants: string; fears: string }[]
-  tiers: { key: string; label: string }[]
+  // `blurb` is what the tier *is* and every tier has one; `eras` below is the
+  // block of Magic that supplied the names, and only three tiers have that.
+  tiers: { key: string; label: string; blurb: string }[]
   eras: { name: string; setting: string; named: string; story: string }[]
   combinations: Combination[]
+}
+
+/**
+ * What the corpus knows about a deck's commander, beyond the card itself.
+ *
+ * Every number here was counted by `service.commander_dossier` over the
+ * corpus. None of it is written into the UI, which is rule 1 applied to the
+ * one panel most tempting to fill with remembered trivia.
+ */
+export interface CommanderDossier {
+  slug: string
+  card: Card | null
+  supertypes: string[]
+  /** How crowded each of the commander's creature types is. */
+  subtypes: { name: string; total: number; legendary: number }[]
+  /** Other cards whose name contains the character's — offered as related,
+   *  not asserted as the same character. */
+  other_cards: {
+    name: string; type_line?: string | null; mana_cost?: string | null
+    image?: string | null; art_crop?: string | null
+  }[]
+  printings: { count: number; first_released: string | null; first_set: string | null } | null
 }
 
 export interface ChallengeProgress {
@@ -645,12 +680,15 @@ export const api = {
   }) => post<ImportResult>('/api/decks/import', body),
   // The 32 combinations and their history. No corpus, no decks, no network —
   // so the first screen of the create flow renders on a fresh clone.
+  // Separate from `deck()` on purpose: it runs several extra corpus queries
+  // for a panel that is decorative, so the 99 must never wait on it.
+  commander: (slug: string) => get<CommanderDossier>(`/api/decks/${slug}/commander`),
   colors: () => get<ColorTaxonomy>('/api/colors'),
   challengeProgress: () => get<ChallengeProgress>('/api/colors/progress'),
-  // The only call here that can lose work. `confirm` must equal the slug —
-  // a value only somebody looking at the right deck can produce, which a
-  // mis-aimed click cannot satisfy. The deck moves to `.trash/` rather than
-  // being unlinked, and the response says where.
+  // The only call here that can lose work. `confirm` must be a word somebody
+  // typed — `bury`, or the slug itself — which a mis-aimed click cannot
+  // satisfy. The deck moves to `.trash/` rather than being unlinked, and the
+  // response says where.
   deleteDeck: (slug: string, confirm: string) =>
     send<DeleteResult>('DELETE',
       `/api/decks/${slug}?confirm=${encodeURIComponent(confirm)}`),

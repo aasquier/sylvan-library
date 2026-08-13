@@ -326,12 +326,21 @@ describe('Library mana pips', () => {
 /**
  * Deleting a deck.
  *
- * The safeguard is that the confirmation is the slug rather than a yes/no: an
- * "Are you sure?" is answered identically by someone who read it and someone
- * who clicked through it. These tests pin that the button stays disabled until
- * the slug matches, that cancelling calls nothing, and that the response's
- * `moved_to` is shown — a deletion is only survivable if you can see where it
- * went.
+ * The safeguard is that the confirmation is a typed word rather than a yes/no:
+ * an "Are you sure?" is answered identically by someone who read it and
+ * someone who clicked through it. These tests pin that the button stays
+ * disabled until the answer matches, that cancelling calls nothing, and that
+ * the response's `moved_to` is shown — a deletion is only survivable if you
+ * can see where it went.
+ *
+ * Two of them are regression tests for the same bug, and it is worth naming
+ * because it did not look like a bug. The dialog used to demand the slug in a
+ * label styled `uppercase`, so `ishai-ojutai-dragonspeaker` appeared as
+ * `ISHAI-OJUTAI-DRAGONSPEAKER` over a case-sensitive comparison: typing
+ * exactly what was on screen left the button disabled and said nothing about
+ * why, which reads as a broken control rather than as a refusal. `bury` is the
+ * short answer that replaced it, and the match ignores case so that what is on
+ * screen is always an accepted answer.
  */
 describe('Library deck deletion', () => {
   async function openDialogFor(name: string) {
@@ -341,28 +350,59 @@ describe('Library deck deletion', () => {
     return screen.getByRole('dialog')
   }
 
-  it('will not delete until the slug is typed exactly', async () => {
+  it('will not delete until the word is typed', async () => {
     const dialog = await openDialogFor('Goreclaw')
     const confirm = within(dialog).getByRole('button', { name: /delete this deck/i })
     expect(confirm.hasAttribute('disabled')).toBe(true)
 
     fireEvent.change(within(dialog).getByRole('textbox'),
-                     { target: { value: 'gorecla' } })
+                     { target: { value: 'bur' } })
     expect(confirm.hasAttribute('disabled')).toBe(true)
 
     fireEvent.change(within(dialog).getByRole('textbox'),
-                     { target: { value: 'goreclaw' } })
+                     { target: { value: 'bury' } })
     expect(confirm.hasAttribute('disabled')).toBe(false)
   })
 
-  it('sends the typed slug as the confirmation', async () => {
+  it('accepts the word whatever case it is typed in', async () => {
+    // The regression. Whatever the label renders has to be an answer the
+    // dialog takes, and CSS is free to change how a label renders.
+    const dialog = await openDialogFor('Goreclaw')
+    const confirm = within(dialog).getByRole('button', { name: /delete this deck/i })
+    fireEvent.change(within(dialog).getByRole('textbox'),
+                     { target: { value: 'BURY' } })
+    expect(confirm.hasAttribute('disabled')).toBe(false)
+  })
+
+  it('still accepts the slug, in any case, for anyone who prefers it', async () => {
+    const dialog = await openDialogFor('Goreclaw')
+    const confirm = within(dialog).getByRole('button', { name: /delete this deck/i })
+    fireEvent.change(within(dialog).getByRole('textbox'),
+                     { target: { value: 'GORECLAW' } })
+    expect(confirm.hasAttribute('disabled')).toBe(false)
+  })
+
+  it('never asks for a literal it renders in a different case', async () => {
+    // The bug itself, pinned at its cause rather than at its symptom: the
+    // label named the string to retype and CSS uppercased it. Any
+    // `text-transform` on the element holding that literal reintroduces it.
+    const dialog = await openDialogFor('Goreclaw')
+    const literal = within(dialog).getByText('bury', { selector: 'code' })
+    expect(literal.textContent).toBe('bury')
+    for (let el: HTMLElement | null = literal; el; el = el.parentElement) {
+      expect(el.className).not.toMatch(/\buppercase\b|\blowercase\b|\bcapitalize\b/)
+      if (el === dialog) break
+    }
+  })
+
+  it('sends the normalised answer as the confirmation', async () => {
     const dialog = await openDialogFor('Goreclaw')
     fireEvent.change(within(dialog).getByRole('textbox'),
-                     { target: { value: 'goreclaw' } })
+                     { target: { value: '  BURY ' } })
     fireEvent.click(within(dialog).getByRole('button', { name: /delete this deck/i }))
 
     await waitFor(() => expect(api.deleteDeck).toHaveBeenCalledWith(
-      'goreclaw', 'goreclaw'))
+      'goreclaw', 'bury'))
   })
 
   it('drops the deck from the shelf and says where it went', async () => {

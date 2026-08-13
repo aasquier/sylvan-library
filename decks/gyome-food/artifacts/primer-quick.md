@@ -43,4 +43,4 @@ Curve is 9 / 15 / 21 / 13 / 4 / 3 across MV 1-5 then 6+, average nonland MV 3.02
 | Lands | 34 |
 
 ---
-_Generated 2026-08-10 from `deck.yaml`. Edit the deck file, not this document._
+_Generated 2026-08-12 from `deck.yaml`. Edit the deck file, not this document._

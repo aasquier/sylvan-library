@@ -29,8 +29,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type Card, type Combination, type ColorTaxonomy } from '../lib/api'
-import { COLOR_NAMES, COLOR_VAR } from '../lib/mtg'
-import { CardHover, ManaText } from '../components/ui'
+import { COLOR_VAR } from '../lib/mtg'
+import { CardHover, ColorRing, ManaText } from '../components/ui'
 
 /** The era whose story named a tier, so the lesson has its setting attached. */
 const TIER_ERA: Record<string, string> = {
@@ -58,39 +58,6 @@ function slugify(name: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48)
-}
-
-/* ------------------------------------------------------------------ pips */
-
-function ColorRing({ colors, size = 34 }: { colors: string[]; size?: number }) {
-  if (!colors.length) {
-    return (
-      <span
-        className="inline-flex items-center justify-center rounded-full font-semibold"
-        style={{
-          width: size, height: size, fontSize: size * 0.4,
-          background: 'var(--mtg-c)', color: '#141414',
-          boxShadow: '0 0 0 1px var(--hairline)',
-        }}
-      >C</span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center" style={{ gap: 2 }}>
-      {colors.map((c) => (
-        <span
-          key={c}
-          title={COLOR_NAMES[c]}
-          className="inline-flex items-center justify-center rounded-full font-semibold"
-          style={{
-            width: size, height: size, fontSize: size * 0.45,
-            background: COLOR_VAR[c], color: '#141414',
-            boxShadow: '0 0 0 1px var(--hairline)',
-          }}
-        >{c}</span>
-      ))}
-    </span>
-  )
 }
 
 /* -------------------------------------------------------------- the page */
@@ -264,7 +231,11 @@ export default function NewDeck() {
     return <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
   }
 
+  const tierInfo = taxonomy.tiers.find((t) => t.key === tier) ?? null
   const era = current ? taxonomy.eras.find((e) => e.name === TIER_ERA[current.tier]) : null
+  // Colourless and All five have exactly one member, so stepping is a no-op
+  // and a counter reading "1 / 1" is a control that says nothing.
+  const many = inTier.length > 1
 
   return (
     <div className="space-y-8">
@@ -385,18 +356,33 @@ export default function NewDeck() {
             ))}
           </div>
 
-          {/* The era belongs to the whole tier, not to each slot in it.
+          {/* Tier-level context, above the carousel rather than inside it.
               Ravnica names all ten guilds; repeating that paragraph under
               every guild taught it ten times and said nothing about the guild
-              you were actually looking at. It sits here once, above the
-              carousel, and the card below is free to be about Azorius. */}
-          {era && (
-            <p className="max-w-3xl border-l-2 pl-4 text-sm leading-relaxed"
-               style={{ borderColor: 'var(--baseline)', color: 'var(--text-muted)' }}>
-              <strong style={{ color: 'var(--text-secondary)' }}>{era.name}</strong>
-              {' '}— {era.setting}. {era.story}
+              you were actually looking at. It sits here once, and the card
+              below is free to be about Azorius.
+
+              Two paragraphs, because they answer different questions and only
+              one of them always has an answer. The blurb is what this kind of
+              combination *is* and every tier has one — which is the gap that
+              used to push the definition of a shard into Bant's own
+              description, where someone who arrowed straight to Naya never
+              saw it. The era is the block of Magic that supplied the names,
+              and only guilds, shards and wedges come from one. */}
+          <div className="max-w-3xl border-l-2 pl-4"
+               style={{ borderColor: 'var(--baseline)' }}>
+            <p className="text-sm leading-relaxed"
+               style={{ color: 'var(--text-secondary)' }}>
+              {tierInfo?.blurb}
             </p>
-          )}
+            {era && (
+              <p className="mt-2 text-sm leading-relaxed"
+                 style={{ color: 'var(--text-muted)' }}>
+                <strong style={{ color: 'var(--text-secondary)' }}>{era.name}</strong>
+                {' '}— {era.setting}. {era.story}
+              </p>
+            )}
+          </div>
 
           {current && (
             <article
@@ -424,9 +410,12 @@ export default function NewDeck() {
                     </p>
                   )}
                 </div>
-                <span className="ml-auto tabular text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {index + 1} / {inTier.length}
-                </span>
+                {many && (
+                  <span className="ml-auto tabular text-xs"
+                        style={{ color: 'var(--text-muted)' }}>
+                    {index + 1} / {inTier.length}
+                  </span>
+                )}
               </div>
 
               <p className="mt-4 text-lg" style={{ color: 'var(--text-primary)' }}>
@@ -476,18 +465,25 @@ export default function NewDeck() {
               )}
 
               <div className="mt-6 flex flex-wrap items-center gap-2">
-                <button onClick={() => step(-1)}
-                        className="rounded-md px-3 py-2 text-sm"
-                        style={{ border: '1px solid var(--hairline)',
-                                 color: 'var(--text-secondary)' }}>
-                  ← Previous
-                </button>
-                <button onClick={() => step(1)}
-                        className="rounded-md px-3 py-2 text-sm"
-                        style={{ border: '1px solid var(--hairline)',
-                                 color: 'var(--text-secondary)' }}>
-                  Next →
-                </button>
+                {/* Not rendered at all on a tier of one. A disabled pair would
+                    still be two controls explaining that they do nothing;
+                    Colourless and All five simply have nowhere to step. */}
+                {many && (
+                  <>
+                    <button onClick={() => step(-1)}
+                            className="rounded-md px-3 py-2 text-sm"
+                            style={{ border: '1px solid var(--hairline)',
+                                     color: 'var(--text-secondary)' }}>
+                      ← Previous
+                    </button>
+                    <button onClick={() => step(1)}
+                            className="rounded-md px-3 py-2 text-sm"
+                            style={{ border: '1px solid var(--hairline)',
+                                     color: 'var(--text-secondary)' }}>
+                      Next →
+                    </button>
+                  </>
+                )}
                 <button onClick={() => choose(current)}
                         className="ml-auto rounded-md px-4 py-2 text-sm font-medium"
                         style={{ background: 'var(--series-1)', color: '#fff' }}>

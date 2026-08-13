@@ -42,4 +42,4 @@ Keep 2-5 lands. Do not demand mana pieces on top of that. From a Tier 1 policy s
 | Lands | 36 |
 
 ---
-_Generated 2026-08-10 from `deck.yaml`. Edit the deck file, not this document._
+_Generated 2026-08-12 from `deck.yaml`. Edit the deck file, not this document._

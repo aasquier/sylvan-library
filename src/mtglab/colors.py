@@ -96,6 +96,50 @@ TIER_LABELS = {
     "five": "All five",
 }
 
+#: What a tier *is*, as opposed to what any one of its members is.
+#:
+#: This table exists because its absence had a cost. Three combinations —
+#: Bant, Abzan and Artifice, the first entry in the shard, wedge and quad
+#: tiers — each opened by explaining their whole tier, because there was
+#: nowhere else for that sentence to live. Someone arrowing straight to Naya
+#: therefore never learned what a shard was, and someone reading Bant was told
+#: about Alara twice, once here and once in the era paragraph above it.
+#:
+#: Distinct from `ERAS`, and deliberately so. A blurb is definitional and every
+#: tier has one; an era is the block of Magic whose story supplied the names,
+#: and only three tiers have that. Colourless is not from anywhere.
+#:
+#: The split is also a rule about what goes where, and it has to be kept or the
+#: two paragraphs say the same thing one after the other. **A blurb is
+#: mechanical and never names a plane; an era is a setting and never restates
+#: the mechanics.** Both of these are rendered as plain text, so no markdown:
+#: an asterisk here reaches the screen as an asterisk.
+TIER_BLURBS = {
+    "colorless": "The absence of colour rather than a choice among colours — "
+                 "and the only identity that can play any land in the game "
+                 "without a cost.",
+    "mono": "One colour, and everything it cannot do left undone. The "
+            "cheapest mana base in the format and the sharpest set of "
+            "weaknesses, which is what makes these the decks people recommend "
+            "building first.",
+    "guild": "Two colours, and there are exactly ten ways to pick two: five "
+             "pairs that sit next to each other on the colour wheel and five "
+             "that sit opposite. Neighbours cooperate; opposites have to be "
+             "talked into it, and are usually the more interesting deck.",
+    "shard": "Three colours: one colour and both of the two it neighbours, so "
+             "the whole identity is one unbroken arc of the wheel. A shard "
+             "agrees with itself, which makes it the more comfortable of the "
+             "two three-colour shapes and the less pointed one.",
+    "wedge": "Three colours: one colour and the two it sits opposite. That is "
+             "the whole difference from a shard, and it is why wedges feel "
+             "less comfortable and more distinctive — the colours in them "
+             "disagree, and the deck has to be the argument that settles it.",
+    "quad": "Four colours, best understood by the one they refuse. Each of "
+            "these is all five minus one, and the missing colour says more "
+            "about the deck than the four present ones do.",
+    "five": "Every colour, and the mana base that bill comes with.",
+}
+
 
 @dataclass(frozen=True)
 class Combination:
@@ -272,11 +316,10 @@ COMBINATIONS: tuple[Combination, ...] = (
     Combination(
         "WUG", "Bant", "shard",
         "Order, chivalry, and a hierarchy everyone accepts.",
-        "Alara shattered into five planes, each missing two colours, and each "
-        "became a caricature of what remained. Bant kept white with blue and "
-        "green and lost black and red entirely — so it has no ambition and no "
-        "passion, only duty. Angels, knights, and a rigid caste system nobody "
-        "questions because nobody has anything to be angry about.",
+        "Bant is white's shard. It kept blue and green and lost black and red "
+        "entirely — so it has no ambition and no passion, only duty. Angels, "
+        "knights, and a rigid caste system nobody questions because nobody has "
+        "anything to be angry about.",
         verified_by="Bant Charm"),
     Combination(
         "WUB", "Esper", "shard",
@@ -317,11 +360,10 @@ COMBINATIONS: tuple[Combination, ...] = (
     Combination(
         "WBG", "Abzan", "wedge",
         "The family endures. The individual is how it does that.",
-        "Where a shard is a colour with its two friends, a wedge is a colour "
-        "with its two enemies — which makes wedges harder to hold together and "
-        "more interesting when they cohere. Tarkir's five clans each took one. "
-        "Abzan is white's endurance flanked by black and green: outlast "
-        "everything, and count the dead as still contributing.",
+        "The Abzan Houses are white's endurance flanked by black and green: "
+        "fortress walls, ancestors who keep contributing after death, and "
+        "creatures that get harder to kill the longer the game runs. Outlast "
+        "everything, and count the dead as still on the roster.",
         verified_by="Abzan Charm"),
     Combination(
         "WUR", "Jeskai", "wedge",
@@ -359,12 +401,10 @@ COMBINATIONS: tuple[Combination, ...] = (
     Combination(
         "WUBR", "Artifice", "quad",
         "Everything except green — the made over the grown.",
-        "Four-colour identities are best understood by what they exclude, "
-        "since each is all five minus one. Artifice rejects green: nothing "
-        "here trusts the natural order, and the answer to every problem is a "
-        "better artifact. Commander 2016 named this deck Artifice and gave it "
-        "Breya; EDHREC calls it Yore-Tiller after the Guildpact Nephilim with "
-        "the same identity.",
+        "Artifice rejects green: nothing here trusts the natural order, and "
+        "the answer to every problem is a better artifact. Commander 2016 "
+        "named this deck Artifice and gave it Breya; EDHREC calls it "
+        "Yore-Tiller after the Guildpact Nephilim with the same identity.",
         aliases=("Yore-Tiller",), verified_by="Breya, Etherium Shaper"),
     Combination(
         "UBRG", "Chaos", "quad",
@@ -434,7 +474,13 @@ def by_tier(tier: str) -> list[Combination]:
 
 @dataclass(frozen=True)
 class Era:
-    """A block that named a set of colour combinations, for the carousel."""
+    """A block that named a set of colour combinations, for the carousel.
+
+    The setting and why the names stuck — not what the combination *is*, which
+    is `TIER_BLURBS` and is rendered directly above this. The two used to
+    overlap badly enough that a reader met the definition of a wedge twice in
+    consecutive paragraphs.
+    """
 
     name: str
     setting: str
@@ -452,16 +498,15 @@ ERAS: tuple[Era, ...] = (
         "player what their deck is and 'Golgari' is a complete answer."),
     Era("Alara", "One plane shattered into five",
         "the five shards",
-        "Alara broke into five fragments, and each fragment lost two colours "
-        "entirely. What survived was a colour and both of its allies, taken to "
-        "an extreme with nothing to balance it — a world with no ambition, a "
-        "world with no mercy. The five shards give three-colour allied "
-        "identities their names."),
+        "Alara broke into five fragments and each fragment lost two colours "
+        "outright — not suppressed, gone, with nothing left to argue against "
+        "what remained. A world with no ambition; a world with no mercy. The "
+        "plane was eventually put back together, and the names stayed."),
     Era("Tarkir", "A world of dragons, and then of clans, and then of dragons",
         "the five wedges",
-        "Tarkir's five clans each venerated one aspect of dragonkind, and each "
-        "took a colour with both of its *enemies* rather than its friends. "
-        "That is the difference between a shard and a wedge, and it is why "
-        "wedges feel less comfortable and more distinctive: the colours in "
-        "them disagree, and the deck has to be the argument that settles it."),
+        "Tarkir's five clans each venerated one aspect of dragonkind, and "
+        "each was built around a colour flanked by the two it least agrees "
+        "with — an ancestor-cult, a monastery, a raiding horde. Then someone "
+        "went back through time and changed the outcome, and the dragons won "
+        "instead. Tarkir has two histories, and cards printed from both."),
 )

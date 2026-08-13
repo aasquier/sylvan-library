@@ -30,7 +30,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import tiny_corpus  # noqa: E402
 from mtglab import config  # noqa: E402
-from mtglab.api import jobs  # noqa: E402
+from mtglab.api import jobs, service  # noqa: E402
 from mtglab.api.app import create_app  # noqa: E402
 from mtglab.api.deps import deck_source  # noqa: E402
 from mtglab.decks.model import Deck  # noqa: E402
@@ -1274,14 +1274,47 @@ def deletable(client):
     client.app.dependency_overrides.pop(deck_source, None)
 
 
-def test_deleting_needs_the_slug_as_confirmation(client, deletable):
+def test_deleting_needs_a_typed_word_as_confirmation(client, deletable):
     """Not a boolean. A client that sends `confirm=true` for every deletion has
     confirmed nothing, and a mis-aimed request looks exactly like an intended
-    one. The slug is a value only somebody looking at the right deck has."""
+    one. Both accepted answers have to be typed out."""
     r = client.request("DELETE", "/api/decks/doomed?confirm=true")
     assert r.status_code == 422
-    assert "confirm with the slug" in r.json()["detail"]
+    detail = r.json()["detail"]
+    # The refusal names what it wants. A gate whose answer is only in the
+    # source is the shape of the bug this replaced.
+    assert service.DELETE_WORD in detail and "slug" in detail
     assert deletable.slugs() == ["doomed"], "and nothing was moved"
+
+
+def test_the_delete_word_is_bury(client):
+    """Pinned here because `web/src/routes/Library.tsx` types this word into
+    its own dialog and cannot import it. If one side changes, this fails and
+    names the other."""
+    assert service.DELETE_WORD == "bury"
+
+
+def test_deleting_with_the_magic_word_removes_the_deck(client, deletable):
+    """The short answer, and the one the app asks for. The slug is a stronger
+    confirmation and still works, but it was also 26 hyphenated characters on
+    the deck it was most often aimed at, which is a gate that gets bypassed in
+    the shell rather than satisfied."""
+    r = client.request("DELETE", "/api/decks/doomed?confirm=bury")
+    assert r.status_code == 200
+    assert r.json()["deleted"] is True
+    assert deletable.slugs() == []
+
+
+@pytest.mark.parametrize("confirm", ["BURY", "  Bury  ", "DOOMED"])
+def test_confirmation_ignores_case_and_surrounding_space(
+        client, deletable, confirm):
+    """The regression, at the layer that decides it. The app rendered the
+    confirmation string uppercased next to a case-sensitive comparison, so
+    typing what was on screen was refused with no explanation. Whatever a
+    client displays has to be an answer this accepts."""
+    r = client.request("DELETE", f"/api/decks/doomed?confirm={confirm.strip()}")
+    assert r.status_code == 200
+    assert deletable.slugs() == []
 
 
 def test_deleting_with_no_confirmation_at_all_is_refused(client, deletable):
@@ -1452,3 +1485,81 @@ def test_the_interview_at_a_stance_of_off_makes_no_call(client):
     assert body["asked"] is False
     assert body["questions"] == []
     assert body["answered_by"] == "claude", "labelled even when it said nothing"
+
+
+# ------------------------------------------------- the commander dossier
+
+def test_commander_dossier_counts_subtypes_off_the_corpus(
+        corpus, in_memory_client):
+    """Gyome is a Troll Warlock, and how unusual that is comes from counting
+    type lines rather than from anybody's recollection.
+
+    This is the endpoint most tempting to fill with remembered trivia, which
+    is exactly why the numbers are queries. A wrong one is a bug with a
+    reproducible query behind it."""
+    deck = Deck.from_text(
+        "slug: gyome\nname: Gyome\ncommander:\n  - Gyome, Master Chef\n"
+        "cards:\n  - name: Swamp\n    category: land\n    why: mana\n    qty: 99\n",
+        slug="gyome")
+    with in_memory_client([deck]) as client:
+        body = client.get("/api/decks/gyome/commander").json()
+
+    assert body["card"]["type_line"] == "Legendary Creature — Troll Warlock"
+    assert body["supertypes"] == ["Legendary", "Creature"]
+    names = [s["name"] for s in body["subtypes"]]
+    assert names == ["Troll", "Warlock"]
+    for row in body["subtypes"]:
+        # Every legendary one is also one of the total, so this ordering holds
+        # for any corpus and catches the two counts being swapped.
+        assert 0 < row["legendary"] <= row["total"]
+
+
+def test_commander_dossier_reads_the_front_face_of_a_double_faced_card(corpus):
+    """A DFC's `type_line` carries both halves around a `//`. The commander's
+    types are the ones on the side you cast, which is the same reason
+    `CardRecord.front_type_line` exists."""
+    supertypes, subtypes = service._type_parts(
+        "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani")
+    assert supertypes == ["Legendary", "Creature"]
+    assert subtypes == ["Cat", "Warrior"], "the back face must not leak in"
+
+
+def test_commander_dossier_handles_a_type_line_with_no_subtypes(corpus):
+    assert service._type_parts("Artifact") == (["Artifact"], [])
+    assert service._type_parts("Basic Land — Swamp") == (["Basic", "Land"], ["Swamp"])
+
+
+def test_commander_dossier_is_empty_rather_than_a_404_without_a_corpus(
+        tmp_path, in_memory_client):
+    """A decorative panel must not take the deck page down with it. The deck
+    still renders on a fresh clone; the dossier is simply empty."""
+    with config.use_paths(data_dir=tmp_path / "absent"), \
+            in_memory_client([tiny_corpus.mono_green_deck()]) as client:
+        r = client.get("/api/decks/mono-green/commander")
+        assert r.status_code == 200
+        assert r.json()["card"] is None
+        assert r.json()["subtypes"] == []
+
+
+def test_commander_dossier_survives_a_corpus_with_no_printings(
+        corpus, in_memory_client):
+    """`tiny_corpus` loads oracle rows and no printings, which is also what a
+    partially-built corpus looks like. Zero printings is a fact to report, not
+    a crash."""
+    with in_memory_client([tiny_corpus.mono_green_deck()]) as client:
+        body = client.get("/api/decks/mono-green/commander").json()
+    assert body["printings"]["count"] == 0
+    assert body["printings"]["first_released"] is None
+    assert body["printings"]["first_set"] is None
+
+
+def test_commander_dossier_never_lists_the_commander_among_its_own_relatives(
+        corpus, in_memory_client):
+    with in_memory_client([tiny_corpus.mono_green_deck()]) as client:
+        body = client.get("/api/decks/mono-green/commander").json()
+    assert body["card"]["name"] not in [c["name"] for c in body["other_cards"]]
+
+
+def test_commander_dossier_404s_for_an_unknown_deck(corpus, in_memory_client):
+    with in_memory_client([tiny_corpus.mono_green_deck()]) as client:
+        assert client.get("/api/decks/nope/commander").status_code == 404

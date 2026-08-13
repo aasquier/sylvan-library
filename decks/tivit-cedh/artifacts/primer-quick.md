@@ -19,7 +19,7 @@ Keep hands that do TWO of these three: produce fast mana, interact for free, or 
 
 ## Turn-by-turn shape
 
-TODO — recount from the corpus, not by hand.
+— not yet recounted from the corpus, and not worth counting by hand.
 
 ## Three things that will kill you
 
@@ -40,4 +40,4 @@ TODO — recount from the corpus, not by hand.
 | Lands | 30 |
 
 ---
-_Generated 2026-08-10 from `deck.yaml`. Edit the deck file, not this document._
+_Generated 2026-08-12 from `deck.yaml`. Edit the deck file, not this document._

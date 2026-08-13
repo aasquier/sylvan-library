@@ -15,11 +15,11 @@ Ramp on 1-3, deploy a doubler on 4, and live to turn 6. The deck does not need t
 
 ## Mulligan rule
 
-TODO — derive from a Tier 1 sweep. Note the source markdown quotes a 60,000-trial figure (Trostani castable 60.9% by T4, 71.4% by T5, 78.6% by T6, mana screw 15.0%) from an earlier tool; re-derive with mtglab rather than inheriting it.
+— not yet derived from a Tier 1 sweep. The source markdown quotes a 60,000-trial figure (Trostani castable 60.9% by T4, 71.4% by T5, 78.6% by T6, mana screw 15.0%) from an earlier tool; re-derive with mtglab rather than inheriting it.
 
 ## Turn-by-turn shape
 
-TODO — recount from the corpus, not by hand.
+— not yet recounted from the corpus, and not worth counting by hand.
 
 ## Three things that will kill you
 
@@ -40,4 +40,4 @@ TODO — recount from the corpus, not by hand.
 | Lands | 35 |
 
 ---
-_Generated 2026-08-10 from `deck.yaml`. Edit the deck file, not this document._
+_Generated 2026-08-12 from `deck.yaml`. Edit the deck file, not this document._
