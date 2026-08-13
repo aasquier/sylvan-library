@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,16 +25,27 @@ from mtglab.auth import bootstrap
 from mtglab.auth.mail import EmailSender
 from mtglab.decks.source import DeckNotFound, DeckSource
 
-if TYPE_CHECKING:
-    # Type-only, so `simruns` stays lazily imported inside the two routes that
-    # need it -- it pulls in the engine, and every other route pays nothing.
-    from mtglab.api.simruns import Plan
-
 # The request scope, as one annotation. Every deck-facing route takes it, so
 # when auth arrives the change is to `deps.deck_source` and nowhere else.
 Decks = Annotated[DeckSource, Depends(deck_source)]
 
 WEB_DIST = Path(__file__).resolve().parent.parent / "web_dist"
+
+
+def _job_for(plan: jobs.Plan, caller: UserScope) -> jobs.Job:
+    """A finished job when the answer was already known, a queued one otherwise.
+
+    Both producers of a `Plan` come through here -- `api/simruns.py` for Tier 1
+    and `api/themeruns.py` for the theme proposal -- and neither route decides
+    which pool the work belongs in. The plan carries its own `lane` because
+    that is a property of the work rather than of the route, and a route is
+    exactly the place somebody would eventually forget to pass it.
+    """
+    if plan.result is not None:
+        return jobs.completed(plan.kind, result=plan.result,
+                              label=plan.label, owner=caller.user_id)
+    return jobs.submit(plan.kind, plan.run, label=plan.label,
+                       owner=caller.user_id, lane=plan.lane)
 
 
 def create_app(*, dev: bool = False, require_auth: bool | None = None,
@@ -405,20 +416,31 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     @app.post("/api/claude/theme/proposal")
-    def claude_theme_proposal(payload: dict[str, Any]) -> dict[str, Any]:
-        """Two colour combinations and six commanders, from the conversation.
+    def claude_theme_proposal(payload: dict[str, Any],
+                              caller: Scope) -> dict[str, Any]:
+        """Submit the proposal. Returns a **job**, not a proposal.
 
-        409 when the floor has not been reached, which is its own status on
-        purpose: nothing is malformed and nothing failed, there simply is not
-        enough yet. A 422 would read as "you sent something wrong" to a client
-        that sent exactly the right thing too early.
+        Measured at 226 seconds, which no hosted proxy will hold a POST open
+        for, so this queues the work and the client polls `/api/jobs/{id}` --
+        the same contract the two sim routes have had all along. The
+        conversational half above stays synchronous; it is a few seconds.
+
+        What did *not* move into the job is every refusal, and that is the
+        point of `themeruns.plan_proposal`. 409 when the floor has not been
+        reached, which is its own status on purpose: nothing is malformed and
+        nothing failed, there simply is not enough yet — a 422 would read as
+        "you sent something wrong" to a client that sent exactly the right
+        thing too early. 503 when there is no key. Both are still decided here,
+        because a job in state `error` carrying one of those sentences is three
+        answers flattened into one string.
         """
+        from mtglab.api.themeruns import plan_proposal
         from mtglab.claude.client import ClaudeUnavailable
         from mtglab.claude.theme import NotReady, TranscriptRejected
 
         budget = payload.get("budget")
         try:
-            return service.claude_theme_propose(
+            plan = plan_proposal(
                 transcript=payload.get("transcript"),
                 slots=payload.get("slots"),
                 requested=payload.get("stance") or None,
@@ -430,8 +452,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ClaudeUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
-        except service.ClaudeFailed as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return _job_for(plan, caller).as_dict()
 
     @app.post("/api/decks/{slug}/interview")
     def claude_interview(slug: str, payload: dict[str, Any],
@@ -546,14 +567,6 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     # is keyed on a hash of the compiled deck, so two callers share an entry
     # only when they are asking for the identical simulation, and the answer
     # carries nothing about whose deck produced it.
-
-    def _job_for(plan: Plan, caller: UserScope) -> jobs.Job:
-        """A finished job for a cache hit, a queued one for anything else."""
-        if plan.result is not None:
-            return jobs.completed(plan.kind, result=plan.result,
-                                  label=plan.label, owner=caller.user_id)
-        return jobs.submit(plan.kind, plan.run, label=plan.label,
-                           owner=caller.user_id)
 
     @app.post("/api/sim/mana")
     def sim_mana(payload: dict[str, Any], decks: Decks,

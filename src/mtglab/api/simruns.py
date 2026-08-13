@@ -40,9 +40,9 @@ A partial hit is still a job, and simulates only the counts it is missing.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Any
 
+from mtglab.api.jobs import Plan, Progress
 from mtglab.api.service import _connect, _corpus_for, _source
 from mtglab.decks.model import Deck
 from mtglab.decks.source import DeckSource
@@ -68,7 +68,11 @@ LAND_SWEEP_CAVEAT = (
 #: for why an unseeded default was worth replacing.
 DEFAULT_SEED = 7
 
-Progress = Callable[[int, int], None]
+#: Re-exported so this module still reads as the sim planner. Both live in
+#: `api/jobs.py` now that `api/themeruns.py` produces plans too -- see the note
+#: on `Plan` there for why the shape belongs beside the registry.
+__all__ = ["DEFAULT_SEED", "LAND_SWEEP_CAVEAT", "TIER1_CAVEAT", "Plan",
+           "Progress", "plan_lands", "plan_mana"]
 
 
 def _compile(slug: str, *, source: DeckSource | None = None
@@ -105,21 +109,6 @@ def _seed(payload: dict[str, Any]) -> int:
     if raw in (None, ""):
         return DEFAULT_SEED
     return int(raw)
-
-
-@dataclass
-class Plan:
-    """What a sim request turns into: an answer, or the work to produce one.
-
-    `result` is set when the cache already held it, in which case `run` is
-    never called. Exactly one of them is used, and the route decides whether
-    that becomes a finished job or a queued one.
-    """
-
-    kind: str
-    label: str
-    result: dict[str, Any] | None
-    run: Callable[[Progress], dict[str, Any]]
 
 
 def _deferred_failure(exc: BaseException) -> Callable[[Progress], dict[str, Any]]:

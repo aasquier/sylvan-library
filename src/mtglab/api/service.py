@@ -1061,28 +1061,12 @@ def claude_theme_ask(*, transcript: Any = None, slots: Any = None,
         raise ClaudeFailed(claude_client.explain(exc)) from exc
 
 
-def claude_theme_propose(*, transcript: Any = None, slots: Any = None,
-                         requested: Any = None, budget: float | None = None,
-                         avoid: str = "") -> dict[str, Any]:
-    """Two colour combinations and six corpus-checked commanders (ADR 20).
-
-    Raises `NotReady` below the floor rather than proposing anyway. The button
-    is dark in the UI for the same reason, but a floor that lived only in the
-    client would not be one.
-    """
-    from mtglab.claude import client as claude_client
-    from mtglab.claude.modes import ModeExhausted
-    from mtglab.claude.theme import NotReady, TranscriptRejected, propose
-
-    try:
-        return propose(transcript, slots, requested=requested, budget=budget,
-                       avoid=avoid)
-    except (claude_client.ClaudeUnavailable, TranscriptRejected, NotReady):
-        raise
-    except ModeExhausted as exc:
-        raise ClaudeFailed(str(exc)) from exc
-    except Exception as exc:                                       # noqa: BLE001
-        raise ClaudeFailed(claude_client.explain(exc)) from exc
+# The theme *proposal* has no function here, and its absence is deliberate
+# rather than an omission. Every other Claude surface answers inside its
+# request, so a service function is the natural seam; that one was measured at
+# 226 seconds and is a background job, which makes its seam a `Plan` rather
+# than a return value. It lives in `api/themeruns.py`, beside `api/simruns.py`,
+# for exactly the reason the sim planners are not in this file either.
 
 
 def claude_dossier_cached(*, slug: str,

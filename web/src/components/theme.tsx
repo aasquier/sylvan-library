@@ -29,7 +29,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  ApiError,
   api,
+  followJob,
   type ClaudeStatus,
   type ThemeCombination,
   type ThemeCommander,
@@ -56,20 +58,31 @@ const SLOT_LABELS: Record<string, string> = {
 interface Saved {
   transcript: ThemeTurn[]
   slots: ThemeSlot[]
+  /** A proposal in flight, as a job id. Kept for the same reason the
+   *  transcript is: the run takes minutes and costs real money, so a reload
+   *  should reattach to the one already going rather than start a second. */
+  job: string | null
+  /** And the answer once it lands, which is the same argument one step on —
+   *  four minutes of waiting should not be undone by a refresh. */
+  proposal: ThemeProposal | null
 }
+
+const EMPTY: Saved = { transcript: [], slots: [], job: null, proposal: null }
 
 function load(): Saved {
   try {
     const raw = localStorage.getItem(SAVED)
-    if (!raw) return { transcript: [], slots: [] }
+    if (!raw) return EMPTY
     const parsed = JSON.parse(raw) as Partial<Saved>
     return {
       transcript: Array.isArray(parsed.transcript) ? parsed.transcript : [],
       slots: Array.isArray(parsed.slots) ? parsed.slots : [],
+      job: typeof parsed.job === 'string' ? parsed.job : null,
+      proposal: parsed.proposal ?? null,
     }
   } catch {
     // A corrupted stash is not worth an error message. Start again.
-    return { transcript: [], slots: [] }
+    return EMPTY
   }
 }
 
@@ -226,12 +239,13 @@ export function ThemeInterview({ onPick, onLeave }: {
   onLeave: () => void
 }) {
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
-  const [{ transcript, slots }, setSaved] = useState<Saved>(load)
+  const [saved, setSaved] = useState<Saved>(load)
+  const { transcript, slots, proposal } = saved
   const [report, setReport] = useState<ThemeReport | null>(null)
-  const [proposal, setProposal] = useState<ThemeProposal | null>(null)
   const [answer, setAnswer] = useState('')
   const [budget, setBudget] = useState('')
   const [busy, setBusy] = useState<'' | 'asking' | 'proposing'>('')
+  const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const box = useRef<HTMLTextAreaElement>(null)
 
@@ -240,8 +254,8 @@ export function ThemeInterview({ onPick, onLeave }: {
   }, [])
 
   useEffect(() => {
-    localStorage.setItem(SAVED, JSON.stringify({ transcript, slots }))
-  }, [transcript, slots])
+    localStorage.setItem(SAVED, JSON.stringify(saved))
+  }, [saved])
 
   // Stable, so the opening effect below can depend on it honestly rather than
   // being told to ignore it.
@@ -251,12 +265,13 @@ export function ThemeInterview({ onPick, onLeave }: {
     try {
       const got = await api.themeAsk({ transcript: next, slots: carried })
       setReport(got)
-      setSaved({
+      setSaved((s) => ({
+        ...s,
         transcript: got.question
           ? [...next, { role: 'assistant', text: got.question }]
           : next,
         slots: got.slots,
-      })
+      }))
     } catch (e) {
       setError(String((e as Error).message ?? e))
     } finally {
@@ -278,11 +293,16 @@ export function ThemeInterview({ onPick, onLeave }: {
   const awaited = useRef(-1)
   useEffect(() => {
     if (!status?.installed || !status.configured || busy) return
+    // Not while a proposal is in flight either. The transcript almost always
+    // ends on a question by then so this rarely fires, but a tab restored
+    // mid-run can end on an answer, and asking a fresh question underneath a
+    // running proposal is confusing rather than helpful.
+    if (saved.job) return
     if (transcript[transcript.length - 1]?.role === 'assistant') return
     if (awaited.current === transcript.length) return
     awaited.current = transcript.length
     void send(transcript, slots)
-  }, [status, busy, transcript, slots, send])
+  }, [status, busy, transcript, slots, saved.job, send])
 
   function answerIt() {
     const said = answer.trim()
@@ -291,31 +311,97 @@ export function ThemeInterview({ onPick, onLeave }: {
     // Record the answer and stop. The effect above notices there is no
     // question pending and fetches one — which keeps "who asks for the next
     // question" in exactly one place rather than two that can both fire.
-    setSaved({ transcript: [...transcript, { role: 'user', text: said }], slots })
+    setSaved((s) => ({
+      ...s, transcript: [...s.transcript, { role: 'user', text: said }],
+    }))
   }
+
+  // The proposal is a background job now (`api/themeruns.py`), because it was
+  // measured at 226 seconds and a four-minute POST does not survive a hosted
+  // proxy. So this is the simulator's shape: submit, poll, read the result off
+  // the job. What it adds is that the id is *saved* — a reload reattaches to
+  // the run in flight rather than paying for a second one.
+  const poller = useRef<{ cancel: () => void } | null>(null)
+  const followed = useRef<string | null>(null)
+
+  const follow = useCallback((id: string) => {
+    setBusy('proposing')
+    setError(null)
+    poller.current?.cancel()
+    // How old the *run* is, not how long this tab has been watching it. They
+    // differ exactly when it matters: reattaching after a reload showed 0s
+    // against a job already a minute in, which is the confusion a clock was
+    // put there to remove. The job's own `created_at` is the answer, and the
+    // local start is only the guess held until the first poll corrects it.
+    const started = { at: Date.now() }
+    setElapsed(0)
+    // Seconds rather than a percentage bar. The job reports its turn out of a
+    // ceiling it usually does not reach, so a bar would sit at 38% and then
+    // jump; an honest clock is more use to somebody deciding whether to wait.
+    const clock = setInterval(
+      () => setElapsed(Math.round((Date.now() - started.at) / 1000)), 1000)
+    // Two seconds, not the 400ms default: this runs for minutes, and a poll
+    // every 400ms would be six hundred requests to watch one job.
+    const run = followJob(id, (job) => {
+      const born = Date.parse(job.created_at)
+      if (!Number.isNaN(born)) started.at = born
+    }, 2000)
+    poller.current = { cancel: () => { run.cancel(); clearInterval(clock) } }
+    run.promise
+      .then((job) => setSaved((s) => (
+        { ...s, proposal: job.result as ThemeProposal, job: null })))
+      .catch((e) => {
+        setError(e instanceof ApiError && e.status === 404
+          // Jobs live in the server's memory and die with it (`api/jobs.py`).
+          // Say so rather than showing a bare 404 for something the person
+          // never asked to look up.
+          ? 'That run is gone — the server restarted while it was working. Ask again when you are ready.'
+          : String((e as Error).message ?? e))
+        setSaved((s) => ({ ...s, job: null }))
+      })
+      .finally(() => { clearInterval(clock); setBusy('') })
+  }, [])
+
+  // One place decides to follow a job, and it is this — the same argument as
+  // the auto-ask effect above. `proposeIt` records the id and stops; a
+  // restored tab arrives with the id already in state and lands here too, so
+  // there is no second path that could double-poll.
+  useEffect(() => {
+    if (!saved.job || followed.current === saved.job) return
+    followed.current = saved.job
+    follow(saved.job)
+  }, [saved.job, follow])
+
+  useEffect(() => () => poller.current?.cancel(), [])
 
   async function proposeIt() {
     setBusy('proposing')
     setError(null)
+    setElapsed(0)
     try {
-      setProposal(await api.themePropose({
+      const job = await api.themePropose({
         transcript, slots,
         budget: budget ? Number(budget) : undefined,
-      }))
+      })
+      setSaved((s) => ({ ...s, job: job.id }))
     } catch (e) {
+      // 409 below the floor, 503 with no key, 422 for a transcript the server
+      // will not take — all still answered by the POST itself, which is why
+      // they read as sentences here rather than as a job that failed.
       setError(String((e as Error).message ?? e))
-    } finally {
       setBusy('')
     }
   }
 
   function startOver() {
     localStorage.removeItem(SAVED)
+    poller.current?.cancel()
     awaited.current = -1
-    setSaved({ transcript: [], slots: [] })
+    followed.current = null
+    setSaved(EMPTY)
     setReport(null)
-    setProposal(null)
     setError(null)
+    setBusy('')
   }
 
   if (!status) {
@@ -490,14 +576,18 @@ export function ThemeInterview({ onPick, onLeave }: {
                       style={{ background: ready ? 'var(--series-2)' : 'transparent',
                                color: ready ? '#fff' : 'var(--text-muted)',
                                border: ready ? 'none' : '1px solid var(--hairline)' }}>
-                {busy === 'proposing' ? 'Reading around…' : 'Suggest my colours'}
+                {busy === 'proposing'
+                  ? `Reading around… ${elapsed}s`
+                  : 'Suggest my colours'}
               </button>
               <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
                 {/* Measured at three to four minutes: it reads a dozen-odd
                     pages and checks every legend against the corpus. Saying so
-                    is cheaper than a spinner somebody assumes has hung. */}
+                    is cheaper than a spinner somebody assumes has hung — and
+                    the clock on the button is cheaper still, because a number
+                    that moves is the difference between slow and stuck. */}
                 {busy === 'proposing'
-                  ? 'This one takes a few minutes — it reads around and checks every card.'
+                  ? 'A few minutes — it reads around and checks every card. It carries on if you reload or close the tab.'
                   : ready
                     ? 'Ready whenever you are — or keep talking.'
                     : `${grounded} of ${floor} things known so far.`}
@@ -514,7 +604,7 @@ export function ThemeInterview({ onPick, onLeave }: {
               Pick a commander to carry on — you will name the deck next, and
               nothing is created until you say so.
             </p>
-            <button onClick={() => setProposal(null)}
+            <button onClick={() => setSaved((s) => ({ ...s, proposal: null }))}
                     className="ml-auto rounded-md px-3 py-1.5 text-sm"
                     style={{ border: '1px solid var(--hairline)',
                              color: 'var(--text-secondary)' }}>

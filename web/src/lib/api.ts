@@ -951,15 +951,19 @@ export const api = {
   // conversation goes up every turn because this client is where it lives.
   themeAsk: (body: { transcript: ThemeTurn[]; slots: ThemeSlot[]; stance?: string }) =>
     post<ThemeReport>('/api/claude/theme', body),
-  // Answers 409 below the floor. The button is disabled for the same reason,
-  // but a floor that lived only here would not be one.
+  // Returns a **job**, not a proposal — this one was measured at 226 seconds
+  // and no hosted proxy holds a POST open that long. Follow it with
+  // `followJob` and read `job.result` as a `ThemeProposal`, exactly as the
+  // simulator does. Still answers 409 synchronously below the floor: the
+  // button is disabled for the same reason, but a floor that lived only here
+  // would not be one, and a 409 wrapped in a job error would not be one either.
   themePropose: (body: {
     transcript: ThemeTurn[]
     slots: ThemeSlot[]
     budget?: number
     avoid?: string
     stance?: string
-  }) => post<ThemeProposal>('/api/claude/theme/proposal', body),
+  }) => post<Job>('/api/claude/theme/proposal', body),
   // Public, so it is the one call that works before anything else does. The
   // shell reads it to decide whether to ask for a login at all, and the nav to
   // decide whether to offer the admin page.

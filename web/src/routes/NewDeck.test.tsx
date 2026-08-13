@@ -31,10 +31,23 @@ vi.mock('../lib/api', () => ({
   api: {
     colors: vi.fn(), searchCards: vi.fn(), createDeck: vi.fn(),
     claudeStatus: vi.fn(), themeAsk: vi.fn(), themePropose: vi.fn(),
+    job: vi.fn(),
+  },
+  // The proposal is a background job now — it was measured at 226 seconds and
+  // no hosted proxy holds a POST open that long. Faked rather than imported
+  // for real, because the real poller closes over the `api` object this mock
+  // replaces and would go looking for a `fetch` nobody set up.
+  followJob: vi.fn(),
+  ApiError: class ApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
   },
 }))
 
-const { api } = await import('../lib/api')
+const { api, followJob } = await import('../lib/api')
 
 const TAXONOMY = {
   colors: [{ code: 'G', name: 'Green', wants: 'growth', fears: 'artifice' }],
@@ -133,7 +146,13 @@ beforeEach(() => {
   vi.mocked(api.createDeck).mockReset().mockResolvedValue({ slug: 'x' } as never)
   vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(CLAUDE_STATUS as never)
   vi.mocked(api.themeAsk).mockReset().mockResolvedValue(PARTWAY as never)
-  vi.mocked(api.themePropose).mockReset().mockResolvedValue(PROPOSAL as never)
+  vi.mocked(api.themePropose).mockReset()
+    .mockResolvedValue({ id: 'j1', status: 'queued' } as never)
+  vi.mocked(followJob).mockReset().mockImplementation((id) => ({
+    promise: Promise.resolve(
+      { id, status: 'done', result: PROPOSAL } as never),
+    cancel: () => {},
+  }))
 })
 
 afterEach(cleanup)
@@ -233,6 +252,71 @@ describe('the proposal', () => {
     fireEvent.click(screen.getByRole('button', { name: /suggest my colours/i }))
     return screen.findByText(PROPOSAL.combinations[0].reading)
   }
+
+  it('submits a job and reads the answer off it', async () => {
+    // The deploy blocker this shape exists for: 226 seconds of synchronous
+    // POST does not survive a hosted proxy. The POST now returns a job and the
+    // proposal arrives from the poller.
+    await propose()
+    expect(vi.mocked(followJob).mock.calls[0]?.[0]).toBe('j1')
+  })
+
+  it('reattaches to a run in flight instead of paying for a second', async () => {
+    // A reload during those minutes must not resubmit — that is a second four
+    // minutes and a second bill for an answer already being written. The id is
+    // in the same stash the transcript is.
+    localStorage.setItem('mtglab-theme-conversation', JSON.stringify({
+      transcript: [{ role: 'assistant', text: READY.question }],
+      slots: READY.slots, job: 'j9', proposal: null,
+    }))
+    open()
+    fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
+
+    await screen.findByText(PROPOSAL.combinations[0].reading)
+    expect(vi.mocked(followJob).mock.calls[0]?.[0]).toBe('j9')
+    expect(api.themePropose).not.toHaveBeenCalled()
+  })
+
+  it('clocks the run, not this tab', async () => {
+    // Found by reloading during a real 226-second run: the timer restarted at
+    // 0s against a job already a minute old, which is exactly the confusion a
+    // clock was put there to remove. The job carries its own `created_at`.
+    vi.mocked(followJob).mockImplementation((_id, onTick) => {
+      onTick({
+        id: 'j9', kind: 'claude.theme.proposal', status: 'running',
+        done: 3, total: 8, percent: 38, label: '', result: null, error: null,
+        created_at: new Date(Date.now() - 90_000).toISOString(),
+      })
+      return { promise: new Promise(() => {}), cancel: () => {} }
+    })
+    vi.mocked(api.themeAsk).mockResolvedValue(READY as never)
+    open()
+    fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
+    await screen.findByText(READY.question)
+    fireEvent.click(screen.getByRole('button', { name: /suggest my colours/i }))
+
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: /reading around… 9\ds/i }))
+        .toBeTruthy(),
+      { timeout: 2000 })
+  })
+
+  it('says a lost run is lost rather than showing a bare 404', async () => {
+    // Jobs live in the server's memory and die with it (`api/jobs.py`). A
+    // restart mid-run is the one way this fails that is nobody's mistake.
+    const { ApiError } = await import('../lib/api')
+    vi.mocked(followJob).mockImplementation(() => ({
+      promise: Promise.reject(new ApiError('no job', 404)),
+      cancel: () => {},
+    }))
+    vi.mocked(api.themeAsk).mockResolvedValue(READY as never)
+    open()
+    fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
+    await screen.findByText(READY.question)
+    fireEvent.click(screen.getByRole('button', { name: /suggest my colours/i }))
+
+    expect(await screen.findByText(/that run is gone/i)).toBeTruthy()
+  })
 
   it('keeps the reading and the claim visibly apart', async () => {
     // One of these can be wrong and the other cannot. Merging them is the

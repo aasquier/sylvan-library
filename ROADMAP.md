@@ -204,11 +204,50 @@ arc; this is what the next few sessions actually do.
      prompt-cached (~48k cached tokens by turn three). The proposal is the
      expensive half — **measured at 226 seconds** end to end with `max_uses: 4`,
      ~79k input / 8k output, since it reads a dozen-odd pages and checks every
-     legend. Trimmed to three searches, and the UI now says it takes a few
-     minutes. **This is a deploy blocker in its current shape**: a
-     four-minute synchronous POST will not survive a hosted proxy, and the fix
-     is to run it as a background job the way `api/simruns.py` already runs
-     Tier 1. Worth doing before item 4, not after.
+     legend. Trimmed to three searches, and the UI says it takes a few minutes.
+     That was **the deploy blocker**, and it is fixed — see 5b below.
+
+   **5b — The proposal is a background job.** Landed 2026-08-13, on the branch
+   that also carries this paragraph. No ADR: nothing ADR 20 settled moved. The
+   transcript is still client-held and resent, the server still stores no
+   conversation, readiness is still recomputed rather than carried, and the
+   wire format is still the mode's own. What changed is only how the answer is
+   delivered.
+
+   - **Checking happens in the request; calling happens in the job.** The same
+     division `plan_mana` makes, and for a sharper reason: three things refuse a
+     proposal without a network call — a malformed transcript (422), a floor not
+     yet reached (409), no key (503) — and each is a distinct answer the UI acts
+     on. Carried into a worker they would all arrive as *a job in state `error`*,
+     which is one string for three cases and a status code for none. So
+     `theme.check_proposal` runs in the route and `api/themeruns.py` queues only
+     what needs Anthropic. A stance of `off` is a job born finished, the shape
+     `jobs.completed` already existed for.
+   - **There are two job pools now, and the split is about what the work waits
+     on.** Tier 1 is CPU-bound pure Python and keeps its single worker, because
+     a second thread would contend on the GIL. A Claude call is a socket wait
+     that releases it for minutes, so sharing one queue would stall a
+     thirty-second sweep behind four minutes of somebody else's conversation.
+     `jobs.CPU` and `jobs.NET`; the lane rides on the `Plan` because it is a
+     property of the work rather than of the route.
+   - **Nothing is cached, deliberately.** ADR 18 caches a simulation because it
+     is reproducible; a proposal is not, and the dossier is cached because its
+     subject is a character that outlives any conversation. Caching here would
+     mean the one moment somebody wants a different answer — clicking again on
+     an unchanged transcript — is the moment they cannot have one. The client
+     keeps the job *id* instead, so a reload reattaches to the run in flight
+     rather than paying for a second.
+   - **Two things only the live run showed**, which is now the fourth branch
+     running where that has been true. A four-minute job reporting nothing is
+     indistinguishable from a wedged one, so `converse` gained an `on_turn`
+     hook and the job reports turn *n* of 8 (a ceiling it usually does not
+     reach, so the UI shows seconds rather than a bar that would sit at 38% and
+     jump). And the first reattach after a reload showed **0s against a job
+     already 70 seconds old** — the clock now reads the job's own `created_at`,
+     which is the run's age rather than this tab's.
+   - **Measured on the real surface, twice:** 15 pages read, 4 cited, 0 sources
+     dropped, 0 commanders dropped, ~72k in / 5.8k out with 53k served from the
+     prompt cache. A reload mid-run reattached to the same job both times.
 
    Three things are already settled and should not be re-opened:
 

@@ -96,7 +96,12 @@ SHARED = {
     # belonging to one account for another to reach. What comes back is a
     # suggestion; making the deck goes through the shared create route.
     "/api/claude/theme": "a conversation the client holds; no stored state",
-    "/api/claude/theme/proposal": "colours and commanders out of the shared corpus",
+    # Submits a job rather than answering — 226 seconds is longer than a hosted
+    # proxy will hold a POST. Filed here for the same reason the two sim routes
+    # are: the *submission* is shared (there is no deck and nothing personal on
+    # the server to reach), and the job it hands back is scoped by `jobs.get`.
+    "/api/claude/theme/proposal": "submits a job; colours and commanders out of "
+                                  "the shared corpus, and the job is scoped",
     "/api/sim/mana": "submits a job against a shared deck; the job is scoped",
     "/api/sim/lands": "submits a job too, and the job it returns is scoped",
 }

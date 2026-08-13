@@ -49,11 +49,16 @@ src/mtglab/
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
   artifacts/generate.py   the five deliverables
-  claude/                 client, tools, stance, and two modes: interview.py
-                          (a card's `why`) and dossier.py (the commander)
+  claude/                 client, tools, stance, and four modes across three
+                          features: interview.py (a card's `why`), dossier.py
+                          (the commander), theme.py (two — a conversation
+                          about you, then a proposal)
   auth/                   app.db, Argon2id, accounts, sessions, rate limit,
                           invite/reset tokens, the EmailSender seam
-  api/                    FastAPI app, services, background sim jobs
+  api/                    FastAPI app, services, background jobs
+  api/jobs.py             the job registry; two pools, CPU and NET
+  api/simruns.py          Tier 1 planned in the request, run in a job
+  api/themeruns.py        the theme proposal, same shape (226s, ADR 20)
   api/auth.py             the deny-by-default middleware and login routes
   api/deps.py             the request scope: who is asking, what they see
   web_dist/               built frontend, committed so `mtglab ui` needs no Node
@@ -274,16 +279,34 @@ research.**
 
 **Started, not finished.** `src/mtglab/claude/` is the pipe — a client on
 `ANTHROPIC_API_KEY` and seven read-only tool schemas over `api/service.py` —
-plus the stance (`stance.py`, three axes, off by default) and **two** modes.
-The **rationale interview** (`interview.py`) asks about a card's slot so you
-can write its `why`. The **commander dossier** (`dossier.py`,
-[ADR 19](docs/adr/0019-the-dossier-cites-three-sources.md)) says who a deck's
-commander is, what archetype they define, who their rivals are and where they
-sit in Magic's history. `mtglab claude check` proves the key;
+plus the stance (`stance.py`, three axes, off by default) and **four** modes
+across three features. The **rationale interview** (`interview.py`) asks about
+a card's slot so you can write its `why`. The **commander dossier**
+(`dossier.py`, [ADR 19](docs/adr/0019-the-dossier-cites-three-sources.md)) says
+who a deck's commander is, what archetype they define, who their rivals are and
+where they sit in Magic's history. The **theme interview** (`theme.py`,
+[ADR 20](docs/adr/0020-the-theme-interview-reads-a-person.md)) is two modes and
+the create flow's third door: a conversation whose questions are **not about
+Magic** — a film, a period, your sign, how you are at game night — and then a
+proposal of two colour combinations with three corpus-checked commanders each.
+`mtglab claude check` proves the key;
 `mtglab claude interview <slug> --card X` and `mtglab claude dossier <slug>`
-run the modes, and the deck page runs both. The other three modes ADR 15 names,
-the activity log, and any UI for the stance dial do not exist — check what is
-actually there before assuming either way.
+run the first two, and the deck page runs both. The other three modes ADR 15
+names, the activity log, and any UI for the stance dial do not exist — check
+what is actually there before assuming either way.
+
+**The theme proposal is a background job** (`api/themeruns.py`), because it was
+measured at 226 seconds and no hosted proxy holds a POST open that long. The
+division is the one `api/simruns.py` already makes and it is load-bearing here:
+**everything refusable is refused in the request** — a malformed transcript
+(422), a floor not yet reached (409), no key (503) — and only the Anthropic call
+is queued, because three distinct answers delivered as a job in state `error`
+are one string and no status code. `jobs.py` grew a second pool for it: Tier 1
+keeps its single CPU worker (pure Python, GIL-bound), and anything waiting on a
+socket goes in `NET`, so a thirty-second sweep never queues behind four minutes
+of somebody's conversation. Nothing is cached — a proposal is not reproducible
+and its subject does not outlive the conversation — but the **client keeps the
+job id**, so a reload reattaches rather than paying twice.
 
 **The dossier is the first mode whose facts are not all the corpus's**, so it
 carries rules the interview did not need. Card facts still come from the corpus,
