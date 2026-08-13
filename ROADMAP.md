@@ -32,9 +32,12 @@ arc; this is what the next few sessions actually do.
    stands between here and deploy. The list came from the maintainer on
    2026-08-12 and is written out below so it survives a fresh session; it is
    his list, so **an item is done when he says it is, not when it compiles.**
-   Four branches, in order, each green before the next starts.
+   Five branches, in order, each green before the next starts. Branch 2 was
+   not on the original list — it came out of reviewing branch 1's deck page
+   and displaced the rest by one.
 
-   **1 — Bugs and quick wins.** Landed 2026-08-12.
+   **1 — Bugs and quick wins.** Landed 2026-08-12 in
+   [#55](https://github.com/aasquier/sylvan-library/pull/55).
    - *Delete was unusable.* The confirm label was styled `uppercase` while the
      check was case-sensitive against the lowercase slug, so typing what was
      on screen left the button disabled and said nothing about why. The
@@ -58,7 +61,45 @@ arc; this is what the next few sessions actually do.
      four that never had one. A blurb is mechanical and never names a plane;
      an era is a setting and never restates the mechanics.
 
-   **2 — Visual identity.** The splash and the Sylvan Library art (which is
+   **2 — The commander dossier, and alternative arts.** Next, and the reason
+   the rest shifted: branch 1 answered "what does this card do" with corpus
+   counts, and the maintainer's response was that the *interesting* half — who
+   this character is, what archetype they define and where it came from, their
+   rivals, where they sit in Magic's history — is exactly what Claude is for.
+   This is the first Claude surface that is not a rationale interview, so it
+   wants an ADR extending ADR 15's mode table before any code.
+
+   Decided with the maintainer on 2026-08-12, so a session does not re-open
+   these:
+
+   - **Three sources, and a rule about which may support which claim.** Card
+     facts — cost, type, text, legality, identity — come from the corpus,
+     always; never from web search and never from recall. The meta, archetype
+     history and "where does this sit in Magic" come from **server-side web
+     search with its sources shown** (`web_search_20260209`; Anthropic-hosted,
+     so the no-crawler rule is intact). Claude supplies voice and framing and
+     carries no factual weight. The UI shows the seams: branch 1's counted
+     strip stays, Claude's prose sits below it labelled, web claims keep their
+     link. That is ADR 14 boundary 3 made visible.
+   - **It writes nothing to `deck.yaml`.** `may_write` stays empty and ADR 15's
+     invariant is untouched. The result is cached like Tier 1 results, keyed on
+     the commander's `oracle_id`, so it is generated once and shared by every
+     deck that commander leads — including across users on a hosted instance.
+   - **Generated automatically for new and imported decks**, on a button for
+     the existing six. At stance `off` the button does not appear, because off
+     means no calls (ADR 15).
+   - **Any card the model names is validated against the corpus**, the way the
+     interview drops anything that is not a question.
+   - **Alternative arts**: a `commander_art` field on `deck.yaml` holding a
+     printing id, a picker showing every **non-digital** printing newest first
+     (Goreclaw has 12, including a Secret Lair; Gyome has 3), and
+     `mtglab decks set <slug> --art <set>`. A deck property rather than a
+     per-viewer preference — `deck.yaml` is the source of truth and the choice
+     should travel with the deck through git. Note `printings` has
+     `image_normal` but no `image_art_crop`, so the hero band needs one or the
+     other resolved.
+
+   **3 — Visual identity.** The splash and the Sylvan Library art (which is
    only rendered on an *empty* library today, so the maintainer has never
    seen it), an interactive colour pentagram for the mono tier, and the
    builder's tier headers, which are plain grey panels. Decided: the card art
@@ -66,15 +107,15 @@ arc; this is what the next few sessions actually do.
    new binary assets, no licensing question, and the pentagram is a diagram
    anyway.
 
-   **3 — Teaching.** A vocabulary section for beginners; hover help in the
+   **4 — Teaching.** A vocabulary section for beginners; hover help in the
    simulator, whose parameters are words and numbers divorced from meaning;
    and real depth behind the guilds, shards, clans and colours — champions,
    plot lines, classic cards.
 
-   **4 — Claude in the builder.** A guided, adaptive interview that helps pick
+   **5 — Claude in the builder.** A guided, adaptive interview that helps pick
    a theme and a commander, and a refactor pass over an existing deck. Both
-   are modes ADR 15's table does not name, so both want an ADR first. Rule 4
-   is untouched by either: no mode writes a `why`.
+   are modes ADR 15's table does not name. Rule 4 is untouched by either: no
+   mode writes a `why`.
 
    Two things from the cleanup pass are worth knowing while working through
    it: the four-colour names come from `colors.py`'s taxonomy (Artifice,
