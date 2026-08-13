@@ -37,6 +37,24 @@ from mtglab.auth.mail import EmailSender, Message
 
 CLAIM_PATH = "/auth/claim"
 
+# In both messages, because the failure is in neither of them.
+#
+# **Some mail apps drop the `#...` when you click**, and nothing about that
+# reaches the server: the fragment is client-side by design, so a stripped link
+# looks exactly like no link at all, and re-sending produces one that fails
+# identically. Seen on the deployed instance 2026-08-13, where the *visible* URL
+# in a plain-text reset was whole and the click arrived with an empty hash.
+#
+# So the recovery has to travel with the message rather than live on the page
+# somebody cannot reach. The claim screen takes a pasted address (`Claim.tsx`
+# `tokenFromPaste`); this is the sentence that tells them to try it. Worth the
+# four lines: without it the person is locked out and cannot say why.
+_IF_THE_LINK_FAILS = (
+    "If that opens a page asking for a link rather than a password box, copy\n"
+    "the whole address above -- including the part after the # -- and paste it\n"
+    "into your browser instead. Some mail apps cut the link short.\n"
+)
+
 
 def claim_link(token: str, base_url: str | None = None) -> str:
     """The URL that goes in the message. See the module docstring for the `#`."""
@@ -55,6 +73,8 @@ def _invite_message(to: str, link: str) -> Message:
             "Choose a password to finish setting it up:\n"
             "\n"
             f"{link}\n"
+            "\n"
+            f"{_IF_THE_LINK_FAILS}"
             "\n"
             "The link works once and expires in a week. Nobody, including "
             "whoever invited you, ever sees the password you pick.\n"
@@ -76,6 +96,8 @@ def _reset_message(to: str, link: str) -> Message:
             "Choose a new one here:\n"
             "\n"
             f"{link}\n"
+            "\n"
+            f"{_IF_THE_LINK_FAILS}"
             "\n"
             "The link works once and expires in an hour. Setting a new "
             "password signs you out everywhere.\n"

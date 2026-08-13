@@ -970,6 +970,19 @@ Everyone else gets an invite rather than an account you made a password for
 Note that neither the CLI nor that page will demote or disable the last admin
 who can sign in; to hand the instance over, promote the successor first.
 
+**If somebody says the link "didn't work" and dropped them on the sign-in
+screen, this is almost certainly it: their mail app cut the link short.** The
+token travels in the URL fragment so it stays out of every access log, and the
+cost of that is that some clients drop it when you click — the address they can
+*see* is whole, and the one the browser opens is not. Nothing about it reaches
+the server, so there is no log line to find, and re-sending does not help
+because the next link fails identically.
+
+The claim screen takes a pasted address for exactly this, and both messages say
+so. Tell them to copy the whole address out of the email — including the part
+after the `#` — and paste it into the box on that page. Their link is
+untouched: a stripped click spends nothing.
+
 ---
 
 ## 5. Running it

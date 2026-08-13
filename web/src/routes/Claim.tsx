@@ -9,6 +9,16 @@
  * that way and says so; this is the client half of that contract, and the one
  * request that carries the token is the POST below, in a JSON body.
  *
+ * **...and out of a paste, when the fragment did not survive the trip.** That
+ * is the same rule rather than an exception to it: a pasted link is read here
+ * and posted in the body, so the token still never rides in a URL anything logs.
+ * It exists because the failure is otherwise terminal — a fragment lost between
+ * the message and the browser is invisible to the server, indistinguishable
+ * from no link at all, and a replacement link fails in exactly the same way, so
+ * "ask for a new one" is advice that cannot work. Seen on the deployed instance
+ * 2026-08-13, on a plain-text reset whose visible URL was whole and whose click
+ * arrived with an empty hash.
+ *
  * **Claiming does not sign you in.** The API deliberately sets no cookie here —
  * a link that arrived by mail is not a session-minting endpoint — and returns
  * the username instead, so the login form can be filled in. That hand-off is
@@ -52,14 +62,46 @@ function tokenFromHash(hash: string): string | null {
   return token && token.trim() ? token.trim() : null
 }
 
+/** What `secrets.token_urlsafe` produces: base64url, and 43 chars for 32 bytes.
+ *
+ * The length is not asserted. A token that is the wrong length is the server's
+ * to refuse, and a client that decides what a real one looks like is a client
+ * that has to be edited when `tokens.TOKEN_BYTES` changes.
+ */
+const BARE_TOKEN = /^[A-Za-z0-9_-]{20,}$/
+
+/** A token out of whatever somebody pasted, or `null`.
+ *
+ * Exists because **a fragment can be lost between the message and the browser
+ * and the loss is silent.** Nothing about it reaches the server, so a link that
+ * arrives stripped is indistinguishable from no link at all — and asking for a
+ * new one produces another link that fails identically. Observed on the
+ * deployed instance 2026-08-13: a plain-text reset link whose *visible* text
+ * was whole, whose click landed on `/auth/claim` with an empty hash.
+ *
+ * Both spellings are accepted because both are what people actually have to
+ * hand: the whole address out of the address bar or the message, and the bare
+ * token for somebody who has already picked it out. A pasted URL that has no
+ * fragment is `null` rather than something optimistic — it is the exact shape
+ * of the broken link, and telling them so is the whole point of this path.
+ */
+function tokenFromPaste(pasted: string): string | null {
+  const text = pasted.trim()
+  if (!text) return null
+  const hash = text.indexOf('#')
+  if (hash !== -1) return tokenFromHash(text.slice(hash))
+  return BARE_TOKEN.test(text) ? text : null
+}
+
 export default function Claim({ onClaimed }: {
   /** Called with the username the server hands back, so the login form beside
    *  this one can be filled in. Claiming issues no session. */
   onClaimed: (username: string) => void
 }) {
   // Read once, at mount. Kept in state rather than re-read, so the hash can be
-  // cleared from the address bar the moment it is spent.
-  const [token] = useState(() => tokenFromHash(window.location.hash))
+  // cleared from the address bar the moment it is spent — and so the recovery
+  // form below can supply one the fragment never delivered.
+  const [token, setToken] = useState(() => tokenFromHash(window.location.hash))
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
@@ -73,6 +115,11 @@ export default function Claim({ onClaimed }: {
   // because a lookup went wrong.
   const [kind, setKind] = useState<'invite' | 'reset' | null>(null)
   const [username, setUsername] = useState('')
+  // The recovery path, for a link that arrived without its fragment. Separate
+  // from `error`, which belongs to the claim itself: this one is refused
+  // entirely on the client and never reaches the server.
+  const [pasted, setPasted] = useState('')
+  const [pasteError, setPasteError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -151,12 +198,39 @@ export default function Claim({ onClaimed }: {
   if (!token) {
     return (
       <AuthCard title="This page needs a link">
-        <PlainNote>
-          Open the link from your email — the part after the <code>#</code> is
-          what this page reads, and it is missing here. If the link was copied
-          without it, or has already been used, ask for a new one from the sign-in
-          screen.
-        </PlainNote>
+        <div className="space-y-4">
+          <PlainNote>
+            The part of the address after the <code>#</code> is what this page
+            reads, and it is missing here. Some mail apps drop it when you click.
+            Paste the whole address from your email below — it is the same link,
+            and nothing about it was used up.
+          </PlainNote>
+          <form
+            className="space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault()
+              const found = tokenFromPaste(pasted)
+              if (!found) {
+                setPasteError(
+                  pasted.trim()
+                    ? 'That address has no token in it — the part after the # is '
+                      + 'the bit that matters, and it is missing from what you pasted.'
+                    : 'Paste the address from your email.')
+                return
+              }
+              setPasteError(null)
+              setToken(found)
+            }}
+          >
+            <AuthField
+              label="Link from your email" autoFocus value={pasted}
+              onChange={(value) => { setPasted(value); setPasteError(null) }}
+              hint="The whole address, including the part after the #." />
+            <AuthSubmit label="Continue" busyLabel="Continue" busy={false}
+                        disabled={!pasted.trim()} />
+            {pasteError && <ErrorNote>{pasteError}</ErrorNote>}
+          </form>
+        </div>
       </AuthCard>
     )
   }
