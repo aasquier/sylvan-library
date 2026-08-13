@@ -78,9 +78,11 @@ def plan_proposal(*, transcript: Any = None, slots: Any = None,
         return Plan(KIND, label, answer, lambda _progress: answer, lane=NET)
 
     # Raised here rather than four minutes into a job that was never going to
-    # work. Costs no network -- `connect` checks the extra and the environment
-    # and constructs a client -- and preserves the 503 the UI already handles.
-    claude_client.connect()
+    # work, which preserves the 503 the UI already handles. `require` rather
+    # than `connect`: this only needs to know *whether* a call is possible, and
+    # connecting would leave an HTTP client nobody closes behind on every
+    # request to answer the same question.
+    claude_client.require()
 
     def run(progress: Progress) -> dict[str, Any]:
         try:

@@ -98,12 +98,14 @@ def available() -> bool:
     return sdk_installed() and credential_present()
 
 
-def connect() -> Any:
-    """An `anthropic.Anthropic`, or `ClaudeUnavailable` with a fixable reason.
+def require() -> None:
+    """`ClaudeUnavailable` with a fixable reason, or nothing at all.
 
-    Constructed with no arguments on purpose: that is the path where the SDK
-    resolves the credential from the environment itself, which is the whole
-    point of never holding the key here.
+    Split out of `connect` for the caller that needs to know *whether* a call
+    is possible without making one -- `api/themeruns.py` refuses a proposal
+    with no key from the request rather than four minutes into a job that was
+    never going to work. Asking `connect` would have answered the same
+    question and left an HTTP client nobody closes behind on every request.
     """
     if not sdk_installed():
         raise ClaudeUnavailable(
@@ -112,6 +114,16 @@ def connect() -> Any:
         raise ClaudeUnavailable(
             "no ANTHROPIC_API_KEY in the environment -- put one in .env "
             "(see .env.example), or `fly secrets set` it when deployed")
+
+
+def connect() -> Any:
+    """An `anthropic.Anthropic`, or `ClaudeUnavailable` with a fixable reason.
+
+    Constructed with no arguments on purpose: that is the path where the SDK
+    resolves the credential from the environment itself, which is the whole
+    point of never holding the key here.
+    """
+    require()
     import anthropic
     return anthropic.Anthropic()
 

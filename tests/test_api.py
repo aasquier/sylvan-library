@@ -1677,7 +1677,6 @@ def test_a_queued_proposal_waits_on_the_network_lane(client, monkeypatch):
 
     monkeypatch.setattr(cc, "credential_present", lambda: True)
     monkeypatch.setattr(cc, "sdk_installed", lambda: True)
-    monkeypatch.setattr(cc, "connect", lambda: object())
     monkeypatch.setattr(theme, "run_proposal",
                         lambda request, on_turn=None: {"combinations": []})
 
