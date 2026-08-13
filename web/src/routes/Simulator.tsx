@@ -11,8 +11,25 @@ import {
   ByTurnChart, CommanderCurve, DataTable, LandSweepChart, LandTradeoffChart,
   WastedManaChart,
 } from '../components/charts'
+import { HelpTip, Term } from '../components/term'
 
 type Mode = 'mana' | 'lands'
+
+/**
+ * Every control and every figure on this screen, keyed to `glossary.py`.
+ *
+ * This screen was the clearest case for the glossary existing: its parameters
+ * are words and numbers with no meaning attached — "Min mana pieces" is three
+ * words that name a rule inside `KeepRule` and say nothing about it, and
+ * "Deployment spread" is a number nobody can act on without being told what
+ * flat means.
+ *
+ * The keys are pinned from the Python side by `SIMULATOR_KEYS` in
+ * `tests/test_glossary.py`, because TypeScript cannot check a string against a
+ * table in another language and a renamed key would otherwise just stop
+ * opening.
+ */
+const help = (key: string) => <HelpTip name={key} />
 
 /** The seed a run gets unless you ask for another. Matches
  * `simruns.DEFAULT_SEED`, so the app and the CLI describe the same sample. */
@@ -132,7 +149,10 @@ export default function Simulator() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Simulator</h1>
         <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Tier 1 Monte Carlo: shuffle, draw, pay costs, repeat.
+          <Term name="tier-1">Tier 1</Term> Monte Carlo: shuffle, draw, pay
+          costs, repeat. It is a <Term name="goldfish">goldfish</Term> — nobody
+          is playing against you — so it answers questions about mana and no
+          others.
         </p>
       </header>
 
@@ -146,24 +166,26 @@ export default function Simulator() {
                   { value: 'lands', label: 'Land count sweep' },
                 ]} />
         <NumberField label="Games" value={games} onChange={setGames}
-                     min={100} max={200000} step={1000} />
+                     min={100} max={200000} step={1000} help={help('sim.games')} />
         {mode === 'lands' ? (
           <>
-            <NumberField label="From lands" value={low} onChange={setLow} min={20} max={59} />
-            <NumberField label="To lands" value={high} onChange={setHigh} min={21} max={60} />
+            <NumberField label="From lands" value={low} onChange={setLow} min={20} max={59}
+                         help={help('sim.land_range')} />
+            <NumberField label="To lands" value={high} onChange={setHigh} min={21} max={60}
+                         help={help('sim.land_range')} />
           </>
         ) : (
           <>
             <NumberField label="Keep min lands" value={minLands} onChange={setMinLands}
-                         min={0} max={7} />
+                         min={0} max={7} help={help('sim.min_lands')} />
             <NumberField label="Keep max lands" value={maxLands} onChange={setMaxLands}
-                         min={1} max={7} />
+                         min={1} max={7} help={help('sim.max_lands')} />
             <NumberField label="Min mana pieces" value={minPieces} onChange={setMinPieces}
-                         min={0} max={7} />
+                         min={0} max={7} help={help('sim.min_pieces')} />
           </>
         )}
         <NumberField label="Seed" value={seed} onChange={setSeed}
-                     min={1} max={999999} />
+                     min={1} max={999999} help={help('sim.seed')} />
         <button onClick={() => run()} disabled={running || !slug}
                 className="h-9 rounded-lg px-4 text-sm font-medium disabled:opacity-50"
                 style={{ background: 'var(--series-1)', color: '#fff' }}>
@@ -198,14 +220,18 @@ export default function Simulator() {
         <div className="space-y-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatTile label="Mulligan rate" value={percent(mana.mulligan_rate)}
-                      hint={`avg ${mana.avg_mulligans.toFixed(2)} per game`} />
+                      hint={`avg ${mana.avg_mulligans.toFixed(2)} per game`}
+                      help={help('stat.mulligan_rate')} />
             <StatTile label="Median commander turn"
-                      value={mana.median_commander_turn?.toString() ?? '—'} />
+                      value={mana.median_commander_turn?.toString() ?? '—'}
+                      help={help('stat.median_commander_turn')} />
             <StatTile label="Never cast by T12"
                       value={percent(mana.never_cast_commander)}
-                      tone={mana.never_cast_commander > 0.05 ? 'warning' : 'good'} />
+                      tone={mana.never_cast_commander > 0.05 ? 'warning' : 'good'}
+                      help={help('stat.never_cast_commander')} />
             <StatTile label="Color-only blocks"
-                      value={mana.color_screw_rate.toFixed(2)} hint="turns per game" />
+                      value={mana.color_screw_rate.toFixed(2)} hint="turns per game"
+                      help={help('stat.color_screw_rate')} />
           </div>
 
           <section className="card-surface space-y-2 rounded-xl p-5">
@@ -241,9 +267,12 @@ export default function Simulator() {
             <StatTile label="Deployment spread"
                       value={lands.deployment_spread.toFixed(2)}
                       hint="spells through T8, best minus worst"
-                      tone={lands.flat ? 'warning' : undefined} />
-            <StatTile label="Highest deployment" value={`${lands.argmax_lands} lands`} />
-            <StatTile label="Games per count" value={lands.games.toLocaleString()} />
+                      tone={lands.flat ? 'warning' : undefined}
+                      help={help('stat.deployment_spread')} />
+            <StatTile label="Highest deployment" value={`${lands.argmax_lands} lands`}
+                      help={help('stat.argmax_lands')} />
+            <StatTile label="Games per count" value={lands.games.toLocaleString()}
+                      help={help('sim.games')} />
           </div>
 
           {lands.flat && (
@@ -262,7 +291,9 @@ export default function Simulator() {
           )}
 
           <section className="card-surface space-y-2 rounded-xl p-5">
-            <h3 className="text-sm font-semibold">Spells deployed through T8</h3>
+            <h3 className="flex items-center text-sm font-semibold">
+              Spells deployed through T8{help('stat.spells_through_t8')}
+            </h3>
             <Caveat>
               The decision metric. The shaded band spans the full range of results —
               if the line stays inside it, the differences are noise.
@@ -276,7 +307,9 @@ export default function Simulator() {
               <LandTradeoffChart rows={lands.rows} />
             </section>
             <section className="card-surface space-y-2 rounded-xl p-5">
-              <h3 className="text-sm font-semibold">What it costs you</h3>
+              <h3 className="flex items-center text-sm font-semibold">
+                What it costs you{help('stat.wasted_through_t8')}
+              </h3>
               <WastedManaChart rows={lands.rows} />
             </section>
           </div>

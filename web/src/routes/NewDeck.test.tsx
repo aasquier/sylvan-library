@@ -57,6 +57,12 @@ const TAXONOMY = {
     key: 'BG', name: 'Golgari', tier: 'guild', colors: ['B', 'G'], size: 2,
     tagline: 'Death and rebirth.', history: 'Ravnica, 2005.',
     aliases: ['Golgari'], verified_by: 'Scryfall',
+    // The teaching fields, in the shape `/api/colors` serves them. Names and
+    // a role only: the cards come from `/api/colors/{key}`, which this screen
+    // never calls — it shows the short version and links across.
+    lore: 'The Swarm holds the undercity, and the succession is a sacrifice.',
+    champions: [{ card: 'Jarad, Golgari Lich Lord', role: 'Dead, and in charge.' }],
+    signature: ["Assassin's Trophy"],
   }],
 }
 

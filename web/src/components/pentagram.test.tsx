@@ -34,6 +34,10 @@ function combo(key: string, name: string, tier: string, colors: string[]): Combi
     key, name, tier, colors, size: colors.length,
     tagline: `${name} tagline.`, history: `${name} history.`,
     aliases: [], verified_by: 'a card',
+    // The teaching fields. Empty here on purpose: the wheel is geometry and
+    // labels, and nothing about the diagram should start depending on whether
+    // a slot has a story attached.
+    lore: '', champions: [], signature: [],
   }
 }
 
@@ -134,6 +138,36 @@ describe('the colour wheel', () => {
 
     fireEvent.mouseEnter(target('Mono-W'))
     expect(screen.getByText(/read Mono-W below/)).toBeTruthy()
+  })
+
+  it('says nothing about a combination it cannot draw', () => {
+    // Found by running the Learn page, where `selected` is any of the 32
+    // rather than only the fifteen shapes on the wheel. Artifice has no vertex
+    // and no chord, so captioning it looked up a key that is in neither, found
+    // no edge, and fell through to describing a four-colour identity as an
+    // "enemy pair — opposite on the wheel" with a button offering to cross to
+    // the guilds. The diagram only captions what it can point at.
+    render(
+      <ColorPentagram
+        combinations={[...TAXONOMY,
+                       combo('WUBR', 'Artifice', 'quad', ['W', 'U', 'B', 'R'])]}
+        onPick={vi.fn()}
+        selected="WUBR"
+      />,
+    )
+    expect(screen.queryByText('Artifice')).toBeNull()
+    expect(screen.queryByText(/enemy pair/)).toBeNull()
+    // The resting caption instead, which is what "nothing is selected on this
+    // diagram" has always looked like.
+    expect(screen.getByText(/every pair of them has a name/)).toBeTruthy()
+  })
+
+  it('marks a guild it can draw when the page has one selected', () => {
+    render(
+      <ColorPentagram combinations={TAXONOMY} onPick={vi.fn()} selected="BG" />,
+    )
+    expect(screen.getByText('Golgari')).toBeTruthy()
+    expect(screen.getByText(/enemy pair/)).toBeTruthy()
   })
 
   it('takes every name from the taxonomy rather than from itself', () => {
