@@ -130,6 +130,34 @@ primary_region = "iad"          # change to the region nearest you
   internal_port = 8080
   force_https = true
 
+  # ---- TEMPORARY, 2026-08-13: held awake for a few days of testing --------
+  #
+  # **Revert to the block below this one when the testing week is over.** This
+  # costs real money for nothing the moment it stops earning its keep: a
+  # `shared-cpu-1x`/1GB machine held up around the clock is roughly $0.19/day
+  # against near-zero when it scales to zero between visits.
+  #
+  # Why the file and not `fly machine update --autostop=off`: **a deploy
+  # applies `fly.toml`**, so anything set with a CLI command is silently undone
+  # by the next one. That is not hypothetical — it is exactly how the machine
+  # got scaled from `performance-1x` back to `shared-cpu-1x` earlier today. A
+  # setting that has to survive deploys has to be tracked in git.
+  #
+  # What it buys, and it is not comfort: suspend/resume kept interrupting
+  # measurement. Every `fly ssh console` in this session had to be preceded by
+  # an HTTP request to wake the machine, and a four-minute request is exactly
+  # the kind of work a suspend lands in the middle of. Holding it awake removes
+  # that variable from anything measured this week.
+  #
+  # `min_machines_running` is belt and braces: with `auto_stop_machines` off it
+  # is not consulted, but leaving it at 0 reads like permission to scale to
+  # zero and this block exists to say the opposite.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # ---- The steady state to restore afterwards ----------------------------
+  #
   # Scale to zero between visits. §3's conclusion was that idle dominates the
   # bill for a handful of friends, and this is the setting that acts on it —
   # worth more than every micro-optimisation in that section combined.
@@ -137,9 +165,10 @@ primary_region = "iad"          # change to the region nearest you
   # `suspend` rather than `stop`: it resumes from memory, so a wake is fast.
   # This is also why seeding the corpus is not a boot step — several minutes of
   # download on the wake path would turn a visit into an outage.
-  auto_stop_machines = "suspend"
-  auto_start_machines = true
-  min_machines_running = 0
+  #
+  # auto_stop_machines = "suspend"
+  # auto_start_machines = true
+  # min_machines_running = 0
 
   [http_service.concurrency]
     # One process, so these are request-level guards rather than a worker
