@@ -740,17 +740,27 @@ That is a known, deliberate state recorded in CLAUDE.md, not a bad deploy.
 
 ### Step 7 — domain and TLS
 
-```bash
-fly certs add mtg.yourdomain.com
-```
-
-Add the CNAME Fly prints, then confirm:
+The domain is `sylvan-libraries.com`, registered 2026-08-13, and the app
+answers on the **root**:
 
 ```bash
-fly certs show mtg.yourdomain.com
+fly certs add sylvan-libraries.com
 ```
 
+Add the records Fly prints, then confirm:
+
+```bash
+fly certs show sylvan-libraries.com
+```
+
+An apex is A/AAAA rather than a CNAME, which Fly prints for you — there is no
+extra work, but it is the one place the instructions differ from a subdomain.
 `force_https` in `fly.toml` handles the redirect. TLS is automatic and free.
+
+**`send.sylvan-libraries.com` is the mail subdomain and is not this.** It is
+verified with Resend and carries the sending records; nothing is served from
+it. `MTGLAB_EMAIL_FROM` is on `send.`, `MTGLAB_BASE_URL` is the root, and
+mixing them up produces mail Resend refuses or links that go nowhere.
 
 ### Step 8 — create your account
 
@@ -762,15 +772,40 @@ unclaimed account gets a reset link deliberately — and you are in without ever
 opening a shell.
 
 The shell path is the break-glass one, for a misconfigured mail provider or a
-`MTGLAB_ADMIN_EMAIL` you got wrong:
+`MTGLAB_ADMIN_EMAIL` you got wrong. **It has to be an interactive console**,
+and this is the correction worth reading before you need it: the password is
+read with `getpass`, which needs a TTY, so `fly ssh console -C "..."` — which
+runs one command with no terminal attached — cannot work. Open the shell
+first:
 
 ```bash
-fly ssh console -C "mtglab users add aaron --email you@example.com --admin"
+fly ssh console
 ```
 
-Do this from a terminal you trust. It prompts for the password twice; there is
-no way to pass one as an argument, because command-line arguments land in shell
-history and in the process table.
+then, inside it, whichever of these applies:
+
+```bash
+mtglab users passwd gyome                       # the bootstrapped account exists
+mtglab users add aaron --email you@example.com --admin   # it does not
+```
+
+`users passwd` is usually the one you want. `MTGLAB_ADMIN_EMAIL` has already
+created the account and left it unclaimed, so there is nothing to *add* — what
+is missing is a password, and that is the command that sets one. It ends every
+session on that account as a side effect, which is the right behaviour for a
+credential reset.
+
+Do this from a terminal you trust. Both prompt twice; there is no way to pass a
+password as an argument, because command-line arguments land in shell history
+and in the process table.
+
+**`RESEND_API_KEY` is not optional for the email path**, and it is worth being
+explicit because the fallback people expect is deliberately absent: locally, a
+missing key makes `mtglab users invite` print the link it would have sent, but
+with `MTGLAB_REQUIRE_AUTH` on that fallback is *refused* rather than used —
+printing recipients into Fly's logs is what ADR 16 forbids. So on a deployed
+instance there is no "just read the link off the console" escape hatch. Either
+Resend works, or you use the shell.
 
 Everyone else gets an invite rather than an account you made a password for
 (ADR 16) — `mtglab users invite <email>`, or the Accounts page once you are in.
@@ -1134,23 +1169,35 @@ here rather than rewriting the sections above.
 
 ### Have these in hand before deploy day
 
-- [ ] Fly account with a card on file (the machine sizes are paid tier).
+Ticked items are done as of 2026-08-13.
+
+- [x] ~~Fly account with a card on file~~ — done, billing set up.
+- [x] ~~A domain~~ — `sylvan-libraries.com`, with `send.sylvan-libraries.com`
+      verified with Resend and its DNS in place. The Fly TLS step (§4 step 7)
+      is still to run.
+- [x] ~~`MTGLAB_EMAIL_FROM` and `MTGLAB_BASE_URL`~~ — both are real values in
+      `fly.toml` now rather than placeholders, since neither is personal data
+      and a placeholder here is only discovered once a reset link has already
+      gone out wrong.
 - [x] ~~`SESSION_SECRET` generated (`openssl rand -base64 32`).~~ **Not
       needed** — see above. Sessions are opaque tokens, not signed ones.
-- [ ] `MTGLAB_REQUIRE_AUTH=1` **and `MTGLAB_ADMIN_EMAIL`** in `fly.toml` — the
-      first is set in the committed file; the second is a placeholder there and
-      is what makes the maintainer an admin on that instance, so without it a
-      fresh deployment has nobody who can administer it. Set it to an address
-      you can receive mail at, then **claim the account from the sign-in page's
-      reset link — that page exists** (it landed 2026-08-12 with the login
-      screen, ticked above). `mtglab users add <name> --admin` over `fly ssh
-      console` (§4 step 8) still works and is the break-glass path; it is no
-      longer the only one.
-- [ ] `RESEND_API_KEY`, `MTGLAB_EMAIL_FROM` and `MTGLAB_BASE_URL` set, and one
-      real invite sent to an address you control before anybody else is
-      invited. Deliverability is the one part of the email half that no test
-      covers, by design.
-- [ ] A domain, if you want one, plus the Fly TLS certificate step.
+- [ ] **`MTGLAB_ADMIN_EMAIL` and `MTGLAB_ADMIN_USERNAME` via `fly secrets`.**
+      These two stay placeholders in the tracked file — the address is the one
+      piece of personal data the project handles — so this is the step nothing
+      in the repository can do for you, and **a deploy without it comes up
+      looking healthy with nobody behind the sign-in page who is you.**
+      `MTGLAB_REQUIRE_AUTH=1` is already set in the committed file.
+- [ ] `RESEND_API_KEY` via `fly secrets`, and **one real invite sent to an
+      address you control before anybody else is invited**. Deliverability is
+      the one part of the email half that no test covers, by design. Note there
+      is no console fallback on a deployed instance (§4 step 8): with auth on,
+      a missing key refuses rather than prints.
+- [ ] The first sign-in, by whichever path: the reset link from the sign-in
+      page if Resend is working, or `mtglab users passwd <username>` over an
+      **interactive** `fly ssh console` if it is not. There is no
+      `MTGLAB_ADMIN_PASSWORD` and there will not be one (ADR 16) — the
+      bootstrapped account is unclaimed, so what it is missing is a password
+      rather than an account.
 - [ ] Cloudflare Access configured, if the instance is not to be public.
 - [ ] **A second home for `ANTHROPIC_API_KEY`.** One key, one environment, two
       places once deployed: the gitignored `.env` here and `fly secrets` there.
