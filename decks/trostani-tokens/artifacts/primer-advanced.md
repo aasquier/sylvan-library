@@ -18,11 +18,11 @@ Craterhoof Behemoth or Moonshaker Cavalry for one lethal swing, Triumph of the H
 
 ## Mana base notes
 
-TODO — 35 lands inherited from the source, not yet confirmed by a sweep. The source's own note is worth keeping: replacing Fountainport and Gavony Township, both of which tap for colourless only and cannot help cast a {G}{G}{W}{W} commander, with real GW sources was worth roughly 7 points of castability at every turn.
+35 lands inherited from the source — not yet confirmed by a land sweep. The source's own note is worth keeping: replacing Fountainport and Gavony Township, both of which tap for colourless only and cannot help cast a {G}{G}{W}{W} commander, with real GW sources was worth roughly 7 points of castability at every turn.
 
 ## Matchups
 
-TODO — needs Tier 2.
+— unmeasured. The pod simulator that would answer this is not built yet.
 
 ## Politics and table talk
 
@@ -41,4 +41,4 @@ Divine Visitation is the clean cut if you would rather run the populate plan unc
 Populate copies a token you control; Divine Visitation's replacement fully overwrites the copy. Minas Tirith and The Shire enter untapped because Trostani is legendary. Ojer Taq triples token creation only while it is a creature, and flips to a land when it dies.
 
 ---
-_Generated 2026-08-10 from `deck.yaml`._
+_Generated 2026-08-12 from `deck.yaml`._

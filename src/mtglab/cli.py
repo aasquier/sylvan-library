@@ -359,7 +359,7 @@ def cmd_decks_promote(args):
 def cmd_decks_delete(args):
     """Remove a deck from the library, recoverably.
 
-    Interactive by default: it prints what is about to go and asks for the slug
+    Interactive by default: it prints what is about to go and asks for a word
     back. `--yes` is for scripts, and it still has to name the slug on the
     command line, so there is no spelling of this that deletes a deck the
     caller did not type out.
@@ -374,9 +374,12 @@ def cmd_decks_delete(args):
     print(f"  {deck['name']} ({args.slug})")
     print(f"  {deck['total_cards']} cards, {deck['stage']}, {deck['status']}")
     if not args.yes:
-        # Reading the slug back, not a y/n. The point is that the answer is
-        # only producible by somebody looking at the right deck.
-        typed = input(f"  type the slug to delete it [{args.slug}]: ").strip()
+        # A typed word, not a y/n -- the answer has to be produced rather than
+        # clicked past. The slug is still accepted and is the stronger of the
+        # two, since only somebody looking at the right deck can produce it.
+        typed = input(
+            f"  type '{service.DELETE_WORD}' (or the slug) to delete it: ",
+        ).strip()
     else:
         typed = args.slug
 

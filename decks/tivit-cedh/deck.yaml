@@ -37,7 +37,7 @@ notes:
     Tier 1's land-count mulligan models — do not quote sim mulligan rates for
     this deck as if they described this rule.
   curve_plan: >
-    TODO — recount from the corpus, not by hand.
+    — not yet recounted from the corpus, and not worth counting by hand.
   pitfalls: >
     (1) The Time Sieve loop needs FIVE artifacts per iteration and you only get
     five votes with three living opponents — kill someone and the loop breaks
@@ -73,8 +73,9 @@ notes:
     List is ALLOWED here but only three cards use it (Tundra, Underground Sea,
     Scrubland); the surveil-land substitutions cost little.
   matchups: >
-    TODO — needs Tier 2. Known shape: loses to decks that go under it, grinds
-    out anything slower.
+    — unmeasured. The pod simulator that would answer this is not built yet.
+    The known shape: loses to decks that go under it, grinds out anything
+    slower.
   politics: >
     Opponents will sometimes vote to deny you Treasures; it does not matter,
     every vote is still an artifact and Time Sieve does not care which kind.

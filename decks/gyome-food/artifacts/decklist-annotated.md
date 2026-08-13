@@ -178,4 +178,4 @@ Golgari Food aristocrats. Gyome converts every nontoken creature that enters int
 
 
 ---
-_Generated 2026-08-10 from `deck.yaml`._
+_Generated 2026-08-12 from `deck.yaml`._

@@ -10,7 +10,9 @@
 import { cleanup, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DeckDetail as Deck, DeckStats, Suggestions, ValidationReport } from '../lib/api'
+import type {
+  CommanderDossier, DeckDetail as Deck, DeckStats, Suggestions, ValidationReport,
+} from '../lib/api'
 import DeckDetail from './DeckDetail'
 
 vi.mock('../lib/api', async () => ({
@@ -22,7 +24,7 @@ vi.mock('../lib/api', async () => ({
     deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
     swapCard: vi.fn(), addCard: vi.fn(), removeCard: vi.fn(),
     setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),
-    claudeStatus: vi.fn(), interview: vi.fn(),
+    claudeStatus: vi.fn(), interview: vi.fn(), commander: vi.fn(),
   },
 }))
 
@@ -80,6 +82,20 @@ const SHORTLIST: Suggestions = {
       reasons: ['same card type (Creature)', 'shares trample', 'EDHREC rank 1,589'],
     }],
   }],
+}
+
+/** What `service.commander_dossier` counts off the corpus. */
+const DOSSIER: CommanderDossier = {
+  slug: 'goreclaw-stompy',
+  card: null,
+  supertypes: ['Legendary', 'Creature'],
+  subtypes: [{ name: 'Bear', total: 78, legendary: 26 }],
+  other_cards: [{
+    name: 'Surrak and Goreclaw', type_line: 'Legendary Creature — Human Bear',
+    mana_cost: '{2}{R}{G}', image: 'https://example.test/surrak-full.jpg',
+    art_crop: 'https://example.test/surrak.jpg',
+  }],
+  printings: { count: 12, first_released: '2018-07-13', first_set: 'Core Set 2019' },
 }
 
 const EDIT_RESULT = {
@@ -165,6 +181,7 @@ beforeEach(() => {
   vi.mocked(api.stats).mockReset().mockResolvedValue(STATS)
   vi.mocked(api.validate).mockReset().mockResolvedValue(REPORT)
   vi.mocked(api.suggestions).mockReset().mockResolvedValue(SHORTLIST)
+  vi.mocked(api.commander).mockReset().mockResolvedValue(DOSSIER)
   vi.mocked(api.swapCard).mockReset().mockResolvedValue({
     slug: 'goreclaw-stompy', swapped_out: 'Primeval Titan',
     swapped_in: 'Cultivator Colossus', why: 'because', ok: true,
@@ -606,5 +623,88 @@ describe('DeckDetail promotion', () => {
     await screen.findByText(DECK.name)
     expect(screen.queryByRole('button', { name: /promote/i })).toBeNull()
     expect(screen.queryByText(/still need/)).toBeNull()
+  })
+})
+
+/**
+ * The hero.
+ *
+ * `art_crop` is 626x457 and the band it used to fill alone was 1200/260 — so
+ * the page kept about a third of the commander's painting and took that third
+ * out of the middle, which on a card drawn head-up is the part without the
+ * head. No band ratio fixes that: anything square enough to show the painting
+ * is 600px tall on a wide screen. The whole card, uncropped, is the fix, and
+ * these pin that it is the card and not another crop.
+ */
+describe('DeckDetail hero', () => {
+  it('shows the commander as a whole card, not a crop', async () => {
+    vi.mocked(api.deck).mockResolvedValue({
+      ...DECK,
+      commander_card: {
+        name: 'Goreclaw, Terror of Qal Sisma',
+        category: 'commander', why: '', qty: 1, known: true,
+        image: 'https://example.test/goreclaw-full.jpg',
+        art_crop: 'https://example.test/goreclaw-crop.jpg',
+      },
+    } as unknown as Deck)
+    renderDeck()
+
+    const card = await screen.findByAltText('Goreclaw, Terror of Qal Sisma')
+    expect(card.getAttribute('src')).toBe('https://example.test/goreclaw-full.jpg')
+  })
+
+  it('renders without a commander card when the corpus has no art', async () => {
+    // A fresh clone has no corpus, so `commander_card` is null and the hero
+    // has nothing to lift out of the band. It must still render the deck.
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(screen.queryByAltText('Goreclaw, Terror of Qal Sisma')).toBeNull()
+  })
+})
+
+/**
+ * The corpus facts under the header.
+ *
+ * Every number in this panel was counted by `service.commander_dossier` over
+ * the corpus, and these tests exist to keep it that way: the panel renders
+ * what it was handed and computes nothing, so a wrong figure is always a bug
+ * in a query somebody can re-run.
+ */
+describe('DeckDetail commander facts', () => {
+  it('renders the subtype counts it was given', async () => {
+    renderDeck()
+    await screen.findByText('Bear')
+    expect(screen.getByText(/26 legendary, 78 in all/)).toBeTruthy()
+  })
+
+  it('shows the first printing as a year and a set', async () => {
+    renderDeck()
+    await screen.findByText('2018')
+    expect(screen.getByText(/in Core Set 2019/)).toBeTruthy()
+    expect(screen.getByText(/12 printings/)).toBeTruthy()
+  })
+
+  it('offers the other cards carrying the name', async () => {
+    renderDeck()
+    expect(await screen.findByText('Surrak and Goreclaw')).toBeTruthy()
+  })
+
+  it('renders nothing at all when the corpus had nothing to say', async () => {
+    // A fresh clone. An empty "About this commander" heading is worse than
+    // no heading, and the deck page must still work.
+    vi.mocked(api.commander).mockResolvedValue({
+      slug: 'goreclaw-stompy', card: null, supertypes: [], subtypes: [],
+      other_cards: [], printings: { count: 0, first_released: null, first_set: null },
+    })
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(screen.queryByText(/about this commander/i)).toBeNull()
+  })
+
+  it('does not take the deck down when the dossier request fails', async () => {
+    vi.mocked(api.commander).mockRejectedValue(new Error('boom'))
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(screen.queryByText(/about this commander/i)).toBeNull()
   })
 })

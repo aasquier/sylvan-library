@@ -142,8 +142,15 @@ def _corpus_for(deck: Deck,
     return db.get_cards(con, names)
 
 
-def _card_json(entry: CardEntry, rec: CardRecord | None) -> dict[str, Any]:
-    """One row of the 99, merged with whatever the corpus knows about it."""
+def _card_json(entry: CardEntry, rec: CardRecord | None, *,
+               full: bool = False) -> dict[str, Any]:
+    """One row of the 99, merged with whatever the corpus knows about it.
+
+    `full` adds the fields only a hero panel wants — the flavour text and the
+    artist. Opt-in rather than always-on because this runs 99 times per deck
+    and those two fields are read exactly once, for the commander: carrying
+    them on every row would add a few kilobytes to every payload for nothing.
+    """
     out: dict[str, Any] = {
         "name": entry.name,
         "category": entry.category,
@@ -169,6 +176,14 @@ def _card_json(entry: CardEntry, rec: CardRecord | None) -> dict[str, Any]:
             "loyalty": rec.loyalty,
             "game_changer": rec.game_changer,
         })
+        if full:
+            # Flavour text is a property of a *printing*, so plenty of cards
+            # have none and the UI has to treat it as optional rather than as
+            # missing data. Two of the six commanders here have one.
+            out.update({
+                "flavor_text": rec.flavor_text,
+                "artist": rec.artist,
+            })
     return out
 
 
@@ -228,6 +243,162 @@ def list_decks(*, source: DeckSource | None = None) -> list[dict[str, Any]]:
             con.close()
 
 
+def _type_parts(type_line: str) -> tuple[list[str], list[str]]:
+    """A type line split into the part before the dash and the part after.
+
+    `"Legendary Creature — Troll Warlock"` -> `(["Legendary", "Creature"],
+    ["Troll", "Warlock"])`. Both em dash and hyphen are accepted because
+    Scryfall uses the em dash and hand-typed data does not always. A card with
+    no subtypes gives an empty second list rather than a fake one.
+
+    Only the front face. A double-faced card's `type_line` carries both halves
+    around a `//`, and the commander's own types are the ones on the side you
+    cast — which is the same reason `CardRecord.front_type_line` exists.
+    """
+    front = type_line.split("//")[0].strip()
+    for dash in ("—", "–", " - "):
+        if dash in front:
+            before, after = front.split(dash, 1)
+            return before.split(), after.split()
+    return front.split(), []
+
+
+def commander_dossier(slug: str, *,
+                      source: DeckSource | None = None) -> dict[str, Any]:
+    """Everything interesting the corpus knows about a deck's commander.
+
+    The deck page's header used to say a name and show a painting, which meant
+    the one card that governs all 99 others was the card you knew least about.
+    This is the answer to "who is this, actually" — and every part of it is a
+    query, not a recollection.
+
+    That distinction is the whole design. "Gyome is one of eight legendary
+    Trolls" and "Trostani has five other cards" are exactly the kind of claim
+    a language model will produce fluently and wrongly, and `CLAUDE.md` rule 1
+    exists because that has already happened twice on this project. So the
+    facts are counted here, in Python, over the corpus: a wrong number is a
+    bug with a reproducible query behind it rather than a confident sentence
+    nobody can check.
+
+    Three kinds of fact, chosen because each says something the card's own
+    text does not:
+
+    **Subtypes and how rare they are.** A Troll Warlock is a more interesting
+    thing to be when eight legendary Trolls exist and eighty-one legendary
+    Warlocks do.
+
+    **Other cards for the same character.** Trostani has been printed five
+    more times with different mechanics each time; Arahbo got a second version
+    years later. Matched on the character's name — the part before the comma,
+    which is how Magic names legends — so `Trostani, Selesnya's Voice` finds
+    `Trostani Discordant` and `Trostani's Summoner`. A loose match on purpose:
+    these are offered as related cards, not asserted as the same character.
+
+    **How often it has been printed, and when it first was.** From the
+    `printings` table, so a 2012 guild leader reads differently from a card
+    that arrived last year.
+
+    Returns `None` for `card` when there is no corpus, rather than failing —
+    this is a decorative panel and a fresh clone should still show its decks.
+    """
+    deck = _source(source).get(slug)
+    if not deck.commander:
+        return {"slug": deck.slug, "card": None, "subtypes": [],
+                "other_cards": [], "printings": None}
+
+    name = deck.commander[0]
+    con = _connect()
+    if con is None:
+        return {"slug": deck.slug, "card": None, "subtypes": [],
+                "other_cards": [], "printings": None}
+
+    try:
+        rec = db.get_cards(con, [name]).get(name)
+        if rec is None:
+            return {"slug": deck.slug, "card": None, "subtypes": [],
+                    "other_cards": [], "printings": None}
+
+        supertypes, subtypes = _type_parts(rec.type_line)
+
+        # One query per subtype, and there are at most a handful. `ilike` with
+        # word boundaries would be better, but DuckDB's `ilike` has no \b --
+        # so the count is over type lines *containing* the word, and the
+        # payload says "type lines" rather than claiming anything sharper.
+        subtype_rows: list[dict[str, Any]] = []
+        for sub in subtypes:
+            pattern = f"%{sub}%"
+            total = con.execute(
+                "SELECT count(*) FROM oracle_cards WHERE type_line ILIKE ?",
+                [pattern]).fetchone()
+            legends = con.execute(
+                "SELECT count(*) FROM oracle_cards WHERE type_line ILIKE ? "
+                "AND type_line ILIKE '%Legendary%'", [pattern]).fetchone()
+            subtype_rows.append({
+                "name": sub,
+                "total": int(total[0]) if total else 0,
+                "legendary": int(legends[0]) if legends else 0,
+            })
+
+        # The character's name: everything before the first comma, which is
+        # how Magic writes a legend. A mononym like "Goreclaw, Terror of Qal
+        # Sisma" gives "Goreclaw"; one with no comma gives the whole name and
+        # simply matches itself, which the `name <> ?` filter then drops.
+        character = name.split(",")[0].strip()
+        others = con.execute(
+            "SELECT name, type_line, mana_cost, image_normal, image_art_crop "
+            "FROM oracle_cards WHERE name ILIKE ? AND name <> ? "
+            "ORDER BY edhrec_rank NULLS LAST LIMIT 6",
+            [f"%{character}%", name]).fetchall()
+
+        printed = con.execute(
+            "SELECT count(*), min(released_at) FROM printings "
+            "WHERE oracle_id = (SELECT oracle_id FROM oracle_cards "
+            "WHERE name = ? LIMIT 1)", [name]).fetchone()
+
+        first_set = None
+        if printed and printed[1] is not None:
+            row = con.execute(
+                "SELECT set_name FROM printings WHERE oracle_id = "
+                "(SELECT oracle_id FROM oracle_cards WHERE name = ? LIMIT 1) "
+                "AND released_at = ? LIMIT 1", [name, printed[1]]).fetchone()
+            first_set = row[0] if row else None
+
+        return {
+            "slug": deck.slug,
+            "card": {
+                "name": rec.name,
+                "mana_cost": rec.mana_cost,
+                "type_line": rec.type_line,
+                "oracle_text": rec.oracle_text,
+                "flavor_text": rec.flavor_text,
+                "artist": rec.artist,
+                "power": rec.power,
+                "toughness": rec.toughness,
+                "loyalty": rec.loyalty,
+                "image": rec.image_normal,
+                "art_crop": getattr(rec, "image_art_crop", None),
+                "color_identity": sorted(rec.color_identity),
+                "edhrec_rank": rec.edhrec_rank,
+                "game_changer": rec.game_changer,
+            },
+            "supertypes": supertypes,
+            "subtypes": subtype_rows,
+            "other_cards": [{
+                "name": r[0], "type_line": r[1], "mana_cost": r[2],
+                "image": r[3], "art_crop": r[4],
+            } for r in others],
+            "printings": {
+                "count": int(printed[0]) if printed else 0,
+                "first_released": printed[1].isoformat()
+                if printed and printed[1] else None,
+                "first_set": first_set,
+            },
+        }
+    finally:
+        if con is not None:
+            con.close()
+
+
 def get_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
     deck = _source(source).get(slug)
     con = _connect()
@@ -251,7 +422,7 @@ def get_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
             "commander_card": _card_json(
                 type("E", (), {"name": deck.commander[0], "category": "commander",
                                "why": deck.notes.get("commander_why", ""), "qty": 1})(),
-                commander_rec) if commander_rec else None,
+                commander_rec, full=True) if commander_rec else None,
             "cards": [_card_json(e, cards.get(e.name)) for e in deck.cards],
             "swap_board": [_card_json(e, cards.get(e.name)) for e in deck.swap_board],
             "corpus_available": con is not None,
@@ -494,6 +665,21 @@ class DeleteRejected(Exception):
     """The deletion was refused, and nothing was moved."""
 
 
+#: The short word that confirms a deletion, alongside the slug itself.
+#:
+#: "Bury" is Magic's own retired templating for destroying a permanent so that
+#: it cannot regenerate, and it is the right verb here for the reason the
+#: obvious alternatives are the wrong ones: the deck goes to `decks/.trash/`
+#: and can be brought back, so "exile" — which in Magic means gone for good —
+#: would misdescribe what this does.
+#:
+#: `web/src/routes/Library.tsx` types this word into its own dialog and
+#: `tests/test_api.py` pins it here, the same way `Simulator.tsx` mirrors
+#: `simruns.DEFAULT_SEED`. If the two ever drift, the refusal message names
+#: what the server actually wants.
+DELETE_WORD = "bury"
+
+
 def delete_deck(*, slug: str, confirm: str,
                 source: DeckSource | None = None) -> dict[str, Any]:
     """Remove a deck from the library. Recoverably, and only on purpose.
@@ -502,10 +688,20 @@ def delete_deck(*, slug: str, confirm: str,
     work. Three safeguards, chosen so that each catches something the others
     do not:
 
-    **`confirm` must be the slug, exactly.** Not a boolean, not a `force=true`
-    flag — a value only somebody looking at the right deck can produce. A
-    client that sends `{"confirm": true}` for every deletion has not confirmed
-    anything, and a mis-clicked row cannot satisfy this by accident.
+    **`confirm` must be a typed word — the slug, or `bury`.** Not a boolean and
+    not a `force=true` flag: a client that sends `{"confirm": true}` for every
+    deletion has not confirmed anything, and neither spelling here can be
+    satisfied by a mis-clicked row.
+
+    The slug was originally the only answer, on the argument that it is a value
+    only somebody looking at the right deck can produce. That argument is
+    sound and the slug still works — but it was also, in practice, a gate
+    people could not get through: `ishai-ojutai-dragonspeaker` is 26 characters
+    of hyphenated name to copy by eye, and the app rendered it uppercased next
+    to a case-sensitive comparison, so typing exactly what was on screen was
+    refused with no explanation. A confirmation nobody can satisfy does not
+    protect the deck; it just moves the deletion to the shell, unconfirmed.
+    So the check now takes either, and takes both case-insensitively.
 
     **A read-only source refuses.** `docs/HOSTING.md` keeps the curated decks
     read-only for everyone but the maintainer, and this is the operation where
@@ -529,11 +725,13 @@ def delete_deck(*, slug: str, confirm: str,
         raise DeleteRejected("this library is read-only")
     deck = decks.get(slug)                       # raises DeckNotFound
 
-    if confirm != slug:
+    typed = confirm.strip().casefold() if isinstance(confirm, str) else ""
+    if typed not in {slug.casefold(), DELETE_WORD}:
         raise DeleteRejected(
-            f"to delete {slug!r}, confirm with the slug itself. Got "
-            f"{confirm!r}. This is deliberately not a yes/no: it is the one "
-            f"operation here that can lose work nothing else recorded.")
+            f"to delete {slug!r}, confirm by typing {DELETE_WORD!r} or the "
+            f"slug itself. Got {confirm!r}. This is deliberately not a yes/no: "
+            f"it is the one operation here that can lose work nothing else "
+            f"recorded.")
 
     moved_to = decks.delete(slug)
     return {
@@ -674,7 +872,8 @@ def color_taxonomy() -> dict[str, Any]:
     return {
         "colors": [{"code": c.code, "name": c.name, "wants": c.wants,
                     "fears": c.fears} for c in colors.COLORS],
-        "tiers": [{"key": t, "label": colors.TIER_LABELS[t]}
+        "tiers": [{"key": t, "label": colors.TIER_LABELS[t],
+                   "blurb": colors.TIER_BLURBS[t]}
                   for t in colors.TIERS],
         "eras": [{"name": e.name, "setting": e.setting, "named": e.named,
                   "story": e.story} for e in colors.ERAS],

@@ -20,7 +20,7 @@ Selesnya go-wide tokens built on multiplication rather than addition. Six static
 - **Cultivate** `{2}{G}` — Two basics, one to hand. Ramp and colour fixing together.
 - **Delighted Halfling** `{G}` — One-mana dork that also makes Trostani uncounterable.
 - **Enduring Vitality** `{1}{G}{G}` — Same effect as Cryptolith Rite on a 3/3 vigilance body that rebuys itself as an enchantment when it dies.
-- **Growing Rites of Itlimoc** — Ramps early, then flips into a Gaea's-Cradle-style land once you are wide. Your budget Cradle.
+- **Growing Rites of Itlimoc** `{2}{G}` — Ramps early, then flips into a Gaea's-Cradle-style land once you are wide. Your budget Cradle.
 - **Kodama's Reach** `{2}{G}` — Functional Cultivate
 - **Nature's Lore** `{1}{G}` — Fetches a Forest untapped — grabs Temple Garden.
 - **Smothering Tithe** `{3}{W}` — Every opponent draw either taxes them 2 or gives you a Treasure. Passive ramp that does not need your board.
@@ -99,7 +99,7 @@ Selesnya go-wide tokens built on multiplication rather than addition. Six static
 - **Cathars' Crusade** `{3}{W}{W}` — A +1/+1 counter on every creature you control whenever any creature enters. With a wide board this is a one-card kill.
 - **Divine Visitation** `{3}{W}{W}` — Every creature token becomes a 4/4 flying vigilance Angel — your only real evasion. Note it fully replaces populated tokens' characteristics, so it does not stack with the populate plan.
 
-- **Ojer Taq, Deepest Foundation** — Triples token creation while it is a creature; flips to a land when it dies.
+- **Ojer Taq, Deepest Foundation** `{4}{W}{W}` — Triples token creation while it is a creature; flips to a land when it dies.
 - **Securitron Squadron** `{1}{W}` — Permanent +1/+1 counter on every token that enters, forever. Squad for extra copies.
 
 ## Win Conditions (5)
@@ -119,7 +119,7 @@ Selesnya go-wide tokens built on multiplication rather than addition. Six static
 - **Command Tower** — Perfect fixing.
 - **Eiganjo, Seat of the Empire** — White source or a removal spell — never a dead draw.
 - **8x Forest** — Green sources for {G}{G}, and the targets Nature's Lore and Cultivate want.
-- **Kabira Takedown** — White source, or damage equal to your creature count, which scales perfectly here.
+- **Kabira Takedown** `{1}{W}` — White source, or damage equal to your creature count, which scales perfectly here.
 - **Lush Portico** — GW surveil land.
 - **Minas Tirith** — Draw engine, and it enters untapped because Trostani is legendary.
 - **Oran-Rief, the Vastwood** — A +1/+1 counter on each green creature that entered this turn.
@@ -134,4 +134,4 @@ Selesnya go-wide tokens built on multiplication rather than addition. Six static
 - **Yavimaya, Cradle of Growth** — Makes every land a Forest; huge fixing for the {G}{G} half of the commander.
 
 ---
-_Generated 2026-08-10 from `deck.yaml`._
+_Generated 2026-08-12 from `deck.yaml`._

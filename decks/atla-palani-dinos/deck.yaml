@@ -26,13 +26,13 @@ notes:
     crack at least one Egg. You are not casting your threats; you are drawing
     them off the top of the library two mana at a time.
   mulligan: >
-    TODO — derive from a Tier 1 sweep. Note Tier 1 models casting spells for
-    mana and will systematically understate this deck, whose whole plan is
-    putting creatures onto the battlefield without casting them.
+    — not yet derived from a Tier 1 sweep. When it is, note that Tier 1 models
+    casting spells for mana and will systematically understate this deck, whose
+    whole plan is putting creatures onto the battlefield without casting them.
   curve_plan: >
-    TODO — recount from the corpus. Note that nominal mana value is close to
-    meaningless here: the titans are 12-15 MV cards the deck never intends to
-    cast.
+    — not yet recounted from the corpus. Note that nominal mana value is close
+    to meaningless here: the titans are 12-15 MV cards the deck never intends
+    to cast.
   pitfalls: >
     (1) The trigger lives on ATLA, not on the Egg token — she must be on the
     battlefield when the Egg dies, though she may die simultaneously with the
@@ -66,9 +66,9 @@ notes:
     36 land slots — 34 lands plus 2 modal double-faced cards. Basics shifted
     from 10/2/2 to 8/3/3 to support the double-pip costs: {3}{R}{R} on Terror
     of the Peaks and Nesting Dragon, {W}{W} on Ghalta and Mavren, plus Akroma's
-    Will and Xenagos. Not yet confirmed by an mtglab land sweep — TODO.
+    Will and Xenagos. Not yet confirmed by an mtglab land sweep.
   matchups: >
-    TODO — needs Tier 2.
+    — unmeasured. The pod simulator that would answer this is not built yet.
   politics: >
     Blightsteel Colossus generates more table friction than anything else in
     the deck. Pod-check the infect plan before sitting down.

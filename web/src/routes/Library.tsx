@@ -7,16 +7,39 @@ import {
 } from '../components/ui'
 
 /**
- * Confirm a deletion by typing the slug.
+ * The word that confirms a deletion. Mirrors `service.DELETE_WORD`, which also
+ * still accepts the slug; this dialog asks for the shorter of the two.
  *
- * Not a yes/no. The server refuses anything but the slug itself, and this is
- * the same check on the near side rather than a softer one: an "Are you sure?"
- * is answered the same way by someone who read the dialog and someone who
- * clicked through it, and the deck this is most likely to be aimed at by
- * mistake is a draft imported minutes ago that git has never seen.
+ * Magic's own retired templating for destroying something that cannot
+ * regenerate — and the right verb because the obvious alternative is wrong:
+ * the deck moves to `decks/.trash/`, so "exile", which in Magic means gone for
+ * good, would promise something harsher than what happens.
+ */
+const DELETE_WORD = 'bury'
+
+/**
+ * Confirm a deletion by typing a word.
  *
- * It says where the deck goes, because a deletion someone is nervous about is
- * one they should be able to see is reversible before they commit to it.
+ * Not a yes/no. An "Are you sure?" is answered the same way by someone who
+ * read the dialog and someone who clicked through it, and the deck this is
+ * most likely to be aimed at by mistake is a draft imported minutes ago that
+ * git has never seen. It says where the deck goes, too, because a deletion
+ * someone is nervous about is one they should be able to see is reversible
+ * before they commit to it.
+ *
+ * It used to ask for the slug, and that is worth recording because it failed
+ * in a way that looked like a broken button. The label was styled
+ * `uppercase`, so `ishai-ojutai-dragonspeaker` rendered as
+ * `ISHAI-OJUTAI-DRAGONSPEAKER`; the comparison was case-sensitive against the
+ * lowercase slug; and typing exactly what was on screen left the button
+ * disabled with nothing on screen explaining why. **A field whose contents
+ * must be retyped verbatim can never carry a `text-transform`** — that is the
+ * general rule the bug is an instance of, and it is why the label below is not
+ * uppercased even though every other small label in the app is.
+ *
+ * Both fixes are here rather than only one: the word is short enough to retype
+ * without copying, *and* the match ignores case and surrounding space, so the
+ * near side cannot refuse something the server would accept.
  */
 function DeleteDialog({ deck, onCancel, onDeleted }: {
   deck: DeckSummary
@@ -26,14 +49,18 @@ function DeleteDialog({ deck, onCancel, onDeleted }: {
   const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const matches = typed.trim() === deck.slug
+  const answer = typed.trim().toLowerCase()
+  const matches = answer === DELETE_WORD || answer === deck.slug.toLowerCase()
 
   async function remove() {
     if (!matches) return
     setBusy(true)
     setError(null)
     try {
-      const result = await api.deleteDeck(deck.slug, typed.trim())
+      // The normalised answer, not the raw keystrokes: it is the value this
+      // dialog actually validated, and sending anything else would let the two
+      // sides disagree about what was confirmed.
+      const result = await api.deleteDeck(deck.slug, answer)
       onDeleted(result.moved_to)
     } catch (e) {
       setError(String((e as Error).message ?? e))
@@ -58,9 +85,13 @@ function DeleteDialog({ deck, onCancel, onDeleted }: {
           so this is reversible from the shell. Its artifacts go with it.
         </p>
         <label className="mt-4 block">
-          <span className="text-xs uppercase tracking-wide"
+          {/* Deliberately not `uppercase` — see the component's docstring.
+              The word is inside a `<code>` so it is unmistakably the literal
+              to retype rather than an English verb in a sentence. */}
+          <span className="text-xs tracking-wide"
                 style={{ color: 'var(--text-muted)' }}>
-            Type <code>{deck.slug}</code> to confirm
+            Type <code style={{ color: 'var(--text-primary)' }}>{DELETE_WORD}</code>
+            {' '}to confirm
           </span>
           <input
             autoFocus
@@ -70,10 +101,22 @@ function DeleteDialog({ deck, onCancel, onDeleted }: {
               if (e.key === 'Escape') onCancel()
               if (e.key === 'Enter' && matches) void remove()
             }}
+            placeholder={DELETE_WORD}
+            aria-label={`Type ${DELETE_WORD} to confirm deleting ${deck.name}`}
             className="mt-1 w-full rounded-md px-3 py-2 font-mono text-sm"
             style={{ background: 'var(--page)', color: 'var(--text-primary)',
                      border: '1px solid var(--hairline)' }}
           />
+          {/* A disabled button with no stated reason is what made the old
+              version read as broken rather than as refusing. */}
+          {!matches && (
+            <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+              {typed.trim()
+                ? <>That is not the word. Type <code>{DELETE_WORD}</code>, or the
+                    deck&rsquo;s slug <code>{deck.slug}</code>.</>
+                : <>Or type the deck&rsquo;s slug, <code>{deck.slug}</code>.</>}
+            </span>
+          )}
         </label>
         {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
         <div className="mt-5 flex items-center gap-3">
@@ -283,8 +326,14 @@ export default function Library() {
             </button>
             <Link to={`/decks/${deck.slug}`}
                   className="card-surface block overflow-hidden rounded-xl transition hover:-translate-y-0.5 hover:shadow-lg">
+              {/* 626/457 is `art_crop`'s own shape, so the tile shows the
+                  whole painting instead of a band cut out of its middle. It
+                  was 626/300, which threw away a third of the height and took
+                  it off the top and bottom equally — on a commander drawn
+                  head-up, off the head. A taller tile is the cost, and it is
+                  the right one on a shelf whose whole job is recognition. */}
               <CardArt src={deck.art_crop} alt={deck.commander[0] ?? deck.name}
-                       ratio="aspect-[626/300]" className="rounded-none" />
+                       ratio="aspect-[626/457]" className="rounded-none" />
               <div className="space-y-2 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="font-semibold leading-tight">{deck.name}</h2>

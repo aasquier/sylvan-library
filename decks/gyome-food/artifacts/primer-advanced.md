@@ -22,7 +22,7 @@ Drain loops (Blood Artist / Nadier's Nightblade / Mirkwood Bats), Mazirek or Pip
 
 ## Matchups
 
-TODO — needs Tier 2. Known shape: fast combo decks beat the grind, and artifact sweepers are far worse against this deck than against most Golgari boards because of Ygra.
+— unmeasured. The pod simulator that would answer this is not built yet. The known shape: fast combo decks beat the grind, and artifact sweepers are far worse against this deck than against most Golgari boards because of Ygra.
 
 ## Politics and table talk
 
@@ -34,11 +34,11 @@ Flooding without Tireless Provisioner, or holding a hand of payoffs with no outl
 
 ## Sideboard / swap philosophy
 
-TODO — populate the swap board.
+—
 
 ## Rules corners worth knowing
 
 Great Arashin City's white Spirit token does not add white to its identity (token colour is not a mana symbol). Jaheira is {2}{G} mono-green; the Background pairing is what makes her read Selesnya. Warren Soultrader costs 1 life per activation, which caps loops that do not gain life back.
 
 ---
-_Generated 2026-08-10 from `deck.yaml`._
+_Generated 2026-08-12 from `deck.yaml`._

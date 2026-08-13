@@ -76,9 +76,10 @@ notes:
     mana as waste, but Gyome's own {1}-sacrifice, Torment of Hailfire and
     Bolas's Citadel are real sinks it does not model.
   matchups: >
-    TODO — needs Tier 2. Known shape: fast combo decks beat the grind, and
-    artifact sweepers are far worse against this deck than against most
-    Golgari boards because of Ygra.
+    — unmeasured. The pod simulator that would answer this is not built yet.
+    The known shape: fast combo decks beat the grind, and artifact sweepers
+    are far worse against this deck than against most Golgari boards because
+    of Ygra.
   politics: >
     The deck looks like durdle for six turns and then kills the table from a
     board of Food. Expect to be underestimated early and targeted the moment a
@@ -87,7 +88,7 @@ notes:
     Flooding without Tireless Provisioner, or holding a hand of payoffs with
     no outlet. The deck has eleven ways to sacrifice for exactly this reason.
   swap_philosophy: >
-    TODO — populate the swap board.
+    —
   rules_corners: >
     Great Arashin City's white Spirit token does not add white to its identity
     (token colour is not a mana symbol). Jaheira is {2}{G} mono-green; the

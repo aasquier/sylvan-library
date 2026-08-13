@@ -28,9 +28,9 @@ notes:
     combo; you are deploying more power than the table can block, then breaking
     the board open with an overrun effect.
   mulligan: >
-    TODO — derive from a Tier 1 sweep, do not guess.
+    — not yet derived from a Tier 1 sweep, and not worth guessing at.
   curve_plan: >
-    TODO — recount from the corpus, not by hand.
+    — not yet recounted from the corpus, and not worth counting by hand.
   pitfalls: >
     (1) City of Solitude is symmetric — it turns off your own Heroic
     Intervention, Veil of Summer, Vines, Chord, Sylvan Safekeeper and Yavimaya
@@ -60,11 +60,12 @@ notes:
     Selvala, Heart of the Wilds plus Umbral Mantle for infinite green mana —
     cut Umbral Mantle for Snakeskin Veil to run zero combos.
   manabase: >
-    TODO — 34 lands inherited from the source, not yet confirmed by a sweep.
+    34 lands inherited from the source — not yet confirmed by a land sweep.
   matchups: >
-    TODO — needs Tier 2. Known shape: a fair Bracket 4 that wins through combat
-    math rather than a mana engine, so it loses to tuned Bracket 4 combo more
-    often than it beats it.
+    — unmeasured. The pod simulator that would answer this is not built yet.
+    The known shape: a fair Bracket 4 that wins through combat math rather
+    than a mana engine, so it loses to tuned Bracket 4 combo more often than
+    it beats it.
   politics: >
     You are visibly the biggest board at the table from turn four. There is no
     hiding this deck; play for the pod to be unable to profitably attack you

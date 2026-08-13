@@ -80,6 +80,47 @@ export function ManaText({ children, size = 13 }: {
   )
 }
 
+/**
+ * A colour identity at a size you are meant to notice, each colour lettered.
+ *
+ * The loud counterpart to `ColorPips`, which is 12px dots for a dense list.
+ * This is for the places where the identity *is* the headline — the deck
+ * hero and the builder's carousel — and it is shared between them rather than
+ * written twice, for the same reason `Pip` is shared: two copies of the same
+ * mark drift, and MTG's colours are fixed semantics that must not.
+ */
+export function ColorRing({ colors, size = 34 }: { colors: string[]; size?: number }) {
+  if (!colors.length) {
+    return (
+      <span
+        title="Colourless"
+        className="inline-flex items-center justify-center rounded-full font-semibold"
+        style={{
+          width: size, height: size, fontSize: size * 0.4,
+          background: 'var(--mtg-c)', color: '#141414',
+          boxShadow: '0 0 0 1px var(--hairline)',
+        }}
+      >C</span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center" style={{ gap: 2 }}>
+      {colors.map((c) => (
+        <span
+          key={c}
+          title={COLOR_NAMES[c]}
+          className="inline-flex items-center justify-center rounded-full font-semibold"
+          style={{
+            width: size, height: size, fontSize: size * 0.45,
+            background: COLOR_VAR[c], color: '#141414',
+            boxShadow: '0 0 0 1px var(--hairline)',
+          }}
+        >{c}</span>
+      ))}
+    </span>
+  )
+}
+
 export function ColorPips({ identity }: { identity: string[] }) {
   if (!identity.length) {
     return <span className="text-xs" style={{ color: 'var(--text-muted)' }}>colorless</span>
@@ -299,12 +340,21 @@ export function Caveat({ children }: { children: React.ReactNode }) {
 /* ------------------------------------------------------------------- art */
 
 export function CardArt({
-  src, alt, className = '', ratio = 'aspect-[626/457]',
+  src, alt, className = '', ratio = 'aspect-[626/457]', position,
 }: {
   src?: string | null
   alt: string
   className?: string
   ratio?: string
+  /**
+   * `object-position` for the crop, when the default centre is wrong.
+   *
+   * Scryfall's `art_crop` is 626x457 — about 1.37:1 — so any container wider
+   * than that throws away height, and a centred crop throws it away from the
+   * top and bottom equally. Card art is composed with its subject above the
+   * middle far more often than below it, so a wide band wants to keep the top.
+   */
+  position?: string
 }) {
   const [loaded, setLoaded] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
@@ -338,6 +388,7 @@ export function CardArt({
         onLoad={() => setLoaded(true)}
         // Never leave a broken URL as an invisible element -- show the frame.
         onError={() => setLoaded(true)}
+        style={position ? { objectPosition: position } : undefined}
         className={`art-fade h-full w-full object-cover ${loaded ? 'loaded' : ''}`}
       />
     </div>

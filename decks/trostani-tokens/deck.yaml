@@ -30,12 +30,12 @@ notes:
     need to interact much before then — it needs to not die and to hit land
     drops. From turn 6 the board doubles faster than anyone can remove it.
   mulligan: >
-    TODO — derive from a Tier 1 sweep. Note the source markdown quotes a
+    — not yet derived from a Tier 1 sweep. The source markdown quotes a
     60,000-trial figure (Trostani castable 60.9% by T4, 71.4% by T5, 78.6% by
     T6, mana screw 15.0%) from an earlier tool; re-derive with mtglab rather
     than inheriting it.
   curve_plan: >
-    TODO — recount from the corpus, not by hand.
+    — not yet recounted from the corpus, and not worth counting by hand.
   pitfalls: >
     (1) Divine Visitation replaces a populated token's characteristics
     ENTIRELY, including abilities — so while it is out you cannot populate a
@@ -62,13 +62,13 @@ notes:
     Crusade quietly making the board lethal several turns early, or Elspeth,
     Sun's Champion's ultimate.
   manabase: >
-    TODO — 35 lands inherited from the source, not yet confirmed by a sweep.
+    35 lands inherited from the source — not yet confirmed by a land sweep.
     The source's own note is worth keeping: replacing Fountainport and Gavony
     Township, both of which tap for colourless only and cannot help cast a
     {G}{G}{W}{W} commander, with real GW sources was worth roughly 7 points of
     castability at every turn.
   matchups: >
-    TODO — needs Tier 2.
+    — unmeasured. The pod simulator that would answer this is not built yet.
   politics: >
     You look harmless for five turns and then present lethal from nowhere. The
     table usually gives you those five turns; the moment a doubler resolves,

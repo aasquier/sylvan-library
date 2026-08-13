@@ -159,3 +159,41 @@ def test_verified_by_names_match_the_real_corpus():
             wrong.append(f"{c.name}: {c.verified_by} is "
                          f"{colors.key_for(rec.color_identity)}, not {c.key}")
     assert not wrong, "\n".join(wrong)
+
+
+def test_every_tier_has_a_label_and_a_blurb():
+    """A tier with no blurb is a tier whose definition has to live somewhere,
+    and the somewhere it chose was the first combination in it."""
+    for tier in colors.TIERS:
+        assert colors.TIER_LABELS[tier], tier
+        assert colors.TIER_BLURBS[tier], tier
+    assert set(colors.TIER_BLURBS) == set(colors.TIERS), "no orphan blurbs"
+
+
+@pytest.mark.parametrize("key,stolen", [
+    ("WUG", "Alara shattered"),      # Bant opened by explaining shards
+    ("WBG", "Where a shard is"),     # Abzan opened by explaining wedges
+    ("WUBR", "Four-colour identities are"),   # Artifice, the same again
+])
+def test_a_combination_does_not_explain_its_own_tier(key, stolen):
+    """The regression this table was added for.
+
+    Each of these three is the first entry in its tier, and each used to open
+    with a paragraph about the tier as a whole -- so the definition of a shard
+    was only visible to somebody who happened to land on Bant, and somebody
+    who arrowed straight to Naya never met it. `TIER_BLURBS` is where that
+    sentence lives now; a combination's own history is about the combination.
+    """
+    assert stolen not in colors.BY_KEY[key].history
+
+
+def test_no_reference_prose_uses_markdown():
+    """Blurbs, taglines, histories and era stories are rendered as plain text.
+    An asterisk meant as emphasis reaches the screen as an asterisk, which is
+    what `*enemies*` did in the wedge blurb."""
+    prose = [*colors.TIER_BLURBS.values()]
+    prose += [e.story for e in colors.ERAS]
+    prose += [c.tagline for c in colors.COMBINATIONS]
+    prose += [c.history for c in colors.COMBINATIONS]
+    for text in prose:
+        assert "*" not in text and "_" not in text, text[:60]

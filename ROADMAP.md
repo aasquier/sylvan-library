@@ -29,13 +29,58 @@ arc; this is what the next few sessions actually do.
    `mtglab-ui-auth` launch entry) is still worth a pass of its own, since it
    is the configuration Fly actually runs.
 3. **UI/UX polish** — the punchlist from that tour, and the phase that now
-   stands between here and deploy. **The list is the maintainer's; it is not
-   reproduced here, and a session should ask for it rather than inventing
-   one.** Two things from the cleanup pass are worth knowing while working
-   through it: the four-colour names now come from `colors.py`'s taxonomy
-   (Artifice, Chaos, Aggression, Altruism, Growth) and any new copy of that
-   table has to agree with it, and the six non-landing routes are lazy, so a
-   new screen wants a `React.lazy` line rather than a top-level import.
+   stands between here and deploy. The list came from the maintainer on
+   2026-08-12 and is written out below so it survives a fresh session; it is
+   his list, so **an item is done when he says it is, not when it compiles.**
+   Four branches, in order, each green before the next starts.
+
+   **1 — Bugs and quick wins.** Landed 2026-08-12.
+   - *Delete was unusable.* The confirm label was styled `uppercase` while the
+     check was case-sensitive against the lowercase slug, so typing what was
+     on screen left the button disabled and said nothing about why. The
+     confirmation is now the word `bury` (`service.DELETE_WORD`, and the slug
+     still works), matched case-insensitively, with the reason shown when it
+     does not match. Regression-tested on both sides.
+   - *Deck notes read like source code.* 17 `TODO —` markers across six decks
+     became prose or a bare `—`. Artifacts regenerated for the four decks the
+     gate lets through; Atla and Goreclaw still refuse on their banned card.
+   - *The commander was cropped out of its own page.* `art_crop` is 1.37:1 and
+     the hero band was 4.6:1, so it kept a third of the painting's height from
+     the middle. The band is atmosphere now and the commander is the whole
+     card, uncropped, with the usual hover. Library tiles went to `art_crop`'s
+     own ratio for the same reason.
+   - *Dead carousel controls* on Colourless and All five, which have one
+     member each.
+   - *Tier context lived inside the first combination of each tier* — Bant
+     explained shards, Abzan explained wedges, Artifice explained four-colour
+     identities — so it was invisible to anyone who arrowed past them.
+     `colors.TIER_BLURBS` is where it lives now, one per tier including the
+     four that never had one. A blurb is mechanical and never names a plane;
+     an era is a setting and never restates the mechanics.
+
+   **2 — Visual identity.** The splash and the Sylvan Library art (which is
+   only rendered on an *empty* library today, so the maintainer has never
+   seen it), an interactive colour pentagram for the mono tier, and the
+   builder's tier headers, which are plain grey panels. Decided: the card art
+   stays a Scryfall hotlink and everything else is **drawn in SVG/CSS** — no
+   new binary assets, no licensing question, and the pentagram is a diagram
+   anyway.
+
+   **3 — Teaching.** A vocabulary section for beginners; hover help in the
+   simulator, whose parameters are words and numbers divorced from meaning;
+   and real depth behind the guilds, shards, clans and colours — champions,
+   plot lines, classic cards.
+
+   **4 — Claude in the builder.** A guided, adaptive interview that helps pick
+   a theme and a commander, and a refactor pass over an existing deck. Both
+   are modes ADR 15's table does not name, so both want an ADR first. Rule 4
+   is untouched by either: no mode writes a `why`.
+
+   Two things from the cleanup pass are worth knowing while working through
+   it: the four-colour names come from `colors.py`'s taxonomy (Artifice,
+   Chaos, Aggression, Altruism, Growth) and any new copy of that table has to
+   agree with it, and the six non-landing routes are lazy, so a new screen
+   wants a `React.lazy` line rather than a top-level import.
 4. **Deploy** — [docs/HOSTING.md](docs/HOSTING.md) §7 is the checklist. What
    remains is an account, a card, a DNS record and the seeding run: the Fly
    app + volume, the Resend account and verified sending domain (start the
