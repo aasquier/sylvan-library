@@ -344,7 +344,18 @@ function TermEntry({ term, byKey, onJump }: {
       <dt className="text-base font-semibold tracking-tight">{term.term}</dt>
       <dd className="mt-1 max-w-3xl text-sm leading-relaxed"
           style={{ color: 'var(--text-secondary)' }}>
-        <ManaText>{term.long}</ManaText>
+        {/* `short` first, then `long`. The two are written as a pair rather
+            than as alternatives: about a third of the entries -- the whole
+            `stat.*` block, plus commander tax and mana base -- open their
+            paragraph as sentence *two*, commenting on a thing only `short`
+            ever names. Rendering the long form alone left those terms
+            undefined on the one page whose job is defining them. The search
+            below has always matched `short`, so it was also possible to find
+            an entry by text the page then refused to show. */}
+        <p style={{ color: 'var(--text-primary)' }}>
+          <ManaText>{term.short}</ManaText>
+        </p>
+        <p className="mt-1.5"><ManaText>{term.long}</ManaText></p>
         {term.see_also.length > 0 && (
           <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs"
                 style={{ color: 'var(--text-muted)' }}>

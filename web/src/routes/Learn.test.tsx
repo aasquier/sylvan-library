@@ -212,6 +212,20 @@ describe('the vocabulary tab', () => {
     expect(within(section).getByText(/London mulligan/)).toBeTruthy()
   })
 
+  it('leads with the short form, because a long form may be sentence two',
+     async () => {
+    renderLearn('/learn?tab=words')
+    await screen.findByText('Mulligan')
+    const entry = document.getElementById('term-sim.min_pieces')!
+    // The min-pieces `long` opens "A piece is…", commenting on a control that
+    // only `short` names — the shape a third of the real entries have. Both
+    // render, and the definition comes first.
+    const definition = within(entry).getByText(/Lands plus cheap ramp/)
+    const paragraph = within(entry).getByText(/mana value 2 or less/)
+    expect(definition.compareDocumentPosition(paragraph)
+           & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('filters on a search, and says so when nothing matches', async () => {
     renderLearn('/learn?tab=words')
     await screen.findByText('Mulligan')

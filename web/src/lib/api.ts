@@ -581,9 +581,9 @@ export interface ReferenceCard {
 export interface Term {
   key: string
   term: string
-  /** One sentence — what a tooltip shows. */
+  /** One sentence — a tooltip, and the Learn page's lead line. */
   short: string
-  /** A paragraph — what the Learn page shows. */
+  /** A paragraph, elaborating `short` rather than repeating it. */
   long: string
   section: string
   see_also: string[]

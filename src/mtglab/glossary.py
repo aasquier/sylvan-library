@@ -19,10 +19,18 @@ makes it checkable: the meaning of `min_pieces` belongs to `sim.tier1.engine`'s
 `KeepRule`, not to a form, and `tests/test_glossary.py` fails if a control on
 the screen has no entry.
 
-`short` is one sentence and is what a tooltip shows. `long` is a paragraph and
-is what the Learn page shows. Both are rendered as **plain text** -- an
-asterisk meant as emphasis reaches the screen as an asterisk -- except that a
-`{G}` is drawn as a mana symbol by the same `ManaText` the deck files use.
+`short` is one sentence and is what a tooltip shows. `long` is a paragraph.
+**The Learn page shows both, `short` first**, and that is a contract rather than
+a layout: a `long` here is free to open as sentence *two*. Around a third of
+them do -- every `stat.*` entry comments on a number that only `short` names,
+and so do commander tax and mana base -- so the paragraph elaborates a
+definition, it does not have to repeat one. Writing a new entry, put the
+definition in `short` and the argument in `long`; the page reads as one
+because it renders them in that order.
+
+Both are rendered as **plain text** -- an asterisk meant as emphasis reaches
+the screen as an asterisk -- except that a `{G}` is drawn as a mana symbol by
+the same `ManaText` the deck files use.
 """
 
 from __future__ import annotations

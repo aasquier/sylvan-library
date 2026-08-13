@@ -670,17 +670,26 @@ arc; this is what the next few sessions actually do.
       robust half of the reattach story** — the localStorage id only ever
       covered one tab; this covers a reload, a second tab, another device and a
       cleared cache, because the server is the thing that knows.
-   2. **Learn/Vocabulary renders `long` only.** `Learn.tsx:347` shows
-      `term.long`; `term.short` is used at `:395` *solely* to match the search
-      box, and `components/term.tsx:106` is the only place it is ever displayed.
-      A `Term` is defined twice at two lengths and the page shows one of them.
-      35 of the 37 longs stand alone, but **Commander tax** and **Mana base**
-      were written as sentence *two* — "The cost is cumulative and it does not
-      reset…", "Two jobs, and they are not the same job…" — so the page never
-      defines them at all. Two fixes and they are not equivalent: render `short`
-      as a lead line, which uses the data the way it was designed and touches
-      all 37, or rewrite those two longs, which touches two. **The maintainer's
-      call**, because it is a decision about what a glossary entry is.
+   2. ~~**Learn/Vocabulary renders `long` only.**~~ **Fixed 2026-08-13**, by
+      rendering `short` as a lead line — the maintainer's call between that and
+      rewriting the two offending paragraphs.
+
+      **The count in the original note was wrong, and it is what decided it.**
+      "35 of the 37 longs stand alone" does not survive reading all 37: around a
+      third open as sentence *two*. The entire `stat.*` block does it as a house
+      style — "The tail the median hides", "The cost of flooding, made into a
+      number", "The sweep's answer, and only as good as the spread it sits in" —
+      each commenting on a measure that only `short` ever names. **Commander
+      tax** and **Mana base** were not two exceptions; they were the two the
+      maintainer happened to open. So rewriting them would have fixed two
+      symptoms and left a dozen, and left the next entry free to acquire the
+      same defect.
+
+      The rendering fix also closes a smaller hole: the search box at `:395` has
+      always matched `short`, so it was possible to find an entry by text the
+      page then refused to display. `glossary.py`'s docstring now states the
+      contract the data always had — definition in `short`, argument in `long`,
+      the page renders both in that order — so a new entry inherits it.
    3. **iOS Safari private tab lost the dossier reattach.** Unexplained — zero
       polls after the reload, while the theme key survived a reload in that same
       tab and planting a job id locally proved the read half works. P3, and (1)
