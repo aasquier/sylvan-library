@@ -579,7 +579,7 @@ with the same "derived, never set independently" rule as `DB_PATH`.
 
 ```bash
 fly secrets set RESEND_API_KEY="paste-it-here"
-fly secrets set ANTHROPIC_API_KEY="paste-it-here"   # only once ADR 15's modes exist
+fly secrets set ANTHROPIC_API_KEY="paste-it-here"   # four modes exist; see below
 ```
 
 **If you set them in the dashboard instead, they are `Staged` and not live.**
@@ -651,6 +651,22 @@ out, which is the correct emergency response to a suspected session leak.
 `ANTHROPIC_API_KEY` is read by the Anthropic SDK directly; the app never binds
 it to a variable, and asks only whether it is set. Locally the same variable
 comes from a gitignored `.env` (see `.env.example`) rather than from Fly.
+
+**The key alone is not enough, and the failure is silent.** The image must also
+carry the SDK, which is the `claude` extra. On the first deployment it did not:
+the Dockerfile installed `.[api]` on the then-true grounds that no ADR 15 mode
+was built, so the instance had the secret set and nothing that could read it.
+Nothing looked broken from outside — the app was healthy, the UI rendered the
+dossier and theme-interview controls, and every one of them was a 503.
+`mtglab claude check` on the machine is what says so:
+
+```bash
+fly ssh console -C "mtglab claude check"     # status: available
+```
+
+`tests/test_packaging.py` now pins the image's extras against the surfaces that
+need them, because no other test can see this: they all stub the SDK, so they
+pass whether or not it is installed.
 
 #### Why a static key here, and when to stop using one
 

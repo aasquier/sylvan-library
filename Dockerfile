@@ -35,12 +35,23 @@ COPY src ./src
 # A venv rather than `--prefix`, so the runtime stage can copy one directory
 # and put it on PATH without caring where the interpreter keeps site-packages.
 #
-# `.[api]` and not `.[dev]`: fastapi, uvicorn, python-dotenv and argon2-cffi.
-# The `claude` extra is left out on purpose — ADR 15's modes are not built, and
-# an unused SDK in a deployed image is dependency surface with no caller.
+# `.[api,claude]` and not `.[dev]`: fastapi, uvicorn, python-dotenv, argon2-cffi
+# and the Anthropic SDK. No pytest, ruff or mypy.
+#
+# The `claude` extra was left out when this file was written, and the reason
+# given was that "ADR 15's modes are not built, so an unused SDK is dependency
+# surface with no caller." That was true on 2026-08-12 and is not true now:
+# four modes are built, and the deployed instance had `ANTHROPIC_API_KEY` set
+# as a secret while the image had nothing that could read it. `mtglab claude
+# check` on the live machine answered `unavailable`, and the dossier and both
+# theme-interview modes were 503s behind buttons the UI shows.
+#
+# #60 is the argument in one line: the theme proposal was made a background job
+# *because* no hosted proxy holds a 226-second POST open. That work was for a
+# deployment, so the deployment has to be able to run it.
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --no-cache-dir ".[api]"
+RUN pip install --no-cache-dir ".[api,claude]"
 
 # ------------------------------------------------------------------ runtime
 
