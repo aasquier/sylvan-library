@@ -82,6 +82,10 @@ class _Response:
     stop_reason: str = "end_turn"
     model: str = "claude-sonnet-5"
     usage: _Usage = field(default_factory=_Usage)
+    # None unless a server-side tool ran, which is how the real response
+    # behaves — and the reason `converse` reads it defensively rather than
+    # assuming the attribute is populated.
+    container: Any = None
 
 
 class _Messages:
@@ -381,3 +385,134 @@ def test_the_stance_widens_the_prompt_without_widening_the_tools():
 
 def test_max_tool_turns_is_a_documented_ceiling_not_a_magic_number():
     assert modes.MAX_TOOL_TURNS >= 3
+
+
+# --------------------------------------------------------- server-side tools
+#
+# Everything below arrived with the dossier (ADR 19), the first mode to use an
+# Anthropic-hosted tool. Two of the three are about failures that only appear
+# once a server tool and a second turn are both in play, which is why they were
+# found by running the mode rather than by reading the request shapes.
+
+@dataclass
+class _SearchResult:
+    url: str
+    title: str
+
+
+@dataclass
+class _SearchBlock:
+    content: Any
+    type: str = "web_search_tool_result"
+
+
+@dataclass
+class _SearchError:
+    error_code: str
+
+
+@dataclass
+class _Container:
+    id: str
+
+
+SEARCHING = Mode(name="searching", purpose="p", instructions="i",
+                 tool_names=("get_cards",),
+                 server_tools=({"type": "web_search_20260209",
+                                "name": "web_search"},))
+
+
+def test_a_server_tool_reaches_the_request_but_not_the_dispatcher():
+    """Two tool lists, one door. A hosted tool is advertised to the model and
+    is not something `tools.run` will ever be asked to execute."""
+    names = {t["name"] for t in SEARCHING.schemas()}
+    assert names == {"get_cards", "web_search"}
+    with pytest.raises(tools.ToolNotAllowed):
+        tools.run("web_search", {"query": "x"}, allowed=SEARCHING.tool_names)
+
+
+def test_the_pages_a_search_returned_are_collected(scripted):
+    """`Turn.searched` is evidence, not telemetry: with a response schema set
+    the API attaches no citations, so this list is the only thing a caller can
+    check an answer's sources against."""
+    scripted([_Response([
+        _SearchBlock([_SearchResult("https://example.com/a", "A"),
+                      _SearchResult("https://example.com/b", "B")]),
+        _Text("done"),
+    ])])
+    turn = converse(SEARCHING, messages=ASK, stance=Stance())
+    assert [p["url"] for p in turn.searched] == ["https://example.com/a",
+                                                 "https://example.com/b"]
+    assert turn.searched[0]["title"] == "A"
+
+
+def test_the_same_page_found_twice_is_listed_once(scripted):
+    """A mode that searches twice around a topic gets overlapping pages back,
+    and the same source listed twice is noise in the evidence list."""
+    stub = scripted([_Response([
+        _SearchBlock([_SearchResult("https://example.com/a", "A")]),
+        _ToolUse("get_cards", {"names": ["Sol Ring"]}),
+    ], stop_reason="tool_use"), _Response([
+        _SearchBlock([_SearchResult("https://example.com/a", "A"),
+                      _SearchResult("https://example.com/b", "B")]),
+        _Text("done"),
+    ])])
+    turn = converse(SEARCHING, messages=ASK, stance=Stance())
+    assert len(stub.messages.calls) == 2, "both turns must actually run"
+    assert [p["url"] for p in turn.searched] == ["https://example.com/a",
+                                                 "https://example.com/b"]
+
+
+def test_a_failed_search_is_not_an_empty_result_set(scripted):
+    """On success the block's content is a list; on failure it is an error
+    object. Reading the second as the first turns a broken search into
+    'found nothing', which is a different answer."""
+    scripted([_Response([_SearchBlock(_SearchError("max_uses_exceeded")),
+                         _Text("done")])])
+    turn = converse(SEARCHING, messages=ASK, stance=Stance())
+    assert turn.searched == []
+    assert turn.search_errors == ["max_uses_exceeded"]
+
+
+def test_a_paused_turn_is_resumed_rather_than_returned(scripted):
+    """The failure this project already knows by another name.
+
+    A server-side tool loop that hits its own limit stops with `pause_turn`
+    carrying text that reads finished — the same shape as a Forge game that
+    plays on with 96 cards and reports a plausible winner. Returning it would
+    hand back a truncated answer nothing marks as truncated.
+    """
+    stub = scripted([
+        _Response([_Text("I have searched and I think")], stop_reason="pause_turn"),
+        _Response([_Text("the complete answer.")]),
+    ])
+    turn = converse(SEARCHING, messages=ASK, stance=Stance())
+    assert turn.stop_reason == "end_turn"
+    assert turn.text == "the complete answer."
+    assert len(stub.messages.calls) == 2
+    # Resumed by re-sending, with nothing appended: a trailing "continue" would
+    # be a new instruction rather than a resumption.
+    assert stub.messages.calls[1]["messages"][-1]["role"] == "assistant"
+
+
+def test_a_container_from_a_server_tool_is_carried_to_the_next_turn(scripted):
+    """The dated web search filters its results inside a code-execution
+    container. A follow-up request carrying that turn's blocks is refused with
+    `container_id is required...` unless the container comes with it — a 400
+    that needs both a server tool and a second turn to appear at all.
+    """
+    stub = scripted([
+        _Response([_SearchBlock([_SearchResult("https://example.com/a", "A")]),
+                   _ToolUse("get_cards", {"names": ["Sol Ring"]})],
+                  stop_reason="tool_use", container=_Container("cont_abc")),
+        _Response([_Text("done")]),
+    ])
+    converse(SEARCHING, messages=ASK, stance=Stance())
+    assert "container" not in stub.messages.calls[0]
+    assert stub.messages.calls[1]["container"] == "cont_abc"
+
+
+def test_a_mode_with_no_server_tool_never_sends_a_container(scripted):
+    stub = scripted([_Response([_Text("done")])])
+    converse(MODE, messages=ASK, stance=Stance())
+    assert "container" not in stub.messages.calls[0]

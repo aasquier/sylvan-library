@@ -216,6 +216,13 @@ def list_decks(*, source: DeckSource | None = None) -> list[dict[str, Any]]:
                 if rec is not None:
                     art = getattr(rec, "image_art_crop", None) or rec.image_normal
                     identity = sorted(rec.color_identity)
+                # A deck's chosen printing shows on the shelf too. The library
+                # is where somebody notices they picked one, and a tile that
+                # kept the default while the deck page showed a Secret Lair
+                # would read as a bug in one of the two.
+                chosen = _chosen_art(deck, con)
+                if chosen:
+                    art = chosen["art_crop"] or chosen["image"] or art
             out.append({
                 "slug": deck.slug,
                 "name": deck.name,
@@ -350,6 +357,15 @@ def commander_dossier(slug: str, *,
             "ORDER BY edhrec_rank NULLS LAST LIMIT 6",
             [f"%{character}%", name]).fetchall()
 
+        # Scryfall's stable id for the *card*, across every printing of it.
+        # Two things need it and neither is decorative: the art picker lists a
+        # card's printings by it, and ADR 19 keys a cached dossier on it —
+        # a dossier is about a character, so every deck that commander leads
+        # shares one. `CardRecord` does not carry it, hence the query.
+        row = con.execute("SELECT oracle_id FROM oracle_cards WHERE name = ? "
+                          "LIMIT 1", [name]).fetchone()
+        oracle_id = row[0] if row else None
+
         printed = con.execute(
             "SELECT count(*), min(released_at) FROM printings "
             "WHERE oracle_id = (SELECT oracle_id FROM oracle_cards "
@@ -367,6 +383,7 @@ def commander_dossier(slug: str, *,
             "slug": deck.slug,
             "card": {
                 "name": rec.name,
+                "oracle_id": oracle_id,
                 "mana_cost": rec.mana_cost,
                 "type_line": rec.type_line,
                 "oracle_text": rec.oracle_text,
@@ -399,13 +416,132 @@ def commander_dossier(slug: str, *,
             con.close()
 
 
+def art_crop_from(image_normal: str | None) -> str | None:
+    """The `art_crop` URL for a printing whose `normal` URL we have.
+
+    The `printings` table stores `image_normal` and no crop, so a deck showing
+    a chosen printing would have nothing to put in the hero band, which is a
+    crop. Rather than adding a column and requiring a 500MB re-ingest before
+    the feature works at all, the crop is derived: Scryfall's image URLs differ
+    only in the size segment, which is checkable rather than assumed --
+    `oracle_cards` stores both for the same printing id and they are identical
+    but for `normal` / `art_crop`.
+
+    Anything not matching that shape returns None rather than a guess, and the
+    caller falls back to the full card image. A wrong URL renders as a broken
+    image; None renders as the card.
+    """
+    if not image_normal or "/normal/" not in image_normal:
+        return None
+    return image_normal.replace("/normal/", "/art_crop/", 1)
+
+
+def commander_printings(slug: str, *,
+                        source: DeckSource | None = None) -> dict[str, Any]:
+    """Every printing of this deck's commander, newest first.
+
+    **Non-digital only.** Arena and MTGO printings have their own art in the
+    corpus and are not things you can put in a sleeve, so offering one as a
+    deck's art is offering something that does not exist as a card. The count
+    the maintainer will recognise -- Goreclaw has twelve, Gyome three -- is the
+    physical count, and this is what makes it so.
+
+    `selected` marks the deck's current choice so a picker does not have to
+    compare ids itself, and it is computed here rather than in the client so
+    that the CLI and the app agree about which one is showing.
+    """
+    deck = _source(source).get(slug)
+    empty: dict[str, Any] = {"slug": deck.slug, "commander": "",
+                             "selected": deck.commander_art, "printings": []}
+    if not deck.commander:
+        return empty
+    name = deck.commander[0]
+    empty["commander"] = name
+
+    con = _connect()
+    if con is None:
+        return empty
+    try:
+        rows = con.execute(
+            "SELECT p.id, p.set_code, p.set_name, p.collector_number, "
+            "       p.rarity, p.released_at, p.promo, p.image_normal, "
+            "       p.price_usd "
+            "FROM printings p "
+            "WHERE p.oracle_id = (SELECT oracle_id FROM oracle_cards "
+            "                     WHERE name = ? LIMIT 1) "
+            # `digital IS NOT TRUE` rather than `= FALSE`: the column is
+            # nullable, and a NULL means "Scryfall did not say", which for a
+            # printing that exists on paper is the common case in older rows.
+            # `= FALSE` would silently hide them.
+            "  AND p.digital IS NOT TRUE "
+            "  AND p.image_normal IS NOT NULL "
+            "ORDER BY p.released_at DESC NULLS LAST, p.set_code, "
+            "         p.collector_number",
+            [name]).fetchall()
+    finally:
+        con.close()
+
+    return {
+        **empty,
+        "printings": [{
+            "id": r[0],
+            "set_code": (r[1] or "").upper(),
+            "set_name": r[2],
+            "collector_number": r[3],
+            "rarity": r[4],
+            "released_at": r[5].isoformat() if r[5] else None,
+            "promo": bool(r[6]),
+            "image": r[7],
+            "art_crop": art_crop_from(r[7]),
+            "price_usd": r[8],
+            "selected": r[0] == deck.commander_art,
+        } for r in rows],
+    }
+
+
+def _chosen_art(deck: Any, con: Any) -> dict[str, Any] | None:
+    """The printing this deck picked for its commander, if it picked one.
+
+    Returns None for the common case -- no choice made -- so every caller's
+    fallback is the corpus's default printing, unchanged. A choice pointing at
+    a printing that no longer exists also returns None rather than blanking
+    the art: a stale id is a deck showing its default, not a deck with no
+    commander picture.
+    """
+    art_id = getattr(deck, "commander_art", "")
+    if not art_id or con is None:
+        return None
+    row = con.execute(
+        "SELECT image_normal, set_name, set_code FROM printings WHERE id = ?",
+        [art_id]).fetchone()
+    if row is None or not row[0]:
+        return None
+    return {"image": row[0], "art_crop": art_crop_from(row[0]),
+            "set_name": row[1], "set_code": (row[2] or "").upper()}
+
+
 def get_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
     deck = _source(source).get(slug)
     con = _connect()
     try:
         cards = _corpus_for(deck, con)
         commander_rec = cards.get(deck.commander[0]) if deck.commander else None
+        commander_card = _card_json(
+            type("E", (), {"name": deck.commander[0], "category": "commander",
+                           "why": deck.notes.get("commander_why", ""), "qty": 1})(),
+            commander_rec, full=True) if commander_rec else None
+        # The chosen printing replaces the images and nothing else. Oracle text,
+        # cost, type line and colour identity are the *card's*, and they do not
+        # vary by printing -- swapping them here would make a cosmetic choice
+        # look like it changed what the commander does.
+        chosen = _chosen_art(deck, con)
+        if commander_card and chosen:
+            commander_card["image"] = chosen["image"]
+            commander_card["art_crop"] = chosen["art_crop"] or commander_card.get("art_crop")
+            commander_card["printing"] = {"set_name": chosen["set_name"],
+                                          "set_code": chosen["set_code"]}
         return {
+            "commander_art": deck.commander_art,
             "slug": deck.slug,
             "name": deck.name,
             "status": deck.status,
@@ -419,10 +555,7 @@ def get_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
             "total_cards": deck.total_cards,
             "land_count": deck.land_count,
             "color_identity": sorted(commander_rec.color_identity) if commander_rec else [],
-            "commander_card": _card_json(
-                type("E", (), {"name": deck.commander[0], "category": "commander",
-                               "why": deck.notes.get("commander_why", ""), "qty": 1})(),
-                commander_rec, full=True) if commander_rec else None,
+            "commander_card": commander_card,
             "cards": [_card_json(e, cards.get(e.name)) for e in deck.cards],
             "swap_board": [_card_json(e, cards.get(e.name)) for e in deck.swap_board],
             "corpus_available": con is not None,
@@ -799,13 +932,18 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
         # user should be able to read next to the dial.
         "never": "No stance lets Claude write a card's rationale.",
         # The modes that exist, so a UI can offer what is built rather than
-        # what ADR 15 planned. One today.
+        # what ADR 15 planned. Two today.
         "modes": [{
-            "name": interview.name,
-            "purpose": interview.purpose,
-            "tools": list(interview.tool_names),
-            "writes": list(interview.may_write),
-        }],
+            "name": mode.name,
+            "purpose": mode.purpose,
+            "tools": list(mode.tool_names),
+            # Anthropic's own, listed separately because they are a different
+            # kind of thing: they never reach this package's tool door, and a
+            # UI that says "searches the web" is saying something a user cares
+            # about in a way "get_cards" is not.
+            "server_tools": [t["name"] for t in mode.server_tools],
+            "writes": list(mode.may_write),
+        } for mode in (interview, claude_dossier_mode())],
     }
 
 
@@ -819,6 +957,12 @@ def claude_interview_mode() -> Mode:
     """
     from mtglab.claude.interview import RATIONALE_INTERVIEW
     return RATIONALE_INTERVIEW
+
+
+def claude_dossier_mode() -> Mode:
+    """The commander dossier's mode object (ADR 19). Imported lazily too."""
+    from mtglab.claude.dossier import COMMANDER_DOSSIER
+    return COMMANDER_DOSSIER
 
 
 class ClaudeFailed(Exception):
@@ -858,6 +1002,58 @@ def claude_interview(*, slug: str, card: str, requested: Any = None,
         # to turn a 401 into "your key may have expired" rather than a stack
         # trace. Same treatment `claude check` gives it.
         raise ClaudeFailed(claude_client.explain(exc)) from exc
+
+
+def claude_dossier(*, slug: str, requested: Any = None, refresh: bool = False,
+                   source: DeckSource | None = None) -> dict[str, Any]:
+    """Who this deck's commander is (ADR 19). Cached on the commander.
+
+    Note the two ways this differs from `claude_interview` above, both of them
+    consequences of what a dossier *is*. It takes no card, because it is about
+    the one card the deck is named for. And it can answer without reaching the
+    network at all — a stored dossier is served whatever the stance, since
+    reading a row somebody else's call produced is not a call.
+    """
+    from mtglab.claude import client as claude_client
+    from mtglab.claude.dossier import NoCommander, ask
+    from mtglab.claude.modes import ModeExhausted
+
+    try:
+        return ask(slug, requested=requested, refresh=refresh, source=source)
+    except (claude_client.ClaudeUnavailable, NoCommander, DeckNotFound):
+        raise
+    except ModeExhausted as exc:
+        raise ClaudeFailed(str(exc)) from exc
+    except Exception as exc:                                       # noqa: BLE001
+        raise ClaudeFailed(claude_client.explain(exc)) from exc
+
+
+def claude_dossier_cached(*, slug: str,
+                          source: DeckSource | None = None) -> dict[str, Any]:
+    """A stored dossier for this deck's commander, or a payload saying there is
+    none. Never calls Anthropic, so the deck page can ask on every load.
+
+    This is why the write path and the read path are separate functions rather
+    than one with a flag: a GET that could spend money is a GET somebody will
+    eventually put in a polling loop.
+    """
+    from mtglab.claude.dossier import NoCommander, brief, cache_key, get
+
+    try:
+        facts = brief(slug, source=source)
+    except NoCommander:
+        return {"slug": slug, "commander": "", "dossier": {}, "cached": False,
+                "generated_at": None}
+    card = facts["card"]
+    hit = get(cache_key(card.get("oracle_id") or ""))
+    return {
+        "answered_by": "claude" if hit else "",
+        "slug": slug,
+        "commander": card["name"],
+        "dossier": hit["result"] if hit else {},
+        "cached": hit is not None,
+        "generated_at": hit["created_at"] if hit else None,
+    }
 
 
 # ------------------------------------------------------------------- colours
@@ -1115,16 +1311,49 @@ def set_card_field(slug: str, *, name: str, field: str, value: Any,
     return _commit(slug, decks, updated, card=entry.name, field=field)
 
 
+def _check_printing(deck: Any, printing_id: str) -> None:
+    """Refuse an art id that is not a printing of this deck's commander.
+
+    Silence when there is no corpus: a fresh clone cannot check, and refusing
+    every art change on a machine without a 500MB download would be a worse
+    answer than accepting one that renders as the default.
+    """
+    if not deck.commander:
+        raise EditRejected("this deck has no commander, so it has no art to set")
+    con = _connect()
+    if con is None:
+        return
+    try:
+        row = con.execute(
+            "SELECT p.name FROM printings p WHERE p.id = ? AND p.oracle_id = "
+            "(SELECT oracle_id FROM oracle_cards WHERE name = ? LIMIT 1)",
+            [printing_id, deck.commander[0]]).fetchone()
+    finally:
+        con.close()
+    if row is None:
+        raise EditRejected(
+            f"{printing_id} is not a printing of {deck.commander[0]}. "
+            f"`GET /api/decks/{deck.slug}/printings` lists the ones that are.")
+
+
 def set_deck_field(slug: str, *, field: str, value: Any,
                    source: DeckSource | None = None) -> dict[str, Any]:
-    """Change one of the deck's own scalars: stage, status or bracket.
+    """Change one of the deck's own scalars: stage, status, bracket or art.
 
     Promotion -- `stage` to `curated` -- is the one that closes the import
     lifecycle. It is refused while any card is blank, by the edit layer, so the
     deck is never written into a state its author has to undo.
+
+    `commander_art` is checked here rather than in `edit.py`, because it is the
+    one settable field whose validity is a question for the corpus: the editor
+    can tell a printing id from a typo by its shape, and only a query can tell
+    whether that id is a printing *of this commander*. Pointing a deck at some
+    other card's art would be accepted by every check that did not ask.
     """
     decks = _for_writing(source)
-    decks.get(slug)                     # 404 before anything else
+    deck = decks.get(slug)              # 404 before anything else
+    if field == "commander_art" and str(value or "").strip():
+        _check_printing(deck, str(value).strip())
     try:
         updated = edit.set_deck_field(decks.read_text(slug), field=field,
                                       value=value)
@@ -1341,6 +1570,9 @@ def cards_named(*, names: list[str]) -> dict[str, Any]:
                 "reserved": rec.reserved,
                 "edhrec_rank": rec.edhrec_rank,
                 "image": rec.image_normal,
+                # Cropped art, for callers rendering a card as a chip rather
+                # than as a scan -- the dossier's rivals, for one.
+                "art_crop": getattr(rec, "image_art_crop", None),
                 # Strings, because "*" and "1+*" are real printed values. For
                 # a double-faced card these are the front face's, matching
                 # `mana_cost`; both faces stay available in `card_faces`.

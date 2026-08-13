@@ -117,6 +117,15 @@ class Deck:
     status: str = "theoretical"
     stage: str = "curated"
     commander: list[str] = field(default_factory=list)
+    # Which printing's art the deck shows for its commander: a Scryfall
+    # printing id, or empty for "whatever the corpus considers the default".
+    #
+    # A deck property rather than a per-viewer setting, deliberately.
+    # `deck.yaml` is the source of truth (ADR 1) and the choice should travel
+    # with the deck through git the way every other decision about it does --
+    # a Secret Lair Goreclaw is a fact about that deck, not a preference of
+    # whoever is looking at it.
+    commander_art: str = ""
     companion: str | None = None
     bracket: int | None = None
     strategy: str = ""
@@ -197,6 +206,7 @@ class Deck:
             status=str(raw.get("status") or "theoretical").strip().lower(),
             stage=str(raw.get("stage") or "curated").strip().lower(),
             commander=list(commander),
+            commander_art=str(raw.get("commander_art") or "").strip(),
             companion=raw.get("companion"),
             bracket=raw.get("bracket"),
             strategy=raw.get("strategy", ""),
@@ -214,6 +224,11 @@ class Deck:
             "stage": self.stage,
             "commander": self.commander,
         }
+        # Omitted when unset, so the six decks that predate it are unchanged by
+        # a round trip and a `commander_art:` line in a diff always means
+        # somebody picked one.
+        if self.commander_art:
+            payload["commander_art"] = self.commander_art
         if self.companion:
             payload["companion"] = self.companion
         if self.bracket is not None:

@@ -16,15 +16,19 @@ import type {
 import DeckDetail from './DeckDetail'
 
 vi.mock('../lib/api', async () => ({
-  // The real one: it is pure, and a stub here would let a regression in
-  // message extraction pass every refusal test in this file.
+  // The real ones: both are pure, and a stub would let a regression in message
+  // extraction — or in "is there actually a dossier here" — pass every test in
+  // this file.
   errorMessage: (await vi.importActual<typeof import('../lib/api')>(
     '../lib/api')).errorMessage,
+  hasDossier: (await vi.importActual<typeof import('../lib/api')>(
+    '../lib/api')).hasDossier,
   api: {
     deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
     swapCard: vi.fn(), addCard: vi.fn(), removeCard: vi.fn(),
     setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),
     claudeStatus: vi.fn(), interview: vi.fn(), commander: vi.fn(),
+    dossier: vi.fn(), writeDossier: vi.fn(), printings: vi.fn(),
   },
 }))
 
@@ -158,6 +162,63 @@ const CLAUDE_STATUS = {
             tools: ['get_cards'], writes: [] }],
 }
 
+/** No dossier written yet — the state five of the six decks are in. */
+const NO_DOSSIER = {
+  answered_by: '', slug: 'goreclaw-stompy',
+  commander: 'Goreclaw, Terror of Qal Sisma',
+  dossier: {}, cached: false, generated_at: null,
+}
+
+/**
+ * One that has been written, shaped as it comes back from the server: already
+ * source-checked, with the counts of what was discarded on the way.
+ */
+const WRITTEN_DOSSIER = {
+  answered_by: 'claude', slug: 'goreclaw-stompy',
+  commander: 'Goreclaw, Terror of Qal Sisma',
+  cached: false, generated_at: '2026-08-12T10:00:00+00:00',
+  asked: true, reason: '', model: 'claude-sonnet-5',
+  usage: { input_tokens: 800, output_tokens: 900 },
+  never: 'This is Claude’s writing over cited pages. The card facts above it '
+         + 'are the corpus’s.',
+  dossier: {
+    who: { prose: 'A bear god of Qal Sisma.', source_ids: ['s1'] },
+    archetype: { name: 'Mono-green stompy',
+                 prose: 'Big creatures, cheaper.', source_ids: ['s1', 's2'] },
+    rivals: [{
+      name: 'Ghalta, Primal Hunger', prose: 'Bigger, and dumber about it.',
+      source_ids: ['s2'], mana_cost: '{10}{G}{G}',
+      type_line: 'Legendary Creature — Elder Dinosaur',
+      image: 'https://cards.scryfall.io/normal/ghalta.jpg',
+      art_crop: 'https://cards.scryfall.io/art_crop/ghalta.jpg',
+      legal_commander: true, oracle_text: 'Trample',
+    }],
+    standing: { prose: 'A 2018 mythic that never left.', source_ids: ['s2'] },
+    sources: [
+      { id: 's1', title: 'Goreclaw | EDHREC', url: 'https://edhrec.com/g' },
+      { id: 's2', title: 'Stompy primer', url: 'https://example.com/stompy' },
+    ],
+    sources_dropped: 0, rivals_dropped: 0, searched: 18,
+  },
+}
+
+const PRINTINGS = {
+  slug: 'goreclaw-stompy', commander: 'Goreclaw, Terror of Qal Sisma',
+  selected: '',
+  printings: [
+    { id: 'p-blc', set_code: 'BLC', set_name: 'Bloomburrow Commander',
+      collector_number: '212', rarity: 'rare', released_at: '2024-08-02',
+      promo: false, image: 'https://cards.scryfall.io/normal/blc.jpg',
+      art_crop: 'https://cards.scryfall.io/art_crop/blc.jpg',
+      price_usd: 1.2, selected: false },
+    { id: 'p-m19', set_code: 'M19', set_name: 'Core Set 2019',
+      collector_number: '186', rarity: 'rare', released_at: '2018-07-13',
+      promo: false, image: 'https://cards.scryfall.io/normal/m19.jpg',
+      art_crop: 'https://cards.scryfall.io/art_crop/m19.jpg',
+      price_usd: 2.4, selected: false },
+  ],
+}
+
 const INTERVIEW = {
   answered_by: 'claude', mode: 'rationale-interview',
   model: 'claude-sonnet-5', slug: 'goreclaw-stompy', card: 'Sol Ring',
@@ -196,6 +257,11 @@ beforeEach(() => {
   // button rather than its "not installed" note in most tests.
   vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(CLAUDE_STATUS)
   vi.mocked(api.interview).mockReset().mockResolvedValue(INTERVIEW)
+  // No dossier stored by default — the ordinary state for five of the six
+  // decks, and the one the collapsed panel has to handle without noise.
+  vi.mocked(api.dossier).mockReset().mockResolvedValue(NO_DOSSIER)
+  vi.mocked(api.writeDossier).mockReset().mockResolvedValue(WRITTEN_DOSSIER)
+  vi.mocked(api.printings).mockReset().mockResolvedValue(PRINTINGS)
 })
 
 afterEach(cleanup)
@@ -706,5 +772,178 @@ describe('DeckDetail commander facts', () => {
     renderDeck()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.queryByText(/about this commander/i)).toBeNull()
+  })
+})
+
+/**
+ * The commander dossier panel (ADR 19).
+ *
+ * The ADR's acceptance criterion for the UI is that the page shows the seams:
+ * the counted strip stays separate, Claude's prose is labelled as Claude's,
+ * and a claim from the web keeps its link. Those are the tests here — they are
+ * not cosmetic assertions, they are the visible half of a rule the server
+ * enforces structurally.
+ */
+describe('DeckDetail commander dossier', () => {
+  it('is collapsed by default so the page does not get busy', async () => {
+    renderDeck()
+    expect(await screen.findByText(/who is goreclaw\?/i)).toBeTruthy()
+    // The heading is there; the prose is not, until asked for.
+    expect(screen.queryByText(/bear god of qal sisma/i)).toBeNull()
+  })
+
+  it('says whose writing it is without being opened', async () => {
+    // Somebody who never expands it should still know what is inside and who
+    // wrote it. The label is outside the collapsed panel for that reason.
+    renderDeck()
+    expect(await screen.findByText(/claude, with sources/i)).toBeTruthy()
+  })
+
+  it('costs nothing to open when nothing is stored', async () => {
+    renderDeck()
+    fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
+    await screen.findByText(/nothing written yet/i)
+    // The free GET may be called; the paid POST must not be.
+    expect(vi.mocked(api.writeDossier)).not.toHaveBeenCalled()
+  })
+
+  it('writes one on request and shows its prose', async () => {
+    renderDeck()
+    fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
+    fireEvent.click(await screen.findByText(/write the dossier/i))
+    expect(await screen.findByText(/bear god of qal sisma/i)).toBeTruthy()
+    // The archetype's own name, not the deck's — which happens to contain the
+    // same words, so this asserts on the exact casing the payload carries.
+    expect(screen.getByText('Mono-green stompy')).toBeTruthy()
+    expect(screen.getByText(/big creatures, cheaper/i)).toBeTruthy()
+  })
+
+  it('keeps every web claim next to a real link', async () => {
+    renderDeck()
+    fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
+    fireEvent.click(await screen.findByText(/write the dossier/i))
+    const source = await screen.findByText('Goreclaw | EDHREC')
+    expect(source.getAttribute('href')).toBe('https://edhrec.com/g')
+    // And it opens away from the app rather than navigating out of it.
+    expect(source.getAttribute('rel')).toContain('noopener')
+  })
+
+  it('renders a rival as a real card with its cost', async () => {
+    // Rivals survived a corpus lookup server-side, so the name and cost here
+    // are the corpus's. A reader who doubts the sentence can hover the card.
+    renderDeck()
+    fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
+    fireEvent.click(await screen.findByText(/write the dossier/i))
+    expect(await screen.findByText('Ghalta, Primal Hunger')).toBeTruthy()
+  })
+
+  it('shows what was discarded rather than hiding it', async () => {
+    // A number that climbs is a prompt inventing citations. Nobody checks a
+    // number they cannot see.
+    vi.mocked(api.writeDossier).mockResolvedValue({
+      ...WRITTEN_DOSSIER,
+      dossier: { ...WRITTEN_DOSSIER.dossier, sources_dropped: 2, rivals_dropped: 1 },
+    })
+    renderDeck()
+    fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
+    fireEvent.click(await screen.findByText(/write the dossier/i))
+    expect(await screen.findByText(/discarded before you saw it/i)).toBeTruthy()
+  })
+
+  it('offers no button at all when the stance is off', async () => {
+    // ADR 15: off means no calls. A control that exists and refuses is a worse
+    // answer than one that is honestly absent.
+    vi.mocked(api.claudeStatus).mockResolvedValue({
+      ...CLAUDE_STATUS,
+      stance: { ...STANCE, axes: [{ ...STANCE.axes[0], level: 'off' },
+                                  ...STANCE.axes.slice(1)] },
+    })
+    renderDeck()
+    fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
+    expect(await screen.findByText(/claude stance is off/i)).toBeTruthy()
+    expect(screen.queryByText(/write the dossier/i)).toBeNull()
+  })
+
+  it('reports a refusal rather than rendering an unsourced dossier', async () => {
+    // The server refuses when no cited page survived checking. The UI must
+    // show that refusal, not an empty panel that looks like nothing happened.
+    vi.mocked(api.writeDossier).mockResolvedValue({
+      ...NO_DOSSIER,
+      reason: 'No source survived checking, so there is nothing to stand '
+              + 'behind the claims.',
+    })
+    renderDeck()
+    fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
+    fireEvent.click(await screen.findByText(/write the dossier/i))
+    expect(await screen.findByText(/no source survived checking/i)).toBeTruthy()
+  })
+
+  it('keeps the counted strip and the written prose apart', async () => {
+    // The whole point of ADR 19's UI half: the corpus's counted facts and
+    // Claude's prose are adjacent, never merged into one voice.
+    renderDeck()
+    expect(await screen.findByText(/about this commander/i)).toBeTruthy()
+    expect(await screen.findByText(/claude, with sources/i)).toBeTruthy()
+  })
+})
+
+describe('DeckDetail art picker', () => {
+  it('does not fetch printings until it is opened', async () => {
+    // Goreclaw has twelve and most visits never open this.
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(vi.mocked(api.printings)).not.toHaveBeenCalled()
+  })
+
+  it('lists the printings when opened', async () => {
+    renderDeck()
+    fireEvent.click(await screen.findByText(/change art/i))
+    expect(await screen.findByText('BLC')).toBeTruthy()
+    expect(screen.getByText('M19')).toBeTruthy()
+  })
+
+  it('says the choice lives in the deck file', async () => {
+    // It is a deck property, not a viewer preference, and the copy has to say
+    // so — otherwise it reads as a per-person display setting.
+    renderDeck()
+    fireEvent.click(await screen.findByText(/change art/i))
+    expect(await screen.findByText(/travels with the deck/i)).toBeTruthy()
+  })
+
+  it('writes the pick through the ordinary deck-field edit', async () => {
+    renderDeck()
+    fireEvent.click(await screen.findByText(/change art/i))
+    fireEvent.click(await screen.findByTitle(/Bloomburrow Commander/))
+    await waitFor(() => {
+      expect(vi.mocked(api.setDeckField)).toHaveBeenCalledWith(
+        'goreclaw-stompy', 'commander_art', 'p-blc')
+    })
+  })
+
+  it('clicking the printing already showing clears it back to the default', async () => {
+    // How somebody gets back to the default without having to know which one
+    // it was.
+    vi.mocked(api.printings).mockResolvedValue({
+      ...PRINTINGS, selected: 'p-blc',
+      printings: PRINTINGS.printings.map((p) => ({
+        ...p, selected: p.id === 'p-blc',
+      })),
+    })
+    renderDeck()
+    fireEvent.click(await screen.findByText(/change art/i))
+    fireEvent.click(await screen.findByTitle(/Bloomburrow Commander/))
+    await waitFor(() => {
+      expect(vi.mocked(api.setDeckField)).toHaveBeenCalledWith(
+        'goreclaw-stompy', 'commander_art', '')
+    })
+  })
+
+  it('surfaces a refused pick instead of silently doing nothing', async () => {
+    vi.mocked(api.setDeckField).mockRejectedValue(
+      new Error('is not a printing of Goreclaw, Terror of Qal Sisma'))
+    renderDeck()
+    fireEvent.click(await screen.findByText(/change art/i))
+    fireEvent.click(await screen.findByTitle(/Bloomburrow Commander/))
+    expect(await screen.findByText(/is not a printing of/i)).toBeTruthy()
   })
 })

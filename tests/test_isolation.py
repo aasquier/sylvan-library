@@ -80,7 +80,12 @@ SHARED = {
     "/api/decks/{slug}/notes/{key}": "edits a shared deck",
     "/api/decks/{slug}/suggestions": "derived from a shared deck and the corpus",
     "/api/decks/{slug}/commander": "corpus facts about a shared deck's commander",
+    "/api/decks/{slug}/printings": "which arts a shared deck's commander has",
     "/api/decks/{slug}/interview": "questions about a shared deck's card",
+    # Both verbs, one entry: the dossier is about the commander of a deck
+    # everybody can already see, and ADR 19 keys it on the card's oracle id
+    # precisely so it is shared rather than per-person.
+    "/api/decks/{slug}/dossier": "who a shared deck's commander is",
     "/api/cards/search": "the public Scryfall corpus",
     "/api/sets/upcoming": "Scryfall's own release calendar",
     "/api/colors": "a fixed taxonomy, no data at all",

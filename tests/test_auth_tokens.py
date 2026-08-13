@@ -58,8 +58,21 @@ class Recorder:
 
 # --------------------------------------------------------------- the schema
 
-def test_the_database_is_at_version_three(con):
-    assert con.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 3
+def test_a_fresh_database_is_at_the_current_version(con):
+    """Pinned to the constant rather than to a literal.
+
+    It was `== 3` and had to be edited when the dossier cache added a fourth
+    migration, which is churn that proves nothing: what matters is that a
+    freshly created file has run every migration in the ladder, not what the
+    ladder's length happens to be this week. The length itself is asserted
+    once, below, where adding a migration is the thing being checked.
+    """
+    version = con.execute("PRAGMA user_version").fetchone()[0]
+    assert version == db.SCHEMA_VERSION
+    assert len(db._MIGRATIONS) == db.SCHEMA_VERSION, (
+        "SCHEMA_VERSION and the migration ladder have drifted apart; a "
+        "migration added without bumping the version never runs on an "
+        "existing app.db")
 
 
 def test_a_version_one_database_migrates_in_place(tmp_path):
@@ -72,14 +85,15 @@ def test_a_version_one_database_migrates_in_place(tmp_path):
     old = auth_db.connect(path)
     users.create(old, "ada", password=PASSWORD)
     # Wind it back to what version 1 left behind.
-    old.executescript(
-        "DROP TABLE auth_tokens; DROP TABLE sim_cache; PRAGMA user_version = 1;")
+    old.executescript("DROP TABLE auth_tokens; DROP TABLE sim_cache; "
+                      "DROP TABLE dossier_cache; PRAGMA user_version = 1;")
     old.commit()
     old.close()
 
     migrated = auth_db.connect(path)
     try:
-        assert migrated.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert migrated.execute(
+            "PRAGMA user_version").fetchone()[0] == auth_db.SCHEMA_VERSION
         assert users.get(migrated, "ada") is not None, "the account survived"
         assert tokens.issue(migrated, users.get(migrated, "ada").id,
                             tokens.Purpose.INVITE)
@@ -102,15 +116,50 @@ def test_a_version_two_database_gains_the_sim_cache(tmp_path):
     path = tmp_path / "v2.db"
     old = auth_db.connect(path)
     users.create(old, "ada", password=PASSWORD)
-    old.executescript("DROP TABLE sim_cache; PRAGMA user_version = 2;")
+    old.executescript("DROP TABLE sim_cache; DROP TABLE dossier_cache; "
+                      "PRAGMA user_version = 2;")
     old.commit()
     old.close()
 
     migrated = auth_db.connect(path)
     try:
-        assert migrated.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert migrated.execute(
+            "PRAGMA user_version").fetchone()[0] == auth_db.SCHEMA_VERSION
         assert users.get(migrated, "ada") is not None, "the account survived"
         assert migrated.execute("SELECT count(*) FROM sim_cache").fetchone()[0] == 0
+    finally:
+        migrated.close()
+
+
+def test_a_version_three_database_gains_the_dossier_cache(tmp_path):
+    """The upgrade that happens on the maintainer's laptop this time.
+
+    Same shape as the one above and worth having as its own test for the same
+    reason: every `app.db` in existence when ADR 19 landed is at version three
+    with real accounts and real cached simulations in it, and the new
+    migration has to run against that without disturbing either.
+    """
+    from mtglab.auth import db as auth_db
+
+    path = tmp_path / "v3.db"
+    old = auth_db.connect(path)
+    users.create(old, "ada", password=PASSWORD)
+    old.execute("INSERT INTO sim_cache (key, kind, result_json, created_at, "
+                "last_used_at) VALUES ('k', 'sim.mana', '{}', 'then', 'then')")
+    old.executescript("DROP TABLE dossier_cache; PRAGMA user_version = 3;")
+    old.commit()
+    old.close()
+
+    migrated = auth_db.connect(path)
+    try:
+        assert migrated.execute(
+            "PRAGMA user_version").fetchone()[0] == auth_db.SCHEMA_VERSION
+        assert users.get(migrated, "ada") is not None, "the account survived"
+        assert migrated.execute(
+            "SELECT count(*) FROM sim_cache").fetchone()[0] == 1, \
+            "cached simulations survived the upgrade"
+        assert migrated.execute(
+            "SELECT count(*) FROM dossier_cache").fetchone()[0] == 0
     finally:
         migrated.close()
 

@@ -327,6 +327,16 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         """
         return service.commander_dossier(slug, source=decks)
 
+    @app.get("/api/decks/{slug}/printings")
+    def deck_printings(slug: str, decks: Decks) -> dict[str, Any]:
+        """Every non-digital printing of this deck's commander, newest first.
+
+        Its own route rather than fields on the deck: Goreclaw has twelve and
+        most decks never open the picker, so this is a query the deck page
+        should not pay for on every load.
+        """
+        return service.commander_printings(slug, source=decks)
+
     # ------------------------------------------------------------ cards
 
     @app.get("/api/cards/search")
@@ -397,6 +407,44 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         except ValueError as exc:
             # A malformed stance. `CardNotInDeck` is a ValueError too, which is
             # why it is caught above this rather than below it.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ClaudeUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except service.ClaudeFailed as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/decks/{slug}/dossier")
+    def claude_dossier_cached(slug: str, decks: Decks) -> dict[str, Any]:
+        """A stored commander dossier, or an empty one. Never calls Anthropic.
+
+        A GET on purpose, and a *different function* from the POST below rather
+        than the same one with a flag: this one is free and idempotent, so the
+        deck page can ask for it on every load, and no amount of refreshing can
+        turn it into spend.
+        """
+        return service.claude_dossier_cached(slug=slug, source=decks)
+
+    @app.post("/api/decks/{slug}/dossier")
+    def claude_dossier(slug: str, payload: dict[str, Any],
+                       decks: Decks) -> dict[str, Any]:
+        """Write the commander dossier (ADR 19). Costs a call and a search.
+
+        Same status-code split as the interview, plus one: 422 when the deck
+        has no commander the corpus can find, which is a fact about the deck
+        rather than a failure of the model.
+        """
+        from mtglab.claude.client import ClaudeUnavailable
+        from mtglab.claude.dossier import NoCommander
+
+        try:
+            return service.claude_dossier(
+                slug=slug,
+                requested=payload.get("stance") or None,
+                refresh=bool(payload.get("refresh")),
+                source=decks)
+        except NoCommander as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ClaudeUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc

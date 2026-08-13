@@ -18,6 +18,7 @@
     mtglab users disable|enable <name>
     mtglab users promote|demote <name>  admin, and never the last one
     mtglab claude check                 one real API call -- is the key live?
+    mtglab claude dossier <slug>        who the commander is, with sources
     mtglab claude interview <slug>      questions about a card's slot; you
                             --card X    write the rationale, it never does
 """
@@ -297,6 +298,48 @@ def cmd_decks_remove(args):
     _report_edit(result)
 
 
+def _art_id(args):
+    """Turn `--art <set-code>` into the printing id the deck file stores.
+
+    A set code is what a person has to hand -- nobody knows a Scryfall UUID --
+    but the deck file stores the id, because a set code is not unique: the
+    Multiverse Legends printings of Goreclaw share `MUL` and are three
+    different paintings. So a code matching several printings prints them and
+    refuses, rather than picking one and being wrong about which art the user
+    meant. `--art ''` clears the choice back to the default printing.
+    """
+    from mtglab.api import service
+
+    ref = args.art.strip()
+    if not ref:
+        return ""
+
+    listing = service.commander_printings(args.slug)
+    printings = listing["printings"]
+    if not printings:
+        sys.exit(f"no printings found for {listing['commander'] or args.slug} "
+                 f"-- is the corpus loaded? (`mtglab data refresh`)")
+
+    exact = [p for p in printings if p["id"] == ref]
+    if exact:
+        return exact[0]["id"]
+
+    matches = [p for p in printings if p["set_code"] == ref.upper()]
+    if not matches:
+        codes = sorted({p["set_code"] for p in printings})
+        sys.exit(f"{listing['commander']} has no printing in {ref.upper()!r}. "
+                 f"It is in: {', '.join(codes)}")
+    if len(matches) > 1:
+        print(f"\n  {ref.upper()} has {len(matches)} printings of "
+              f"{listing['commander']}. Pick one by its id:\n")
+        for match in matches:
+            print(f"    {match['id']}  #{match['collector_number']:<6} "
+                  f"{match['rarity']:<9} {match['set_name']}")
+        print()
+        sys.exit("re-run with --art <id>")
+    return matches[0]["id"]
+
+
 def cmd_decks_set(args):
     """Change one field -- of a card with `--card`, of the deck without it.
 
@@ -309,11 +352,13 @@ def cmd_decks_set(args):
     card_fields = (("why", args.why), ("category", args.category),
                    ("qty", args.qty))
     deck_fields = (("stage", args.stage), ("status", args.status),
-                   ("bracket", args.bracket))
+                   ("bracket", args.bracket),
+                   ("commander_art", _art_id(args) if args.art is not None
+                    else None))
     chosen = [(f, v) for f, v in card_fields + deck_fields if v is not None]
     if len(chosen) != 1:
         sys.exit("choose exactly one of --why, --category, --qty (with --card) "
-                 "or --stage, --status, --bracket (without)")
+                 "or --stage, --status, --bracket, --art (without)")
     field, value = chosen[0]
     on_a_card = field in dict(card_fields)
 
@@ -978,6 +1023,105 @@ def cmd_claude_interview(args):
     print(f"  tokens: {usage['input_tokens']} in / {usage['output_tokens']} out")
 
 
+def _wrapped(text, indent="  ", width=76):
+    import textwrap
+    return textwrap.fill(text, width=width, initial_indent=indent,
+                         subsequent_indent=indent)
+
+
+def cmd_claude_dossier(args):
+    """Who a deck's commander is (ADR 19), from the corpus and the open web.
+
+    The printing is where ADR 14's third boundary lives in a terminal, so it is
+    not decoration: every passage prints the source ids it rests on, the source
+    list prints the real URLs, and the header says which system wrote it. A
+    dossier rendered as unattributed prose would be the failure the whole mode
+    is built to avoid, arrived at in the last ten lines.
+    """
+    from mtglab.api import service
+    from mtglab.claude import dossier as dossier_mod
+    from mtglab.claude.client import ClaudeUnavailable
+
+    if args.list:
+        rows = dossier_mod.stored()
+        if not rows:
+            print("\n  no dossiers stored yet.\n")
+            return
+        print(f"\n  {len(rows)} stored:\n")
+        for row in rows:
+            print(f"  {row['commander']:<34} {row['created_at'][:10]}")
+        print()
+        return
+
+    if args.clear:
+        print(f"\n  cleared {dossier_mod.clear()} dossier(s).\n")
+        return
+
+    if not args.slug:
+        print("  a deck slug is required (or --list / --clear)")
+        sys.exit(1)
+
+    try:
+        report = service.claude_dossier(slug=args.slug, requested=args.stance,
+                                        refresh=args.refresh)
+    except (dossier_mod.NoCommander, ClaudeUnavailable,
+            service.ClaudeFailed) as exc:
+        print(f"  {exc}")
+        sys.exit(1)
+
+    print(f"\n  {report['commander']} — {report['slug']}")
+    body = report["dossier"]
+    if not body:
+        print(f"\n  {report['reason']}\n")
+        return
+
+    origin = ("stored " + report["generated_at"][:10] if report["cached"]
+              else f"written by {report['model']}")
+    print(f"  Claude's writing, not the gate's — {origin}\n")
+
+    def passage(title, section, extra=""):
+        cites = " ".join(f"[{i}]" for i in section["source_ids"])
+        print(f"  {title}{extra}{'  ' + cites if cites else ''}")
+        print(_wrapped(section["prose"], indent="    "))
+        print()
+
+    passage("WHO", body["who"])
+    passage("ARCHETYPE", body["archetype"],
+            extra=f" — {body['archetype']['name']}" if body["archetype"]["name"] else "")
+    if body["rivals"]:
+        print("  RIVALS")
+        for rival in body["rivals"]:
+            cost = f" {rival['mana_cost']}" if rival.get("mana_cost") else ""
+            cites = " ".join(f"[{i}]" for i in rival["source_ids"])
+            print(f"    {rival['name']}{cost}{'  ' + cites if cites else ''}")
+            print(_wrapped(rival["prose"], indent="      "))
+        print()
+    passage("STANDING", body["standing"])
+
+    print("  SOURCES — every one of these was actually fetched\n")
+    for source in body["sources"]:
+        print(f"    [{source['id']}] {source['title'][:64]}")
+        print(f"          {source['url']}")
+
+    print(f"\n  {report['never']}")
+    # The dropped counts are printed rather than logged, because a number that
+    # climbs is a prompt inventing citations and nobody checks what they cannot
+    # see. Silence here means everything the model cited, it had read.
+    if body["sources_dropped"] or body["rivals_dropped"]:
+        print(f"  dropped: {body['sources_dropped']} cited page(s) the search "
+              f"never returned, {body['rivals_dropped']} rival(s) not in the "
+              f"corpus.")
+    print(f"  {body['searched']} pages searched, {len(body['sources'])} cited.")
+    usage = report["usage"]
+    if report["cached"]:
+        print("  no tokens: served from the store. --refresh to write it again.")
+    else:
+        print(f"  tokens: {usage['input_tokens']} in / "
+              f"{usage['output_tokens']} out "
+              f"({usage['cache_read_tokens']} cached)")
+    print()
+
+
 # --------------------------------------------------------------------- main
 
 def main(argv=None):
@@ -1041,6 +1185,10 @@ def main(argv=None):
                     help="curated needs every card justified; see `decks promote`")
     st.add_argument("--status", choices=list(DECK_STATUSES))
     st.add_argument("--bracket", type=int)
+    st.add_argument("--art", metavar="SET",
+                    help="which printing's art the deck shows for its "
+                         "commander: a set code, or a printing id when a set "
+                         "has several. Empty clears it back to the default.")
     st.set_defaults(func=cmd_decks_set)
     pr = decks.add_parser("promote", help="mark a draft curated, once every card "
                                           "carries a `why`")
@@ -1150,6 +1298,17 @@ def main(argv=None):
                     help="off | consultant | second-opinion | collaborator")
     ci.add_argument("--focus", help="what you are stuck on, in your own words")
     ci.set_defaults(func=cmd_claude_interview)
+    cd = claude.add_parser("dossier",
+                           help="who a deck's commander is, with its sources")
+    cd.add_argument("slug", nargs="?")
+    cd.add_argument("--stance", default="consultant",
+                    help="off | consultant | second-opinion | collaborator")
+    cd.add_argument("--refresh", action="store_true",
+                    help="write it again even if one is stored")
+    cd.add_argument("--list", action="store_true",
+                    help="what dossiers are stored, and when they were written")
+    cd.add_argument("--clear", action="store_true", help="drop every one")
+    cd.set_defaults(func=cmd_claude_dossier)
 
     args = p.parse_args(argv)
     args.func(args)

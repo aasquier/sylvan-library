@@ -61,13 +61,41 @@ arc; this is what the next few sessions actually do.
      four that never had one. A blurb is mechanical and never names a plane;
      an era is a setting and never restates the mechanics.
 
-   **2 — The commander dossier, and alternative arts.** Next, and the reason
-   the rest shifted: branch 1 answered "what does this card do" with corpus
-   counts, and the maintainer's response was that the *interesting* half — who
-   this character is, what archetype they define and where it came from, their
-   rivals, where they sit in Magic's history — is exactly what Claude is for.
-   This is the first Claude surface that is not a rationale interview, so it
-   wants an ADR extending ADR 15's mode table before any code.
+   **2 — The commander dossier, and alternative arts.** Landed 2026-08-12,
+   with [ADR 19](docs/adr/0019-the-dossier-cites-three-sources.md) written
+   first. Branch 1 answered "what does this card do" with corpus counts; this
+   is the *interesting* half — who this character is, what archetype they
+   define and where it came from, their rivals, where they sit in Magic's
+   history. The second Claude mode, and the first whose facts do not all come
+   from the corpus.
+
+   What the build settled, beyond the decisions below:
+
+   - **Web search and structured outputs coexist, and that is what makes the
+     source check load-bearing.** A response schema *suppresses* the API's own
+     citations, so a URL in the payload is a string the model typed and nothing
+     more. `dossier.keep_sources()` intersects the cited pages with the ones
+     `Turn.searched` recorded and drops the rest, counting what went — the
+     answer to "how do you know it read that" is now a set intersection rather
+     than a promise. Measured on Gyome: 54 pages read, 4 cited, 0 dropped.
+   - **Two bugs that only appear with a server tool *and* a second turn**, both
+     found by running the mode rather than reading the request shapes. The
+     dated search filters its results inside a code-execution container, so a
+     follow-up request carrying that turn's blocks is a 400 unless the
+     container id comes with it. And a server-side tool loop that hits its own
+     limit stops with `pause_turn` carrying text that reads finished — the same
+     shape as a Forge game that plays on with 96 cards, and now resumed rather
+     than returned.
+   - **A rule-1 leak in the one sentence most likely to have one.** A first run
+     described Trostani Discordant as making Food tokens; she makes 1/1
+     Soldiers. Comparing two commanders is exactly the sentence that wants a
+     half-remembered ability, so the mode now must call `get_cards` on every
+     rival before writing about it, and the rival's real corpus text rides in
+     the payload so the card sits next to the sentence. The second half is what
+     does not depend on the model complying.
+   - **Cost:** about 800 uncached input tokens and 2,100 out per commander,
+     with ~57k served from the prompt cache. Once per commander, ever, because
+     the key is the `oracle_id`.
 
    Decided with the maintainer on 2026-08-12, so a session does not re-open
    these:
@@ -99,7 +127,18 @@ arc; this is what the next few sessions actually do.
      `image_normal` but no `image_art_crop`, so the hero band needs one or the
      other resolved.
 
-   **3 — Visual identity.** The splash and the Sylvan Library art (which is
+     *Built.* The crop is **derived** rather than stored: Scryfall's image URLs
+     differ only in the size segment, which `oracle_cards` proves by carrying
+     both for the same printing id, so `service.art_crop_from` swaps `normal`
+     for `art_crop` and returns None on any other shape. That avoids blocking a
+     UI branch on a 500MB re-ingest, and a column can still be added later
+     without changing a caller. Two checks in two layers: `edit.py` refuses a
+     value that is not a UUID (it is text surgery and has no database), and
+     `service.py` refuses a printing that is not **this commander's** (only a
+     query can know). A set code with several printings — `MUL` has four
+     Goreclaws — lists them and refuses rather than picking one.
+
+   **3 — Visual identity.** Next. The splash and the Sylvan Library art (which is
    only rendered on an *empty* library today, so the maintainer has never
    seen it), an interactive colour pentagram for the mono tier, and the
    builder's tier headers, which are plain grey panels. Decided: the card art
@@ -617,9 +656,14 @@ Since then: the **stance** (three axes, off by default, deck-derived default,
 deployment ceiling) and the **first mode**, the rationale interview — with a UI
 beside the rationale box. Both are detailed below.
 
-What is *not* built: the other three modes, a UI for the stance dial itself, the
-activity log the top of the write axis needs, research through server-side web
-tooling, and the Forge half.
+Then the **commander dossier** (2026-08-12, ADR 19) — the second mode, and the
+first to reach past the corpus. It is also where research through server-side
+web tooling turned from a plan into code: `web_search_20260209`, with every
+cited page checked against what the search actually returned.
+
+What is *not* built: the other three modes ADR 15 names, a UI for the stance
+dial itself, the activity log the top of the write axis needs, and the Forge
+half.
 
 The plumbing was already in place: an API key reaches the app from a gitignored
 `.env` or `fly secrets`, named in `.env.example` and in the CI reviewer workflow
@@ -696,6 +740,12 @@ argument. Four are worth building first, and every one of them may write
 | Argue a slot | the case against a specific card, from corpus facts and category counts |
 | Deck conversation | anything about a deck, with the gate's output and the corpus in reach |
 | Research | the meta, rulings in practice, cards spoiled ahead of the next bulk refresh |
+| **Commander dossier** | who the character is, the archetype and its history, rivals, standing — ADR 19, built 2026-08-12 |
+
+Four was a guess and the dossier is the guess being wrong in the direction ADR
+15 predicted. What held is the structure: a mode is a prompt, a tool set and a
+capability declaration, and it absorbed a **server-side tool** and a second
+class of evidence without the write column moving.
 
 The interview is the mode that made this worth settling before writing code.
 "Claude asks, the user answers, the answer lands in `why`" breaks no rule — the
