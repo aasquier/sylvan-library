@@ -447,10 +447,28 @@ default.
 
 ### Prerequisites
 
+**Not `brew install flyctl` on this machine.** The only development machine
+this project has is macOS 12 on Intel, where Homebrew is too stale to build
+anything from source — so the package-manager instruction every Fly guide opens
+with is a dead end here, and it is worth saying that in the guide rather than
+rediscovering it on deploy day. Fly ships a shell installer that needs no
+package manager and no compiler:
+
 ```bash
-brew install flyctl
-fly auth signup     # or: fly auth login
+curl -L https://fly.io/install.sh | sh
+fly auth login
 ```
+
+It installs a static binary to `~/.fly/bin` and appends a `PATH` line to your
+shell rc — `~/.bashrc` here, which `~/.bash_profile` sources, so it resolves in
+a login shell. Verified on macOS 12.7.6 / x86_64 with flyctl v0.4.82: the
+binary runs, which was the real risk on an OS this old.
+
+**`flyctl` is not optional, and the browser is not a substitute.** Fly's web
+dashboard can create the app, set secrets and deploy — but steps 6 and 8 below
+are commands *inside* the machine, and there is no browser path to either. An
+instance built entirely from the dashboard has no corpus, no decks, and no way
+to give the maintainer a password.
 
 You will also need a credit card on file; the machine sizes below are inside
 Fly's paid tier.
@@ -563,6 +581,29 @@ with the same "derived, never set independently" rule as `DB_PATH`.
 fly secrets set RESEND_API_KEY="paste-it-here"
 fly secrets set ANTHROPIC_API_KEY="paste-it-here"   # only once ADR 15's modes exist
 ```
+
+**If you set them in the dashboard instead, they are `Staged` and not live.**
+Found the hard way on 2026-08-13. Fly's web UI stages a secret and waits for an
+explicit `fly secrets deploy`; `fly secrets list` says so in a column nobody
+reads until something is wrong. Until that runs, the app is up, healthy, and
+running on `fly.toml`'s **placeholders** — which means `MTGLAB_ADMIN_EMAIL` is
+`you@example.com` and the admin account that exists is called `you`. The
+symptom is `mtglab users passwd <your-handle>` reporting no such user, which
+points at everything except the cause.
+
+```bash
+fly secrets list          # STATUS must read Deployed, not Staged
+fly secrets deploy
+```
+
+**And `fly secrets deploy` does not pick up `fly.toml` changes.** It restarts
+the machine with new secrets against the *image and `[env]` of the last real
+`fly deploy`, which is a half-state worth naming: new credentials, old
+configuration. On the first deploy that showed up as a correct
+`RESEND_API_KEY` next to a placeholder `MTGLAB_EMAIL_FROM` on an unverified
+domain — so mail was configured, authorised, and refused by Resend on every
+send. Run `fly deploy` after any `fly.toml` edit, and treat a `[env]` change
+and a secret change as two different operations.
 
 **There is no `SESSION_SECRET`.** This step used to open with one; the code was
 then written and did not need it. Sessions are opaque random tokens stored as
@@ -738,6 +779,37 @@ fly ssh console -C "mtglab decks validate gyome-food"
 Expect **Goreclaw and Atla Palani to fail the gate on one banned card each**.
 That is a known, deliberate state recorded in CLAUDE.md, not a bad deploy.
 
+#### Reading the mail DNS, and the mistake worth not repeating
+
+Resend's records span three names and it is easy to declare one missing by
+querying the wrong one. For a sending domain of `send.sylvan-libraries.com`:
+
+| Name | Record | What it is |
+| --- | --- | --- |
+| `send.sylvan-libraries.com` | `MX inbound-smtp...` | receiving |
+| `send.sylvan-libraries.com` | DKIM at `resend._domainkey.` | signs outbound mail |
+| `send.send.sylvan-libraries.com` | `TXT v=spf1 include:amazonses.com` | the custom MAIL FROM |
+| `send.send.sylvan-libraries.com` | `MX feedback-smtp...` | bounces |
+
+**SPF is evaluated against the envelope sender, not the `From` header.** SES
+sets a custom MAIL FROM on a further subdomain, so the SPF record correctly
+lives at `send.send.` and its absence from `send.` is not a gap. On
+2026-08-13 this was reported as a missing SPF record on exactly that reasoning;
+the tell that it was wrong was already in the output and read past —
+`inbound-smtp` is a *receiving* endpoint, so the sending records were always
+going to be somewhere else.
+
+Both alignments hold: DKIM matches the `From` domain exactly, and SPF matches
+under relaxed alignment through the shared organisational domain.
+
+**Porkbun ships two ALIAS records on a new domain** — one at the apex and a
+`*` wildcard — both pointing at a parking page. Both have to go: the apex one
+conflicts with the `A` record outright, and the wildcard otherwise answers for
+every name that has no record of its own, including the `_acme-challenge` and
+`_fly-ownership` names Fly falls back to. Deleting them does not disturb the
+mail records, because a wildcard never synthesises for a name that exists —
+verified before and after on this instance rather than assumed.
+
 ### Step 7 — domain and TLS
 
 The domain is `sylvan-libraries.com`, registered 2026-08-13, and the app
@@ -756,6 +828,17 @@ fly certs show sylvan-libraries.com
 An apex is A/AAAA rather than a CNAME, which Fly prints for you — there is no
 extra work, but it is the one place the instructions differ from a subdomain.
 `force_https` in `fly.toml` handles the redirect. TLS is automatic and free.
+
+**The `A` record points at Fly's *shared* IPv4 and that is correct.** It looks
+wrong next to a dedicated IPv6 and it is not: Fly routes shared-IPv4 traffic by
+the hostname in the TLS handshake, so a dedicated IPv4 buys nothing here and
+costs ~$2/month. Validation runs against the `AAAA` — Fly needs one of an AAAA
+pointing at the app, an `_acme-challenge` CNAME, or a `_fly-ownership` TXT, and
+the dedicated IPv6 satisfies the first without any extra record.
+
+**Done 2026-08-13.** Issued by Let's Encrypt about three minutes after the
+records landed; `https://sylvan-libraries.com` serves the app, plain HTTP 301s
+to it, and `sylvan-library.fly.dev` keeps working alongside.
 
 **`send.sylvan-libraries.com` is the mail subdomain and is not this.** It is
 verified with Resend and carries the sending records; nothing is served from
@@ -782,12 +865,32 @@ first:
 fly ssh console
 ```
 
-then, inside it, whichever of these applies:
+then, **before anything else**, put the venv on `PATH`:
+
+```bash
+export PATH="/opt/venv/bin:$PATH"
+```
+
+This is the second half of the same correction and it is the combination that
+actually bites. The image sets `ENV PATH="/opt/venv/bin:$PATH"`, and
+`fly ssh console -C "mtglab ..."` inherits it — every command in step 6 works
+unmodified. An *interactive* console does not: it starts a login shell, and
+Debian's `/etc/profile` overwrites `PATH` for root. So the one form that needs
+a TTY is the one form where `mtglab` is not found, and the error says
+`command not found` rather than anything about `PATH`. `/opt/venv/bin/mtglab`
+in full works just as well for a single command.
+
+Then, whichever of these applies:
 
 ```bash
 mtglab users passwd gyome                       # the bootstrapped account exists
 mtglab users add aaron --email you@example.com --admin   # it does not
 ```
+
+Running as root is fine here, and deliberately so: `docker-entrypoint.sh`
+does a recursive `chown` of the volume at every boot *because* this step and
+step 6 both arrive over `fly ssh console` as root. Anything you leave
+root-owned is repaired at the next restart.
 
 `users passwd` is usually the one you want. `MTGLAB_ADMIN_EMAIL` has already
 created the account and left it unclaimed, so there is nothing to *add* — what
@@ -807,6 +910,17 @@ printing recipients into Fly's logs is what ADR 16 forbids. So on a deployed
 instance there is no "just read the link off the console" escape hatch. Either
 Resend works, or you use the shell.
 
+**Clean up the placeholder account if one was created.** If the instance ever
+booted with `MTGLAB_ADMIN_EMAIL` unset or still reading `you@example.com`, an
+admin account exists for it. There is no `users delete` — deliberately, since
+an account is referenced by sessions and tokens — so it is disabled rather than
+removed, and only *after* your real account has a password, or the last-admin
+guard refuses:
+
+```bash
+mtglab users disable you
+```
+
 Everyone else gets an invite rather than an account you made a password for
 (ADR 16) — `mtglab users invite <email>`, or the Accounts page once you are in.
 Note that neither the CLI nor that page will demote or disable the last admin
@@ -823,6 +937,70 @@ plenty unless you are watching prices.
 
 ```bash
 fly ssh console -C "mtglab data refresh"
+```
+
+**One line, and it does not fit on the machine that runs the app.** Measured on
+the first real run, 2026-08-13. The job is five phases and only the first
+prints before it starts:
+
+1. download `oracle_cards` (~24 MB gzipped)
+2. `load_oracle` — 35,390 rows, **silent until it finishes**
+3. print `loaded N oracle cards`
+4. download `default_cards` — several times larger
+5. `load_printings` — 107,338 rows, the longest phase
+
+On `shared-cpu-1x` phase 2 alone took **over thirty minutes** and phase 5 is
+three times the rows. So scale up for the run and back down after:
+
+```bash
+fly scale vm performance-1x                       # ~7x faster, measured
+fly ssh console -C "mtglab data refresh"
+fly scale vm shared-cpu-1x --vm-memory 1024       # or let the next deploy do it
+```
+
+**`performance-1x` rather than `shared-cpu-4x`, despite a quarter the cores.**
+The load is a single-threaded Python loop — `json.loads` per line, then batched
+`executemany` — so more cores buy nothing and an unthrottled one buys
+everything. Measured on the volume: ~0.65 MB/min of WAL growth on the shared
+slice against ~4.5 MB/min on the dedicated core.
+
+`fly.toml` pins `shared-cpu-1x` in `[[vm]]`, so **the next `fly deploy` scales
+you back down whether or not you remember to.** That is a safety net, and it is
+also why a permanently larger machine has to be a change to the file rather
+than a `fly scale` command.
+
+#### Watch the filesystem, not stdout
+
+Two things about a long job over `fly ssh console` that cost an hour of
+confusion on the first run, and that generalise to every command in step 6:
+
+**The output lags badly.** `fly ssh` delivers stdout in chunks, so the terminal
+sat on `downloading oracle_cards ...` while the work was demonstrably three
+phases further on. Progress is on the volume:
+
+```bash
+fly ssh console -C "sh -c 'date -u +%T; ls -l /data/mtg.duckdb /data/mtg.duckdb.wal'"
+```
+
+A growing `.wal` is work in progress; a `.wal` that collapses while the
+database jumps is a commit landing — that is how you see a phase boundary go
+by without a line being printed.
+
+**And the session dying does not mean the job died.** `auto_stop_machines` is
+`suspend`, which snapshots memory rather than killing processes: when the
+machine suspended mid-refresh, the SSH session broke with
+`remote command exited without exit status or exit signal` — a message about
+the transport that reads like a message about the job — and the refresh
+*resumed from memory* on the next start and ran to completion headless. The
+apparent failure was reported, believed, and wrong. **Check
+`/api/health` before concluding anything about a job that appeared to die.**
+
+**Whatever ran over `fly ssh` ran as root**, so hand the volume back
+afterwards. A restart does it, since that is what the entrypoint's
+`chown -R` is for:
+
+```bash
+fly machine restart <machine-id>
 ```
 
 **Why there is no cron here.** Fly volumes attach to exactly one machine, so a
@@ -1192,12 +1370,19 @@ Ticked items are done as of 2026-08-13.
       the one part of the email half that no test covers, by design. Note there
       is no console fallback on a deployed instance (§4 step 8): with auth on,
       a missing key refuses rather than prints.
-- [ ] The first sign-in, by whichever path: the reset link from the sign-in
-      page if Resend is working, or `mtglab users passwd <username>` over an
-      **interactive** `fly ssh console` if it is not. There is no
+- [x] ~~The first sign-in~~ — done 2026-08-13 via
+      `mtglab users passwd gyome` over an **interactive** `fly ssh console`,
+      which is the path that needs no working mail. There is no
       `MTGLAB_ADMIN_PASSWORD` and there will not be one (ADR 16) — the
       bootstrapped account is unclaimed, so what it is missing is a password
       rather than an account.
+- [x] ~~Seed the volume~~ — done 2026-08-13. 35,390 oracle cards and 107,338
+      printings, and the resulting `mtg.duckdb` is byte-for-byte the same size
+      as the one built on the maintainer's laptop. The gate then passed
+      gyome-food, arahbo-cats and trostani-tokens clean and failed
+      goreclaw-stompy on Primeval Titan, which is the documented state and the
+      strongest single proof that the corpus is real card data rather than an
+      empty table.
 - [ ] Cloudflare Access configured, if the instance is not to be public.
 - [ ] **A second home for `ANTHROPIC_API_KEY`.** One key, one environment, two
       places once deployed: the gitignored `.env` here and `fly secrets` there.
