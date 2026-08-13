@@ -188,11 +188,40 @@ arc; this is what the next few sessions actually do.
      to engages no part of rule 4, and the mode still may not pre-fill a
      rationale for any card it suggests.
 
-   Open, and worth deciding before the ADR: whether the theme interview is
-   *conversational* (multi-turn, adapting to answers) or **one shot** (a form
-   of questions, then a proposal), and whether the refactor pass belongs in
-   this branch at all or is goal 10, which ROADMAP already sequences last and
-   for stated reasons.
+   **Conversational, not one-shot** — decided 2026-08-12. A multi-turn
+   interview that adapts to the answers, rather than a form of fixed questions
+   followed by a proposal. It is the more expensive thing to build and it is
+   the reason the feature is interesting: a form could have been a form
+   without a language model in it.
+
+   That choice is what makes this mode genuinely new rather than the rationale
+   interview with different words, and it is the part the ADR has to think
+   about hardest. Three consequences that are not obvious:
+
+   - **The interview holds state across turns, and `converse` currently does
+     not.** Every mode so far is one question and one answer; this one is a
+     conversation whose history has to survive between HTTP requests. Where
+     that history lives — client-held and resent, or server-side and keyed —
+     is a real decision with a cost either way, and it is the first thing to
+     settle.
+   - **A multi-turn mode has no natural stopping point**, which is exactly
+     where `MAX_TOOL_TURNS` came from for the single-shot ones. It needs a
+     ceiling that is about the *conversation*, not the tool loop, and a way
+     to say "I have enough to propose now" that is checkable in Python rather
+     than trusted from the model.
+   - **The proposal is a schema, the conversation is prose.** Those want
+     different response shapes, so a mode that does both is either two modes
+     or one mode with a mode switch — and ADR 15 says a mode is a prompt, a
+     tool set and a capability declaration, so two is probably the honest
+     answer.
+
+   Still open, and the one thing to confirm before writing the ADR: **the
+   refactor pass.** Working assumption is that it stays out of this branch and
+   remains goal 10, which ROADMAP already sequences last for stated reasons —
+   it inherits the rationale interview's answer to who writes the `why`, and
+   the pod measurement decides whether Forge can contribute to it honestly.
+   Branch 5 is then the theme-and-commander interview plus the discoverability
+   fix below.
 
    **Also in scope, and cheap:** the rationale interview is currently
    undiscoverable. It works, and nothing on the deck page says it exists.
