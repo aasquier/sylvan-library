@@ -93,6 +93,13 @@ SHARED = {
     "/api/colors/{key}": "a fixed taxonomy plus public corpus cards",
     "/api/glossary": "fixed reference prose, no data at all",
     "/api/claude": "whether the surface is configured on this instance",
+    # The persona roster and the deal. Both are the same class of thing as
+    # `/api/colors`: a checked-in table and a shuffle, computed from nothing
+    # anybody owns. The reading is seeded and stateless — the client carries
+    # the seed, so there is no dealt spread on the server for anybody to reach,
+    # belonging to them or to anyone else.
+    "/api/claude/personas": "a fixed roster of voices, no data at all",
+    "/api/tarot/reading": "a seeded shuffle of a public-domain deck; no state",
     # ADR 20's two. Neither takes a deck or a slug — the conversation is about
     # the person and is held by their browser, so there is nothing here
     # belonging to one account for another to reach. What comes back is a

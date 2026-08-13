@@ -50,10 +50,12 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
+from mtglab import tarot
 from mtglab.api import service
+from mtglab.claude import persona as persona_mod
 from mtglab.claude import stance as stance_mod
 from mtglab.claude.modes import Mode, Turn, converse
 
@@ -742,8 +744,24 @@ _FRAME = ("Somebody has opened the deckbuilder and does not know what to "
           "build. Interview them.")
 
 
-def _messages(transcript: list[dict[str, str]], *, closing: str
-              ) -> list[dict[str, Any]]:
+def _frame_for(reading: tarot.Reading | None) -> str:
+    """The opening frame, plus the spread when there is one.
+
+    **Here rather than in the system prompt, and that is a caching decision.**
+    A mode's instructions are byte-stable so `converse` can cache them; a
+    spread is different every reading, so putting it there would make every
+    first turn a cache miss for the whole block. As a message it sits after the
+    breakpoint and costs one short paragraph.
+    """
+    if reading is None:
+        return _FRAME
+    return (f"{_FRAME}\n\nYou have already dealt three cards, face up, in this "
+            f"order. These are the cards on the table and there are no others:\n"
+            f"{reading.describe()}")
+
+
+def _messages(transcript: list[dict[str, str]], *, closing: str,
+              frame: str = _FRAME) -> list[dict[str, Any]]:
     """The transcript as a request: a frame, the conversation, and the ask.
 
     The system block carries the instructions and the taxonomy and is
@@ -753,7 +771,7 @@ def _messages(transcript: list[dict[str, str]], *, closing: str
     second breakpoint. Without one, every turn re-reads the whole conversation
     at full price.
     """
-    out: list[dict[str, Any]] = [{"role": "user", "content": _FRAME}]
+    out: list[dict[str, Any]] = [{"role": "user", "content": frame}]
     out += [{"role": t["role"], "content": t["text"]} for t in transcript]
 
     # The closing instruction rides with the last user turn rather than as a
@@ -775,6 +793,52 @@ def _messages(transcript: list[dict[str, str]], *, closing: str
             {"type": "text", "text": closing,
              "cache_control": {"type": "ephemeral"}}]})
     return out
+
+
+def _with_voice(base: Mode, who: persona_mod.Persona) -> Mode:
+    """The same mode, speaking differently.
+
+    Appended, never substituted: `CONVERSATION_INSTRUCTIONS` and
+    `PROPOSAL_INSTRUCTIONS` carry the rules that make this feature work, and a
+    persona is not allowed a say in them. Last, because recency is worth
+    something and the reference data in between is a table rather than an
+    instruction.
+
+    The default persona gets the base object back unchanged -- same name, same
+    bytes -- so nothing about the interview as it already exists moves.
+    """
+    if not who.voice:
+        return base
+    return replace(base, name=f"{base.name}:{who.key}",
+                   instructions=f"{base.instructions}\n\n{who.voice}")
+
+
+#: Built once at import, so each persona's system block is byte-stable and
+#: `converse` can go on caching it. Building one per request would silently
+#: turn every conversation into a cache miss.
+CONVERSATION_MODES: dict[str, Mode] = {
+    key: _with_voice(THEME_CONVERSATION, who)
+    for key, who in persona_mod.PERSONAS.items()}
+
+PROPOSAL_MODES: dict[str, Mode] = {
+    key: _with_voice(THEME_PROPOSAL, who)
+    for key, who in persona_mod.PERSONAS.items()}
+
+
+def _reading_for(who: persona_mod.Persona, seed: Any) -> tarot.Reading | None:
+    """The spread this conversation is being read from, or None.
+
+    Re-dealt from the seed on every turn rather than stored. The deal is
+    deterministic (`tarot.deal`), so the client carrying one integer is enough
+    to make the cards the same cards for the whole reading -- the same trick
+    the transcript uses, and the reason this mode still needs no table.
+    """
+    if not who.deals or seed is None:
+        return None
+    try:
+        return tarot.deal(int(seed))
+    except (TypeError, ValueError) as exc:
+        raise TranscriptRejected(f"not a usable reading seed: {seed!r}") from exc
 
 
 def _stance(requested: Any) -> stance_mod.Stance:
@@ -820,23 +884,31 @@ def _report(turn: Turn | None, *, mode: str, effective: stance_mod.Stance,
 
 
 def ask(transcript: Any = None, slots: Any = None, *,
-        requested: Any = None) -> dict[str, Any]:
+        requested: Any = None, persona: Any = None, seed: Any = None
+        ) -> dict[str, Any]:
     """One turn of the theme conversation: a question back, and what it heard.
 
     Stateless. The transcript arrives from the client and leaves again; nothing
     is stored, which is why this needs no table, no expiry sweep and no ADR 5
     ownership rule -- and, as it turns out, is the reason the most personal
     thing this app handles never touches the server's disk.
+
+    `persona` picks the voice and `seed` re-deals the spread it is reading
+    from. Both are client-held for the same reason the transcript is, and both
+    default to what every client sent before they existed.
     """
     history = check_transcript(transcript)
     effective = _stance(requested)
+    who = persona_mod.get(persona)
+    mode = CONVERSATION_MODES[who.key]
+    reading = _reading_for(who, seed)
     # Grounded against the transcript on the way *in* as well as out, because
     # the client carried them and the client is not the authority on what its
     # user said.
     carried, _ = ground(list(slots or []), history)
 
     if not effective.allows_calls:
-        return _report(None, mode=THEME_CONVERSATION.name, effective=effective,
+        return _report(None, mode=mode.name, effective=effective, persona=who.key,
                        asked=False, question="", fact=None, slots=carried,
                        slots_dropped=0, grounded=len(carried),
                        floor=FLOOR, may_propose=may_propose(carried),
@@ -847,7 +919,7 @@ def ask(transcript: Any = None, slots: Any = None, *,
         # The conversation ceiling, and it is not the tool loop's. Reported as
         # a finished conversation rather than an error: what it has is what it
         # has, and if that is three grounded slots there is still a proposal.
-        return _report(None, mode=THEME_CONVERSATION.name, effective=effective,
+        return _report(None, mode=mode.name, effective=effective, persona=who.key,
                        asked=False, question="", fact=None, slots=carried,
                        slots_dropped=0, grounded=len(carried),
                        floor=FLOOR, may_propose=may_propose(carried),
@@ -856,15 +928,16 @@ def ask(transcript: Any = None, slots: Any = None, *,
                               f"long as this conversation goes.")
 
     closing = _closing_for(carried, history)
-    turn = converse(THEME_CONVERSATION,
-                    messages=_messages(history, closing=closing),
+    turn = converse(mode,
+                    messages=_messages(history, closing=closing,
+                                       frame=_frame_for(reading)),
                     stance=effective,
                     # No client tools at all, so the only reason to go round
                     # again is the one search resuming after a pause_turn.
                     max_turns=4)
 
     if turn.refused:
-        return _report(turn, mode=THEME_CONVERSATION.name, effective=effective,
+        return _report(turn, mode=mode.name, effective=effective, persona=who.key,
                        asked=True, question="", fact=None, slots=carried,
                        slots_dropped=0, grounded=len(carried), floor=FLOOR,
                        may_propose=may_propose(carried),
@@ -874,7 +947,7 @@ def ask(transcript: Any = None, slots: Any = None, *,
     try:
         payload = turn.parsed()
     except json.JSONDecodeError:
-        return _report(turn, mode=THEME_CONVERSATION.name, effective=effective,
+        return _report(turn, mode=mode.name, effective=effective, persona=who.key,
                        asked=True, question="", fact=None, slots=carried,
                        slots_dropped=0, grounded=len(carried), floor=FLOOR,
                        may_propose=may_propose(carried),
@@ -892,7 +965,7 @@ def ask(transcript: Any = None, slots: Any = None, *,
     grounded, dropped = ground(payload.get("slots") or [], history)
 
     return _report(
-        turn, mode=THEME_CONVERSATION.name, effective=effective, asked=True,
+        turn, mode=mode.name, effective=effective, persona=who.key, asked=True,
         question=question,
         fact=keep_fact(payload.get("fact"), turn.searched),
         slots=grounded,
@@ -957,6 +1030,13 @@ class ProposalRequest:
     effective: stance_mod.Stance
     budget: float | None = None
     avoid: str = ""
+    #: The voice that ran the conversation, carried so the payoff arrives in
+    #: the same one. A reading that turns into a committee memo at the moment
+    #: it matters has thrown away the only thing the persona was for.
+    persona: str = persona_mod.DEFAULT
+    #: The spread's seed, or None. Re-dealt rather than carried whole, for the
+    #: reason `_reading_for` gives.
+    seed: int | None = None
 
     @property
     def needs_call(self) -> bool:
@@ -972,7 +1052,8 @@ class ProposalRequest:
 
 def check_proposal(transcript: Any = None, slots: Any = None, *,
                    requested: Any = None, budget: float | None = None,
-                   avoid: str = "") -> ProposalRequest:
+                   avoid: str = "", persona: Any = None,
+                   seed: Any = None) -> ProposalRequest:
     """Everything that can refuse a proposal, done before anything is spent.
 
     Refuses below the floor rather than proposing anyway. The button is dark in
@@ -989,13 +1070,23 @@ def check_proposal(transcript: Any = None, slots: Any = None, *,
             f"and every one has to be something they actually said. Keep "
             f"talking.")
 
+    # Resolved here rather than in the worker: an unknown persona is a
+    # malformed request and belongs with the other 422s, not four minutes
+    # later as a job in state `error`.
+    who = persona_mod.get(persona)
+    _reading_for(who, seed)          # raises now if the seed is unusable
+
     return ProposalRequest(history=history, grounded=grounded, dropped=dropped,
-                           effective=effective, budget=budget, avoid=avoid)
+                           effective=effective, budget=budget, avoid=avoid,
+                           persona=who.key,
+                           seed=int(seed) if who.deals and seed is not None
+                           else None)
 
 
 def propose(transcript: Any = None, slots: Any = None, *,
             requested: Any = None, budget: float | None = None,
-            avoid: str = "") -> dict[str, Any]:
+            avoid: str = "", persona: Any = None, seed: Any = None
+            ) -> dict[str, Any]:
     """Two colour combinations and six commanders, from what they told you.
 
     Check and run in one call, which is what the CLI wants and what every test
@@ -1003,7 +1094,8 @@ def propose(transcript: Any = None, slots: Any = None, *,
     be a job; see `check_proposal`.
     """
     return run_proposal(check_proposal(transcript, slots, requested=requested,
-                                       budget=budget, avoid=avoid))
+                                       budget=budget, avoid=avoid,
+                                       persona=persona, seed=seed))
 
 
 def run_proposal(req: ProposalRequest, *,
@@ -1016,18 +1108,23 @@ def run_proposal(req: ProposalRequest, *,
     says it is still moving.
     """
     grounded, dropped, effective = req.grounded, req.dropped, req.effective
+    who = persona_mod.PERSONAS[req.persona]
+    mode = PROPOSAL_MODES[who.key]
+    reading = _reading_for(who, req.seed)
 
     if not req.needs_call:
-        return _report(None, mode=THEME_PROPOSAL.name, effective=effective,
+        return _report(None, mode=mode.name, effective=effective,
+                       persona=who.key,
                        asked=False, combinations=[], sources=[],
                        slots=grounded, slots_dropped=dropped,
                        reason="The stance is off, so no call was made.")
 
-    turn = converse(THEME_PROPOSAL,
+    turn = converse(mode,
                     messages=_messages(req.history,
                                        closing=_proposal_ask(grounded,
                                                              req.budget,
-                                                             req.avoid)),
+                                                             req.avoid),
+                                       frame=_frame_for(reading)),
                     stance=effective,
                     # A search, a look at what came back, a commander search, a
                     # get_cards to confirm, and the write-up -- with a paused
@@ -1036,14 +1133,14 @@ def run_proposal(req: ProposalRequest, *,
                     on_turn=on_turn)
 
     if turn.refused:
-        return _report(turn, mode=THEME_PROPOSAL.name, effective=effective,
+        return _report(turn, mode=mode.name, effective=effective, persona=who.key,
                        asked=True, combinations=[], sources=[],
                        slots=grounded, slots_dropped=dropped,
                        reason="The model declined to write this one.")
     try:
         payload = turn.parsed()
     except json.JSONDecodeError:
-        return _report(turn, mode=THEME_PROPOSAL.name, effective=effective,
+        return _report(turn, mode=mode.name, effective=effective, persona=who.key,
                        asked=True, combinations=[], sources=[],
                        slots=grounded, slots_dropped=dropped,
                        reason=f"The answer did not parse (stop reason: "
@@ -1061,14 +1158,14 @@ def run_proposal(req: ProposalRequest, *,
         # dossier with no source is empty; a proposal with no *combination* has
         # nothing to propose, which is a different failure and the only one
         # worth refusing over.
-        return _report(turn, mode=THEME_PROPOSAL.name, effective=effective,
+        return _report(turn, mode=mode.name, effective=effective, persona=who.key,
                        asked=True, combinations=[], sources=sources,
                        slots=grounded, slots_dropped=dropped,
                        reason="Nothing came back that resolved against the "
                               "corpus, so there is nothing to suggest.")
 
     return _report(
-        turn, mode=THEME_PROPOSAL.name, effective=effective, asked=True,
+        turn, mode=mode.name, effective=effective, persona=who.key, asked=True,
         combinations=combinations,
         sources=sources,
         # ADR 20 diverges from ADR 19 here and it is deliberate: an unsourced

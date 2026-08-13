@@ -31,6 +31,12 @@ Decks = Annotated[DeckSource, Depends(deck_source)]
 
 WEB_DIST = Path(__file__).resolve().parent.parent / "web_dist"
 
+#: The 78 tarot pictures, shipped in the package rather than the bundle.
+#: `assets/tarot/PROVENANCE.md` says where they came from and why they may be
+#: here. Kept out of `web_dist` because that directory belongs to Vite, and
+#: putting them through `web/public` would store 4.6MB twice in git.
+TAROT = Path(__file__).resolve().parent.parent / "assets" / "tarot"
+
 #: Revalidate before reuse, every time.
 #:
 #: **`no-cache` does not mean "do not store".** It means "do not reuse without
@@ -422,6 +428,41 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    @app.get("/api/claude/personas")
+    def claude_personas() -> dict[str, Any]:
+        """The voices the theme interview can adopt, for the door to render.
+
+        Free, deterministic and reaching nothing: this is a checked-in table,
+        the same class of thing as `/api/colors`. It answers with no key set
+        and no corpus, which matters because the door renders before anybody
+        has committed to spending anything.
+
+        `voice` is deliberately not in the payload. Not because a prompt in a
+        public repository is a secret, but because a client that received one
+        would eventually send one back, and "the persona is one of a fixed set"
+        is worth keeping structural rather than polite.
+        """
+        from mtglab.claude import persona as persona_mod
+        return {"personas": persona_mod.as_dicts(),
+                "default": persona_mod.DEFAULT}
+
+    @app.get("/api/tarot/reading")
+    def tarot_reading(seed: int | None = None) -> dict[str, Any]:
+        """Deal three cards. No model, no corpus, no network, no cost.
+
+        **Python decides** (ADR 14): a shuffle has a right answer and belongs
+        here, while what a spread means has none and belongs to the reader.
+        Seeded and returning its seed, so the client can carry one integer and
+        get the same three cards for the whole conversation — the same
+        stateless trick the transcript uses, and the reason a reading needs no
+        table either.
+
+        A `seed` may be supplied to re-deal an existing reading, which is what
+        a reload does.
+        """
+        from mtglab import tarot
+        return tarot.deal(seed).as_dict()
+
     @app.post("/api/claude/theme")
     def claude_theme(payload: dict[str, Any]) -> dict[str, Any]:
         """One turn of the theme interview (ADR 20).
@@ -443,7 +484,11 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             return service.claude_theme_ask(
                 transcript=payload.get("transcript"),
                 slots=payload.get("slots"),
-                requested=payload.get("stance") or None)
+                requested=payload.get("stance") or None,
+                # An unknown persona is an `UnknownPersona`, which is a
+                # `ValueError`, which the handler below already answers 422.
+                persona=payload.get("persona") or None,
+                seed=payload.get("seed"))
         except (TranscriptRejected, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ClaudeUnavailable as exc:
@@ -481,7 +526,9 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 slots=payload.get("slots"),
                 requested=payload.get("stance") or None,
                 budget=float(budget) if budget else None,
-                avoid=str(payload.get("avoid") or ""))
+                avoid=str(payload.get("avoid") or ""),
+                persona=payload.get("persona") or None,
+                seed=payload.get("seed"))
         except NotReady as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except (TranscriptRejected, ValueError) as exc:
@@ -672,6 +719,17 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         return job.as_dict()
 
     # ----------------------------------------------------------- static
+
+    # Mounted before the SPA catch-all below, which would otherwise hand a
+    # missing card the HTML shell with a 200 -- an `<img>` that "loads" and
+    # shows nothing. Same reason `/assets` sits here.
+    #
+    # `Revalidated` for consistency rather than necessity: unlike the bundle
+    # these files genuinely never change, so a long immutable cache would be
+    # defensible. It is not worth a second caching policy to argue about, and
+    # only the three dealt cards are ever fetched.
+    if TAROT.is_dir():
+        app.mount("/tarot", Revalidated(directory=TAROT), name="tarot")
 
     if WEB_DIST.is_dir():
         assets = WEB_DIST / "assets"

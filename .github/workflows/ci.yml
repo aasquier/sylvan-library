@@ -237,6 +237,16 @@ jobs:
             'test -f /app/decks-seed/arahbo-cats/deck.yaml'
           echo "decks seed present"
 
+      # The tarot art ships as `package-data`, not as part of the built bundle,
+      # so nothing else in this pipeline would notice it going missing: the
+      # tests read it from the source tree and pass either way. What breaks is
+      # only ever the *installed* package, which is only ever built here.
+      # 78 exactly -- a glob that half-matches is worse than one that fails.
+      - name: The tarot deck must survive being packaged
+        run: |
+          docker run --rm --entrypoint python sylvan-library:ci -c \
+            "import mtglab, pathlib, sys; d = pathlib.Path(mtglab.__file__).parent / 'assets/tarot'; n = len(list(d.glob('*.webp'))); print(d, n, 'cards'); sys.exit(0 if n == 78 else 1)"
+
       - name: Run it
         run: |
           docker volume create mtglab-ci-data

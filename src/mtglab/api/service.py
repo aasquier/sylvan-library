@@ -1041,7 +1041,8 @@ def claude_dossier(*, slug: str, requested: Any = None, refresh: bool = False,
 
 
 def claude_theme_ask(*, transcript: Any = None, slots: Any = None,
-                     requested: Any = None) -> dict[str, Any]:
+                     requested: Any = None, persona: Any = None,
+                     seed: Any = None) -> dict[str, Any]:
     """One turn of the theme interview (ADR 20). Asks about you, not about Magic.
 
     Note what is absent from the signature: there is no `slug` and no `source`.
@@ -1053,7 +1054,8 @@ def claude_theme_ask(*, transcript: Any = None, slots: Any = None,
     from mtglab.claude.theme import TranscriptRejected, ask
 
     try:
-        return ask(transcript, slots, requested=requested)
+        return ask(transcript, slots, requested=requested,
+                   persona=persona, seed=seed)
     except (claude_client.ClaudeUnavailable, TranscriptRejected):
         raise
     except ModeExhausted as exc:
