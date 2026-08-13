@@ -7,6 +7,7 @@ never drift into disagreeing about a deck.
 
 from __future__ import annotations
 
+import mimetypes
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -36,6 +37,26 @@ WEB_DIST = Path(__file__).resolve().parent.parent / "web_dist"
 #: here. Kept out of `web_dist` because that directory belongs to Vite, and
 #: putting them through `web/public` would store 4.6MB twice in git.
 TAROT = Path(__file__).resolve().parent.parent / "assets" / "tarot"
+
+# Name the type ourselves rather than asking the host what a `.webp` is.
+#
+# Starlette guesses a static file's content type through `mimetypes`, which
+# reads the *operating system's* database — `/etc/mime.types` and friends. The
+# slim image has none, so `mimetypes.guess_type("x.webp")` answers `None`
+# there and all 78 tarot pictures went out as `application/octet-stream`. This
+# laptop knows `.webp` and so does CI's ubuntu, which is precisely why nothing
+# caught it: the fault is a property of the environment the code is installed
+# into, not of the code. That is the same shape as the two bugs of 2026-08-12
+# — a faked mail `Transport`, a stubbed SDK — and the third instance of the
+# lesson: **ask what the container has, not what the tests pass with.**
+#
+# Browsers sniff the bytes and render them anyway, so this was invisible in
+# production too. That is not a reason to leave it. One
+# `X-Content-Type-Options: nosniff`, one strict proxy or one CDN image rule
+# and every card in the deck fails at once, in production only, with a green
+# suite behind it. `.js`, `.css` and `.html` are in Python's own built-in
+# table and need no help; `.webp` is not, in 3.12.
+mimetypes.add_type("image/webp", ".webp")
 
 #: Revalidate before reuse, every time.
 #:

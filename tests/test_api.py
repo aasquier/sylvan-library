@@ -191,6 +191,29 @@ def test_the_shell_and_its_assets_are_served_revalidated(client):
     assert asset.headers.get("cache-control") == "no-cache"
 
 
+def test_a_tarot_picture_is_served_as_a_picture(client):
+    """`image/webp`, and named by us rather than by the operating system.
+
+    Starlette resolves a static file's type through `mimetypes`, which reads
+    the *host's* database. The slim image has no `/etc/mime.types`, so `.webp`
+    answered `None` there and all 78 cards went out as
+    `application/octet-stream` — on the deployed instance, and only there.
+    Browsers sniff the bytes and render them, so it was invisible in
+    production as well as in the suite.
+
+    This test cannot see that on its own: macOS and CI's ubuntu both know the
+    type, so it passed before the fix and passes after. What it pins is the
+    contract; the `image` job in `ci.yml` asks the *container* the same
+    question, because that is the only machine that has ever answered it
+    differently. Two halves of one check, and neither is sufficient alone —
+    the same division `tests/test_packaging.py` makes about the Dockerfile.
+    """
+    card = client.get("/tarot/00-fool.webp")
+    if card.status_code == 404:                       # pragma: no cover
+        pytest.skip("no packaged tarot art in this tree")
+    assert card.headers["content-type"] == "image/webp"
+
+
 def test_an_unchanged_asset_still_answers_304(client):
     """Which is what makes `no-cache` cheap rather than expensive.
 

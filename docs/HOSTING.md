@@ -1281,6 +1281,27 @@ here rather than rewriting the sections above.
 - [x] **Long simulations are already off the request path** — `api/jobs.py`
       and `api/simruns.py` run them in the background and the UI polls.
 - [x] **The frontend is prebuilt and committed**, so the image needs no Node.
+- [x] **Static files are served with a content type the app names itself.**
+      Found on the instance 2026-08-13, hours after the tarot art shipped:
+      every one of the 78 cards was going out as `application/octet-stream`.
+      Starlette resolves a static file's type through `mimetypes`, which reads
+      the **host's** database — and the slim image has no `/etc/mime.types`,
+      so `.webp` answered `None` there. macOS knows the type and so does CI's
+      ubuntu, so nothing local could see it; browsers sniff the bytes and
+      render them, so nothing *remote* could see it either. It was one
+      `X-Content-Type-Options: nosniff`, one strict proxy or one CDN image
+      rule away from every picture in the app failing at once, in production
+      only, behind a green suite. `api/app.py` registers `image/webp`
+      explicitly and the `image` CI job asks the container the same question.
+
+      **The fourth deployment-only fault, and the fourth of one shape.** A
+      faked mail `Transport`, a stubbed Anthropic SDK, a mail client's
+      linkifier, and now the operating system's mime database: every one is a
+      property of the environment the code runs *in* rather than of the code,
+      which is exactly what a test seam replaces. The habit worth keeping is
+      the one that caught this — **ask the container, not the suite**, and
+      check the response headers rather than the rendered page, because the
+      browser was quietly compensating.
 - [x] **CI refuses to let the corpus or a key be committed** — by filename and
       by scanning every tracked file's contents, the built bundle included.
 - [x] **Read-only DuckDB is safe across processes and threads**, verified in

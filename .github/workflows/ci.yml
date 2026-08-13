@@ -247,6 +247,19 @@ jobs:
           docker run --rm --entrypoint python sylvan-library:ci -c \
             "import mtglab, pathlib, sys; d = pathlib.Path(mtglab.__file__).parent / 'assets/tarot'; n = len(list(d.glob('*.webp'))); print(d, n, 'cards'); sys.exit(0 if n == 78 else 1)"
 
+      # And they must be served as pictures. `mimetypes` reads the *host's*
+      # database, and this image has no `/etc/mime.types` — so `.webp`
+      # resolved to nothing and every card went out as
+      # `application/octet-stream`. macOS knows the type and so does this
+      # runner, which is exactly why neither the suite nor a local browser
+      # could see it. `api/app.py` registers it explicitly now; this asserts
+      # that the registration is what the *container* ends up doing, which is
+      # the only place the question has ever had a different answer.
+      - name: A packaged card must resolve as an image, not as bytes
+        run: |
+          docker run --rm --entrypoint python sylvan-library:ci -c \
+            "import mtglab.api.app, mimetypes, sys; t = mimetypes.guess_type('x.webp')[0]; print('webp ->', t); sys.exit(0 if t == 'image/webp' else 1)"
+
       - name: Run it
         run: |
           docker volume create mtglab-ci-data

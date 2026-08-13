@@ -638,6 +638,20 @@ arc; this is what the next few sessions actually do.
    log, which is the instrument for it — what you are looking for is one job id
    continuing across a document request, and a screenshot cannot show that.
 
+   **A fourth deployment-only fault, found the same way, 2026-08-13.** Hours
+   after the tarot art shipped, every one of the 78 pictures was being served
+   as `application/octet-stream` — on the instance and only there. Starlette
+   asks `mimetypes`, `mimetypes` asks the operating system, and the slim image
+   has no `/etc/mime.types`; macOS and CI's ubuntu both know `.webp`, so no
+   local check could see it, and browsers sniff and render anyway, so no remote
+   *page* could either. It took reading the response headers. `api/app.py`
+   names the type itself now and the `image` job asks the container.
+
+   The shape is the point and it is now four for four: a faked mail
+   `Transport`, a stubbed SDK, a mail client's linkifier, and the host's mime
+   database. **Every one is a fact about the environment rather than about the
+   code**, which is precisely what a test seam stands in for.
+
    ### The punchlist, 2026-08-13
 
    Five items, written down here rather than left in a session's memory. The
