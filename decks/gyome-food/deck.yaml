@@ -3,6 +3,7 @@ name: Gyome, Master Chef — Food
 status: built  # built: the cards are sleeved up
 commander:
   - Gyome, Master Chef
+commander_art: c48d1586-23e9-4b0e-91ff-01bd6f32427c
 bracket: 4
 
 strategy: >

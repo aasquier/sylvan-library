@@ -54,7 +54,15 @@ const GUILDS: Record<string, string> = {
   WUBRG: 'Five-colour',
 }
 
-const WUBRG = ['W', 'U', 'B', 'R', 'G']
+/**
+ * Canonical colour order, and the mirror of `colors.WUBRG` in Python.
+ *
+ * Exported because the pentagram is drawn from it: the five vertices go round
+ * in this order, which is what makes adjacency mean "allied" and two-apart
+ * mean "enemy". A different order here would draw a diagram that is merely
+ * decorative.
+ */
+export const WUBRG = ['W', 'U', 'B', 'R', 'G']
 
 export function identityName(identity: string[]): string {
   if (!identity.length) return 'Colorless'

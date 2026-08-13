@@ -299,6 +299,32 @@ describe('Library', () => {
     expect(art.getAttribute('alt')).toBe('')
     expect(art.getAttribute('aria-hidden')).toBe('true')
   })
+
+  it('keeps its heading, and shows the painting once', async () => {
+    // The nameplate normally carries the `h1`, and it is deliberately not
+    // rendered here — `FirstRun` is the same painting at full size and two of
+    // them stacked is the app introducing itself twice. Suppressing it took
+    // the page's only top-level heading with it, which is the regression this
+    // pins: exactly one `h1`, and exactly one copy of the art.
+    vi.mocked(api.decks).mockResolvedValue([])
+    const { container } = renderLibrary()
+    await waitFor(() => expect(screen.getByText('Nothing on the shelf yet.')).toBeTruthy())
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Deck library')
+    expect(container.querySelectorAll('img')).toHaveLength(1)
+  })
+
+  it('names the painting for a screen reader on a stocked shelf', async () => {
+    // The nameplate's copy is the subject rather than a backdrop — it is shown
+    // whole and at its own ratio — so unlike `FirstRun`'s it gets a real
+    // description instead of being hidden.
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    const art = screen.getByRole('heading', { level: 1 })
+      .closest('section')!.querySelector('img')!
+    expect(art.getAttribute('aria-hidden')).toBeNull()
+    expect(art.getAttribute('alt')).toMatch(/Yeong-Hao Han/)
+  })
 })
 
 // ---------------------------------------------------------------- mana pips
@@ -314,12 +340,40 @@ describe('Library mana pips', () => {
     renderLibrary()
     await waitFor(() => expect(shownNames()).toHaveLength(1))
     const card = screen.getByText('Cats').closest('a')!
-    expect(card.textContent).toContain('A GW deck that wants 1.')
+    // The braces are gone and the prose either side of them survives. Asserted
+    // around the pips rather than through them: a colour pip is a drawing now
+    // and contributes no text, where it used to contribute its letter.
     expect(card.textContent).not.toContain('{G}')
+    expect(card.textContent).toContain('A ')
+    expect(card.textContent).toContain(' deck that wants ')
+    // A generic cost has no icon and stays a numeral, which is the branch in
+    // `Pip` that decides between a glyph and a character.
+    expect(card.textContent).toContain('1.')
     // Each pip carries the colour's name, which is what makes it readable
-    // without the letter being spelled out in the prose.
+    // without the letter being spelled out in the prose. Both the tooltip and
+    // the accessible name, because they serve different readers and the letter
+    // that used to serve the second one is no longer there.
     expect(within(card).getByTitle('Green')).toBeTruthy()
     expect(within(card).getByTitle('White')).toBeTruthy()
+    expect(within(card).getByLabelText('Green')).toBeTruthy()
+    expect(within(card).getByLabelText('White')).toBeTruthy()
+  })
+
+  it('draws a colour identity but leaves numerals and X as characters', async () => {
+    vi.mocked(api.decks).mockResolvedValue([
+      deck({ slug: 'cats', name: 'Cats', color_identity: [],
+             strategy: 'Pay {2} or {X}, then {B}.' }),
+    ])
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(1))
+    const card = screen.getByText('Cats').closest('a')!
+    // Nothing but the five colours has an icon: a generic cost is a number and
+    // `{X}` is a letter, so both keep their character and neither acquires a
+    // drawing that would be asserting a meaning they do not have.
+    expect(card.textContent).toContain('2')
+    expect(card.textContent).toContain('X')
+    expect(within(card).getByLabelText('Black')).toBeTruthy()
+    expect(within(card).queryByLabelText('2')).toBeNull()
   })
 })
 

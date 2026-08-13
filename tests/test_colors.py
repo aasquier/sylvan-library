@@ -197,3 +197,74 @@ def test_no_reference_prose_uses_markdown():
     prose += [c.history for c in colors.COMBINATIONS]
     for text in prose:
         assert "*" not in text and "_" not in text, text[:60]
+
+
+# ----------------------------------------------------------- the colour wheel
+
+# The pentagram in `web/src/components/pentagram.tsx` draws five vertices in
+# WUBRG order and claims that its perimeter is the allied guilds and its five
+# chords the enemy ones. That is a claim about `colors.py`, made in TypeScript,
+# where nothing here can see it -- so it is checked from this side instead,
+# against the same adjacency rule the component computes its lines from.
+#
+# The component copies no names and no membership: it looks every label up in
+# the taxonomy `/api/colors` already served it. What these pin is the property
+# that makes the *shape* honest, which is the one thing a diagram can get wrong
+# silently.
+
+def _pairs(step: int) -> list[str]:
+    """Keys for the five pairs `step` apart on a WUBRG wheel."""
+    w = colors.WUBRG
+    return [colors.key_for({w[i], w[(i + step) % 5]}) for i in range(5)]
+
+
+def test_the_wheels_perimeter_and_chords_are_exactly_the_ten_guilds():
+    """Ten lines, ten guilds, nothing left over and nothing drawn twice.
+
+    If this fails the diagram is drawing a line to a combination that is not a
+    guild, or two lines to the same one -- either of which looks entirely
+    plausible on screen.
+    """
+    perimeter, chords = _pairs(1), _pairs(2)
+    assert not set(perimeter) & set(chords), "a pair cannot be both"
+    assert len(set(perimeter + chords)) == 10, "each guild drawn once"
+    assert set(perimeter + chords) == {c.key for c in colors.by_tier("guild")}
+
+
+def test_adjacent_on_the_wheel_is_allied_and_two_apart_is_enemy():
+    """The rule the component classifies solid against dashed with.
+
+    Anchored on the shards and wedges rather than asserted: a shard is a colour
+    with both its neighbours, so every allied pair sits inside some shard; a
+    wedge is a colour with both its opposites, so every enemy pair sits inside
+    some wedge. That makes this checkable from the taxonomy alone.
+    """
+    shards = [set(c.colors) for c in colors.by_tier("shard")]
+    wedges = [set(c.colors) for c in colors.by_tier("wedge")]
+
+    for key in _pairs(1):
+        pair = set(colors.BY_KEY[key].colors)
+        assert any(pair <= s for s in shards), f"{key} is not allied"
+    for key in _pairs(2):
+        pair = set(colors.BY_KEY[key].colors)
+        assert any(pair <= w for w in wedges), f"{key} is not an enemy pair"
+
+
+def test_the_tier_badges_draw_the_shape_their_blurb_describes():
+    """`TIER_SHAPE` in the component picks one member per tier to light up.
+
+    Those index sets are duplicated here deliberately -- they are the badge's
+    geometry, and this is the assertion that each one really is a member of the
+    tier it stands for. The pair that matters is shard against wedge: same
+    three dots, opposite textures, and the badges are only worth drawing if
+    that distinction is real.
+    """
+    w = colors.WUBRG
+    shapes = {
+        "colorless": [], "mono": [0], "guild": [0, 1], "shard": [4, 0, 1],
+        "wedge": [0, 2, 3], "quad": [0, 1, 2, 3], "five": [0, 1, 2, 3, 4],
+    }
+    assert set(shapes) == set(colors.TIERS), "a badge for every tier"
+    for tier, idx in shapes.items():
+        combo = colors.of({w[i] for i in idx})
+        assert combo.tier == tier, f"{tier} badge draws a {combo.tier}"

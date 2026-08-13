@@ -158,6 +158,66 @@ const SYLVAN_LIBRARY_ART =
   'https://cards.scryfall.io/art_crop/front/3/0/3003d481-1b52-4aa9-bbdc-e948fbc8d49d.jpg'
 
 /**
+ * The library's own nameplate, and the one place the app is named after
+ * anything.
+ *
+ * It exists because the painting above had been in the codebase for weeks and
+ * nobody had ever seen it: `FirstRun` is the only thing that rendered it, and
+ * `FirstRun` only renders on an **empty** library, which no instance with
+ * decks on it ever is. A piece of identity reachable exclusively by deleting
+ * all your work is not identity.
+ *
+ * **Beside the title rather than behind it**, and that is the interesting
+ * decision. The obvious masthead is a full-bleed band, and this is the third
+ * time in this project that the obvious one has been wrong for the same
+ * measured reason: `art_crop` is 616x452, about 1.36:1, and a band across a
+ * 1230px page is nearer 3:1, so `object-fit: cover` keeps **44% of the
+ * painting's height** and throws the rest away from the top and bottom
+ * equally. On this painting that lands on bare wall texture — the sky goes,
+ * the path goes, and the three human figures that give the canyon its scale go
+ * with it.
+ *
+ * Branch 1 hit this on the deck hero and answered it by showing the commander
+ * as a whole card next to the band rather than as a second crop. Same answer
+ * here, for the same reason, and it costs nothing: shown at its own ratio the
+ * painting is entirely visible, which is the whole point of putting it on the
+ * page.
+ */
+function LibraryMasthead({ decks, health }: {
+  decks: number
+  health: Health | null
+}) {
+  return (
+    <section className="card-surface overflow-hidden rounded-xl">
+      <div className="flex flex-col sm:flex-row">
+        {/* No `ratio` prop and no cropping: the container takes the image's
+            own shape, so there is nothing to anchor and nothing to lose. */}
+        <img
+          src={SYLVAN_LIBRARY_ART}
+          alt="Sylvan Library, painted by Yeong-Hao Han: a canyon of mossy
+               trunks riddled with alcoves, with three tiny figures on the path
+               below for scale."
+          className="masthead-art w-full object-cover sm:w-[260px]"
+        />
+        <div className="flex min-w-0 flex-col justify-center gap-1 px-5 py-4 sm:px-6">
+          <h1 className="text-2xl font-semibold tracking-tight">Deck library</h1>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            {decks} deck{decks === 1 ? '' : 's'} ·{' '}
+            {health?.corpus
+              ? `${health.oracle_cards.toLocaleString()} cards in the local corpus`
+              : 'no corpus yet — run `mtglab data refresh`'}
+          </p>
+          <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <em>Sylvan Library</em> by Yeong-Hao Han, Commander&rsquo;s Arsenal —
+            the card this project is named after.
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/**
  * What someone sees before they own anything.
  *
  * Distinct from "no decks match those filters", which is a dead end you get
@@ -242,17 +302,29 @@ export default function Library() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      {/* The nameplate carries the title and the counts now, so the row below
+          is only the controls.
+
+          The plain heading on an empty library is not a stylistic choice, it
+          is the page keeping its `h1`. `FirstRun` is this same painting at
+          full size, so showing the nameplate too would introduce the app
+          twice — but dropping the nameplate silently dropped the only
+          top-level heading with it, which is what the first version of this
+          did. */}
+      {decks.length > 0 ? (
+        <LibraryMasthead decks={decks.length} health={health} />
+      ) : (
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Deck library</h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {decks.length} deck{decks.length === 1 ? '' : 's'} ·{' '}
             {health?.corpus
               ? `${health.oracle_cards.toLocaleString()} cards in the local corpus`
               : 'no corpus yet — run `mtglab data refresh`'}
           </p>
         </div>
+      )}
 
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-wrap items-end gap-3">
           <Select label="Bracket" value={bracket} onChange={setBracket}
                   options={[{ value: 'all', label: 'All brackets' },

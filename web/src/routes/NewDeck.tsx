@@ -46,6 +46,7 @@ import {
 } from '../lib/api'
 import { COLOR_VAR } from '../lib/mtg'
 import { CardHover, ColorRing, ManaText } from '../components/ui'
+import { ColorPentagram, TierGlyph } from '../components/pentagram'
 import { ThemeInterview } from '../components/theme'
 
 /** The era whose story named a tier, so the lesson has its setting attached. */
@@ -164,6 +165,27 @@ export default function NewDeck() {
     if (!inTier.length) return
     setIndex((i) => (i + delta + inTier.length) % inTier.length)
   }
+
+  /**
+   * Show a combination in the carousel, wherever in the taxonomy it lives.
+   *
+   * The pentagram's vertices are mono and its ten lines are guilds, so a click
+   * on the wheel can cross a tier boundary: picking Azorius from a diagram
+   * drawn on the mono tier has to move the tier selector as well as the index.
+   *
+   * It stops at showing, deliberately. `choose` commits to a combination and
+   * loads its commanders; this is "look at this one", which is what pointing
+   * at a shape on a diagram means. The card below still carries the Build
+   * button, so the act that starts a deck is the same one it was before the
+   * wheel existed.
+   */
+  const goTo = useCallback((combo: Combination) => {
+    const list = taxonomy?.combinations.filter((c) => c.tier === combo.tier) ?? []
+    const at = list.findIndex((c) => c.key === combo.key)
+    if (at < 0) return
+    setTier(combo.tier)
+    setIndex(at)
+  }, [taxonomy])
 
   // Arrow keys drive the carousel while it is the active step. Only bound
   // before a combination is chosen, so it cannot fight the commander list.
@@ -415,18 +437,30 @@ export default function NewDeck() {
       {/* -------------------------------- step 1, guided: the history lesson */}
       {!chosen && mode === 'guided' && (
         <section className="space-y-4">
-          <div className="flex flex-wrap gap-1">
+          {/* Seven identical grey pills said nothing about what they were
+              selecting, which on the one screen whose whole job is teaching
+              the taxonomy was the wrong thing for the taxonomy's own control
+              to be. Each carries the wheel with its own shape lit now, so the
+              row reads as one figure picked out seven ways — and the two that
+              people actually confuse, shard and wedge, are visibly an arc
+              against a span before either label is read. */}
+          <div className="flex flex-wrap gap-1.5">
             {taxonomy.tiers.map((t) => (
               <button
                 key={t.key}
                 onClick={() => pickTier(t.key)}
-                className="rounded-md px-3 py-1.5 text-sm font-medium transition"
+                aria-pressed={tier === t.key}
+                className="flex items-center gap-2 rounded-lg py-1.5 pl-2 pr-3 text-sm font-medium transition"
                 style={{
                   color: tier === t.key ? 'var(--text-primary)' : 'var(--text-muted)',
                   background: tier === t.key ? 'var(--gridline)' : 'transparent',
-                  border: '1px solid var(--hairline)',
+                  // The selected tier gets a real border rather than a hairline,
+                  // because a filled background alone is nearly invisible on the
+                  // dark theme where `--gridline` is two steps off the page.
+                  border: `1px solid ${tier === t.key ? 'var(--baseline)' : 'var(--hairline)'}`,
                 }}
               >
+                <TierGlyph tier={t.key} />
                 {t.label}
               </button>
             ))}
@@ -459,6 +493,24 @@ export default function NewDeck() {
               </p>
             )}
           </div>
+
+          {/* The wheel, on the tier it explains.
+
+              Mono is where it belongs because a vertex *is* a mono-colour
+              deck, so the diagram is the tier's own chooser rather than an
+              illustration beside it. That it also answers "why is Azorius
+              white-blue and Orzhov white-black" is the geometry paying for
+              itself: the ten lines were going to be drawn anyway, and leaving
+              them dead would raise the question of what they were for. */}
+          {tier === 'mono' && (
+            <section className="card-surface rounded-xl px-6 py-6">
+              <ColorPentagram
+                combinations={taxonomy.combinations}
+                onPick={goTo}
+                selected={current?.key}
+              />
+            </section>
+          )}
 
           {current && (
             <article
