@@ -168,6 +168,48 @@ def test_frontend_routes_still_get_the_shell(client):
         assert resp.headers["content-type"].startswith("text/html"), path
 
 
+def test_the_shell_and_its_assets_are_served_revalidated(client):
+    """The bug this pins cost a black screen and an hour, 2026-08-13.
+
+    `web/vite.config.ts` emits stable filenames on purpose, because the bundle
+    is committed so `mtglab ui` needs no Node. Starlette sends an etag and a
+    last-modified, which is freshness *if the browser asks* — and with no
+    `Cache-Control` at all it may assign its own heuristic lifetime and not
+    ask. Safari did: after a deploy it re-fetched `app.js` and never requested
+    `DeckDetail.js`, so an old panel met a new server contract and the page
+    went black.
+
+    The failure mode is a returning visitor running two halves of two
+    different versions, which no amount of testing either half would catch.
+    """
+    for path in ("/", "/decks/gyome-food"):
+        assert client.get(path).headers.get("cache-control") == "no-cache", path
+
+    asset = client.get("/assets/app.js")
+    if asset.status_code == 404:                      # pragma: no cover
+        pytest.skip("no built bundle in this tree")
+    assert asset.headers.get("cache-control") == "no-cache"
+
+
+def test_an_unchanged_asset_still_answers_304(client):
+    """Which is what makes `no-cache` cheap rather than expensive.
+
+    `no-cache` means "revalidate", not "do not store" — so the conditional
+    request it forces must still come back empty when nothing has changed. If
+    this ever fails, the fix above has quietly turned into a full re-download
+    of the bundle on every page load.
+    """
+    first = client.get("/assets/app.js")
+    if first.status_code == 404:                      # pragma: no cover
+        pytest.skip("no built bundle in this tree")
+    etag = first.headers.get("etag")
+    assert etag, "revalidation needs something to revalidate against"
+
+    again = client.get("/assets/app.js", headers={"If-None-Match": etag})
+    assert again.status_code == 304
+    assert not again.content
+
+
 def test_missing_deck_is_a_404_not_a_500(client):
     resp = client.get("/api/decks/does-not-exist")
     assert resp.status_code == 404
