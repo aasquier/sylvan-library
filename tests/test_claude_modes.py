@@ -239,6 +239,31 @@ def test_a_tool_call_is_run_and_its_result_fed_back(scripted, source):
     assert json.loads(result["content"])["slug"] == "mini"
 
 
+def test_each_turn_is_reported_to_a_caller_that_asked(scripted, source):
+    """The hook the theme proposal needs now that it runs as a background job.
+
+    That mode takes minutes, and a job reporting nothing for four of them is
+    indistinguishable from a wedged one. Called at the *start* of each turn, so
+    the count is turns begun rather than turns finished -- which is what makes
+    the first tick arrive before the first request rather than after it.
+    """
+    scripted([
+        _Response([_ToolUse("get_deck", {"slug": "mini"})], stop_reason="tool_use"),
+        _Response([_Text("done")]),
+    ])
+    seen: list[tuple[int, int]] = []
+    converse(MODE, messages=ASK, stance=Stance(), source=source, max_turns=4,
+             on_turn=lambda done, total: seen.append((done, total)))
+
+    assert seen == [(0, 4), (1, 4)], "one per turn taken, not per turn allowed"
+
+
+def test_a_caller_that_wants_no_progress_gets_the_same_answer(scripted):
+    """`on_turn` is optional, and every other mode leaves it out."""
+    scripted([_Response([_Text("Because it ramps.")])])
+    assert converse(MODE, messages=ASK, stance=Stance()).text == "Because it ramps."
+
+
 def test_tokens_accumulate_across_turns(scripted, source):
     """Billing is per turn, and a caller shown only the last one would be told
     a multi-tool conversation cost what its final exchange cost."""

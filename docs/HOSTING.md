@@ -507,6 +507,13 @@ Five things differ from the draft, each for a reason:
 > which the route turns into a 404 (ADR 5, never a 403). The symptom would be a
 > running simulation reported as gone, at random, half the time. Sessions and
 > the login rate limiter live in `app.db` and would have been fine.
+>
+> **That got sharper on 2026-08-13**, when the theme proposal became a job too
+> (`api/themeruns.py`). It is a *four-minute* job that costs a real Anthropic
+> call, so on two workers the failure would not be a lost simulation somebody
+> resubmits for free — it would be a proposal that vanishes halfway through and
+> has to be paid for twice. One worker, and the reason is now in two places
+> rather than one.
 
 ### Step 2 — fly.toml
 

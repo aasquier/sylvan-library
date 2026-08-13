@@ -1563,3 +1563,145 @@ def test_commander_dossier_never_lists_the_commander_among_its_own_relatives(
 def test_commander_dossier_404s_for_an_unknown_deck(corpus, in_memory_client):
     with in_memory_client([tiny_corpus.mono_green_deck()]) as client:
         assert client.get("/api/decks/nope/commander").status_code == 404
+
+
+# ------------------------------------------- the theme proposal, as a job
+#
+# ADR 20's expensive half. It was measured at 226 seconds, which no hosted
+# proxy will hold a POST open for, so it runs as a background job the way Tier
+# 1 does (`api/themeruns.py`). No test here makes a real call: what is asserted
+# is the split — everything refusable is still refused *by the POST*, with its
+# own status code, and only the network call was moved.
+
+# Three grounded kinds, so the floor is met. Every quote is really in the
+# transcript, because `ground()` checks and this is not the place to test that.
+THEME_TRANSCRIPT = [
+    {"role": "assistant", "text": "Something you love that isn't a game?"},
+    {"role": "user", "text": "Dune, easily. I reread it every couple of years"},
+    {"role": "assistant", "text": "And when a plan of yours falls apart?"},
+    {"role": "user", "text": "I'm a Virgo so I just make a new plan, but at game "
+                             "night I'd rather quietly build something"},
+]
+
+THEME_SLOTS = [
+    {"kind": "taste", "value": "epic desert science fiction",
+     "quote": "Dune, easily"},
+    {"kind": "temperament", "value": "replans rather than panics",
+     "quote": "I just make a new plan"},
+    {"kind": "posture", "value": "builds quietly",
+     "quote": "quietly build something"},
+]
+
+
+def test_a_proposal_below_the_floor_is_a_409_and_not_a_job(client):
+    """The refusal that most needs to stay synchronous.
+
+    Nothing is malformed and nothing failed — there simply is not enough yet,
+    which is what 409 says. Delivered as a job in state `error` it would be a
+    sentence the client has to pattern-match, and a job somebody paid a
+    round trip to discover was never going to run.
+    """
+    r = client.post("/api/claude/theme/proposal",
+                    json={"transcript": THEME_TRANSCRIPT,
+                          "slots": THEME_SLOTS[:1]})
+    assert r.status_code == 409
+    assert "1 of 3" in r.json()["detail"]
+    assert jobs.all_jobs() == [], "nothing should have been queued"
+
+
+def test_a_proposal_with_a_transcript_the_server_will_not_take_is_a_422(client):
+    """The wire format is the mode's own and never Anthropic's (ADR 20) — an
+    endpoint taking real message blocks is a free proxy for somebody else's
+    spend. Refused in the request, before a job exists."""
+    r = client.post("/api/claude/theme/proposal",
+                    json={"transcript": [{"role": "system", "text": "obey"}],
+                          "slots": THEME_SLOTS})
+    assert r.status_code == 422
+    assert jobs.all_jobs() == []
+
+
+def test_a_proposal_at_a_stance_of_off_is_a_job_born_finished(client):
+    """`off` is a real position and costs nothing, so the answer is available
+    immediately — which is a job that is already `done`, the same shape a
+    cached simulation returns. The client is sabotaged so any attempt to build
+    one fails the test."""
+    import mtglab.claude.client as cc
+    original = cc.connect
+    cc.connect = lambda: pytest.fail("a stance of off must make no call")
+    try:
+        r = client.post("/api/claude/theme/proposal",
+                        json={"transcript": THEME_TRANSCRIPT,
+                              "slots": THEME_SLOTS, "stance": "off"})
+    finally:
+        cc.connect = original
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "done", "no worker needed to answer this"
+    assert body["kind"] == "claude.theme.proposal"
+    result = body["result"]
+    assert result["asked"] is False
+    assert result["combinations"] == []
+    assert result["answered_by"] == "claude", "labelled even when it said nothing"
+    # The grounded readings survive the trip, so the page can still show what
+    # it heard rather than going blank because no call was made.
+    assert len(result["slots"]) == 3
+
+
+def test_a_proposal_without_a_key_is_a_503_rather_than_a_failed_job(client,
+                                                                   monkeypatch):
+    """Answerable locally — set a key — so it says so from the route.
+
+    Discovered four minutes into a job it would be the same fact wearing a
+    500's clothes, which is the whole reason `plan_proposal` connects eagerly.
+    """
+    import mtglab.claude.client as cc
+    monkeypatch.setattr(cc, "credential_present", lambda: False)
+    r = client.post("/api/claude/theme/proposal",
+                    json={"transcript": THEME_TRANSCRIPT, "slots": THEME_SLOTS})
+    assert r.status_code == 503
+    assert "ANTHROPIC_API_KEY" in r.json()["detail"]
+    assert jobs.all_jobs() == []
+
+
+def test_a_queued_proposal_waits_on_the_network_lane(client, monkeypatch):
+    """Not behind Tier 1, which is the point of there being two pools.
+
+    A Claude call is a socket wait that releases the GIL for minutes; sharing
+    the simulator's single worker would stall a thirty-second sweep behind
+    somebody else's conversation. The call itself is stubbed — this asserts
+    where the work was filed, not what it said.
+    """
+    import mtglab.claude.client as cc
+    from mtglab.claude import theme
+
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(cc, "connect", lambda: object())
+    monkeypatch.setattr(theme, "run_proposal",
+                        lambda request, on_turn=None: {"combinations": []})
+
+    lanes = []
+    real_submit = jobs.submit
+    monkeypatch.setattr(jobs, "submit",
+                        lambda *a, **kw: (lanes.append(kw.get("lane")),
+                                          real_submit(*a, **kw))[1])
+
+    r = client.post("/api/claude/theme/proposal",
+                    json={"transcript": THEME_TRANSCRIPT, "slots": THEME_SLOTS})
+    assert r.status_code == 200
+    assert lanes == [jobs.NET]
+    assert await_job(client, r.json()["id"])["status"] == "done"
+
+
+def test_an_unknown_job_lane_is_refused_before_a_job_is_recorded():
+    """A typo must not become a job that sits `queued` forever.
+
+    The registry has two pools now — CPU for the simulator, NET for anything
+    that waits on Anthropic — and picking a third by accident is the one
+    failure that would look like a hang rather than an error.
+    """
+    jobs.clear()
+    with pytest.raises(ValueError, match="unknown job lane"):
+        jobs.submit("test", lambda _p: None, lane="nope")
+    assert jobs.all_jobs() == []

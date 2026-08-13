@@ -49,6 +49,8 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from mtglab.api import service
@@ -936,10 +938,42 @@ def _closing_for(grounded: list[dict[str, str]],
             "up an anchor. Re-state every slot you are confident of.")
 
 
-def propose(transcript: Any = None, slots: Any = None, *,
-            requested: Any = None, budget: float | None = None,
-            avoid: str = "") -> dict[str, Any]:
-    """Two colour combinations and six commanders, from what they told you.
+@dataclass(frozen=True)
+class ProposalRequest:
+    """A proposal that has passed every check not needing the network.
+
+    The split exists because the expensive half runs in a background job and
+    the refusals must not go with it. A malformed transcript, a floor not yet
+    reached and an unparseable stance are all decidable in the request, and
+    each has a status code the UI acts on -- 422, 409, 422. Carried into a
+    worker they would arrive as a *job* in state `error`, which turns three
+    distinct answers into one string somebody has to pattern-match. So
+    `check_proposal` refuses synchronously and this is what survives it.
+    """
+
+    history: list[dict[str, str]]
+    grounded: list[dict[str, str]]
+    dropped: int
+    effective: stance_mod.Stance
+    budget: float | None = None
+    avoid: str = ""
+
+    @property
+    def needs_call(self) -> bool:
+        """Whether running this reaches Anthropic at all.
+
+        False at stance `off`, which is a real position and not an error: the
+        answer is a report saying no call was made, available immediately. A
+        caller that queues work can use this to hand back a job born finished,
+        the way a cached simulation does.
+        """
+        return bool(self.effective.allows_calls)
+
+
+def check_proposal(transcript: Any = None, slots: Any = None, *,
+                   requested: Any = None, budget: float | None = None,
+                   avoid: str = "") -> ProposalRequest:
+    """Everything that can refuse a proposal, done before anything is spent.
 
     Refuses below the floor rather than proposing anyway. The button is dark in
     the UI for the same reason, but a floor that only existed in the client
@@ -955,21 +989,51 @@ def propose(transcript: Any = None, slots: Any = None, *,
             f"and every one has to be something they actually said. Keep "
             f"talking.")
 
-    if not effective.allows_calls:
+    return ProposalRequest(history=history, grounded=grounded, dropped=dropped,
+                           effective=effective, budget=budget, avoid=avoid)
+
+
+def propose(transcript: Any = None, slots: Any = None, *,
+            requested: Any = None, budget: float | None = None,
+            avoid: str = "") -> dict[str, Any]:
+    """Two colour combinations and six commanders, from what they told you.
+
+    Check and run in one call, which is what the CLI wants and what every test
+    of the whole path uses. The app splits the two so the minutes-long half can
+    be a job; see `check_proposal`.
+    """
+    return run_proposal(check_proposal(transcript, slots, requested=requested,
+                                       budget=budget, avoid=avoid))
+
+
+def run_proposal(req: ProposalRequest, *,
+                 on_turn: Callable[[int, int], None] | None = None) -> dict[str, Any]:
+    """The expensive half: read around, name legends, check every one.
+
+    **Measured at 226 seconds** with four searches, since it reads a dozen-odd
+    pages and resolves every legend against the corpus. That is why the caller
+    may hand in `on_turn` -- run as a background job this is the only thing that
+    says it is still moving.
+    """
+    grounded, dropped, effective = req.grounded, req.dropped, req.effective
+
+    if not req.needs_call:
         return _report(None, mode=THEME_PROPOSAL.name, effective=effective,
                        asked=False, combinations=[], sources=[],
                        slots=grounded, slots_dropped=dropped,
                        reason="The stance is off, so no call was made.")
 
     turn = converse(THEME_PROPOSAL,
-                    messages=_messages(history,
-                                       closing=_proposal_ask(grounded, budget,
-                                                             avoid)),
+                    messages=_messages(req.history,
+                                       closing=_proposal_ask(grounded,
+                                                             req.budget,
+                                                             req.avoid)),
                     stance=effective,
                     # A search, a look at what came back, a commander search, a
                     # get_cards to confirm, and the write-up -- with a paused
                     # turn able to spend one.
-                    max_turns=8)
+                    max_turns=8,
+                    on_turn=on_turn)
 
     if turn.refused:
         return _report(turn, mode=THEME_PROPOSAL.name, effective=effective,

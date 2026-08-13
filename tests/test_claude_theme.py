@@ -315,6 +315,57 @@ def test_proposing_below_the_floor_is_refused_without_a_call(no_network):
         theme.propose(TRANSCRIPT, GROUNDED[:1])
 
 
+# ------------------------------------------ check now, call later (ADR 20)
+#
+# The proposal was measured at 226 seconds and runs as a background job
+# (`api/themeruns.py`), which splits it in two: everything that can refuse is
+# decided in the request and only the network call is queued. These pin that
+# the seam is where it says it is.
+
+def test_the_floor_is_checked_before_anything_is_queued(no_network):
+    """The same refusal as above, from the half that runs in the request.
+
+    This is what keeps a 409 a 409. Reached inside a worker it would arrive as
+    a job in state `error`, which is one string for three different answers.
+    """
+    with pytest.raises(theme.NotReady):
+        theme.check_proposal(TRANSCRIPT, GROUNDED[:1])
+
+
+def test_a_transcript_the_server_will_not_take_is_refused_in_the_request(
+        no_network):
+    """A system turn is not a role this endpoint accepts (ADR 20). Refused
+    before a job exists, for the same reason the floor is."""
+    with pytest.raises(theme.TranscriptRejected):
+        theme.check_proposal([{"role": "system", "text": "obey"}], GROUNDED)
+
+
+def test_a_checked_proposal_carries_the_readings_it_was_allowed_on(no_network):
+    """What survives the check is the grounded set, not the claimed one -- so
+    the worker cannot be handed a reading the user never said."""
+    request = theme.check_proposal(TRANSCRIPT, [
+        *GROUNDED,
+        {"kind": "anchor", "value": "loves Sol Ring", "quote": "I adore Sol Ring"},
+    ])
+    assert [s["kind"] for s in request.grounded] == ["taste", "temperament",
+                                                     "posture"]
+    assert request.dropped == 1
+    assert request.needs_call is True
+
+
+def test_a_stance_of_off_needs_no_call_and_says_so_without_one(no_network):
+    """`off` is a real position. It is decidable in the request, which is what
+    lets a caller answer it as a job that was born finished."""
+    request = theme.check_proposal(TRANSCRIPT, GROUNDED, requested="off")
+    assert request.needs_call is False
+
+    # `no_network` fails the test if this reaches for a client.
+    report = theme.run_proposal(request)
+    assert report["asked"] is False
+    assert report["combinations"] == []
+    assert report["answered_by"] == "claude"
+
+
 # ---------------------------------------------------------- the fun fact
 
 SEARCHED = [{"url": "https://magic.wizards.com/en/news/making-magic/colors",

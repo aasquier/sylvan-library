@@ -43,6 +43,7 @@ a finished answer; that is resumed rather than returned, for the same reason
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -229,7 +230,8 @@ def _server_results(content: Any) -> tuple[list[dict[str, Any]], list[str]]:
 
 def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
              source: DeckSource | None = None,
-             max_turns: int = MAX_TOOL_TURNS) -> Turn:
+             max_turns: int = MAX_TOOL_TURNS,
+             on_turn: Callable[[int, int], None] | None = None) -> Turn:
     """Run `mode` over `messages` until it stops asking for tools.
 
     The caller is responsible for having checked `stance.allows_calls` first.
@@ -237,6 +239,14 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
     nothing when the stance was `off` would be indistinguishable from one that
     ran and found nothing to say, and "off means no calls" deserves a caller
     that had to decide rather than a default that happened.
+
+    `on_turn(done, max_turns)` fires as each model turn begins, and exists for
+    the one mode slow enough to be a background job: the theme proposal takes
+    minutes, and a job that reports nothing for that long is indistinguishable
+    from a wedged one. It is a **ceiling and not an estimate** -- a loop that
+    finishes on turn four of eight jumps straight to done, which `jobs.submit`
+    already squares up. Anything more truthful would need to know in advance
+    how many searches the model was going to run.
     """
     con = client.connect()
     schemas = mode.schemas()
@@ -253,7 +263,9 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
     container: str | None = None
     tokens_in = tokens_out = tokens_cached = 0
 
-    for _ in range(max_turns):
+    for done in range(max_turns):
+        if on_turn is not None:
+            on_turn(done, max_turns)
         # `container` only ever has a value once a *server* tool has run, and
         # it is required rather than optional after that: the dated web search
         # does its own result filtering inside a code-execution container, so

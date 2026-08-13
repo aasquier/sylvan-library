@@ -10,6 +10,17 @@ So: a bounded thread pool plus a dict. Jobs are ephemeral by design. Restart
 the server and they are gone, which is correct for a local tool where the
 inputs are cheap to resubmit.
 
+**There are two pools, and the split is about what the work waits on.** A Tier 1
+sweep is CPU-bound pure Python, so a second simulation thread would contend on
+the GIL and make both slower -- one worker, honest queueing. A Claude call is
+the opposite shape: it is a socket wait that releases the GIL for minutes at a
+time (the theme proposal was measured at 226 seconds), so a single shared queue
+would stall a thirty-second sweep behind four minutes of somebody else's
+conversation while the CPU sat idle. Hence `CPU` and `NET`. The `NET` lane is
+bounded at two for a reason that is not throughput: a proposal costs real money
+per run, and a queue is a cheaper way to say "not four at once" than a
+rate limiter nobody has written yet.
+
 **Every job carries an owner, and lookups take one.** A job is the first thing
 in this app that belongs to a person rather than to the library: its label
 names a deck and its result is a simulation somebody paid thirty seconds of CPU
@@ -32,15 +43,28 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-# One worker. The simulation is CPU-bound pure Python, so extra threads would
-# contend on the GIL and make every job slower rather than adding throughput.
-# Queueing is the honest behaviour here.
-_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mtglab-job")
+#: Work that burns CPU: Tier 1, the land sweep. One worker, because the
+#: simulation is pure Python and extra threads would contend on the GIL and
+#: make every job slower rather than adding throughput.
+CPU = "cpu"
+
+#: Work that waits on a socket: anything that calls Anthropic. Two workers,
+#: because such a job holds no GIL and blocking a sweep behind it would be a
+#: four-minute stall for nothing. See the module docstring for why two.
+NET = "net"
+
+_LANES: dict[str, ThreadPoolExecutor] = {
+    CPU: ThreadPoolExecutor(max_workers=1, thread_name_prefix="mtglab-job"),
+    NET: ThreadPoolExecutor(max_workers=2, thread_name_prefix="mtglab-net"),
+}
 _LOCK = threading.Lock()
 _JOBS: dict[str, Job] = {}
 
 # Keep the registry from growing without bound in a long-lived session.
 MAX_JOBS = 50
+
+#: What a worker is handed to report with: `progress(done, total)`.
+Progress = Callable[[int, int], None]
 
 
 @dataclass
@@ -76,6 +100,29 @@ class Job:
         }
 
 
+@dataclass
+class Plan:
+    """What a slow request turns into: an answer, or the work to produce one.
+
+    `result` is set when the answer was already available -- a cached
+    simulation, or a Claude mode whose stance is `off` and so made no call. In
+    that case `run` is never called. Exactly one of them is used, and the route
+    turns that into a job born finished or a job that was queued.
+
+    It lives here rather than beside either caller because it is the shape of a
+    job's *input*, and there are now two producers of one: `api/simruns.py` and
+    `api/themeruns.py`. `lane` is the second reason -- which pool the work
+    belongs in is a property of the work, so it is decided where the work is
+    planned rather than at the route, where somebody would eventually forget.
+    """
+
+    kind: str
+    label: str
+    result: dict[str, Any] | None
+    run: Callable[[Progress], dict[str, Any]]
+    lane: str = CPU
+
+
 def _record(job: Job) -> Job:
     """Register a job, evicting finished ones if the registry is over its bound."""
     with _LOCK:
@@ -106,9 +153,21 @@ def completed(kind: str, *, result: Any, label: str = "",
                        owner=owner))
 
 
-def submit(kind: str, fn: Callable[[Callable[[int, int], None]], Any],
-           *, label: str = "", owner: int | None = None) -> Job:
-    """Queue `fn`, handing it a `progress(done, total)` callback to report with."""
+def submit(kind: str, fn: Callable[[Progress], Any],
+           *, label: str = "", owner: int | None = None,
+           lane: str = CPU) -> Job:
+    """Queue `fn`, handing it a `progress(done, total)` callback to report with.
+
+    `lane` picks the pool -- `CPU` for work that computes, `NET` for work that
+    waits on Anthropic. Checked before the job is recorded, so a typo is an
+    exception out of the route rather than a job that sits `queued` forever
+    because nothing was ever going to run it.
+    """
+    pool = _LANES.get(lane)
+    if pool is None:
+        raise ValueError(
+            f"unknown job lane {lane!r}; expected one of {sorted(_LANES)}")
+
     job = _record(Job(id=uuid.uuid4().hex[:12], kind=kind, label=label,
                       owner=owner))
 
@@ -129,7 +188,7 @@ def submit(kind: str, fn: Callable[[Callable[[int, int], None]], Any],
             job.status = "error"
             traceback.print_exc()
 
-    _EXECUTOR.submit(wrapped)
+    pool.submit(wrapped)
     return job
 
 
