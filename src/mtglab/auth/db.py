@@ -39,7 +39,7 @@ from mtglab import config
 
 # Bumped when `_MIGRATIONS` grows. Stored in SQLite's own `user_version`, which
 # costs no table and cannot be forgotten in a schema dump.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # One entry per version, applied in order to whatever the file is at. A fresh
 # database runs all of them; an existing one runs the tail. The invite and
@@ -177,19 +177,114 @@ _MIGRATIONS: tuple[str, ...] = (
 
     CREATE INDEX dossier_cache_by_oracle ON dossier_cache(oracle_id);
     """,
+    # -- 5 ------------------------------------------------------------------
+    # `users.id` gains AUTOINCREMENT. Version 1 wrote `INTEGER PRIMARY KEY`,
+    # which makes the column an alias for the rowid -- and a plain rowid is
+    # *reused*: SQLite picks max(rowid)+1, so deleting the newest account hands
+    # its integer to the next one created. Jobs are held in memory keyed on
+    # exactly that integer, so the new holder of an id inherited the dead
+    # account's results and the deck names in their labels. #68 fixed the
+    # instance by dropping a deleted owner's jobs; this fixes the class, and
+    # the class is the point -- `jobs` is merely the first thing to key on a
+    # user id, and an isolation filter that is written correctly can still be
+    # defeated by arithmetic underneath it.
+    #
+    # AUTOINCREMENT cannot be added by ALTER TABLE, so this is SQLite's
+    # documented table rebuild. Two things about it are load-bearing:
+    #
+    # - **`DROP TABLE users` would cascade.** `sessions` and `auth_tokens`
+    #   reference it `ON DELETE CASCADE`, and `connect()` turns `foreign_keys`
+    #   on *before* migrations run, so with the pragma left alone this
+    #   migration would silently sign out every account and void every
+    #   outstanding invite. `_apply_migrations` turns it off around the ladder
+    #   and runs `foreign_key_check` before giving it back.
+    # - **The transaction is written here rather than left to Python.**
+    #   `executescript` commits whatever is pending and then performs no
+    #   transaction control of its own, so without an explicit BEGIN a failure
+    #   between the DROP and the RENAME would leave `users_rebuilt` behind with
+    #   `user_version` still at 4 -- and the next start would re-run this and
+    #   fail on a table that already exists, which is an app that never boots.
+    #
+    # What it cannot do is repair ids already issued: the high-water mark it
+    # sets is max(id) over the rows that exist, and an id handed out and then
+    # deleted is not in them. It stops the *next* one from being recycled.
+    """
+    BEGIN;
+
+    CREATE TABLE users_rebuilt (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        password_hash TEXT,
+        email         TEXT UNIQUE COLLATE NOCASE,
+        is_admin      INTEGER NOT NULL DEFAULT 0,
+        disabled_at   TEXT,
+        created_at    TEXT NOT NULL
+    );
+
+    -- Ids are carried across unchanged. Sessions and tokens point at them and
+    -- are not being rewritten; renumbering here would sign everyone out to no
+    -- purpose.
+    INSERT INTO users_rebuilt
+        (id, username, password_hash, email, is_admin, disabled_at, created_at)
+    SELECT id, username, password_hash, email, is_admin, disabled_at, created_at
+    FROM users;
+
+    DROP TABLE users;
+
+    ALTER TABLE users_rebuilt RENAME TO users;
+
+    COMMIT;
+    """,
 )
+
+
+class MigrationFailed(RuntimeError):
+    """A migration left the file in a state it must not be used in.
+
+    Raised rather than returned, and raised *before* `connect()` hands the
+    connection out: a schema change that has broken referential integrity is
+    not something an API process should serve requests on top of.
+    """
 
 
 def _apply_migrations(con: sqlite3.Connection) -> None:
     version: int = con.execute("PRAGMA user_version").fetchone()[0]
     if version >= SCHEMA_VERSION:
         return
-    for statement in _MIGRATIONS[version:]:
-        con.executescript(statement)
-    # `PRAGMA user_version = ?` is not parameterisable -- pragmas are parsed,
-    # not bound. The value is an int constant in this module, never input.
-    con.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-    con.commit()
+    # Foreign keys off for the duration, which is SQLite's own instruction for
+    # any migration that rebuilds a table -- and migration 5 rebuilds `users`,
+    # which `sessions` and `auth_tokens` reference `ON DELETE CASCADE`. With
+    # the pragma left on as `connect()` sets it, the `DROP TABLE` inside that
+    # rebuild would take every session and every unspent invite with it, and
+    # would do it silently: a cascade is not an error.
+    #
+    # It is done here rather than inside the one migration that needs it for
+    # two reasons. The pragma is a **no-op inside a transaction**, so a script
+    # that opens one cannot set it; and the next rebuild -- there will be one,
+    # this is the second schema in the file to want a column it cannot ALTER
+    # into place -- inherits the safety instead of rediscovering the trap.
+    con.execute("PRAGMA foreign_keys=OFF")
+    try:
+        for statement in _MIGRATIONS[version:]:
+            con.executescript(statement)
+        # `PRAGMA user_version = ?` is not parameterisable -- pragmas are
+        # parsed, not bound. The value is an int constant in this module,
+        # never input.
+        con.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        con.commit()
+        # The other half of the bargain: having switched enforcement off, prove
+        # nothing broke while it was off before anyone is served from this
+        # file. `foreign_key_check` returns a row per violation and nothing at
+        # all when the file is sound.
+        violations = con.execute("PRAGMA foreign_key_check").fetchall()
+        if violations:
+            raise MigrationFailed(
+                f"migrating app.db to version {SCHEMA_VERSION} left "
+                f"{len(violations)} foreign key violation(s); the file has "
+                f"not been signed off and must be restored from a backup "
+                f"(docs/HOSTING.md §5)")
+    finally:
+        con.execute("PRAGMA foreign_keys=ON")
 
 
 def connect(path: Path | str | None = None) -> sqlite3.Connection:

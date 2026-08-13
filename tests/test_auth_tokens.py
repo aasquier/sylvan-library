@@ -131,6 +131,90 @@ def test_a_version_two_database_gains_the_sim_cache(tmp_path):
         migrated.close()
 
 
+def test_a_deleted_id_is_never_reissued(con):
+    """The property the whole of migration 5 exists for.
+
+    Before it, `users.id` was a bare rowid: SQLite picks max(rowid)+1, so
+    deleting the newest account handed its integer straight to the next one
+    created. Jobs are held in memory keyed on that integer, which is how a new
+    account came to inherit a dead one's results.
+    """
+    first = users.create(con, "ada", password=PASSWORD)
+    users.delete(con, first.id)
+    second = users.create(con, "grace", password=PASSWORD)
+    assert second.id != first.id, (
+        "a deleted account's id was handed to the next account created; "
+        "anything keyed on a user id now points at the wrong person")
+    assert second.id > first.id
+
+
+def test_migrating_to_autoincrement_keeps_sessions_and_tokens(tmp_path):
+    """Migration 5 rebuilds `users`, and a rebuild means `DROP TABLE users`.
+
+    `sessions` and `auth_tokens` reference it `ON DELETE CASCADE` and
+    `connect()` turns `foreign_keys` on before the ladder runs, so the obvious
+    way to write this migration signs every account out and voids every
+    unspent invite -- silently, because a cascade is not an error. This is the
+    test that fails if the pragma handling in `_apply_migrations` is removed.
+    """
+    from mtglab.auth import db as auth_db
+
+    path = tmp_path / "v4.db"
+    old = auth_db.connect(path)
+    ada = users.create(old, "ada", password=PASSWORD)
+    live = sessions.create(old, ada.id)
+    invite = tokens.issue(old, ada.id, tokens.Purpose.INVITE)
+    # Wind `users` back to the pre-AUTOINCREMENT shape, which is what every
+    # `app.db` in existence is at -- including the deployed one.
+    #
+    # The pragma below is not ceremony. Written without it this setup destroys
+    # the very rows the test is about, and does it before the migration under
+    # test has run -- which is what happened on the first draft, and is the
+    # clearest possible demonstration of why `_apply_migrations` handles it.
+    old.execute("PRAGMA foreign_keys=OFF")
+    old.executescript("""
+        BEGIN;
+        CREATE TABLE users_v4 (
+            id            INTEGER PRIMARY KEY,
+            username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            password_hash TEXT,
+            email         TEXT UNIQUE COLLATE NOCASE,
+            is_admin      INTEGER NOT NULL DEFAULT 0,
+            disabled_at   TEXT,
+            created_at    TEXT NOT NULL
+        );
+        INSERT INTO users_v4 SELECT id, username, password_hash, email,
+                                    is_admin, disabled_at, created_at FROM users;
+        DROP TABLE users;
+        ALTER TABLE users_v4 RENAME TO users;
+        PRAGMA user_version = 4;
+        COMMIT;
+    """)
+    old.execute("PRAGMA foreign_keys=ON")
+    old.commit()
+    old.close()
+
+    migrated = auth_db.connect(path)
+    try:
+        assert migrated.execute(
+            "PRAGMA user_version").fetchone()[0] == auth_db.SCHEMA_VERSION
+        assert users.get(migrated, "ada") is not None, "the account survived"
+        assert migrated.execute(
+            "SELECT count(*) FROM sessions").fetchone()[0] == 1, \
+            "the migration cascaded live sessions away"
+        assert migrated.execute(
+            "SELECT count(*) FROM auth_tokens").fetchone()[0] == 1, \
+            "the migration cascaded unspent invites away"
+        # Not merely present as rows -- still usable through the real paths.
+        assert sessions.lookup(migrated, live) is not None
+        assert tokens.redeem(migrated, invite, PASSWORD,
+                             tokens.Purpose.INVITE) is not None
+        # And the pragma was given back, so the cascade works again after.
+        assert migrated.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+    finally:
+        migrated.close()
+
+
 def test_a_version_three_database_gains_the_dossier_cache(tmp_path):
     """The upgrade that happens on the maintainer's laptop this time.
 
