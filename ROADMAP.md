@@ -37,7 +37,7 @@ arc; this is what the next few sessions actually do.
    the rest by one.
 
    **The order is now 1, 2, 5, 3, 4**, changed 2026-08-12 after the branch 2
-   review. The numbers are identities, not positions, so nothing renumbers.
+   review; 1, 2 and 5 have landed. The numbers are identities, not positions, so nothing renumbers.
    What moved 5 to the front is worth recording because it is a finding rather
    than a preference: asked to test branch 2, the maintainer went looking for
    an *interactive* Claude assist in the deck builder and found none. He was
@@ -164,11 +164,51 @@ arc; this is what the next few sessions actually do.
    and real depth behind the guilds, shards, clans and colours — champions,
    plot lines, classic cards.
 
-   **5 — Claude in the builder. Next**, moved ahead of 3 and 4 on 2026-08-12
-   for the reason recorded above. A guided, adaptive interview that helps pick
-   a theme and a commander, and a refactor pass over an existing deck. Both
-   are modes ADR 15's table does not name. Rule 4 is untouched by either: no
-   mode writes a `why`.
+   **5 — Claude in the builder.** Built 2026-08-12, with
+   [ADR 20](docs/adr/0020-the-theme-interview-reads-a-person.md) written first.
+   Moved ahead of 3 and 4 for the reason recorded above. A guided, adaptive
+   interview that helps pick a theme and a commander, plus the discoverability
+   fix below. The refactor pass stayed out and remains goal 10. Rule 4 is
+   untouched: no mode writes a `why`.
+
+   What the build settled, beyond the decisions below:
+
+   - **The questions are not about Magic, and that is the whole feature.** The
+     first draft asked "when you picture yourself winning, what is on the
+     table" — a Magic question wearing a friendly hat, unanswerable by exactly
+     the person this is for. It asks about a film, a period, a star sign, how
+     somebody is at game night, and translates. That works because the colour
+     pie is a personality taxonomy before it is a set of mechanics, which is
+     also why `colors.py` is a **fourth source** alongside ADR 19's three:
+     checked in, carrying `verified_by`, and free.
+   - **Readiness is a grounded-slot count.** Every reading the mode takes
+     carries a quote, Python checks the quote against the user's own turns, and
+     three surviving kinds opens the proposal. Third instrument after
+     `only_questions()` and `keep_sources()`, pointed at a model reporting back
+     a preference nobody expressed.
+   - **Three bugs that only appear when you run it**, none visible from reading
+     the shapes. The interviewer speaks first, so the transcript starts with an
+     assistant turn and the request needs a synthetic user frame or every
+     answer is a 400. Alternation was enforced on a false premise — the API
+     combines consecutive same-role turns — and enforcing it wedged any
+     conversation where a turn came back without a usable question. And the
+     proposal ran **zero searches** on its first outing, resting archetype
+     claims on nothing, until the prompt was made prescriptive about when to
+     call the tool.
+   - **A dropped commander can cost a whole suggestion.** A legend of a
+     *subset* identity is legal in those colours and does not make a deck that
+     fills that slot, so it is dropped — and when all three go, the combination
+     goes with them. Observed live: one run returned two combinations and the
+     next returned one. Counted and surfaced now rather than silently thin.
+   - **Cost and time:** a conversation turn is a few seconds and heavily
+     prompt-cached (~48k cached tokens by turn three). The proposal is the
+     expensive half — **measured at 226 seconds** end to end with `max_uses: 4`,
+     ~79k input / 8k output, since it reads a dozen-odd pages and checks every
+     legend. Trimmed to three searches, and the UI now says it takes a few
+     minutes. **This is a deploy blocker in its current shape**: a
+     four-minute synchronous POST will not survive a hosted proxy, and the fix
+     is to run it as a background job the way `api/simruns.py` already runs
+     Tier 1. Worth doing before item 4, not after.
 
    Three things are already settled and should not be re-opened:
 
@@ -215,16 +255,20 @@ arc; this is what the next few sessions actually do.
      tool set and a capability declaration, so two is probably the honest
      answer.
 
-   Still open, and the one thing to confirm before writing the ADR: **the
-   refactor pass.** Working assumption is that it stays out of this branch and
-   remains goal 10, which ROADMAP already sequences last for stated reasons —
-   it inherits the rationale interview's answer to who writes the `why`, and
-   the pod measurement decides whether Forge can contribute to it honestly.
-   Branch 5 is then the theme-and-commander interview plus the discoverability
-   fix below.
+   **The refactor pass stays out**, confirmed 2026-08-12, and the reason is now
+   a design one rather than only sequencing: it is a *critique* surface over an
+   existing deck, and this branch's whole argument is that the deckbuilding
+   surface must not reach a deck. Shipping both together would blur the
+   boundary on the branch that draws it. It also still inherits the rationale
+   interview's answer to who writes the `why`, and the pod measurement still
+   decides whether Forge can contribute to it honestly. Goal 10.
 
-   **Also in scope, and cheap:** the rationale interview is currently
-   undiscoverable. It works, and nothing on the deck page says it exists.
+   **Also in scope, and cheap:** the rationale interview was undiscoverable —
+   it worked, and nothing on the deck page said so. *Done:* every card carries
+   an **Ask Claude** control beside *Write why*, which opens the editor already
+   asking rather than revealing a second button that asks; the cards tab says
+   the feature exists and states rule 4 in the same breath; and all of it is
+   honestly absent when the surface is off, unconfigured or uninstalled.
 
    Two things from the cleanup pass are worth knowing while working through
    it: the four-colour names come from `colors.py`'s taxonomy (Artifice,

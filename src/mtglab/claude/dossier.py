@@ -320,7 +320,7 @@ def keep_sources(claimed: list[Any],
     path -- a different page on the same site is a different page, and treating
     a site as a source is how a citation stops meaning anything.
     """
-    by_url = {_canonical(p["url"]): p for p in searched}
+    by_url = {canonical_url(p["url"]): p for p in searched}
     kept: list[dict[str, Any]] = []
     dropped = 0
     for item in claimed:
@@ -328,7 +328,7 @@ def keep_sources(claimed: list[Any],
             dropped += 1
             continue
         url = str(item.get("url", "")).strip()
-        match = by_url.get(_canonical(url))
+        match = by_url.get(canonical_url(url))
         if not url or match is None:
             dropped += 1
             continue
@@ -342,8 +342,13 @@ def keep_sources(claimed: list[Any],
     return kept, dropped
 
 
-def _canonical(url: str) -> str:
-    """A URL reduced to what makes two of them the same page."""
+def canonical_url(url: str) -> str:
+    """A URL reduced to what makes two of them the same page.
+
+    Public because the theme interview checks a fun fact's source the same way
+    (ADR 20), and two copies of this would be two chances to disagree about
+    whether a trailing slash is a different page.
+    """
     trimmed = url.strip().rstrip("/")
     if "://" in trimmed:
         scheme, rest = trimmed.split("://", 1)

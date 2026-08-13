@@ -932,7 +932,7 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
         # user should be able to read next to the dial.
         "never": "No stance lets Claude write a card's rationale.",
         # The modes that exist, so a UI can offer what is built rather than
-        # what ADR 15 planned. Two today.
+        # what ADR 15 planned. Four today, across three features.
         "modes": [{
             "name": mode.name,
             "purpose": mode.purpose,
@@ -943,7 +943,7 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
             # about in a way "get_cards" is not.
             "server_tools": [t["name"] for t in mode.server_tools],
             "writes": list(mode.may_write),
-        } for mode in (interview, claude_dossier_mode())],
+        } for mode in (interview, claude_dossier_mode(), *claude_theme_modes())],
     }
 
 
@@ -963,6 +963,17 @@ def claude_dossier_mode() -> Mode:
     """The commander dossier's mode object (ADR 19). Imported lazily too."""
     from mtglab.claude.dossier import COMMANDER_DOSSIER
     return COMMANDER_DOSSIER
+
+
+def claude_theme_modes() -> tuple[Mode, Mode]:
+    """The theme interview's two mode objects (ADR 20).
+
+    Two rather than one because a conversation is prose and a proposal is a
+    schema, and a single mode doing both either loses the schema or forces
+    every chatty turn through it.
+    """
+    from mtglab.claude.theme import THEME_CONVERSATION, THEME_PROPOSAL
+    return THEME_CONVERSATION, THEME_PROPOSAL
 
 
 class ClaudeFailed(Exception):
@@ -1021,6 +1032,52 @@ def claude_dossier(*, slug: str, requested: Any = None, refresh: bool = False,
     try:
         return ask(slug, requested=requested, refresh=refresh, source=source)
     except (claude_client.ClaudeUnavailable, NoCommander, DeckNotFound):
+        raise
+    except ModeExhausted as exc:
+        raise ClaudeFailed(str(exc)) from exc
+    except Exception as exc:                                       # noqa: BLE001
+        raise ClaudeFailed(claude_client.explain(exc)) from exc
+
+
+def claude_theme_ask(*, transcript: Any = None, slots: Any = None,
+                     requested: Any = None) -> dict[str, Any]:
+    """One turn of the theme interview (ADR 20). Asks about you, not about Magic.
+
+    Note what is absent from the signature: there is no `slug` and no `source`.
+    This mode runs *before a deck exists* and never sees one, which is what
+    makes "it builds, it does not critique" structural rather than requested.
+    """
+    from mtglab.claude import client as claude_client
+    from mtglab.claude.modes import ModeExhausted
+    from mtglab.claude.theme import TranscriptRejected, ask
+
+    try:
+        return ask(transcript, slots, requested=requested)
+    except (claude_client.ClaudeUnavailable, TranscriptRejected):
+        raise
+    except ModeExhausted as exc:
+        raise ClaudeFailed(str(exc)) from exc
+    except Exception as exc:                                       # noqa: BLE001
+        raise ClaudeFailed(claude_client.explain(exc)) from exc
+
+
+def claude_theme_propose(*, transcript: Any = None, slots: Any = None,
+                         requested: Any = None, budget: float | None = None,
+                         avoid: str = "") -> dict[str, Any]:
+    """Two colour combinations and six corpus-checked commanders (ADR 20).
+
+    Raises `NotReady` below the floor rather than proposing anyway. The button
+    is dark in the UI for the same reason, but a floor that lived only in the
+    client would not be one.
+    """
+    from mtglab.claude import client as claude_client
+    from mtglab.claude.modes import ModeExhausted
+    from mtglab.claude.theme import NotReady, TranscriptRejected, propose
+
+    try:
+        return propose(transcript, slots, requested=requested, budget=budget,
+                       avoid=avoid)
+    except (claude_client.ClaudeUnavailable, TranscriptRejected, NotReady):
         raise
     except ModeExhausted as exc:
         raise ClaudeFailed(str(exc)) from exc

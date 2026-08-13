@@ -730,6 +730,123 @@ export function hasDossier(
   return !!report && 'who' in report.dossier
 }
 
+/* ------------------------------------------------ the theme interview (ADR 20) */
+
+/**
+ * One turn of the conversation, as it crosses the wire.
+ *
+ * Deliberately **not** an Anthropic message block. The transcript is held by
+ * this client and resent on every turn, so this type is the whole of what a
+ * browser may put into a request — plain text with a role. The server refuses
+ * anything else, and the reason is that an endpoint accepting real message
+ * blocks would be a free proxy for somebody else's key.
+ */
+export interface ThemeTurn {
+  role: 'user' | 'assistant'
+  text: string
+}
+
+/**
+ * What the interview believes about you, and the words you used to say it.
+ *
+ * `quote` is not decoration and it is not for display: the server checks it
+ * against your own turns and throws the slot away if it is not there. That is
+ * what stops the interview deciding who you are and then reporting it back as
+ * something you said.
+ */
+export interface ThemeSlot {
+  /** taste | temperament | posture | anchor */
+  kind: string
+  value: string
+  quote: string
+}
+
+export interface ThemeFact {
+  text: string
+  /** A page title, or the literal `taxonomy` for the checked-in colour data. */
+  source: string
+  url: string
+}
+
+export interface ThemeReport {
+  answered_by: string
+  mode: string
+  model: string
+  asked: boolean
+  reason: string
+  stance: StanceView
+  question: string
+  fact: ThemeFact | null
+  slots: ThemeSlot[]
+  /** Readings whose quote was not in the transcript. A number that climbs is a
+   *  model inventing preferences, which is why it is rendered, not logged. */
+  slots_dropped: number
+  grounded: number
+  floor: number
+  /** Counted server-side from the grounded slots. There is no field the model
+   *  can set to change this, which is the point of it. */
+  may_propose: boolean
+  exchanges: number
+  max_exchanges: number
+  usage: { input_tokens: number; output_tokens: number }
+  never?: string
+}
+
+export interface ThemeCommander {
+  name: string
+  prose: string
+  source_ids: string[]
+  mana_cost?: string | null
+  type_line?: string | null
+  oracle_text?: string | null
+  color_identity?: string[]
+  image?: string | null
+  art_crop?: string | null
+}
+
+/**
+ * One suggested colour combination.
+ *
+ * `reading` and `grounding` are two fields because one of them can be wrong.
+ * The reading is the leap from what you said to these colours — an
+ * interpretation, offered as one. The grounding is what is factually true
+ * about the colours and rests on `source_ids` or on the checked-in taxonomy.
+ * A renderer that merged them would produce exactly the blended paragraph
+ * ADR 19 rejected, so the UI keeps them visibly apart.
+ */
+export interface ThemeCombination {
+  key: string
+  name: string
+  colors: string[]
+  tier: string
+  tagline: string
+  reading: string
+  grounding: string
+  source_ids: string[]
+  commanders: ThemeCommander[]
+}
+
+export interface ThemeProposal {
+  answered_by: string
+  mode: string
+  model: string
+  asked: boolean
+  reason: string
+  stance: StanceView
+  combinations: ThemeCombination[]
+  sources: { id: string; title: string; url: string }[]
+  sources_dropped: number
+  commanders_dropped: number
+  /** Whole suggestions lost because every legend named for them turned out to
+   *  have a subset identity. Counted because losing half a proposal silently
+   *  is how a thin answer looks like a deliberate one. */
+  combinations_dropped: number
+  searched: number
+  slots: ThemeSlot[]
+  usage: { input_tokens: number; output_tokens: number }
+  never?: string
+}
+
 export const api = {
   health: () => get<Health>('/api/health'),
   decks: () => get<DeckSummary[]>('/api/decks'),
@@ -828,6 +945,21 @@ export const api = {
   // Every non-digital printing of the commander, newest first. Its own call
   // because most visits never open the picker and Goreclaw has twelve.
   printings: (slug: string) => get<PrintingList>(`/api/decks/${slug}/printings`),
+  // The theme interview (ADR 20). Note there is no slug in either path: this
+  // runs before a deck exists and never sees one, which is what makes "it
+  // builds, it does not critique" structural rather than a request. The whole
+  // conversation goes up every turn because this client is where it lives.
+  themeAsk: (body: { transcript: ThemeTurn[]; slots: ThemeSlot[]; stance?: string }) =>
+    post<ThemeReport>('/api/claude/theme', body),
+  // Answers 409 below the floor. The button is disabled for the same reason,
+  // but a floor that lived only here would not be one.
+  themePropose: (body: {
+    transcript: ThemeTurn[]
+    slots: ThemeSlot[]
+    budget?: number
+    avoid?: string
+    stance?: string
+  }) => post<ThemeProposal>('/api/claude/theme/proposal', body),
   // Public, so it is the one call that works before anything else does. The
   // shell reads it to decide whether to ask for a login at all, and the nav to
   // decide whether to offer the admin page.

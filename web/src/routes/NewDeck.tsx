@@ -24,13 +24,29 @@
  * entirely — for someone who arrived already knowing the card they want. The
  * choice persists in localStorage, so the tutorial is offered once rather
  * than every visit.
+ *
+ * **A third door, and it opens somewhere else** (ADR 20). Both of the above
+ * ask the same first question — which of the 32 do you want? — and somebody
+ * who has never played cannot answer it. `theme` asks about *them* instead and
+ * proposes colours at the end. Its output is deliberately the same state the
+ * carousel produces, a `chosen` combination and a `commander`, so it lands on
+ * step 3 and the button that makes the deck is the one that was already there.
+ * It is the one mode that is **not** remembered: entering it starts a
+ * conversation that costs money, and that should be a click every time.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, type Card, type Combination, type ColorTaxonomy } from '../lib/api'
+import {
+  api,
+  type Card,
+  type Combination,
+  type ColorTaxonomy,
+  type ThemeCommander,
+} from '../lib/api'
 import { COLOR_VAR } from '../lib/mtg'
 import { CardHover, ColorRing, ManaText } from '../components/ui'
+import { ThemeInterview } from '../components/theme'
 
 /** The era whose story named a tier, so the lesson has its setting attached. */
 const TIER_ERA: Record<string, string> = {
@@ -50,6 +66,23 @@ function keyFor(identity: string[] | undefined): string {
   return key || 'C'
 }
 
+/** The three ways in, least-assuming first. */
+const DOORS = [
+  { key: 'theme', label: 'Help me decide' },
+  { key: 'guided', label: 'Take me through the colours' },
+  { key: 'direct', label: 'I know what I want' },
+] as const
+
+const DOOR_BLURBS: Record<'guided' | 'direct' | 'theme', string> = {
+  theme: 'A few questions about you — none of them about Magic — and then a '
+       + 'suggestion you are free to ignore.',
+  guided: 'Pick a colour combination, then a commander. There are 32 '
+        + 'combinations in Magic, and building one of each is a challenge '
+        + 'people spend years on.',
+  direct: 'Pick a combination, or search for the commander you already have '
+        + 'in mind.',
+}
+
 function slugify(name: string): string {
   return name
     .toLowerCase()
@@ -67,12 +100,16 @@ export default function NewDeck() {
   const [taxonomy, setTaxonomy] = useState<ColorTaxonomy | null>(null)
   const [taxonomyError, setTaxonomyError] = useState<string | null>(null)
 
-  // Remembered, so the tutorial is offered once rather than every visit.
-  const [mode, setMode] = useState<'guided' | 'direct'>(
+  // Remembered, so the tutorial is offered once rather than every visit —
+  // except for `theme`, which is not stored. Landing straight back in a Claude
+  // conversation because you tried one last week is a bill nobody asked for.
+  const [mode, setMode] = useState<'guided' | 'direct' | 'theme'>(
     () => (localStorage.getItem('mtglab-new-deck-mode') === 'direct'
       ? 'direct' : 'guided'),
   )
-  useEffect(() => { localStorage.setItem('mtglab-new-deck-mode', mode) }, [mode])
+  useEffect(() => {
+    if (mode !== 'theme') localStorage.setItem('mtglab-new-deck-mode', mode)
+  }, [mode])
 
   const [tier, setTier] = useState('guild')
   const [index, setIndex] = useState(0)
@@ -203,6 +240,29 @@ export default function NewDeck() {
     if (!slugTouched) setSlug(slugify(card.name))
   }
 
+  /**
+   * The theme interview's output, landed as the create flow's own state.
+   *
+   * This is where ADR 20's "it proposes; you create" stops being a rule being
+   * honoured and becomes how the screen is wired. The interview hands over a
+   * combination key and a corpus-resolved card; both go into exactly the
+   * variables the carousel would have set, so the next thing the user sees is
+   * step 3 and the button that makes the deck is the existing one.
+   */
+  const takeProposal = (key: string, card: ThemeCommander) => {
+    setChosen(taxonomy?.combinations.find((c) => c.key === key) ?? null)
+    setCommanders(null)
+    pickCommander({
+      // The create route needs a name and takes the rest from the corpus. The
+      // fields below the name are for the hover card on this page only.
+      name: card.name, category: '', why: '', qty: 1, known: true,
+      mana_cost: card.mana_cost, type_line: card.type_line ?? undefined,
+      oracle_text: card.oracle_text ?? undefined,
+      color_identity: card.color_identity,
+      image: card.image, art_crop: card.art_crop,
+    })
+  }
+
   const create = async () => {
     if (!commander) return
     setCreating(true)
@@ -239,25 +299,41 @@ export default function NewDeck() {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-wrap items-start gap-4">
+      <header className="space-y-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Start a deck</h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {mode === 'guided'
-              ? 'Pick a colour combination, then a commander. There are 32 combinations in Magic, and building one of each is a challenge people spend years on.'
-              : 'Pick a combination, or search for the commander you already have in mind.'}
+            {DOOR_BLURBS[mode]}
           </p>
         </div>
+        {/* Three ways in, and the order is deliberate: the one that assumes
+            least goes first. Both of the others open onto "which of the 32 do
+            you want", which is a question somebody who has never played cannot
+            answer (ADR 20). */}
         {!chosen && !commander && (
-          <button
-            onClick={() => setMode(mode === 'guided' ? 'direct' : 'guided')}
-            className="ml-auto rounded-md px-3 py-1.5 text-sm"
-            style={{ border: '1px solid var(--hairline)', color: 'var(--text-secondary)' }}
-          >
-            {mode === 'guided' ? 'Skip the guide →' : '← Show the guide'}
-          </button>
+          <div className="flex flex-wrap gap-1">
+            {DOORS.map((d) => (
+              <button
+                key={d.key}
+                onClick={() => setMode(d.key)}
+                className="rounded-md px-3 py-1.5 text-sm font-medium transition"
+                style={{
+                  color: mode === d.key ? 'var(--text-primary)' : 'var(--text-muted)',
+                  background: mode === d.key ? 'var(--gridline)' : 'transparent',
+                  border: '1px solid var(--hairline)',
+                }}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
         )}
       </header>
+
+      {/* ------------------------------------- step 1, theme: ask about them */}
+      {!chosen && !commander && mode === 'theme' && (
+        <ThemeInterview onPick={takeProposal} onLeave={() => setMode('guided')} />
+      )}
 
       {/* ------------------------------- step 1, direct: no lesson, just 32 */}
       {!chosen && mode === 'direct' && (
