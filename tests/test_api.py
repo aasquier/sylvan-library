@@ -17,6 +17,7 @@ legal 99 built out of them.
 
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -1165,6 +1166,96 @@ def test_four_colour_slots_expose_both_naming_conventions(client):
     quad = next(c for c in body["combinations"] if c["key"] == "WUBR")
     assert quad["name"] == "Artifice"
     assert quad["aliases"] == ["Yore-Tiller"]
+
+
+def test_the_taxonomy_carries_the_teaching_depth_without_a_corpus(client):
+    """Lore, champion names and signature names ride on the table itself.
+
+    Names only -- the cards come from `/api/colors/{key}`, which does need a
+    corpus. Splitting it that way is what lets the create flow's first screen
+    keep working on a fresh clone while still saying who Trostani is.
+    """
+    body = client.get("/api/colors").json()
+    selesnya = next(c for c in body["combinations"] if c["key"] == "WG")
+    assert len(selesnya["lore"].split()) >= 40
+    assert "Trostani, Selesnya's Voice" in [
+        ch["card"] for ch in selesnya["champions"]]
+    assert selesnya["signature"]
+    # Mono-Green is not a faction and does not pretend to be one.
+    green = next(c for c in body["combinations"] if c["key"] == "G")
+    assert green["lore"] == "" and green["champions"] == []
+    assert green["signature"]
+
+
+def test_combination_detail_reports_no_corpus_rather_than_failing(tmp_path):
+    """A fresh clone gets the prose and an honest empty card list.
+
+    Pointed at an empty data directory rather than run on the bare `client`
+    fixture, which would find the maintainer's own 500MB corpus and pass here
+    while asserting the opposite of what CI sees.
+    """
+    with config.use_paths(data_dir=tmp_path / "empty"), \
+            TestClient(create_app()) as c:
+        body = c.get("/api/colors/WG").json()
+    assert body["name"] == "Selesnya"
+    assert len(body["lore"].split()) >= 40
+    assert body["corpus"] is False
+    assert body["champions"] == [] and body["signature"] == []
+    assert body["exact_total"] is None
+
+
+def test_combination_detail_canonicalises_the_key_and_404s_on_nonsense(client):
+    assert client.get("/api/colors/gw").json()["name"] == "Selesnya"
+    assert client.get("/api/colors/C").json()["name"] == "Colourless"
+    assert client.get("/api/colors/ZZ").status_code == 404
+
+
+def test_combination_detail_resolves_cards_and_drops_what_is_missing(
+        corpus, client, monkeypatch):
+    """The ADR 19 instrument, pointed at reference data.
+
+    A misspelled name here would otherwise render as a confident empty card,
+    so an unresolved one is dropped and counted. The lists are monkeypatched
+    rather than borrowed from the real table because the tiny corpus holds 21
+    cards and none of them is a Selesnya staple -- what is under test is the
+    resolution, and the real names are checked against the real corpus in
+    `test_colors.py`.
+    """
+    from mtglab import colors
+    patched = dict(colors.BY_KEY)
+    patched["G"] = replace(
+        patched["G"],
+        signature=("Goreclaw, Terror of Qal Sisma", "No Such Card"),
+        champions=(colors.Champion("Regal Behemoth", "A fixture, not a face."),
+                   colors.Champion("Also Not A Card", "Dropped on the way.")))
+    monkeypatch.setattr(colors, "BY_KEY", patched)
+
+    body = client.get("/api/colors/G").json()
+    assert body["corpus"] is True
+    assert [c["name"] for c in body["signature"]] == [
+        "Goreclaw, Terror of Qal Sisma"]
+    assert [c["name"] for c in body["champions"]] == ["Regal Behemoth"]
+    assert body["champions"][0]["role"] == "A fixture, not a face."
+    # Two names in, two dropped, and the count is reported rather than implied.
+    assert body["dropped"] == 2
+    # Counted over the corpus rather than stored. The tiny fixture is mostly
+    # mono-green, so this is a real number and not a placeholder.
+    assert body["exact_total"] > 0
+
+
+def test_glossary_needs_no_corpus_and_no_decks(client):
+    """Reference prose, like the taxonomy. Same fresh-clone property."""
+    body = client.get("/api/glossary").json()
+    keys = {t["key"] for t in body["terms"]}
+    assert {"commander", "color-identity", "mulligan"} <= keys
+    # The simulator's own controls are in the same table as the Magic words,
+    # which is what lets one component serve both.
+    assert {"sim.min_pieces", "stat.spells_through_t8"} <= keys
+    assert [s["key"] for s in body["sections"]] == [
+        "format", "building", "simulator"]
+    for term in body["terms"]:
+        assert term["short"] and term["long"]
+        assert all(ref in keys for ref in term["see_also"])
 
 
 def test_challenge_progress_counts_filled_slots(in_memory_client):

@@ -507,6 +507,74 @@ export interface Combination {
   aliases: string[]
   /** A real card whose Scryfall colour identity proves this row. */
   verified_by: string
+  /**
+   * What happened to this faction. Empty for the twelve slots that are not
+   * one — Mono-Red is not from anywhere, and does not get a story pretending
+   * it is.
+   */
+  lore: string
+  /**
+   * The faces of the faction: a card name and who they are in the story.
+   *
+   * Names only here, because `/api/colors` reaches no corpus. The cards
+   * themselves come from `combination()` below, which does — that split is
+   * what keeps this payload working on a fresh clone.
+   */
+  champions: { card: string; role: string }[]
+  /** Names of cards whose colour identity is exactly this combination. */
+  signature: string[]
+}
+
+/**
+ * One combination with its cards resolved against the corpus.
+ *
+ * `dropped` counts names that did not resolve, which are left out rather than
+ * rendered from the name alone — the same instrument ADR 19 uses for the
+ * dossier's rivals. `exact_total` is how many cards in the whole corpus have
+ * exactly this identity, and it is the sharpest thing on the page: two, for
+ * Artifice.
+ */
+export interface CombinationDetail extends Omit<Combination,
+  'champions' | 'signature'> {
+  corpus: boolean
+  champions: (ReferenceCard & { role: string })[]
+  signature: ReferenceCard[]
+  dropped: number
+  exact_total: number | null
+}
+
+/**
+ * A card as reference data renders it.
+ *
+ * Deliberately not `Card`, which carries `category`, `why` and `qty` — a
+ * champion is not in anybody's deck, and giving it a blank rationale would be
+ * the one shape rule 4 exists to prevent.
+ */
+export interface ReferenceCard {
+  name: string
+  mana_cost?: string | null
+  type_line?: string | null
+  oracle_text?: string | null
+  color_identity: string[]
+  image?: string | null
+  art_crop?: string | null
+}
+
+/** One glossary entry. Mirrors `mtglab.glossary.Term`. */
+export interface Term {
+  key: string
+  term: string
+  /** One sentence — what a tooltip shows. */
+  short: string
+  /** A paragraph — what the Learn page shows. */
+  long: string
+  section: string
+  see_also: string[]
+}
+
+export interface Glossary {
+  sections: { key: string; label: string; blurb: string }[]
+  terms: Term[]
 }
 
 export interface ColorTaxonomy {
@@ -905,6 +973,13 @@ export const api = {
   commander: (slug: string) => get<CommanderDossier>(`/api/decks/${slug}/commander`),
   colors: () => get<ColorTaxonomy>('/api/colors'),
   challengeProgress: () => get<ChallengeProgress>('/api/colors/progress'),
+  // One combination with its champions and signature cards resolved. Separate
+  // from `colors()` because this one needs the corpus and that one must not.
+  combination: (key: string) =>
+    get<CombinationDetail>(`/api/colors/${encodeURIComponent(key)}`),
+  // The vocabulary. Memoised below rather than here, because a tooltip may ask
+  // for it from anywhere and asking twice on one screen is the normal case.
+  glossary: () => get<Glossary>('/api/glossary'),
   // The only call here that can lose work. `confirm` must be a word somebody
   // typed — `bury`, or the slug itself — which a mis-aimed click cannot
   // satisfy. The deck moves to `.trash/` rather than being unlinked, and the

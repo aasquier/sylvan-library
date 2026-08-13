@@ -547,6 +547,26 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         Challenge, scored against the same table."""
         return service.challenge_progress(source=decks)
 
+    # Declared after `/progress`, and it has to stay that way: FastAPI matches
+    # in declaration order, so a `{key}` route above it would swallow the
+    # literal path.
+    @app.get("/api/colors/{key}")
+    def combination_detail(key: str) -> dict[str, Any]:
+        """One combination, with its champions and signature cards resolved
+        against the corpus. The teaching depth behind a slot."""
+        try:
+            return service.combination_detail(key)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=404,
+                detail=f"no colour combination {key!r}") from exc
+
+    @app.get("/api/glossary")
+    def glossary() -> dict[str, Any]:
+        """The vocabulary. Reference data, like `/api/colors` -- no corpus, no
+        deck source, no network."""
+        return service.glossary()
+
     # -------------------------------------------------------------- sim
 
     # The job closures capture `decks` and run after the response has been

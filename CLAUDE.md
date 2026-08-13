@@ -32,6 +32,8 @@ those are not reachable — widen the environment's access level first, or run
 ```
 src/mtglab/
   config.py               where decks and the corpus live; env-overridable
+  colors.py               the 32 combinations, and the teaching depth
+  glossary.py             the vocabulary, Magic's and this tool's own
   mana.py                 cost parsing + castability solver
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema
@@ -161,6 +163,35 @@ carries `seed`, `cached` and `computed_at` — **quote a cached number as
 cached.** Runs are seeded by default (`simruns.DEFAULT_SEED`); an unseeded
 sample was what the app used to show and is not reproducible. Land sweeps cache
 per count, so an overlapping range reuses rows. `mtglab sim cache [--clear]`.
+
+**`colors.py` and `glossary.py` are reference prose, and that was argued
+rather than assumed.** They are the two modules that deliberately know things
+Scryfall did not say — what a guild is, what happened to it, what a mulligan
+is — and the alternative was a Claude surface. It lost on four counts, written
+out in `colors.py`'s docstring and ROADMAP item 3 branch 4: `/api/colors` and
+`/api/glossary` work with **no corpus and no network**, the set is finite and
+written once, ADR 20 already classed `colors.py` as a fourth source that is
+free, and *bland prose is fixed by editing, which only checked-in text
+allows*. Claude answers the unbounded per-deck question about a **commander**
+— that is ADR 19, and it stays there.
+
+Card facts inside that prose still come from the corpus. `champions` and
+`signature` hold **names**; `/api/colors/{key}` resolves them through
+`get_cards` and a name that does not resolve is **dropped and counted**, the
+same instrument ADR 19 built for the dossier's rivals. `signature` carries no
+prose at all — what it asserts is that the card's identity is *exactly* that
+combination, which a test checks — so the only editorial sentence attached to
+a card is a champion's story role, and the card's own oracle text renders
+beside it. Adding a name means the full-corpus test in `tests/test_colors.py`
+has to pass; it is one test covering all three lists, because a second
+`needs_full_corpus` marker would move CI's skip gate off two.
+
+The simulator's parameters and reported figures are glossary entries too
+(`sim.*` for what you set, `stat.*` for what you are given), which is why they
+live next to the `KeepRule` that defines them rather than in the React form.
+`SIMULATOR_KEYS` in `tests/test_glossary.py` is the seam: TypeScript cannot
+check a string against a Python table, so a renamed key fails there instead of
+silently emptying a tooltip.
 
 Keep `mana.py` and `sim/` dependency-light (stdlib + numpy). DuckDB stays
 behind `cards/db.py`. `sim/cache.py` imports `auth/db.py` for one reason and it

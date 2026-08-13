@@ -16,6 +16,7 @@ const Admin = lazy(() => import('./routes/Admin'))
 const CardSearch = lazy(() => import('./routes/CardSearch'))
 const DeckDetail = lazy(() => import('./routes/DeckDetail'))
 const Import = lazy(() => import('./routes/Import'))
+const Learn = lazy(() => import('./routes/Learn'))
 const NewDeck = lazy(() => import('./routes/NewDeck'))
 const Simulator = lazy(() => import('./routes/Simulator'))
 
@@ -25,6 +26,9 @@ const NAV = [
   { to: '/import', label: 'Import', end: false },
   { to: '/search', label: 'Card search', end: false },
   { to: '/simulate', label: 'Simulator', end: false },
+  // Last, and deliberately not first: it is reference rather than a task, and
+  // somebody who needs it usually arrives from a word on another screen.
+  { to: '/learn', label: 'Learn', end: false },
 ]
 
 // Appended for admins only. Hiding it is a courtesy — every route the page
@@ -257,6 +261,7 @@ export default function App() {
           <Route path="/import" element={<Import />} />
           <Route path="/search" element={<CardSearch />} />
           <Route path="/simulate" element={<Simulator />} />
+          <Route path="/learn" element={<Learn />} />
           {/* Declared unconditionally. A non-admin who types the URL gets the
               page's own 403 from the API rather than the catch-all's "nothing
               here", which is the more honest of the two answers. */}

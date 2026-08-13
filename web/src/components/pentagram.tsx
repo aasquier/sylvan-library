@@ -92,6 +92,19 @@ const EDGES: Edge[] = Array.from({ length: 5 }, (_, i) => i).flatMap((i) => [
   { key: pairKey(WUBRG[i], WUBRG[(i + 2) % 5]), from: i, to: (i + 2) % 5, allied: false },
 ])
 
+/**
+ * The fifteen keys this diagram can point at: five discs and ten lines.
+ *
+ * `selected` is whatever the page around it happens to be showing, and on the
+ * Learn page that is any of the 32. A shard has no vertex and no chord here,
+ * so captioning it would describe a shape nobody can see — and worse, the
+ * caption's allied/enemy line is computed by looking the key up in `EDGES`,
+ * which for a four-colour key finds nothing and falls through to calling
+ * Artifice an enemy pair. Guarding at the point the caption is chosen keeps
+ * that impossible rather than handling it four lines later.
+ */
+const DRAWABLE = new Set<string>([...WUBRG, ...EDGES.map((e) => e.key)])
+
 /* ---------------------------------------------------------- tier badges */
 
 /**
@@ -186,7 +199,8 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
   const [active, setActive] = useState<string | null>(null)
 
   const byKey = new Map(combinations.map((c) => [c.key, c]))
-  const shown = active ?? selected ?? null
+  const marked = selected && DRAWABLE.has(selected) ? selected : null
+  const shown = active ?? marked
   const captioned = shown ? byKey.get(shown) ?? null : null
 
   /** Shared by both kinds of target: a click, Enter and Space all pick. */

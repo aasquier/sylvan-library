@@ -37,7 +37,8 @@ arc; this is what the next few sessions actually do.
    the rest by one.
 
    **The order is now 1, 2, 5, 3, 4**, changed 2026-08-12 after the branch 2
-   review; 1, 2, 5 and 3 have landed, so only teaching is left. The numbers are identities, not positions, so nothing renumbers.
+   review; **all five have landed as of 2026-08-13**, and what stands between
+   here and deploy is item 4 below. The numbers are identities, not positions, so nothing renumbers.
    What moved 5 to the front is worth recording because it is a finding rather
    than a preference: asked to test branch 2, the maintainer went looking for
    an *interactive* Claude assist in the deck builder and found none. He was
@@ -215,10 +216,82 @@ arc; this is what the next few sessions actually do.
    - **Cost:** entry chunk 262 kB → 266 kB (84 kB gzipped). The pentagram rides
      in the lazy `NewDeck` chunk; only the glyphs are in the entry.
 
-   **4 — Teaching.** A vocabulary section for beginners; hover help in the
-   simulator, whose parameters are words and numbers divorced from meaning;
-   and real depth behind the guilds, shards, clans and colours — champions,
-   plot lines, classic cards.
+   **4 — Teaching.** Built 2026-08-13. A vocabulary section for beginners;
+   hover help in the simulator, whose parameters are words and numbers
+   divorced from meaning; and real depth behind the guilds, shards, clans and
+   colours — champions, plot lines, classic cards. No ADR: the one decision
+   that needed making is recorded here and in `colors.py`'s own docstring,
+   and nothing in the build moved it.
+
+   The decision, made before any code: **the depth is checked-in reference
+   prose, not a Claude surface.** A guild is exactly the kind of question
+   ADR 19's dossier answers well, so it is worth writing down why not.
+   `/api/colors` is the one page in the app that works with no corpus and no
+   network — a stated property, pinned in `tests/test_isolation.py` — and a
+   model call would spend it on the screen a brand-new player meets first. The
+   set is finite: ten guilds, five shards, five wedges, written once, ever, so
+   a per-view call pays repeatedly for content with no variance in it. ADR 20
+   had already classed `colors.py` as a **fourth source** alongside the
+   dossier's three — checked in, carrying `verified_by`, and free. And the
+   complaint that produced the work was that the prose was *bland*; bland is
+   fixed by editing, and only checked-in text can be edited. What Claude
+   answers is the unbounded, per-deck question about a **commander**, which is
+   ADR 19 and stays there.
+
+   What the build settled:
+
+   - **The teaching content moved out of a wizard.** The whole colour taxonomy
+     rendered only inside "Start a deck" — a screen you pass through on the
+     way to something else. Reference material reachable only mid-task is
+     reference material nobody reads twice. `/learn` is a sixth nav item and
+     the home of all three pieces; the create flow keeps a **short version**
+     (the champions named, and a link across) so it stays a chooser.
+   - **A champion is a character; the card is the evidence.** `Champion(card,
+     role)` holds a card *name* and one sentence about who they are in the
+     story — the only thing the card cannot say about itself. The page
+     resolves the name through `get_cards` and renders the real card's cost,
+     type and oracle text directly beneath the sentence, so a role that
+     drifted from the card is visible next to what would disprove it. A name
+     that does not resolve is **dropped and counted**, which is ADR 19's
+     rivals instrument pointed at reference data.
+   - **`signature` carries no prose at all, and that is the design.** Three or
+     four cards per combination whose colour identity is **exactly** that
+     combination — so the list asserts a checkable property rather than an
+     opinion, and there is no sentence in it for a card fact to be wrong in.
+     "Exactly these colours" is also the most direct available answer to what
+     a combination is *for*.
+   - **`exact_total` is counted live and teaches more than the paragraph does.**
+     Exactly **two** cards in the corpus have the Artifice identity, and the
+     page says so. No four-colour blurb about refusing green lands as hard.
+   - **144 card names, every one verified against the corpus before it landed**
+     — 51 champions and 93 signature slots. Two rules, and they are not the
+     same rule: signature and `verified_by` must be *exactly* the
+     combination's identity, a champion need only be a *subset*, because a
+     faction is a story and the story owes the colour pie no exact match.
+     Folded into the existing `needs_full_corpus` test rather than added as a
+     second one, so CI's skip gate stays pinned at two.
+   - **The vocabulary is one table with two kinds of entry**, deliberately:
+     Magic words (commander, colour identity, ramp, goldfish) and *this
+     tool's own* controls and measures (`sim.min_pieces`,
+     `stat.deployment_spread`). Both are words and numbers divorced from
+     meaning to a newcomer. Keeping the simulator's half in `glossary.py` next
+     to the `KeepRule` that defines it is what makes it checkable —
+     `SIMULATOR_KEYS` in `tests/test_glossary.py` fails if a control on the
+     screen has no entry, which TypeScript cannot do against a Python table.
+   - **Twenty of the 32 get a story and twelve do not.** Mono-Red is not from
+     anywhere. The test asserts that in both directions, because a non-faction
+     with lore is a paragraph invented to fill a field.
+   - **Two bugs only the running app showed**, which is now six branches for
+     six. The colour wheel captions whatever `selected` it is handed, and on
+     Learn that is any of the 32 — a four-colour key is neither a vertex nor a
+     chord, so it found no edge, fell through, and described **Artifice as an
+     "enemy pair — opposite on the wheel"** with a button offering to cross to
+     the guilds. And the help popover is a descendant of the field label,
+     which on the simulator is `uppercase tracking-wide`, so every sentence of
+     help arrived SHOUTED AND LETTER-SPACED. Both are pinned now.
+   - **Cost:** entry chunk unchanged at 266 kB (84 kB gzipped). `Learn` is
+     lazy at 10.9 kB and the pentagram became a shared chunk, since two lazy
+     routes now draw it.
 
    **5 — Claude in the builder.** Built 2026-08-12, with
    [ADR 20](docs/adr/0020-the-theme-interview-reads-a-person.md) written first.
@@ -397,10 +470,11 @@ arc; this is what the next few sessions actually do.
 
    *Content depth:*
 
-   - **The guild, clan and shard descriptions are bland**, at the macro level
-     too — "the guilds of Ravnica are pretty famous. We can do better."
-     **This is branch 4** (teaching) and needs no new slot; it is recorded here
-     as evidence for what branch 4 is actually for.
+   - ~~**The guild, clan and shard descriptions are bland**, at the macro level
+     too — "the guilds of Ravnica are pretty famous. We can do better."~~
+     **Done in branch 4**, which is what it turned out to be the brief for:
+     every faction has what happened to it, two or three named champions with
+     their real cards, and the cards that are exactly its colours.
    - **Lore rivals on the commander dossier.** He likes ADR 19's Rivals, and
      reads them as *strategic* rivals; he also wants **story** rivals — "like
      Bolas and Ugin, for instance." A second, separately-labelled kind rather

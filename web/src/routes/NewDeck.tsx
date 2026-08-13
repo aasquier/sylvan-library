@@ -36,7 +36,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   api,
   type Card,
@@ -98,6 +98,7 @@ function slugify(name: string): string {
 
 export default function NewDeck() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   const [taxonomy, setTaxonomy] = useState<ColorTaxonomy | null>(null)
   const [taxonomyError, setTaxonomyError] = useState<string | null>(null)
 
@@ -186,6 +187,20 @@ export default function NewDeck() {
     setTier(combo.tier)
     setIndex(at)
   }, [taxonomy])
+
+  // Arriving from a Build button on the Learn page. The link carries a
+  // combination rather than a commander, so it lands on the carousel showing
+  // that slot — the reading and the choosing are still the same act, this one
+  // just started on the other screen.
+  useEffect(() => {
+    const key = params.get('c')
+    if (!key || !taxonomy) return
+    const combo = taxonomy.combinations.find((c) => c.key === key)
+    if (combo) {
+      setMode('guided')
+      goTo(combo)
+    }
+  }, [params, taxonomy, goTo])
 
   // Arrow keys drive the carousel while it is the active step. Only bound
   // before a combination is chosen, so it cannot fight the commander list.
@@ -552,6 +567,32 @@ export default function NewDeck() {
               <p className="mt-3 max-w-3xl text-sm leading-relaxed"
                  style={{ color: 'var(--text-secondary)' }}>
                 <ManaText>{current.history}</ManaText>
+              </p>
+
+              {/* The short version of the depth, with the long one one click
+                  away. This is a chooser and it stays one: the faces get
+                  named here, and the story, the cards and the counts live on
+                  Learn rather than growing this panel to twice its height on
+                  the screen somebody is trying to get through. Only the twenty
+                  slots that are a faction have champions at all. */}
+              {current.champions.length > 0 && (
+                <p className="mt-3 max-w-3xl text-sm"
+                   style={{ color: 'var(--text-muted)' }}>
+                  <span className="text-xs uppercase tracking-wide">
+                    Who they are
+                  </span>{' '}
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    {current.champions.map((c) => c.card).join(' · ')}
+                  </span>
+                </p>
+              )}
+              <p className="mt-2 text-xs">
+                <Link to={`/learn?c=${current.key}`}
+                      style={{ color: 'var(--series-1)' }}>
+                  {current.lore
+                    ? `Read what happened to ${current.name} →`
+                    : `${current.name} on the Learn page →`}
+                </Link>
               </p>
 
               {/* Who actually leads it — the specific thing this slot has

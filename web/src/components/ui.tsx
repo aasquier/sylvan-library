@@ -181,20 +181,34 @@ export function ColorPips({ identity }: { identity: string[] }) {
 
 /* --------------------------------------------------------------- controls */
 
+/**
+ * `help` is a node rather than a string, and that is a dependency decision.
+ *
+ * The affordance that renders it is `<HelpTip>`, which reads the glossary and
+ * therefore imports `ManaText` from this file. Taking the rendered node from
+ * the caller keeps the arrow pointing one way: these controls stay ignorant of
+ * the glossary, and nothing here has to import the thing that imports it.
+ *
+ * It sits inside the `<label>` but outside the label text, so a click on the
+ * word still focuses the field and a click on the mark does not.
+ */
 interface SelectProps {
   label: string
   value: string
   onChange: (value: string) => void
   options: { value: string; label: string }[]
   className?: string
+  help?: React.ReactNode
 }
 
-export function Select({ label, value, onChange, options, className = '' }: SelectProps) {
+export function Select({
+  label, value, onChange, options, className = '', help,
+}: SelectProps) {
   return (
     <label className={`flex flex-col gap-1 ${className}`}>
-      <span className="text-[11px] font-medium uppercase tracking-wide"
+      <span className="flex items-center text-[11px] font-medium uppercase tracking-wide"
             style={{ color: 'var(--text-muted)' }}>
-        {label}
+        {label}{help}
       </span>
       <select
         value={value}
@@ -217,7 +231,7 @@ export function Select({ label, value, onChange, options, className = '' }: Sele
 }
 
 export function NumberField({
-  label, value, onChange, min, max, step = 1, suffix,
+  label, value, onChange, min, max, step = 1, suffix, help,
 }: {
   label: string
   value: number
@@ -226,12 +240,13 @@ export function NumberField({
   max?: number
   step?: number
   suffix?: string
+  help?: React.ReactNode
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium uppercase tracking-wide"
+      <span className="flex items-center text-[11px] font-medium uppercase tracking-wide"
             style={{ color: 'var(--text-muted)' }}>
-        {label}
+        {label}{help}
       </span>
       <div className="flex items-center gap-1">
         <input
@@ -291,12 +306,13 @@ export function TextField({
 /* ----------------------------------------------------------------- chrome */
 
 export function StatTile({
-  label, value, hint, tone,
+  label, value, hint, tone, help,
 }: {
   label: string
   value: string
   hint?: string
   tone?: 'good' | 'warning' | 'critical'
+  help?: React.ReactNode
 }) {
   const toneColor =
     tone === 'good' ? 'var(--status-good)'
@@ -305,9 +321,9 @@ export function StatTile({
           : 'var(--text-primary)'
   return (
     <div className="card-surface rounded-lg px-4 py-3">
-      <div className="text-[11px] font-medium uppercase tracking-wide"
+      <div className="flex items-center text-[11px] font-medium uppercase tracking-wide"
            style={{ color: 'var(--text-muted)' }}>
-        {label}
+        {label}{help}
       </div>
       <div className="mt-1 text-2xl font-semibold" style={{ color: toneColor }}>
         {value}

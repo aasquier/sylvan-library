@@ -125,40 +125,130 @@ def test_every_combination_cites_a_card_to_check_it_against():
 
 
 @pytest.mark.needs_full_corpus
-def test_verified_by_names_match_the_real_corpus():
+def test_every_named_card_matches_the_real_corpus():
     """The claim that `Selesnya Charm` is {G}{W} is checkable. Check it.
 
     One of the two tests `tiny_corpus` cannot carry, and marked rather than
     silently skipped so the gap is countable. The point is to check all 32
     combinations at once -- every guild, shard and wedge -- against cards
-    nobody chose for the fixture. Putting those 32 cards in the fixture would
+    nobody chose for the fixture. Putting those cards in the fixture would
     make the test verify the fixture rather than the table, which is the one
     thing it must not do: this is what would catch a misremembered guild, a
     misspelled card, or a wedge filed as a shard.
 
-    So it runs where the corpus lives. Every one of the 32 was verified this
-    way before the table landed.
+    It covers all three lists rather than just `verified_by`, and deliberately
+    stays **one** test: a second `needs_full_corpus` marker would move CI's
+    skip count off the two it is pinned to, and the argument for running here
+    is identical for all three. Three rules, and they are not the same rule:
+
+    - `verified_by` and every `signature` card must be **exactly** this
+      identity. Signature carries no prose, so that equality is the entire
+      claim the list makes, and it is what makes the list worth showing.
+    - a `champion` need only be a **subset** -- Alesha is a Mardu warrior on a
+      card whose identity is Mardu via two hybrid pips, but a faction is a
+      story and the story owes the colour pie no exact match.
     """
     from mtglab import config
     if not config.DB_PATH.exists():
         pytest.skip(f"needs the full corpus at {config.DB_PATH}")
 
     from mtglab.cards import db
+    exact = {c.key: [c.verified_by, *c.signature] for c in colors.COMBINATIONS}
+    within = {c.key: [ch.card for ch in c.champions]
+              for c in colors.COMBINATIONS}
+    names = sorted({n for v in exact.values() for n in v}
+                   | {n for v in within.values() for n in v})
+
     con = db.connect(config.DB_PATH)
     try:
-        found = db.get_cards(con, [c.verified_by for c in colors.COMBINATIONS])
+        found = db.get_cards(con, names)
     finally:
         con.close()
 
     wrong = []
     for c in colors.COMBINATIONS:
-        rec = found.get(c.verified_by)
-        if rec is None:
-            wrong.append(f"{c.name}: no card named {c.verified_by!r}")
-        elif colors.key_for(rec.color_identity) != c.key:
-            wrong.append(f"{c.name}: {c.verified_by} is "
-                         f"{colors.key_for(rec.color_identity)}, not {c.key}")
+        for name in exact[c.key]:
+            rec = found.get(name)
+            if rec is None:
+                wrong.append(f"{c.name}: no card named {name!r}")
+            elif colors.key_for(rec.color_identity) != c.key:
+                wrong.append(f"{c.name}: {name} is "
+                             f"{colors.key_for(rec.color_identity)}, "
+                             f"not exactly {c.key}")
+        for name in within[c.key]:
+            rec = found.get(name)
+            if rec is None:
+                wrong.append(f"{c.name}: no champion named {name!r}")
+            elif not set(rec.color_identity) <= set(c.colors):
+                wrong.append(f"{c.name}: champion {name} is "
+                             f"{colors.key_for(rec.color_identity)}, "
+                             f"outside {c.key}")
     assert not wrong, "\n".join(wrong)
+
+
+# ------------------------------------------------------- the teaching depth
+
+#: The tiers that are an actual faction, with characters and a story.
+#:
+#: Mono-Red is not from anywhere, and neither is Colourless -- the four tiers
+#: left out here get signature cards and the corpus-derived "most-built
+#: commanders" the builder already showed, which is the honest answer where
+#: there is no faction to write about.
+FACTION_TIERS = ("guild", "shard", "wedge")
+
+
+def test_exactly_the_factions_have_lore_and_champions():
+    """Twenty of the 32, and the other twelve have neither.
+
+    Both directions matter. A faction with no lore is a blank panel on the
+    page; a non-faction with lore is a paragraph inventing a story for
+    Mono-Blue, which is the failure mode of writing to fill a field.
+    """
+    factions = {c.key for c in colors.COMBINATIONS if c.tier in FACTION_TIERS}
+    assert len(factions) == 20
+    for c in colors.COMBINATIONS:
+        has = c.key in factions
+        assert bool(c.lore) is has, f"{c.name}: lore should be {has}"
+        assert bool(c.champions) is has, f"{c.name}: champions should be {has}"
+
+
+def test_every_combination_has_signature_cards():
+    """Including the four-colour slots, where there are barely any cards to
+    choose from -- which is the point rather than a gap."""
+    for c in colors.COMBINATIONS:
+        assert c.signature, f"{c.name} lists no signature card"
+        assert len(set(c.signature)) == len(c.signature), \
+            f"{c.name} lists a signature card twice"
+
+
+def test_every_champion_says_who_they_are():
+    for c in colors.COMBINATIONS:
+        cards = [ch.card for ch in c.champions]
+        assert len(set(cards)) == len(cards), f"{c.name} repeats a champion"
+        for ch in c.champions:
+            assert ch.card.strip(), c.name
+            assert len(ch.role.split()) >= 6, f"{c.name}: {ch.card} role is thin"
+
+
+def test_the_lore_is_a_paragraph_and_not_a_restatement_of_the_tier():
+    """`TIER_BLURBS` says what a guild is; `lore` says what happened to this
+    one. The failure this guards is the same one that put the definition of a
+    shard inside Bant."""
+    for c in colors.COMBINATIONS:
+        if not c.lore:
+            continue
+        assert len(c.lore.split()) >= 40, f"{c.name} lore is thin"
+        assert "three allied colours" not in c.lore
+        assert "two enemies" not in c.lore
+
+
+def test_no_teaching_prose_uses_markdown():
+    """Same rule as the blurbs above, extended to the fields added for the
+    teaching pass -- all of it renders as plain text."""
+    prose = [c.lore for c in colors.COMBINATIONS]
+    prose += [ch.role for c in colors.COMBINATIONS for ch in c.champions]
+    for text in prose:
+        assert "*" not in text and "_" not in text, text[:60]
 
 
 def test_every_tier_has_a_label_and_a_blurb():
