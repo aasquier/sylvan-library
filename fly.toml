@@ -1,126 +1,47 @@
-# Fly.io deployment. `docs/HOSTING.md` §4 is the guide; this is the file.
+# fly.toml app configuration file generated for sylvan-library on 2026-08-13T14:10:56Z
 #
-# **Nothing secret belongs here.** This repository is public and CI scans every
-# tracked file's contents for an API key. `RESEND_API_KEY` and
-# `ANTHROPIC_API_KEY` are `fly secrets set`, never `[env]` — see §4 step 4.
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# Fly is what §4 recommends *for the app alone*, and that recommendation is
-# still open in §7: it flips to a Hetzner box if Forge ever goes server-side,
-# because Forge wants ~470MB of card data, a JRE, and gigabytes of heap. This
-# file is the only Fly-specific thing in the repository — the Dockerfile is
-# plain OCI and runs anywhere — so switching costs this file and nothing else.
 
-app = "sylvan-library"
-primary_region = "iad"          # change to the region nearest you
+app = 'sylvan-library'
+primary_region = 'iad'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  MTGLAB_DATA_DIR = "/data"
+  MTGLAB_ADMIN_EMAIL = 'you@example.com'
+  MTGLAB_ADMIN_USERNAME = 'you'
+  MTGLAB_BASE_URL = 'https://sylvan-library.fly.dev'
+  MTGLAB_DATA_DIR = '/data'
+  MTGLAB_DECKS_DIR = '/data/decks'
+  MTGLAB_EMAIL_FROM = 'sylvan-library@example.com'
+  MTGLAB_REQUIRE_AUTH = '1'
 
-  # The volume, not `/app/decks`. `deck.yaml` is the source of truth and the
-  # app's editing routes write it, so a decks directory inside the image would
-  # mean every rationale written in the UI disappeared at the next deploy. The
-  # image carries `/app/decks-seed`; §4 step 6 copies it here once.
-  #
-  # The consequence to know: this instance's decks and the repository's can now
-  # diverge, and neither is automatically authoritative. §5 says how to keep
-  # them in step.
-  MTGLAB_DECKS_DIR = "/data/decks"
-
-  # Auth on. The local default is off and stays off — one person on a laptop
-  # does not need a login — but a shared instance is the case the whole of §1
-  # was written for. With this set, `api/auth.py`'s middleware refuses every
-  # path outside `PUBLIC_PATHS` before routing, and `App.tsx` renders the login
-  # screen in place of the app.
-  MTGLAB_REQUIRE_AUTH = "1"
-
-  # ---- CHANGE THESE FOUR BEFORE THE FIRST DEPLOY -------------------------
-  #
-  # Placeholders on purpose. This repository is public, and an email address is
-  # the one piece of personal data the project handles — CLAUDE.md keeps it out
-  # of logs, artifacts and tool results, and a tracked file is a weaker place
-  # to put it than any of those. The real values live in the gitignored `.env`.
-  #
-  # Two ways to supply them, and the second keeps the address out of git for
-  # good: edit the lines below, **or** `fly secrets set MTGLAB_ADMIN_EMAIL=...`,
-  # which is injected as an environment variable and takes precedence over
-  # `[env]`. Neither is a credential; the second is just a private place to put
-  # configuration.
-
-  # Who administers this instance (ADR 17). `auth/bootstrap.py` reconciles this
-  # account to admin-and-enabled at every boot, creating it unclaimed if
-  # absent, so a demotion or a restored backup is repaired by a restart. There
-  # is deliberately no `MTGLAB_ADMIN_PASSWORD`; the account is claimed from the
-  # sign-in page's reset link.
-  #
-  # **A deploy with this unset has nobody who can administer it.** Whoever can
-  # change it is an admin on the next boot — already true of anyone who can run
-  # `fly deploy`, so it grants nothing new, and every change is logged.
-  MTGLAB_ADMIN_EMAIL = "you@example.com"
-  MTGLAB_ADMIN_USERNAME = "you"
-
-  # Where emailed invite and reset links point. Without it every link in every
-  # message says `127.0.0.1` and nobody can claim an account. Change it to the
-  # custom domain once §4 step 7 is done.
-  MTGLAB_BASE_URL = "https://sylvan-library.fly.dev"
-
-  # The sending address, which must be on the domain verified with Resend.
-  # `RESEND_API_KEY` is a secret and is not here; `sender_from_env()` refuses
-  # to start without it when auth is on, deliberately — the console fallback
-  # would print recipient addresses into Fly's logs, which ADR 16 forbids.
-  MTGLAB_EMAIL_FROM = "sylvan-library@example.com"
-
-[mounts]
-  source = "mtglab_data"
-  destination = "/data"
-  # 3GB, sized in §4 step 3 to hold the ~63MB corpus, the ~98MB of Scryfall
-  # downloads it is built from, `app.db`, the decks, and a backup. Both halves
-  # of that download now actually land here — until 2026-08-12 `download_bulk`
-  # wrote to a relative `data/scryfall`, which in this container would have
-  # been the ephemeral layer rather than the volume this line sizes.
-  initial_size = "3gb"
+[[mounts]]
+  source = 'mtglab_data'
+  destination = '/data'
+  initial_size = '3gb'
 
 [http_service]
   internal_port = 8080
   force_https = true
-
-  # Scale to zero between visits. §3's conclusion was that idle dominates the
-  # bill for a handful of friends, and this is the setting that acts on it —
-  # worth more than every micro-optimisation in that section combined.
-  #
-  # `suspend` rather than `stop`: it resumes from memory, so a wake is fast.
-  # This is also why seeding the corpus is not a boot step — several minutes of
-  # download on the wake path would turn a visit into an outage.
-  auto_stop_machines = "suspend"
+  auto_stop_machines = 'suspend'
   auto_start_machines = true
   min_machines_running = 0
 
   [http_service.concurrency]
-    # One process, so these are request-level guards rather than a worker
-    # count. See the Dockerfile's CMD for why a second worker is not safe:
-    # `api/jobs.py` keeps its registry in a module-level dict, so a sim
-    # submitted to one process is a 404 from the other.
-    type = "requests"
-    soft_limit = 20
+    type = 'requests'
     hard_limit = 40
+    soft_limit = 20
 
-  # The same endpoint as the image's HEALTHCHECK, checked from outside the
-  # container. `/api/health` is on `PUBLIC_PATHS`, so it answers 200 with auth
-  # on — that is what makes it usable here rather than a login redirect. It
-  # reports corpus state in its body, but an unseeded instance is a correct
-  # state between deploy and §4 step 6, not an unhealthy one.
   [[http_service.checks]]
-    interval = "30s"
-    timeout = "5s"
-    grace_period = "10s"
-    method = "GET"
-    path = "/api/health"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/api/health'
 
 [[vm]]
-  size = "shared-cpu-1x"
-  # 512mb is too tight: DuckDB, numpy, an Argon2id hash at its configured cost,
-  # and a Tier 1 sweep all want headroom at once. §7 flags this as the number to
-  # watch if Forge is ever added, which is most of why that would mean Hetzner.
-  memory = "1gb"
+  size = 'shared-cpu-1x'
+  memory = '1gb'
