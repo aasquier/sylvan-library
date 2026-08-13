@@ -365,6 +365,23 @@ export interface ClaimResult {
   username: string
 }
 
+/** `POST /api/auth/claim/preview` — what kind of link this is, before spending it.
+ *
+ * A POST rather than a GET, and that is not a style choice: the token lives in
+ * the URL *fragment* precisely so it reaches no server's access log, and reading
+ * it back over a query string would undo that at the first hop. It goes in a body
+ * for the same reason the claim itself does.
+ *
+ * It spends nothing. The claim screen calls it on mount so it can offer a
+ * username field to an invite and not to a reset — the server refuses a rename
+ * on a reset either way, so this only keeps the form from offering what the
+ * server would decline.
+ */
+export interface ClaimPreview {
+  purpose: 'invite' | 'reset'
+  username: string
+}
+
 export class ApiError extends Error {
   // Declared explicitly rather than as a constructor parameter property, which
   // tsconfig's erasableSyntaxOnly disallows.
@@ -1058,8 +1075,10 @@ export const api = {
   // query string, which would put a live credential in every access log along
   // the way; see `auth/invites.py`. This POST is the only request that carries
   // it, in a JSON body rather than a URL.
-  claim: (body: { token: string; password: string }) =>
+  claim: (body: { token: string; password: string; username?: string }) =>
     post<ClaimResult>('/api/auth/claim', body),
+  claimPreview: (body: { token: string }) =>
+    post<ClaimPreview>('/api/auth/claim/preview', body),
   // Everything under here is refused to a non-admin by the middleware, before
   // routing (ADR 17). Hiding the nav entry is a courtesy to the person using
   // the app, never the protection — a 403 is what actually stops anybody.

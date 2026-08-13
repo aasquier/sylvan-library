@@ -14,12 +14,24 @@
  * the username instead, so the login form can be filled in. That hand-off is
  * `onClaimed`, and it is the whole of what success does.
  *
- * One invite, one reset, one page: both purposes redeem through
- * `POST /api/auth/claim`, so there is nothing here that branches on which kind
- * of link arrived. The server knows; this screen does not need to.
+ * One invite, one reset, one page — and it now *does* branch on which kind of
+ * link arrived, which it did not before. An invite is somebody's first minute
+ * here, so it offers a username rather than handing them the handle derived
+ * from their email address; a reset is an account that already has a name
+ * other people have seen, and renaming it from a forgotten-password link would
+ * make "somebody reached my email" and "somebody took my identity here" the
+ * same incident.
+ *
+ * The page cannot tell the two apart from a token, so it asks
+ * `POST /api/auth/claim/preview` on mount. **That is a convenience, not a
+ * control**: `tokens.redeem` gates the rename on the token's own purpose read
+ * from the database, so a client that renders the field anyway and posts a
+ * username gets a 422. If the preview fails for any reason, this falls back to
+ * the password-only form, which is the behaviour it had before and is never
+ * wrong — only less helpful.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../lib/api'
 import { useRetryAfter } from '../lib/retry'
 import { AuthCard, AuthField, AuthSubmit, PlainNote } from '../components/auth'
@@ -55,6 +67,30 @@ export default function Claim({ onClaimed }: {
   const [claimed, setClaimed] = useState<string | null>(null)
   const [wait, holdFor] = useRetryAfter()
 
+  // What kind of link this is. `null` until the preview answers, and it stays
+  // `null` if the preview fails — see the module docstring: that degrades to
+  // the password-only form rather than blocking somebody out of a valid link
+  // because a lookup went wrong.
+  const [kind, setKind] = useState<'invite' | 'reset' | null>(null)
+  const [username, setUsername] = useState('')
+
+  useEffect(() => {
+    if (!token) return
+    let live = true
+    api.claimPreview({ token })
+      .then(preview => {
+        if (!live) return
+        setKind(preview.purpose)
+        // Prefilled with the derived handle rather than left empty: the
+        // suggestion is usually fine, and somebody who does not care should be
+        // able to press the button. Rule 4's empty-box argument is about a
+        // rationale nobody may write for you — a username is not that.
+        if (preview.purpose === 'invite') setUsername(preview.username)
+      })
+      .catch(() => { /* the form still works; the server is the authority */ })
+    return () => { live = false }
+  }, [token])
+
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     if (!token || busy || wait > 0) return
@@ -71,7 +107,13 @@ export default function Claim({ onClaimed }: {
     setBusy(true)
     setError(null)
     try {
-      const result = await api.claim({ token, password })
+      // Sent only for an invite, and only when it differs from what was
+      // suggested — there is no reason to ask the server to rename an account
+      // to the name it already has.
+      const chosen = kind === 'invite' ? username.trim() : ''
+      const result = await api.claim({
+        token, password, ...(chosen ? { username: chosen } : {}),
+      })
       setPassword('')
       setConfirm('')
       // Spent, so there is no reason for it to sit in the address bar or ride
@@ -119,21 +161,30 @@ export default function Claim({ onClaimed }: {
     )
   }
 
+  const inviting = kind === 'invite'
+
   return (
     <AuthCard
-      title="Choose a password"
+      title={inviting ? 'Set up your account' : 'Choose a password'}
       blurb="Nobody else ever sees it — not whoever invited you, and not the maintainer."
     >
       <form onSubmit={submit} className="space-y-3">
+        {inviting && (
+          <AuthField label="Username" autoComplete="username" autoFocus
+                     value={username} onChange={setUsername}
+                     hint="This is how you sign in and how you appear to others. Letters, digits, dot, dash or underscore." />
+        )}
         <AuthField label="New password" type="password" autoComplete="new-password"
-                   autoFocus value={password} onChange={setPassword}
+                   autoFocus={!inviting} value={password} onChange={setPassword}
                    hint={`At least ${MIN_PASSWORD_LENGTH} characters.`} />
         <AuthField label="Again" type="password" autoComplete="new-password"
                    value={confirm} onChange={setConfirm} />
 
         <div className="flex items-center gap-3 pt-1">
-          <AuthSubmit label="Set password" busyLabel="Setting…" busy={busy}
-                      disabled={!password || !confirm || wait > 0} />
+          <AuthSubmit label={inviting ? 'Create account' : 'Set password'}
+                      busyLabel="Setting…" busy={busy}
+                      disabled={!password || !confirm || wait > 0
+                                || (inviting && !username.trim())} />
           {wait > 0 && (
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
               try again in {wait}s

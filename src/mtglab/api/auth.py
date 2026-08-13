@@ -104,6 +104,10 @@ PUBLIC_PATHS = frozenset({
     "/api/auth/me",
     "/api/auth/reset",
     "/api/auth/claim",
+    # Public for the same reason `claim` is: its caller is holding an emailed
+    # link and by definition has no session. It reads a token and spends
+    # nothing.
+    "/api/auth/claim/preview",
 })
 
 # Everything an admin does lives under one prefix, and the middleware refuses it
@@ -433,9 +437,16 @@ def install(app: FastAPI, *, require: bool, secure_cookies: bool,
 
         Every session for the account ends inside `tokens.redeem`, in the same
         transaction that sets the password.
+
+        An **invite** may also carry a `username`, which is the holder naming
+        themselves rather than living with the one derived from their email
+        address. A reset may not; `redeem` gates that on the token's own
+        purpose, read from the database, so this handler never has to be the
+        thing that remembers.
         """
         token = str(payload.get("token") or "").strip()
         password = str(payload.get("password") or "")
+        chosen = str(payload.get("username") or "").strip() or None
         if not token or not password:
             raise HTTPException(status_code=422,
                                 detail="a token and a password are required")
@@ -452,11 +463,18 @@ def install(app: FastAPI, *, require: bool, secure_cookies: bool,
                     detail="too many attempts -- wait and try again",
                     headers={"Retry-After": str(wait)})
             try:
-                user = tokens.redeem(con, token, password)
-            except passwords.WeakPassword as exc:
+                user = tokens.redeem(con, token, password, username=chosen)
+            except (passwords.WeakPassword, users.InvalidUsername,
+                    tokens.WrongPurpose) as exc:
                 # Not counted and not a refusal of the link: the token is
-                # intact and the sensible next move is a longer password.
+                # intact and the sensible next move is a longer password, or a
+                # different handle.
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
+            except users.UserExists as exc:
+                # 409, and the link is still live -- `redeem` rolls the token
+                # spend back with the failed rename, so "that name is taken"
+                # is a retryable answer rather than a dead invite.
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
             except tokens.TokenError as exc:
                 ratelimit.record_failure(con, key,
                                          ratelimit.CLAIM_PER_ADDRESS)
@@ -467,6 +485,66 @@ def install(app: FastAPI, *, require: bool, secure_cookies: bool,
         _LOG.info("password set for %r from %s", user.username, address)
         return {"detail": "password set -- you can sign in now",
                 "username": user.username}
+
+    @app.post("/api/auth/claim/preview")
+    def claim_preview(payload: dict[str, Any],
+                      request: Request) -> dict[str, Any]:
+        """What kind of link this is, and the name it currently carries.
+
+        **A POST, and the token is in the body.** A GET would put it in a query
+        string, and the entire reason `invites.claim_link` hides it in a URL
+        *fragment* is that a fragment reaches no server's access log. Reading a
+        token back over the query string would undo that at the first hop, for
+        the convenience of a verb.
+
+        It exists because the claim screen has a token and nothing else, and
+        two things now depend on which kind of link arrived: an invite offers a
+        username field, a reset must not (`tokens.redeem` refuses it either
+        way — this is so the form does not offer what the server will refuse).
+
+        **It spends nothing and changes nothing.** A valid link previewed ten
+        times is still a valid link; only `claim` consumes one.
+
+        What comes back is the purpose and the username, and deliberately not
+        the email address. The holder of the token knows their own address, but
+        ADR 16 does not put one in a response that nobody authenticated for,
+        and a preview is exactly that.
+        """
+        token = str(payload.get("token") or "").strip()
+        if not token:
+            raise HTTPException(status_code=422, detail="a token is required")
+
+        address = client_address(request)
+        # Its own bucket rather than `claim`'s. Sharing one would let a page
+        # that previews on mount spend the budget a person needs to actually
+        # redeem, and the two failures mean different things.
+        key = ratelimit.address_key(address, scope="claim-preview")
+
+        with db.connection() as con:
+            if ratelimit.exhausted(con, key, ratelimit.CLAIM_PER_ADDRESS):
+                wait = ratelimit.retry_after(con, key,
+                                             ratelimit.CLAIM_PER_ADDRESS)
+                raise HTTPException(
+                    status_code=429,
+                    detail="too many attempts -- wait and try again",
+                    headers={"Retry-After": str(wait)})
+            try:
+                resolved = tokens.lookup(con, token)
+            except tokens.TokenError as exc:
+                ratelimit.record_failure(con, key,
+                                         ratelimit.CLAIM_PER_ADDRESS)
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+            account = users.get_by_id(con, resolved.user_id)
+            if account is None or account.disabled:
+                # The same sentence `redeem` gives, for the same reason: a
+                # disabled account's link is not a link whose holder is owed
+                # an explanation of why.
+                raise HTTPException(status_code=400,
+                                    detail="that link is not valid")
+            ratelimit.clear(con, key)
+
+        return {"purpose": str(resolved.purpose), "username": account.username}
 
     @app.get("/api/auth/me")
     def me(caller: Scope) -> dict[str, Any]:

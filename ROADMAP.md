@@ -523,12 +523,27 @@ arc; this is what the next few sessions actually do.
    exists because he rejected a first draft that asked Magic questions in a
    friendly voice; the tarot and persona ideas are that same instinct. A
    version of these that arrives sensible and dull has missed them.
-4. **Deploy** — [docs/HOSTING.md](docs/HOSTING.md) §7 is the checklist. What
-   remains is an account, a card, a DNS record and the seeding run: the Fly
-   app + volume, the Resend account and verified sending domain (start the
-   DNS early), `fly secrets`, seed the corpus and decks, then the refresh
-   runbook.
-5. **After deploy, next build work in order:** re-price automated PR review
+4. ~~**Deploy**~~ — **done 2026-08-13. Live at https://sylvan-libraries.com.**
+   [docs/HOSTING.md](docs/HOSTING.md) is the guide and was corrected the same
+   day against what actually happened (#65).
+5. **Testing the live instance** — started 2026-08-13, **not finished.** Email
+   is proven end to end: a real invite, a new sending domain, Gmail, the claim
+   link, a sign-in. Getting there turned up two bugs that only a deployment
+   could show, both fixed and deployed in #66 — Cloudflare in front of
+   `api.resend.com` refusing Python's default User-Agent, and the image not
+   carrying the Anthropic SDK while the instance held the key.
+
+   **Both lived below a test seam**, which is the durable lesson: mail is faked
+   through `Transport` and the SDK is stubbed in every Claude test, so the
+   whole suite passed while neither worked. `tests/test_packaging.py` is the
+   first check that reads the *image* rather than the code.
+
+   What is left: driving the app itself — the Learn page, the theme interview,
+   the dossier, a deck edit surviving a restart. **The Claude surfaces have
+   only just become reachable and are entirely unexercised on the instance.**
+   One punchlist item is already open: letting an invited person choose their
+   own username, rather than wearing the local part of their email address.
+6. **After that, next build work in order:** re-price automated PR review
    (ENGINEERING §5, parked), the stance dial UI, then the remaining Claude
    modes ADR 15 names and branch 5 does not build (argue a slot, deck
    conversation, research).

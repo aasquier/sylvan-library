@@ -12,7 +12,7 @@
  */
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../lib/api'
 import Claim from './Claim'
 
@@ -22,7 +22,7 @@ vi.mock('../lib/api', async () => {
     ...actual,
     // `login` is mocked so the test can assert it is never reached. A claim
     // that quietly signed somebody in would otherwise look like a nicer flow.
-    api: { claim: vi.fn(), login: vi.fn() },
+    api: { claim: vi.fn(), login: vi.fn(), claimPreview: vi.fn() },
   }
 })
 
@@ -47,6 +47,15 @@ function setBoth(password: string, confirm = password) {
 function setPassword() {
   return screen.getByRole('button', { name: 'Set password' })
 }
+
+beforeEach(() => {
+  // A reset unless a test says otherwise: the password-only form, which is what
+  // this page did before invites could name themselves. Every assertion below
+  // that is not about the username field is an assertion about that form.
+  vi.mocked(api.claimPreview).mockResolvedValue({
+    purpose: 'reset', username: 'ada',
+  })
+})
 
 afterEach(() => {
   cleanup()
@@ -153,6 +162,100 @@ describe('choosing a password', () => {
     // A 422 leaves the token intact, so the retry has to still have it. This is
     // why the fragment is cleared on success and not on submit.
     expect(window.location.hash).toBe('#token=a-256-bit-token')
+  })
+})
+
+describe('naming yourself, on an invite only', () => {
+  function asInvite(username = 'ada.lovelace') {
+    vi.mocked(api.claimPreview).mockResolvedValue({ purpose: 'invite', username })
+  }
+
+  function createAccount() {
+    return screen.getByRole('button', { name: 'Create account' })
+  }
+
+  it('offers a username field, prefilled with the derived handle', async () => {
+    arriveAt('/auth/claim#token=a-256-bit-token')
+    asInvite()
+    render(<Claim onClaimed={vi.fn()} />)
+
+    const field = await screen.findByLabelText('Username')
+    // Prefilled rather than empty: the suggestion is usually fine, and somebody
+    // who does not care should be able to press the button.
+    expect((field as HTMLInputElement).value).toBe('ada.lovelace')
+  })
+
+  it('sends the name the person actually chose', async () => {
+    arriveAt('/auth/claim#token=a-256-bit-token')
+    asInvite()
+    vi.mocked(api.claim).mockResolvedValue({ detail: 'ok', username: 'countess' })
+    render(<Claim onClaimed={vi.fn()} />)
+    await screen.findByLabelText('Username')
+
+    fillIn('Username', 'countess')
+    setBoth(GOOD_PASSWORD)
+    fireEvent.click(createAccount())
+
+    await waitFor(() => {
+      expect(api.claim).toHaveBeenCalledWith({
+        token: 'a-256-bit-token', password: GOOD_PASSWORD, username: 'countess',
+      })
+    })
+  })
+
+  it('shows no username field on a reset', async () => {
+    arriveAt('/auth/claim#token=a-256-bit-token')
+    render(<Claim onClaimed={vi.fn()} />)   // the default preview is a reset
+
+    await screen.findByLabelText('New password')
+    // A forgotten password is not a reason to be handed a rename. The server
+    // refuses it too; this is the form not offering what would be declined.
+    expect(screen.queryByLabelText('Username')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Set password' })).toBeTruthy()
+  })
+
+  it('never sends a username with a reset', async () => {
+    arriveAt('/auth/claim#token=a-256-bit-token')
+    vi.mocked(api.claim).mockResolvedValue({ detail: 'ok', username: 'ada' })
+    render(<Claim onClaimed={vi.fn()} />)
+    await screen.findByLabelText('New password')
+
+    setBoth(GOOD_PASSWORD)
+    fireEvent.click(setPassword())
+
+    await waitFor(() => {
+      expect(api.claim).toHaveBeenCalledWith({
+        token: 'a-256-bit-token', password: GOOD_PASSWORD,
+      })
+    })
+  })
+
+  it('keeps the link alive when the name is taken', async () => {
+    arriveAt('/auth/claim#token=a-256-bit-token')
+    asInvite()
+    vi.mocked(api.claim).mockRejectedValue(
+      new ApiError('that username is already taken', 409))
+    render(<Claim onClaimed={vi.fn()} />)
+    await screen.findByLabelText('Username')
+
+    setBoth(GOOD_PASSWORD)
+    fireEvent.click(createAccount())
+
+    expect(await screen.findByText('that username is already taken')).toBeTruthy()
+    // The whole point of the 409: a collision must leave a retryable invite
+    // rather than a spent link and an account nobody can get into.
+    expect(window.location.hash).toBe('#token=a-256-bit-token')
+  })
+
+  it('falls back to the password-only form if the preview fails', async () => {
+    arriveAt('/auth/claim#token=a-256-bit-token')
+    vi.mocked(api.claimPreview).mockRejectedValue(new ApiError('nope', 500))
+    render(<Claim onClaimed={vi.fn()} />)
+
+    // Degrading to what the page did before is never wrong, only less helpful.
+    // The server still gates the rename, so nothing is lost but the field.
+    expect(await screen.findByLabelText('New password')).toBeTruthy()
+    expect(screen.queryByLabelText('Username')).toBeNull()
   })
 })
 
