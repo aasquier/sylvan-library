@@ -33,6 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 DOCKERFILE = ROOT / "Dockerfile"
+FLY_TOML = ROOT / "fly.toml"
 
 # Extras the runtime image must install, and the surface each one is there for.
 # An entry is a promise the UI already makes: a control the app renders whose
@@ -79,3 +80,68 @@ def test_every_required_extra_is_declared_in_pyproject():
     names = set(re.findall(r"^(\w+) = \[", block[1], flags=re.MULTILINE))
     missing = set(REQUIRED_EXTRAS) - names
     assert not missing, f"the Dockerfile would install undeclared extras: {missing}"
+
+
+# --------------------------------------- what makes the deployment private
+
+# Settings the deployed instance is only safe with, and what each one stops.
+# All three default to *off* or to a placeholder in code, which is right for a
+# laptop and is exactly why they have to be asserted here: the safe value is
+# the one nobody has to type, so a line going missing is silent.
+REQUIRED_ENV = {
+    "MTGLAB_REQUIRE_AUTH":
+        "the middleware that refuses every path outside PUBLIC_PATHS. "
+        "`config.require_auth()` is a flag that defaults to False, so an "
+        "instance missing this line serves the whole app to the internet",
+    "MTGLAB_CLIENT_IP_HEADER":
+        "login rate limiting by real client address. Without it "
+        "`auth.client_address` sees Fly's proxy, so every attempt from "
+        "everybody shares one bucket and one mistyped password 429s the "
+        "instance",
+}
+
+
+def fly_env() -> dict[str, str]:
+    """`fly.toml`'s `[env]` table, as a plain dict.
+
+    Parsed with a regex rather than a TOML library: `tomllib` would do it, but
+    this reads one flat table of scalars and the point is to be readable by
+    somebody checking whether the check is right.
+    """
+    text = FLY_TOML.read_text(encoding="utf-8")
+    block = text.split("\n[env]", 1)
+    assert len(block) == 2, "no [env] table in fly.toml"
+    # Stop at the next table header; `[[mounts]]` is the one that follows.
+    body = re.split(r"\n\[", block[1], maxsplit=1)[0]
+    return {m[1]: m[2] for m in
+            re.finditer(r'^\s*(\w+)\s*=\s*"([^"]*)"\s*$', body,
+                        flags=re.MULTILINE)}
+
+
+@pytest.mark.parametrize("name", sorted(REQUIRED_ENV))
+def test_the_deployment_sets_what_makes_it_private(name):
+    """`fly.toml` is the only thing standing between the app and the public.
+
+    There is no type system spanning a TOML table and a `getenv` default, which
+    is this module's whole reason for existing -- and this is the seam where
+    that gap is worst, because **every one of these defaults to the open
+    setting.** `config.require_auth()` returns False when unset, so an instance
+    deployed without `MTGLAB_REQUIRE_AUTH` comes up serving every route to
+    anybody, with a passing health check and nothing in the log to say so. It
+    is the same failure shape `fly.toml` already warns about for the
+    `you@example.com` placeholder: the app looks entirely well and is silently
+    wrong.
+
+    Off-by-default is the right default -- CLAUDE.md is explicit that a login
+    in front of one person on a laptop is a regression -- so the fix is not to
+    invert it. The fix is to assert the deployment file, which is what this
+    does, at pull-request time rather than after a deploy.
+
+    Worth having because that file is edited for unrelated reasons: the
+    machine-awake block sits a hundred lines below `[env]` in the same file,
+    and a stray line-drop while editing it would not otherwise fail anything.
+    """
+    env = fly_env()
+    assert name in env, (
+        f"fly.toml's [env] no longer sets {name} -- {REQUIRED_ENV[name]}")
+    assert env[name].strip(), f"{name} is set to an empty value in fly.toml"

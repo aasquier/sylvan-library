@@ -130,12 +130,18 @@ primary_region = "iad"          # change to the region nearest you
   internal_port = 8080
   force_https = true
 
-  # ---- TEMPORARY, 2026-08-13: held awake for a few days of testing --------
+  # ---- Held awake through primary development ----------------------------
   #
-  # **Revert to the block below this one when the testing week is over.** This
-  # costs real money for nothing the moment it stops earning its keep: a
-  # `shared-cpu-1x`/1GB machine held up around the clock is roughly $0.19/day
-  # against near-zero when it scales to zero between visits.
+  # Added 2026-08-13 as "a few days of testing"; **that deadline was wrong and
+  # is deliberately removed.** Reviewed 2026-08-14 and the call is to hold this
+  # until primary development is done, not until a date — suspend/resume was
+  # interfering with testing badly enough that the money is not the deciding
+  # term. Restore the block below this one *then*, and not on a calendar.
+  #
+  # What it costs while it stands: a `shared-cpu-1x`/1GB machine held up around
+  # the clock is roughly $0.19/day, against near-zero when it scales to zero
+  # between visits. Cheap enough to be the wrong thing to optimise mid-build,
+  # and worth actually reverting once the building stops.
   #
   # Why the file and not `fly machine update --autostop=off`: **a deploy
   # applies `fly.toml`**, so anything set with a CLI command is silently undone
@@ -147,7 +153,7 @@ primary_region = "iad"          # change to the region nearest you
   # measurement. Every `fly ssh console` in this session had to be preceded by
   # an HTTP request to wake the machine, and a four-minute request is exactly
   # the kind of work a suspend lands in the middle of. Holding it awake removes
-  # that variable from anything measured this week.
+  # that variable from anything measured against the instance.
   #
   # `min_machines_running` is belt and braces: with `auto_stop_machines` off it
   # is not consulted, but leaving it at 0 reads like permission to scale to
