@@ -164,7 +164,12 @@ function DeckHero({ deck, report, dossier, claude, onRefresh }: {
                   style={{ background: 'var(--series-1)', color: '#fff' }}>
               Simulate this deck
             </Link>
-            <ArtPicker slug={deck.slug} onPicked={onRefresh} />
+            {/* Every control below is hidden rather than disabled when the
+                deck is not this viewer's to change. Disabled would be honest
+                about the shape of the app but would offer a row of dead
+                buttons to somebody who is only ever going to read; the
+                server refuses either way. */}
+            {deck.writable && <ArtPicker slug={deck.slug} onPicked={onRefresh} />}
             {card?.artist && (
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 {/* The artist belongs to the printing being shown, so when a
@@ -540,13 +545,15 @@ export default function DeckDetail() {
                 Nothing is outstanding. Promoting marks it curated and unblocks
                 the five artifacts.
               </span>
-              <div className="mt-2">
-                <button onClick={promote} disabled={promoting}
-                        className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                        style={{ background: 'var(--series-1)', color: '#fff' }}>
-                  {promoting ? 'Promoting…' : 'Promote to curated'}
-                </button>
-              </div>
+              {deck.writable && (
+                <div className="mt-2">
+                  <button onClick={promote} disabled={promoting}
+                          className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                          style={{ background: 'var(--series-1)', color: '#fff' }}>
+                    {promoting ? 'Promoting…' : 'Promote to curated'}
+                  </button>
+                </div>
+              )}
             </>
           )}
           {promoteError && (
@@ -608,7 +615,10 @@ export default function DeckDetail() {
               queue, so the fix is a sentence rather than a redesign. It says
               what the rule is at the same time, because the first question
               anybody asks about this is whether it writes the answer. */}
-          {claudeReady && (
+          {/* Also gated on `writable`: announcing a feature to somebody who
+              cannot reach it is worse than not announcing it, and the whole
+              point of this paragraph was that the interview was invisible. */}
+          {deck.writable && claudeReady && (
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Stuck on a <code>why</code>? <strong>Ask Claude</strong> on any card
               and it will interview you about that slot — corpus text, the gate’s
@@ -617,9 +627,11 @@ export default function DeckDetail() {
             </p>
           )}
 
-          <div className="flex flex-wrap items-center gap-3">
-            <AddCardForm slug={slug} stage={deck.stage} onDone={() => void refresh()} />
-          </div>
+          {deck.writable && (
+            <div className="flex flex-wrap items-center gap-3">
+              <AddCardForm slug={slug} stage={deck.stage} onDone={() => void refresh()} />
+            </div>
+          )}
           {editError && <ErrorNote>{editError}</ErrorNote>}
 
           {groups.map(([key, cards]) => (
@@ -679,7 +691,12 @@ export default function DeckDetail() {
                           the editor already asking, because clicking a control
                           that says "ask" and then being shown another one that
                           says "ask" is the same problem one layer down. */}
-                      {claudeReady && (
+                      {/* The interview is gated with the writes even though it
+                          only asks questions: its entire purpose is to help
+                          somebody write a `why`, and offering that to a
+                          reader who cannot save one would spend a Claude call
+                          on a dead end. */}
+                      {deck.writable && claudeReady && (
                         <button
                           onClick={() => {
                             setAskNow(true)
@@ -692,23 +709,27 @@ export default function DeckDetail() {
                           Ask Claude
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          setAskNow(false)
-                          setEditing(editing === card.name ? null : card.name)
-                        }}
-                        className="rounded-md px-2 py-1 text-[11px] font-medium"
-                        style={{ background: 'var(--gridline)',
-                                 color: 'var(--text-primary)' }}>
-                        {card.why ? 'Edit why' : 'Write why'}
-                      </button>
-                      <button
-                        onClick={() => removeCard(card.name)}
-                        title={`Remove ${card.name} from the deck`}
-                        className="rounded-md px-2 py-1 text-[11px]"
-                        style={{ color: 'var(--text-muted)' }}>
-                        Remove
-                      </button>
+                      {deck.writable && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setAskNow(false)
+                              setEditing(editing === card.name ? null : card.name)
+                            }}
+                            className="rounded-md px-2 py-1 text-[11px] font-medium"
+                            style={{ background: 'var(--gridline)',
+                                     color: 'var(--text-primary)' }}>
+                            {card.why ? 'Edit why' : 'Write why'}
+                          </button>
+                          <button
+                            onClick={() => removeCard(card.name)}
+                            title={`Remove ${card.name} from the deck`}
+                            className="rounded-md px-2 py-1 text-[11px]"
+                            style={{ color: 'var(--text-muted)' }}>
+                            Remove
+                          </button>
+                        </>
+                      )}
                     </div>
                    </div>
                    {editing === card.name && (
@@ -829,17 +850,23 @@ export default function DeckDetail() {
                               <ManaText>{c.reasons.join(' · ')}</ManaText>
                             </p>
                           </div>
-                          <button
-                            onClick={() => {
-                              setSwapping({ out: shortlist.card, into: c.name })
-                              setSwapWhy('')
-                              setSwapError(null)
-                            }}
-                            className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
-                            style={{ background: 'var(--gridline)',
-                                     color: 'var(--text-primary)' }}>
-                            Use this card
-                          </button>
+                          {/* The shortlist itself stays visible — it is
+                              analysis, and reading why a card is a candidate
+                              is worth having without the power to act on it.
+                              Only the swap is taken away. */}
+                          {deck.writable && (
+                            <button
+                              onClick={() => {
+                                setSwapping({ out: shortlist.card, into: c.name })
+                                setSwapWhy('')
+                                setSwapError(null)
+                              }}
+                              className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
+                              style={{ background: 'var(--gridline)',
+                                       color: 'var(--text-primary)' }}>
+                              Use this card
+                            </button>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -922,12 +949,15 @@ export default function DeckDetail() {
                   {key.replace(/_/g, ' ')}
                 </h3>
                 <NoteEditor slug={slug} noteKey={key} value={value}
+                            writable={deck.writable}
                             onDone={() => void refresh()} />
               </section>
             ))}
           </div>
-          <AddNoteForm slug={slug} existing={Object.keys(deck.notes)}
-                       onDone={() => void refresh()} />
+          {deck.writable && (
+            <AddNoteForm slug={slug} existing={Object.keys(deck.notes)}
+                         onDone={() => void refresh()} />
+          )}
         </div>
       )}
     </div>

@@ -94,10 +94,18 @@ class DeckSource(Protocol):
     def writable(self) -> bool:
         """Whether this caller may edit these decks.
 
-        Always true today, with one local user. `docs/HOSTING.md` keeps the
-        curated decks read-only for everyone but the maintainer, and this is
-        the flag that will say so -- checked in one place rather than
-        rediscovered per endpoint.
+        ~~Always true today, with one local user.~~ No longer: the moment a
+        second account existed, "the curated library is the same six for
+        everyone" stopped meaning "and everyone may edit them". `api/deps.py`
+        derives this from the caller, and it is checked in one place rather
+        than rediscovered per endpoint -- which is the whole reason it was put
+        on the protocol before anything needed it.
+
+        An implementation that reports `False` here must also *refuse*, by
+        raising `ReadOnlySource` from the write operations. The flag is for
+        callers that want to ask ahead (the UI, so it can hide a control);
+        it is not the enforcement, because a flag nobody reads enforces
+        nothing.
         """
 
 
@@ -110,12 +118,26 @@ class DeckExists(Exception):
 
 
 class FileDeckSource:
-    """Decks as `<root>/<slug>/deck.yaml`."""
+    """Decks as `<root>/<slug>/deck.yaml`.
 
-    def __init__(self, root: Path | str | None = None) -> None:
+    `writable` is a constructor argument rather than a hardcoded `True` because
+    this library is now read by people who do not own it. Until the per-user
+    tier exists there is exactly one library and it is the maintainer's, so
+    "may this caller edit decks" and "is this caller the maintainer" are the
+    same question -- but they are the same question only by accident of there
+    being one library, and the flag is where they come apart later. See
+    `api/deps.deck_source`, which is the only place that decides it.
+    """
+
+    def __init__(self, root: Path | str | None = None, *,
+                 writable: bool = True) -> None:
         # None means "ask config at call time", so `config.use_paths()` in a
         # test actually takes effect. Passing a root pins it explicitly.
         self._root = Path(root) if root is not None else None
+        # Defaults to True so every existing caller -- the CLI, the artifact
+        # generator, the tests that build a source directly -- is unchanged.
+        # The API is the one caller with somebody to be read-only *to*.
+        self._writable = writable
 
     @property
     def root(self) -> Path:
@@ -142,13 +164,32 @@ class FileDeckSource:
     def read_text(self, slug: str) -> str:
         return self._path(slug).read_text(encoding="utf-8")
 
+    def _writable_or_raise(self, slug: str) -> None:
+        """Refuse an edit before looking at the filesystem.
+
+        Checked *first*, ahead of `DeckNotFound` and `DeckExists`, for two
+        reasons. It is the cheaper answer, and more importantly it is the one
+        that does not depend on state: a caller who may not write gets the same
+        answer whether or not the deck is there, so no sequence of refused
+        edits maps out the library.
+
+        That mapping is not itself a secret here -- this library is deliberately
+        readable by everyone, and `GET /api/decks` lists it -- but an
+        authorisation check whose answer varies with the resource is the shape
+        of a leak, and it costs nothing to not write one.
+        """
+        if not self._writable:
+            raise ReadOnlySource(slug)
+
     def write_text(self, slug: str, text: str) -> None:
+        self._writable_or_raise(slug)
         # Written whole rather than in place: a partial write would leave the
         # source of truth truncated, and the caller has already verified the
         # text parses.
         self._path(slug).write_text(text, encoding="utf-8")
 
     def create(self, slug: str, text: str) -> None:
+        self._writable_or_raise(slug)
         path = self.root / slug / "deck.yaml"
         if path.exists():
             raise DeckExists(slug)
@@ -171,7 +212,13 @@ class FileDeckSource:
         glob is `*/deck.yaml`, and a trashed deck sits one level deeper. It is
         gitignored, so a deleted deck leaves the working tree without leaving a
         staged deletion nobody asked for.
+
+        Refused outright on a read-only source, before anything moves. This is
+        the operation the flag exists for: a delete here takes the artifacts
+        with it, and for a deck imported an hour ago and never committed there
+        is no `git checkout` to undo with.
         """
+        self._writable_or_raise(slug)
         path = self._path(slug)                      # raises DeckNotFound
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         trash = self.root / ".trash" / f"{slug}-{stamp}"
@@ -193,10 +240,11 @@ class FileDeckSource:
 
     @property
     def writable(self) -> bool:
-        return True
+        return self._writable
 
     def __repr__(self) -> str:
-        return f"FileDeckSource({self.root})"
+        mode = "rw" if self._writable else "ro"
+        return f"FileDeckSource({self.root}, {mode})"
 
 
 class MemoryDeckSource:

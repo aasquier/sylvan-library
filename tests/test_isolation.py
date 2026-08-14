@@ -504,6 +504,13 @@ def test_addresses_are_serialised_in_two_places(instance):
 
 # ----------------------------------------------------------- shared routes
 
+#: The one field on a shared payload that is allowed to differ per caller.
+#: It is not deck data -- it is the answer to "may *you* change this", which
+#: has to vary or it would not be an answer. Everything else about a shared
+#: deck must be identical, and the test below checks both halves.
+PER_CALLER_FIELDS = {"writable"}
+
+
 def test_shared_routes_are_reachable_by_any_account(instance):
     """The other half of the classification: shared really is shared.
 
@@ -512,6 +519,14 @@ def test_shared_routes_are_reachable_by_any_account(instance):
     session is enough. What would be wrong is a route filed as shared that
     quietly returns different data per user; that is a claim about handlers
     which do not read the scope at all.
+
+    **That claim needed narrowing.** The library is still the same six decks
+    for everybody -- but since the write gate, each one carries `writable`,
+    and that field is *about the caller* rather than about the deck. So the
+    assertion is now the sharper of the two: every field except `writable` is
+    identical, and `writable` genuinely differs. A blanket `==` would have to
+    be deleted to make the gate pass, and deleting it would take the real
+    check with it.
     """
     client, _, _ = instance
     login(client, "alice", PASSWORD_A)
@@ -519,7 +534,18 @@ def test_shared_routes_are_reachable_by_any_account(instance):
     client.post("/api/auth/logout")
     login(client, "bob", PASSWORD_B)
     as_bob = client.get("/api/decks").json()
-    assert as_alice == as_bob
+
+    def without_permissions(decks: list) -> list:
+        return [{k: v for k, v in d.items() if k not in PER_CALLER_FIELDS}
+                for d in decks]
+
+    assert without_permissions(as_alice) == without_permissions(as_bob)
+    # And the field that is allowed to differ must actually differ, or the
+    # exemption above is quietly hiding a gate that stopped working. Alice
+    # administers this instance; Bob does not.
+    assert [d["writable"] for d in as_alice] == [True] * len(as_alice)
+    assert [d["writable"] for d in as_bob] == [False] * len(as_bob)
+    assert as_alice, "the fixture must serve at least one deck to prove this"
 
 
 def test_shared_entries_carry_a_reason():

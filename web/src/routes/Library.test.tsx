@@ -24,6 +24,9 @@ function deck(overrides: Partial<DeckSummary> & { slug: string }): DeckSummary {
     name: overrides.slug,
     status: 'built',
     stage: 'curated',
+    // The maintainer's own view by default, so existing tests describe the
+    // library as its owner sees it. A reader's view is `writable: false`.
+    writable: true,
     needs_rationale: 0,
     commander: ['Some Commander'],
     companion: null,

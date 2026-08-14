@@ -22,9 +22,9 @@ const Simulator = lazy(() => import('./routes/Simulator'))
 
 const NAV = [
   { to: '/', label: 'Library', end: true },
-  { to: '/new', label: 'Start a deck', end: false },
-  { to: '/import', label: 'Import', end: false },
   { to: '/search', label: 'Card search', end: false },
+  // `/new` and `/import` are spliced in after Library when the viewer may
+  // actually create a deck — see AUTHORING_NAV.
   { to: '/simulate', label: 'Simulator', end: false },
   // Last, and deliberately not first: it is reference rather than a task, and
   // somebody who needs it usually arrives from a word on another screen.
@@ -35,6 +35,21 @@ const NAV = [
 // calls is refused to anybody else by the middleware, before routing (ADR 17),
 // so this decides what is offered and never what is allowed.
 const ADMIN_NAV = { to: '/admin', label: 'Accounts', end: false }
+
+// The two doors that create a deck. Shown only to somebody who may write to
+// the library, because there is currently exactly one library and it is the
+// maintainer's — a deck started by anybody else has nowhere to go but into
+// somebody else's shelf, which is the thing the write gate exists to stop.
+//
+// Gated on `is_admin` rather than on a deck's `writable`, and that asymmetry
+// is deliberate: `writable` is a fact about *a deck*, and these routes create
+// one that does not exist yet. When decks have owners this gate does not move
+// somewhere better — it disappears, because everybody will be able to start
+// their own.
+const AUTHORING_NAV = [
+  { to: '/new', label: 'Start a deck', end: false },
+  { to: '/import', label: 'Import', end: false },
+]
 
 /** Where the emailed link lands. Mirrors `auth.invites.CLAIM_PATH`. */
 const CLAIM_PATH = '/auth/claim'
@@ -190,7 +205,11 @@ export default function App() {
     )
   }
 
-  const nav = auth?.is_admin ? [...NAV, ADMIN_NAV] : NAV
+  // Library first, then the authoring doors if this viewer has anywhere to put
+  // a deck, then the rest, then Accounts for an admin.
+  const nav = auth?.is_admin
+    ? [NAV[0], ...AUTHORING_NAV, ...NAV.slice(1), ADMIN_NAV]
+    : NAV
   // Only ever true on an instance that requires a login. With auth off there is
   // nobody to be signed out of, and offering it would be the regression this
   // whole flag exists to avoid.

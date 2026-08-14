@@ -397,11 +397,16 @@ export function AddCardForm({ slug, stage, onDone }: {
 }
 
 /** Edit the deck-level prose the advanced primer reads directly. */
-export function NoteEditor({ slug, noteKey, value, onDone }: {
+export function NoteEditor({ slug, noteKey, value, onDone, writable = true }: {
   slug: string
   noteKey: string
   value: string
   onDone: (result: EditResult) => void
+  /** Whether to offer the Edit control. The note's *prose* is shown either
+   *  way — this component renders the deck's thinking, not just a button, and
+   *  hiding it from a reader would hide content rather than an affordance.
+   *  Defaults true so every existing caller is unchanged. */
+  writable?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [text, setText] = useState(value)
@@ -429,10 +434,12 @@ export function NoteEditor({ slug, noteKey, value, onDone }: {
            style={{ color: 'var(--text-secondary)' }}>
           <ManaText>{value}</ManaText>
         </p>
-        <button onClick={() => { setText(value); setEditing(true) }}
-                className="mt-2 text-xs underline" style={{ color: 'var(--text-muted)' }}>
-          Edit
-        </button>
+        {writable && (
+          <button onClick={() => { setText(value); setEditing(true) }}
+                  className="mt-2 text-xs underline" style={{ color: 'var(--text-muted)' }}>
+            Edit
+          </button>
+        )}
       </>
     )
   }

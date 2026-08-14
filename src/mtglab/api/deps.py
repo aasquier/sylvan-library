@@ -107,13 +107,30 @@ Admin = Annotated[UserScope, Depends(admin)]
 
 
 def deck_source(caller: Scope) -> DeckSource:
-    """The decks this request may see.
+    """The decks this request may see, and whether they may change them.
 
     Still the curated file-backed library for everyone, because that is still
     the only tier that exists (ADR 1, and `docs/HOSTING.md` §6 step 6 is where
     the second one lands). What has changed is that the answer is now a
     function of *who is asking*, so adding `SqlDeckSource` for a user's own
     decks is an edit to this function and to nothing else.
+
+    **Read stays shared; write does not.** Everyone with a session sees the
+    same six decks — that is the classification in `tests/test_isolation.py`
+    and it is unchanged. But this library is one person's work, held in git as
+    the source of truth, and served from `/data/decks` where an edit is the
+    only copy. Before there was a second account, "shared" and "editable by
+    whoever is looking" were indistinguishable. An invite made them different,
+    and this is the line.
+
+    `is_admin` is the test rather than an owner column because there is no
+    owner column — there is one library and it belongs to the maintainer. When
+    the per-user tier lands, this becomes a comparison against the deck's owner
+    and the curated six become the maintainer's own, shared by default. That is
+    the *next* decision and it wants an ADR; this one only stops a stranger
+    editing somebody else's decks in the meantime.
+
+    Note `LOCAL.is_admin` is `True`, so a laptop with auth off is untouched —
+    one person holding the file the app reads, which is what that scope means.
     """
-    del caller       # named, unused, and the signature is the point
-    return FileDeckSource()
+    return FileDeckSource(writable=caller.is_admin)
