@@ -250,7 +250,8 @@ describe('a 401', () => {
     refuseWith(401, 'authentication required')
     const heard = listen()
 
-    await expect(api.setNote('gyome-food', 'mulligan', 'keep two lands'))
+    await expect(api.setNote({ owner: 'aasquier', slug: 'gyome-food' },
+                             'mulligan', 'keep two lands'))
       .rejects.toThrow('authentication required')
 
     expect(heard).toHaveBeenCalledTimes(1)
@@ -338,5 +339,83 @@ describe('a 429', () => {
 
     const caught = await api.requestReset('someone@example.com').catch((e) => e)
     expect(caught.retryAfter).toBeNull()
+  })
+})
+
+/**
+ * The owner segment (ADR 22).
+ *
+ * A slug alone stopped identifying a deck the moment slugs became unique per
+ * owner rather than globally, so every deck call takes an address. What is
+ * pinned here is the *shape of the URL*, because that is the one thing no
+ * component test can see: a screen mocking `api` will happily pass its checks
+ * while the real client asks for `/api/decks/goreclaw` — the route that no
+ * longer exists, and the failure this whole branch's browser half is for.
+ */
+describe('deck URLs', () => {
+  /** Answer any request with an empty object, and hand back the mock so the
+   *  path it was called with can be read off. */
+  function capture() {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true, status: 200, json: async () => ({}),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  const REF = { owner: 'mitch', slug: 'goreclaw' }
+
+  it('puts the owner ahead of the slug', async () => {
+    const fetchMock = capture()
+    await api.deck(REF)
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/decks/mitch/goreclaw')
+  })
+
+  it('keeps the owner ahead of the slug on every sub-resource', async () => {
+    const fetchMock = capture()
+    await api.validate(REF)
+    await api.stats(REF)
+    await api.suggestions(REF)
+    await api.printings(REF)
+    await api.commander(REF)
+    await api.dossier(REF)
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+      '/api/decks/mitch/goreclaw/validate',
+      '/api/decks/mitch/goreclaw/stats',
+      '/api/decks/mitch/goreclaw/suggestions',
+      '/api/decks/mitch/goreclaw/printings',
+      '/api/decks/mitch/goreclaw/commander',
+      '/api/decks/mitch/goreclaw/dossier',
+    ])
+  })
+
+  it('addresses the writes the same way', async () => {
+    const fetchMock = capture()
+    await api.setCardField(REF, 'Llanowar Elves', 'why', 'a turn-one dork')
+    await api.setNote(REF, 'mulligan', 'keep two lands')
+    await api.setDeckField(REF, 'stage', 'curated')
+    await api.setShared(REF, true)
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+      '/api/decks/mitch/goreclaw/cards/Llanowar%20Elves',
+      '/api/decks/mitch/goreclaw/notes/mulligan',
+      '/api/decks/mitch/goreclaw',
+      '/api/decks/mitch/goreclaw/shared',
+    ])
+  })
+
+  it('keeps the confirmation on the delete, after the owner', async () => {
+    const fetchMock = capture()
+    await api.deleteDeck(REF, 'bury')
+    expect(fetchMock.mock.calls[0][0])
+      .toBe('/api/decks/mitch/goreclaw?confirm=bury')
+  })
+
+  it('encodes both segments rather than trusting what was in the URL bar', async () => {
+    // Neither can need it today — a slug is `[a-z0-9-]` and a username is
+    // letters, digits, `.`, `_` and `-`. This function is handed whatever the
+    // address bar held, so the guarantee is worth having anyway.
+    const fetchMock = capture()
+    await api.deck({ owner: 'a b', slug: 'c/d' })
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/decks/a%20b/c%2Fd')
   })
 })

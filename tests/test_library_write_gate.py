@@ -321,3 +321,68 @@ def test_a_guest_still_cannot_create_inside_the_curated_library(
                                     "commander": ["Gyome, Master Chef"]})
     assert sorted(p.name for p in decks_dir.iterdir()) == ["mini"]
     assert on_disk(decks_dir) == DECK_YAML
+
+
+# --------------------------------------------------- the shelf's two halves
+
+def test_the_listing_marks_the_showcase_and_nothing_else(instance, corpus):
+    """`GET /api/decks` says which owner the curated six belong to (ADR 22).
+
+    The browse tab needs three groups out of one flat list -- yours, the
+    showcase, everybody else's -- and it can only work two of them out for
+    itself. `writable` identifies the caller's own decks; **nothing identifies
+    the maintainer's**, because the client is never told who that is. Without
+    this field a browser would have to infer the showcase from the *order* of
+    this response, and ordering is not a contract.
+
+    Read the two flags together: they are what "mine and the showcase in front,
+    everybody else behind a tab" is made of.
+    """
+    client, _ = instance
+    login(client, "guest", GUEST_PASSWORD)
+    client.post("/api/decks", json={"slug": "theirs",
+                                    "commander": ["Gyome, Master Chef"]})
+
+    tiles = {d["slug"]: d for d in client.get("/api/decks").json()}
+    assert set(tiles) == {"mini", "theirs"}
+
+    # The file tier: the showcase, and not this caller's to change.
+    assert tiles["mini"]["showcase"] is True
+    assert tiles["mini"]["writable"] is False
+    # Their own: theirs to change, and not the showcase.
+    assert tiles["theirs"]["showcase"] is False
+    assert tiles["theirs"]["writable"] is True
+
+
+def test_a_private_deck_is_absent_from_somebody_else_s_shelf(instance, corpus):
+    """And so cannot be marked anything at all.
+
+    The tile's `shared` flag is only ever a fact about a deck the caller can
+    already see, which is why the app may render "private" from it without
+    ever claiming that about a stranger's deck: a stranger's private deck is
+    not in this response. It is the same fact its 404 states, arrived at the
+    same way -- `Library` never hands out a source that can see it.
+    """
+    client, _ = instance
+    login(client, "guest", GUEST_PASSWORD)
+    client.post("/api/decks", json={"slug": "theirs",
+                                    "commander": ["Gyome, Master Chef"]})
+    client.post("/api/auth/logout")
+
+    login(client, "owner", OWNER_PASSWORD)
+    slugs = {d["slug"] for d in client.get("/api/decks").json()}
+    assert slugs == {"mini"}, "the guest's private deck is not on this shelf"
+
+    # Shared, and now it is -- under its owner's name, and not writable here.
+    client.post("/api/auth/logout")
+    login(client, "guest", GUEST_PASSWORD)
+    assert client.put("/api/decks/guest/theirs/shared",
+                      json={"shared": True}).status_code == 200
+    client.post("/api/auth/logout")
+
+    login(client, "owner", OWNER_PASSWORD)
+    tiles = {d["slug"]: d for d in client.get("/api/decks").json()}
+    assert set(tiles) == {"mini", "theirs"}
+    assert tiles["theirs"]["owner"] == "guest"
+    assert tiles["theirs"]["writable"] is False
+    assert tiles["theirs"]["showcase"] is False

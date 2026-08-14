@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, type DeckSummary, type Health } from '../lib/api'
+import { api, deckUrl, type DeckTile, type Health } from '../lib/api'
 import { identityName } from '../lib/mtg'
 import {
   Badge, CardArt, ColorPips, ErrorNote, ManaText, Select, Spinner,
@@ -42,7 +42,7 @@ const DELETE_WORD = 'bury'
  * near side cannot refuse something the server would accept.
  */
 function DeleteDialog({ deck, onCancel, onDeleted }: {
-  deck: DeckSummary
+  deck: DeckTile
   onCancel: () => void
   onDeleted: (movedTo: string) => void
 }) {
@@ -60,7 +60,7 @@ function DeleteDialog({ deck, onCancel, onDeleted }: {
       // The normalised answer, not the raw keystrokes: it is the value this
       // dialog actually validated, and sending anything else would let the two
       // sides disagree about what was confirmed.
-      const result = await api.deleteDeck(deck.slug, answer)
+      const result = await api.deleteDeck(deck, answer)
       onDeleted(result.moved_to)
     } catch (e) {
       setError(String((e as Error).message ?? e))
@@ -257,8 +257,132 @@ function FirstRun() {
   )
 }
 
+/**
+ * One deck on the shelf.
+ *
+ * Extracted when the browse tab arrived, because the same tile now renders in
+ * two places and the alternative was the whole card duplicated per tab.
+ *
+ * Two things it says that it did not have to before decks had owners: whose it
+ * is, when it is not yours; and whether it is private, when it is. Both are
+ * only shown in the case that carries information — a tile on a laptop, where
+ * one person owns everything and shares it with nobody, is unchanged.
+ */
+function DeckCard({ deck, onDelete, heading: Heading = 'h2' }: {
+  deck: DeckTile
+  onDelete: (deck: DeckTile) => void
+  /** `h3` inside the browse tab, where the owner's username is the `h2` these
+   *  decks sit under. A flat shelf keeps `h2`, which is what it is: a list of
+   *  decks under the page's own `h1`. */
+  heading?: 'h2' | 'h3'
+}) {
+  return (
+    // `group/card` is on this wrapper rather than on the Link, because the
+    // delete button has to sit outside the Link — inside it, a click would
+    // navigate — and still react to hovering the card.
+    <div className="group/card relative">
+      {/* Muted until the card is hovered or the button is focused: deleting a
+          deck should be reachable without being the thing your eye lands on. */}
+      {deck.writable && (
+        <button
+          onClick={() => onDelete(deck)}
+          title={`Delete ${deck.name}`}
+          aria-label={`Delete ${deck.name}`}
+          className="absolute right-2 top-2 z-10 rounded-md px-2 py-1 text-[11px] opacity-0 transition focus:opacity-100 group-hover/card:opacity-100"
+          style={{ background: 'var(--surface-1)', color: 'var(--text-muted)',
+                   border: '1px solid var(--hairline)' }}
+        >
+          Delete
+        </button>
+      )}
+      <Link to={deckUrl(deck)}
+            className="card-surface block overflow-hidden rounded-xl transition hover:-translate-y-0.5 hover:shadow-lg">
+        {/* 626/457 is `art_crop`'s own shape, so the tile shows the whole
+            painting instead of a band cut out of its middle. It was 626/300,
+            which threw away a third of the height and took it off the top and
+            bottom equally — on a commander drawn head-up, off the head. A
+            taller tile is the cost, and it is the right one on a shelf whose
+            whole job is recognition. */}
+        <CardArt src={deck.art_crop} alt={deck.commander[0] ?? deck.name}
+                 ratio="aspect-[626/457]" className="rounded-none" />
+        <div className="space-y-2 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <Heading className="font-semibold leading-tight">{deck.name}</Heading>
+            <div className="flex shrink-0 items-center gap-1">
+              {/* Only on somebody else's deck. On your own it would be a label
+                  reading "yours" on every tile, which is not information. */}
+              {!deck.writable && <Badge>{deck.owner}</Badge>}
+              {/* And only on your own, for the mirror-image reason: a private
+                  deck of somebody else's is not in this response at all, so
+                  the absence of this badge elsewhere says nothing. */}
+              {deck.writable && !deck.shared && <Badge>private</Badge>}
+              {/* null is "the corpus was missing, so the gate never ran" --
+                  which is not the same as passing. Rendering it like a clean
+                  deck throws away the distinction the list endpoint carries
+                  these counts to preserve. */}
+              {/* A theoretical deck is a list, not a box of cards. Worth
+                  saying on the shelf, because the difference decides whether
+                  you can sit down and play it. */}
+              {deck.status === 'theoretical' && <Badge>theory</Badge>}
+              {/* Orthogonal to that: has anyone reasoned about it? A draft
+                  renders like a curated deck unless the shelf says so, which
+                  hides the distinction the stage exists to draw. The count is
+                  the prompt (ADR 13). */}
+              {deck.stage === 'draft' && (
+                <Badge tone="warning">
+                  draft · {deck.needs_rationale}
+                </Badge>
+              )}
+              {deck.errors === null && <Badge tone="warning">not checked</Badge>}
+              {deck.errors !== null && deck.errors > 0 && (
+                <Badge tone="critical">
+                  {deck.errors} error{deck.errors === 1 ? '' : 's'}
+                </Badge>
+              )}
+              {deck.bracket && <Badge>B{deck.bracket}</Badge>}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs"
+               style={{ color: 'var(--text-secondary)' }}>
+            <ColorPips identity={deck.color_identity} />
+            <span>{identityName(deck.color_identity)}</span>
+            <span aria-hidden>·</span>
+            <span className="tabular">{deck.total_cards} cards</span>
+            <span aria-hidden>·</span>
+            <span className="tabular">{deck.land_count} lands</span>
+          </div>
+          {deck.strategy && (
+            <p className="line-clamp-3 text-xs leading-relaxed"
+               style={{ color: 'var(--text-muted)' }}>
+              <ManaText>{deck.strategy}</ManaText>
+            </p>
+          )}
+        </div>
+      </Link>
+    </div>
+  )
+}
+
+function DeckGrid({ decks, onDelete, heading }: {
+  decks: DeckTile[]
+  onDelete: (deck: DeckTile) => void
+  heading?: 'h2' | 'h3'
+}) {
+  return (
+    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {decks.map((deck) => (
+        <DeckCard key={`${deck.owner}/${deck.slug}`} deck={deck}
+                  onDelete={onDelete} heading={heading} />
+      ))}
+    </div>
+  )
+}
+
+/** Which shelf is being looked at. See the `split` memo below. */
+type Shelf = 'mine' | 'players'
+
 export default function Library() {
-  const [decks, setDecks] = useState<DeckSummary[] | null>(null)
+  const [decks, setDecks] = useState<DeckTile[] | null>(null)
   const [health, setHealth] = useState<Health | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [bracket, setBracket] = useState('all')
@@ -266,7 +390,8 @@ export default function Library() {
   const [sort, setSort] = useState('name')
   const [status, setStatus] = useState('all')
   const [stage, setStage] = useState('all')
-  const [deleting, setDeleting] = useState<DeckSummary | null>(null)
+  const [shelf, setShelf] = useState<Shelf>('mine')
+  const [deleting, setDeleting] = useState<DeckTile | null>(null)
   // Kept after the dialog closes: "it is in .trash/" is the sentence that
   // makes a deletion feel survivable, and it is useless if it flashes past.
   const [deleted, setDeleted] = useState<{ name: string; movedTo: string } | null>(null)
@@ -280,8 +405,28 @@ export default function Library() {
       .catch((e) => setError(String(e.message ?? e)))
   }, [])
 
+  /**
+   * The two shelves ADR 22 asks for: yours, and everybody else's.
+   *
+   * Other players' decks are "a tab somebody opts into rather than something
+   * in the way", and the maintainer's showcase is "always visible" — so the
+   * default shelf is what you can write plus the six, and the browse tab is
+   * the remainder.
+   *
+   * Both tests come from the server. `writable` is the caller's own decks and
+   * `showcase` is the curated six's owner; neither is a comparison this client
+   * could make, because it is never told who the maintainer is.
+   */
+  const [mine, players] = useMemo(() => {
+    const list = decks ?? []
+    return [
+      list.filter((d) => d.writable || d.showcase),
+      list.filter((d) => !d.writable && !d.showcase),
+    ]
+  }, [decks])
+
   const shown = useMemo(() => {
-    let list = decks ?? []
+    let list = shelf === 'mine' ? mine : players
     if (bracket !== 'all') list = list.filter((d) => String(d.bracket) === bracket)
     if (color !== 'all') list = list.filter((d) => d.color_identity.includes(color))
     if (status !== 'all') list = list.filter((d) => d.status === status)
@@ -293,7 +438,21 @@ export default function Library() {
           ? b.total_cards - a.total_cards
           : a.name.localeCompare(b.name),
     )
-  }, [decks, bracket, color, status, stage, sort])
+  }, [mine, players, shelf, bracket, color, status, stage, sort])
+
+  /** The browse shelf, grouped under the username it belongs to.
+   *
+   * Alphabetical by owner, and by whatever `sort` says within each — the deck
+   * controls keep working inside a group rather than being overridden by it.
+   */
+  const byOwner = useMemo(() => {
+    const out = new Map<string, DeckTile[]>()
+    for (const deck of shown) {
+      if (!out.has(deck.owner)) out.set(deck.owner, [])
+      out.get(deck.owner)!.push(deck)
+    }
+    return [...out.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [shown])
 
   if (error) return <ErrorNote>Could not load decks: {error}</ErrorNote>
   if (!decks) return <Spinner label="Loading decks…" />
@@ -311,8 +470,8 @@ export default function Library() {
           twice — but dropping the nameplate silently dropped the only
           top-level heading with it, which is what the first version of this
           did. */}
-      {decks.length > 0 ? (
-        <LibraryMasthead decks={decks.length} health={health} />
+      {mine.length > 0 ? (
+        <LibraryMasthead decks={mine.length} health={health} />
       ) : (
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Deck library</h1>
@@ -321,6 +480,33 @@ export default function Library() {
               ? `${health.oracle_cards.toLocaleString()} cards in the local corpus`
               : 'no corpus yet — run `mtglab data refresh`'}
           </p>
+        </div>
+      )}
+
+      {/* Offered only when there is somebody to browse. On a laptop, and on an
+          instance where nobody else has shared anything, this is one tab
+          labelling itself — which is exactly the "something in the way" ADR 22
+          asked the browse view not to be. */}
+      {players.length > 0 && (
+        <div role="tablist" aria-label="Whose decks"
+             className="flex gap-1 border-b" style={{ borderColor: 'var(--hairline)' }}>
+          {([
+            ['mine', 'My decks', mine.length],
+            ['players', 'Other players', players.length],
+          ] as const).map(([key, label, count]) => (
+            <button key={key} role="tab" aria-selected={shelf === key}
+                    onClick={() => setShelf(key)}
+                    className="-mb-px border-b-2 px-3 py-2 text-sm font-medium transition"
+                    style={{
+                      borderColor: shelf === key ? 'var(--series-1)' : 'transparent',
+                      color: shelf === key ? 'var(--text-primary)' : 'var(--text-muted)',
+                    }}>
+              {label}
+              <span className="ml-1.5 text-xs tabular" style={{ color: 'var(--text-muted)' }}>
+                {count}
+              </span>
+            </button>
+          ))}
         </div>
       )}
 
@@ -369,93 +555,30 @@ export default function Library() {
         </div>
       )}
 
-      {decks.length === 0 ? (
+      {shelf === 'mine' && mine.length === 0 ? (
         <FirstRun />
       ) : shown.length === 0 ? (
         <div className="card-surface rounded-lg px-4 py-8 text-center text-sm"
              style={{ color: 'var(--text-secondary)' }}>
           No decks match those filters.
         </div>
+      ) : shelf === 'mine' ? (
+        <DeckGrid decks={shown} onDelete={setDeleting} />
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {shown.map((deck) => (
-            // `group/card` is on this wrapper rather than on the Link, because
-            // the delete button has to sit outside the Link — inside it, a
-            // click would navigate — and still react to hovering the card.
-            <div key={deck.slug} className="group/card relative">
-            {/* Muted until the card is hovered or the button is focused:
-                deleting a deck should be reachable without being the thing
-                your eye lands on. */}
-            {deck.writable && (
-              <button
-                onClick={() => setDeleting(deck)}
-                title={`Delete ${deck.name}`}
-                aria-label={`Delete ${deck.name}`}
-                className="absolute right-2 top-2 z-10 rounded-md px-2 py-1 text-[11px] opacity-0 transition focus:opacity-100 group-hover/card:opacity-100"
-                style={{ background: 'var(--surface-1)', color: 'var(--text-muted)',
-                         border: '1px solid var(--hairline)' }}
-              >
-                Delete
-              </button>
-            )}
-            <Link to={`/decks/${deck.slug}`}
-                  className="card-surface block overflow-hidden rounded-xl transition hover:-translate-y-0.5 hover:shadow-lg">
-              {/* 626/457 is `art_crop`'s own shape, so the tile shows the
-                  whole painting instead of a band cut out of its middle. It
-                  was 626/300, which threw away a third of the height and took
-                  it off the top and bottom equally — on a commander drawn
-                  head-up, off the head. A taller tile is the cost, and it is
-                  the right one on a shelf whose whole job is recognition. */}
-              <CardArt src={deck.art_crop} alt={deck.commander[0] ?? deck.name}
-                       ratio="aspect-[626/457]" className="rounded-none" />
-              <div className="space-y-2 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <h2 className="font-semibold leading-tight">{deck.name}</h2>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {/* null is "the corpus was missing, so the gate never
-                        ran" -- which is not the same as passing. Rendering it
-                        like a clean deck throws away the distinction the list
-                        endpoint carries these counts to preserve. */}
-                    {/* A theoretical deck is a list, not a box of cards.
-                        Worth saying on the shelf, because the difference
-                        decides whether you can sit down and play it. */}
-                    {deck.status === 'theoretical' && <Badge>theory</Badge>}
-                    {/* Orthogonal to that: has anyone reasoned about it?
-                        A draft renders like a curated deck unless the shelf
-                        says so, which hides the distinction the stage exists
-                        to draw. The count is the prompt (ADR 13). */}
-                    {deck.stage === 'draft' && (
-                      <Badge tone="warning">
-                        draft · {deck.needs_rationale}
-                      </Badge>
-                    )}
-                    {deck.errors === null && <Badge tone="warning">not checked</Badge>}
-                    {deck.errors !== null && deck.errors > 0 && (
-                      <Badge tone="critical">
-                        {deck.errors} error{deck.errors === 1 ? '' : 's'}
-                      </Badge>
-                    )}
-                    {deck.bracket && <Badge>B{deck.bracket}</Badge>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-xs"
-                     style={{ color: 'var(--text-secondary)' }}>
-                  <ColorPips identity={deck.color_identity} />
-                  <span>{identityName(deck.color_identity)}</span>
-                  <span aria-hidden>·</span>
-                  <span className="tabular">{deck.total_cards} cards</span>
-                  <span aria-hidden>·</span>
-                  <span className="tabular">{deck.land_count} lands</span>
-                </div>
-                {deck.strategy && (
-                  <p className="line-clamp-3 text-xs leading-relaxed"
-                     style={{ color: 'var(--text-muted)' }}>
-                    <ManaText>{deck.strategy}</ManaText>
-                  </p>
-                )}
-              </div>
-            </Link>
-            </div>
+        // Grouped under the username, which is what ADR 22 asked browsing to
+        // be organised by — and the path shape gives it for free, since the
+        // owner is already half of every deck's address.
+        <div className="space-y-8">
+          {byOwner.map(([owner, group]) => (
+            <section key={owner} className="space-y-4">
+              <h2 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight">
+                {owner}
+                <span className="text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
+                  {group.length} deck{group.length === 1 ? '' : 's'} shared
+                </span>
+              </h2>
+              <DeckGrid decks={group} onDelete={setDeleting} heading="h3" />
+            </section>
           ))}
         </div>
       )}
@@ -468,8 +591,11 @@ export default function Library() {
             // Drop it from the list here rather than re-fetching: the server
             // has already confirmed, and a round trip would leave the deck on
             // screen for a beat after it was gone.
+            //
+            // Matched on the whole address, not the slug: two owners may have
+            // a `goreclaw` and only one of them was deleted.
             setDecks((current) => (current ?? []).filter(
-              (d) => d.slug !== deleting.slug))
+              (d) => d.slug !== deleting.slug || d.owner !== deleting.owner))
             setDeleted({ name: deleting.name, movedTo })
             setDeleting(null)
           }}

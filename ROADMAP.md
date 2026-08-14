@@ -823,9 +823,9 @@ arc; this is what the next few sessions actually do.
       else's library — and it is the argument for doing the ownership tier
       next rather than eventually.
 
-   7. **Deck ownership and sharing — the server half is built
-      ([ADR 22](docs/adr/0022-decks-have-owners-and-sharing-is-a-flag.md)); the
-      browser half is not.** Asked for 2026-08-14: people should be able to
+   7. **Deck ownership and sharing — built, both halves
+      ([ADR 22](docs/adr/0022-decks-have-owners-and-sharing-is-a-flag.md)), and
+      not yet exercised on the instance.** Asked for 2026-08-14: people should be able to
       show each other their decks, the maintainer's should always be visible,
       it should be a tab somebody opts into rather than something in the way,
       and other players' decks should be organised **by username**. Leaderboards
@@ -862,13 +862,38 @@ arc; this is what the next few sessions actually do.
       library. `tests/test_isolation.py` files every per-deck route as
       **user-scoped** now, with ten new adversarial tests.
 
-      **Still owed: the whole browser half.** `web/src/lib/api.ts` builds every
-      deck URL in one place (20 call sites) and none of them carry an owner
-      yet; the router's `/decks/:slug` needs the segment; `Library.tsx` needs
-      the browse-by-username tab; and the committed `web_dist` bundle has to be
-      rebuilt. **This branch must not merge until that lands** — the bundle is
-      in git, so a server-only merge ships a frontend calling routes that no
-      longer exist.
+      **The browser half, and the two things it needed that the server half did
+      not have.** Every deck call takes a `DeckRef` — `{owner, slug}` as an
+      object rather than two positional strings, because transposing two
+      strings is a runtime 404 against somebody else's library and named fields
+      make it a compile error. `deckUrl` is the single place an in-app deck link
+      is built, and `lib/api.test.ts` asserts the **URL shape** directly:
+      a screen mocking `api` passes its tests while the real client asks for a
+      route that no longer exists, which is precisely the failure this half
+      exists to prevent.
+
+      - **`GET /api/decks` gained one field, `showcase`.** The browse tab needs
+        three groups out of one flat list — yours, the showcase, everybody
+        else's — and could only work out two. `writable` identifies the
+        caller's own decks; *nothing* identified the maintainer's, because the
+        client is never told who that is. Inferring it from the response's
+        order was the alternative, and ordering is not a contract.
+      - **`/decks/:slug` survives as a resolver, not as a deck route.** That
+        was every deck's address for the life of the app and the instance has
+        been driven for days, so a bookmark or a link sent to a friend still
+        works: it looks the slug up and redirects, first match winning, which
+        is your own deck before the showcase before a stranger's because that
+        is the order the library is listed in.
+      - **The authoring doors are no longer gated on `is_admin`.** That gate
+        said it would disappear rather than move when decks got owners, and it
+        did — everybody has a library to put a deck in now.
+      - **The sharing toggle is the deck page's, owner-only.** Without it a
+        SQL-tier deck is private forever and the browse tab can never have
+        anything in it.
+
+      **Owed: exercising it on the instance.** A non-admin account driving the
+      write gate, ADR 5's 404 and ADR 17's 403 against the deployed app, which
+      is where every fault in this project has actually lived.
 
    Still owed from the test list itself: **the theme interview on the
    instance** (both modes, and now both readers) — the deployed React half,

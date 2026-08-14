@@ -1,19 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ApiError, api, errorMessage, followJob, hasDossier,
-  type DossierBody, type DossierReport, type DossierSection, type Job,
+  type DeckRef, type DossierBody, type DossierReport, type DossierSection,
+  type Job,
 } from '../lib/api'
 import { CardHover, ManaCost, Spinner } from './ui'
 
 /**
  * Where a run's id is parked so a reload can reattach to it.
  *
- * Keyed by slug because two deck pages are two runs, and the failure this
- * fixes was precisely that a reload lost the connection to work that was still
- * happening — the dossier was written and cached while the page showed
- * `Load failed`.
+ * Keyed by the deck's whole address because two deck pages are two runs, and
+ * the failure this fixes was precisely that a reload lost the connection to
+ * work that was still happening — the dossier was written and cached while the
+ * page showed `Load failed`.
+ *
+ * The owner is in the key and not only the slug: slugs are unique per owner now
+ * (ADR 22), so keying on the slug alone would hand one person's in-flight run
+ * to somebody else's deck page of the same name.
  */
-const jobKey = (slug: string) => `mtglab-dossier-job:${slug}`
+const jobKey = ({ owner, slug }: DeckRef) => `mtglab-dossier-job:${owner}/${slug}`
 
 /**
  * The commander dossier, and the seams it is required to show.
@@ -42,9 +47,9 @@ const jobKey = (slug: string) => `mtglab-dossier-job:${slug}`
  * get busy, and four paragraphs of prose above the 99 would bury the deck.
  */
 export function CommanderDossierPanel({
-  slug, commander, canGenerate, onLoaded,
+  deck, commander, canGenerate, onLoaded,
 }: {
-  slug: string
+  deck: DeckRef
   commander: string
   /** False at stance `off` — ADR 15 says off means no calls, so the button
    *  that would make one is absent rather than present and refusing. */
@@ -56,7 +61,7 @@ export function CommanderDossierPanel({
   const [submitting, setSubmitting] = useState(false)
   // Read from storage on mount, so a tab that comes back finds the run it left.
   const [jobId, setJobId] = useState<string | null>(
-    () => localStorage.getItem(jobKey(slug)))
+    () => localStorage.getItem(jobKey(deck)))
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [fetched, setFetched] = useState(false)
@@ -71,7 +76,7 @@ export function CommanderDossierPanel({
     if (fetched) return
     setFetched(true)
     try {
-      const got = await api.dossier(slug)
+      const got = await api.dossier(deck)
       setReport(got)
       onLoaded?.(got)
     } catch {
@@ -121,10 +126,10 @@ export function CommanderDossierPanel({
       })
       .finally(() => {
         clearInterval(clock)
-        localStorage.removeItem(jobKey(slug))
+        localStorage.removeItem(jobKey(deck))
         setJobId(null)
       })
-  }, [slug, settle])
+  }, [deck, settle])
 
   // One place decides to follow a job: a fresh submission and a restored tab
   // both arrive here with the id in state, so there is no second path that
@@ -141,14 +146,14 @@ export function CommanderDossierPanel({
     setSubmitting(true)
     setError(null)
     try {
-      const job = await api.writeDossier(slug, { refresh })
+      const job = await api.writeDossier(deck, { refresh })
       if (job.status === 'done') {
         // A stored dossier, or a stance of `off`: a job born finished, so
         // there is nothing to poll for and no spinner to earn.
         settle(job)
         return
       }
-      localStorage.setItem(jobKey(slug), job.id)
+      localStorage.setItem(jobKey(deck), job.id)
       setJobId(job.id)
     } catch (err) {
       // 422 with no commander, 503 with no key — both still answered by the

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  api, errorMessage, followJob, type DeckSummary, type Job, type LandResult, type ManaResult,
+  api, errorMessage, followJob, type DeckTile, type Job, type LandResult,
+  type ManaResult,
 } from '../lib/api'
 import { percent } from '../lib/mtg'
 import {
@@ -73,8 +74,13 @@ function Provenance({ seed, cached, computed_at }: {
 
 export default function Simulator() {
   const [params, setParams] = useSearchParams()
-  const [decks, setDecks] = useState<DeckSummary[]>([])
+  const [decks, setDecks] = useState<DeckTile[]>([])
   const [slug, setSlug] = useState(params.get('deck') ?? '')
+  // Whose deck, as its own parameter rather than folded into `deck` (ADR 22).
+  // Two parameters, so a bookmark from before owners existed still names a
+  // deck: absent, the server reads `owner` as the caller's own library, which
+  // is what `?deck=goreclaw` always meant.
+  const [owner, setOwner] = useState(params.get('owner') ?? '')
   const [mode, setMode] = useState<Mode>('mana')
   const [games, setGames] = useState(20000)
   const [minLands, setMinLands] = useState(2)
@@ -93,15 +99,25 @@ export default function Simulator() {
   useEffect(() => {
     api.decks().then((d) => {
       setDecks(d)
-      if (!slug && d.length) setSlug(d[0].slug)
+      if (!slug && d.length) {
+        setSlug(d[0].slug)
+        setOwner(d[0].owner)
+      } else if (!owner && d.length) {
+        // A bookmarked `?deck=` with no owner: resolve it the same way
+        // `DeckRedirect` does, by taking the first library that has it. The
+        // list is the caller's own decks first, then the showcase, then
+        // everybody else's, so first-match is the precedence a person wants.
+        setOwner(d.find((deck) => deck.slug === slug)?.owner ?? '')
+      }
     }).catch((e) => setError(errorMessage(e)))
     // Cancel any in-flight poll when the screen unmounts.
     return () => cancelRef.current?.()
   }, [])                                     // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (slug) setParams({ deck: slug }, { replace: true })
-  }, [slug, setParams])
+    if (slug) setParams(owner ? { deck: slug, owner } : { deck: slug },
+                        { replace: true })
+  }, [slug, owner, setParams])
 
   async function run(withSeed = seed) {
     if (!slug) return
@@ -111,7 +127,7 @@ export default function Simulator() {
     setLands(null)
     try {
       const payload = {
-        slug, games, min_lands: minLands, max_lands: maxLands,
+        slug, owner, games, min_lands: minLands, max_lands: maxLands,
         min_pieces: minPieces, seed: withSeed,
       }
       const submitted =
@@ -157,8 +173,19 @@ export default function Simulator() {
       </header>
 
       <div className="card-surface flex flex-wrap items-end gap-3 rounded-xl p-4">
-        <Select label="Deck" value={slug} onChange={setSlug}
-                options={decks.map((d) => ({ value: d.slug, label: d.name }))} />
+        {/* The value is the deck's whole address, because a slug is unique
+            per owner rather than globally now and two people may both have a
+            `goreclaw` on this list. */}
+        <Select label="Deck" value={owner ? `${owner}/${slug}` : slug}
+                onChange={(v) => {
+                  const cut = v.indexOf('/')
+                  setOwner(cut < 0 ? '' : v.slice(0, cut))
+                  setSlug(cut < 0 ? v : v.slice(cut + 1))
+                }}
+                options={decks.map((d) => ({
+                  value: `${d.owner}/${d.slug}`,
+                  label: d.writable ? d.name : `${d.name} — ${d.owner}`,
+                }))} />
         <Select label="Simulation" value={mode}
                 onChange={(v) => setMode(v as Mode)}
                 options={[

@@ -230,9 +230,12 @@ def list_library(lib: Library) -> list[dict[str, Any]]:
     con = _connect()
     try:
         out: list[dict[str, Any]] = []
+        showcase = lib.file_owner.casefold()
         for owner, src in lib.visible():
-            out.extend(_tiles(src.all(), con, writable=src.writable,
-                              owner=owner))
+            tiles = _tiles(src.all(), con, writable=src.writable, owner=owner)
+            for tile in tiles:
+                tile["showcase"] = owner.casefold() == showcase
+            out.extend(tiles)
         return out
     finally:
         if con is not None:
@@ -270,6 +273,12 @@ def _tiles(decks: list[Deck], con: Any, *, writable: bool,
             # Whose deck this is. Half of its address now (ADR 22), so the
             # client cannot build a link without it, and the key the browse
             # tab groups on.
+            #
+            # `list_library` adds one more field on top of this, `showcase`,
+            # and only there: it says whether this owner is the curated six's,
+            # which is a question about *the library view* and not about a
+            # deck. The Claude tool that shares this function is asking about
+            # one source and would only be given a `false` to misread.
             "owner": owner,
             "name": deck.name,
             # On the shelf as well as the deck page, so the library grid can

@@ -9,8 +9,51 @@ export interface Health {
   message?: string
 }
 
+/**
+ * A deck's full address (ADR 22): whose it is, and which one.
+ *
+ * Slugs are unique **per owner** rather than globally, so a slug on its own no
+ * longer identifies a deck and every deck call takes one of these.
+ *
+ * An object rather than two positional strings, and that is the whole reason it
+ * is a type at all: `deck(owner, slug)` and `deck(slug, owner)` are both two
+ * strings, so transposing them is a runtime 404 against somebody else's
+ * library. Named fields make it a compile error instead.
+ */
+export interface DeckRef {
+  owner: string
+  slug: string
+}
+
+/** The path prefix for one deck, with an optional tail like `/validate`.
+ *
+ * Both segments are encoded. Neither can currently need it — a slug is
+ * `[a-z0-9-]` and `users.USERNAME_RE` allows only letters, digits and `.` `_`
+ * `-` — but this function is handed whatever was in the address bar, and the
+ * cost of being right about that is one call.
+ */
+function deckPath({ owner, slug }: DeckRef, tail = ''): string {
+  return `/api/decks/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}${tail}`
+}
+
+/** Where this deck lives in the app's own router. Mirrors `deckPath`. */
+export function deckUrl({ owner, slug }: DeckRef): string {
+  return `/decks/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}`
+}
+
 export interface DeckSummary {
   slug: string
+  /** The account this deck belongs to, and half of its address (ADR 22). With
+   *  auth off it is the literal `local`: one person, holding the file the app
+   *  reads. */
+  owner: string
+  /** Whether anybody signed in may read this deck, or only its owner.
+   *
+   *  Never a claim about somebody *else's* deck being private — a private deck
+   *  of another owner is not in any response this client sees at all. So this
+   *  is only ever interesting on your own decks, where it is the answer to
+   *  "is this one on display". */
+  shared: boolean
   name: string
   /** "built" = the cards are sleeved up; "theoretical" = a list under consideration. */
   status: string
@@ -38,6 +81,23 @@ export interface DeckSummary {
   // the same as passing, and must not render as a pass.
   errors: number | null
   warnings: number | null
+}
+
+/**
+ * A deck as the library shelf receives it: a summary, plus where it sits.
+ *
+ * `showcase` is on this and not on `DeckSummary` because it is a fact about the
+ * *library view* rather than about a deck — `GET /api/decks/{owner}/{slug}` has
+ * no such field and a type claiming one there would be fiction.
+ *
+ * It says this owner is the curated six's: the maintainer, or `local` on a
+ * laptop. ADR 22 says the showcase is always visible, so it sits in the default
+ * shelf beside your own decks while everybody else's go behind the browse tab.
+ * The client cannot work this out for itself — `writable` identifies *your*
+ * decks and nothing else identifies the maintainer's.
+ */
+export interface DeckTile extends DeckSummary {
+  showcase: boolean
 }
 
 export interface Card {
@@ -251,6 +311,10 @@ export interface Suggestions {
 
 export interface ImportResult {
   slug: string
+  /** Whose library it landed in — always the caller's. Sent back rather than
+   *  assumed, because the deck's URL needs it and guessing it here is guessing
+   *  which tier the server chose. */
+  owner: string
   name: string
   stage: string
   status: string
@@ -667,6 +731,8 @@ export interface DeleteResult {
 
 export interface CreateResult {
   slug: string
+  /** As `ImportResult.owner`: the caller's, and needed to link to the deck. */
+  owner: string
   name: string
   stage: string
   status: string
@@ -1010,12 +1076,16 @@ export interface TarotReading {
 
 export const api = {
   health: () => get<Health>('/api/health'),
-  decks: () => get<DeckSummary[]>('/api/decks'),
-  deck: (slug: string) => get<DeckDetail>(`/api/decks/${slug}`),
-  validate: (slug: string) => get<ValidationReport>(`/api/decks/${slug}/validate`),
-  stats: (slug: string) => get<DeckStats>(`/api/decks/${slug}/stats`),
-  suggestions: (slug: string) =>
-    get<Suggestions>(`/api/decks/${slug}/suggestions`),
+  // Every deck this caller may see, across every owner (ADR 22) — their own
+  // first, then the showcase, then everybody else's shared decks. The only
+  // place a client learns the owner segment it needs to build any other deck
+  // URL at all, which is why nothing here takes a bare slug any more.
+  decks: () => get<DeckTile[]>('/api/decks'),
+  deck: (ref: DeckRef) => get<DeckDetail>(deckPath(ref)),
+  validate: (ref: DeckRef) => get<ValidationReport>(deckPath(ref, '/validate')),
+  stats: (ref: DeckRef) => get<DeckStats>(deckPath(ref, '/stats')),
+  suggestions: (ref: DeckRef) =>
+    get<Suggestions>(deckPath(ref, '/suggestions')),
   upcomingSets: () => get<{ sets: UpcomingSet[]; as_of: string }>('/api/sets/upcoming'),
   searchCards: (params: Record<string, string | number>) => {
     const qs = new URLSearchParams()
@@ -1026,29 +1096,39 @@ export const api = {
       `/api/cards/search?${qs}`,
     )
   },
-  swapCard: (slug: string, body: { out: string; into: string; why: string }) =>
-    post<SwapResult>(`/api/decks/${slug}/swap`, body),
+  swapCard: (ref: DeckRef, body: { out: string; into: string; why: string }) =>
+    post<SwapResult>(deckPath(ref, '/swap'), body),
   addCard: (
-    slug: string,
+    ref: DeckRef,
     body: { name: string; category: string; why?: string; qty?: number; to?: string },
-  ) => post<EditResult>(`/api/decks/${slug}/cards`, body),
-  removeCard: (slug: string, name: string) =>
-    send<EditResult>('DELETE', `/api/decks/${slug}/cards/${encodeURIComponent(name)}`),
+  ) => post<EditResult>(deckPath(ref, '/cards'), body),
+  removeCard: (ref: DeckRef, name: string) =>
+    send<EditResult>('DELETE', deckPath(ref, `/cards/${encodeURIComponent(name)}`)),
   // One field at a time, matching the operation underneath. `why` goes through
   // here: it is the rationale editor's write path, and the value is whatever
   // the user typed — nothing composes, tidies or infers one.
-  setCardField: (slug: string, name: string, field: string, value: string | number) =>
-    send<EditResult>('PATCH', `/api/decks/${slug}/cards/${encodeURIComponent(name)}`,
+  setCardField: (ref: DeckRef, name: string, field: string, value: string | number) =>
+    send<EditResult>('PATCH', deckPath(ref, `/cards/${encodeURIComponent(name)}`),
       { field, value }),
-  setNote: (slug: string, key: string, value: string) =>
-    send<EditResult>('PUT', `/api/decks/${slug}/notes/${encodeURIComponent(key)}`,
+  setNote: (ref: DeckRef, key: string, value: string) =>
+    send<EditResult>('PUT', deckPath(ref, `/notes/${encodeURIComponent(key)}`),
       { value }),
   // The deck's own scalars. `stage: curated` is promotion, and the server
   // refuses it while any card is blank rather than writing a deck the gate
   // would immediately reject. `commander_art` goes through here too, and is
   // refused unless the id is a printing of *this* deck's commander.
-  setDeckField: (slug: string, field: string, value: string | number) =>
-    send<EditResult>('PATCH', `/api/decks/${slug}`, { field, value }),
+  setDeckField: (ref: DeckRef, field: string, value: string | number) =>
+    send<EditResult>('PATCH', deckPath(ref), { field, value }),
+  // Put a deck on display to other accounts, or take it off (ADR 22).
+  //
+  // Its own route rather than a `field` on `setDeckField`, because the two
+  // deck tiers hold this fact in different places — `deck.yaml` for the
+  // curated six, a column for everybody else — and the server's source is what
+  // knows which. Answers with the whole deck, because `shared` is the one deck
+  // field with no `EditResult` to report: it changes who can see the deck and
+  // nothing the gate has an opinion about.
+  setShared: (ref: DeckRef, shared: boolean) =>
+    send<DeckDetail>('PUT', deckPath(ref, '/shared'), { shared }),
   importDeck: (body: {
     slug: string
     text: string
@@ -1063,7 +1143,7 @@ export const api = {
   // so the first screen of the create flow renders on a fresh clone.
   // Separate from `deck()` on purpose: it runs several extra corpus queries
   // for a panel that is decorative, so the 99 must never wait on it.
-  commander: (slug: string) => get<CommanderDossier>(`/api/decks/${slug}/commander`),
+  commander: (ref: DeckRef) => get<CommanderDossier>(deckPath(ref, '/commander')),
   colors: () => get<ColorTaxonomy>('/api/colors'),
   challengeProgress: () => get<ChallengeProgress>('/api/colors/progress'),
   // One combination with its champions and signature cards resolved. Separate
@@ -1077,9 +1157,9 @@ export const api = {
   // typed — `bury`, or the slug itself — which a mis-aimed click cannot
   // satisfy. The deck moves to `.trash/` rather than being unlinked, and the
   // response says where.
-  deleteDeck: (slug: string, confirm: string) =>
+  deleteDeck: (ref: DeckRef, confirm: string) =>
     send<DeleteResult>('DELETE',
-      `/api/decks/${slug}?confirm=${encodeURIComponent(confirm)}`),
+      deckPath(ref, `?confirm=${encodeURIComponent(confirm)}`)),
   // Start a deck from a commander and nothing else. There is no colour field:
   // identity is derived from the commander, and a second source for it would
   // be a second thing to be wrong.
@@ -1093,7 +1173,10 @@ export const api = {
   }) => post<CreateResult>('/api/decks', body),
   // Installed, configured and wanted are three separate answers, and this is
   // the only place that knows all three. Reaches no network.
-  claudeStatus: (params: { slug?: string; stance?: string } = {}) => {
+  // `owner` rides alongside `slug` here because this route resolves a deck by
+  // name, exactly as the sim routes do — the slug is a parameter rather than a
+  // path segment, so nothing about the URL says whose deck it is (ADR 22).
+  claudeStatus: (params: { slug?: string; owner?: string; stance?: string } = {}) => {
     const qs = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v)
     return get<ClaudeStatus>(`/api/claude?${qs}`)
@@ -1101,24 +1184,24 @@ export const api = {
   // The rationale interview. A POST because it costs money and calls out, not
   // because it writes anything — it cannot, and there is no field in the
   // response for a rationale even if it wanted to hand one over.
-  interview: (slug: string, body: { card: string; stance?: string; focus?: string }) =>
-    post<InterviewReport>(`/api/decks/${slug}/interview`, body),
+  interview: (ref: DeckRef, body: { card: string; stance?: string; focus?: string }) =>
+    post<InterviewReport>(deckPath(ref, '/interview'), body),
   // The commander dossier, in two halves that are deliberately different verbs.
   // The GET is free and reads a stored row, so the deck page can ask on every
   // load; the POST spends money and reaches the network. One function with a
   // flag is how the free one ends up in a polling loop that is not free.
-  dossier: (slug: string) => get<DossierReport>(`/api/decks/${slug}/dossier`),
+  dossier: (ref: DeckRef) => get<DossierReport>(deckPath(ref, '/dossier')),
   // Returns a **job**, not a dossier. Measured at 236 seconds on the deployed
   // instance — longer than the theme proposal below, which has been a job
   // since #60 — and what a four-minute POST looks like on a phone is a spinner
   // and then `Load failed`, a transport error carrying no status code to show.
   // Follow it with `followJob` and read `job.result` as a `DossierReport`.
   // A stored dossier comes back already `done`, so a hit still costs nothing.
-  writeDossier: (slug: string, body: { stance?: string; refresh?: boolean } = {}) =>
-    post<Job>(`/api/decks/${slug}/dossier`, body),
+  writeDossier: (ref: DeckRef, body: { stance?: string; refresh?: boolean } = {}) =>
+    post<Job>(deckPath(ref, '/dossier'), body),
   // Every non-digital printing of the commander, newest first. Its own call
   // because most visits never open the picker and Goreclaw has twelve.
-  printings: (slug: string) => get<PrintingList>(`/api/decks/${slug}/printings`),
+  printings: (ref: DeckRef) => get<PrintingList>(deckPath(ref, '/printings')),
   // The theme interview (ADR 20). Note there is no slug in either path: this
   // runs before a deck exists and never sees one, which is what makes "it
   // builds, it does not critique" structural rather than a request. The whole
@@ -1221,6 +1304,10 @@ export const api = {
   deleteAccount: (username: string, confirm: string) =>
     send<{ username: string; revoked: number; jobs_dropped: number }>(
       'DELETE', `/api/admin/users/${encodeURIComponent(username)}`, { confirm }),
+  // Both take their deck in the **payload** rather than the path, so `owner`
+  // goes in the payload too (ADR 22) — a bare slug would reach a deck by name
+  // with nobody asked whose it is. Absent, the server reads it as the caller's
+  // own library, which is what an old bookmark's `?deck=` amounts to.
   simMana: (payload: Record<string, unknown>) => post<Job>('/api/sim/mana', payload),
   simLands: (payload: Record<string, unknown>) => post<Job>('/api/sim/lands', payload),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),

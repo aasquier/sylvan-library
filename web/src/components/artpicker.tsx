@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, errorMessage, type Printing } from '../lib/api'
+import { api, errorMessage, type DeckRef, type Printing } from '../lib/api'
 import { Spinner } from './ui'
 
 /**
@@ -18,8 +18,8 @@ import { Spinner } from './ui'
  * Fetched when opened rather than with the deck: Goreclaw has twelve
  * printings and most visits never open this.
  */
-export function ArtPicker({ slug, onPicked }: {
-  slug: string
+export function ArtPicker({ deck, onPicked }: {
+  deck: DeckRef
   onPicked: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -31,7 +31,7 @@ export function ArtPicker({ slug, onPicked }: {
   useEffect(() => {
     if (!open || printings) return
     let live = true
-    api.printings(slug)
+    api.printings(deck)
       .then((list) => {
         if (!live) return
         setPrintings(list.printings)
@@ -39,7 +39,7 @@ export function ArtPicker({ slug, onPicked }: {
       })
       .catch((err) => { if (live) setError(errorMessage(err)) })
     return () => { live = false }
-  }, [open, printings, slug])
+  }, [open, printings, deck])
 
   async function pick(id: string) {
     // Picking the one already showing clears the choice instead of rewriting
@@ -49,7 +49,7 @@ export function ArtPicker({ slug, onPicked }: {
     setSaving(id)
     setError(null)
     try {
-      await api.setDeckField(slug, 'commander_art', next)
+      await api.setDeckField(deck, 'commander_art', next)
       setSelected(next)
       onPicked()
     } catch (err) {

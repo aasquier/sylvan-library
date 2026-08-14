@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, errorMessage, type ImportResult } from '../lib/api'
+import { api, deckUrl, errorMessage, type ImportResult } from '../lib/api'
 import { Badge, ErrorNote, ManaText, Spinner, TextField } from '../components/ui'
 
 /**
@@ -64,7 +64,10 @@ export default function Import() {
     try {
       const result = await api.importDeck(body(dryRun))
       setPreview(result)
-      if (result.created) navigate(`/decks/${result.slug}`)
+      // `result.owner` rather than an assumption about whose library it
+      // landed in: the server chooses the tier, and the deck's address
+      // needs the owner segment (ADR 22).
+      if (result.created) navigate(deckUrl(result))
     } catch (e) {
       setError(errorMessage(e))
       if (!dryRun) setPreview(null)

@@ -36,6 +36,7 @@ vi.mock('../lib/api', async () => ({
     deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
     swapCard: vi.fn(), addCard: vi.fn(), removeCard: vi.fn(),
     setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),
+    setShared: vi.fn(),
     claudeStatus: vi.fn(), interview: vi.fn(), commander: vi.fn(),
     dossier: vi.fn(), writeDossier: vi.fn(), printings: vi.fn(),
     job: vi.fn(),
@@ -60,6 +61,11 @@ const job = (result: unknown, status: 'queued' | 'done' = 'done') => ({
 
 const DECK = {
   slug: 'goreclaw-stompy',
+  // The curated six are the maintainer's and shared by default (ADR 22) —
+  // they are the showcase, and an instance whose showcase nobody could see
+  // would be an instance with nothing on it.
+  owner: 'aasquier',
+  shared: true,
   name: 'Goreclaw — Mono-Green Stompy',
   // The owner's view. Every editing test below describes what the maintainer
   // sees; `READ_ONLY_DECK` is the other half.
@@ -150,11 +156,20 @@ const DRAFT = {
   ],
 } as unknown as Deck
 
+/** The deck's address (ADR 22). Every call this page makes is aimed at one of
+ *  these rather than a bare slug, because a slug is unique per owner now and
+ *  identifies nothing on its own. */
+const REF = { owner: 'aasquier', slug: 'goreclaw-stompy' }
+
+/** Where the dossier panel parks a run id. Owner-qualified for the same
+ *  reason: two people's `goreclaw-stompy` are two decks and two runs. */
+const JOB_KEY = 'mtglab-dossier-job:aasquier/goreclaw-stompy'
+
 function renderDeck() {
   return render(
-    <MemoryRouter initialEntries={['/decks/goreclaw-stompy']}>
+    <MemoryRouter initialEntries={['/decks/aasquier/goreclaw-stompy']}>
       <Routes>
-        <Route path="/decks/:slug" element={<DeckDetail />} />
+        <Route path="/decks/:owner/:slug" element={<DeckDetail />} />
       </Routes>
     </MemoryRouter>,
   )
@@ -280,6 +295,10 @@ beforeEach(() => {
                     api.setDeckField]) {
     vi.mocked(fn).mockReset().mockResolvedValue(EDIT_RESULT)
   }
+  // Answers with the whole deck rather than an `EditResult`: `shared` changes
+  // who can see the deck and nothing the gate has an opinion about.
+  vi.mocked(api.setShared).mockReset()
+    .mockResolvedValue(DECK as unknown as Deck)
   // Installed and configured by default, so the interview panel renders its
   // button rather than its "not installed" note in most tests.
   vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(CLAUDE_STATUS)
@@ -310,7 +329,7 @@ describe('DeckDetail validation tab', () => {
     expect(api.suggestions).not.toHaveBeenCalled()
 
     openValidation()
-    await waitFor(() => expect(api.suggestions).toHaveBeenCalledWith('goreclaw-stompy'))
+    await waitFor(() => expect(api.suggestions).toHaveBeenCalledWith(REF))
   })
 
   it('fetches the shortlist once, not on every tab switch', async () => {
@@ -387,7 +406,7 @@ describe('DeckDetail validation tab', () => {
                      { target: { value: 'It ramps and it attacks.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Apply swap' }))
 
-    await waitFor(() => expect(api.swapCard).toHaveBeenCalledWith('goreclaw-stompy', {
+    await waitFor(() => expect(api.swapCard).toHaveBeenCalledWith(REF, {
       out: 'Primeval Titan',
       into: 'Cultivator Colossus',
       why: 'It ramps and it attacks.',
@@ -504,7 +523,7 @@ describe('DeckDetail rationale editor', () => {
     fireEvent.click(within(row).getByRole('button', { name: /save rationale/i }))
 
     await waitFor(() => expect(api.setCardField).toHaveBeenCalledWith(
-      'goreclaw-stompy', 'Sol Ring', 'why', 'Two mana for one.'))
+      REF, 'Sol Ring', 'why', 'Two mana for one.'))
   })
 
   it('loads an existing rationale for editing rather than starting blank', async () => {
@@ -532,7 +551,7 @@ describe('DeckDetail rationale editor', () => {
     fireEvent.click(await within(row).findByRole(
       'button', { name: /ask for questions/i }))
     await waitFor(() => expect(api.interview).toHaveBeenCalledWith(
-      'goreclaw-stompy', { card: 'Sol Ring' }))
+      REF, { card: 'Sol Ring' }))
   })
 
   it('renders the questions beside the box and puts nothing in it', async () => {
@@ -661,7 +680,7 @@ describe('DeckDetail rationale editor', () => {
     fireEvent.click(within(row).getByRole('button', { name: 'Remove' }))
 
     await waitFor(() => expect(api.removeCard)
-      .toHaveBeenCalledWith('goreclaw-stompy', 'Primeval Titan'))
+      .toHaveBeenCalledWith(REF, 'Primeval Titan'))
     await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2))
   })
 
@@ -703,7 +722,7 @@ describe('DeckDetail promotion', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /promote to curated/i }))
     await waitFor(() => expect(api.setDeckField)
-      .toHaveBeenCalledWith('goreclaw-stompy', 'stage', 'curated'))
+      .toHaveBeenCalledWith(REF, 'stage', 'curated'))
     // And the page re-reads, so the banner goes away on its own.
     await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2))
   })
@@ -927,7 +946,7 @@ describe('DeckDetail commander dossier', () => {
     // server's cache with nothing left pointing at it.
     const seen: { at: string | null } = { at: null }
     vi.mocked(followJob).mockImplementation(() => {
-      seen.at = localStorage.getItem('mtglab-dossier-job:goreclaw-stompy')
+      seen.at = localStorage.getItem(JOB_KEY)
       return { promise: Promise.resolve(job(WRITTEN_DOSSIER)), cancel: () => {} }
     })
 
@@ -940,14 +959,14 @@ describe('DeckDetail commander dossier', () => {
     // And gone once it landed, so a later visit does not chase a run that has
     // already finished and been evicted.
     await waitFor(() => expect(
-      localStorage.getItem('mtglab-dossier-job:goreclaw-stompy')).toBeNull())
+      localStorage.getItem(JOB_KEY)).toBeNull())
   })
 
   it('reattaches to a run already in flight rather than paying twice', async () => {
     // The reattach path: this tab is a reload, arriving with the id in storage
     // and no memory of having asked. It must follow that run and must not
     // submit a second one.
-    localStorage.setItem('mtglab-dossier-job:goreclaw-stompy', 'job-dossier')
+    localStorage.setItem(JOB_KEY, 'job-dossier')
 
     renderDeck()
     // No click anywhere: it finds the id on mount, follows it, and opens
@@ -1012,7 +1031,7 @@ describe('DeckDetail art picker', () => {
     fireEvent.click(await screen.findByTitle(/Bloomburrow Commander/))
     await waitFor(() => {
       expect(vi.mocked(api.setDeckField)).toHaveBeenCalledWith(
-        'goreclaw-stompy', 'commander_art', 'p-blc')
+        REF, 'commander_art', 'p-blc')
     })
   })
 
@@ -1030,7 +1049,7 @@ describe('DeckDetail art picker', () => {
     fireEvent.click(await screen.findByTitle(/Bloomburrow Commander/))
     await waitFor(() => {
       expect(vi.mocked(api.setDeckField)).toHaveBeenCalledWith(
-        'goreclaw-stompy', 'commander_art', '')
+        REF, 'commander_art', '')
     })
   })
 
@@ -1085,7 +1104,7 @@ describe('DeckDetail rationale interview discoverability', () => {
       .getByRole('button', { name: /ask claude/i }))
 
     await waitFor(() => expect(api.interview).toHaveBeenCalledWith(
-      'goreclaw-stompy', { card: 'Primeval Titan' }))
+      REF, { card: 'Primeval Titan' }))
   })
 
   it('still opens the editor without spending anything', async () => {
@@ -1182,5 +1201,79 @@ describe('DeckDetail for a reader', () => {
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     openValidation()
     expect(screen.queryByText('Use this card')).toBeNull()
+  })
+})
+
+/**
+ * Sharing, and what the page says about whose deck this is (ADR 22).
+ *
+ * The toggle is the only control in the app that changes who can see
+ * something, and it is the only way a deck in the SQL tier ever becomes
+ * visible to anybody — those are created private, so without this the browse
+ * tab is permanently empty and the sharing half of ADR 22 is unreachable.
+ */
+describe('DeckDetail sharing', () => {
+  it('offers to share a private deck, and says who can see it now', async () => {
+    vi.mocked(api.deck).mockResolvedValue(
+      { ...DECK, shared: false } as unknown as Deck)
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(screen.getByRole('button', { name: 'Share this deck' })).toBeTruthy()
+    expect(screen.getByText('Only you can see it.')).toBeTruthy()
+  })
+
+  it('offers to take a shared deck back, and says who can see it now', async () => {
+    // The label is what the click will *do*, not what the deck currently is —
+    // a button labelled with a state is the one people press expecting to
+    // select it.
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(screen.getByRole('button', { name: 'Make private' })).toBeTruthy()
+    expect(screen.getByText('Anyone signed in here can read it.')).toBeTruthy()
+  })
+
+  it('sends the opposite of what the deck is, at the deck\'s own address', async () => {
+    vi.mocked(api.deck).mockResolvedValue(
+      { ...DECK, shared: false } as unknown as Deck)
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    fireEvent.click(screen.getByRole('button', { name: 'Share this deck' }))
+    await waitFor(() => expect(api.setShared).toHaveBeenCalledWith(REF, true))
+    // And re-reads, so the label and the sentence under it both move.
+    await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2))
+  })
+
+  it('reports a refusal rather than looking as though it worked', async () => {
+    vi.mocked(api.setShared).mockRejectedValue(
+      new Error('goreclaw-stompy is not yours to change'))
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    fireEvent.click(screen.getByRole('button', { name: 'Make private' }))
+    expect(await screen.findByText(/not yours to change/)).toBeTruthy()
+  })
+
+  it('is absent for a reader, who is told whose deck this is instead', async () => {
+    vi.mocked(api.deck).mockResolvedValue(
+      { ...DECK, writable: false } as unknown as Deck)
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(screen.queryByRole('button', { name: /share this deck|make private/i }))
+      .toBeNull()
+    expect(screen.getByText(/you can read this deck, not change it/i)).toBeTruthy()
+    expect(screen.getByText('aasquier')).toBeTruthy()
+  })
+
+  it('says nothing about ownership on your own deck', async () => {
+    // It would be a line telling you your own username.
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(screen.queryByText(/you can read this deck, not change it/i)).toBeNull()
+  })
+
+  it('links the simulator at the deck, owner and all', async () => {
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(screen.getByText('Simulate this deck').getAttribute('href'))
+      .toBe('/simulate?owner=aasquier&deck=goreclaw-stompy')
   })
 })

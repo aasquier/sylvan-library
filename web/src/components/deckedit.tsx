@@ -17,7 +17,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  api, type Card, type ClaudeStatus, type EditResult, type InterviewReport,
+  api, type Card, type ClaudeStatus, type DeckRef, type EditResult,
+  type InterviewReport,
 } from '../lib/api'
 import { CATEGORY_LABELS, categoryLabel } from '../lib/mtg'
 import { ErrorNote, ManaText, Select } from '../components/ui'
@@ -65,8 +66,8 @@ function QuietButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButto
  * their key is missing when they simply have not installed the extra:
  * not installed, not configured, and nothing asked yet.
  */
-function InterviewPanel({ slug, card, askNow = false }: {
-  slug: string
+function InterviewPanel({ deck, card, askNow = false }: {
+  deck: DeckRef
   card: string
   /** Opened from a control that already said "ask Claude", so asking again
    *  here would be a second click for a decision already made. */
@@ -81,11 +82,13 @@ function InterviewPanel({ slug, card, askNow = false }: {
   // the environment has and what the dial says.
   useEffect(() => {
     let live = true
-    api.claudeStatus({ slug })
+    // `owner` too: this route takes its deck as a query parameter rather
+    // than a path segment, so the URL alone does not say whose it is.
+    api.claudeStatus({ slug: deck.slug, owner: deck.owner })
       .then((s) => { if (live) setStatus(s) })
       .catch(() => { if (live) setStatus(null) })
     return () => { live = false }
-  }, [slug])
+  }, [deck])
 
   // A new card is a new interview. Without this the questions about the last
   // card linger beside the next one's empty box, which is the most misleading
@@ -99,13 +102,13 @@ function InterviewPanel({ slug, card, askNow = false }: {
       // No stance sent: the server resolves the deck's own default from its
       // `status` and clamps it to the deployment ceiling. What actually
       // applied comes back in the report and is shown below.
-      setReport(await api.interview(slug, { card }))
+      setReport(await api.interview(deck, { card }))
     } catch (e) {
       setError(String((e as Error).message ?? e))
     } finally {
       setBusy(false)
     }
-  }, [slug, card])
+  }, [deck, card])
 
   // Opened by somebody who clicked "Ask Claude" on the card itself. Firing
   // once per card rather than once per mount: the guard is the card name, so
@@ -207,9 +210,9 @@ function InterviewPanel({ slug, card, askNow = false }: {
  * between that and a generate button is one keystroke.
  */
 export function RationaleEditor({
-  slug, card, onSave, onCancel, askNow = false,
+  deck, card, onSave, onCancel, askNow = false,
 }: {
-  slug: string
+  deck: DeckRef
   card: Card
   onSave: (why: string) => Promise<void>
   onCancel: () => void
@@ -288,15 +291,15 @@ export function RationaleEditor({
           : <p style={{ color: 'var(--text-muted)' }}>
               No corpus text for this card.
             </p>}
-        <InterviewPanel slug={slug} card={card.name} askNow={askNow} />
+        <InterviewPanel deck={deck} card={card.name} askNow={askNow} />
       </aside>
     </div>
   )
 }
 
 /** Add a card to the 99 or the swap board. */
-export function AddCardForm({ slug, stage, onDone }: {
-  slug: string
+export function AddCardForm({ deck, stage, onDone }: {
+  deck: DeckRef
   stage: string
   onDone: (result: EditResult) => void
 }) {
@@ -317,7 +320,7 @@ export function AddCardForm({ slug, stage, onDone }: {
     setBusy(true)
     setError(null)
     try {
-      const result = await api.addCard(slug, {
+      const result = await api.addCard(deck, {
         name: name.trim(), category, why: why.trim(), qty, to,
       })
       onDone(result)
@@ -397,8 +400,8 @@ export function AddCardForm({ slug, stage, onDone }: {
 }
 
 /** Edit the deck-level prose the advanced primer reads directly. */
-export function NoteEditor({ slug, noteKey, value, onDone, writable = true }: {
-  slug: string
+export function NoteEditor({ deck, noteKey, value, onDone, writable = true }: {
+  deck: DeckRef
   noteKey: string
   value: string
   onDone: (result: EditResult) => void
@@ -418,7 +421,7 @@ export function NoteEditor({ slug, noteKey, value, onDone, writable = true }: {
     setBusy(true)
     setError(null)
     try {
-      onDone(await api.setNote(slug, noteKey, text.trim()))
+      onDone(await api.setNote(deck, noteKey, text.trim()))
       setEditing(false)
     } catch (e) {
       setError(String((e as Error).message ?? e))
@@ -461,8 +464,8 @@ export function NoteEditor({ slug, noteKey, value, onDone, writable = true }: {
 }
 
 /** Start a note the deck does not have yet. */
-export function AddNoteForm({ slug, existing, onDone }: {
-  slug: string
+export function AddNoteForm({ deck, existing, onDone }: {
+  deck: DeckRef
   existing: string[]
   onDone: (result: EditResult) => void
 }) {
@@ -478,7 +481,7 @@ export function AddNoteForm({ slug, existing, onDone }: {
     setBusy(true)
     setError(null)
     try {
-      onDone(await api.setNote(slug, key.trim(), text.trim()))
+      onDone(await api.setNote(deck, key.trim(), text.trim()))
       setKey('')
       setText('')
       setOpen(false)

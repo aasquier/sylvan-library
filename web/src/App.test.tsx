@@ -181,6 +181,21 @@ describe('with auth on and somebody signed in', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
   })
 
+  it('offers the authoring doors to somebody who is not an admin', async () => {
+    // They were gated on `is_admin` because there was one library and it was
+    // the maintainer's, so a deck started by anybody else had nowhere to go.
+    // Every account has its own library now (ADR 22) and the gate is gone —
+    // not moved somewhere better, gone, which is what it said it would do.
+    renderApp()
+    await screen.findByText('Card search')
+
+    expect(screen.getByText('Start a deck')).toBeTruthy()
+    expect(screen.getByText('Import')).toBeTruthy()
+    // Accounts is a different question and still an admin's. ADR 17's prefix
+    // rule refuses `/api/admin` to everybody else before routing.
+    expect(screen.queryByText('Accounts')).toBeNull()
+  })
+
   it('signs out to the login screen', async () => {
     renderApp()
     await screen.findByRole('button', { name: 'Sign out' })
