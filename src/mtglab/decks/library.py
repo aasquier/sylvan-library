@@ -83,7 +83,19 @@ class Library:
         configured silently serves an empty library: nobody would own the
         showcase, so nobody could see it. Writability then falls back to
         `is_admin`, which is exactly what #80 did before owners existed.
+
+        **With auth off it is `local` regardless**, and that was a bug before
+        it was a rule. `.env` sets `MTGLAB_ADMIN_EMAIL` on the maintainer's own
+        laptop, where `mtglab ui` runs with auth *off* — so this returned
+        `gyome` while `my_owner` returned `local`, the two were different keys,
+        and `visible()` added the one file-backed library twice. The shelf
+        showed every curated deck twice and half the tiles linked to
+        `/decks/local/<slug>`, which 404ed. A maintainer account is a fact
+        about a deployment that has accounts; a laptop has none, and one person
+        holding the file the app reads is the whole of what that scope means.
         """
+        if not self._authenticated:
+            return LOCAL_OWNER
         return self._maintainer or LOCAL_OWNER
 
     # ---- resolving -------------------------------------------------------
@@ -108,14 +120,24 @@ class Library:
         exists to prevent. One answer for "no such person" and "nothing of
         theirs for you": 404.
         """
+        # **Auth off: one person, one library, filed under `local`.** Nothing
+        # else exists to be asked about, and asking would fall through to
+        # `_owner_id` below — which opens `app.db`, and on a laptop that means
+        # *creating* it. `visible()` states the same rule for the same reason;
+        # this is the per-deck path, which a typed URL reaches directly.
+        if not self._authenticated:
+            if owner.casefold() == LOCAL_OWNER:
+                return FileDeckSource(writable=True)
+            raise DeckNotFound(owner)
+
         mine = self._is_me(owner)
 
         # The file tier, under whichever segment owns it here.
         if owner.casefold() == self._file_owner.casefold():
             # Writable by its owner; by an admin when no maintainer is
             # configured and the six are therefore nobody's in particular.
-            if mine or not self._authenticated or (
-                    self._maintainer is None and self._is_admin):
+            # (The auth-off case returned above, so it is not tested here.)
+            if mine or (self._maintainer is None and self._is_admin):
                 return FileDeckSource(writable=True)
             return _SharedOnly(FileDeckSource(writable=False))
 
@@ -187,6 +209,13 @@ class Library:
         # them shared by default. `_file_owner` falls back to `local`, so an
         # instance with no maintainer configured still shows its library
         # rather than an empty shelf.
+        #
+        # `add` dedupes on the owner key, which is what makes this a no-op
+        # when the six are already the caller's: the maintainer's own shelf,
+        # and the laptop, where both names are `local`. That dedupe was doing
+        # nothing on a laptop until `_file_owner` learned about auth being off
+        # — the six were added twice under two names, and the second name had
+        # no working per-deck route behind it.
         add(self._file_owner, self.source_for(self._file_owner))
 
         # **Nothing below this line may run with auth off.** There are no

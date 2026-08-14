@@ -386,3 +386,80 @@ def test_a_private_deck_is_absent_from_somebody_else_s_shelf(instance, corpus):
     assert tiles["theirs"]["owner"] == "guest"
     assert tiles["theirs"]["writable"] is False
     assert tiles["theirs"]["showcase"] is False
+
+
+# ------------------------ a laptop, with a maintainer address in the .env
+
+def test_a_laptop_with_an_admin_address_still_has_exactly_one_library(
+        tmp_path, monkeypatch):
+    """`MTGLAB_ADMIN_EMAIL` set and auth **off** — the maintainer's own laptop.
+
+    This is the configuration every test had, and no test had. `.env` sets the
+    address on the machine where `mtglab ui` runs with auth off, and the two
+    halves of `Library` disagreed about what that meant: `my_owner` answered
+    `local` because nobody is signed in, `_file_owner` answered the maintainer's
+    username because the variable is set, and `visible()` added the one
+    file-backed library under both names. The shelf showed all six curated decks
+    **twice**, and the tiles filed under `local` linked to a route that 404ed,
+    because `source_for("local")` fell through to the SQL tier and found no such
+    account.
+
+    Every existing test missed it from one side or the other: the auth-off
+    fixtures `monkeypatch.delenv` the address precisely so they do not create an
+    `app.db`, and every fixture that sets it also turns auth on.
+
+    Found by loading the page, which is the fourth time that has been the only
+    way to see something.
+    """
+    monkeypatch.setenv("MTGLAB_ADMIN_EMAIL", "maintainer@example.com")
+    monkeypatch.setenv("MTGLAB_ADMIN_USERNAME", "gyome")
+    jobs.clear()
+    decks_dir = tmp_path / "decks"
+    (decks_dir / "mini").mkdir(parents=True)
+    (decks_dir / "mini" / "deck.yaml").write_text(DECK_YAML, encoding="utf-8")
+
+    with config.use_paths(data_dir=tmp_path / "data", decks_dir=decks_dir), \
+            TestClient(create_app()) as client:
+        tiles = client.get("/api/decks").json()
+        assert [d["slug"] for d in tiles] == ["mini"], "one deck, listed once"
+        assert tiles[0]["owner"] == "local"
+        assert tiles[0]["writable"] is True
+        assert tiles[0]["showcase"] is True
+
+        # And the address on the tile is the one that works. The shelf's own
+        # link 404ing is what this looked like on the page.
+        assert client.get("/api/decks/local/mini").status_code == 200
+        assert client.get("/api/decks/gyome/mini").status_code == 404
+
+        # A stray owner segment is a 404 rather than a lookup that enumerates.
+        assert client.get("/api/decks/nobody/mini").status_code == 404
+
+    # No assertion about `app.db` here, deliberately: `auth/bootstrap.py`
+    # reconciles the maintainer account at every start of the app whenever
+    # `MTGLAB_ADMIN_EMAIL` is set, so the file exists in this configuration by
+    # design. The test below is the one that can see the difference.
+
+
+def test_a_bare_laptop_acquires_no_database_from_a_typed_deck_url(tmp_path,
+                                                                  monkeypatch):
+    """Nothing set, auth off, and somebody types an owner segment.
+
+    `test_the_local_app_touches_no_database` pins the *listing*, and
+    `Library.visible()` carries a paragraph about why it must not reach
+    `shared_decks()`. The per-deck path had no such guard and a URL reaches it
+    directly: `source_for("nobody")` fell through to a user lookup, which opens
+    `app.db` -- and on a laptop, opening it creates it. A single mistyped
+    address would leave a database behind for a feature this run does not use.
+    """
+    monkeypatch.delenv("MTGLAB_ADMIN_EMAIL", raising=False)
+    jobs.clear()
+    decks_dir = tmp_path / "decks"
+    (decks_dir / "mini").mkdir(parents=True)
+    (decks_dir / "mini" / "deck.yaml").write_text(DECK_YAML, encoding="utf-8")
+
+    with config.use_paths(data_dir=tmp_path / "data", decks_dir=decks_dir), \
+            TestClient(create_app()) as client:
+        assert client.get("/api/decks/nobody/mini").status_code == 404
+        assert client.get("/api/decks/local/mini").status_code == 200
+
+    assert not (tmp_path / "data" / "app.db").exists()
