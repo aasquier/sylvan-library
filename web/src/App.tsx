@@ -246,10 +246,10 @@ export default function App() {
           <div className="ml-auto flex items-center gap-3">
             {health && (
               <span className="hidden text-xs sm:inline"
-                    style={{ color: health.corpus ? 'var(--text-muted)' : 'var(--status-warning)' }}>
-                {health.corpus
+                    style={{ color: health.pool ? 'var(--text-muted)' : 'var(--status-warning)' }}>
+                {health.pool
                   ? `${health.oracle_cards.toLocaleString()} cards`
-                  : 'no corpus'}
+                  : 'no card pool'}
               </span>
             )}
             {signedIn && (

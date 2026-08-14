@@ -1,6 +1,6 @@
 """The 32 colour combinations, and what each one means.
 
-Reference data, not corpus data. Every other module here refuses to know
+Reference data, not pool data. Every other module here refuses to know
 anything about a card that Scryfall did not say; this one is deliberately the
 opposite -- it is the vocabulary a new player does not have yet, and no amount
 of card data teaches it. `CLAUDE.md` rule 5 is about card corpora and
@@ -12,7 +12,7 @@ the 32 Deck Challenge, which is why goal 8 in ROADMAP treats the challenge and
 the colour diagrams as one dataset rather than two features: a deck's slot in
 the challenge is `Combination.of(deck.color_identity)`.
 
-**Every mapping here was verified against the corpus**, not recalled -- the
+**Every mapping here was verified against the pool**, not recalled -- the
 guild, shard and wedge charms, the Nephilim, and the Commander 2016 commanders
 are all real cards whose `color_identity` Scryfall reports, so the table below
 is checkable rather than asserted. Rule 1 is about cards; this is the same
@@ -21,7 +21,7 @@ habit applied to something that is not one.
 **The depth is checked in rather than generated, and that was a decision.**
 The obvious alternative was a Claude surface: a guild is exactly the sort of
 thing ADR 19's dossier already answers well. Four things argued the other way.
-`/api/colors` is the one page in the app that works with no corpus and no
+`/api/colors` is the one page in the app that works with no card pool and no
 network, which a model call would spend. The set is finite -- ten guilds, five
 shards, five wedges, written once, ever -- so a per-view call pays repeatedly
 for content with no variance in it. ADR 20 already classed this module as a
@@ -31,7 +31,7 @@ prose was bland; bland is fixed by editing, and only checked-in text can be
 edited. What Claude answers is the unbounded per-deck question about a
 *commander*, which is ADR 19 and stays there.
 
-**Card facts inside that prose still come from the corpus.** `champions` and
+**Card facts inside that prose still come from the pool.** `champions` and
 `signature` hold *names*; the page resolves them through `get_cards` and shows
 the real card. `signature` carries no prose at all, so there is no sentence in
 it for a card fact to be wrong in -- what it asserts is a checkable property,
@@ -169,10 +169,10 @@ class Champion:
     `role` is the one thing the card cannot say about itself -- who this is in
     the story. It is deliberately the only editorial sentence attached to a
     card anywhere in this module, and it stops at the character: what the card
-    *does* comes from the corpus, next to the sentence, so a note that drifted
+    *does* comes from the pool, next to the sentence, so a note that drifted
     from the card is visible rather than authoritative.
 
-    `card` is a real card name and is checked against the corpus, twice. Its
+    `card` is a real card name and is checked against the pool, twice. Its
     colour identity must be a *subset* of the combination rather than equal to
     it -- Alesha is a Mardu warrior on a {2}{R} card whose {W/B} hybrids make
     her identity Mardu, and the khans are exact, but a faction is a story and
@@ -209,7 +209,7 @@ class Combination:
     #: Cards whose colour identity is **exactly** this combination.
     #:
     #: Names only, and that is the point. The page renders the real card next
-    #: to the name -- cost, type, oracle text, art, all from the corpus -- so
+    #: to the name -- cost, type, oracle text, art, all from the pool -- so
     #: there is no sentence here for a card fact to be wrong in. What the list
     #: asserts is a checkable property rather than an opinion: these cards can
     #: exist in this combination and in no smaller one, which is the most

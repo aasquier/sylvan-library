@@ -1,6 +1,6 @@
 """Read a decklist the way people actually paste one.
 
-Pure text in, structured lines out. No corpus, no filesystem, no judgement
+Pure text in, structured lines out. No card pool, no filesystem, no judgement
 about whether a card is real -- that is `importer.py`'s job, and keeping the
 two apart is what lets the grammar be tested exhaustively without a database.
 
@@ -26,12 +26,12 @@ people use actually emit:
 disambiguate, and it never silently drops a line it could not read. Lines it
 cannot turn into a name land in `unreadable` with their line number, so the
 importer can report them. Everything it *can* read is handed on verbatim to be
-resolved against the corpus, which is the only thing entitled to say whether a
+resolved against the pool, which is the only thing entitled to say whether a
 name is a card (rule 1).
 
 The one ambiguity that cannot be resolved here: a bare `3 Steps Ahead` is
 either three copies of "Steps Ahead" or one copy of the blue instant. Without a
-corpus both readings are equally good, so the leading-number reading wins --
+pool both readings are equally good, so the leading-number reading wins --
 and the resulting unknown name gets reported rather than guessed at. Writing
 the quantity, as every real export does, removes the ambiguity.
 """
@@ -67,7 +67,7 @@ _SECTION_WORDS = {
 
 # TappedOut and Deckstats group the deck under card-type headings. They are
 # still deck cards, so they all map to the same section -- and note that a
-# `Lands` heading does NOT set the land category. That comes from the corpus's
+# `Lands` heading does NOT set the land category. That comes from the pool's
 # `is_land`, which is right about the double-faced cards a heading is wrong
 # about.
 _SECTION_WORDS.update({

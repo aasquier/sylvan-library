@@ -1,7 +1,7 @@
 """Tool schemas and dispatch, with no model and no network involved.
 
 Every test here runs against a `MemoryDeckSource` and tolerates a missing
-corpus, the same way `test_api.py` does -- a fresh clone has no
+pool, the same way `test_api.py` does -- a fresh clone has no
 `data/mtg.duckdb` until `data refresh` runs, and a tool layer that only works
 on a fully-populated machine is one nobody can test on CI.
 
@@ -18,11 +18,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-import tiny_corpus  # noqa: E402
-from mtglab import config  # noqa: E402
-from mtglab.claude import client, tools  # noqa: E402
-from mtglab.decks.model import Deck  # noqa: E402
-from mtglab.decks.source import MemoryDeckSource  # noqa: E402
+import tiny_pool
+from mtglab import config
+from mtglab.claude import client, tools
+from mtglab.decks.model import Deck
+from mtglab.decks.source import MemoryDeckSource
 
 DECK_YAML = """\
 slug: mini
@@ -156,35 +156,35 @@ def test_suggest_replacements_runs(source):
 
 
 def test_search_cards_runs_without_a_deck_source():
-    """The corpus tools take no source -- they are not deck-facing. Tolerates a
-    missing corpus, which is what a fresh clone has."""
+    """The pool tools take no source -- they are not deck-facing. Tolerates a
+    missing pool, which is what a fresh clone has."""
     result = tools.run("search_cards", {"q": "Sol Ring", "limit": 1})
     assert "cards" in result
 
 
 @pytest.fixture
-def corpus(tmp_path):
-    """The corpus these tools are the whole point of consulting.
+def pool(tmp_path):
+    """The pool these tools are the whole point of consulting.
 
-    These used to call a `requires_corpus()` helper that skipped when
+    These used to call a `requires_pool()` helper that skipped when
     `data/mtg.duckdb` was missing -- which is every CI run, so the tool
     layer that exists specifically to keep card facts out of a model's
     recall was itself never exercised by a pull request.
     """
     with config.use_paths(data_dir=tmp_path / "data"):
-        yield tiny_corpus.build(config.DB_PATH)
+        yield tiny_pool.build(config.DB_PATH)
 
 
-def test_get_cards_looks_a_card_up_by_name(corpus):
+def test_get_cards_looks_a_card_up_by_name(pool):
     result = tools.run("get_cards", {"names": ["sol ring"]})
     card = result["cards"][0]
-    # The corpus's spelling comes back, not the caller's.
+    # The pool's spelling comes back, not the caller's.
     assert card["name"] == "Sol Ring"
     assert card["asked_as"] == "sol ring"
     assert "Add {C}{C}" in card["oracle_text"]
 
 
-def test_a_banned_card_can_be_looked_up_and_says_it_is_banned(corpus):
+def test_a_banned_card_can_be_looked_up_and_says_it_is_banned(pool):
     """The hole this tool exists to close.
 
     `search_cards` filters to Commander-legal, so the two cards the library
@@ -205,7 +205,7 @@ def test_a_banned_card_can_be_looked_up_and_says_it_is_banned(corpus):
         assert not any(c["name"] == name for c in found["cards"])
 
 
-def test_a_name_that_does_not_resolve_is_reported_not_dropped(corpus):
+def test_a_name_that_does_not_resolve_is_reported_not_dropped(pool):
     """Silence is the dangerous answer. A lookup that returns one card for two
     names is how a confident claim gets made about the second."""
     result = tools.run("get_cards",
@@ -214,18 +214,18 @@ def test_a_name_that_does_not_resolve_is_reported_not_dropped(corpus):
     assert result["not_found"] == ["Sol Ringg, Destroyer of Typos"]
 
 
-def test_colour_identity_comes_back_whole_for_a_double_faced_card(corpus):
+def test_colour_identity_comes_back_whole_for_a_double_faced_card(pool):
     """Rule 2, and the specific error that caused it: Ajani, Nacatl Pariah has
     a white front and a red back, so looking it up by the front face must still
     report {R}{W}. Derived from the mana cost it would read as mono-white and
     pass a Selesnya legality check it should fail.
 
-    The "corpus predates the card" skip this used to carry is gone: the
+    The "pool predates the card" skip this used to carry is gone: the
     fixture contains Ajani, so the assertion cannot be quietly stepped over
     on a machine with an older download.
     """
     result = tools.run("get_cards", {"names": ["Ajani, Nacatl Pariah"]})
-    assert result["cards"], "Ajani is in tiny_corpus; a miss here is a lookup bug"
+    assert result["cards"], "Ajani is in tiny_pool; a miss here is a lookup bug"
     assert sorted(result["cards"][0]["color_identity"]) == ["R", "W"]
 
 
@@ -240,10 +240,10 @@ def test_an_empty_lookup_is_not_an_error():
     assert tools.run("get_cards", {"names": []})["cards"] == []
 
 
-def test_a_lookup_without_a_corpus_says_so_rather_than_reporting_nothing(tmp_path):
+def test_a_lookup_without_a_pool_says_so_rather_than_reporting_nothing(tmp_path):
     """The state a fresh clone is in, before `data refresh`.
 
-    Reporting every name as `not_found` with `corpus_available: false` is very
+    Reporting every name as `not_found` with `pool_available: false` is very
     different from reporting an empty result: one says "I cannot check", the
     other reads as "no such card". A model that conflates them will tell
     somebody a real card does not exist.
@@ -251,7 +251,7 @@ def test_a_lookup_without_a_corpus_says_so_rather_than_reporting_nothing(tmp_pat
     from mtglab import config
     with config.use_paths(data_dir=tmp_path / "empty"):
         result = tools.run("get_cards", {"names": ["Sol Ring"]})
-    assert result["corpus_available"] is False
+    assert result["pool_available"] is False
     assert result["not_found"] == ["Sol Ring"]
     assert result["cards"] == []
 
@@ -270,7 +270,7 @@ def test_a_missing_required_argument_is_rejected(source):
         tools.run("get_deck", {}, source=source)
 
 
-def test_a_mode_can_ask_for_legends_of_exactly_these_colours(corpus):
+def test_a_mode_can_ask_for_legends_of_exactly_these_colours(pool):
     """The two arguments ADR 20 needed and the tool schema did not have.
 
     `commanders_only` and `identity_exact` existed on the service and not in

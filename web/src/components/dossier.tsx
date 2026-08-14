@@ -38,7 +38,7 @@ const jobKey = ({ owner, slug }: DeckRef) => `mtglab-dossier-job:${owner}/${slug
  *   citation that scrolls to the source. The sources are listed with their
  *   real titles and real URLs — every one of which the server has already
  *   checked against the pages the search actually fetched.
- * * A rival is a real card, hoverable, showing its corpus text. That is the
+ * * A rival is a real card, hoverable, showing its pool text. That is the
  *   half of rule 1 that does not depend on the model complying: a first run
  *   described a rival as making Food tokens when it makes Soldiers, and the
  *   card being right there is what lets a reader catch it.
@@ -227,8 +227,8 @@ export function CommanderDossierPanel({
             // turn out of a ceiling it usually does not reach, and seconds are
             // what somebody deciding whether to wait actually wants.
             <Spinner label={elapsed
-              ? `reading the web and the corpus… ${elapsed}s`
-              : 'reading the web and the corpus…'} />
+              ? `reading the web and the pool… ${elapsed}s`
+              : 'reading the web and the pool…'} />
           )}
           {error && (
             <p className="text-sm" style={{ color: 'var(--status-critical)' }}>
@@ -238,7 +238,7 @@ export function CommanderDossierPanel({
           {!busy && !body && !error && (
             <p className="max-w-2xl text-sm" style={{ color: 'var(--text-muted)' }}>
               {canGenerate
-                ? 'Nothing written yet. The corpus facts above are counted; '
+                ? 'Nothing written yet. The pool facts above are counted; '
                   + 'this is the part that needs reading around — who the '
                   + 'character is, what archetype they define, and who their '
                   + 'rivals are. It costs one call and a few searches.'
@@ -390,14 +390,14 @@ function DossierBodyView({ body, report }: {
           <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
             Discarded before you saw it: {body.sources_dropped} cited page(s)
             the search never returned, {body.rivals_dropped} rival(s) not in
-            the corpus.
+            the pool.
           </p>
         )}
         <p className="mt-2 text-xs leading-relaxed"
            style={{ color: 'var(--text-muted)' }}>
           {report?.never
             ?? 'This is Claude\'s writing over cited pages. The card facts '
-               + 'above it are the corpus\'s.'}
+               + 'above it are the pool\'s.'}
         </p>
       </section>
     </div>

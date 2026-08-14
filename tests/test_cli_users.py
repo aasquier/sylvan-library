@@ -19,9 +19,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 pytest.importorskip("argon2")
 
-from mtglab import config  # noqa: E402
-from mtglab.auth import db, sessions, tokens, users  # noqa: E402
-from mtglab.cli import main  # noqa: E402
+from mtglab import config
+from mtglab.auth import db, sessions, tokens, users
+from mtglab.cli import main
 
 PASSWORD = "a-perfectly-fine-passphrase"
 
@@ -173,7 +173,7 @@ def test_invite_creates_an_unclaimed_account_and_prints_a_link(app_db, capsys):
 
 def test_the_link_it_prints_is_the_one_that_works(app_db, capsys):
     run(["users", "invite", "ada@example.com"])
-    link = [w for w in capsys.readouterr().err.split() if "#token=" in w][0]
+    link = next(w for w in capsys.readouterr().err.split() if "#token=" in w)
     token = link.partition("#token=")[2]
 
     with db.connection() as con:
@@ -217,10 +217,10 @@ def test_re_inviting_an_unclaimed_account_issues_a_fresh_link(app_db, capsys):
     """The resend path. The first link stops working, which is the point --
     somebody who thinks a message went astray should not leave one live."""
     run(["users", "invite", "ada@example.com"])
-    first = [w for w in capsys.readouterr().err.split() if "#token=" in w][0]
+    first = next(w for w in capsys.readouterr().err.split() if "#token=" in w)
 
     assert run(["users", "invite", "ada@example.com"])[0] == 0
-    second = [w for w in capsys.readouterr().err.split() if "#token=" in w][0]
+    second = next(w for w in capsys.readouterr().err.split() if "#token=" in w)
     assert first != second
 
     with db.connection() as con:
@@ -552,7 +552,7 @@ def test_delete_refuses_somebody_who_is_not_there(app_db):
 # ------------------------------------------------------------------- the file
 
 def test_the_commands_write_where_config_points(app_db, typed, capsys):
-    """`MTGLAB_DATA_DIR` has to move `app.db` with the corpus, or a deployment
+    """`MTGLAB_DATA_DIR` has to move `app.db` with the pool, or a deployment
     puts the irreplaceable database somewhere that is not the volume."""
     typed.extend([PASSWORD, PASSWORD])
     run(["users", "add", "ada"])

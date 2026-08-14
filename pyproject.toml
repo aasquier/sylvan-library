@@ -88,11 +88,11 @@ skip_empty = true
 #
 # 80 -> 90 on 2026-08-12. The number moved for two reasons and only one of them
 # was new tests. CI used to run 663 of the 692 tests that ran locally, because
-# 29 of them skipped without `data/mtg.duckdb`; building a real corpus from
-# `tests/tiny_corpus.py` took the CI figure from 82% to 86% without a line of
+# 29 of them skipped without `data/mtg.duckdb`; building a real pool from
+# `tests/tiny_pool.py` took the CI figure from 82% to 86% without a line of
 # new test code, which is to say four of those points had been written all
 # along and were simply not being run. The rest came from the CLI's
-# corpus-backed commands, the Claude conversation loop, and Forge's setup path.
+# pool-backed commands, the Claude conversation loop, and Forge's setup path.
 fail_under = 90
 
 [tool.pytest.ini_options]
@@ -102,16 +102,16 @@ testpaths = ["tests"]
 # not allowed to skip silently. `-ra` prints the reason for every one.
 addopts = "-ra"
 markers = [
-    # The two tests `tests/tiny_corpus.py` genuinely cannot carry: the 32-way
+    # The two tests `tests/tiny_pool.py` genuinely cannot carry: the 32-way
     # colour-combination check (a fixture containing the 32 cards would verify
     # the fixture rather than the table) and the commander-search ordering bug
     # (which needs more cards than the query limit to reproduce at all).
     #
     # Everything else that used to need `data/mtg.duckdb` now builds a real
-    # corpus from the fixture instead. This marker exists so the remainder is
+    # pool from the fixture instead. This marker exists so the remainder is
     # declared and countable rather than an ad-hoc `pytest.skip` that quietly
     # grows -- `ci.yml` fails the build if the skip count moves.
-    "needs_full_corpus: requires a real `mtglab data refresh` corpus, not the fixture",
+    "needs_full_pool: requires a real `mtglab data refresh` pool, not the fixture",
 ]
 
 [tool.mypy]
@@ -162,7 +162,7 @@ module = [
 # top level only, so `strict = false` here would be silently ignored and these
 # modules would fail the build anyway. The flags it turns on have to be named
 # one at a time, which is tedious but at least makes the exemption explicit:
-# these five are relaxed, and everything else `strict` implies still applies.
+# these eight are relaxed, and everything else `strict` implies still applies.
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 disallow_untyped_calls = false
@@ -180,8 +180,42 @@ target-version = "py311"   # the floor in requires-python, not the local 3.12
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM", "ISC", "DTZ", "BLE"]
+# Widened 2026-08-14, by six groups chosen from measuring each one against the
+# tree rather than from taste. Five were nearly free: PTH, TID and PIE reported
+# nothing at all, and C4 and RET reported two each, so they cost one commit to
+# adopt and then hold a line that is currently held by nobody. Groups that
+# measured expensive were left out and the numbers are worth keeping: ARG
+# reported 310 (unused arguments are normal in overrides and fixtures), PT 65
+# (53 of them the composite-assertion style rule), SLF 63 and N 38.
+#
+# RUF earns its place on RUF100 alone. There were 71 `# noqa` directives
+# suppressing rules that no longer fire -- dead suppressions read exactly like
+# live ones, so the next person cannot tell which lines are still dangerous.
+# RUF100 fails the build on a suppression that has stopped meaning anything.
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM", "ISC", "DTZ", "BLE",
+          "C4", "RET", "PTH", "TID", "PIE", "RUF"]
 ignore = [
+    # Ambiguous-unicode. The prose in this project uses en dashes, em dashes
+    # and typographic quotes deliberately -- `colors.py` and `glossary.py` are
+    # reference text, and card names carry real accents. These rules exist to
+    # catch a Cyrillic homoglyph pasted into an identifier, which is not a
+    # thing that has ever happened here, and they fire on correct typography.
+    "RUF001",
+    "RUF002",
+    # Alphabetical `__all__`. `claude/__init__.py` groups its exports by
+    # concern with a comment over each group explaining why that group is
+    # separable -- the stance is stdlib-only, the interview is one mode's
+    # whole surface. Sorting the list scatters the members out from under
+    # their own comments, which is a worse document for a machine-checkable
+    # property nobody was going to get wrong.
+    "RUF022",
+    # Assignment before return. A named intermediate is often the clearer
+    # form, and both sites this fires on are in `auth/users.py`, inside a
+    # `with con:` whose docstring is entirely about transaction boundaries --
+    # `revoked = ...` then `return revoked` after the block says "committed,
+    # then returned" in a way that `return` inside the block does not. The
+    # rest of RET (the superfluous-else family) is worth having.
+    "RET504",
     # date.today() datestamps generated markdown. These are local documents,
     # not instants needing timezone-aware arithmetic.
     "DTZ011",

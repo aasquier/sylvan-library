@@ -170,4 +170,4 @@ Esper midrange-control at cEDH speed. Fast mana plus free interaction plus hard 
 - **Urza, Lord High Artificer** — In for Necropotence. Makes mana from your artifact pile and doubles as a Time Sieve enabler.
 
 ---
-_Generated 2026-08-12 from `deck.yaml`._
+_Generated 2026-08-14 from `deck.yaml`._

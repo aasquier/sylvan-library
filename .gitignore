@@ -1,4 +1,4 @@
-# --- Never commit: card corpus and derived data -----------------------------
+# --- Never commit: card pool and derived data -----------------------------
 # Scryfall bulk files are large and redistributing them is against their
 # guidelines. They are re-downloadable in one command.
 data/scryfall/
@@ -26,7 +26,7 @@ backups/
 # Tier 3 keeps all of this outside the repository on purpose (see
 # `config.forge_home`), so these patterns should never match anything. They are
 # here for the day somebody unpacks the tarball in the working directory:
-# `res/cardsfolder` is a second engine's card corpus and rule 5 covers it, the
+# `res/cardsfolder` is a second engine's card pool and rule 5 covers it, the
 # jar is 40 MB of binary, and a `.dck` is generated input to a simulator rather
 # than one of the five artifacts.
 forge/

@@ -6,7 +6,7 @@ colour identity to the right slot.
 
 The last one is different. `Combination.verified_by` names a real card whose
 Scryfall `color_identity` is supposed to equal the combination's key, and that
-test builds a tiny corpus to check the claim rather than trusting the table.
+test builds a tiny pool to check the claim rather than trusting the table.
 It is the same discipline as rule 1 applied to data that is not a card: the
 guild, shard and wedge names are checkable facts, so they get checked.
 """
@@ -61,7 +61,7 @@ def test_of_maps_a_colour_identity_to_its_slot(identity, name):
     assert colors.of(identity).name == name
 
 
-def test_of_accepts_what_the_corpus_actually_returns():
+def test_of_accepts_what_the_pool_actually_returns():
     """`CardRecord.color_identity` is a frozenset, and a deck's slot in the
     challenge is `of(deck_identity)` -- so this signature is load-bearing."""
     assert colors.of(frozenset({"G", "W"})).key == "WG"
@@ -115,20 +115,20 @@ def test_every_combination_cites_a_card_to_check_it_against():
     """Structural only -- that a citation exists, not that it is right.
 
     Deliberately separated from the test below, which is the one that actually
-    verifies the claim. Building a fake corpus out of the table's own numbers
+    verifies the claim. Building a fake pool out of the table's own numbers
     would prove nothing at all: it would assert that `Selesnya Charm` is {G}{W}
     against data saying `Selesnya Charm` is {G}{W}. That circularity is the
-    trap, so the real check needs the real corpus and is allowed to skip.
+    trap, so the real check needs the real pool and is allowed to skip.
     """
     for c in colors.COMBINATIONS:
         assert c.verified_by.strip(), f"{c.name} cites no card"
 
 
-@pytest.mark.needs_full_corpus
-def test_every_named_card_matches_the_real_corpus():
+@pytest.mark.needs_full_pool
+def test_every_named_card_matches_the_real_pool():
     """The claim that `Selesnya Charm` is {G}{W} is checkable. Check it.
 
-    One of the two tests `tiny_corpus` cannot carry, and marked rather than
+    One of the two tests `tiny_pool` cannot carry, and marked rather than
     silently skipped so the gap is countable. The point is to check all 32
     combinations at once -- every guild, shard and wedge -- against cards
     nobody chose for the fixture. Putting those cards in the fixture would
@@ -137,7 +137,7 @@ def test_every_named_card_matches_the_real_corpus():
     misspelled card, or a wedge filed as a shard.
 
     It covers all three lists rather than just `verified_by`, and deliberately
-    stays **one** test: a second `needs_full_corpus` marker would move CI's
+    stays **one** test: a second `needs_full_pool` marker would move CI's
     skip count off the two it is pinned to, and the argument for running here
     is identical for all three. Three rules, and they are not the same rule:
 
@@ -150,7 +150,7 @@ def test_every_named_card_matches_the_real_corpus():
     """
     from mtglab import config
     if not config.DB_PATH.exists():
-        pytest.skip(f"needs the full corpus at {config.DB_PATH}")
+        pytest.skip(f"needs the full pool at {config.DB_PATH}")
 
     from mtglab.cards import db
     exact = {c.key: [c.verified_by, *c.signature] for c in colors.COMBINATIONS}
@@ -191,7 +191,7 @@ def test_every_named_card_matches_the_real_corpus():
 #: The tiers that are an actual faction, with characters and a story.
 #:
 #: Mono-Red is not from anywhere, and neither is Colourless -- the four tiers
-#: left out here get signature cards and the corpus-derived "most-built
+#: left out here get signature cards and the pool-derived "most-built
 #: commanders" the builder already showed, which is the honest answer where
 #: there is no faction to write about.
 FACTION_TIERS = ("guild", "shard", "wedge")

@@ -3,7 +3,7 @@
 #
 # Fly attaches a volume owned by root:root, and the mount shadows whatever the
 # image had at that path — so a `chown` in the Dockerfile is invisible by the
-# time it would matter. The app has to write there: `app.db`, the corpus, and
+# time it would matter. The app has to write there: `app.db`, the pool, and
 # (since decks moved to the volume) every deck edit made in the UI.
 #
 # So PID 1 starts as root, does the one thing that needs root, and execs the

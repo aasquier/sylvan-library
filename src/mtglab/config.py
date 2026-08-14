@@ -8,13 +8,13 @@ backwards, and the reason `cli.py` sat at 27% test coverage: there was no way
 to point a test at a temporary deck directory.
 
 And they were *relative* paths resolved against the process working directory,
-so a container could not put the corpus on a mounted volume. `docs/HOSTING.md`
+so a container could not put the pool on a mounted volume. `docs/HOSTING.md`
 lists this as the first prerequisite for deploying anything.
 
 Both are read from the environment now, defaulting to exactly what they were,
 so local use is unchanged:
 
-    MTGLAB_DATA_DIR    default "data"    corpus, price history, app.db
+    MTGLAB_DATA_DIR    default "data"    pool, price history, app.db
     MTGLAB_DECKS_DIR   default "decks"   deck.yaml source of truth
 
 Resolved once at import. Tests that need a different location should use
@@ -104,8 +104,8 @@ def _apply(data_dir: Path, decks_dir: Path) -> None:
     # behind a function instead of three assignable globals.
     DB_PATH = data_dir / "mtg.duckdb"
     # The second embedded database (ADR 4): SQLite, transactional, holding
-    # users and sessions. Beside the corpus on the same volume, but a different
-    # lifecycle -- the corpus is regenerable and gitignored, `app.db` is the
+    # users and sessions. Beside the pool on the same volume, but a different
+    # lifecycle -- the pool is regenerable and gitignored, `app.db` is the
     # irreplaceable half and the thing that gets backed up.
     APP_DB_PATH = data_dir / "app.db"
     # The raw Scryfall bulk downloads `data refresh` ingests from. Derived here
@@ -128,7 +128,7 @@ def reload_from_env() -> None:
 
 # Forge's installed distribution: the desktop jar plus `res/`, several hundred
 # megabytes of it. Deliberately outside the repository -- CLAUDE.md rule 5
-# forbids committing card corpus data, and Forge's `res/cardsfolder` is exactly
+# forbids committing card pool data, and Forge's `res/cardsfolder` is exactly
 # that for a second engine.
 FORGE_HOME_DEFAULT = Path.home() / ".local" / "share" / "mtglab" / "forge"
 

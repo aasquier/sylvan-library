@@ -23,7 +23,7 @@ shrunk counterexample is replayed first next time.
 In CI, a test that fails on one pull request and passes on the next because
 Hypothesis rolled different examples is worse than useless -- it trains people
 to re-run the job. So CI derandomises. The deterministic coverage that a
-randomised search would have provided comes instead from the enumerated corpus
+randomised search would have provided comes instead from the enumerated pool
 in `mana_oracle.py`, which is exhaustive over its alphabet and identical on
 every run.
 

@@ -161,7 +161,7 @@ the Claude tests off the network. This is a real new dependency: an API key in
 `fly secrets`, a verified sending domain, and deliverability as something that
 can break.
 
-What is *not* built is open signup. Sim jobs and the corpus are expensive per
+What is *not* built is open signup. Sim jobs and the pool are expensive per
 user, and an open door needs bot defence and an abuse story to protect something
 with no revenue behind it. Opening it later is a flag and a rate limiter, not a
 rewrite — the token machinery and the users table are the same either way.
@@ -241,7 +241,7 @@ Two embedded databases, zero managed services:
 
 | Store | Engine | Contents | Access |
 | --- | --- | --- | --- |
-| `/data/mtg.duckdb` | DuckDB, 63 MB | Scryfall corpus, prices | Read-mostly, rebuilt by `data refresh` |
+| `/data/mtg.duckdb` | DuckDB, 63 MB | Scryfall pool, prices | Read-mostly, rebuilt by `data refresh` |
 | `/data/app.db` | SQLite | users, sessions, user decks, cached sim results | Read-write |
 
 Keep them separate. DuckDB is an analytics engine holding regenerable public
@@ -272,7 +272,7 @@ CREATE TABLE user_decks (
 
 -- Built 2026-08-12; `auth/db.py` migration 3 is the real one. The sketch below
 -- said "a pure function of deck content + parameters", which is close enough
--- to be dangerous: card facts come from the corpus, so the key is a hash of
+-- to be dangerous: card facts come from the pool, so the key is a hash of
 -- the *compiled* deck rather than of deck.yaml. See ADR 18.
 CREATE TABLE sim_cache (
   key TEXT PRIMARY KEY, kind TEXT NOT NULL, result_json TEXT NOT NULL,
@@ -333,7 +333,7 @@ scales:
 On a 2-vCPU cloud box expect ~1.6x; on 4 vCPU, ~2.4x. Real, free, about twenty
 lines of code. **Caveat discovered while measuring:** DuckDB takes an exclusive
 lock *per process*, so pool workers must receive already-compiled `SimCard`
-objects and must never open the corpus themselves.
+objects and must never open the pool themselves.
 
 ### The DuckDB locking rule, because it will bite you
 
@@ -341,9 +341,9 @@ The write lock is held by the **process**, not the connection, and DuckDB
 allows exactly one writer. Two things follow, and an earlier draft of this
 document got the second one wrong.
 
-**Reads are fine, including across processes.** The API opens the corpus with
+**Reads are fine, including across processes.** The API opens the pool with
 `read_only=True` in `service._connect()`, and read-only handles share happily:
-verified with four separate processes querying the corpus simultaneously, all
+verified with four separate processes querying the pool simultaneously, all
 succeeding. Within one process it is fine too — 12 concurrent requests against
 `/api/decks` all returned 200, because single-worker uvicorn serves sync
 endpoints from a threadpool. **`uvicorn --workers 2+` is therefore fine for
@@ -352,13 +352,13 @@ serving**, contrary to what this section previously claimed.
 **Writes are exclusive, and that is the real constraint.** `db.connect()` —
 the CLI path — executes schema DDL, so it opens read-write and takes the
 exclusive lock. While `mtglab data refresh` is running, nothing else can open
-the corpus read-write, and `service._connect()` deliberately swallows the
-failure and returns `None` so the app degrades to "no corpus" rather than
+the pool read-write, and `service._connect()` deliberately swallows the
+failure and returns `None` so the app degrades to "no card pool" rather than
 500ing every request. Expect a refresh to make card lookups briefly
 unavailable; that is by design, not a bug to fix.
 
 The rule that does still bind: **sim pool workers must receive already-compiled
-`SimCard` objects** rather than opening the corpus themselves, since each new
+`SimCard` objects** rather than opening the pool themselves, since each new
 process would otherwise contend for a handle it does not need.
 
 ### Should you rewrite the simulator in Rust or Go?
@@ -392,7 +392,7 @@ process would otherwise contend for a handle it does not need.
    `sim/cache.py`, the `sim_cache` table in §2, and
    [ADR 18](adr/0018-a-cached-simulation-is-keyed-on-its-compiled-input.md).
    **"By deck-content hash" was the wrong key and the ADR is why.** Card facts
-   come from the corpus, so `deck.yaml` can sit byte-identical while a
+   come from the pool, so `deck.yaml` can sit byte-identical while a
    `data refresh` changes what a card does — Scryfall's "enters the battlefield
    tapped" retemplating is the documented case, and it moves the numbers for
    every deck. The key is a hash of the **compiled** deck instead: the SimCards
@@ -400,7 +400,7 @@ process would otherwise contend for a handle it does not need.
    fingerprint of `engine.py` and `mana.py`'s own source. A hit costs a deck
    parse and one indexed `get_cards`, so it is milliseconds rather than truly
    zero — and in exchange a rationale edit does not throw the numbers away and
-   a corpus refresh that matters does.
+   a card pool refresh that matters does.
 2. **Precompute the standard sims when a deck is saved**, so the numbers are
    already warm when anyone opens the deck. Cheap now: the cache exists, and
    this is one call to `plan_mana` on the write path. Not built, because
@@ -475,7 +475,7 @@ binary runs, which was the real risk on an OS this old.
 **`flyctl` is not optional, and the browser is not a substitute.** Fly's web
 dashboard can create the app, set secrets and deploy — but steps 6 and 8 below
 are commands *inside* the machine, and there is no browser path to either. An
-instance built entirely from the dashboard has no corpus, no decks, and no way
+instance built entirely from the dashboard has no card pool, no decks, and no way
 to give the maintainer a password.
 
 You will also need a credit card on file; the machine sizes below are inside
@@ -489,11 +489,11 @@ Fly's paid tier.
 2026-08-12. They carry their reasoning inline; what follows is what the drafts
 this section used to hold got wrong, so the reasoning is not lost with them.
 
-The corpus is **not** in the image. It is ~63 MB built from ~98 MB of Scryfall
+The pool is **not** in the image. It is ~63 MB built from ~98 MB of Scryfall
 bulk, Scryfall asks that bulk data not be redistributed, and it belongs on the
 volume where it survives deploys. `.dockerignore` keeps `data/` out of the
-build context so a local corpus cannot reach a layer by accident, and the
-`image` job in CI greps the built image for corpus files and fails on a hit —
+build context so a local pool cannot reach a layer by accident, and the
+`image` job in CI greps the built image for card pool files and fails on a hit —
 the tracked-file check is about the repository, this one is about the artifact.
 The frontend bundle *is* committed to `src/mtglab/web_dist`, so the image needs
 no Node toolchain.
@@ -571,14 +571,14 @@ fly launch --no-deploy --name sylvan-library
 fly volumes create mtglab_data --size 3 --region iad
 ```
 
-3 GB leaves room for the 63 MB corpus, the raw Scryfall download during a
+3 GB leaves room for the 63 MB pool, the raw Scryfall download during a
 refresh, `app.db`, the decks, and backups. It costs about $0.45/month.
 `fly.toml` also carries `initial_size = "3gb"`, so a volume Fly creates for you
 is the same size as one you create here.
 
 That sizing was only half true until 2026-08-12: `cards.db.download_bulk`
 defaulted to a *relative* `data/scryfall` and `cmd_data_refresh` passed nothing,
-so the corpus went to the volume and the ~98 MB of JSON it is built from went to
+so the pool went to the volume and the ~98 MB of JSON it is built from went to
 the container's working directory — an ephemeral layer, and not the thing this
 3 GB was sized for. `config.SCRYFALL_DIR` is derived from `MTGLAB_DATA_DIR` now,
 with the same "derived, never set independently" rule as `DB_PATH`.
@@ -766,19 +766,19 @@ to this app:
 fly deploy
 ```
 
-The app will start with **no corpus and no decks**. Both are expected, and both
-are fixed by step 6 — `/api/health` reports corpus state rather than crashing,
+The app will start with **no card pool and no decks**. Both are expected, and both
+are fixed by step 6 — `/api/health` reports pool state rather than crashing,
 which is exactly the fresh-clone case the API tests already cover, and an empty
 `MTGLAB_DECKS_DIR` yields an empty library rather than an error. The CI `image`
 job pins that: it starts this image with an empty volume and requires
-`/api/health` to answer 200 with `"corpus": false`.
+`/api/health` to answer 200 with `"pool": false`.
 
 You should be able to sign in at this point, before seeding anything.
 
 ### Step 6 — seed the volume
 
 Two things live on the volume and neither arrives on its own. **This is a
-documented run, not a build step and not a boot step** — the corpus half needs
+documented run, not a build step and not a boot step** — the pool half needs
 several minutes and a ~500 MB download, and with scale-to-zero putting boot on
 the request path, doing it at startup would turn a visit into an outage.
 
@@ -798,7 +798,7 @@ every boot, and a restart would fix it, but not before the first write fails:
 fly ssh console -C "chown -R mtglab:mtglab /data"
 ```
 
-**The corpus**, second, and this is the slow one:
+**The pool**, second, and this is the slow one:
 
 ```bash
 fly ssh console -C "mtglab data refresh"
@@ -809,7 +809,7 @@ Both halves of that download land on the volume, which was not true before
 part-way, re-run it: `download_bulk` writes to a `.part` file and renames only
 on completion, so an interrupted download is never mistaken for a finished one.
 
-Verify, and note this checks both halves at once — `validate` needs the corpus
+Verify, and note this checks both halves at once — `validate` needs the pool
 to check card facts and the decks to have something to check:
 
 ```bash
@@ -987,7 +987,7 @@ untouched: a stripped click spends nothing.
 
 ## 5. Running it
 
-### Refreshing the corpus
+### Refreshing the pool
 
 Scryfall publishes daily; deck tooling does not need day-fresh data. Monthly is
 plenty unless you are watching prices.
@@ -1099,7 +1099,7 @@ architecture is already shaped for it, since deck-facing endpoints take a
 
 ### Backups
 
-The corpus needs no backup — `data refresh` rebuilds it in one command. That is
+The pool needs no backup — `data refresh` rebuilds it in one command. That is
 the whole reason it is gitignored.
 
 Two things on the volume *are* irreplaceable. **`app.db`** holds users,
@@ -1283,9 +1283,15 @@ rule here until 2026-08-12; somebody wants an account, so it is being built.
 ## 7. Deployment readiness — the running list
 
 Started 2026-08-11, when hosting stopped being hypothetical. Everything above
-is *how* to deploy; this is *what is still missing*, kept as a live list so
-deploy day is an afternoon rather than a discovery exercise. Tick things off
-here rather than rewriting the sections above.
+is *how* to deploy; this is what was missing, kept as a live list so deploy day
+was an afternoon rather than a discovery exercise. Tick things off here rather
+than rewriting the sections above.
+
+**Deploy day happened on 2026-08-13**, and the instance has been serving since.
+The list is kept rather than deleted: what remains unticked is real work that
+the deployment is running without — a written refresh runbook, the Forge
+deployment shape, Cloudflare Access, and a second home for the API key. An
+unticked box below is an open question, not a blocker that was ignored.
 
 ### Already true — do not re-solve these
 
@@ -1316,7 +1322,7 @@ here rather than rewriting the sections above.
       the one that caught this — **ask the container, not the suite**, and
       check the response headers rather than the rendered page, because the
       browser was quietly compensating.
-- [x] **CI refuses to let the corpus or a key be committed** — by filename and
+- [x] **CI refuses to let the pool or a key be committed** — by filename and
       by scanning every tracked file's contents, the built bundle included.
 - [x] **Read-only DuckDB is safe across processes and threads**, verified in
       §3, so `uvicorn --workers 2+` is fine for serving.
@@ -1339,7 +1345,7 @@ here rather than rewriting the sections above.
 
 - [x] **`Dockerfile`** — landed 2026-08-12, with `docker-entrypoint.sh` and
       `.dockerignore`. Two stages and still no Node; non-root app process;
-      `HEALTHCHECK` on `/api/health`; no corpus, enforced against the built
+      `HEALTHCHECK` on `/api/health`; no card pool, enforced against the built
       image and not just the tree. §4 step 1 records what the draft it replaced
       got wrong, including the single-worker argument, which was pointing at
       the wrong cause.
@@ -1348,12 +1354,12 @@ here rather than rewriting the sections above.
       the draft would have thrown away every deck edit made in the app at each
       deploy. See the deck-drift note in §5, which is the question that choice
       creates rather than answers.
-- [x] **A documented corpus-seeding run** against the volume — §4 step 6, which
+- [x] **A documented pool-seeding run** against the volume — §4 step 6, which
       now seeds decks as well. Not a build step and not a boot step: it needs
       several minutes and a ~500 MB download, and with scale-to-zero putting
       boot on the request path it would turn a wake into an outage.
       **This one needed a code fix to be true rather than only written down.**
-      `download_bulk` defaulted to a relative `data/scryfall`, so the corpus
+      `download_bulk` defaulted to a relative `data/scryfall`, so the pool
       landed on the volume and the ~98 MB it is built from landed on the
       container's ephemeral layer; `config.SCRYFALL_DIR` is derived from
       `MTGLAB_DATA_DIR` now. `service.health()` had the same bug, which mattered
@@ -1366,8 +1372,8 @@ here rather than rewriting the sections above.
       Dockerfile is ever built. It builds `linux/amd64` and `linux/arm64`
       (the dev machine is Intel; anything deployed to is arm64), runs the
       amd64 image with auth on, and requires: `/api/health` answers 200 with
-      `"corpus": false`, `/api/decks` answers 401, PID 1 runs as `mtglab`,
-      `/data` is writable by it, no corpus file exists anywhere in the image,
+      `"pool": false`, `/api/decks` answers 401, PID 1 runs as `mtglab`,
+      `/data` is writable by it, no card pool file exists anywhere in the image,
       and the decks seed is at the path §4 step 6's copy command names. Trivy
       fails the build on HIGH/CRITICAL. **`image` is a required check on `main`
       as of 2026-08-12**, which it was not on the day it shipped — a check that
@@ -1376,7 +1382,7 @@ here rather than rewriting the sections above.
       the authority, so read them back rather than trusting either document.
 - [ ] **A refresh procedure.** Cron does not work — Fly volumes attach to
       exactly one machine, so a scheduled second Machine cannot mount the
-      corpus. Monthly and by hand is the plan; write it down as a runbook.
+      pool. Monthly and by hand is the plan; write it down as a runbook.
 - [x] **A login screen in the app**, and the claim page behind the emailed
       link. Build-order step 5c, landed 2026-08-12, and with it the last
       code-side blocker on deploying with auth on. The gate lives in `App.tsx`
@@ -1437,12 +1443,12 @@ here rather than rewriting the sections above.
       it grants nothing new — but it belongs in the same care as the rest of
       the deployment config, and every change the reconciliation makes is
       logged.
-- [ ] **A transactional email provider.** New with ADR 16. The *code* landed
-      2026-08-12 and is ticked above; what is outstanding is the account and
-      the DNS. Needs a `RESEND_API_KEY` in `fly secrets`, a **verified sending
-      domain** (DNS records, so start it early — propagation is not instant),
-      and `MTGLAB_EMAIL_FROM` set to an address on it. Also `MTGLAB_BASE_URL`,
-      or every emailed link points at `127.0.0.1`. All three are in
+- [x] **A transactional email provider.** New with ADR 16. The *code* landed
+      2026-08-12; the account and the DNS followed, and `RESEND_API_KEY` is in
+      `fly secrets` (verified 2026-08-14). The sending domain
+      `send.sylvan-libraries.com` is verified with Resend, `MTGLAB_EMAIL_FROM`
+      is an address on it, and `MTGLAB_BASE_URL` is set — without that last one
+      every emailed link would point at `127.0.0.1`. All three are in
       `.env.example`. Note that `sender_from_env()` **refuses to start without
       the key when auth is on**, deliberately: the console fallback would print
       recipients into the platform's log, which ADR 16 forbids.
@@ -1455,7 +1461,7 @@ here rather than rewriting the sections above.
       **the app was sending no seed**, so every view of a deck was a different
       sample and nothing could have been cached until that was fixed; and the
       obvious key — a hash of `deck.yaml` — would have served pre-refresh
-      numbers forever, because card facts come from the corpus and not from the
+      numbers forever, because card facts come from the pool and not from the
       deck file. `mtglab sim cache` reports what is stored and `--clear` empties
       it, which is a `fly ssh console` away if it is ever needed.
 
@@ -1473,17 +1479,19 @@ Ticked items are done as of 2026-08-13.
       gone out wrong.
 - [x] ~~`SESSION_SECRET` generated (`openssl rand -base64 32`).~~ **Not
       needed** — see above. Sessions are opaque tokens, not signed ones.
-- [ ] **`MTGLAB_ADMIN_EMAIL` and `MTGLAB_ADMIN_USERNAME` via `fly secrets`.**
-      These two stay placeholders in the tracked file — the address is the one
-      piece of personal data the project handles — so this is the step nothing
-      in the repository can do for you, and **a deploy without it comes up
-      looking healthy with nobody behind the sign-in page who is you.**
-      `MTGLAB_REQUIRE_AUTH=1` is already set in the committed file.
-- [ ] `RESEND_API_KEY` via `fly secrets`, and **one real invite sent to an
-      address you control before anybody else is invited**. Deliverability is
-      the one part of the email half that no test covers, by design. Note there
-      is no console fallback on a deployed instance (§4 step 8): with auth on,
-      a missing key refuses rather than prints.
+- [x] ~~**`MTGLAB_ADMIN_EMAIL` and `MTGLAB_ADMIN_USERNAME` via `fly secrets`.**~~
+      Both set and deployed (verified 2026-08-14). These two stay placeholders
+      in the tracked file — the address is the one piece of personal data the
+      project handles — so this is the step nothing in the repository can do
+      for you, and **a deploy without it comes up looking healthy with nobody
+      behind the sign-in page who is you.** `MTGLAB_REQUIRE_AUTH=1` is set in
+      the committed file.
+- [x] ~~`RESEND_API_KEY` via `fly secrets`, and one real invite sent~~ — the
+      key is deployed (verified 2026-08-14) and an invite has been sent,
+      claimed and signed in with. Deliverability is the one part of the email
+      half that no test covers, by design. Note there is no console fallback on
+      a deployed instance (§4 step 8): with auth on, a missing key refuses
+      rather than prints.
 - [x] ~~The first sign-in~~ — done 2026-08-13 via
       `mtglab users passwd gyome` over an **interactive** `fly ssh console`,
       which is the path that needs no working mail. There is no
@@ -1495,7 +1503,7 @@ Ticked items are done as of 2026-08-13.
       as the one built on the maintainer's laptop. The gate then passed
       gyome-food, arahbo-cats and trostani-tokens clean and failed
       goreclaw-stompy on Primeval Titan, which is the documented state and the
-      strongest single proof that the corpus is real card data rather than an
+      strongest single proof that the pool is real card data rather than an
       empty table.
 - [ ] Cloudflare Access configured, if the instance is not to be public.
 - [ ] **A second home for `ANTHROPIC_API_KEY`.** One key, one environment, two
@@ -1560,7 +1568,7 @@ Four things that are code changes, not just sizing:
       linking. And being noncommercial is irrelevant to the GPL either way —
       its terms are identical sold or free. The one action that would trigger
       obligations is **publishing a container image containing Forge**, so:
-- [ ] **Put Forge on the volume, not in the image.** The corpus already lives
+- [ ] **Put Forge on the volume, not in the image.** The pool already lives
       there for a licensing reason of its own (Scryfall asks that bulk data not
       be redistributed), and Forge fits the same slot for the same shape of
       reason: an image that does not contain it cannot redistribute it. This

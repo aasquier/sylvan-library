@@ -19,7 +19,7 @@
  *   reflows or shows five broken images while a CDN answers is a regression on
  *   the app's most load-bearing text.
  * - `/api/colors` is the one deck-facing page that works on a fresh clone
- *   before `data refresh` has ever run — no corpus, no network. It renders
+ *   before `data refresh` has ever run — no card pool, no network. It renders
  *   taglines through `ManaText`. Pips that need a CDN would take that property
  *   away for decoration.
  * - Checking Scryfall's own path data into a public repository would be

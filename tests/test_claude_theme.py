@@ -33,15 +33,15 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import tiny_corpus  # noqa: E402
-from mtglab import config  # noqa: E402
-from mtglab.claude import client, stance, theme, tools  # noqa: E402
+import tiny_pool
+from mtglab import config
+from mtglab.claude import client, stance, theme, tools
 
 
 @pytest.fixture
-def corpus(tmp_path):
+def pool(tmp_path):
     with config.use_paths(data_dir=tmp_path / "data"):
-        yield tiny_corpus.build(config.DB_PATH)
+        yield tiny_pool.build(config.DB_PATH)
 
 
 @pytest.fixture
@@ -96,7 +96,7 @@ def test_neither_mode_can_reach_a_deck():
                             "suggest_replacements", "list_decks"}, mode.name
 
 
-def test_the_conversation_half_has_no_corpus_at_all():
+def test_the_conversation_half_has_no_pool_at_all():
     """It talks; it does not look things up.
 
     With no card tool it has no grounded card facts, which is what keeps a
@@ -516,10 +516,10 @@ def test_an_empty_transcript_is_the_opening_turn():
     assert theme.check_transcript([]) == []
 
 
-# ------------------------------------------------------- corpus resolution
+# ------------------------------------------------------- pool resolution
 
-def test_a_commander_of_the_wrong_identity_is_dropped(corpus):
-    """Not just rule 1 — the other rule the corpus enforces here.
+def test_a_commander_of_the_wrong_identity_is_dropped(pool):
+    """Not just rule 1 — the other rule the pool enforces here.
 
     Goreclaw is a real legend and a real card, and it is mono-green. A deck it
     leads is a mono-green deck and fills a different one of the 32, so it is
@@ -533,18 +533,18 @@ def test_a_commander_of_the_wrong_identity_is_dropped(corpus):
     assert dropped == 1
 
 
-def test_a_commander_of_the_right_identity_is_kept(corpus):
+def test_a_commander_of_the_right_identity_is_kept(pool):
     combo = {"key": "BG", "colors": ["B", "G"]}
     kept, dropped = theme._commanders(
         [{"card": "gyome, master chef", "prose": "cooks", "source_ids": []}],
         combo, set())
     assert dropped == 0
-    # The corpus's spelling, not the model's.
+    # The pool's spelling, not the model's.
     assert kept[0]["name"] == "Gyome, Master Chef"
     assert kept[0]["oracle_text"]
 
 
-def test_an_invented_commander_is_dropped_and_counted(corpus):
+def test_an_invented_commander_is_dropped_and_counted(pool):
     combo = {"key": "BG", "colors": ["B", "G"]}
     kept, dropped = theme._commanders(
         [{"card": "Gyome, Sous Chef", "prose": "not a card", "source_ids": []}],
@@ -553,7 +553,7 @@ def test_an_invented_commander_is_dropped_and_counted(corpus):
     assert dropped == 1
 
 
-def test_a_combination_key_outside_the_32_is_dropped(corpus):
+def test_a_combination_key_outside_the_32_is_dropped(pool):
     kept, _, lost = theme._combinations(
         [{"key": "ZZ", "reading": "", "grounding": "", "source_ids": [],
           "commanders": [{"card": "Gyome, Master Chef", "prose": "",
@@ -562,7 +562,7 @@ def test_a_combination_key_outside_the_32_is_dropped(corpus):
     assert lost == 1
 
 
-def test_a_combination_with_no_resolvable_commander_is_dropped(corpus):
+def test_a_combination_with_no_resolvable_commander_is_dropped(pool):
     """A colour name and a paragraph is not something a user can act on."""
     kept, _, lost = theme._combinations(
         [{"key": "BG", "reading": "r", "grounding": "g", "source_ids": [],
@@ -572,7 +572,7 @@ def test_a_combination_with_no_resolvable_commander_is_dropped(corpus):
     assert lost == 1
 
 
-def test_losing_a_whole_suggestion_is_counted(corpus):
+def test_losing_a_whole_suggestion_is_counted(pool):
     """Measured on a real run: a combination goes when every legend named for
     it turns out to have a *subset* identity — legal in those colours, wrong
     for that slot. Half the proposal vanished and nothing said so, which is how
@@ -590,7 +590,7 @@ def test_losing_a_whole_suggestion_is_counted(corpus):
     assert lost == 1
 
 
-def test_a_citation_to_a_dropped_source_does_not_survive(corpus):
+def test_a_citation_to_a_dropped_source_does_not_survive(pool):
     """`source_ids` are narrowed to what actually survived the source check,
     so a section cannot point at a citation the reader will never see."""
     kept, _, _ = theme._combinations(

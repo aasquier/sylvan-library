@@ -82,7 +82,7 @@ export function ArtPicker({ deck, onPicked }: {
           {!printings && !error && <Spinner label="finding printings…" />}
           {printings && printings.length === 0 && (
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              No printings found. Without a corpus this list is empty — run
+              No printings found. Without a card pool this list is empty — run
               <code className="mx-1">mtglab data refresh</code>.
             </p>
           )}

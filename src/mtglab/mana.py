@@ -112,7 +112,7 @@ def parse_mana_cost(cost: str | None) -> ManaCost:
         if "/" in sym:
             halves = sym.split("/")
             # Phyrexian: payable with 2 life, so never a constraint on mana --
-            # but still one symbol of mana value, and still colored. The corpus
+            # but still one symbol of mana value, and still colored. The pool
             # carries the two-color form too ({G/U/P} on Tamiyo, Compleated
             # Sage), so read the colors rather than assuming a single one.
             if "P" in halves:

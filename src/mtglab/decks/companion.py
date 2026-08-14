@@ -8,10 +8,10 @@ and been declared legal, and the artifacts would have said so in writing.
 
 Two rules shape the code:
 
-1. **The condition text comes from the corpus, never from memory.** Kaheera's
+1. **The condition text comes from the pool, never from memory.** Kaheera's
    allowed creature types are parsed out of Kaheera's own oracle text rather
    than typed in here, so a future errata changes the check automatically.
-   Reading the corpus while writing this also turned up three companions that
+   Reading the pool while writing this also turned up three companions that
    are not the well-known ten -- Lutri, Pauper Otter; Treizeci, Sun of Serra;
    and The Companion of the Wilds -- whose conditions reference expansion
    symbols, frame treatments and set codes. None of those are properties of an
@@ -248,7 +248,7 @@ def check(companion_name: str, entries, cards: dict) -> CompanionCheck:
     """
     rec = cards.get(companion_name)
     if rec is None:
-        return CompanionCheck(condition="", unsupported="card not in the corpus")
+        return CompanionCheck(condition="", unsupported="card not in the pool")
 
     condition = condition_text(rec)
     if not condition:

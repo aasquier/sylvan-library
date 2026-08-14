@@ -25,7 +25,7 @@ Two distinct faults were behind that, and only one of them is this module's:
 
 **Checking happens in the request; calling happens in the job** -- the same
 division `themeruns` makes, and here it carries one refusal that matters more
-than the others: a deck with no commander the corpus can find is a 422, and it
+than the others: a deck with no commander the pool can find is a 422, and it
 is a fact about the deck rather than a failure of anything. Four minutes is a
 long time to wait to be told a slug was wrong.
 
@@ -102,7 +102,7 @@ def plan_dossier(*, slug: str, requested: Any = None, refresh: bool = False,
             # Only reachable if the key vanished between the check above and
             # the worker starting. Left as itself; it is already readable.
             raise
-        except Exception as exc:                                    # noqa: BLE001
+        except Exception as exc:
             # Broad on purpose and narrow in effect: everything landing here is
             # the SDK failing, and `explain` is what turns a 401 into "your key
             # may have expired" rather than a stack trace in a job's error field.
@@ -115,7 +115,7 @@ def plan_dossier(*, slug: str, requested: Any = None, refresh: bool = False,
     # rather than two, the same claim ADR 19 makes about the cache one step
     # earlier in time.
     #
-    # It is `""` when the corpus has no oracle id for the commander, which
+    # It is `""` when the pool has no oracle id for the commander, which
     # disables the dedupe exactly as it disables the caching. That is the
     # honest behaviour and not an oversight: without an id there is nothing to
     # say two requests are for the same thing.

@@ -2,8 +2,8 @@
 
 Two modes, one feature, and
 [ADR 20](../../../docs/adr/0020-the-theme-interview-reads-a-person.md) is why
-they are two. `THEME_CONVERSATION` talks -- prose questions, no corpus, no
-deck -- and `THEME_PROPOSAL` fires once at the end with a schema, the corpus
+they are two. `THEME_CONVERSATION` talks -- prose questions, no card pool, no
+deck -- and `THEME_PROPOSAL` fires once at the end with a schema, the pool
 and a web search. A conversation is prose and a proposal is a shape; a single
 mode doing both either loses the shape or forces every chatty turn through it.
 
@@ -36,7 +36,7 @@ player and started reporting that back as something you said.
 **Readiness is computed, not declared.** There is no `ready` field for the
 model to set. `may_propose()` counts grounded slots and answers in Python.
 
-**Every commander is resolved through the corpus.** `search_cards` with
+**Every commander is resolved through the pool.** `search_cards` with
 `commanders_only` and an exact identity, then `get_cards` to confirm -- or the
 name is dropped and counted, the same as a dossier's rivals.
 
@@ -102,7 +102,7 @@ class TranscriptRejected(ValueError):
     """The conversation handed in is not one this mode will run.
 
     Its own exception because the caller's answer differs from every other
-    failure here: nothing is wrong with the corpus, the key or the model. The
+    failure here: nothing is wrong with the pool, the key or the model. The
     request is malformed, and it is a 422.
     """
 
@@ -122,7 +122,7 @@ def _vocabulary() -> str:
     """The colour pie and the 32, as the mode's shared reference data.
 
     Handed over rather than recalled, for the same reason `interview.brief()`
-    assembles corpus facts before the call: `colors.py` is checked in, carries
+    assembles pool facts before the call: `colors.py` is checked in, carries
     `verified_by`, and is the same table the carousel teaches. A second copy of
     the four-colour names living in a prompt would be a second copy to disagree
     with `colors.py`, which `CLAUDE.md` warns about by name.
@@ -310,7 +310,7 @@ Never give the same fact twice. If the interesting thing you have to say is one
 you have already said in this conversation, omit the fact entirely and just ask
 the question.
 
-You have no access to the card corpus, so you do not know what any card does.
+You have no access to the card pool, so you do not know what any card does.
 Do not state card facts. Talk about colours, planes, history and people; the
 cards come later, from a different surface that can look them up.
 
@@ -406,7 +406,7 @@ PROPOSAL_SCHEMA: dict[str, Any] = {
                                     "type": "string",
                                     "description": (
                                         "The exact printed card name. It is "
-                                        "looked up in the corpus and dropped "
+                                        "looked up in the pool and dropped "
                                         "if it does not resolve."),
                                 },
                                 "prose": {
@@ -493,12 +493,12 @@ Keeping those apart is not a formatting preference. A reading cannot be wrong,
 because it is offered as a reading. A claim about 1993 can be, and it is the
 one a reader will believe.
 
-**Every commander comes out of the corpus, and it must be a legend of exactly
+**Every commander comes out of the pool, and it must be a legend of exactly
 these colours.** Call search_cards with commanders_only true, identity_exact
 true, and identity set to the combination you are proposing. Pick your three
 **only** from what that call returns. If they mentioned a budget, pass
 price_max. Then call get_cards on the three you chose before writing a word
-about any of them; what you remember about a card is not evidence, the corpus
+about any of them; what you remember about a card is not evidence, the pool
 row is.
 
 Do not name a commander from memory and do not name one whose identity is a
@@ -532,7 +532,7 @@ are written in a code file's conventions and yours are not.
 THEME_PROPOSAL = Mode(
     name="theme-proposal",
     purpose="Turns a theme conversation into two colour combinations and six "
-            "corpus-checked commanders.",
+            "pool-checked commanders.",
     instructions=f"{PROPOSAL_INSTRUCTIONS}\n\n"
                  f"The colour pie and the 32 combinations, as reference data. "
                  f"The `key` you return must be one of these.\n\n"
@@ -687,7 +687,7 @@ def check_transcript(raw: Any) -> list[dict[str, str]]:
 
     Tampering with the *content* is allowed and buys nothing, which is worth
     stating rather than asserting: every card in the proposal is re-resolved
-    against the corpus, every source is checked against the search, and
+    against the pool, every source is checked against the search, and
     readiness is recomputed here from the text rather than carried in it. What
     is left is somebody lying to themselves about their own taste.
     """
@@ -1180,7 +1180,7 @@ def run_proposal(req: ProposalRequest, *,
     """The expensive half: read around, name legends, check every one.
 
     **Measured at 226 seconds** with four searches, since it reads a dozen-odd
-    pages and resolves every legend against the corpus. That is why the caller
+    pages and resolves every legend against the pool. That is why the caller
     may hand in `on_turn` -- run as a background job this is the only thing that
     says it is still moving.
     """
@@ -1239,7 +1239,7 @@ def run_proposal(req: ProposalRequest, *,
                        asked=True, combinations=[], sources=sources,
                        slots=grounded, slots_dropped=dropped,
                        reason="Nothing came back that resolved against the "
-                              "corpus, so there is nothing to suggest.")
+                              "pool, so there is nothing to suggest.")
 
     return _report(
         turn, mode=mode.name, effective=effective, persona=who.key, asked=True,
@@ -1249,7 +1249,7 @@ def run_proposal(req: ProposalRequest, *,
         # dossier is refused, an unsourced proposal is not. A dossier is
         # entirely web-sourced claims, so stripping them leaves voice; a
         # proposal's load-bearing content is a colour combination and six real
-        # commanders, and both are corpus facts that survive a failed search.
+        # commanders, and both are pool facts that survive a failed search.
         # The dropped counts are surfaced instead.
         sources_dropped=sources_dropped,
         commanders_dropped=commanders_dropped,
@@ -1259,7 +1259,7 @@ def run_proposal(req: ProposalRequest, *,
         slots_dropped=dropped,
         reason="",
         never=("The reading is Claude's interpretation of what you said, not a "
-               "finding. The cards and their colours are the corpus's."),
+               "finding. The cards and their colours are the pool's."),
     )
 
 
@@ -1295,7 +1295,7 @@ def _proposal_ask(grounded: list[dict[str, str]], budget: float | None,
 
 def _combinations(raw: Any, allowed: set[str]
                   ) -> tuple[list[dict[str, Any]], int, int]:
-    """Combinations with a real key, and commanders the corpus confirms.
+    """Combinations with a real key, and commanders the pool confirms.
 
     Two checks in one pass, and both drop rather than repair. A `key` that is
     not one of the 32 is a combination that cannot be rendered or turned into a
@@ -1346,13 +1346,13 @@ def _combinations(raw: Any, allowed: set[str]
 
 def _commanders(raw: Any, combo: dict[str, Any], allowed: set[str]
                 ) -> tuple[list[dict[str, Any]], int]:
-    """Named legends, resolved against the corpus or dropped and counted.
+    """Named legends, resolved against the pool or dropped and counted.
 
     Two things are checked and the second is the one that matters. The name has
     to exist -- and the card has to actually be able to lead *this* combination,
     because a mono-white legend is legal in a Selesnya deck but a deck it leads
     is a mono-white deck and fills a different one of the 32. Rule 1 is not the
-    only rule the corpus is enforcing here.
+    only rule the pool is enforcing here.
     """
     items = [c for c in (raw or []) if isinstance(c, dict)]
     names = [str(c.get("card") or "").strip() for c in items]

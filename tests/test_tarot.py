@@ -1,6 +1,6 @@
 """The deck and the deal — the half of a reading that has right answers.
 
-No corpus, no network, no key. `tarot.py` is stdlib and stays that way, which
+No card pool, no network, no key. `tarot.py` is stdlib and stays that way, which
 is what lets these run everywhere the mana solver does.
 """
 

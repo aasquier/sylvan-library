@@ -97,5 +97,5 @@ never complete a purchase. Stage the cart and hand it to the user to confirm.
 - Price is not usually an object, but prefer the cheaper option when a genuine
   functional equivalent exists.
 - Reserved List: allowed or not **per deck** — check the deck file, don't assume.
-- Deep cuts from old Magic are wanted, actively. Query the whole corpus.
+- Deep cuts from old Magic are wanted, actively. Query the whole pool.
 - Ask before large design decisions rather than guessing.

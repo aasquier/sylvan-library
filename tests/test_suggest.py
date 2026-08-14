@@ -195,7 +195,7 @@ def test_scores_stay_inside_their_documented_range():
 # ------------------------------------------------- the pool and the wiring
 #
 # `candidate_pool` is the only part that touches DuckDB. A fake connection
-# keeps these runnable without a corpus, which is the property that lets the
+# keeps these runnable without a card pool, which is the property that lets the
 # whole suite run on a fresh clone.
 
 class FakeCon:
@@ -258,7 +258,7 @@ def test_replacements_for_excludes_what_the_deck_already_runs(monkeypatch):
     assert names == ["Fresh Face"], "a card already in the 99 is not a suggestion"
 
 
-def test_replacements_for_is_empty_when_the_corpus_does_not_know_the_card():
+def test_replacements_for_is_empty_when_the_pool_does_not_know_the_card():
     from mtglab.decks.model import Deck
     assert suggest.replacements_for(Deck(slug="d", name="D"), {}, None, "Nothing") == []
 

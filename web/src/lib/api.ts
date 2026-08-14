@@ -1,7 +1,7 @@
 /** Typed client for the mtglab API. Mirrors src/mtglab/api/service.py. */
 
 export interface Health {
-  corpus: boolean
+  pool: boolean
   oracle_cards: number
   printings: number
   bulk_files?: string[]
@@ -77,7 +77,7 @@ export interface DeckSummary {
   art_crop: string | null
   color_identity: string[]
   // Gate counts, so the shelf can flag a deck that does not validate. null
-  // means the corpus was unavailable and the gate never ran -- which is not
+  // means the pool was unavailable and the gate never ran -- which is not
   // the same as passing, and must not render as a pass.
   errors: number | null
   warnings: number | null
@@ -129,7 +129,7 @@ export interface Card {
   artist?: string | null
   /** Set only when the deck picked a specific printing for its commander, so
    *  the header can name which painting it is showing. Its absence means the
-   *  corpus's default printing. */
+   *  pool's default printing. */
   printing?: { set_name: string | null; set_code: string } | null
 }
 
@@ -138,7 +138,7 @@ export interface DeckDetail extends DeckSummary {
   commander_card: Card | null
   cards: Card[]
   swap_board: Card[]
-  corpus_available: boolean
+  pool_available: boolean
   /** The Scryfall printing id whose art this deck shows, or '' for the
    *  default. A deck property rather than a viewer preference: it lives in
    *  `deck.yaml` and travels with the deck through git. */
@@ -305,7 +305,7 @@ export interface SuggestionTarget {
 
 export interface Suggestions {
   slug: string
-  corpus_available: boolean
+  pool_available: boolean
   targets: SuggestionTarget[]
 }
 
@@ -326,7 +326,7 @@ export interface ImportResult {
   land_count: number
   swap_board: string[]
   needs_rationale: number
-  /** Names the corpus does not know. Kept in the deck verbatim, never guessed. */
+  /** Names the pool does not know. Kept in the deck verbatim, never guessed. */
   unknown: string[]
   unreadable: { line: number; text: string }[]
   skipped: { line: number; text: string }[]
@@ -613,7 +613,7 @@ export interface Combination {
   /**
    * The faces of the faction: a card name and who they are in the story.
    *
-   * Names only here, because `/api/colors` reaches no corpus. The cards
+   * Names only here, because `/api/colors` reaches no card pool. The cards
    * themselves come from `combination()` below, which does — that split is
    * what keeps this payload working on a fresh clone.
    */
@@ -623,17 +623,17 @@ export interface Combination {
 }
 
 /**
- * One combination with its cards resolved against the corpus.
+ * One combination with its cards resolved against the pool.
  *
  * `dropped` counts names that did not resolve, which are left out rather than
  * rendered from the name alone — the same instrument ADR 19 uses for the
- * dossier's rivals. `exact_total` is how many cards in the whole corpus have
+ * dossier's rivals. `exact_total` is how many cards in the whole pool have
  * exactly this identity, and it is the sharpest thing on the page: two, for
  * Artifice.
  */
 export interface CombinationDetail extends Omit<Combination,
   'champions' | 'signature'> {
-  corpus: boolean
+  pool: boolean
   champions: (ReferenceCard & { role: string })[]
   signature: ReferenceCard[]
   dropped: number
@@ -684,10 +684,10 @@ export interface ColorTaxonomy {
 }
 
 /**
- * What the corpus knows about a deck's commander, beyond the card itself.
+ * What the pool knows about a deck's commander, beyond the card itself.
  *
  * Every number here was counted by `service.commander_dossier` over the
- * corpus. None of it is written into the UI, which is rule 1 applied to the
+ * pool. None of it is written into the UI, which is rule 1 applied to the
  * one panel most tempting to fill with remembered trivia.
  */
 export interface CommanderDossier {
@@ -706,7 +706,7 @@ export interface CommanderDossier {
 }
 
 export interface ChallengeProgress {
-  corpus: boolean
+  pool: boolean
   filled: number
   total: number
   slots: {
@@ -794,7 +794,7 @@ export interface InterviewQuestion {
   question: string
   /** role | alternative | redundancy | cost | cut | legality */
   angle: string
-  /** The corpus or gate fact the question rests on. Never an opinion. */
+  /** The pool or gate fact the question rests on. Never an opinion. */
   fact: string
 }
 
@@ -826,7 +826,7 @@ export interface InterviewReport {
 }
 
 /**
- * The commander dossier (ADR 19) — the half of the header the corpus cannot
+ * The commander dossier (ADR 19) — the half of the header the pool cannot
  * count.
  *
  * The shape is the ADR made into fields, and the reason it is not four strings
@@ -852,7 +852,7 @@ export interface DossierRival extends DossierSection {
   image?: string | null
   art_crop?: string | null
   legal_commander?: boolean
-  /** The corpus's own text for the rival, so the real card sits next to the
+  /** The pool's own text for the rival, so the real card sits next to the
    *  sentence comparing it. */
   oracle_text?: string | null
 }
@@ -866,7 +866,7 @@ export interface DossierBody {
   /** Cited pages the search never returned. A number that climbs is a prompt
    *  inventing citations, which is why it is rendered rather than logged. */
   sources_dropped: number
-  /** Named rivals the corpus does not have. */
+  /** Named rivals the pool does not have. */
   rivals_dropped: number
   /** How many pages were read to produce this. */
   searched: number
@@ -1139,15 +1139,15 @@ export const api = {
     status?: string
     dry_run?: boolean
   }) => post<ImportResult>('/api/decks/import', body),
-  // The 32 combinations and their history. No corpus, no decks, no network —
+  // The 32 combinations and their history. No card pool, no decks, no network —
   // so the first screen of the create flow renders on a fresh clone.
-  // Separate from `deck()` on purpose: it runs several extra corpus queries
+  // Separate from `deck()` on purpose: it runs several extra pool queries
   // for a panel that is decorative, so the 99 must never wait on it.
   commander: (ref: DeckRef) => get<CommanderDossier>(deckPath(ref, '/commander')),
   colors: () => get<ColorTaxonomy>('/api/colors'),
   challengeProgress: () => get<ChallengeProgress>('/api/colors/progress'),
   // One combination with its champions and signature cards resolved. Separate
-  // from `colors()` because this one needs the corpus and that one must not.
+  // from `colors()` because this one needs the pool and that one must not.
   combination: (key: string) =>
     get<CombinationDetail>(`/api/colors/${encodeURIComponent(key)}`),
   // The vocabulary. Memoised below rather than here, because a tooltip may ask
@@ -1247,10 +1247,10 @@ export const api = {
   }) => post<Job>('/api/claude/theme/proposal', body),
   // The reader roster (ADR 21). Free, deterministic, and reaching nothing —
   // the same class of thing as `/api/colors`. It answers with no key set and
-  // no corpus, which is what lets the door render its whole first screen
+  // no card pool, which is what lets the door render its whole first screen
   // before anybody has committed to spending a penny.
   personas: () => get<PersonaRoster>('/api/claude/personas'),
-  // Deal three cards. No model, no corpus, no network, no cost: a shuffle has
+  // Deal three cards. No model, no card pool, no network, no cost: a shuffle has
   // a right answer, so Python does it (ADR 14). Pass the seed back to re-deal
   // the same spread — which is what a reload does.
   tarotReading: (seed?: number) =>

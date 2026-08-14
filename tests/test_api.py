@@ -3,15 +3,15 @@
 Two kinds of test live here, and the difference is deliberate.
 
 The endpoints that read a deck file run against the **real** decks in `decks/`
-and need no corpus, because a fresh clone has none until `data refresh` runs
+and need no card pool, because a fresh clone has none until `data refresh` runs
 and the app has to stay usable in that state rather than 500ing.
 
 The endpoints that look a card up -- swap, add, suggestions, search, the Tier 1
-jobs -- take the `corpus` fixture and the synthetic deck from `tiny_corpus`.
+jobs -- take the `pool` fixture and the synthetic deck from `tiny_pool`.
 They used to run against the real decks too, gated on `data/mtg.duckdb`, which
 meant they skipped on every pull request and passed only on the maintainer's
-laptop. Card facts cannot be faked (rule 1) and the 500MB corpus cannot go in
-CI (ADR 6), so the fixture is a real DuckDB corpus of 21 real cards with a
+laptop. Card facts cannot be faked (rule 1) and the 500MB pool cannot go in
+CI (ADR 6), so the fixture is a real DuckDB pool of 21 real cards with a
 legal 99 built out of them.
 """
 
@@ -29,7 +29,7 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-import tiny_corpus  # noqa: E402
+import tiny_pool  # noqa: E402
 from mtglab import config  # noqa: E402
 from mtglab.api import jobs, service  # noqa: E402
 from mtglab.api.app import create_app  # noqa: E402
@@ -51,8 +51,8 @@ def client():
 
 
 @pytest.fixture
-def corpus(tmp_path):
-    """A real, queryable corpus -- built rather than borrowed.
+def pool(tmp_path):
+    """A real, queryable pool -- built rather than borrowed.
 
     The card-fact endpoints (swap, add, suggestions, search) look every name
     up, so without this they were gated on `data/mtg.duckdb` being present.
@@ -61,10 +61,10 @@ def corpus(tmp_path):
     shape a test can have, because the green check was reporting on a suite
     five points of coverage smaller than the one being read.
 
-    `tiny_corpus.build` produces a genuine DuckDB corpus in about a second.
+    `tiny_pool.build` produces a genuine DuckDB pool in about a second.
     """
     with config.use_paths(data_dir=tmp_path / "data"):
-        yield tiny_corpus.build(config.DB_PATH)
+        yield tiny_pool.build(config.DB_PATH)
 
 
 def await_job(client, job_id: str) -> dict:
@@ -81,9 +81,9 @@ def await_job(client, job_id: str) -> dict:
 
 # -------------------------------------------------------------------- meta
 
-def test_health_reports_corpus_state(client):
+def test_health_reports_pool_state(client):
     body = client.get("/api/health").json()
-    assert "corpus" in body
+    assert "pool" in body
     assert isinstance(body["oracle_cards"], int)
 
 
@@ -100,7 +100,7 @@ def test_decks_lists_the_library(client):
 def test_deck_list_carries_the_gate_counts(client):
     """The shelf renders a deck with a banned card identically to a clean one
     unless the list endpoint says so, and fetching /validate per deck would be
-    an N+1 on every page load. `errors` may be None when the corpus is missing
+    an N+1 on every page load. `errors` may be None when the pool is missing
     -- that is 'the gate did not run', not 'the deck passed'."""
     body = client.get("/api/decks").json()
     assert body, "no decks found"
@@ -108,15 +108,15 @@ def test_deck_list_carries_the_gate_counts(client):
         assert "errors" in deck and "warnings" in deck
         assert deck["errors"] is None or isinstance(deck["errors"], int)
         assert deck["warnings"] is None or isinstance(deck["warnings"], int)
-        # Never report a count without the corpus that produced it.
+        # Never report a count without the pool that produced it.
         assert (deck["errors"] is None) == (deck["warnings"] is None)
 
 
-def test_deck_list_gate_counts_agree_with_the_validate_endpoint(corpus, client):
+def test_deck_list_gate_counts_agree_with_the_validate_endpoint(pool, client):
     """Two code paths compute the same thing; they must not drift.
 
-    Takes `corpus` so the gate actually runs. What it reports does not matter
-    here -- against a 21-card corpus the real decks are mostly unknown
+    Takes `pool` so the gate actually runs. What it reports does not matter
+    here -- against a 21-card pool the real decks are mostly unknown
     cards, and that is fine, because the subject is whether the two paths
     agree rather than whether any deck is clean.
     """
@@ -265,7 +265,7 @@ def test_suggestions_are_offered_for_a_banned_card(swappable):
     should name the offender and shortlist legal cards that resemble it."""
     with swappable as client:
         body = client.get("/api/decks/local/mono-green/suggestions").json()
-        assert body["corpus_available"] is True
+        assert body["pool_available"] is True
         targets = {t["card"]: t for t in body["targets"]}
         assert "Primeval Titan" in targets, body
 
@@ -399,41 +399,41 @@ def test_the_request_scope_does_not_leak_into_the_public_schema(client):
 # exists precisely so it does not have to.
 
 @pytest.fixture
-def swappable(in_memory_client, corpus):
-    """The fixture deck, held in memory so writes go nowhere, with a corpus
+def swappable(in_memory_client, pool):
+    """The fixture deck, held in memory so writes go nowhere, with a card pool
     behind it so card facts can actually be looked up.
 
-    This was the real Goreclaw list until the corpus fixture existed. Same
+    This was the real Goreclaw list until the pool fixture existed. Same
     shape -- a mono-green commander, a legal 99, exactly one banned card --
-    but built out of `tiny_corpus.CARDS`, so the gate has something real to
+    but built out of `tiny_pool.CARDS`, so the gate has something real to
     catch without needing all 35,000 cards to find it.
     """
-    return in_memory_client([tiny_corpus.mono_green_deck()])
+    return in_memory_client([tiny_pool.mono_green_deck()])
 
 
 @pytest.fixture
-def clean_client(in_memory_client, corpus):
+def clean_client(in_memory_client, pool):
     """The same deck with a legal card in the Titan's slot, so "the gate found
     nothing" is testable as its own case rather than inferred."""
-    return in_memory_client([tiny_corpus.mono_green_deck(clean=True)])
+    return in_memory_client([tiny_pool.mono_green_deck(clean=True)])
 
 
 @pytest.fixture
-def sim_client(in_memory_client, corpus):
+def sim_client(in_memory_client, pool):
     """A deck the simulator can actually compile.
 
     Tier 1 needs a card record for every slot, so these were pointed at
-    `gyome-food` and the real corpus -- which is why the whole simulation
+    `gyome-food` and the real pool -- which is why the whole simulation
     surface, jobs and polling included, went untested in CI. The fixture deck
-    compiles against `tiny_corpus`, so the job contract the UI depends on is
+    compiles against `tiny_pool`, so the job contract the UI depends on is
     now exercised on every pull request.
 
     A background job captures the `DeckSource` and outlives its request, which
-    is fine here: `await_job` blocks inside the test, so `corpus` is still on
+    is fine here: `await_job` blocks inside the test, so `pool` is still on
     the stack when the worker reads it.
     """
     jobs.clear()
-    with in_memory_client([tiny_corpus.mono_green_deck(clean=True)]) as c:
+    with in_memory_client([tiny_pool.mono_green_deck(clean=True)]) as c:
         yield c
 
 
@@ -472,7 +472,7 @@ def test_a_swap_keeps_the_slot_and_records_the_given_why(swappable):
 
 
 # Split by what each refusal needs. The first group is checked before the
-# corpus is even opened, so it runs on a fresh clone -- which is where most of
+# pool is even opened, so it runs on a fresh clone -- which is where most of
 # these mistakes actually get made.
 
 @pytest.mark.parametrize(("payload", "expected"), [
@@ -485,7 +485,7 @@ def test_a_swap_keeps_the_slot_and_records_the_given_why(swappable):
     ({"out": "Primeval Titan", "into": "Goreclaw, Terror of Qal Sisma", "why": "x"},
      "is the commander"),
 ])
-def test_a_swap_refused_on_the_deck_alone_needs_no_corpus(swappable, payload, expected):
+def test_a_swap_refused_on_the_deck_alone_needs_no_pool(swappable, payload, expected):
     with swappable as client:
         resp = client.post("/api/decks/local/mono-green/swap", json=payload)
         assert resp.status_code == 422, resp.text
@@ -494,7 +494,7 @@ def test_a_swap_refused_on_the_deck_alone_needs_no_corpus(swappable, payload, ex
 
 @pytest.mark.parametrize(("payload", "expected"), [
     ({"out": "Primeval Titan", "into": "Not A Real Card At All", "why": "x"},
-     "corpus knows"),
+     "pool knows"),
     ({"out": "Primeval Titan", "into": "Rhystic Study", "why": "x"},
      "outside the commander's"),
     ({"out": "Primeval Titan", "into": "Black Lotus", "why": "x"},
@@ -507,25 +507,25 @@ def test_a_swap_refused_on_a_card_fact_is_looked_up(swappable, payload, expected
         assert expected in resp.json()["detail"]
 
 
-def test_a_swap_without_a_corpus_says_so_rather_than_guessing(in_memory_client,
+def test_a_swap_without_a_pool_says_so_rather_than_guessing(in_memory_client,
                                                               tmp_path):
     """Legality and colour identity are card facts, and CLAUDE.md rule 1 says
-    those are looked up. With no corpus there is nothing to look them up in, so
+    those are looked up. With no card pool there is nothing to look them up in, so
     the swap is refused rather than waved through.
 
-    Points at an empty directory rather than skipping when a corpus happens to
+    Points at an empty directory rather than skipping when a card pool happens to
     be present. The fresh-clone path is a behaviour worth pinning, and it used
     to be tested only on machines that had never run `data refresh` -- which
     is to say, almost nowhere.
     """
     with config.use_paths(data_dir=tmp_path / "absent"), \
-            in_memory_client([tiny_corpus.mono_green_deck()]) as client:
-        assert client.get("/api/health").json()["corpus"] is False
+            in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        assert client.get("/api/health").json()["pool"] is False
         resp = client.post("/api/decks/local/mono-green/swap", json={
             "out": "Primeval Titan", "into": "Cultivator Colossus",
             "why": "A real rationale."})
         assert resp.status_code == 422
-        assert "corpus" in resp.json()["detail"]
+        assert "pool" in resp.json()["detail"]
 
 
 def test_a_refused_swap_changes_nothing(swappable):
@@ -541,7 +541,7 @@ def test_a_refused_swap_changes_nothing(swappable):
 def test_a_read_only_source_refuses_every_swap():
     """What the hosted two-tier model needs: curated decks stay read-only for
     someone who is not the maintainer, checked in one place."""
-    deck = tiny_corpus.mono_green_deck()
+    deck = tiny_pool.mono_green_deck()
     app = create_app()
     _ro = MemoryDeckSource([deck], writable=False)
     app.dependency_overrides[deck_source] = lambda: _ro
@@ -560,11 +560,11 @@ def test_a_read_only_source_refuses_every_swap():
 # and reported, and a refusal that writes nothing.
 
 @pytest.fixture
-def draft_client(in_memory_client, corpus):
+def draft_client(in_memory_client, pool):
     """A draft, so the rule 4 bend is exercisable. Cards keep their `why`s --
     what makes it a draft is the stage, and a draft with rationales already
     written is one of ADR 13's four real combinations."""
-    return in_memory_client([tiny_corpus.mono_green_deck(stage="draft")])
+    return in_memory_client([tiny_pool.mono_green_deck(stage="draft")])
 
 
 def test_a_card_can_be_added_and_the_gate_comes_back(swappable):
@@ -592,12 +592,12 @@ def test_a_card_outside_the_commanders_identity_is_refused(swappable):
         assert "outside the commander's" in resp.json()["detail"]
 
 
-def test_a_card_the_corpus_does_not_know_is_refused(swappable):
+def test_a_card_the_pool_does_not_know_is_refused(swappable):
     with swappable as client:
         resp = client.post("/api/decks/local/mono-green/cards", json={
             "name": "Definitely Not A Card", "category": "ramp", "why": "x"})
         assert resp.status_code == 422
-        assert "not a card the corpus knows" in resp.json()["detail"]
+        assert "not a card the pool knows" in resp.json()["detail"]
 
 
 def test_an_unknown_category_is_refused_before_any_lookup(swappable):
@@ -629,7 +629,7 @@ def test_a_draft_accepts_a_card_that_still_owes_its_rationale(draft_client):
         assert resp.json()["needs_rationale"] == before + 1
 
 
-def test_a_card_can_be_removed_without_a_corpus(swappable):
+def test_a_card_can_be_removed_without_a_pool(swappable):
     """Removing a card is a fact about this deck file, not about Magic, so it
     works on a machine that has never run `data refresh`."""
     with swappable as client:
@@ -771,7 +771,7 @@ def test_a_refused_edit_changes_nothing(swappable):
 
 
 def test_a_read_only_source_refuses_every_edit():
-    deck = tiny_corpus.mono_green_deck()
+    deck = tiny_pool.mono_green_deck()
     app = create_app()
     _ro = MemoryDeckSource([deck], writable=False)
     app.dependency_overrides[deck_source] = lambda: _ro
@@ -801,14 +801,14 @@ def test_a_read_only_source_refuses_every_edit():
 
 @pytest.fixture
 def importable(in_memory_client, tmp_path):
-    """An empty library, with the fixture corpus behind it.
+    """An empty library, with the fixture pool behind it.
 
-    Built rather than borrowed: the real 500MB corpus is absent on a fresh
+    Built rather than borrowed: the real 500MB pool is absent on a fresh
     clone and in CI, and the one thing worth proving about import is what it
-    does *with* a corpus.
+    does *with* a card pool.
     """
     with config.use_paths(data_dir=tmp_path / "data"):
-        tiny_corpus.build(config.DB_PATH)
+        tiny_pool.build(config.DB_PATH)
         yield in_memory_client([])
 
 
@@ -818,7 +818,7 @@ def test_import_creates_a_draft_and_gates_it_immediately(importable):
     with importable as client:
         resp = client.post("/api/decks/import", json={
             "slug": "gyome-x", "name": "Gyome imported",
-            "text": tiny_corpus.DECKLIST, "bracket": 4})
+            "text": tiny_pool.DECKLIST, "bracket": 4})
         assert resp.status_code == 200, resp.text
         body = resp.json()
 
@@ -843,7 +843,7 @@ def test_import_dry_run_previews_without_creating(importable):
     the result rather than an estimate of it."""
     with importable as client:
         resp = client.post("/api/decks/import", json={
-            "slug": "gyome-x", "text": tiny_corpus.DECKLIST, "dry_run": True})
+            "slug": "gyome-x", "text": tiny_pool.DECKLIST, "dry_run": True})
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["created"] is False
@@ -882,17 +882,17 @@ def test_import_refusals(importable, payload, expected):
 def test_import_will_not_overwrite_an_existing_deck(in_memory_client, tmp_path):
     deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
     with config.use_paths(data_dir=tmp_path / "data"):
-        tiny_corpus.build(config.DB_PATH)
+        tiny_pool.build(config.DB_PATH)
         with in_memory_client([deck]) as client:
             resp = client.post("/api/decks/import", json={
-                "slug": "goreclaw-stompy", "text": tiny_corpus.DECKLIST})
+                "slug": "goreclaw-stompy", "text": tiny_pool.DECKLIST})
             assert resp.status_code == 422
             assert "already exists" in resp.json()["detail"]
             # The deck it refused to touch is untouched.
             assert client.get("/api/decks/local/goreclaw-stompy").json()["stage"] == "curated"
 
 
-def test_import_without_a_corpus_refuses_rather_than_guessing(in_memory_client,
+def test_import_without_a_pool_refuses_rather_than_guessing(in_memory_client,
                                                               tmp_path):
     """Every name would be unknown and no land filed, so the deck's facts would
     never be checked -- the one thing the gate exists to do."""
@@ -901,7 +901,7 @@ def test_import_without_a_corpus_refuses_rather_than_guessing(in_memory_client,
         resp = client.post("/api/decks/import",
                            json={"slug": "x", "text": "1 Sol Ring\n"})
         assert resp.status_code == 422
-        assert "corpus" in resp.json()["detail"]
+        assert "pool" in resp.json()["detail"]
 
 
 def test_a_read_only_library_refuses_import():
@@ -930,18 +930,18 @@ def test_an_empty_library_is_empty_rather_than_broken(in_memory_client):
     with in_memory_client([]) as client:
         assert client.get("/api/decks").json() == []
         health = client.get("/api/health").json()
-        if health["corpus"]:
+        if health["pool"]:
             assert health["decks"] == 0
 
 
 # ------------------------------------------------------------------- cards
 
-def test_card_search_respects_the_limit(corpus, client):
+def test_card_search_respects_the_limit(pool, client):
     body = client.get("/api/cards/search", params={"limit": 5}).json()
     assert len(body["cards"]) <= 5
 
 
-def test_card_search_identity_filter_is_a_subset_check(corpus, client):
+def test_card_search_identity_filter_is_a_subset_check(pool, client):
     """Asking for BG must return colorless and mono-B cards too -- that is the
     question a Golgari deckbuilder is actually asking."""
     body = client.get("/api/cards/search",
@@ -1046,7 +1046,7 @@ def test_keep_rule_uses_documented_defaults():
 #
 # The unit-level guarantees -- what reaches the key, that it survives a
 # restart, that a broken store is a miss -- are in `test_sim_cache.py`. These
-# are the ones that need the whole stack: a request, a deck source, a corpus
+# are the ones that need the whole stack: a request, a deck source, a card pool
 # and the job registry, which is where a cache turns into a wrong answer if it
 # is going to.
 
@@ -1211,12 +1211,12 @@ def test_a_deck_that_cannot_compile_still_fails_through_the_job(sim_client, rout
 
 
 def test_a_land_sweep_with_no_lands_reports_that_and_nothing_else(
-        in_memory_client, corpus):
+        in_memory_client, pool):
     """The other `plan_lands` failure, and the one `_resize` raises rather than
     `_compile`: it has to survive the same fallback."""
     from mtglab.decks.model import CardEntry
 
-    landless = tiny_corpus.mono_green_deck(clean=True)
+    landless = tiny_pool.mono_green_deck(clean=True)
     landless.cards = [CardEntry(name="Sol Ring", category="ramp", qty=99,
                                 why="A fixture with no lands at all.")]
     jobs.clear()
@@ -1242,7 +1242,7 @@ def test_job_progress_is_reported(client):
 
 # ---------------------------------------------------------------- colours
 
-def test_colors_needs_no_corpus_and_no_decks(client):
+def test_colors_needs_no_pool_and_no_decks(client):
     """The one deck-facing page that works on a fresh clone.
 
     Nothing here touches DuckDB, the deck source or the network, which is what
@@ -1267,11 +1267,11 @@ def test_four_colour_slots_expose_both_naming_conventions(client):
     assert quad["aliases"] == ["Yore-Tiller"]
 
 
-def test_the_taxonomy_carries_the_teaching_depth_without_a_corpus(client):
+def test_the_taxonomy_carries_the_teaching_depth_without_a_pool(client):
     """Lore, champion names and signature names ride on the table itself.
 
     Names only -- the cards come from `/api/colors/{key}`, which does need a
-    corpus. Splitting it that way is what lets the create flow's first screen
+    pool. Splitting it that way is what lets the create flow's first screen
     keep working on a fresh clone while still saying who Trostani is.
     """
     body = client.get("/api/colors").json()
@@ -1286,11 +1286,11 @@ def test_the_taxonomy_carries_the_teaching_depth_without_a_corpus(client):
     assert green["signature"]
 
 
-def test_combination_detail_reports_no_corpus_rather_than_failing(tmp_path):
+def test_combination_detail_reports_no_pool_rather_than_failing(tmp_path):
     """A fresh clone gets the prose and an honest empty card list.
 
     Pointed at an empty data directory rather than run on the bare `client`
-    fixture, which would find the maintainer's own 500MB corpus and pass here
+    fixture, which would find the maintainer's own 500MB pool and pass here
     while asserting the opposite of what CI sees.
     """
     with config.use_paths(data_dir=tmp_path / "empty"), \
@@ -1298,7 +1298,7 @@ def test_combination_detail_reports_no_corpus_rather_than_failing(tmp_path):
         body = c.get("/api/colors/WG").json()
     assert body["name"] == "Selesnya"
     assert len(body["lore"].split()) >= 40
-    assert body["corpus"] is False
+    assert body["pool"] is False
     assert body["champions"] == [] and body["signature"] == []
     assert body["exact_total"] is None
 
@@ -1310,14 +1310,14 @@ def test_combination_detail_canonicalises_the_key_and_404s_on_nonsense(client):
 
 
 def test_combination_detail_resolves_cards_and_drops_what_is_missing(
-        corpus, client, monkeypatch):
+        pool, client, monkeypatch):
     """The ADR 19 instrument, pointed at reference data.
 
     A misspelled name here would otherwise render as a confident empty card,
     so an unresolved one is dropped and counted. The lists are monkeypatched
-    rather than borrowed from the real table because the tiny corpus holds 21
+    rather than borrowed from the real table because the tiny pool holds 21
     cards and none of them is a Selesnya staple -- what is under test is the
-    resolution, and the real names are checked against the real corpus in
+    resolution, and the real names are checked against the real pool in
     `test_colors.py`.
     """
     from mtglab import colors
@@ -1330,19 +1330,19 @@ def test_combination_detail_resolves_cards_and_drops_what_is_missing(
     monkeypatch.setattr(colors, "BY_KEY", patched)
 
     body = client.get("/api/colors/G").json()
-    assert body["corpus"] is True
+    assert body["pool"] is True
     assert [c["name"] for c in body["signature"]] == [
         "Goreclaw, Terror of Qal Sisma"]
     assert [c["name"] for c in body["champions"]] == ["Regal Behemoth"]
     assert body["champions"][0]["role"] == "A fixture, not a face."
     # Two names in, two dropped, and the count is reported rather than implied.
     assert body["dropped"] == 2
-    # Counted over the corpus rather than stored. The tiny fixture is mostly
+    # Counted over the pool rather than stored. The tiny fixture is mostly
     # mono-green, so this is a real number and not a placeholder.
     assert body["exact_total"] > 0
 
 
-def test_glossary_needs_no_corpus_and_no_decks(client):
+def test_glossary_needs_no_pool_and_no_decks(client):
     """Reference prose, like the taxonomy. Same fresh-clone property."""
     body = client.get("/api/glossary").json()
     keys = {t["key"] for t in body["terms"]}
@@ -1362,7 +1362,7 @@ def test_challenge_progress_counts_filled_slots(in_memory_client):
         body = c.get("/api/colors/progress").json()
     assert body["total"] == 32
     assert len(body["slots"]) == 32
-    # Gyome is Golgari. Without a corpus the identity cannot be derived at all,
+    # Gyome is Golgari. Without a card pool the identity cannot be derived at all,
     # so the assertion is conditional -- the same tolerance the rest of this
     # file has for a fresh clone.
     golgari = next(s for s in body["slots"] if s["key"] == "BG")
@@ -1372,7 +1372,7 @@ def test_challenge_progress_counts_filled_slots(in_memory_client):
 
 # ----------------------------------------------------------------- create
 
-def test_create_makes_a_draft_from_a_commander(corpus, in_memory_client):
+def test_create_makes_a_draft_from_a_commander(pool, in_memory_client):
     with in_memory_client([]) as c:
         body = c.post("/api/decks", json={
             "slug": "brand-new", "commander": ["Gyome, Master Chef"]}).json()
@@ -1384,7 +1384,7 @@ def test_create_makes_a_draft_from_a_commander(corpus, in_memory_client):
     assert body["combination"]["name"] == "Golgari"
 
 
-def test_create_refuses_a_card_that_cannot_lead_a_deck(corpus, in_memory_client):
+def test_create_refuses_a_card_that_cannot_lead_a_deck(pool, in_memory_client):
     with in_memory_client([]) as c:
         r = c.post("/api/decks", json={"slug": "nope", "commander": ["Sol Ring"]})
     assert r.status_code == 422
@@ -1398,7 +1398,7 @@ def test_create_refuses_a_deck_with_no_commander(in_memory_client):
     assert "needs a commander" in r.json()["detail"]
 
 
-def test_create_refuses_a_duplicate_slug(corpus, in_memory_client):
+def test_create_refuses_a_duplicate_slug(pool, in_memory_client):
     existing = Deck.load(Path("decks/gyome-food/deck.yaml"))
     with in_memory_client([existing]) as c:
         r = c.post("/api/decks", json={
@@ -1419,22 +1419,22 @@ def test_create_is_refused_on_a_read_only_library():
     assert r.status_code == 403
 
 
-@pytest.mark.needs_full_corpus
+@pytest.mark.needs_full_pool
 def test_commander_search_is_exact_and_returns_actual_commanders(client):
     """The bug this pins: `commanders_only` used to filter after the SQL
     limit, so a search for Selesnya commanders returned the sixty best
     Selesnya cards, none of which was a commander, and then nothing.
 
-    The one test here that `tiny_corpus` genuinely cannot carry, and it is
+    The one test here that `tiny_pool` genuinely cannot carry, and it is
     marked rather than quietly skipped so the gap is countable. Reproducing
     the bug needs *more* Selesnya cards than the limit, with the commander
     ranked below the cut -- against 21 cards the filter and the limit
     cannot disagree, so a fixture version would pass whether or not the bug
     was back. Eleven more fixture rows to keep one assertion honest is a
-    worse trade than saying plainly that this one needs the real corpus.
+    worse trade than saying plainly that this one needs the real pool.
     """
     if not config.DB_PATH.exists():
-        pytest.skip("needs the full corpus -- run `mtglab data refresh`")
+        pytest.skip("needs the full pool -- run `mtglab data refresh`")
     cards = client.get("/api/cards/search", params={
         "identity": "WG", "identity_exact": True,
         "commanders_only": True, "limit": 10}).json()["cards"]
@@ -1685,8 +1685,8 @@ def test_the_interview_at_a_stance_of_off_makes_no_call(client):
 
 # ------------------------------------------------- the commander dossier
 
-def test_commander_dossier_counts_subtypes_off_the_corpus(
-        corpus, in_memory_client):
+def test_commander_dossier_counts_subtypes_off_the_pool(
+        pool, in_memory_client):
     """Gyome is a Troll Warlock, and how unusual that is comes from counting
     type lines rather than from anybody's recollection.
 
@@ -1706,11 +1706,11 @@ def test_commander_dossier_counts_subtypes_off_the_corpus(
     assert names == ["Troll", "Warlock"]
     for row in body["subtypes"]:
         # Every legendary one is also one of the total, so this ordering holds
-        # for any corpus and catches the two counts being swapped.
+        # for any pool and catches the two counts being swapped.
         assert 0 < row["legendary"] <= row["total"]
 
 
-def test_commander_dossier_reads_the_front_face_of_a_double_faced_card(corpus):
+def test_commander_dossier_reads_the_front_face_of_a_double_faced_card(pool):
     """A DFC's `type_line` carries both halves around a `//`. The commander's
     types are the ones on the side you cast, which is the same reason
     `CardRecord.front_type_line` exists."""
@@ -1720,29 +1720,29 @@ def test_commander_dossier_reads_the_front_face_of_a_double_faced_card(corpus):
     assert subtypes == ["Cat", "Warrior"], "the back face must not leak in"
 
 
-def test_commander_dossier_handles_a_type_line_with_no_subtypes(corpus):
+def test_commander_dossier_handles_a_type_line_with_no_subtypes(pool):
     assert service._type_parts("Artifact") == (["Artifact"], [])
     assert service._type_parts("Basic Land — Swamp") == (["Basic", "Land"], ["Swamp"])
 
 
-def test_commander_dossier_is_empty_rather_than_a_404_without_a_corpus(
+def test_commander_dossier_is_empty_rather_than_a_404_without_a_pool(
         tmp_path, in_memory_client):
     """A decorative panel must not take the deck page down with it. The deck
     still renders on a fresh clone; the dossier is simply empty."""
     with config.use_paths(data_dir=tmp_path / "absent"), \
-            in_memory_client([tiny_corpus.mono_green_deck()]) as client:
+            in_memory_client([tiny_pool.mono_green_deck()]) as client:
         r = client.get("/api/decks/local/mono-green/commander")
         assert r.status_code == 200
         assert r.json()["card"] is None
         assert r.json()["subtypes"] == []
 
 
-def test_commander_dossier_survives_a_corpus_with_no_printings(
-        corpus, in_memory_client):
-    """`tiny_corpus` loads oracle rows and no printings, which is also what a
-    partially-built corpus looks like. Zero printings is a fact to report, not
+def test_commander_dossier_survives_a_pool_with_no_printings(
+        pool, in_memory_client):
+    """`tiny_pool` loads oracle rows and no printings, which is also what a
+    partially-built pool looks like. Zero printings is a fact to report, not
     a crash."""
-    with in_memory_client([tiny_corpus.mono_green_deck()]) as client:
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
         body = client.get("/api/decks/local/mono-green/commander").json()
     assert body["printings"]["count"] == 0
     assert body["printings"]["first_released"] is None
@@ -1750,14 +1750,14 @@ def test_commander_dossier_survives_a_corpus_with_no_printings(
 
 
 def test_commander_dossier_never_lists_the_commander_among_its_own_relatives(
-        corpus, in_memory_client):
-    with in_memory_client([tiny_corpus.mono_green_deck()]) as client:
+        pool, in_memory_client):
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
         body = client.get("/api/decks/local/mono-green/commander").json()
     assert body["card"]["name"] not in [c["name"] for c in body["other_cards"]]
 
 
-def test_commander_dossier_404s_for_an_unknown_deck(corpus, in_memory_client):
-    with in_memory_client([tiny_corpus.mono_green_deck()]) as client:
+def test_commander_dossier_404s_for_an_unknown_deck(pool, in_memory_client):
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
         assert client.get("/api/decks/local/nope/commander").status_code == 404
 
 
@@ -1910,6 +1910,93 @@ def test_a_queued_proposal_waits_on_the_network_lane(client, monkeypatch):
     assert await_job(client, r.json()["id"])["status"] == "done"
 
 
+# The three error translations inside the worker. Everything refusable is
+# refused by the POST above; these are the failures that can only happen once
+# the call is already in flight, and until 2026-08-14 not one of them had a
+# test. They matter more than their line count suggests: this is the code that
+# decides whether an expired key reads as "your key may have expired" or as a
+# stack trace in a job's error field, and the key this project runs on has a
+# fixed lifetime, so the 401 path is a question of when rather than whether.
+
+
+def _claude_is_available(monkeypatch):
+    """A key and an SDK, without either being real."""
+    import mtglab.claude.client as cc
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+
+
+def _expired_key_error():
+    """A real `anthropic.AuthenticationError`, which is the failure these three
+    paths exist for.
+
+    Deliberately not a bare `RuntimeError`: `explain()` returns `str(exc)` for
+    anything it does not recognise, so a generic exception cannot tell a worker
+    that translates from one that re-raises. A 401 can — only the translation
+    produces the word "expired".
+    """
+    anthropic = pytest.importorskip("anthropic")
+    import httpx
+
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    response = httpx.Response(401, request=request, json={
+        "type": "error", "error": {"type": "authentication_error",
+                                   "message": "invalid x-api-key"}})
+    return anthropic.AuthenticationError("invalid x-api-key",
+                                         response=response, body=None)
+
+
+def test_a_proposal_that_fails_mid_call_becomes_a_readable_job_error(
+        client, monkeypatch):
+    """A broad `except` on purpose, and narrow in effect: everything reaching
+    it is the SDK failing, and the job carries `explain()`'s account of it
+    rather than a traceback.
+
+    The key this project runs on has a fixed lifetime, so this is the failure
+    to expect rather than an exotic one — and four minutes in, the job's error
+    field is the only thing anybody gets to read.
+    """
+    from mtglab.claude import theme
+
+    _claude_is_available(monkeypatch)
+
+    def boom(request, on_turn=None):
+        raise _expired_key_error()
+
+    monkeypatch.setattr(theme, "run_proposal", boom)
+
+    r = client.post("/api/claude/theme/proposal",
+                    json={"transcript": THEME_TRANSCRIPT, "slots": THEME_SLOTS})
+    assert r.status_code == 200, "the failure belongs in the job, not the POST"
+
+    done = await_job(client, r.json()["id"])
+    assert done["status"] == "error"
+    assert "expired" in done["error"], "the raw 401 reached the job untranslated"
+    assert "Traceback" not in done["error"]
+
+
+def test_an_exhausted_proposal_says_so_rather_than_returning_a_stub(
+        client, monkeypatch):
+    """`ModeExhausted` is the tool loop hitting its turn limit. Its own message
+    survives, because "it ran out of turns" and "the SDK broke" are different
+    facts and the job is the only place either one can be read."""
+    from mtglab.claude import theme
+    from mtglab.claude.modes import ModeExhausted
+
+    _claude_is_available(monkeypatch)
+
+    def exhausted(request, on_turn=None):
+        raise ModeExhausted("stopped after 8 turns without finishing")
+
+    monkeypatch.setattr(theme, "run_proposal", exhausted)
+
+    r = client.post("/api/claude/theme/proposal",
+                    json={"transcript": THEME_TRANSCRIPT, "slots": THEME_SLOTS})
+    done = await_job(client, r.json()["id"])
+    assert done["status"] == "error"
+    assert "8 turns" in done["error"]
+
+
 # ------------------------------------------ the theme conversation, as a job
 #
 # ADR 20's cheap half, which turned out not to be reliably cheap: 4.3-37.7
@@ -2007,6 +2094,31 @@ def test_a_conversation_past_its_ceiling_is_a_job_born_finished(client,
     assert str(theme.MAX_EXCHANGES) in body["result"]["reason"]
 
 
+def test_a_turn_that_fails_mid_call_becomes_a_readable_job_error(client,
+                                                                 monkeypatch):
+    """The third copy of the same error translation — `plan_ask` has it too,
+    and it was the last of the three to move off the request path. A turn is
+    the cheapest of the three surfaces and the most frequently run, so it is
+    the one most likely to be the first to meet an expired key."""
+    from mtglab.claude import theme
+
+    _claude_is_available(monkeypatch)
+
+    def boom(request, on_turn=None):
+        raise _expired_key_error()
+
+    monkeypatch.setattr(theme, "run_ask", boom)
+
+    r = client.post("/api/claude/theme",
+                    json={"transcript": THEME_TRANSCRIPT, "slots": THEME_SLOTS})
+    assert r.status_code == 200, "the failure belongs in the job, not the POST"
+
+    done = await_job(client, r.json()["id"])
+    assert done["status"] == "error"
+    assert "expired" in done["error"], "the raw 401 reached the job untranslated"
+    assert "Traceback" not in done["error"]
+
+
 def test_a_turn_without_a_key_is_a_503_rather_than_a_failed_job(client,
                                                                monkeypatch):
     """Answerable locally — set a key — so it says so from the route, with the
@@ -2082,16 +2194,16 @@ def test_two_turns_in_flight_are_two_jobs_and_not_one(client, monkeypatch):
 # asked what the HTTP surface did with it.
 
 @pytest.fixture
-def dossier_client(in_memory_client, corpus):
-    """A deck whose commander the corpus can actually resolve.
+def dossier_client(in_memory_client, pool):
+    """A deck whose commander the pool can actually resolve.
 
     The planning half looks the commander up before anything is queued -- that
     is what makes a bad deck a 422 in the request rather than four minutes
-    later -- so this needs a real corpus behind a real deck, the same shape
+    later -- so this needs a real pool behind a real deck, the same shape
     `sim_client` needs for compilation.
     """
     jobs.clear()
-    with in_memory_client([tiny_corpus.mono_green_deck(clean=True)]) as c:
+    with in_memory_client([tiny_pool.mono_green_deck(clean=True)]) as c:
         yield c
 
 
@@ -2171,20 +2283,66 @@ def test_a_stored_dossier_is_a_job_born_finished(dossier_client, monkeypatch):
     assert body["result"]["cached"] is True, "quote a cached dossier as cached"
 
 
-def test_a_deck_with_no_commander_the_corpus_knows_is_a_422_before_any_job(
+def test_a_deck_with_no_commander_the_pool_knows_is_a_422_before_any_job(
         dossier_client, monkeypatch):
     """A fact about the deck, not a failure of the model — and a poor thing to
     wait four minutes to be told."""
     from mtglab.claude import dossier
 
     def no_commander(slug, source=None):
-        raise dossier.NoCommander("no commander this corpus knows")
+        raise dossier.NoCommander("no commander this pool knows")
 
     monkeypatch.setattr(dossier, "brief", no_commander)
 
     r = dossier_client.post("/api/decks/local/mono-green/dossier", json={})
     assert r.status_code == 422
     assert jobs.all_jobs() == [], "nothing should have been queued"
+
+
+def test_a_dossier_that_fails_mid_call_becomes_a_readable_job_error(
+        dossier_client, monkeypatch):
+    """The counterpart to the 503 above, for the failures that can only happen
+    once the call is already in flight. The 236-second run is the one place
+    nobody is watching, so what it leaves in the job's error field is the whole
+    of what a person gets to debug from."""
+    from mtglab.claude import dossier
+
+    _claude_is_available(monkeypatch)
+
+    def boom(request, on_turn=None):
+        raise _expired_key_error()
+
+    monkeypatch.setattr(dossier, "run_dossier", boom)
+
+    r = dossier_client.post("/api/decks/local/mono-green/dossier", json={})
+    assert r.status_code == 200, "the failure belongs in the job, not the POST"
+
+    done = await_job(dossier_client, r.json()["id"])
+    assert done["status"] == "error"
+    assert "expired" in done["error"], "the raw 401 reached the job untranslated"
+    assert "Traceback" not in done["error"]
+
+
+def test_an_exhausted_dossier_is_an_error_and_not_a_half_written_one(
+        dossier_client, monkeypatch):
+    """ADR 19 refuses a dossier with no surviving source rather than showing a
+    thin one; a dossier that ran out of turns is the same argument one step
+    earlier. A truncated answer that reads finished is the failure worth
+    avoiding — the Forge-with-96-cards shape."""
+    from mtglab.claude import dossier
+    from mtglab.claude.modes import ModeExhausted
+
+    _claude_is_available(monkeypatch)
+
+    def exhausted(request, on_turn=None):
+        raise ModeExhausted("stopped after 8 turns without finishing")
+
+    monkeypatch.setattr(dossier, "run_dossier", exhausted)
+
+    r = dossier_client.post("/api/decks/local/mono-green/dossier", json={})
+    done = await_job(dossier_client, r.json()["id"])
+    assert done["status"] == "error"
+    assert "8 turns" in done["error"]
 
 
 @pytest.fixture

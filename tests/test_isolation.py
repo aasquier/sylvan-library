@@ -52,14 +52,14 @@ pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 pytest.importorskip("argon2")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-import tiny_corpus  # noqa: E402
-from mtglab import config  # noqa: E402
-from mtglab.api import jobs  # noqa: E402
-from mtglab.api.app import create_app  # noqa: E402
-from mtglab.api.auth import ADMIN_PREFIX, PUBLIC_PATHS  # noqa: E402
-from mtglab.auth import db, users  # noqa: E402
+import tiny_pool
+from mtglab import config
+from mtglab.api import jobs
+from mtglab.api.app import create_app
+from mtglab.api.auth import ADMIN_PREFIX, PUBLIC_PATHS
+from mtglab.auth import db, users
 
 PASSWORD_A = "correct-horse-battery-staple"
 PASSWORD_B = "a-different-long-passphrase"
@@ -82,11 +82,11 @@ SHARED = {
     "/api/sim/mana": "submits a job against a deck the caller may see; the "
                      "owner is resolved through Library and the job is scoped",
     "/api/sim/lands": "submits a job too, same resolution, and the job is scoped",
-    "/api/cards/search": "the public Scryfall corpus",
+    "/api/cards/search": "the public Scryfall pool",
     "/api/sets/upcoming": "Scryfall's own release calendar",
     "/api/colors": "a fixed taxonomy, no data at all",
     "/api/colors/progress": "scored over the shared library",
-    "/api/colors/{key}": "a fixed taxonomy plus public corpus cards",
+    "/api/colors/{key}": "a fixed taxonomy plus public pool cards",
     "/api/glossary": "fixed reference prose, no data at all",
     "/api/claude": "whether the surface is configured on this instance",
     # The persona roster and the deal. Both are the same class of thing as
@@ -107,7 +107,7 @@ SHARED = {
     # are: the *submission* is shared (there is no deck and nothing personal on
     # the server to reach), and the job it hands back is scoped by `jobs.get`.
     "/api/claude/theme/proposal": "submits a job; colours and commanders out of "
-                                  "the shared corpus, and the job is scoped",
+                                  "the shared pool, and the job is scoped",
 }
 
 # Belongs to one person. Each entry says how to make one as user A and where to
@@ -376,7 +376,7 @@ def test_a_job_submitted_over_http_is_owned_by_the_caller(instance):
     a handler that forgot would leave `owner=None` and the job would be
     visible to nobody, which is a bug that reads as working isolation.
     """
-    client, alice, _ = instance
+    client, _alice, _ = instance
     login(client, "alice", PASSWORD_A)
     submitted = client.post("/api/sim/mana",
                             json={"slug": "no-such-deck", "games": 1})
@@ -577,16 +577,16 @@ if __name__ == "__main__":                                    # pragma: no cover
 # ------------------------------------------------------- ADR 22: deck owners
 
 @pytest.fixture
-def corpus(instance):
-    """A queryable corpus inside the instance's own scratch data directory.
+def pool(instance):
+    """A queryable pool inside the instance's own scratch data directory.
 
     Depends on `instance` rather than standing alone so it is built *inside*
     that fixture's `config.use_paths`, and so both share one app. Creating a
-    deck is refused without a corpus (a commander nobody checked is a colour
+    deck is refused without a card pool (a commander nobody checked is a colour
     identity nobody checked), so the ownership tests below need one — and only
     they pay the second it costs.
     """
-    return tiny_corpus.build(config.DB_PATH)
+    return tiny_pool.build(config.DB_PATH)
 
 
 def _make_private_deck(client, owner: str, slug: str) -> None:
@@ -606,7 +606,7 @@ def _make_private_deck(client, owner: str, slug: str) -> None:
 @pytest.mark.parametrize("suffix", [
     "", "/validate", "/stats", "/suggestions", "/commander", "/printings",
 ])
-def test_a_private_deck_is_a_404_to_another_account(instance, corpus, suffix):
+def test_a_private_deck_is_a_404_to_another_account(instance, pool, suffix):
     """ADR 22's hard case, and the opposite call from #80's.
 
     A 403 here would confirm the deck exists, which is the leak ADR 5 exists to
@@ -614,7 +614,7 @@ def test_a_private_deck_is_a_404_to_another_account(instance, corpus, suffix):
     published in a public repository and `GET /api/decks` had just listed it to
     that caller — neither is true of somebody's private brew.
     """
-    client, alice, _bob = instance
+    client, _alice, _bob = instance
     login(client, "alice", PASSWORD_A)
     _make_private_deck(client, "alice", "secret-brew")
     client.post("/api/auth/logout")
@@ -626,7 +626,7 @@ def test_a_private_deck_is_a_404_to_another_account(instance, corpus, suffix):
         f"would confirm it exists (ADR 5)")
 
 
-def test_a_private_deck_is_a_404_to_writes_too(instance, corpus):
+def test_a_private_deck_is_a_404_to_writes_too(instance, pool):
     """The half that is easy to get wrong.
 
     A refused *write* on a private deck must be 404 rather than #80's 403, for
@@ -649,7 +649,7 @@ def test_a_private_deck_is_a_404_to_writes_too(instance, corpus):
                       json={"shared": True}).status_code == 404
 
 
-def test_a_shared_deck_is_readable_but_403_to_write(instance, corpus):
+def test_a_shared_deck_is_readable_but_403_to_write(instance, pool):
     """The other side of ADR 22's rule, and why it is not simply "404 always".
 
     Once alice shares a deck bob can read it, so answering 404 to his write
@@ -682,7 +682,7 @@ def test_an_unknown_owner_is_a_404_and_not_a_different_error(instance):
     assert client.get("/api/decks/alice/not-a-deck").status_code == 404
 
 
-def test_an_admin_still_cannot_write_another_persons_deck(instance, corpus):
+def test_an_admin_still_cannot_write_another_persons_deck(instance, pool):
     """Administering the instance is not owning everybody's decks.
 
     The same property `test_an_admin_still_cannot_see_another_persons_job`
@@ -707,7 +707,7 @@ def test_an_admin_still_cannot_write_another_persons_deck(instance, corpus):
     "", "/validate", "/stats", "/suggestions", "/commander", "/printings",
 ])
 def test_an_admin_still_cannot_see_another_persons_private_deck(
-        instance, corpus, suffix):
+        instance, pool, suffix):
     """The half the test above leaves out, and the one that actually leaks.
 
     `test_an_admin_still_cannot_write_another_persons_deck` shares bob's deck
@@ -736,7 +736,7 @@ def test_an_admin_still_cannot_see_another_persons_private_deck(
 
 
 def test_an_admin_is_refused_a_private_deck_s_writes_as_404_too(instance,
-                                                                corpus):
+                                                                pool):
     """And the writes, which must not fall back to 403 for an admin either.
 
     The same argument as `test_a_private_deck_is_a_404_to_writes_too`, one

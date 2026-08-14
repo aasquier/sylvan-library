@@ -1,6 +1,6 @@
 """`app.db` — the transactional half of the two-database split (ADR 4).
 
-DuckDB holds the corpus: public, regenerable, gitignored, rebuilt by one
+DuckDB holds the pool: public, regenerable, gitignored, rebuilt by one
 command. SQLite holds everything a person typed that nothing else records —
 accounts today, their decks at `docs/HOSTING.md` §6 step 6. Different
 lifecycles and different backup rules, which is why §2 says not to merge them
@@ -119,7 +119,7 @@ _MIGRATIONS: tuple[str, ...] = (
     # Memoised Tier 1 results (`sim/cache.py`), the table `docs/HOSTING.md` §2
     # sketched and ADR 4 listed in this file's contents. It is the one thing in
     # here that is *derived*: every row can be recomputed from the deck and the
-    # corpus, and dropping the table loses nothing but CPU time. That is why
+    # pool, and dropping the table loses nothing but CPU time. That is why
     # `mtglab sim cache --clear` is a supported operation and why nothing else
     # in `app.db` has one.
     #
@@ -132,7 +132,7 @@ _MIGRATIONS: tuple[str, ...] = (
     CREATE TABLE sim_cache (
         -- sha256 over the *compiled* deck, the run parameters, the seed and a
         -- fingerprint of the engine's own source. Not a deck slug and not a
-        -- hash of deck.yaml: card facts come from the corpus, so a refresh can
+        -- hash of deck.yaml: card facts come from the pool, so a refresh can
         -- change a simulation while the deck file does not move. See
         -- `sim/cache.py` for the full argument.
         key          TEXT PRIMARY KEY,

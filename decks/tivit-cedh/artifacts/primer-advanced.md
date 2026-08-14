@@ -41,4 +41,4 @@ Ten flex slots, each naming what it replaces. Academy Manufactor turns each trig
 Voice of Victory is legal in Esper: its Warrior tokens are red, but the card has no red mana symbols, so its colour identity is white only. Mana Crypt and Jeweled Lotus are banned as of the September 2024 update — do not go looking for them. Imposter Mech copies a creature as a NONCREATURE Vehicle, so it dodges creature removal and wraths and still counts for Mox Opal and Time Sieve.
 
 ---
-_Generated 2026-08-12 from `deck.yaml`._
+_Generated 2026-08-14 from `deck.yaml`._

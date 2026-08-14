@@ -86,7 +86,7 @@ export default function Import() {
           <h1 className="text-2xl font-semibold tracking-tight">Import a decklist</h1>
           <p className="mt-1 max-w-2xl text-sm" style={{ color: 'var(--text-secondary)' }}>
             Paste an export from Moxfield, Archidekt, Arena or anywhere else.
-            Names are resolved against the local corpus — anything that does not
+            Names are resolved against the local pool — anything that does not
             resolve is reported, never guessed.
           </p>
         </div>
@@ -234,7 +234,7 @@ function Preview({ result, showYaml, onToggleYaml }: {
         <div className="space-y-1">
           <h3 className="text-sm font-semibold">
             {result.unknown.length} name{result.unknown.length === 1 ? '' : 's'} the
-            corpus does not know
+            pool does not know
           </h3>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Kept exactly as written so the deck stays the size you pasted.

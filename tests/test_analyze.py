@@ -1,7 +1,7 @@
 """Deterministic deck analysis.
 
 These are the numbers the app shows instead of me working them out in chat,
-so they need to be pinned. No DuckDB here -- the corpus is a plain dict, the
+so they need to be pinned. No DuckDB here -- the pool is a plain dict, the
 same shape `decks/validate.py` accepts.
 """
 
@@ -48,9 +48,9 @@ def test_curve_excludes_lands():
         CardEntry(name="Forest", category="land", qty=8, why="x"),
         CardEntry(name="Bear", category="threat", why="x"),
     )
-    corpus = {"Forest": Rec("Forest", None, "Basic Land — Forest", ("G",)),
+    pool = {"Forest": Rec("Forest", None, "Basic Land — Forest", ("G",)),
               "Bear": Rec("Bear", "{1}{G}")}
-    out = curve(deck, corpus)
+    out = curve(deck, pool)
     assert out["nonland_cards"] == 1
     assert out["average_mv"] == 2.0
 
@@ -63,7 +63,7 @@ def test_curve_weights_by_qty():
 
 
 def test_curve_uses_deck_override_when_card_is_too_new():
-    """CardEntry.mana_cost exists for cards not yet in the corpus."""
+    """CardEntry.mana_cost exists for cards not yet in the pool."""
     deck = deck_of(CardEntry(name="Spoiler", category="threat",
                              mana_cost="{4}{B}{G}", why="x"))
     assert curve(deck, {})["average_mv"] == 6.0
@@ -80,17 +80,17 @@ def test_color_sources_counts_lands_by_qty():
         CardEntry(name="Forest", category="land", qty=8, why="x"),
         CardEntry(name="Swamp", category="land", qty=6, why="x"),
     )
-    corpus = {"Forest": Rec("Forest", None, "Basic Land — Forest", ("G",)),
+    pool = {"Forest": Rec("Forest", None, "Basic Land — Forest", ("G",)),
               "Swamp": Rec("Swamp", None, "Basic Land — Swamp", ("B",))}
-    got = color_sources(deck, corpus)
+    got = color_sources(deck, pool)
     assert got["G"] == 8 and got["B"] == 6 and got["W"] == 0
 
 
 def test_dual_counts_for_both_colors():
     deck = deck_of(CardEntry(name="Overgrown Tomb", category="land", why="x"))
-    corpus = {"Overgrown Tomb": Rec("Overgrown Tomb", None,
+    pool = {"Overgrown Tomb": Rec("Overgrown Tomb", None,
                                     "Land — Swamp Forest", ("B", "G"))}
-    got = color_sources(deck, corpus)
+    got = color_sources(deck, pool)
     assert got["B"] == 1 and got["G"] == 1
 
 
@@ -113,8 +113,8 @@ def test_hybrid_pip_counts_for_every_payable_color():
 
 def test_lands_do_not_contribute_pip_demand():
     deck = deck_of(CardEntry(name="Tower", category="land", why="x"))
-    corpus = {"Tower": Rec("Tower", None, "Land", ("B", "G"))}
-    assert all(n.pips == 0 for n in pip_requirements(deck, corpus))
+    pool = {"Tower": Rec("Tower", None, "Land", ("B", "G"))}
+    assert all(n.pips == 0 for n in pip_requirements(deck, pool))
 
 
 def test_any_color_sources_do_not_invent_offidentity_colors():
@@ -127,7 +127,7 @@ def test_any_color_sources_do_not_invent_offidentity_colors():
         CardEntry(name="Command Tower", category="land", qty=10, why="x"),
         CardEntry(name="Doubler", category="threat", why="x"),
     )
-    corpus = {
+    pool = {
         "Gyome, Master Chef": Rec("Gyome, Master Chef", "{2}{B}{G}",
                                   "Legendary Creature — Troll Warlock",
                                   color_identity=frozenset("BG")),
@@ -135,7 +135,7 @@ def test_any_color_sources_do_not_invent_offidentity_colors():
                              ("W", "U", "B", "R", "G")),
         "Doubler": Rec("Doubler", "{B}{B}"),
     }
-    reported = {n.color for n in pip_requirements(deck, corpus)}
+    reported = {n.color for n in pip_requirements(deck, pool)}
     assert reported == {"B", "G"}, reported
 
 
@@ -150,9 +150,9 @@ def test_sources_per_pip_is_reported():
         CardEntry(name="Doubler", category="threat", why="x"),
         CardEntry(name="Swamp", category="land", qty=4, why="x"),
     )
-    corpus = {"Doubler": Rec("Doubler", "{B}{B}"),
+    pool = {"Doubler": Rec("Doubler", "{B}{B}"),
               "Swamp": Rec("Swamp", None, "Basic Land — Swamp", ("B",))}
-    needs = {n.color: n for n in pip_requirements(deck, corpus)}
+    needs = {n.color: n for n in pip_requirements(deck, pool)}
     assert needs["B"].sources == 4 and needs["B"].pips == 2
     assert needs["B"].sources_per_pip == 2.0
 
@@ -183,10 +183,10 @@ def test_type_breakdown_takes_the_front_face():
         CardEntry(name="Path", category="land", why="x"),
         CardEntry(name="Gyome", category="threat", why="x"),
     )
-    corpus = {"Path": Rec("Path", None, "Land // Land"),
+    pool = {"Path": Rec("Path", None, "Land // Land"),
               "Gyome": Rec("Gyome", "{2}{B}{G}",
                            "Legendary Creature — Troll Warlock")}
-    got = type_breakdown(deck, corpus)
+    got = type_breakdown(deck, pool)
     assert got["Land"] == 1
     assert got["Creature"] == 1
 
@@ -203,9 +203,9 @@ def test_deck_stats_is_serialisable_and_complete():
         CardEntry(name="Forest", category="land", qty=8, why="x"),
         CardEntry(name="Bear", category="threat", why="x"),
     )
-    corpus = {"Forest": Rec("Forest", None, "Basic Land — Forest", ("G",)),
+    pool = {"Forest": Rec("Forest", None, "Basic Land — Forest", ("G",)),
               "Bear": Rec("Bear", "{1}{G}")}
-    stats = deck_stats(deck, corpus)
+    stats = deck_stats(deck, pool)
     assert stats["total_cards"] == 9
     assert stats["land_count"] == 8
     assert {"curve", "categories", "colors", "types"} <= set(stats)
@@ -214,7 +214,7 @@ def test_deck_stats_is_serialisable_and_complete():
     json.dumps({k: v for k, v in stats.items() if k != "curve"})
 
 
-def test_deck_stats_survives_a_missing_corpus():
+def test_deck_stats_survives_a_missing_pool():
     """The app must still render something before `data refresh` has run."""
     stats = deck_stats(deck_of(CardEntry(name="Bear", category="threat", why="x")))
     assert stats["total_cards"] == 1
@@ -271,9 +271,9 @@ def _deck_with(names, bracket=3):
 def test_counts_the_game_changers_a_deck_runs():
     from mtglab.decks.analyze import game_changers
     deck = _deck_with(["Smothering Tithe", "Llanowar Elves"])
-    corpus = {"Smothering Tithe": _Rec(True), "Llanowar Elves": _Rec(False),
+    pool = {"Smothering Tithe": _Rec(True), "Llanowar Elves": _Rec(False),
               "Gyome, Master Chef": _Rec(False)}
-    report = game_changers(deck, corpus)
+    report = game_changers(deck, pool)
     assert report["cards"] == ["Smothering Tithe"]
     assert report["count"] == 1
     assert report["allowed"] == 3
@@ -284,8 +284,8 @@ def test_a_bracket_three_deck_over_the_cap_is_flagged():
     from mtglab.decks.analyze import game_changers
     names = ["A", "B", "C", "D"]
     deck = _deck_with(names, bracket=3)
-    corpus = {n: _Rec(True) for n in names} | {"Gyome, Master Chef": _Rec(False)}
-    report = game_changers(deck, corpus)
+    pool = {n: _Rec(True) for n in names} | {"Gyome, Master Chef": _Rec(False)}
+    report = game_changers(deck, pool)
     assert report["count"] == 4
     assert report["verdict"] == "over", "bracket 3 permits three"
 
@@ -294,8 +294,8 @@ def test_a_high_bracket_has_no_limit():
     from mtglab.decks.analyze import game_changers
     names = ["A", "B", "C", "D", "E"]
     deck = _deck_with(names, bracket=5)
-    corpus = {n: _Rec(True) for n in names} | {"Gyome, Master Chef": _Rec(False)}
-    report = game_changers(deck, corpus)
+    pool = {n: _Rec(True) for n in names} | {"Gyome, Master Chef": _Rec(False)}
+    report = game_changers(deck, pool)
     assert report["allowed"] is None
     assert report["verdict"] == "ok", "cEDH is where these belong"
 
@@ -305,11 +305,11 @@ def test_the_commander_counts_too():
     rather the point of the list."""
     from mtglab.decks.analyze import game_changers
     deck = _deck_with(["Llanowar Elves"])
-    corpus = {"Llanowar Elves": _Rec(False), "Gyome, Master Chef": _Rec(True)}
-    assert game_changers(deck, corpus)["count"] == 1
+    pool = {"Llanowar Elves": _Rec(False), "Gyome, Master Chef": _Rec(True)}
+    assert game_changers(deck, pool)["count"] == 1
 
 
-def test_no_corpus_is_unknown_rather_than_zero():
+def test_no_pool_is_unknown_rather_than_zero():
     """An absent count is not a count of zero. A deck reporting "0 Game
     Changers" because nobody looked is the quiet wrong answer this whole
     column set exists to prevent."""
@@ -322,8 +322,8 @@ def test_no_corpus_is_unknown_rather_than_zero():
 def test_no_declared_bracket_is_unknown_rather_than_ok():
     from mtglab.decks.analyze import game_changers
     deck = _deck_with(["Smothering Tithe"], bracket="")
-    corpus = {"Smothering Tithe": _Rec(True), "Gyome, Master Chef": _Rec(False)}
-    assert game_changers(deck, corpus)["verdict"] == "unknown"
+    pool = {"Smothering Tithe": _Rec(True), "Gyome, Master Chef": _Rec(False)}
+    assert game_changers(deck, pool)["verdict"] == "unknown"
 
 
 def test_deck_stats_carries_the_report():

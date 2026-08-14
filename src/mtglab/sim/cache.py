@@ -15,7 +15,7 @@ below is in service of that.
 `run()` takes exactly `(library, commander, games, turns, keep_rule, seed)` and
 reads nothing else. `library` and `commander` come out of `compile_deck`, which
 reads `mana_cost`, `type_line`, `oracle_text` and `produced_mana` **from the
-corpus**. So the obvious key -- a hash of `deck.yaml` -- is not sufficient: a
+pool**. So the obvious key -- a hash of `deck.yaml` -- is not sufficient: a
 `data refresh` can change what a card does while the deck file is byte
 identical. That is not hypothetical. Scryfall retemplated "enters the
 battlefield tapped" to "enters tapped", and `sim/compile.py` carries the
@@ -26,15 +26,15 @@ deck-hash cache would have served the pre-refresh numbers forever.
 So the key is a hash of the **compiled** deck: the `SimCard` list the engine is
 actually handed. That is exact in both directions.
 
-- A card's corpus facts change in a way that matters -> different SimCards ->
+- A card's pool facts change in a way that matters -> different SimCards ->
   miss, and the numbers get recomputed.
-- A rationale is edited, or a comment is reflowed, or the corpus is refreshed
+- A rationale is edited, or a comment is reflowed, or the pool is refreshed
   without touching anything this deck runs -> identical SimCards -> hit.
 
 The cost is that a hit is not quite free: it needs a deck parse and one indexed
 `get_cards` over ~100 names, a few milliseconds, instead of eighteen seconds.
 That is the right trade. The alternative -- hashing the YAML text plus some
-proxy for the corpus, like the DuckDB file's mtime -- is cheaper on the hit
+proxy for the pool, like the DuckDB file's mtime -- is cheaper on the hit
 path and asks you to trust that the proxy never lies. This one does not have to
 be trusted; it is the input.
 

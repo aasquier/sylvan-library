@@ -1,6 +1,6 @@
 """Deterministic deck analysis.
 
-Everything here is a pure function of a deck plus a card corpus. No DuckDB, no
+Everything here is a pure function of a deck plus a card pool. No DuckDB, no
 network, no judgement calls that vary between runs -- the same deck always
 produces the same report, and the API layer is a thin wrapper over these.
 
@@ -8,7 +8,7 @@ That is the point. Curve, pip demand and category coverage were previously
 worked out by hand in conversation, which meant nobody running the app could
 reproduce them and nothing tested them. Logic that lives here gets tests.
 
-The corpus is passed in as a `{name: CardRecord}` dict, matching
+The pool is passed in as a `{name: CardRecord}` dict, matching
 `decks/validate.py`, so these test without a database.
 """
 
@@ -37,7 +37,7 @@ CATEGORY_TARGETS: dict[str, tuple[int, int]] = {
 #: Unlike `CATEGORY_TARGETS` above, which is conventional guidance, this is the
 #: published rule for the bracket a deck declares — which is why it can be
 #: *counted* rather than estimated. Scryfall carries the flag per card, so the
-#: count is a corpus fact.
+#: count is a card pool fact.
 #:
 #: It is still reported rather than enforced. `validate.py` is the gate and
 #: this module is the advice, and the same reasoning that keeps a banned card a
@@ -52,7 +52,7 @@ def game_changers(deck: Deck, cards: dict | None = None) -> dict[str, Any]:
     """Which Game Changers the deck runs, and what its bracket allows.
 
     Returns `allowed: None` for an unlimited bracket and `verdict: "unknown"`
-    when the deck declares no bracket or the corpus is missing — an absent
+    when the deck declares no bracket or the pool is missing — an absent
     count is not a count of zero, and a deck that reports "0 Game Changers"
     because nobody looked is the quiet wrong answer this project keeps finding.
     """
@@ -203,7 +203,7 @@ def pip_requirements(deck: Deck, cards: dict) -> list[ColorNeed]:
 
     sources = color_sources(deck, cards)
     identity = commander_identity(deck, cards)
-    # Without a commander in the corpus there is no identity to filter by, so
+    # Without a commander in the pool there is no identity to filter by, so
     # fall back to whatever the spells actually demand.
     relevant = identity or {c for c in COLORS if pips[c]}
     return [

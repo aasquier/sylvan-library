@@ -2,7 +2,7 @@
 
 Both of these were silently wrong and both skewed the land-count
 recommendation, which is the headline output of a Tier 1 sweep. The texts
-below are quoted from the real corpus.
+below are quoted from the real pool.
 """
 
 import sys
@@ -113,13 +113,13 @@ def test_qty_is_expanded_into_the_library():
         CardEntry(name="Swamp", category="land", qty=8, why="x"),
         CardEntry(name="Sol Ring", category="ramp", why="x"),
     ])
-    corpus = {
+    pool = {
         "Cmd": _Rec("Cmd"),
         "Forest": _Rec("Forest", "Basic Land — Forest", None, "", ("G",)),
         "Swamp": _Rec("Swamp", "Basic Land — Swamp", None, "", ("B",)),
         "Sol Ring": _Rec("Sol Ring", "Artifact", "{1}", "", ("C",)),
     }
-    library, commander = compile_deck(deck, corpus)
+    library, commander = compile_deck(deck, pool)
     assert len(library) == 17, len(library)
     assert sum(1 for c in library if c.is_land) == 16
     assert commander is not None
@@ -133,12 +133,12 @@ def test_instants_do_not_become_permanent_mana_sources():
     deck = Deck(slug="t", name="T", commander=["Cmd"], cards=[
         CardEntry(name="Deadly Dispute", category="card-advantage", why="x"),
     ])
-    corpus = {
+    pool = {
         "Cmd": _Rec("Cmd"),
         "Deadly Dispute": _Rec("Deadly Dispute", "Instant", "{1}{B}", "",
                                ("W", "U", "B", "R", "G")),
     }
-    library, _ = compile_deck(deck, corpus)
+    library, _ = compile_deck(deck, pool)
     assert library[0].produces == ()
     assert not library[0].is_ramp
 

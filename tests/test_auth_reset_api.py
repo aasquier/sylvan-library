@@ -24,13 +24,13 @@ pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 pytest.importorskip("argon2")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from mtglab import config  # noqa: E402
-from mtglab.api import jobs  # noqa: E402
-from mtglab.api.app import create_app  # noqa: E402
-from mtglab.api.auth import COOKIE_NAME, RESET_ANSWER  # noqa: E402
-from mtglab.auth import db, mail, ratelimit, sessions, tokens, users  # noqa: E402
+from mtglab import config
+from mtglab.api import jobs
+from mtglab.api.app import create_app
+from mtglab.api.auth import COOKIE_NAME, RESET_ANSWER
+from mtglab.auth import db, mail, ratelimit, sessions, tokens, users
 
 PASSWORD = "a-perfectly-fine-passphrase"
 NEW_PASSWORD = "a-completely-different-passphrase"

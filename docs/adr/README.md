@@ -34,12 +34,23 @@ they differ.
 | [18](0018-a-cached-simulation-is-keyed-on-its-compiled-input.md) | A cached simulation is keyed on its compiled input, not on the deck file | Accepted |
 | [19](0019-the-dossier-cites-three-sources.md) | The commander dossier cites three sources, and the page shows the seams | Accepted |
 | [20](0020-the-theme-interview-reads-a-person.md) | The theme interview reads a person, and Python decides when it may propose | Accepted |
+| [21](0021-a-persona-is-a-voice-and-the-spread-is-the-slots.md) | A persona is a voice, and a tarot spread is the slots wearing pictures | Accepted |
+| [22](0022-decks-have-owners-and-sharing-is-a-flag.md) | Decks have owners, and sharing is a flag on the deck | Accepted |
+
+**A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
+That is what it was called when they were written; everywhere else in the
+project it is now the **card pool**, renamed on 2026-08-14 for being a word
+from linguistics rather than from Magic. The ADRs keep the old word because
+they are records of what was decided and how it was said at the time. Same
+thing, two names, and this is the only place both appear.
 
 **Proposed** means the decision is made and argued but nothing implements it
-yet — 4 and 5 still describe a deployment that does not exist. 16 was Proposed
-for a matter of hours: the auth core landed the same day it was written and the
-email half the day after, so it is the one part of the hosting plan that is
-code rather than intent.
+yet. 4 and 5 were both recorded that way, and both have since been built and
+deployed — their status fields are left as written, because a status is part of
+the record rather than a live indicator. 16 was Proposed for a matter of hours:
+the auth core landed the same day it was written and the email half the day
+after, so it is the one part of the hosting plan that was code rather than
+intent from the start.
 
 17 finished the server half the same day, and it is worth reading next to 5
 rather than after it: 5 decided that a resource belonging to one person is
@@ -72,7 +83,22 @@ whose instruments it borrows and extends — a claimed source is intersected wit
 what the search returned, and now a claimed *preference* is intersected with
 what the user actually typed. It also declines to inherit one of 19's rules:
 an unsourced dossier is refused, an unsourced proposal is not, because a
-proposal's load-bearing content is corpus facts and survives the loss.
+proposal's load-bearing content is card pool facts and survives the loss.
+
+21 adds the third thing a surface has. 15 gave a mode a **stance**, which is
+all about *how much* the model does; a **persona** is *who it sounds like*,
+which is orthogonal — so it is its own field, appended to the mode's
+instructions rather than substituted for them. Its second half is the load-
+bearing one: a tarot spread's three positions **are** the theme interview's
+first three slots, so a card is dealt *for* a slot and 20's readiness
+instrument works untouched. The querent's own words stay the only evidence —
+a card is not something they said.
+
+22 is the one written after a bug rather than before one. Deck ownership was
+implicit in the filesystem until an invited account turned out to be able to
+edit the curated six; the fix made an owner a field and sharing a flag, and
+the ADR records why the answer is 404 for a deck you cannot see and 403 for
+one you can see but may not write.
 
 16 supersedes exactly one paragraph of 5, which is the pattern this directory is
 for: 5's "no self-signup" was a good argument that lost to a better one a day
@@ -82,10 +108,13 @@ test — is untouched.
 
 14 and 15 were Proposed for exactly one day, which was the point: they drew the
 boundary for a model integration before the first client call rather than after
-it. Both are now Accepted and **partly** implemented — the client, the tools and
-the rule that no code path writes a `why`; not the modes, the stances, or Forge.
-Each carries a note at the top saying which half is which, because a status of
-Accepted on its own would overstate it.
+it. Both are Accepted, and most of what they describe now exists: the client,
+the tools, the stance, Forge, four modes across three features, and the rule
+that no code path writes a `why` — which is enforced over the package's syntax
+tree rather than by prompt. Three of the modes 15 tabulates are still unbuilt,
+and there is still no UI for the stance dial. The notes at the top of each say
+which half is which, because a status of Accepted on its own would overstate
+it.
 
 ## Where the longer arguments live
 

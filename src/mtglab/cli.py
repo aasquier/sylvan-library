@@ -32,7 +32,7 @@ from pathlib import Path
 from mtglab import config
 from mtglab.decks.model import CATEGORIES, DECK_STAGES, DECK_STATUSES, Deck
 from mtglab.sim.compile import (
-    CorpusRequired,
+    PoolRequired,
     compile_deck,
     enters_tapped,
     fetches_lands,
@@ -43,8 +43,13 @@ from mtglab.sim.compile import (
 # point them at a scratch directory.
 deck_paths = config.deck_paths
 
-__all__ = ["main", "deck_paths", "load_all_decks",
-           "enters_tapped", "fetches_lands"]
+__all__ = [
+    "deck_paths",
+    "enters_tapped",
+    "fetches_lands",
+    "load_all_decks",
+    "main",
+]
 
 
 def _load(slug: str) -> Deck:
@@ -54,7 +59,7 @@ def _load(slug: str) -> Deck:
     return Deck.load(path)
 
 
-def _corpus(deck: Deck):
+def _pool(deck: Deck):
     """Look up every card in the deck. Returns None if the DB is absent, so
     callers can degrade to structural checks with a visible warning."""
     if not config.DB_PATH.exists():
@@ -119,7 +124,7 @@ def cmd_decks_list(args):
 def cmd_decks_validate(args):
     from mtglab.decks.validate import validate
     deck = _load(args.slug)
-    rep = validate(deck, _corpus(deck))
+    rep = validate(deck, _pool(deck))
     print(rep.render())
     print(f"\n{len(rep.errors)} error(s), {len(rep.warnings)} warning(s)")
     sys.exit(1 if rep.errors else 0)
@@ -157,7 +162,7 @@ def cmd_decks_import(args):
     for note in result["notes"]:
         print(f"  note: {note}")
     if result["unknown"]:
-        print(f"\n  {len(result['unknown'])} name(s) the corpus does not know. "
+        print(f"\n  {len(result['unknown'])} name(s) the pool does not know. "
               "Kept exactly as written -- nothing was guessed:")
         for name in result["unknown"]:
             print(f"    {name}")
@@ -192,7 +197,7 @@ def cmd_decks_suggest(args):
 
     deck = _load(args.slug)
     if not config.DB_PATH.exists():
-        sys.exit("suggestions need the card corpus -- run `mtglab data refresh`")
+        sys.exit("suggestions need the card pool -- run `mtglab data refresh`")
 
     con = db.connect(config.DB_PATH)
     names = deck.commander + [c.name for c in deck.cards] + \
@@ -226,7 +231,7 @@ def cmd_decks_suggest(args):
         candidates = suggest.replacements_for(deck, cards, con, name,
                                               limit=args.limit)
         if not candidates:
-            print("      no candidates -- the corpus does not know this card.\n")
+            print("      no candidates -- the pool does not know this card.\n")
             continue
         for i, cand in enumerate(candidates, 1):
             cost = cand.record.mana_cost or ""
@@ -318,7 +323,7 @@ def _art_id(args):
     printings = listing["printings"]
     if not printings:
         sys.exit(f"no printings found for {listing['commander'] or args.slug} "
-                 f"-- is the corpus loaded? (`mtglab data refresh`)")
+                 f"-- is the pool loaded? (`mtglab data refresh`)")
 
     exact = [p for p in printings if p["id"] == ref]
     if exact:
@@ -458,7 +463,7 @@ def cmd_decks_build(args):
     from mtglab.decks.validate import validate
 
     deck = _load(args.slug)
-    cards = _corpus(deck)
+    cards = _pool(deck)
     rep = validate(deck, cards)
     if rep.errors and not args.force:
         print(rep.render())
@@ -519,19 +524,19 @@ def cmd_ui(args):
 # without importing the command line. Imported above and re-exported.
 
 def _sim_cards(deck: Deck, cards):
-    """CLI wrapper: turn a missing corpus into a clean exit rather than a
+    """CLI wrapper: turn a missing pool into a clean exit rather than a
     traceback. Library callers should use `compile_deck` and catch
-    `CorpusRequired`."""
+    `PoolRequired`."""
     try:
         return compile_deck(deck, cards)
-    except CorpusRequired as exc:
+    except PoolRequired as exc:
         sys.exit(str(exc))
 
 
 def cmd_sim_mana(args):
     from mtglab.sim.tier1.engine import KeepRule, run
     deck = _load(args.slug)
-    library, commander = _sim_cards(deck, _corpus(deck))
+    library, commander = _sim_cards(deck, _pool(deck))
     rule = KeepRule(min_lands=args.min_lands, max_lands=args.max_lands,
                     min_mana_pieces=args.min_pieces)
     print(run(library, commander, games=args.games, turns=args.turns,
@@ -541,7 +546,7 @@ def cmd_sim_mana(args):
 def cmd_sim_lands(args):
     from mtglab.sim.tier1.engine import run
     deck = _load(args.slug)
-    library, commander = _sim_cards(deck, _corpus(deck))
+    library, commander = _sim_cards(deck, _pool(deck))
     lands = [c for c in library if c.is_land]
     spells = [c for c in library if not c.is_land]
     if not lands:
@@ -713,7 +718,7 @@ def _prompt_new_password(who: str) -> str:
 
 
 def cmd_users_add(args):
-    db, _, _, users = _auth()
+    _db, _, _, users = _auth()
 
     password = None if args.no_password else _prompt_new_password(args.username)
     con = _connect()
@@ -762,7 +767,7 @@ def cmd_users_invite(args):
     *claimed* one is refused, and points at the reset flow, because that is
     what somebody who has forgotten their password actually needs.
     """
-    db, _, _, users = _auth()
+    _db, _, _, users = _auth()
     from mtglab.auth import invites, mail
 
     try:
@@ -812,7 +817,7 @@ def cmd_users_invite(args):
 
 
 def cmd_users_list(args):
-    db, _, sessions, users = _auth()
+    _db, _, sessions, users = _auth()
     from mtglab.auth import tokens
 
     con = _connect()
@@ -845,7 +850,7 @@ def cmd_users_passwd(args):
     suspects compromise, and one that leaves the other party logged in has
     answered the wrong question (ADR 16).
     """
-    db, _, _, users = _auth()
+    _db, _, _, users = _auth()
 
     con = _connect()
     try:
@@ -863,7 +868,7 @@ def cmd_users_passwd(args):
 
 
 def _set_disabled(username: str, disabled: bool):
-    db, _, _, users = _auth()
+    _db, _, _, users = _auth()
 
     con = _connect()
     try:
@@ -945,7 +950,7 @@ def _set_admin(username: str, is_admin: bool):
     and that rule lives in `auth/users.py` so this command and the admin page
     inherit it rather than each implementing it.
     """
-    db, _, _, users = _auth()
+    _db, _, _, users = _auth()
 
     con = _connect()
     try:
@@ -1072,7 +1077,7 @@ def _wrapped(text, indent="  ", width=76):
 
 
 def cmd_claude_dossier(args):
-    """Who a deck's commander is (ADR 19), from the corpus and the open web.
+    """Who a deck's commander is (ADR 19), from the pool and the open web.
 
     The printing is where ADR 14's third boundary lives in a terminal, so it is
     not decoration: every passage prints the source ids it rests on, the source
@@ -1152,7 +1157,7 @@ def cmd_claude_dossier(args):
     if body["sources_dropped"] or body["rivals_dropped"]:
         print(f"  dropped: {body['sources_dropped']} cited page(s) the search "
               f"never returned, {body['rivals_dropped']} rival(s) not in the "
-              f"corpus.")
+              f"pool.")
     print(f"  {body['searched']} pages searched, {len(body['sources'])} cited.")
     usage = report["usage"]
     if report["cached"]:

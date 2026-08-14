@@ -2,14 +2,14 @@
 
 [ADR 14](../../../docs/adr/0014-python-decides-claude-advises.md) drew the line
 -- deterministic Python owns everything with a right answer, Claude owns the
-questions a corpus query cannot settle.
+questions a card pool query cannot settle.
 [ADR 15](../../../docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md)
 says what a surface *is*: a mode (prompt, tools, capabilities) plus a stance.
 
 The pipe is a client, a model, and tool schemas over the read-only half of
 `api/service.py`. On top of it sit the stance (the user's dial) and the modes,
 of which there is currently one: the **rationale interview**, which asks about
-a card's slot so the user can write its `why`. Every mode reaches the corpus
+a card's slot so the user can write its `why`. Every mode reaches the pool
 through `tools.READ_ONLY` and nothing else -- deliberately the only door, so
 the boundary that matters is one allowlist rather than a rule repeated in every
 mode that gets added later.

@@ -386,7 +386,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         """Change one field of one card: its category, quantity or rationale.
 
         The rationale editor's write path. A PATCH of one field rather than a
-        PUT of the card, because a card is mostly corpus facts and the deck
+        PUT of the card, because a card is mostly pool facts and the deck
         file only carries the handful of things a person decided.
         """
         field = str(payload.get("field", ""))
@@ -452,14 +452,14 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
     @app.get("/api/decks/{owner}/{slug}/commander")
     def deck_commander(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
-        """Who leads this deck, and what the corpus knows about them.
+        """Who leads this deck, and what the pool knows about them.
 
         Its own route rather than more fields on `GET /api/decks/{slug}`,
         for two reasons. It runs several extra queries — a count per subtype,
         a name search, a printing lookup — to fill a panel that is decorative,
         and the deck page should not wait on any of that to render its 99.
         And it answers with `card: null` rather than a 404 when there is no
-        corpus, which is a different contract from the deck itself.
+        pool, which is a different contract from the deck itself.
         """
         return service.commander_dossier(slug, source=lib.source_for(owner))
 
@@ -518,7 +518,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
         Free, deterministic and reaching nothing: this is a checked-in table,
         the same class of thing as `/api/colors`. It answers with no key set
-        and no corpus, which matters because the door renders before anybody
+        and no card pool, which matters because the door renders before anybody
         has committed to spending anything.
 
         `voice` is deliberately not in the payload. Not because a prompt in a
@@ -532,7 +532,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
     @app.get("/api/tarot/reading")
     def tarot_reading(seed: int | None = None) -> dict[str, Any]:
-        """Deal three cards. No model, no corpus, no network, no cost.
+        """Deal three cards. No model, no card pool, no network, no cost.
 
         **Python decides** (ADR 14): a shuffle has a right answer and belongs
         here, while what a spread means has none and belongs to the reader.
@@ -700,7 +700,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         `api/dossierruns.py`.
 
         The refusals stay here, which is the whole point of planning in the
-        request. 422 when the deck has no commander the corpus can find, which
+        request. 422 when the deck has no commander the pool can find, which
         is a fact about the deck rather than a failure of the model and a poor
         thing to wait four minutes to be told; 503 when there is no key. What
         is *no longer* here is the 502: a call that came back unusable is now a
@@ -734,7 +734,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     def color_taxonomy() -> dict[str, Any]:
         """The 32 combinations, the five colours and the three eras.
 
-        No corpus, no deck source, no network -- so this is the one deck-facing
+        No card pool, no deck source, no network -- so this is the one deck-facing
         page that works on a fresh clone before `data refresh` has ever run.
         """
         return service.color_taxonomy()
@@ -751,7 +751,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     @app.get("/api/colors/{key}")
     def combination_detail(key: str) -> dict[str, Any]:
         """One combination, with its champions and signature cards resolved
-        against the corpus. The teaching depth behind a slot."""
+        against the pool. The teaching depth behind a slot."""
         try:
             return service.combination_detail(key)
         except KeyError as exc:
@@ -761,7 +761,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
     @app.get("/api/glossary")
     def glossary() -> dict[str, Any]:
-        """The vocabulary. Reference data, like `/api/colors` -- no corpus, no
+        """The vocabulary. Reference data, like `/api/colors` -- no card pool, no
         deck source, no network."""
         return service.glossary()
 
@@ -778,7 +778,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     # "whose is this" is answered in one place (ADR 5).
 
     # Both sim routes plan before they queue. A plan compiles the deck -- a
-    # parse and one indexed corpus query -- and asks the cache whether these
+    # parse and one indexed pool query -- and asks the cache whether these
     # exact numbers already exist; if they do the job is born finished and the
     # response is the same shape it always was, just with `status: "done"` on
     # the first read. The cache is global rather than per-user on purpose: it

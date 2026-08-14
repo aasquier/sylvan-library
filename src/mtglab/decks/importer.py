@@ -1,7 +1,7 @@
 """Turn a pasted decklist into a draft `deck.yaml`.
 
 The parser (`decklist.py`) reads lines. This resolves what those lines *mean*
-against the corpus and writes a deck file. Split that way because resolution is
+against the pool and writes a deck file. Split that way because resolution is
 the half with an opinion, and the opinion is short:
 
 **Nothing is guessed.** Rule 1 says never evaluate a card from memory, and the
@@ -16,7 +16,7 @@ written as `stage: draft` so the gate reports those as warnings and counts them
 rule 4 exists to prevent, and doing it 99 times at once is worse than doing it
 once ([ADR 11](../../../docs/adr/0011-the-api-may-apply-a-swap.md)).
 
-**One thing is inferred, and only because it is a corpus fact.** A card is filed
+**One thing is inferred, and only because it is a card pool fact.** A card is filed
 under `land` when `CardRecord.is_land` says so -- which is right about the
 double-faced cards a type line is wrong about -- and everything else takes the
 model's `utility` default for a human to file. Guessing that a card is "ramp"
@@ -61,7 +61,7 @@ class ImportReport:
 
     deck: Deck
     yaml_text: str
-    # Names the corpus does not have. Kept in the deck; reported here and by
+    # Names the pool does not have. Kept in the deck; reported here and by
     # the gate as `unknown-card`.
     unknown: list[str] = field(default_factory=list)
     # Lines the parser could not read at all, as (line number, text).
@@ -78,7 +78,7 @@ class ImportReport:
 
 def names_in(parsed: ParsedList, *, commander: list[str] | None = None,
              companion: str | None = None) -> list[str]:
-    """Every name that needs a corpus lookup, so the caller can fetch once."""
+    """Every name that needs a card pool lookup, so the caller can fetch once."""
     names = [c.name for c in parsed.cards]
     names += list(commander or [])
     if companion:
@@ -87,7 +87,7 @@ def names_in(parsed: ParsedList, *, commander: list[str] | None = None,
 
 
 def _canonical(written: str, cards: dict) -> tuple[str, object | None]:
-    """The name as the corpus spells it, and the record behind it.
+    """The name as the pool spells it, and the record behind it.
 
     Casing is corrected, but a double-faced card written by its front face
     stays written that way. `db.get_cards` resolves both, the curated decks all
@@ -112,7 +112,7 @@ def build_deck(parsed: ParsedList, cards: dict, *, slug: str,
 
     `cards` is a name -> CardRecord mapping, as returned by `db.get_cards` over
     `names_in(parsed)`. Passing an empty mapping is legal and means every name
-    is reported as unknown, which is what a fresh clone with no corpus gets --
+    is reported as unknown, which is what a fresh clone with no card pool gets --
     honestly useless rather than silently wrong.
     """
     report_notes: list[str] = []
@@ -216,7 +216,7 @@ def _entries(lines: list[ParsedCard], resolve, outside: set[str],
             continue
         by_key[key] = CardEntry(
             name=canonical,
-            # The only inference, and only because `is_land` is a corpus fact.
+            # The only inference, and only because `is_land` is a card pool fact.
             category="land" if rec is not None and rec.is_land else "utility",
             why="",
             qty=line.qty,
@@ -229,7 +229,7 @@ def _companion_hints(swaps: list[CardEntry], cards: dict) -> list[str]:
 
     Our own moxfield.txt puts the commander *and* the companion under
     `SIDEBOARD:`, so re-importing an exported deck strands the companion there.
-    Having a Companion ability is a corpus fact and worth reporting; concluding
+    Having a Companion ability is a card pool fact and worth reporting; concluding
     that this deck runs it as its companion is a judgement, and the card is
     perfectly capable of being an ordinary creature in the 99.
     """

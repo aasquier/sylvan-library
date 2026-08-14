@@ -87,7 +87,7 @@ class Mode:
     #: `high` deliberately, and not for depth. Lower effort levels reach for
     #: tools less often, and a mode that answers from recall instead of calling
     #: `get_cards` is rule 1 failing quietly. The interview also hands the
-    #: corpus facts over in the opening brief rather than relying on this, but
+    #: pool facts over in the opening brief rather than relying on this, but
     #: the two together are cheaper than finding out which one was load-bearing.
     effort: str = "high"
     #: A JSON schema for the final answer, or None for prose.
@@ -160,7 +160,7 @@ class Turn:
     """What one exchange produced, including how it got there.
 
     `tool_calls` is kept because ADR 14's third boundary is that a user can
-    tell which system answered. For an opinion assembled from six corpus
+    tell which system answered. For an opinion assembled from six pool
     lookups, "which system" is only half the answer -- the other half is what
     it read, and a caller that wants to show its working needs the list.
     """

@@ -54,7 +54,7 @@ function renderApp(at = '/') {
 
 beforeEach(() => {
   routes = {
-    '/api/health': { body: { corpus: true, oracle_cards: 21, printings: 21 } },
+    '/api/health': { body: { pool: true, oracle_cards: 21, printings: 21 } },
     '/api/decks': { body: [] },
     '/api/auth/me': { body: auth() },
     '/api/auth/logout': { body: { authenticated: false } },
@@ -155,7 +155,7 @@ describe('with auth on and nobody signed in', () => {
         headers: { get: () => null },
         json: async () => (String(input) === '/api/auth/me'
           ? auth({ auth_required: true })
-          : { corpus: false, oracle_cards: 0, printings: 0 }),
+          : { pool: false, oracle_cards: 0, printings: 0 }),
       }
     })
 

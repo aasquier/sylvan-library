@@ -52,8 +52,8 @@ CARD_LISTS = ("cards", "swap_board")
 
 # What `set_card_field` will write. Deliberately short. `name` belongs to
 # `replace_card`, which also drops the overrides identifying the outgoing card;
-# `scryfall_id` and `mana_cost` are overrides for cards the corpus does not yet
-# know, and hand-editing them through this path would mask a stale corpus.
+# `scryfall_id` and `mana_cost` are overrides for cards the pool does not yet
+# know, and hand-editing them through this path would mask a stale pool.
 SETTABLE_FIELDS = ("category", "qty", "why")
 
 # What `set_deck_field` will write: the deck's own scalars. `strategy` and
@@ -70,9 +70,9 @@ _DECK_KEY_ORDER = ("slug", "name", "status", "stage", "commander",
                    "notes", "cards", "swap_board")
 
 # A Scryfall printing id: a plain UUID. Checked by shape rather than against
-# the corpus, because `edit.py` is pure text surgery over YAML and reaching for
+# the pool, because `edit.py` is pure text surgery over YAML and reaching for
 # DuckDB here would give the editor a database dependency it has never had.
-# The corpus check happens one layer up, in `service.set_deck_field`, which is
+# The pool check happens one layer up, in `service.set_deck_field`, which is
 # where the connection already is.
 _PRINTING_ID = re.compile(r"^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$")
 

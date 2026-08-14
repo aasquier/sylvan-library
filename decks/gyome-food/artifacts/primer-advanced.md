@@ -41,4 +41,4 @@ Flooding without Tireless Provisioner, or holding a hand of payoffs with no outl
 Great Arashin City's white Spirit token does not add white to its identity (token colour is not a mana symbol). Jaheira is {2}{G} mono-green; the Background pairing is what makes her read Selesnya. Warren Soultrader costs 1 life per activation, which caps loops that do not gain life back.
 
 ---
-_Generated 2026-08-12 from `deck.yaml`._
+_Generated 2026-08-14 from `deck.yaml`._

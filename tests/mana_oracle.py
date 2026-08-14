@@ -1,4 +1,4 @@
-"""Reference implementations of castability, and the corpus they answer.
+"""Reference implementations of castability, and the case set they answer.
 
 `mtglab.mana.can_pay` decides "can these sources pay this cost?" with Kuhn's
 augmenting-path matching. It is fast, and it is subtle enough that a reader has
@@ -18,9 +18,9 @@ a second clever algorithm can be wrong the same way. Neither reference shares
 code with `mana.py`; `_units` below is reimplemented rather than imported for
 exactly that reason.
 
-The corpus is enumerated, not sampled. `corpus_cases()` yields the same cases in
+The case set is enumerated, not sampled. `all_cases()` yields the same cases in
 the same order in any language, on any machine, forever -- which is what makes
-it usable as the differential corpus for a compiled port (docs/ENGINEERING.md
+it usable as the differential case set for a compiled port (docs/ENGINEERING.md
 1). Run this module as a script to dump it as JSON Lines.
 """
 
@@ -92,7 +92,7 @@ def hall_can_pay(cost: ManaCost, sources: Iterable[ManaSource],
     return True
 
 
-# ------------------------------------------------------------------- corpus
+# -------------------------------------------------------------------- cases
 #
 # Small alphabets chosen for structure, not realism: a mono pip, a colorless
 # pip that only {C} can pay, and a hybrid whose two colors are both reachable,
@@ -101,7 +101,7 @@ def hall_can_pay(cost: ManaCost, sources: Iterable[ManaSource],
 # shared payer is one dual -- which is the family of cases naive source
 # counting gets wrong.
 
-CORPUS_PIPS: tuple[frozenset[str], ...] = (
+CASE_PIPS: tuple[frozenset[str], ...] = (
     frozenset({"W"}),
     frozenset({"U"}),
     frozenset({"G"}),
@@ -109,7 +109,7 @@ CORPUS_PIPS: tuple[frozenset[str], ...] = (
     frozenset({"W", "U"}),
 )
 
-CORPUS_UNITS: tuple[frozenset[str], ...] = (
+CASE_UNITS: tuple[frozenset[str], ...] = (
     frozenset({"W"}),
     frozenset({"U"}),
     frozenset({"G"}),
@@ -123,30 +123,30 @@ MAX_GENERIC = 2
 MAX_SOURCES = 3
 
 
-def corpus_costs() -> Iterator[ManaCost]:
-    """Every cost of up to MAX_PIPS pips over CORPUS_PIPS, at each generic
+def case_costs() -> Iterator[ManaCost]:
+    """Every cost of up to MAX_PIPS pips over CASE_PIPS, at each generic
     count. Pips are drawn with replacement, so {W}{W} is included."""
     for size in range(MAX_PIPS + 1):
-        for pips in itertools.combinations_with_replacement(CORPUS_PIPS, size):
+        for pips in itertools.combinations_with_replacement(CASE_PIPS, size):
             for generic in range(MAX_GENERIC + 1):
                 yield ManaCost(generic=generic, pips=pips)
 
 
-def corpus_pools() -> Iterator[Pool]:
-    """Every pool of 1..MAX_SOURCES single-mana sources over CORPUS_UNITS."""
+def case_pools() -> Iterator[Pool]:
+    """Every pool of 1..MAX_SOURCES single-mana sources over CASE_UNITS."""
     for size in range(1, MAX_SOURCES + 1):
-        for colors in itertools.combinations_with_replacement(CORPUS_UNITS, size):
+        for colors in itertools.combinations_with_replacement(CASE_UNITS, size):
             yield tuple(ManaSource(c) for c in colors)
 
 
-def corpus_cases() -> Iterator[tuple[ManaCost, Pool]]:
+def all_cases() -> Iterator[tuple[ManaCost, Pool]]:
     """The full cross product, costs outer and pools inner.
 
     Order is part of the contract: a port reimplementing this enumeration must
     produce the same sequence for the digest below to mean anything.
     """
-    for cost in corpus_costs():
-        for pool in corpus_pools():
+    for cost in case_costs():
+        for pool in case_pools():
             yield cost, pool
 
 
@@ -159,10 +159,10 @@ def case_id(cost: ManaCost, pool: Sequence[ManaSource]) -> str:
     return f"{cost} <- [{pool_text}]"
 
 
-def corpus_digest(answer: Callable[[ManaCost, Pool], bool]) -> str:
-    """sha256 over `case=answer` lines for the whole corpus, in order."""
+def cases_digest(answer: Callable[[ManaCost, Pool], bool]) -> str:
+    """sha256 over `case=answer` lines for the whole case set, in order."""
     digest = hashlib.sha256()
-    for cost, pool in corpus_cases():
+    for cost, pool in all_cases():
         digest.update(f"{case_id(cost, pool)}={int(answer(cost, pool))}\n".encode())
     return digest.hexdigest()
 
@@ -173,12 +173,12 @@ if __name__ == "__main__":
     from mtglab.mana import can_pay
 
     # `--digest` prints the golden pinned by tests/test_mana_properties.py;
-    # bare, it dumps the whole corpus as JSON Lines for a port to consume.
+    # bare, it dumps the whole case set as JSON Lines for a port to consume.
     if "--digest" in sys.argv[1:]:
-        print(corpus_digest(can_pay))
+        print(cases_digest(can_pay))
         raise SystemExit(0)
 
-    for case_cost, case_pool in corpus_cases():
+    for case_cost, case_pool in all_cases():
         print(json.dumps({
             "cost": str(case_cost),
             "generic": case_cost.generic,

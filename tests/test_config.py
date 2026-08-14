@@ -1,4 +1,4 @@
-"""Where mtglab looks for decks and the corpus.
+"""Where mtglab looks for decks and the pool.
 
 These paths used to be module-level constants in `cli.py`. That had two costs:
 the API had to import the command line to find them, and there was no way to
@@ -50,7 +50,7 @@ def test_environment_overrides_both_directories(clean_env, monkeypatch):
 
 def test_db_path_follows_data_dir(clean_env, monkeypatch):
     """The reason DB_PATH is derived rather than separately assignable: a
-    container that mounts a volume at /data must not keep reading the corpus
+    container that mounts a volume at /data must not keep reading the pool
     from ./data."""
     monkeypatch.setenv("MTGLAB_DATA_DIR", "/data")
     config.reload_from_env()
@@ -111,28 +111,28 @@ def test_deck_paths_reads_the_current_setting_not_an_import_time_default(tmp_pat
     assert found == ["scratch-deck"]
 
 
-def test_the_service_resolves_the_corpus_path_at_call_time(tmp_path):
+def test_the_service_resolves_the_pool_path_at_call_time(tmp_path):
     """The same bug as `deck_paths`, found in `service._connect`, which did
     `from mtglab.config import DB_PATH` and so bound the default `data/`
     forever. It worked in production, where the environment is set before the
-    process starts, and made it impossible to point a test at a scratch corpus
+    process starts, and made it impossible to point a test at a scratch pool
     -- so the import path could only be tested against the real 500MB one."""
     from mtglab.api import service
 
     with config.use_paths(data_dir=tmp_path / "empty"):
         assert service._connect() is None
 
-    import tiny_corpus
+    import tiny_pool
 
-    with config.use_paths(data_dir=tmp_path / "corpus"):
-        tiny_corpus.build(config.DB_PATH)
+    with config.use_paths(data_dir=tmp_path / "pool"):
+        tiny_pool.build(config.DB_PATH)
         con = service._connect()
         assert con is not None
         try:
             # The fixture's own size, not a number to remember here -- the
             # point of this test is which *path* was opened.
             assert (con.execute("SELECT count(*) FROM oracle_cards").fetchone()[0]
-                    == len(tiny_corpus.CARDS))
+                    == len(tiny_pool.CARDS))
         finally:
             con.close()
 
@@ -142,7 +142,7 @@ def test_the_service_resolves_the_corpus_path_at_call_time(tmp_path):
 # `DB_PATH` moved with `DATA_DIR` from the day this module was written. The
 # raw Scryfall files it is *built from* did not: `download_bulk` defaulted to a
 # relative `data/scryfall` and `cmd_data_refresh` passed nothing, so with
-# `MTGLAB_DATA_DIR=/data` the corpus went to the volume and the ~500MB of JSON
+# `MTGLAB_DATA_DIR=/data` the pool went to the volume and the ~500MB of JSON
 # behind it went to the working directory. Found while writing the Dockerfile,
 # where the working directory is an ephemeral container layer and the volume is
 # sized in `docs/HOSTING.md` to hold exactly that download.
@@ -155,7 +155,7 @@ def test_scryfall_dir_follows_data_dir(clean_env, monkeypatch):
 
 
 def test_download_bulk_writes_under_the_configured_data_dir(tmp_path, monkeypatch):
-    """The bug itself: the download must land beside the corpus it builds.
+    """The bug itself: the download must land beside the pool it builds.
 
     No network -- `_fetch_json` is stubbed and the target is pre-created, so
     `download_bulk` returns the existing file. What is under test is which
@@ -182,15 +182,15 @@ def test_download_bulk_writes_under_the_configured_data_dir(tmp_path, monkeypatc
 
 def test_health_reports_bulk_files_from_the_data_dir(tmp_path):
     """`/api/health` is the container's HEALTHCHECK target and the one endpoint
-    that reports corpus state, so it reporting no bulk files on a fully seeded
+    that reports pool state, so it reporting no bulk files on a fully seeded
     volume is a wrong answer in the place it is least likely to be questioned.
     """
-    import tiny_corpus
+    import tiny_pool
     from mtglab.api import service
     from mtglab.decks.source import MemoryDeckSource
 
     with config.use_paths(data_dir=tmp_path / "volume"):
-        tiny_corpus.build(config.DB_PATH)
+        tiny_pool.build(config.DB_PATH)
         config.SCRYFALL_DIR.mkdir(parents=True)
         (config.SCRYFALL_DIR / "oracle_cards-2026-08-12.jsonl.gz").write_bytes(b"")
         health = service.health(source=MemoryDeckSource())

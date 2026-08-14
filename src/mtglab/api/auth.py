@@ -90,7 +90,7 @@ COOKIE_NAME = "sid"
 # learns only that it is anonymous.
 #
 # `/api/health` is here so a platform health check is a health check rather
-# than a 401. It reports corpus size and the count of curated decks, which is
+# than a 401. It reports pool size and the count of curated decks, which is
 # what a public git repository already says.
 #
 # `/api/auth/reset` and `/api/auth/claim` are here because a person who cannot

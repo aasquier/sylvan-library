@@ -71,7 +71,7 @@ class ValidationReport:
 
 def validate(deck: Deck, cards: dict | None = None, *,
              expected_size: int = 99) -> ValidationReport:
-    """Validate a deck. `cards` maps name -> CardRecord from the local corpus.
+    """Validate a deck. `cards` maps name -> CardRecord from the local pool.
 
     Passing `cards=None` runs only the structural checks and warns that the
     card-level checks were skipped -- it never silently claims the deck is fine.
@@ -83,7 +83,7 @@ def validate(deck: Deck, cards: dict | None = None, *,
         rep.add("error", "no-commander", "deck has no commander")
 
     # Structural, so it belongs above the `cards is None` early return -- a
-    # nonsense status must not become invisible whenever the corpus is missing.
+    # nonsense status must not become invisible whenever the pool is missing.
     if deck.status not in DECK_STATUSES:
         rep.add("error", "deck-status",
                 f"status {deck.status!r} is not one of {', '.join(DECK_STATUSES)}")
@@ -108,7 +108,7 @@ def validate(deck: Deck, cards: dict | None = None, *,
     # Yorion is the one companion that changes how big the deck must be
     # ("at least twenty cards more than the minimum deck size"), so the size
     # check has to know about it or a legal Yorion deck fails here. Keyed by
-    # name because this runs before the corpus is consulted, and because deck
+    # name because this runs before the pool is consulted, and because deck
     # size is a property of the deck rather than a judgement about a card.
     bonus = companion.DECK_SIZE_BONUS.get((deck.companion or "").lower(), 0)
     if bonus:
@@ -171,7 +171,7 @@ def validate(deck: Deck, cards: dict | None = None, *,
     # ---- card-level -----------------------------------------------------
     if cards is None:
         rep.add("warn", "unverified",
-                "no card corpus supplied; identity, legality and text were NOT checked")
+                "no card pool supplied; identity, legality and text were NOT checked")
         return rep
 
     all_names = deck.commander + [c.name for c in deck.cards] + \
@@ -182,7 +182,7 @@ def validate(deck: Deck, cards: dict | None = None, *,
     missing = [n for n in all_names if n not in cards]
     for name in missing:
         rep.add("error", "unknown-card",
-                "not found in the local corpus -- check spelling, or refresh "
+                "not found in the local pool -- check spelling, or refresh "
                 "the Scryfall data if this is a new card", name)
 
     # Colour identity is derived from the commander(s), so it must resolve.

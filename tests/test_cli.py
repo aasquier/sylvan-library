@@ -7,7 +7,7 @@ nowhere to point them. `config.use_paths()` fixed that, so these run the real
 
 Exit codes matter here as much as output: `decks validate` is used as a shell
 gate, and `decks build` must *refuse* to emit artifacts for an invalid deck.
-Nothing here needs DuckDB -- without a corpus the gate degrades to structural
+Nothing here needs DuckDB -- without a card pool the gate degrades to structural
 checks, which is exactly the fresh-clone path worth covering.
 """
 
@@ -48,7 +48,7 @@ BAD_DECK = GOOD_DECK.replace("    why: Two mana for one.\n", "")
 
 @pytest.fixture
 def decks(tmp_path):
-    """A scratch deck directory, with no corpus alongside it."""
+    """A scratch deck directory, with no card pool alongside it."""
     root = tmp_path / "decks"
     (root / "mini").mkdir(parents=True)
     (root / "mini" / "deck.yaml").write_text(GOOD_DECK, encoding="utf-8")
@@ -102,13 +102,13 @@ def test_decks_list_without_a_decks_directory_exits_cleanly(tmp_path, capsys):
 # ----------------------------------------------------------- decks validate
 
 def test_validate_exits_zero_for_a_structurally_sound_deck(decks, capsys):
-    """No corpus here, so this is the structural path -- which must still be a
+    """No card pool here, so this is the structural path -- which must still be a
     clean exit, because a fresh clone has no data/mtg.duckdb."""
     code, _ = run(["decks", "validate", "mini"])
     out = capsys.readouterr().out
     assert code == 0, out
     assert "0 error(s)" in out
-    assert "NOT checked" in out, "a skipped corpus check must say so"
+    assert "NOT checked" in out, "a skipped pool check must say so"
 
 
 def test_validate_exits_one_when_the_gate_finds_an_error(decks, capsys):
@@ -210,7 +210,7 @@ def test_a_draft_reports_one_counted_warning_not_a_wall(decks, capsys):
 
 # ------------------------------------------------------------- decks import
 
-def test_import_without_a_corpus_refuses_rather_than_guessing(decks, capsys):
+def test_import_without_a_pool_refuses_rather_than_guessing(decks, capsys):
     """Every name would be unknown and no land would be filed, so the deck's
     facts would never be checked -- the one thing the gate exists to do."""
     listing = tmp_listing(decks, "1 Sol Ring\n1 Swamp\n")
@@ -218,7 +218,7 @@ def test_import_without_a_corpus_refuses_rather_than_guessing(decks, capsys):
                      "--commander", "Gyome, Master Chef"])
     capsys.readouterr()
     assert code == 1
-    assert "needs the card corpus" in msg
+    assert "needs the card pool" in msg
     assert not (decks / "new-deck").exists()
 
 
@@ -248,10 +248,10 @@ def test_import_refuses_to_overwrite_an_existing_deck(decks, capsys):
 def test_import_writes_a_draft_and_the_gate_catches_the_banned_card(decks, capsys):
     """The whole bargain, end to end: the facts are checked on day one, the
     thinking is counted rather than invented, and nothing is guessed."""
-    import tiny_corpus
+    import tiny_pool
 
-    tiny_corpus.build(config.DB_PATH)
-    listing = tmp_listing(decks, tiny_corpus.DECKLIST)
+    tiny_pool.build(config.DB_PATH)
+    listing = tmp_listing(decks, tiny_pool.DECKLIST)
     code, msg = run(["decks", "import", "gyome-x", "--from", str(listing),
                      "--name", "Gyome imported", "--bracket", "4"])
     out = capsys.readouterr().out
@@ -262,7 +262,7 @@ def test_import_writes_a_draft_and_the_gate_catches_the_banned_card(decks, capsy
     assert deck.status == "theoretical", "never silently claimed as owned"
     assert deck.commander == ["Gyome, Master Chef"]
     assert deck.total_cards == 99
-    assert deck.land_count == 97, "only lands are categorised, and by the corpus"
+    assert deck.land_count == 97, "only lands are categorised, and by the pool"
     assert [c.why for c in deck.cards] == ["", "", ""], "no rationale is invented"
 
     assert "banned" in out and "Primeval Titan" in out
@@ -270,10 +270,10 @@ def test_import_writes_a_draft_and_the_gate_catches_the_banned_card(decks, capsy
 
 
 def test_import_dry_run_writes_nothing(decks, capsys):
-    import tiny_corpus
+    import tiny_pool
 
-    tiny_corpus.build(config.DB_PATH)
-    listing = tmp_listing(decks, tiny_corpus.DECKLIST)
+    tiny_pool.build(config.DB_PATH)
+    listing = tmp_listing(decks, tiny_pool.DECKLIST)
     code, msg = run(["decks", "import", "gyome-x", "--from", str(listing),
                      "--dry-run"])
     out = capsys.readouterr().out
@@ -287,11 +287,11 @@ def test_import_dry_run_writes_nothing(decks, capsys):
 
 # ------------------------------------------------------------- decks editing
 #
-# These run without a corpus, which is exactly the point for three of the four:
+# These run without a card pool, which is exactly the point for three of the four:
 # removing a card, setting a field and writing a note are facts about the deck
-# file rather than about Magic. Adding a card needs the corpus and says so.
+# file rather than about Magic. Adding a card needs the pool and says so.
 
-def test_remove_takes_a_card_out_without_a_corpus(decks, capsys):
+def test_remove_takes_a_card_out_without_a_pool(decks, capsys):
     code, msg = run(["decks", "remove", "mini", "--card", "Sol Ring"])
     assert code == 0, msg
     assert "Sol Ring" not in (decks / "mini" / "deck.yaml").read_text()
@@ -346,16 +346,16 @@ def test_note_can_read_long_prose_from_a_file(decks, tmp_path):
     assert written["notes"]["gameplan"] == text
 
 
-def test_add_without_a_corpus_refuses_rather_than_guessing(decks):
+def test_add_without_a_pool_refuses_rather_than_guessing(decks):
     """Rule 1 applied to a write: a card nobody looked up is a card whose
     legality and colour identity are a guess."""
     code, msg = run(["decks", "add", "mini", "--card", "Llanowar Elves",
                      "--category", "ramp", "--why", "One mana dork."])
     assert code == 1
-    assert "corpus" in msg
+    assert "pool" in msg
 
 
-def test_an_unknown_category_is_refused_before_the_corpus_is_needed(decks):
+def test_an_unknown_category_is_refused_before_the_pool_is_needed(decks):
     code, msg = run(["decks", "add", "mini", "--card", "Llanowar Elves",
                      "--category", "rampp", "--why", "typo"])
     assert code == 1
@@ -413,15 +413,15 @@ def test_a_refused_edit_leaves_the_file_untouched(decks):
     assert (decks / "mini" / "deck.yaml").read_text() == before
 
 
-def test_sim_without_a_corpus_exits_with_advice_not_a_traceback(decks, capsys):
-    """`compile_deck` raises CorpusRequired; the CLI turns that into a clean
+def test_sim_without_a_pool_exits_with_advice_not_a_traceback(decks, capsys):
+    """`compile_deck` raises PoolRequired; the CLI turns that into a clean
     message naming the command that fixes it."""
     code, msg = run(["sim", "mana", "mini", "--games", "10"])
     assert code == 1
     assert "data refresh" in msg
 
 
-def test_sim_lands_without_a_corpus_also_exits_cleanly(decks, capsys):
+def test_sim_lands_without_a_pool_also_exits_cleanly(decks, capsys):
     code, msg = run(["sim", "lands", "mini", "30", "31", "--games", "10"])
     assert code == 1
     assert "data refresh" in msg
@@ -545,26 +545,26 @@ def test_forge_check_only_names_the_cards_forge_lacks(decks, monkeypatch):
     assert "Sol Ring" in msg
 
 
-# ------------------------------------------------- the commands that need a corpus
+# ------------------------------------------------- the commands that need a card pool
 #
 # `cli.py` sat at 62% because roughly a third of it -- suggest, the simulators,
 # card lookup, price, the Claude surface -- opens `config.DB_PATH` on the first
-# line and exits if it is missing. On a machine with no corpus those handlers
+# line and exits if it is missing. On a machine with no card pool those handlers
 # were unreachable, so CI ran the argument parsing and none of the work.
 #
-# `tiny_corpus` removes that. The scratch deck below is built from cards the
+# `tiny_pool` removes that. The scratch deck below is built from cards the
 # fixture knows, so the same `main()` runs the same code path it runs for real.
 
 @pytest.fixture
-def corpus_decks(tmp_path):
-    """A scratch deck directory *with* a corpus beside it."""
-    import tiny_corpus
+def pool_decks(tmp_path):
+    """A scratch deck directory *with* a card pool beside it."""
+    import tiny_pool
 
     root = tmp_path / "decks"
     (root / "mini").mkdir(parents=True)
     (root / "mini" / "deck.yaml").write_text(GOOD_DECK, encoding="utf-8")
     with config.use_paths(decks_dir=root, data_dir=tmp_path / "data"):
-        tiny_corpus.build(config.DB_PATH)
+        tiny_pool.build(config.DB_PATH)
         yield root
 
 
@@ -575,9 +575,9 @@ def write_deck(root: Path, slug: str, deck) -> None:
     deck.dump(root / slug / "deck.yaml")
 
 
-def test_validate_with_a_corpus_checks_card_facts_not_just_structure(corpus_decks,
+def test_validate_with_a_pool_checks_card_facts_not_just_structure(pool_decks,
                                                                      capsys):
-    """Without a corpus the gate degrades to structural checks. With one it
+    """Without a card pool the gate degrades to structural checks. With one it
     resolves every name, which is the half that was never exercised in CI."""
     code, _ = run(["decks", "validate", "mini"])
     out = capsys.readouterr().out
@@ -585,19 +585,19 @@ def test_validate_with_a_corpus_checks_card_facts_not_just_structure(corpus_deck
     assert "0 error(s)" in out
 
 
-def test_validate_reports_a_banned_card_by_name(corpus_decks, capsys):
-    import tiny_corpus
-    write_deck(corpus_decks, "banned", tiny_corpus.mono_green_deck())
+def test_validate_reports_a_banned_card_by_name(pool_decks, capsys):
+    import tiny_pool
+    write_deck(pool_decks, "banned", tiny_pool.mono_green_deck())
     code, _ = run(["decks", "validate", "banned"])
     out = capsys.readouterr().out
     assert code == 1, out
     assert "Primeval Titan" in out
 
 
-def test_suggest_shortlists_replacements_for_what_the_gate_flagged(corpus_decks,
+def test_suggest_shortlists_replacements_for_what_the_gate_flagged(pool_decks,
                                                                    capsys):
-    import tiny_corpus
-    write_deck(corpus_decks, "banned", tiny_corpus.mono_green_deck())
+    import tiny_pool
+    write_deck(pool_decks, "banned", tiny_pool.mono_green_deck())
     code, _ = run(["decks", "suggest", "banned"])
     out = capsys.readouterr().out
     assert code == 0, out
@@ -606,17 +606,17 @@ def test_suggest_shortlists_replacements_for_what_the_gate_flagged(corpus_decks,
     assert "Cultivator Colossus" in out or "Craterhoof" in out
 
 
-def test_suggest_on_a_clean_deck_says_so_rather_than_upselling(corpus_decks,
+def test_suggest_on_a_clean_deck_says_so_rather_than_upselling(pool_decks,
                                                               capsys):
-    import tiny_corpus
-    write_deck(corpus_decks, "clean", tiny_corpus.mono_green_deck(clean=True))
+    import tiny_pool
+    write_deck(pool_decks, "clean", tiny_pool.mono_green_deck(clean=True))
     code, _ = run(["decks", "suggest", "clean"])
     out = capsys.readouterr().out
     assert code == 0, out
     assert "Primeval Titan" not in out
 
 
-def test_sim_mana_runs_and_prints_its_caveat(corpus_decks, capsys):
+def test_sim_mana_runs_and_prints_its_caveat(pool_decks, capsys):
     """The command runs end to end and reports a row per turn."""
     code, _ = run(["sim", "mana", "mini", "--games", "50", "--turns", "4",
                    "--seed", "1"])
@@ -628,7 +628,7 @@ def test_sim_mana_runs_and_prints_its_caveat(corpus_decks, capsys):
         assert turn in out
 
 
-def test_sim_mana_is_seeded_and_repeatable(corpus_decks, capsys):
+def test_sim_mana_is_seeded_and_repeatable(pool_decks, capsys):
     """Same seed, same numbers -- otherwise a sweep is not a comparison."""
     run(["sim", "mana", "mini", "--games", "50", "--turns", "4", "--seed", "7"])
     first = capsys.readouterr().out
@@ -636,7 +636,7 @@ def test_sim_mana_is_seeded_and_repeatable(corpus_decks, capsys):
     assert capsys.readouterr().out == first
 
 
-def test_sim_lands_sweeps_the_requested_range(corpus_decks, capsys):
+def test_sim_lands_sweeps_the_requested_range(pool_decks, capsys):
     code, _ = run(["sim", "lands", "mini", "34", "36", "--games", "40",
                    "--seed", "1"])
     out = capsys.readouterr().out
@@ -645,17 +645,17 @@ def test_sim_lands_sweeps_the_requested_range(corpus_decks, capsys):
         assert count in out
 
 
-def test_sim_needs_a_corpus_and_says_which_command_fixes_it(decks):
+def test_sim_needs_a_pool_and_says_which_command_fixes_it(decks):
     """The fresh-clone path: refuse rather than simulate a deck of unknowns."""
     code, msg = run(["sim", "mana", "mini", "--games", "10"])
     assert code == 1
     assert "data refresh" in msg
 
 
-def test_price_deck_reports_rather_than_crashing_without_printings(corpus_decks,
+def test_price_deck_reports_rather_than_crashing_without_printings(pool_decks,
                                                                   capsys):
-    """`tiny_corpus` loads oracle rows but no printings, which is exactly the
-    state a corpus refreshed with --oracle-only is in. Pricing must degrade to
+    """`tiny_pool` loads oracle rows but no printings, which is exactly the
+    state a card pool refreshed with --oracle-only is in. Pricing must degrade to
     "no price" rather than raising."""
     code, _ = run(["price", "deck", "mini"])
     out = capsys.readouterr().out
@@ -762,7 +762,7 @@ def test_the_interview_tells_you_to_write_the_why_yourself(decks, monkeypatch,
 
 
 def test_the_interview_names_what_it_looked_up(decks, monkeypatch, capsys):
-    """Rule 1's receipt: an opinion assembled from corpus lookups should say
+    """Rule 1's receipt: an opinion assembled from pool lookups should say
     which ones, deduplicated rather than one line per call."""
     from mtglab.api import service
     monkeypatch.setattr(service, "claude_interview",

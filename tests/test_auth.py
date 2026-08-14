@@ -20,8 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 pytest.importorskip("argon2")
 
-from mtglab import config  # noqa: E402
-from mtglab.auth import db, passwords, ratelimit, sessions, users  # noqa: E402
+from mtglab import config
+from mtglab.auth import db, passwords, ratelimit, sessions, users
 
 GOOD = "a-perfectly-fine-passphrase"
 ALSO_GOOD = "another-perfectly-fine-one"
@@ -52,7 +52,7 @@ def test_connect_creates_the_file_and_the_schema(tmp_path):
     assert {"users", "sessions", "login_attempts"} <= tables
 
 
-def test_app_db_sits_beside_the_corpus_and_moves_with_it(tmp_path):
+def test_app_db_sits_beside_the_pool_and_moves_with_it(tmp_path):
     """`use_paths` has to move both, or a test writes into the real data dir."""
     with config.use_paths(data_dir=tmp_path / "elsewhere"):
         assert config.APP_DB_PATH.name == "app.db"

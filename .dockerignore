@@ -1,11 +1,11 @@
 # What must never reach the build context.
 #
 # The first two entries are the ones that matter, and they are the same two
-# rules CLAUDE.md rule 5 states for git: no corpus, no credentials. `.git`
+# rules CLAUDE.md rule 5 states for git: no card pool, no credentials. `.git`
 # would carry both back in through history, which is why it is excluded rather
 # than merely unused.
 
-# The corpus and everything derived from it. Scryfall asks that bulk data not
+# The pool and everything derived from it. Scryfall asks that bulk data not
 # be redistributed, and the volume is where it lives. A local `data/` here is
 # ~600MB, so this is also the difference between a fast build and a slow one.
 data/
@@ -54,7 +54,7 @@ docs/
 decks/.trash/
 
 # Forge's distribution, if it was ever unpacked in-tree. Several hundred MB,
-# and `res/cardsfolder` is card corpus data by another name.
+# and `res/cardsfolder` is card pool data by another name.
 forge/
 *.jar
 

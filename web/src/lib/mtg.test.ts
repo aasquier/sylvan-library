@@ -94,7 +94,7 @@ describe('manaSymbols', () => {
   })
 
   it('treats a missing cost as no symbols', () => {
-    // Lands have no mana cost; so does any card the corpus does not know.
+    // Lands have no mana cost; so does any card the pool does not know.
     expect(manaSymbols(null)).toEqual([])
     expect(manaSymbols(undefined)).toEqual([])
     expect(manaSymbols('')).toEqual([])
@@ -116,7 +116,7 @@ describe('percent', () => {
 
 describe('money', () => {
   it('renders an em dash when there is no price', () => {
-    // A card the corpus has no printing price for must not render as "$0.00".
+    // A card the pool has no printing price for must not render as "$0.00".
     expect(money(null)).toBe('—')
     expect(money(undefined)).toBe('—')
   })

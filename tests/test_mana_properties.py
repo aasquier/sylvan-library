@@ -7,7 +7,7 @@ and pools, and every one of them is checked against a brute-force search and
 against Hall's condition. A disagreement is a real bug in the most
 correctness-critical function in the project.
 
-The enumerated corpus at the bottom does the same job deterministically, so the
+The enumerated case set at the bottom does the same job deterministically, so the
 suite has a fixed backbone that does not depend on which examples Hypothesis
 happened to roll -- and so a compiled port has something concrete to be
 differentially tested against (docs/ENGINEERING.md 1).
@@ -28,10 +28,10 @@ from hypothesis import strategies as st
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from mana_oracle import (
+    all_cases,
     brute_force_can_pay,
     case_id,
-    corpus_cases,
-    corpus_digest,
+    cases_digest,
     hall_can_pay,
 )
 from mtglab.mana import ManaCost, ManaSource, can_pay, expand_units, parse_mana_cost
@@ -262,21 +262,21 @@ def test_phyrexian_mana_value_matches_scryfall():
     assert parse_mana_cost("{U/P}").colors == frozenset({"U"})
 
 
-# ---------------------------------------------------------------- corpus
+# ----------------------------------------------------------------- cases
 #
 # Deterministic coverage, so the suite does not depend on which examples
 # Hypothesis rolled this run.
 
-def test_the_corpus_is_the_size_it_claims():
+def test_the_case_set_is_the_size_it_claims():
     """Pins the enumeration itself. If someone widens an alphabet, the digest
     below changes for a reason that has nothing to do with the solver, and this
     assertion says which of the two happened."""
-    assert sum(1 for _ in corpus_cases()) == 13_944
+    assert sum(1 for _ in all_cases()) == 13_944
 
 
-def test_solver_agrees_with_both_oracles_across_the_whole_corpus():
+def test_solver_agrees_with_both_oracles_across_the_whole_case_set():
     disagreements = []
-    for cost, pool in corpus_cases():
+    for cost, pool in all_cases():
         got = can_pay(cost, pool)
         if got != brute_force_can_pay(cost, pool) or got != hall_can_pay(cost, pool):
             disagreements.append(case_id(cost, pool))
@@ -285,18 +285,18 @@ def test_solver_agrees_with_both_oracles_across_the_whole_corpus():
     )
 
 
-# The answers `mana.py` gives across the whole corpus, as one hash. This is a
+# The answers `mana.py` gives across the whole case set, as one hash. This is a
 # golden value: it does not verify correctness -- the oracles above do that --
 # it makes a change in castability semantics impossible to make by accident.
 # Regenerate deliberately, and say in the commit message what changed and why:
 #     python tests/mana_oracle.py --digest
-CORPUS_ANSWER_DIGEST = "ffa656572471da2a29177d3b195ffbe7684c2e0e9c2ec1f500934dd9d6fed36c"
+CASES_ANSWER_DIGEST = "ffa656572471da2a29177d3b195ffbe7684c2e0e9c2ec1f500934dd9d6fed36c"
 
 
-def test_corpus_answers_have_not_changed():
-    assert corpus_digest(can_pay) == CORPUS_ANSWER_DIGEST, (
+def test_case_set_answers_have_not_changed():
+    assert cases_digest(can_pay) == CASES_ANSWER_DIGEST, (
         "castability semantics changed. If that was deliberate, update "
-        "CORPUS_ANSWER_DIGEST and explain the change in the commit message."
+        "CASES_ANSWER_DIGEST and explain the change in the commit message."
     )
 
 

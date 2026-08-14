@@ -13,7 +13,7 @@
  * Colour identity is never sent to the server. The commander decides it
  * (rule 2), and the taxonomy exists to help someone *find* a commander — so
  * the last step searches for legends whose identity is exactly the slot you
- * landed on, and the deck records whatever the corpus says about the one you
+ * landed on, and the deck records whatever the pool says about the one you
  * pick.
  *
  * **The lesson is skippable, and skipping is remembered.** A player who has
@@ -148,7 +148,7 @@ export default function NewDeck() {
    * The faces of a colour pair, and deliberately *not* a hand-written list of
    * guild characters: a name typed from memory is a name nobody checked, and
    * rule 1 applies to reference data the same way it applies to a deck. These
-   * come out of the corpus with their real colour identity, so the three
+   * come out of the pool with their real colour identity, so the three
    * legends under "Selesnya" are Selesnya because Scryfall says so.
    *
    * Cached per key because the carousel is arrow-driven and stepping through
@@ -249,7 +249,7 @@ export default function NewDeck() {
       limit: 3,
     })
       .then((r) => { if (live) setLeaders((c) => ({ ...c, [key]: r.cards })) })
-      // A fresh clone has no corpus. An empty list renders as nothing, which
+      // A fresh clone has no card pool. An empty list renders as nothing, which
       // is the right amount of noise for a page whose whole point is that it
       // works before `data refresh` has ever run.
       .catch(() => { if (live) setLeaders((c) => ({ ...c, [key]: [] })) })
@@ -299,7 +299,7 @@ export default function NewDeck() {
    *
    * This is where ADR 20's "it proposes; you create" stops being a rule being
    * honoured and becomes how the screen is wired. The interview hands over a
-   * combination key and a corpus-resolved card; both go into exactly the
+   * combination key and a card pool-resolved card; both go into exactly the
    * variables the carousel would have set, so the next thing the user sees is
    * step 3 and the button that makes the deck is the existing one.
    */
@@ -307,7 +307,7 @@ export default function NewDeck() {
     setChosen(taxonomy?.combinations.find((c) => c.key === key) ?? null)
     setCommanders(null)
     pickCommander({
-      // The create route needs a name and takes the rest from the corpus. The
+      // The create route needs a name and takes the rest from the pool. The
       // fields below the name are for the hover card on this page only.
       name: card.name, category: '', why: '', qty: 1, known: true,
       mana_cost: card.mana_cost, type_line: card.type_line ?? undefined,
@@ -621,7 +621,7 @@ export default function NewDeck() {
               </p>
 
               {/* Who actually leads it — the specific thing this slot has
-                  that the era paragraph above cannot say. Read off the corpus
+                  that the era paragraph above cannot say. Read off the pool
                   by exact colour identity rather than typed from memory, so
                   the three legends under a guild's name are that guild's
                   colours because Scryfall says they are. Hover for the card. */}
@@ -721,7 +721,7 @@ export default function NewDeck() {
           {commanders?.length === 0 && (
             <div className="card-surface rounded-xl px-6 py-8 text-center">
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                No commanders found. This needs the card corpus — run{' '}
+                No commanders found. This needs the card pool — run{' '}
                 <code>mtglab data refresh</code>.
               </p>
             </div>

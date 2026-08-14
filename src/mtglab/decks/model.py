@@ -132,7 +132,7 @@ class Deck:
     shared: bool = True
     commander: list[str] = field(default_factory=list)
     # Which printing's art the deck shows for its commander: a Scryfall
-    # printing id, or empty for "whatever the corpus considers the default".
+    # printing id, or empty for "whatever the pool considers the default".
     #
     # A deck property rather than a per-viewer setting, deliberately.
     # `deck.yaml` is the source of truth (ADR 1) and the choice should travel

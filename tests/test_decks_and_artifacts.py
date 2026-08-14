@@ -42,7 +42,7 @@ def make_deck(n=99, **kw):
                 cards=cards, **kw)
 
 
-def corpus_for(deck, identity=BG, **overrides):
+def pool_for(deck, identity=BG, **overrides):
     out = {"Gyome, Master Chef": FakeCard("Gyome, Master Chef", identity,
                                           "Legendary Creature — Troll Chef")}
     for c in deck.cards + deck.swap_board:
@@ -78,12 +78,12 @@ def test_yaml_round_trip():
 
 def test_valid_deck_passes():
     deck = make_deck(99)
-    assert validate(deck, corpus_for(deck)).ok
+    assert validate(deck, pool_for(deck)).ok
 
 
 def test_wrong_size_fails():
     deck = make_deck(98)
-    rep = validate(deck, corpus_for(deck))
+    rep = validate(deck, pool_for(deck))
     assert not rep.ok
     assert any(i.code == "deck-size" for i in rep.errors)
 
@@ -91,16 +91,16 @@ def test_wrong_size_fails():
 def test_missing_rationale_blocks_generation():
     deck = make_deck(99)
     deck.cards[3].why = ""
-    rep = validate(deck, corpus_for(deck))
+    rep = validate(deck, pool_for(deck))
     assert any(i.code == "missing-rationale" for i in rep.errors)
 
 
 def test_offidentity_card_is_caught():
     """The Ajani, Nacatl Pariah case: a card whose identity leaks a colour."""
     deck = make_deck(99)
-    corpus = corpus_for(deck)
-    corpus["Card 7"] = FakeCard("Card 7", frozenset("RW"))
-    rep = validate(deck, corpus)
+    pool = pool_for(deck)
+    pool["Card 7"] = FakeCard("Card 7", frozenset("RW"))
+    rep = validate(deck, pool)
     bad = [i for i in rep.errors if i.code == "color-identity"]
     assert bad and bad[0].card == "Card 7"
     assert "R" in bad[0].message and "W" in bad[0].message
@@ -108,32 +108,32 @@ def test_offidentity_card_is_caught():
 
 def test_banned_card_is_caught():
     deck = make_deck(99)
-    corpus = corpus_for(deck)
-    corpus["Card 2"] = FakeCard("Card 2", G, legal_commander=False)
-    assert any(i.code == "banned" for i in validate(deck, corpus).errors)
+    pool = pool_for(deck)
+    pool["Card 2"] = FakeCard("Card 2", G, legal_commander=False)
+    assert any(i.code == "banned" for i in validate(deck, pool).errors)
 
 
 def test_duplicate_nonbasic_is_caught():
     deck = make_deck(98)
     deck.cards.append(CardEntry(name="Card 0", category="threat", why="dupe"))
-    assert any(i.code == "singleton" for i in validate(deck, corpus_for(deck)).errors)
+    assert any(i.code == "singleton" for i in validate(deck, pool_for(deck)).errors)
 
 
 def test_basics_may_repeat():
     deck = make_deck(95)
     deck.cards.append(CardEntry(name="Forest", category="land", qty=4, why="basic"))
-    rep = validate(deck, corpus_for(deck))
+    rep = validate(deck, pool_for(deck))
     assert not any(i.code == "singleton" for i in rep.errors)
 
 
 def test_unknown_card_is_an_error_not_a_shrug():
     deck = make_deck(99)
-    corpus = corpus_for(deck)
-    del corpus["Card 5"]
-    assert any(i.code == "unknown-card" for i in validate(deck, corpus).errors)
+    pool = pool_for(deck)
+    del pool["Card 5"]
+    assert any(i.code == "unknown-card" for i in validate(deck, pool).errors)
 
 
-def test_no_corpus_warns_loudly():
+def test_no_pool_warns_loudly():
     rep = validate(make_deck(99), None)
     assert any(i.code == "unverified" for i in rep.warnings)
 
@@ -155,7 +155,7 @@ def test_moxfield_txt_shape():
 def test_annotated_list_includes_every_why():
     deck = make_deck(10)
     deck.cards[0].why = "unique-marker-string"
-    out = annotated_decklist(deck, corpus_for(deck))
+    out = annotated_decklist(deck, pool_for(deck))
     assert "unique-marker-string" in out
     for c in deck.cards:
         assert c.name in out
@@ -184,7 +184,7 @@ def test_write_all_produces_five_files():
     prev = make_deck(99)
     prev.cards[0] = CardEntry(name="Old Card", category="threat", why="was here")
     with tempfile.TemporaryDirectory() as tmp:
-        written = write_all(deck, tmp, cards=corpus_for(deck), previous=prev,
+        written = write_all(deck, tmp, cards=pool_for(deck), previous=prev,
                             prices={"Card 0": 1.0})
         names = sorted(p.name for p in written)
     assert names == ["decklist-annotated.md", "moxfield.txt", "primer-advanced.md",
@@ -194,7 +194,7 @@ def test_write_all_produces_five_files():
 def test_write_all_omits_swaps_when_nothing_changed():
     deck = make_deck(99)
     with tempfile.TemporaryDirectory() as tmp:
-        written = write_all(deck, tmp, cards=corpus_for(deck))
+        written = write_all(deck, tmp, cards=pool_for(deck))
     assert len(written) == 4
 
 
@@ -282,7 +282,7 @@ def test_a_draft_warns_about_a_missing_why_and_a_curated_deck_blocks():
     for stage, level in (("draft", "warn"), ("curated", "error")):
         deck = make_deck(99, stage=stage)
         deck.cards[3].why = ""
-        rep = validate(deck, corpus_for(deck))
+        rep = validate(deck, pool_for(deck))
         codes = {i.code for i in getattr(rep, "errors" if level == "error"
                                         else "warnings")}
         assert ("missing-rationale" in codes) == (level == "error"), stage
@@ -296,7 +296,7 @@ def test_a_draft_reports_one_counted_issue_rather_than_ninety_nine():
     deck = make_deck(99, stage="draft")
     for card in deck.cards:
         card.why = ""
-    rep = validate(deck, corpus_for(deck))
+    rep = validate(deck, pool_for(deck))
     assert len(rep.warnings) == 1
     assert rep.warnings[0].code == "draft-incomplete"
     assert "99 of 99 cards still need a `why`" in rep.warnings[0].message
@@ -308,10 +308,10 @@ def test_a_draft_still_blocks_on_every_card_fact():
     deck = make_deck(99, stage="draft")
     for card in deck.cards:
         card.why = ""
-    corpus = corpus_for(deck)
-    corpus["Card 0"] = FakeCard("Card 0", G, legal_commander=False)
-    corpus["Card 1"] = FakeCard("Card 1", frozenset("U"))
-    assert {i.code for i in validate(deck, corpus).errors} == \
+    pool = pool_for(deck)
+    pool["Card 0"] = FakeCard("Card 0", G, legal_commander=False)
+    pool["Card 1"] = FakeCard("Card 1", frozenset("U"))
+    assert {i.code for i in validate(deck, pool).errors} == \
         {"banned", "color-identity"}
 
 
@@ -319,7 +319,7 @@ def test_promotion_is_refused_while_any_card_is_blank():
     """`stage: curated` is not something a deck can declare its way into."""
     deck = make_deck(99, stage="curated")
     deck.cards[0].why = ""
-    assert not validate(deck, corpus_for(deck)).ok
+    assert not validate(deck, pool_for(deck)).ok
 
 
 def test_write_all_refuses_a_draft_and_names_what_is_owed():

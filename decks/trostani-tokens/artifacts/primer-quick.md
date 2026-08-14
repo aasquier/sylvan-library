@@ -19,7 +19,7 @@ Ramp on 1-3, deploy a doubler on 4, and live to turn 6. The deck does not need t
 
 ## Turn-by-turn shape
 
-— not yet recounted from the corpus, and not worth counting by hand.
+— not yet recounted from the pool, and not worth counting by hand.
 
 ## Three things that will kill you
 
@@ -40,4 +40,4 @@ Ramp on 1-3, deploy a doubler on 4, and live to turn 6. The deck does not need t
 | Lands | 35 |
 
 ---
-_Generated 2026-08-12 from `deck.yaml`. Edit the deck file, not this document._
+_Generated 2026-08-14 from `deck.yaml`. Edit the deck file, not this document._

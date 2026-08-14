@@ -17,7 +17,7 @@
  * questions. They are never mistaken for something anybody said.
  *
  * **The roster is fetched, not written here.** `/api/claude/personas` is free,
- * needs no key and no corpus, and answers before anyone has committed to
+ * needs no key and no card pool, and answers before anyone has committed to
  * spending anything — so the first screen of the most expensive door in the
  * app costs nothing. Three more voices are on ADR 21's list and none of them
  * needs this file reopened.

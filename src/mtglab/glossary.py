@@ -2,7 +2,7 @@
 
 Reference data, like `colors.py` and for the same reason: no amount of card
 data teaches somebody what a mulligan is, and the app is full of screens that
-assume they already know. It is committed, it needs no corpus and no network,
+assume they already know. It is committed, it needs no card pool and no network,
 and it is checked rather than asserted wherever a claim happens to be
 checkable.
 

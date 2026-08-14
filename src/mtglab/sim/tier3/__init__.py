@@ -12,7 +12,7 @@ bridge is four small pieces and no more:
     parse.py      `sim -q` output -> a GameResult
     run.py        find the install, build the argv, run it, time it
 
-Nothing here imports DuckDB or the corpus, and nothing imports the CLI. A
+Nothing here imports DuckDB or the pool, and nothing imports the CLI. A
 `Deck` and a directory containing Forge is the whole input.
 
 **The pre-flight is not optional.** `run.py` refuses to start a simulation it

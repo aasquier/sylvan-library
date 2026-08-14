@@ -39,7 +39,7 @@ from typing import Any
 # Aaron's call, argued in ADR 14 and recorded in ROADMAP: start on Sonnet and
 # find out whether it is enough, rather than paying for Opus on the assumption
 # that it is not. Most of what the modes will do is conversation over tool
-# results the corpus already computed, which is not obviously Opus-shaped work.
+# results the pool already computed, which is not obviously Opus-shaped work.
 #
 # **Do not quietly raise this.** Moving up is a decision to make once there is
 # evidence, and the override below exists so that evidence can be gathered --

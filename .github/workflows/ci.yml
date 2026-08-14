@@ -5,9 +5,28 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege. `dependency-review.yml` has said this since it landed and
+# this file never did, which meant the whole suite ran with whatever the
+# repository default happened to be. Nothing here writes: no job pushes an
+# image, comments on a PR, or updates a check.
+permissions:
+  contents: read
+
+# One run per ref. Pushing three times in a minute used to start three full
+# builds -- six jobs each, including the arm64 QEMU image build -- and the
+# first two were obsolete before they finished. Cancelled on pull requests
+# only: a superseded PR run answers a question nobody is asking any more,
+# whereas every commit on `main` should keep its own recorded result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Generous against the normal run (~6 minutes) but far below the 6-hour
+    # default. A hung test should cost minutes of runner time, not a morning.
+    timeout-minutes: 20
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -16,6 +35,10 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
+          # The dependency set is small but numpy and duckdb are large wheels,
+          # and they are re-downloaded on every job of every run without this.
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       # The `api` extra is not optional here. tests/test_api.py opens with
       # pytest.importorskip("fastapi"), so installing only [dev] skips the
@@ -54,16 +77,16 @@ jobs:
       # The check that would have caught the reason this job was ever green
       # while testing less than the maintainer's laptop did.
       #
-      # Until 2026-08-12, 29 tests called `pytest.skip("no corpus available")`
+      # Until 2026-08-12, 29 tests called `pytest.skip("no card pool available")`
       # because CI has no `data/mtg.duckdb` -- so the whole card-fact surface
       # (swap, add, suggestions, search, the simulators, the Claude tools) was
       # reported as passing while never running. A skipped test is a test
       # nobody reads the result of, and the failure mode is silent by
       # construction: the check stays green as the suite quietly shrinks.
       #
-      # `tests/tiny_corpus.py` builds a real DuckDB corpus in about a second,
+      # `tests/tiny_pool.py` builds a real DuckDB pool in about a second,
       # so those tests now run here. Exactly two remain, both carrying the
-      # `needs_full_corpus` marker and both explained where they are declared.
+      # `needs_full_pool` marker and both explained where they are declared.
       # If that number moves, this fails and somebody has to say why.
       - name: The suite must not skip silently
         run: |
@@ -72,7 +95,7 @@ jobs:
           if [ "$got" != "$expected" ]; then
             echo "::error::expected $expected skipped test(s), got $got"
             echo "A skipped test is a test nobody is reading the result of."
-            echo "Either make it run, or mark it needs_full_corpus and raise"
+            echo "Either make it run, or mark it needs_full_pool and raise"
             echo "the expected count here deliberately."
             grep '^SKIPPED' pytest.log || true
             exit 1
@@ -91,6 +114,7 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
@@ -143,13 +167,14 @@ jobs:
           echo "committed bundle is current"
 
   # Guard against the two things that must never land in the repo.
-  no-secrets-or-corpus:
+  no-secrets-or-card-data:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       # `app.db` joined this list on 2026-08-12. It holds password hashes and
       # email addresses -- the first personal data the project stores (ADR 16)
-      # -- and unlike the corpus it is irreplaceable, so a committed one is
+      # -- and unlike the pool it is irreplaceable, so a committed one is
       # both a leak and a thing somebody might try to "restore" from git.
       - name: Reject committed card data, collections, or credentials
         run: |
@@ -195,6 +220,9 @@ jobs:
   # that does not gate.
   image:
     runs-on: ubuntu-latest
+    # The longest job by far: the arm64 build at the end runs under QEMU. This
+    # is a stuck-build ceiling, not a target.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -215,18 +243,18 @@ jobs:
           cache-to: type=gha,mode=max
 
       # Rule 5, enforced against the artifact rather than against the tree. The
-      # `no-secrets-or-corpus` job checks what is *tracked*; this checks what is
+      # `no-secrets-or-card-data` job checks what is *tracked*; this checks what is
       # *shipped*, which is a different thing the moment a `.dockerignore` line
       # is deleted. Scryfall asks that bulk data not be redistributed, and a
       # published image is redistribution.
-      - name: The image must contain no corpus
+      - name: The image must contain no card pool
         run: |
           found=$(docker run --rm --entrypoint sh sylvan-library:ci -c \
             'find / -xdev \( -name "*.duckdb" -o -name "*.jsonl.gz" -o -name "*.json.gz" \) 2>/dev/null' )
           if [ -n "$found" ]; then
-            echo "::error::corpus data found in the image:"; echo "$found"; exit 1
+            echo "::error::card pool data found in the image:"; echo "$found"; exit 1
           fi
-          echo "no corpus in the image"
+          echo "no card pool in the image"
 
       # The decks ship as a seed, not as the live directory -- MTGLAB_DECKS_DIR
       # points at the volume. If this path moves, HOSTING §4 step 6's copy
@@ -281,14 +309,14 @@ jobs:
           docker logs mtglab-ci || true
           exit 1
 
-      # `/api/health` is on PUBLIC_PATHS *and* reports corpus state, which is
-      # why it is the HEALTHCHECK target. A fresh instance has no corpus and
+      # `/api/health` is on PUBLIC_PATHS *and* reports pool state, which is
+      # why it is the HEALTHCHECK target. A fresh instance has no card pool and
       # must say so rather than failing: that is the correct state between a
       # deploy and the seeding run, and an image that 500s here would make the
       # platform restart a perfectly healthy machine forever.
-      - name: Health answers with auth on, and reports no corpus
+      - name: Health answers with auth on, and reports no card pool
         run: |
-          grep -q '"corpus": *false' health.json
+          grep -q '"pool": *false' health.json
           echo "health reports an unseeded instance, as it should"
 
       # The gate is a gate. If this ever returns 200 the middleware has stopped
