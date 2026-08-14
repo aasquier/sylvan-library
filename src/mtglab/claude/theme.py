@@ -841,7 +841,7 @@ def _reading_for(who: persona_mod.Persona, seed: Any) -> tarot.Reading | None:
         raise TranscriptRejected(f"not a usable reading seed: {seed!r}") from exc
 
 
-def _stance(requested: Any) -> stance_mod.Stance:
+def stance_for(requested: Any) -> stance_mod.Stance:
     """The stance that applies when there is no deck to derive one from.
 
     Every other mode reads `status: built | theoretical` off the deck it is
@@ -854,6 +854,14 @@ def _stance(requested: Any) -> stance_mod.Stance:
 
     Still clamped to the deployment ceiling, so `off` remains reachable and an
     operator who has turned this off has turned it off.
+
+    **Public because the dial has to be able to ask.** `/api/claude` renders
+    the stance readout beside the create flow, and with no deck to name it
+    would otherwise resolve through `stance.resolve(None, None)` and report
+    `off` — while this function was about to run the conversation at
+    `second-opinion`. A dial that misreports the stance it governs is worse
+    than no dial, and the fix is one caller rather than a second copy of this
+    default living in TypeScript.
     """
     if requested is None:
         return stance_mod.clamp(stance_mod.SECOND_OPINION, stance_mod.ceiling())
@@ -939,7 +947,7 @@ def check_ask(transcript: Any = None, slots: Any = None, *,
     nothing in it yet is exactly the case this mode exists for.
     """
     history = check_transcript(transcript)
-    effective = _stance(requested)
+    effective = stance_for(requested)
     # Resolved here rather than in the worker, the same argument
     # `check_proposal` makes: an unknown persona is a malformed request and
     # belongs with the other 422s, not a moment later as a job in state `error`.
@@ -1139,7 +1147,7 @@ def check_proposal(transcript: Any = None, slots: Any = None, *,
     """
     history = check_transcript(transcript)
     grounded, dropped = ground(list(slots or []), history)
-    effective = _stance(requested)
+    effective = stance_for(requested)
 
     if not may_propose(grounded):
         raise NotReady(

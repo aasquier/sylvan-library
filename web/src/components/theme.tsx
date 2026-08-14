@@ -41,7 +41,9 @@ import {
   type ThemeTurn,
 } from '../lib/api'
 import { COLOR_VAR } from '../lib/mtg'
+import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 import { CardHover, ColorRing } from './ui'
+import { StanceDial } from './stance'
 
 /** Held here so a closed tab does not cost ten minutes of somebody's thinking.
  *  The server stores nothing (ADR 20), which is also why the most personal
@@ -281,10 +283,16 @@ export function ThemeInterview({
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const box = useRef<HTMLTextAreaElement>(null)
+  const [pin, setPin] = useStance()
 
+  // No slug, because there is no deck yet — which is the whole point of this
+  // mode. With neither a deck nor a pin `theme._stance` supplies its own
+  // default (`SECOND_OPINION`, since a deck nobody has built is as theoretical
+  // as a deck gets), so "follow the deck" is not an empty position here.
   useEffect(() => {
-    api.claudeStatus().then(setStatus).catch(() => setStatus(null))
-  }, [])
+    fetchClaudeStatus({ surface: 'theme' }, pin, () => setPin(null))
+      .then(setStatus).catch(() => setStatus(null))
+  }, [pin, setPin])
 
   useEffect(() => {
     localStorage.setItem(SAVED, JSON.stringify(saved))
@@ -311,7 +319,7 @@ export function ThemeInterview({
     try {
       const job = await api.themeAsk({
         transcript: next, slots: carried,
-        persona, seed: seed ?? undefined,
+        persona, seed: seed ?? undefined, stance: effectivePin(pin, status),
       })
       // `initial` is what keeps the cheap case cheap: stance `off` and a
       // finished conversation come back already `done`, and this resolves with
@@ -339,7 +347,7 @@ export function ThemeInterview({
       setBusy('')
       box.current?.focus()
     }
-  }, [persona, seed])
+  }, [persona, seed, pin, status])
 
   // Fetch a question whenever there isn't one pending. That covers the opening
   // turn, and it also covers the case a plain `length > 0` guard got wrong: a
@@ -449,7 +457,7 @@ export function ThemeInterview({
       const job = await api.themePropose({
         transcript, slots,
         budget: budget ? Number(budget) : undefined,
-        persona, seed: seed ?? undefined,
+        persona, seed: seed ?? undefined, stance: effectivePin(pin, status),
       })
       setSaved((s) => ({ ...s, job: job.id }))
     } catch (e) {
@@ -668,6 +676,12 @@ export function ThemeInterview({
                     : `${grounded} of ${floor} things known so far.`}
               </p>
             </div>
+
+            {/* Last in the column, because it is a setting rather than a step.
+                It governs both halves of this screen — the questions and the
+                proposal — which is why it sits beside them once rather than
+                over each. */}
+            <StanceDial status={status} pin={pin} onPin={setPin} />
           </aside>
         </div>
       )}

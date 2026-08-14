@@ -1600,6 +1600,56 @@ def test_the_stance_default_comes_from_the_decks_status(client):
     assert not built["default"]["may_write"]
 
 
+def test_the_theme_surface_reports_its_own_default_not_off(client):
+    """The stance a surface reports must be the stance it will run.
+
+    Caught by building the dial and looking at it: the create flow has no deck,
+    so `/api/claude` resolved through `stance.resolve(None, None)` and answered
+    `off` — while `theme.stance_for` was about to run the conversation at
+    `second-opinion`, because a deck nobody has built yet is as theoretical as
+    a deck gets. Every test here passed, because every one of them asked about
+    a deck.
+
+    A readout that says `off` next to a mode that is about to make calls is
+    worse than no readout, and the sentence "no calls, ever" is the specific
+    thing it would have got wrong.
+    """
+    plain = client.get("/api/claude").json()
+    theme = client.get("/api/claude", params={"surface": "theme"}).json()
+
+    # Unchanged for a caller that names nothing: `off` is right when there is
+    # genuinely nothing to go on.
+    assert plain["default"]["preset"] == "off"
+    assert plain["stance"]["preset"] == "off"
+
+    assert theme["default"]["preset"] == "second-opinion"
+    assert theme["stance"]["preset"] == "second-opinion"
+    assert theme["stance"]["allows_calls"] is True
+    # And still no write, at the default, on any surface.
+    assert theme["stance"]["may_write"] is False
+
+
+def test_a_named_surface_never_widens_past_a_pin_or_the_ceiling(client):
+    """`surface` picks a *default*; it is not a second way to ask for more.
+
+    Worth pinning because the parameter is new and reads like a mode selector:
+    an explicit stance still wins over it, and `resolve` still clamps.
+    """
+    pinned = client.get("/api/claude",
+                        params={"surface": "theme", "stance": "consultant"}).json()
+    assert pinned["stance"]["preset"] == "consultant"
+
+    import mtglab.claude.stance as stance_mod
+    original = stance_mod.ceiling
+    stance_mod.ceiling = lambda: stance_mod.CONSULTANT
+    try:
+        capped = client.get("/api/claude", params={"surface": "theme"}).json()
+        # The surface's own default is `second-opinion`; the ceiling narrows it.
+        assert capped["stance"]["preset"] == "consultant"
+    finally:
+        stance_mod.ceiling = original
+
+
 def test_a_requested_stance_is_reported_back_resolved(client):
     body = client.get("/api/claude", params={"stance": "collaborator"}).json()
     assert body["stance"]["preset"] == "collaborator"

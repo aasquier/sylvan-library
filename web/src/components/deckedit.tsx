@@ -21,6 +21,7 @@ import {
   type InterviewReport,
 } from '../lib/api'
 import { CATEGORY_LABELS, categoryLabel } from '../lib/mtg'
+import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 import { ErrorNote, ManaText, Select } from '../components/ui'
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS).filter((k) => k !== 'commander')
@@ -77,6 +78,10 @@ function InterviewPanel({ deck, card, askNow = false }: {
   const [report, setReport] = useState<InterviewReport | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Read rather than set: the dial itself lives on the deck page, and this
+  // panel opens inside a modal over it. One store, so moving the dial and
+  // then opening this asks with the stance the user just chose.
+  const [pin, setPin] = useStance()
 
   // Cheap and local: this endpoint reaches no network, it only reports what
   // the environment has and what the dial says.
@@ -84,11 +89,11 @@ function InterviewPanel({ deck, card, askNow = false }: {
     let live = true
     // `owner` too: this route takes its deck as a query parameter rather
     // than a path segment, so the URL alone does not say whose it is.
-    api.claudeStatus({ slug: deck.slug, owner: deck.owner })
+    fetchClaudeStatus({ slug: deck.slug, owner: deck.owner }, pin, () => setPin(null))
       .then((s) => { if (live) setStatus(s) })
       .catch(() => { if (live) setStatus(null) })
     return () => { live = false }
-  }, [deck])
+  }, [deck, pin, setPin])
 
   // A new card is a new interview. Without this the questions about the last
   // card linger beside the next one's empty box, which is the most misleading
@@ -99,16 +104,17 @@ function InterviewPanel({ deck, card, askNow = false }: {
     setBusy(true)
     setError(null)
     try {
-      // No stance sent: the server resolves the deck's own default from its
-      // `status` and clamps it to the deployment ceiling. What actually
-      // applied comes back in the report and is shown below.
-      setReport(await api.interview(deck, { card }))
+      // The dial's pin, or nothing at all — in which case the server resolves
+      // the deck's own default from its `status`. Either way it clamps to the
+      // deployment ceiling, and what actually applied comes back in the report
+      // and is shown below.
+      setReport(await api.interview(deck, { card, stance: effectivePin(pin, status) }))
     } catch (e) {
       setError(String((e as Error).message ?? e))
     } finally {
       setBusy(false)
     }
-  }, [deck, card])
+  }, [deck, card, pin, status])
 
   // Opened by somebody who clicked "Ask Claude" on the card itself. Firing
   // once per card rather than once per mount: the guard is the card name, so

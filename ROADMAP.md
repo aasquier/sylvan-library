@@ -986,13 +986,27 @@ arc; this is what the next few sessions actually do.
    tokens is close enough to the 1M window to lose the diff. Exclude the bundle
    from any review diff.
 
-   **A note on the order.** The stance dial is listed before the modes and the
-   dependency runs that way too, which was not obvious until the code was read:
-   ADR 15 gives **deck conversation** the reversible edits *"at the top stance
-   only"*, and no client can currently ask for a stance at all — every surface
-   sends none and takes the deck-derived default, which caps at
-   `SECOND_OPINION` (`write: none`). Build that mode first and its defining
-   capability is unreachable. The dial is a prerequisite, not a peer.
+   **The stance dial landed 2026-08-14** and was a prerequisite rather than a
+   peer, which only became clear once the code was read: ADR 15 gives **deck
+   conversation** its reversible edits *"at the top stance only"*, and until
+   this no client could ask for a stance at all — every surface sent none and
+   took the deck-derived default, which caps at `SECOND_OPINION` (`write:
+   none`). That mode's defining capability was unreachable. It is reachable
+   now.
+
+   Building it found a bug forty-two tests had missed, and the shape of the
+   miss is the transferable part. The create flow has no deck, so
+   `/api/claude` resolved through `stance.resolve(None, None)` and answered
+   `off` — while `theme.stance_for` was about to run that conversation at
+   `second-opinion`. Every test of that endpoint passed, because every one of
+   them named a deck; the case with no deck was the case nobody wrote.
+   **Rendering a value is what audits it.** The number had been served since
+   ADR 20 and nothing had ever had cause to look at it, and it took putting it
+   on screen next to the thing it describes. `/api/claude` takes a `surface`
+   now, and each surface's default is asked of the module that owns it.
+
+   So what is left of item 7 is the three modes: argue a slot, deck
+   conversation, research.
 
 ---
 

@@ -47,13 +47,17 @@ const jobKey = ({ owner, slug }: DeckRef) => `mtglab-dossier-job:${owner}/${slug
  * get busy, and four paragraphs of prose above the 99 would bury the deck.
  */
 export function CommanderDossierPanel({
-  deck, commander, canGenerate, onLoaded,
+  deck, commander, canGenerate, stance, onLoaded,
 }: {
   deck: DeckRef
   commander: string
   /** False at stance `off` — ADR 15 says off means no calls, so the button
    *  that would make one is absent rather than present and refusing. */
   canGenerate: boolean
+  /** The dial's pin, or undefined for the deck's own default. Passed through
+   *  untouched: the server resolves and clamps it, and a dossier reports the
+   *  stance that actually applied. */
+  stance?: string
   onLoaded?: (report: DossierReport) => void
 }) {
   const [report, setReport] = useState<DossierReport | null>(null)
@@ -146,7 +150,7 @@ export function CommanderDossierPanel({
     setSubmitting(true)
     setError(null)
     try {
-      const job = await api.writeDossier(deck, { refresh })
+      const job = await api.writeDossier(deck, { refresh, stance })
       if (job.status === 'done') {
         // A stored dossier, or a stance of `off`: a job born finished, so
         // there is nothing to poll for and no spinner to earn.

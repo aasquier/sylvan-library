@@ -59,9 +59,34 @@
 > checkable. It asked about that rather than assuming, which is the boundary
 > working, and the gap is now its own piece of work.
 >
-> **Not built:** the other three modes, the activity log, and any UI for the
-> stance itself — the interview sends no stance and takes the deck-derived
-> default, reporting back which one applied.
+> **The stance dial landed 2026-08-14**, which was the last of this ADR's own
+> parts still missing on the browser side. `web/src/components/stance.tsx` is
+> the control and `web/src/lib/stance.ts` is the pin behind it; all four
+> surfaces send it and every one of them reports back what actually applied.
+>
+> Three things the build decided that the argument below does not settle.
+> **"Follow the deck" is a position on the dial, and the default one** — the
+> per-deck default this ADR argued for is real behaviour, and a dial whose
+> lowest setting was `off` would destroy it the first time anybody touched the
+> control, with no way to ask for it back. **The three axes render as a
+> readout, not as three controls**, because `stance.py` says the presets exist
+> for people who will never touch the axes, and the readout is the server's
+> resolved answer rather than anything computed here — a second implementation
+> of `clamp` in TypeScript would disagree silently and show a level the
+> instance never ran. And **a pin the server refuses is dropped and the call
+> retried bare**, because every Claude panel gates on `/api/claude`: a preset
+> renamed between builds would otherwise not produce an error, it would remove
+> the dial, which is the only control able to clear the pin.
+>
+> Building it also found a fault nothing else could. The create flow has no
+> deck, so `/api/claude` resolved through `stance.resolve(None, None)` and
+> reported `off` — while `theme.stance_for` was about to run that conversation
+> at `second-opinion`. Forty-two tests covered this endpoint and all of them
+> passed, because every one asked about a deck. **A readout is a claim, and
+> nothing had ever had cause to check this one.** `/api/claude` takes a
+> `surface` now, and the default is asked of the module that owns it.
+>
+> **Not built:** the other three modes and the activity log.
 
 Refines [ADR 14](0014-python-decides-claude-advises.md), which drew the line
 between what Python decides and what Claude advises on. This one says what a

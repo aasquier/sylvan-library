@@ -497,17 +497,25 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
     @app.get("/api/claude")
     def claude_status(lib: Lib, stance: str = "", slug: str = "",
-                      owner: str = "") -> dict[str, Any]:
+                      owner: str = "", surface: str = "") -> dict[str, Any]:
         """Is the Claude surface installed, configured, and switched on?
 
         Three separate answers — a UI that collapses them tells someone their
         key is missing when actually they turned it off. Reaches no network:
         the stance is deterministic and availability is a fact about the
         environment.
+
+        `surface` names which mode is asking, and exists because the answer is
+        not the same for all of them. A deck-facing mode derives its default
+        from the deck, so `slug` is enough; the theme interview runs before a
+        deck exists and defaults to what a theoretical deck would get. Without
+        this, the dial beside the create flow reported `off` while the
+        conversation it governs was about to run at `second-opinion`.
         """
         try:
             return service.claude_status(
                 requested=stance or None, slug=slug or None,
+                surface=surface or None,
                 source=lib.source_for(owner or lib.my_owner))
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
