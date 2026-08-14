@@ -541,7 +541,11 @@ async function refuse(resp: Response, path: string): Promise<never> {
   } catch {
     /* non-JSON error body; the status line is all we have */
   }
-  if (resp.status === 401 && !ANSWERS_WITH_401.has(path.split('?')[0])) {
+  // `?? path` because `split` on a non-empty string always yields a non-empty
+  // first element -- but a `!` here would be asserting that about whatever
+  // `path` becomes later, and the honest fallback is the unsplit path, which
+  // is what the set is keyed on when there is no query string anyway.
+  if (resp.status === 401 && !ANSWERS_WITH_401.has(path.split('?')[0] ?? path)) {
     for (const listener of sessionListeners) listener()
   }
   throw new ApiError(detail, resp.status, retryAfterOf(resp))

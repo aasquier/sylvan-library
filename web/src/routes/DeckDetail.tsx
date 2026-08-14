@@ -266,7 +266,7 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
           The dossier is about the character, and the deck knows its name
           without a card pool — on a fresh clone the panel should still say what
           it is rather than vanish along with the card row. */}
-      {deck.commander.length > 0 && (
+      {deck.commander[0] && (
         <CommanderDossierPanel
           deck={deckRef}
           commander={deck.commander[0]}
@@ -525,7 +525,13 @@ export default function DeckDetail() {
     for (const card of shown) {
       const key =
         groupBy === 'type'
-          ? (card.type_line?.split(' // ')[0].split('—')[0].trim().split(' ').pop() ?? 'Unknown')
+          // Front face, before the em dash, last word: "Legendary Creature —
+          // Cat Warrior" groups as "Creature". Every step can come back empty
+          // on a card with no type line, so the chain is optional throughout
+          // and lands on 'Unknown' rather than asserting a shape the pool does
+          // not promise.
+          ? (card.type_line?.split(' // ')[0]?.split('—')[0]?.trim()
+              .split(' ').pop() || 'Unknown')
           : groupBy === 'mv'
             ? `MV ${card.cmc ?? 0}`
             : card.category

@@ -914,8 +914,11 @@ describe('DeckDetail commander dossier', () => {
     // answer than one that is honestly absent.
     vi.mocked(api.claudeStatus).mockResolvedValue({
       ...CLAUDE_STATUS,
-      stance: { ...STANCE, axes: [{ ...STANCE.axes[0], level: 'off' },
-                                  ...STANCE.axes.slice(1)] },
+      // `map` and not `[{ ...axes[0] }, ...slice(1)]`: same result, and it
+      // says "turn the first axis off" without indexing a list whose first
+      // element the checker has to take on trust.
+      stance: { ...STANCE, axes: STANCE.axes.map(
+        (a, i) => (i === 0 ? { ...a, level: 'off' } : a)) },
     })
     renderDeck()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))

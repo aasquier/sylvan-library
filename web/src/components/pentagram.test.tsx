@@ -78,7 +78,7 @@ describe('the colour wheel', () => {
   it('draws five vertices and the ten guilds, each exactly once', () => {
     draw()
     const labels = screen.getAllByRole('button')
-      .map((el) => el.getAttribute('aria-label')!.split(' —')[0])
+      .map((el) => el.getAttribute('aria-label')?.split(' —')[0] ?? '')
 
     // Five mono and ten guilds, and the guilds are the ten real ones rather
     // than ten lines that happen to number ten.
@@ -229,7 +229,7 @@ describe('the tier badges', () => {
     const filled = [...container.querySelectorAll('circle')]
       .filter((n) => Number(n.getAttribute('r')) > 3)
     expect(filled).toHaveLength(1)
-    expect(filled[0].getAttribute('fill')).toBe('var(--mtg-c)')
+    expect(filled[0]?.getAttribute('fill')).toBe('var(--mtg-c)')
   })
 })
 
@@ -248,7 +248,7 @@ describe('the mana symbols', () => {
     const { container } = render(<ManaGlyph symbol="G" size={16} />)
     const paths = container.querySelectorAll('path')
     expect(paths).toHaveLength(1)
-    expect(paths[0].getAttribute('fill')).toBe('#141414')
+    expect(paths[0]?.getAttribute('fill')).toBe('#141414')
     expect(container.textContent).toBe('')
   })
 

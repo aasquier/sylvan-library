@@ -45,7 +45,7 @@ function signedIn(username = 'root', isAdmin = false): AuthState {
 }
 
 function paths(): string[] {
-  return fetchMock.mock.calls.map((call) => String(call[0]).split('?')[0])
+  return fetchMock.mock.calls.map((call) => String(call[0]).split('?')[0] ?? '')
 }
 
 function renderApp(at = '/') {
@@ -60,7 +60,7 @@ beforeEach(() => {
     '/api/auth/logout': { body: { authenticated: false } },
   }
   fetchMock = vi.fn(async (input: string) => {
-    const path = String(input).split('?')[0]
+    const path = String(input).split('?')[0] ?? ''
     const entry = routes[path]
     const reply = typeof entry === 'function' ? entry() : (entry ?? { status: 404, body: {} })
     const status = reply.status ?? 200

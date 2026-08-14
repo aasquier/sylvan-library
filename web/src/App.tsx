@@ -205,8 +205,12 @@ export default function App() {
 
   // Library first, then the authoring doors — everybody has somewhere to put a
   // deck now — then the rest, then Accounts for an admin.
+  // `NAV.slice(0, 1)` and not `NAV[0]`: a slice of a known array is still
+  // `NavItem[]`, whereas indexing one is `NavItem | undefined`, which spreads
+  // that `undefined` into the element type and makes every field read in the
+  // map below possibly-undefined. Same splice, no widening.
   const nav = [
-    NAV[0], ...AUTHORING_NAV, ...NAV.slice(1),
+    ...NAV.slice(0, 1), ...AUTHORING_NAV, ...NAV.slice(1),
     ...(auth?.is_admin ? [ADMIN_NAV] : []),
   ]
   // Only ever true on an instance that requires a login. With auth off there is

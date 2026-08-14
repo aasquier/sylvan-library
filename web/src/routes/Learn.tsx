@@ -264,8 +264,23 @@ function ColorsTab({ taxonomy, selected, onSelect }: {
   selected: string
   onSelect: (key: string) => void
 }) {
+  // The fallback is itself an index, so it is `Combination | undefined` and not
+  // the safety net it looks like. `colors.py` writes all 32 and `/api/colors`
+  // serves them with no pool and no network, so an empty list means that
+  // endpoint answered with nothing — a broken deployment rather than a state
+  // this screen can render around. Say so once, here, instead of letting nine
+  // field reads downstream each decide what to do about it.
   const combo = taxonomy.combinations.find((c) => c.key === selected)
     ?? taxonomy.combinations[0]
+  if (!combo) {
+    return (
+      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        The colour taxonomy came back empty. `/api/colors` is served from
+        checked-in prose and needs neither the card pool nor a network, so this
+        is the endpoint failing rather than missing data.
+      </p>
+    )
+  }
   const tier = taxonomy.tiers.find((t) => t.key === combo.tier)
 
   return (
