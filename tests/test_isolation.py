@@ -701,3 +701,59 @@ def test_an_admin_still_cannot_write_another_persons_deck(instance, corpus):
     assert client.patch("/api/decks/bob/bobs-brew",
                         json={"field": "status", "value": "built"}
                         ).status_code == 403
+
+
+@pytest.mark.parametrize("suffix", [
+    "", "/validate", "/stats", "/suggestions", "/commander", "/printings",
+])
+def test_an_admin_still_cannot_see_another_persons_private_deck(
+        instance, corpus, suffix):
+    """The half the test above leaves out, and the one that actually leaks.
+
+    `test_an_admin_still_cannot_write_another_persons_deck` shares bob's deck
+    before alice looks at it, so it only ever puts the admin in front of a deck
+    that is *meant* to be visible — 200 to read, 403 to write, which is #80's
+    pair. The private case had no coverage at all, and it is the one where the
+    two rules pull opposite ways: a shared deck answers an admin 403, a private
+    one must answer 404, and "administering the instance" is exactly the excuse
+    an exemption would be written under.
+
+    Parametrised over the same read verbs as
+    `test_a_private_deck_is_a_404_to_another_account`, because an exemption
+    added to `Library.source_for` reaches all of them at once and a single
+    `GET` would only prove the plainest one.
+    """
+    client, _alice, _bob = instance
+    login(client, "bob", PASSWORD_B)
+    _make_private_deck(client, "bob", "bobs-brew")
+    client.post("/api/auth/logout")
+
+    login(client, "alice", PASSWORD_A)
+    r = client.get(f"/api/decks/bob/bobs-brew{suffix}")
+    assert r.status_code == 404, (
+        f"the admin got {r.status_code} for bob's private deck{suffix}; "
+        f"ADR 5 makes it invisible, and admin is not an exemption")
+
+
+def test_an_admin_is_refused_a_private_deck_s_writes_as_404_too(instance,
+                                                                corpus):
+    """And the writes, which must not fall back to 403 for an admin either.
+
+    The same argument as `test_a_private_deck_is_a_404_to_writes_too`, one
+    privilege level up: 403 here would confirm the deck exists to the one
+    caller most likely to have been handed a shortcut.
+    """
+    client, _alice, _bob = instance
+    login(client, "bob", PASSWORD_B)
+    _make_private_deck(client, "bob", "bobs-brew")
+    client.post("/api/auth/logout")
+
+    login(client, "alice", PASSWORD_A)
+    assert client.patch("/api/decks/bob/bobs-brew",
+                        json={"field": "status", "value": "built"}
+                        ).status_code == 404
+    assert client.request("DELETE",
+                          "/api/decks/bob/bobs-brew?confirm=bobs-brew"
+                          ).status_code == 404
+    assert client.put("/api/decks/bob/bobs-brew/shared",
+                      json={"shared": True}).status_code == 404
