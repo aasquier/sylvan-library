@@ -545,6 +545,18 @@ install and Homebrew is too stale to build Colima, so CI is the only place the
 `Dockerfile` is ever built. Treat a red `image` job as the first real feedback
 on a container change rather than as a surprise.
 
+**Merging deploys.** Since 2026-08-14 a push to `main` whose four checks are
+green deploys itself ([ADR 23](docs/adr/0023-a-green-main-deploys-itself.md));
+the `deploy` job `needs` all four, so it cannot run on a red suite. Expect the
+instance to be live about ten minutes after a merge, and note the two
+consequences: **every merge is a few seconds of downtime** (one machine, one
+volume, so Fly cannot roll), and **a schema migration in `auth/db.py` applies
+on boot without anybody watching** — that ladder is forward-only, so rolling
+the code back does not roll the schema back. Land a schema change on its own
+branch and merge it when you can watch it. There is a manual button
+(Actions → *tests* → Run workflow) which runs the whole suite and then
+deploys; the runbook and the rollback are `docs/HOSTING.md` §5.
+
 **Do not open a documentation-only pull request.** Updating `ROADMAP.md` when
 direction changes is required and the rule above still holds — but a PR whose
 whole diff is a few paragraphs costs six CI jobs, a review round trip and a

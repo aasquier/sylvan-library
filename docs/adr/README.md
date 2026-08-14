@@ -36,6 +36,7 @@ they differ.
 | [20](0020-the-theme-interview-reads-a-person.md) | The theme interview reads a person, and Python decides when it may propose | Accepted |
 | [21](0021-a-persona-is-a-voice-and-the-spread-is-the-slots.md) | A persona is a voice, and a tarot spread is the slots wearing pictures | Accepted |
 | [22](0022-decks-have-owners-and-sharing-is-a-flag.md) | Decks have owners, and sharing is a flag on the deck | Accepted |
+| [23](0023-a-green-main-deploys-itself.md) | A green `main` deploys itself, and the deploy is not done until the instance answers | Accepted |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the
@@ -99,6 +100,15 @@ implicit in the filesystem until an invited account turned out to be able to
 edit the curated six; the fix made an owner a field and sharing a flag, and
 the ADR records why the answer is 404 for a deck you cannot see and 403 for
 one you can see but may not write.
+
+23 is also written after the thing it prevents, and the thing was an hour old:
+the quality pass renamed a wire field, and the running instance went on
+answering the old name because deploying was still something a person had to
+remember. It is the directory's clearest example of a **silent** failure —
+a skipped deploy raises nothing, unlike the failing test or the failing build
+either side of it. Read the consequences rather than the decision; the
+interesting half is what an auto-deploy costs, and the sharpest edge is that
+a forward-only schema migration now applies without anybody watching.
 
 16 supersedes exactly one paragraph of 5, which is the pattern this directory is
 for: 5's "no self-signup" was a good argument that lost to a better one a day
