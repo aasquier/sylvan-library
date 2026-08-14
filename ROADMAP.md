@@ -971,10 +971,28 @@ arc; this is what the next few sessions actually do.
      whether `WUBRG` is an array or a five-element tuple. The pentagram's edge
      list is built by walking a rotated copy in lockstep instead.
 
-7. **After that, next build work in order:** re-price automated PR review
-   (ENGINEERING §5, parked), the stance dial UI, then the remaining Claude
-   modes ADR 15 names and branch 5 does not build (argue a slot, deck
-   conversation, research).
+7. **After that, next build work in order:** ~~re-price automated PR review~~
+   (done 2026-08-14 — **still parked**, and now for a measured reason: 87 PRs
+   in five days is 17.4 a day, and a Sonnet 5 review of a median PR costs $0.50,
+   so **$262/month against the $10/month Copilot Pro already rejected on
+   price**. Not close, and not fixable by model choice. ENGINEERING §5 has the
+   table.), the stance dial UI, then the remaining Claude modes ADR 15 names and
+   branch 5 does not build (argue a slot, deck conversation, research).
+
+   The re-price's **useful** finding was incidental to it: `web_dist/` is **75%
+   of the median review's input and 88% of the worst** — PR #87 is 305,735
+   tokens whole and 15,216 without the bundle. That is a bill being paid today,
+   because `/code-review ultra` is billed and does get run, and #81's 865,448
+   tokens is close enough to the 1M window to lose the diff. Exclude the bundle
+   from any review diff.
+
+   **A note on the order.** The stance dial is listed before the modes and the
+   dependency runs that way too, which was not obvious until the code was read:
+   ADR 15 gives **deck conversation** the reversible edits *"at the top stance
+   only"*, and no client can currently ask for a stance at all — every surface
+   sends none and takes the deck-derived default, which caps at
+   `SECOND_OPINION` (`write: none`). Build that mode first and its defining
+   capability is unreachable. The dial is a prerequisite, not a peer.
 
 ---
 

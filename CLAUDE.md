@@ -534,7 +534,7 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
 
 ## Landing work
 
-The repo is public and `main` is protected: pull request required, **all five**
+The repo is public and `main` is protected: pull request required, **all six**
 CI checks green, branch up to date, enforced for admins. A direct push to
 `main` is rejected — branch first, then open a PR. Squash merge; linear history
 is required.
@@ -544,6 +544,12 @@ run locally** — this Mac is macOS 12 on Intel, where Docker Desktop will not
 install and Homebrew is too stale to build Colima, so CI is the only place the
 `Dockerfile` is ever built. Treat a red `image` job as the first real feedback
 on a container change rather than as a surprise.
+
+The sixth is `dependency-review`, required since 2026-08-14 and the only one
+that is **not** a `ci.yml` job. It runs on `pull_request` only — it diffs the
+dependency graph between base and head, and a push has no base — so it gates
+merging and takes no part in the deploy, whose `needs` list is `ci.yml`'s four.
+It also cannot be run locally in any useful form. See ENGINEERING §5.
 
 **Merging deploys.** Since 2026-08-14 a push to `main` whose four checks are
 green deploys itself ([ADR 23](docs/adr/0023-a-green-main-deploys-itself.md));

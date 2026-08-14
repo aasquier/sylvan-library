@@ -705,7 +705,7 @@ The settings on `main`, recorded so they can be rebuilt:
 | Setting | Value | Why |
 | --- | --- | --- |
 | Pull request required | yes, **0 approvals** | A solo maintainer cannot approve their own PR, so requiring 1 would deadlock the repo |
-| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-card-data`, `image` | The whole pipeline. Renaming a CI job silently stops gating until this list is updated |
+| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-card-data`, `image`, `dependency-review` | The whole pipeline. Renaming a CI job silently stops gating until this list is updated |
 | Strict (branch up to date) | yes | Checks that passed against a stale base did not test what is being merged |
 | Enforce for admins | **yes** | Off, it does not apply to the only contributor, which makes it decorative |
 | Force pushes, deletions | blocked | |
@@ -725,11 +725,40 @@ here is worse than being absent. And **adding a CI job is two steps**: writing
 it, and requiring it. The second has no artifact in the repository, so it is the
 one that gets forgotten.
 
+**`dependency-review` became the sixth on 2026-08-14**, closing the second step
+that the bullet in *Supply chain and release* had left open since 2026-08-12.
+Three things about it are worth keeping.
+
+The context is `dependency-review` — the *job id*, not `dependency review`, which
+is the workflow's `name:`. A required check is matched on the check-run name, and
+a check run takes the job's `name:` if it has one and its id otherwise; this job
+has none. Guessing the workflow name here would have produced a check that never
+reports and a `main` nothing can merge into.
+
+It is the first required check that **cannot run on a push**. The workflow is
+`on: pull_request` only, because the action diffs the dependency graph between
+base and head and a push to `main` has no base to diff against. That is why the
+deploy job still `needs` **four** jobs rather than five: those four are `ci.yml`'s,
+they run on both events, and requiring a check that structurally never fires on a
+push would deadlock every deploy. Protection governs merging, `needs` governs the
+deploy, and the two lists are different on purpose.
+
+And the same call **pinned `no-secrets-or-card-data` to app id 15368**, which it
+was not before. Classic protection stores each context with an app id or `null`,
+and `null` means *any* app's status of that name satisfies the check — including
+one set through the statuses API rather than by Actions. The other four were
+already pinned to GitHub Actions; this one was the odd row out, visible only in
+the JSON and never in the UI. Nothing was exploiting it on a repo with one
+contributor, but a required check that any credential can satisfy is not a check.
+
 Read them back with:
 
 ```bash
-gh api repos/aasquier/sylvan-library/branches/main/protection --jq .required_status_checks.contexts
+gh api repos/aasquier/sylvan-library/branches/main/protection --jq .required_status_checks.checks
 ```
+
+`.contexts` is the older, flatter field and it is the one that hides the app id.
+Ask for `.checks` instead — the pin is half of what a required check means.
 
 Note also that the repository carries a **ruleset** ("Me") alongside the classic
 protection rule. It enforces only deletion and non-fast-forward, and it holds no
@@ -817,9 +846,11 @@ The first three landed 2026-08-12:
       introductions. It needed the repository's dependency graph enabled,
       which was done by enabling Dependabot alerts — a settings change with
       no artifact in the tree, recorded here for the same reason the branch
-      protection table is. **It is not yet a required check on `main`** —
-      the "adding a CI job is two steps" lesson below applies, and the second
-      step is deliberately left as a decision.
+      protection table is. **Required on `main` since 2026-08-14**, two days
+      after the job itself landed — the "adding a CI job is two steps" lesson
+      below, run once more with the second step actually taken. See the
+      protection table for the context name, and for why the deploy job's
+      `needs` list stays at four.
 - [x] **Dependabot**, weekly, grouped per ecosystem (actions, pip, npm).
 - [ ] Generate an SBOM (`syft`) and attach it to releases.
 - [ ] Sign container images with `cosign`, publish via OIDC rather than
@@ -903,13 +934,49 @@ Steps 1–6 make the existing project defensible without adding a language, and
 leave hosting a matter of adding an auth layer and a second deck source rather
 than reworking what is here.
 
-Automated PR review (§5) is **deliberately parked** — priced out 2026-08-10.
-Copilot Free does not include PR review; Copilot Pro is $10/mo; the Claude
-action is pay-per-run and needs an API key. One input to that pricing has since
-changed: the repository is public now, so Actions minutes are no longer metered
-and the "it eats the free allowance" half of the argument is gone. The
-per-review cost is not, so this stays parked — but re-price it, rather than
-re-reading the old conclusion, when PR volume justifies a look.
+Automated PR review (§5) is **deliberately parked** — priced out 2026-08-10,
+and **re-priced 2026-08-14 rather than re-read.** It stays parked, but the
+reason is now a measurement instead of an intuition, and the measuring turned
+up something worth more than the answer.
+
+The old note said to re-price when PR volume justified a look. Volume is the
+number that had never been counted: **87 pull requests in five days, 17.4 a
+day.** That is what decides it, because per-review cost only matters
+multiplied.
+
+Costs were measured, not estimated — `count_tokens` is free, so there was no
+excuse for a guess. CLAUDE.md is **13,685 tokens**, and it is re-read on every
+review because it is the first thing the prompt tells the reviewer to read. Ten
+recent pull requests were counted whole. Against Sonnet 5 at $3/$15 per MTok,
+with the four-turn agentic loop the action actually runs and its prefix
+prompt-cached:
+
+| | per review | per month at 522 PRs |
+| --- | --- | --- |
+| Median PR | $0.50 | **$262** |
+| Median PR, bundle excluded | $0.29 | $151 |
+| Worst PR (#81) | $4.24 | — |
+| Haiku 4.5, median | $0.17 | $87 |
+
+Against the **$10/month Copilot Pro that was already rejected on price**, the
+cheapest arrangement here is nine times dearer and the realistic one is
+twenty-six times. That is not close, and it does not turn on model choice or
+prompt tuning. **Still parked**, now for a number.
+
+**The finding worth keeping is not the price.** Counting the diffs showed that
+`web_dist/` — the committed frontend bundle, which exists so `mtglab ui` needs
+no Node — is **75% of the median review's input and 88% of the worst.** PR #87
+is 305,735 tokens whole and 15,216 without it; #81 is 865,448 and 105,037. The
+bundle is generated, nobody reviews it, and it very nearly does not fit in a
+context window.
+
+That is a live cost today, because **`/code-review ultra` is billed and gets
+run.** Reviewing this repository means paying to read a minified bundle four
+times over, and #81 at 865k tokens is close enough to the 1M window that the
+review could silently lose the diff it was meant to read. Any reviewer pointed
+at this repo — the parked action, `ultra`, or a person — should exclude
+`web_dist/` from the diff. **A committed build artifact is a review-cost
+decision, and it was not one anybody had made on purpose.**
 
 ## Cloud-compatible by construction
 
