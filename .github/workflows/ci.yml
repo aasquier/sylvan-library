@@ -528,3 +528,28 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl releases --app sylvan-library | head -10
+
+      # The same move `claude/client.py`'s `explain()` makes for a 401: a
+      # credential that lapsed reads exactly like an integration that broke,
+      # and the person reading this will have forgotten the token had a
+      # lifetime at all. `FLY_API_TOKEN` is deliberately app-scoped and
+      # deliberately *not* the 20-year default, so it will expire on a date
+      # nobody has in mind -- name the date rather than making them find it.
+      - name: If that failed, read this first
+        if: failure()
+        run: |
+          echo "Deploy failed. Two things to rule out before debugging the app:"
+          echo
+          echo "1. FLY_API_TOKEN expires 2027-08-14. An expired or missing"
+          echo "   token fails as an auth error, which reads like a broken"
+          echo "   integration rather than a lapsed credential. Rotate with:"
+          echo
+          echo "     fly tokens create deploy -a sylvan-library \\"
+          echo "       -n github-actions-deploy -x 8760h"
+          echo "     gh secret set FLY_API_TOKEN --repo aasquier/sylvan-library"
+          echo
+          echo "2. If flyctl succeeded and the smoke test did not, the instance"
+          echo "   is up but wrong -- most likely the volume. Check the health"
+          echo "   payload above: \"pool\": false means it is not mounted, and a"
+          echo "   deck count of 0 means the decks on it are gone. Neither is"
+          echo "   fixed by redeploying. docs/HOSTING.md section 5 has the runbook."

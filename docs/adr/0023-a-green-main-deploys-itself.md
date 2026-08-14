@@ -96,9 +96,37 @@ The last two are the ones worth having. A fresh or unmounted volume answers
 this one — and `deck.yaml` is written by the app's editing routes, so a deploy
 that lost the volume loses edits that exist in no repository.
 
-The token is **app-scoped** (`fly tokens create deploy -a sylvan-library`),
-not an org-wide credential, so what leaks if it leaks is the ability to deploy
-this one app.
+### The token
+
+This is the first thing in the pipeline that holds a credential, and Fly is
+opinionated about it in a way worth following — *"the token with the narrowest
+access that will work for your purpose"*, and explicitly not the org-wide auth
+token.
+
+```bash
+fly tokens create deploy -a sylvan-library -n github-actions-deploy -x 8760h
+```
+
+**App-scoped**, so what leaks if it leaks is the ability to deploy this one
+app. **One year, not the default**: `fly tokens create deploy` issues a
+**20-year** token when `-x` is omitted, and flyctl's own help recommends
+against that. A credential that outlives the project is how one ends up still
+live in an old fork.
+
+A stored secret cannot be avoided here. Fly's OIDC support runs **outbound** —
+Machines authenticating to AWS, GCP and similar — with no inbound trust from
+GitHub Actions to Fly, so there is no federated path that would remove the
+secret entirely. Checked 2026-08-14.
+
+One year rather than ninety days is a deliberate trade against this decision's
+own goal. **An expired token does not stop merges; it stops deploys** — so
+`main` and the instance diverge exactly as they did before this ADR, with a red
+check beside it instead of total silence. A shorter expiry buys a smaller leak
+window at the cost of meeting that state four times a year instead of once.
+The deploy job prints the rotation command on failure, which is the same move
+`claude/client.py`'s `explain()` makes for a 401: a lapsed credential reads
+like a broken integration, and the person reading the error will have
+forgotten the thing had a lifetime.
 
 ## Consequences
 

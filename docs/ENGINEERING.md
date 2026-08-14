@@ -550,9 +550,20 @@ it requires the live instance to answer with a mounted volume and a non-zero
 deck count, because a deploy that comes up against a fresh volume looks
 perfectly healthy while having lost every deck edit.
 
-This is also the first thing in the pipeline that holds a **credential**. The
-token is app-scoped (`fly tokens create deploy -a sylvan-library`) rather than
-org-wide, which bounds what a leak costs to "can deploy this one app".
+This is also the first thing in the pipeline that holds a **credential**, and
+the two flags that matter are both non-default:
+
+```bash
+fly tokens create deploy -a sylvan-library -n github-actions-deploy -x 8760h
+```
+
+App-scoped rather than org-wide, which bounds a leak to "can deploy this one
+app" — Fly's own guidance is the narrowest token that will work. And `-x 8760h`
+because **the default is twenty years** (175200h), which flyctl's help
+recommends against. It expires 2027-08-14; the job prints the rotation command
+on failure, because a lapsed credential reads like a broken integration. There
+is no federated alternative: Fly's OIDC is outbound only, so GitHub Actions
+cannot authenticate to Fly without a stored secret (checked 2026-08-14).
 
 Four of those are new, and three of the four are guards against a check being
 green while not checking:
