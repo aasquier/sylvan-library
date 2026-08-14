@@ -435,6 +435,27 @@ thousand-occurrence rename is how a real review turns into a rubber stamp. The
 same argument that made `strict` its own change applies here: it landed alone,
 and it was reviewable because of that.
 
+**Re-measured 2026-08-14, and "51 judgments" was the wrong count.** The errors
+reproduce exactly — 51 across the same 15 files — but they cluster into roughly
+**15 distinct sites**, because one bad expression reports once per use:
+
+- **9 of the 9 in `Learn.tsx` are one variable.**
+  `taxonomy.combinations.find(…) ?? taxonomy.combinations[0]` — the *fallback*
+  is the unchecked index, so `combo` is `Combination | undefined` and every
+  subsequent field read reports.
+- **All 4 in `App.tsx` are one expression.** `const nav = [NAV[0], …]` puts
+  `undefined` into the array's element type, and the `.map` callback reports it
+  four times. `...NAV.slice(0, 1)` fixes all four and is better code.
+- **3 in `mtg.ts`** include `if (GUILDS[key]) return GUILDS[key]`, a double
+  lookup TypeScript cannot narrow across. Binding it once fixes the error and
+  removes the second lookup.
+
+That changes the size of the job but not the argument for its being its own
+change. The genuinely awkward class is `pentagram.tsx`'s `WUBRG[(i + 1) % 5]` —
+provably in range, invisible to the checker — and it is exactly where a
+non-null assertion is tempting and wrong. The fix taken there is to iterate the
+array rather than index it, so the `undefined` never enters the type.
+
 - ~~**No frontend tests at all.**~~ **Built 2026-08-10** — Vitest + Testing
   Library, 35 tests over the three pieces with real logic. `npm test` runs
   them; CI runs it before the build, so a broken component fails as a failing
@@ -550,6 +571,30 @@ it requires the live instance to answer with a mounted volume and a non-zero
 deck count, because a deploy that comes up against a fresh volume looks
 perfectly healthy while having lost every deck edit.
 
+**And the condition was wrong on the day it landed.** It read
+`workflow_dispatch || (push && ref == main)` — the ref check on the `push` arm
+alone — so a manual dispatch deployed **whatever branch it was launched from**,
+indistinguishable in the Actions list from an ordinary deploy. `needs` does not
+help: a feature branch can be perfectly green and still be the wrong thing to
+ship. What makes it worth a guard rather than a note is that redeploying does
+not undo it — `auth/db.py`'s ladder is forward-only, so a branch carrying a
+schema change migrates the volume on boot and deploying `main` afterwards
+leaves the new schema under the old code.
+
+Fixed by hoisting the ref check out of the event arm. The *trigger* stays open
+deliberately: running the suite on a branch is reasonable, and it is only the
+deploy job that must refuse.
+
+The test is the more useful half, and its first version was worthless.
+`tests/test_packaging.py` asserted that the condition *contains*
+`github.ref == 'refs/heads/main'` — a substring the broken condition also
+contains, nested where it does not apply. It passed against the exact bug it
+was written to catch, and only mutation testing showed that: reverting the fix
+left the suite green. It now evaluates the condition against a five-row truth
+table, so it asserts behaviour instead of text. **A test for a config file
+should exercise the config's meaning; matching its source is a test of the
+string you happened to write.**
+
 This is also the first thing in the pipeline that holds a **credential**, and
 the two flags that matter are both non-default:
 
@@ -580,6 +625,18 @@ green while not checking:
   and a function is not a valid React key.
 - **oxlint.** A devDependency with a `lint` script that CI never ran. Both
   warnings it had to report were dead re-exports.
+
+**There is deliberately no Python autoformatter** —
+[ADR 24](adr/0024-no-python-autoformatter.md), decided 2026-08-14 after the
+quality pass deferred it. `ruff format` would rewrite 101 of 111 files and grow
+the tree by 4,525 lines, and two of its changes are not style: it splits the
+`;`-joined argparse table that `pyproject.toml` grants `cli.py` an `E702`
+exemption for (the formatter does not read lint ignores), and it dedents the
+aligned command table in that module's docstring. The line-length argument,
+which is the one a linter does not already cover, measures at nothing here:
+117 lines of 39,823 exceed 88 characters, and 60 of the 61 over 100 are card
+oracle text in `tests/tiny_pool.py`, which no formatter can split. The stated
+trigger for revisiting is **a second regular contributor**, not a line count.
 - **mypy**, strict by default with a named list of modules that are not there
   yet — ten when it landed, **eight** now that `api/service.py` and
   `api/simruns.py` have graduated. Direction over starting point: lax-by-default means a new module

@@ -37,6 +37,7 @@ they differ.
 | [21](0021-a-persona-is-a-voice-and-the-spread-is-the-slots.md) | A persona is a voice, and a tarot spread is the slots wearing pictures | Accepted |
 | [22](0022-decks-have-owners-and-sharing-is-a-flag.md) | Decks have owners, and sharing is a flag on the deck | Accepted |
 | [23](0023-a-green-main-deploys-itself.md) | A green `main` deploys itself, and the deploy is not done until the instance answers | Accepted |
+| [24](0024-no-python-autoformatter.md) | No Python autoformatter; the lint rules hold the line instead | Accepted |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the
@@ -109,6 +110,24 @@ a skipped deploy raises nothing, unlike the failing test or the failing build
 either side of it. Read the consequences rather than the decision; the
 interesting half is what an auto-deploy costs, and the sharpest edge is that
 a forward-only schema migration now applies without anybody watching.
+
+23 also acquired a correction the same day, which is recorded here rather than
+in the file because the decision did not change — only its implementation was
+wider than the decision said. The ADR describes a job that runs "for a push to
+`main` or an explicit `workflow_dispatch`", and the condition shipped with the
+ref check on the `push` arm alone, so a dispatch from **any** branch deployed
+that branch. `tests/test_packaging.py` now evaluates the condition against a
+truth table. Worth reading for how the first version of that test failed: it
+matched `github.ref == 'refs/heads/main'` as a substring, which is present in
+the broken condition too, so it passed against the bug it was written for.
+
+24 is the directory's first **rejection** — a decision not to adopt something,
+which is a shape the other twenty-three do not have. It is here because "why is
+there no formatter?" is a question this repository will be asked repeatedly and
+correctly, and an answer that lives only in somebody's head gets relitigated
+every time. Read it next to 3: both defer a change behind a **stated trigger**
+rather than refusing it forever, and in both cases the trigger is a condition
+about the project rather than a threshold in the code.
 
 16 supersedes exactly one paragraph of 5, which is the pattern this directory is
 for: 5's "no self-signup" was a good argument that lost to a better one a day
