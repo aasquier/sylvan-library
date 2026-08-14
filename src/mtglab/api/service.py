@@ -962,7 +962,28 @@ def delete_deck(*, slug: str, confirm: str,
 
 # -------------------------------------------------------------------- claude
 
+#: Modes whose default stance is not the deck's, because they have no deck.
+#: One entry today; a set rather than an `if` so the second one is a row.
+_SURFACE_DEFAULTS = {"theme"}
+
+
+def _default_stance(deck: Any, surface: str | None) -> Any:
+    """What "no preference" resolves to, asked of whoever owns the answer.
+
+    Three cases and none of them is a literal here: the theme interview has its
+    own (`theme.stance_for`), a deck has one derived from its `status`
+    (`stance.default_for`), and a caller who named neither gets `off`, because
+    "I have no idea what this is about" is the one case where silence is right.
+    """
+    from mtglab.claude import stance as claude_stance
+    if surface in _SURFACE_DEFAULTS and deck is None:
+        from mtglab.claude.theme import stance_for
+        return stance_for(None)
+    return claude_stance.default_for(deck) if deck else claude_stance.OFF
+
+
 def claude_status(*, requested: Any = None, slug: str | None = None,
+                  surface: str | None = None,
                   source: DeckSource | None = None) -> dict[str, Any]:
     """What the Claude surface is, and how much of it is switched on.
 
@@ -987,7 +1008,15 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
         decks = _source(source)
         deck = Deck.from_text(decks.read_text(slug), slug=slug)
 
-    effective = claude_stance.resolve(requested, deck=deck)
+    # Which default applies is the surface's business, not this function's, so
+    # it asks the module that owns it rather than keeping a second copy. The
+    # theme interview is the one mode with no deck to derive from and a default
+    # that is emphatically not `off` — see `theme.stance_for`.
+    if surface in _SURFACE_DEFAULTS and deck is None:
+        from mtglab.claude.theme import stance_for
+        effective = stance_for(requested)
+    else:
+        effective = claude_stance.resolve(requested, deck=deck)
     limit = claude_stance.ceiling()
     interview = claude_interview_mode()
     return {
@@ -998,8 +1027,9 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
         # The deployment's cap, so a UI can grey out what it may not offer
         # rather than letting someone pick a level that is silently clamped.
         "ceiling": claude_stance.describe(limit),
-        "default": claude_stance.describe(
-            claude_stance.default_for(deck) if deck else claude_stance.OFF),
+        # What "no preference" means here, which is the same question the
+        # effective stance above just answered with `requested=None`.
+        "default": claude_stance.describe(_default_stance(deck, surface)),
         "presets": [{
             "name": name,
             "blurb": claude_stance.PRESET_BLURBS[name],

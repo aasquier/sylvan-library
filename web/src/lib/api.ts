@@ -1180,7 +1180,12 @@ export const api = {
   // `owner` rides alongside `slug` here because this route resolves a deck by
   // name, exactly as the sim routes do — the slug is a parameter rather than a
   // path segment, so nothing about the URL says whose deck it is (ADR 22).
-  claudeStatus: (params: { slug?: string; owner?: string; stance?: string } = {}) => {
+  claudeStatus: (params: {
+    slug?: string; owner?: string; stance?: string
+    /** Which mode is asking. Only needed where the default is not the deck's
+     *  — the theme interview runs before a deck exists. */
+    surface?: string
+  } = {}) => {
     const qs = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v)
     return get<ClaudeStatus>(`/api/claude?${qs}`)

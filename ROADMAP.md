@@ -971,10 +971,42 @@ arc; this is what the next few sessions actually do.
      whether `WUBRG` is an array or a five-element tuple. The pentagram's edge
      list is built by walking a rotated copy in lockstep instead.
 
-7. **After that, next build work in order:** re-price automated PR review
-   (ENGINEERING §5, parked), the stance dial UI, then the remaining Claude
-   modes ADR 15 names and branch 5 does not build (argue a slot, deck
-   conversation, research).
+7. **After that, next build work in order:** ~~re-price automated PR review~~
+   (done 2026-08-14 — **still parked**, and now for a measured reason: 87 PRs
+   in five days is 17.4 a day, and a Sonnet 5 review of a median PR costs $0.50,
+   so **$262/month against the $10/month Copilot Pro already rejected on
+   price**. Not close, and not fixable by model choice. ENGINEERING §5 has the
+   table.), the stance dial UI, then the remaining Claude modes ADR 15 names and
+   branch 5 does not build (argue a slot, deck conversation, research).
+
+   The re-price's **useful** finding was incidental to it: `web_dist/` is **75%
+   of the median review's input and 88% of the worst** — PR #87 is 305,735
+   tokens whole and 15,216 without the bundle. That is a bill being paid today,
+   because `/code-review ultra` is billed and does get run, and #81's 865,448
+   tokens is close enough to the 1M window to lose the diff. Exclude the bundle
+   from any review diff.
+
+   **The stance dial landed 2026-08-14** and was a prerequisite rather than a
+   peer, which only became clear once the code was read: ADR 15 gives **deck
+   conversation** its reversible edits *"at the top stance only"*, and until
+   this no client could ask for a stance at all — every surface sent none and
+   took the deck-derived default, which caps at `SECOND_OPINION` (`write:
+   none`). That mode's defining capability was unreachable. It is reachable
+   now.
+
+   Building it found a bug forty-two tests had missed, and the shape of the
+   miss is the transferable part. The create flow has no deck, so
+   `/api/claude` resolved through `stance.resolve(None, None)` and answered
+   `off` — while `theme.stance_for` was about to run that conversation at
+   `second-opinion`. Every test of that endpoint passed, because every one of
+   them named a deck; the case with no deck was the case nobody wrote.
+   **Rendering a value is what audits it.** The number had been served since
+   ADR 20 and nothing had ever had cause to look at it, and it took putting it
+   on screen next to the thing it describes. `/api/claude` takes a `surface`
+   now, and each surface's default is asked of the module that owns it.
+
+   So what is left of item 7 is the three modes: argue a slot, deck
+   conversation, research.
 
 ---
 

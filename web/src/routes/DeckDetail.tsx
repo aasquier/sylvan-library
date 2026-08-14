@@ -25,6 +25,8 @@ import {
 } from '../components/deckedit'
 import { ArtPicker } from '../components/artpicker'
 import { CommanderDossierPanel } from '../components/dossier'
+import { StanceDial } from '../components/stance'
+import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 
 type Tab = 'cards' | 'stats' | 'validation' | 'notes'
 
@@ -128,6 +130,10 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
   claude: ClaudeStatus | null
   onRefresh: () => void
 }) {
+  // Read here rather than passed down: the pin lives outside React (see
+  // `lib/stance.ts`), so this and the fetch in the parent see one value
+  // without the prop having to exist.
+  const [pin, setPin] = useStance()
   const card = deck.commander_card
   const stats = card?.power != null && card?.toughness != null
     ? `${card.power}/${card.toughness}`
@@ -270,11 +276,21 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
         <CommanderDossierPanel
           deck={deckRef}
           commander={deck.commander[0]}
+          stance={effectivePin(pin, claude)}
           canGenerate={
             !!claude?.installed && !!claude?.configured
             && claude.stance.axes[0]?.level !== 'off'
           }
         />
+      )}
+
+      {/* Under the dossier rather than over it, and only where Claude is
+          actually reachable. A dial on an instance with no key would be a
+          control over nothing, and the two panels that obey it — the dossier
+          above and the interview inside the rationale editor — both say for
+          themselves when the SDK or the credential is what is missing. */}
+      {claude?.installed && claude.configured && (
+        <StanceDial status={claude} pin={pin} onPin={setPin} />
       )}
     </div>
   )
@@ -395,6 +411,10 @@ export default function DeckDetail() {
   // Whether a Claude surface exists on this instance at all, and whether the
   // stance permits a call. Fetched once per deck; reaches no network itself.
   const [claude, setClaude] = useState<ClaudeStatus | null>(null)
+  // The dial itself is in `DeckHero`, which subscribes to the same store. This
+  // copy exists so the status fetch below can depend on the pin — and so it can
+  // clear one this build no longer serves.
+  const [pin, setPinFor] = useStance()
   const requested = useRef<string | null>(null)
   // The card the user is proposing to swap in, and the rationale they are
   // writing for it. Null means no swap is being composed.
@@ -491,13 +511,22 @@ export default function DeckDetail() {
       .catch((e) => setError(errorMessage(e)))
     setDossier(null)
     api.commander(deckRef).then(setDossier).catch(() => setDossier(null))
-    setClaude(null)
-    // `owner` alongside `slug`: this route takes its deck as a query parameter
-    // rather than a path segment, so the URL says nothing about whose it is.
-    api.claudeStatus({ slug, owner }).then(setClaude).catch(() => setClaude(null))
     setSuggestions(null)
     requested.current = null
   }, [deckRef, owner, slug])
+
+  // Its own effect, and keyed on the pin as well as the deck, because the
+  // answer depends on both: `stance` in the response is the *resolved* stance,
+  // and re-asking is how the dial's readout shows what a pin actually bought
+  // after the deployment ceiling has had its say. Nothing here recomputes that
+  // — the clamp has one implementation and it is `stance.clamp`.
+  useEffect(() => {
+    setClaude(null)
+    // `owner` alongside `slug`: this route takes its deck as a query parameter
+    // rather than a path segment, so the URL says nothing about whose it is.
+    fetchClaudeStatus({ slug, owner }, pin, () => setPinFor(null))
+      .then(setClaude).catch(() => setClaude(null))
+  }, [owner, slug, pin, setPinFor])
 
   // Lazily, and only for the tab that shows them: building a shortlist means a
   // pool query per offending card, which is real work to do on a page most

@@ -622,14 +622,14 @@ def test_the_default_stance_is_on_because_no_deck_exists_yet(monkeypatch):
     what this is about' and wrong here: a deck that has not been built is as
     theoretical as a deck can get (ADR 20)."""
     monkeypatch.delenv(stance.CEILING_ENV, raising=False)
-    assert theme._stance(None).allows_calls is True
+    assert theme.stance_for(None).allows_calls is True
 
 
 def test_a_deployment_ceiling_still_wins(monkeypatch):
     """An operator who turned this off has turned it off."""
     monkeypatch.setenv(stance.CEILING_ENV, "off")
-    assert theme._stance(None).allows_calls is False
-    assert theme._stance("collaborator").allows_calls is False
+    assert theme.stance_for(None).allows_calls is False
+    assert theme.stance_for("collaborator").allows_calls is False
 
 
 def test_the_report_says_which_system_answered(no_network):

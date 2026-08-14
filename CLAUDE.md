@@ -330,8 +330,26 @@ proposal of two colour combinations with three pool-checked commanders each.
 `mtglab claude check` proves the key;
 `mtglab claude interview <slug> --card X` and `mtglab claude dossier <slug>`
 run the first two, and the deck page runs both. The other three modes ADR 15
-names, the activity log, and any UI for the stance dial do not exist — check
-what is actually there before assuming either way.
+names and the activity log do not exist — check what is actually there before
+assuming either way.
+
+**The stance dial is built** (2026-08-14): `components/stance.tsx` over
+`lib/stance.ts`, on the deck page and in the create flow, and all four surfaces
+send what it holds. Three things about it. **"Follow the deck" is a position,
+and the default one** — `default_for` reads the deck's `status`, so a
+theoretical deck opens wider than a built one, and a dial whose bottom setting
+was `off` would throw that away the first time it was touched. **The axes are a
+readout of the server's resolved answer**, never recomputed here; a second copy
+of `clamp` in TypeScript would disagree silently. And **a pin the server
+refuses is dropped and the call retried bare**, because every Claude panel
+gates on `/api/claude` — a renamed preset would not show an error, it would
+remove the dial, which is the only control that can clear the pin.
+
+`/api/claude` takes a **`surface`** because of what building the dial found:
+the create flow has no deck, so the endpoint resolved `off` while
+`theme.stance_for` was about to run that conversation at `second-opinion`. All
+42 tests on that endpoint passed, because every one of them asked about a deck.
+A surface's default is asked of the module that owns it, never copied.
 
 **A mode also has a voice, and a voice is not a stance**
 ([ADR 21](docs/adr/0021-a-persona-is-a-voice-and-the-spread-is-the-slots.md)).
@@ -534,7 +552,7 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
 
 ## Landing work
 
-The repo is public and `main` is protected: pull request required, **all five**
+The repo is public and `main` is protected: pull request required, **all six**
 CI checks green, branch up to date, enforced for admins. A direct push to
 `main` is rejected — branch first, then open a PR. Squash merge; linear history
 is required.
@@ -544,6 +562,12 @@ run locally** — this Mac is macOS 12 on Intel, where Docker Desktop will not
 install and Homebrew is too stale to build Colima, so CI is the only place the
 `Dockerfile` is ever built. Treat a red `image` job as the first real feedback
 on a container change rather than as a surprise.
+
+The sixth is `dependency-review`, required since 2026-08-14 and the only one
+that is **not** a `ci.yml` job. It runs on `pull_request` only — it diffs the
+dependency graph between base and head, and a push has no base — so it gates
+merging and takes no part in the deploy, whose `needs` list is `ci.yml`'s four.
+It also cannot be run locally in any useful form. See ENGINEERING §5.
 
 **Merging deploys.** Since 2026-08-14 a push to `main` whose four checks are
 green deploys itself ([ADR 23](docs/adr/0023-a-green-main-deploys-itself.md));

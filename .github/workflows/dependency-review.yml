@@ -3,9 +3,10 @@
 # dependency graph between base and head, so there is nothing for it to do on
 # a push to main.
 #
-# Not yet a required check on `main`. Making it one is a settings change, not
-# a workflow change -- ENGINEERING §5 records why the second step is the one
-# that gets forgotten.
+# Required on `main` since 2026-08-14. The context is the job id below,
+# `dependency-review`, and not this workflow's `name:` -- renaming either the
+# job or this file means updating the protection setting in the same change,
+# or the check stops gating while still appearing to pass. ENGINEERING §5.
 name: dependency review
 
 on:
