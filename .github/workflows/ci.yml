@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The manual button. Running the whole workflow rather than the deploy job
+  # alone is deliberate: "deploy whatever is on main right now" should still
+  # mean "having checked it", and a button that skips the suite is a button
+  # that eventually gets used to ship something red.
+  workflow_dispatch:
 
 # Least privilege. `dependency-review.yml` has said this since it landed and
 # this file never did, which meant the whole suite ran with whatever the
@@ -424,3 +429,102 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Continuous deployment to the Fly instance. Added 2026-08-14, because the
+  # alternative was a person running `fly deploy` from a laptop and remembering
+  # to -- and the deploy that gets forgotten is the one where `main` and the
+  # running instance quietly disagree. The card pool rename is exactly that
+  # shape: `/api/health` answers a different field name on either side of it.
+  #
+  # `needs` is the whole safety argument. This job cannot start until all four
+  # checks above are green, so it is *structurally* unable to deploy something
+  # that failed one -- rather than relying on branch protection, which governs
+  # merging and has nothing to say about a workflow_dispatch run.
+  deploy:
+    needs: [test, frontend, no-secrets-or-card-data, image]
+    # Never from a pull request: a fork's PR must not be able to reach the
+    # instance, and `secrets.FLY_API_TOKEN` is not exposed to one anyway.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # One deploy at a time, ever. The workflow-level group already serialises
+    # per ref, but this states the invariant that actually matters rather than
+    # leaving it as a side effect of that one.
+    concurrency:
+      group: deploy-sylvan-library
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # 1.6
+
+      # `--local-only` builds here and pushes the result to Fly's registry.
+      # The alternative, `--remote-only`, provisions a builder Machine on the
+      # account and bills for it; this runner is already paid for and already
+      # has buildx. Note the image is therefore built twice per run -- once by
+      # the `image` job for the two-architecture check, once here for the one
+      # architecture actually deployed. That is a few minutes, not a bug, and
+      # collapsing them means publishing to a registry, which ENGINEERING §5
+      # keeps behind a signing and provenance conversation.
+      #
+      # There is one machine and one volume, so Fly cannot roll: this stops the
+      # instance and starts the new one. A few seconds of downtime per deploy
+      # is inherent to that shape and was equally true by hand.
+      - name: Deploy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --local-only
+
+      # A deploy that returns success and an instance that works are different
+      # facts, and the gap between them is where the interesting failures live.
+      # Three assertions, each pinning a distinct one:
+      #
+      #   200         -- it is up and answering at all
+      #   "pool":true -- the volume is mounted AND the card pool survived. A
+      #                  fresh or unmounted volume answers false, which is the
+      #                  correct state for a new instance and a catastrophe for
+      #                  this one.
+      #   decks > 0   -- the decks on the volume are still there. `deck.yaml`
+      #                  is written by the app's editing routes, so a deploy
+      #                  that lost them loses edits that exist nowhere else.
+      #
+      # Retried, because the health check has a 10s grace period and the first
+      # request after a replace can land before the app is listening.
+      - name: The instance must be up, seeded, and still holding its decks
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS --max-time 10 https://sylvan-libraries.com/api/health \
+                 -o health.json; then
+              break
+            fi
+            echo "attempt $attempt: no answer yet"
+            sleep 5
+          done
+          if [ ! -s health.json ]; then
+            echo "::error::the instance never answered /api/health after deploy"
+            exit 1
+          fi
+          cat health.json
+          python3 - <<'PY'
+          import json, sys
+          h = json.load(open("health.json"))
+          bad = []
+          if not h.get("pool"):
+              bad.append("no card pool -- is the volume mounted?")
+          if not h.get("decks"):
+              bad.append("no decks -- the volume may have been replaced")
+          if bad:
+              print("::error::" + "; ".join(bad))
+              sys.exit(1)
+          print(f"up: {h['oracle_cards']} oracle cards, {h['decks']} decks")
+          PY
+
+      # For the log, so a bad deploy has something to roll back *to* without
+      # anybody having to reconstruct which release was last good.
+      - name: Releases
+        if: always()
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl releases --app sylvan-library | head -10

@@ -766,6 +766,13 @@ to this app:
 fly deploy
 ```
 
+This is the **first** deploy, and the manual path generally. Routine deploys
+are automatic as of 2026-08-14: a push to `main` whose four checks are green
+deploys itself, and there is a manual button in the Actions tab that runs the
+whole workflow and then deploys. See
+[ADR 23](adr/0023-a-green-main-deploys-itself.md) and §5 below for the runbook.
+`fly deploy` from a laptop still works and is the rollback path.
+
 The app will start with **no card pool and no decks**. Both are expected, and both
 are fixed by step 6 — `/api/health` reports pool state rather than crashing,
 which is exactly the fresh-clone case the API tests already cover, and an empty
@@ -986,6 +993,47 @@ untouched: a stripped click spends nothing.
 ---
 
 ## 5. Running it
+
+### Deploying
+
+**A push to `main` whose four checks are green deploys itself**, since
+2026-08-14 — [ADR 23](adr/0023-a-green-main-deploys-itself.md). The `deploy`
+job in `ci.yml` `needs` all four checks, so it cannot start unless they passed,
+and it runs only for a push to `main` or an explicit `workflow_dispatch`.
+Expect it about ten minutes after a merge; most of that is the `image` job.
+
+**To deploy without merging anything** — a redeploy after a `fly secrets`
+change, say — use the manual button: Actions → *tests* → **Run workflow**. It
+runs the whole suite and then deploys, deliberately: a button that skips the
+suite is a button that eventually ships something red.
+
+**The deploy is not done when `flyctl` exits.** The job then requires the live
+instance to answer `/api/health` with 200, `"pool": true` and a non-zero deck
+count. The last two are the ones worth having — a fresh or unmounted volume
+answers `"pool": false`, and a deploy that lost the volume loses deck edits
+that exist in no repository.
+
+**A failed smoke test does not roll back.** It fails loudly and prints
+`fly releases`. That is deliberate: the schema ladder is forward-only, so an
+automatic revert can leave things worse than the state it reverted from, and
+an unmounted volume is not fixed by redeploying the previous image.
+
+To roll back by hand:
+
+```bash
+fly releases --app sylvan-library          # find the last good version
+fly deploy --image <image-ref-from-above>  # or: fly releases rollback
+```
+
+**A schema change deserves the treatment every deploy used to get.** Migrations
+in `auth/db.py` run on boot and do not run backwards, so rolling the code back
+does not roll the schema back. Land a schema change on its own branch, merge
+it when you can watch it, and take a backup first (see *Backups* below).
+
+One machine and one volume means Fly cannot roll — a deploy stops the instance
+and starts the replacement, so every deploy is a few seconds of downtime. That
+is inherent to the shape rather than something automation introduced; it simply
+happens more often now.
 
 ### Refreshing the pool
 

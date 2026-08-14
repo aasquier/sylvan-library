@@ -534,6 +534,26 @@ is exactly the hazard the protection table below names: **the required-check
 list had to be updated in the same change, or the check would have stopped
 gating while still appearing to pass.**
 
+**And the CD half, added 2026-08-14** — [ADR 23](adr/0023-a-green-main-deploys-itself.md).
+A `deploy` job that `needs` all four checks and runs only on a push to `main`
+or a `workflow_dispatch`, so a green `main` deploys itself. The prompt was a
+silent failure rather than a loud one: the quality pass above renamed a wire
+field and the running instance went on answering the old name, because
+deploying was still something a person had to remember. A failing test is
+loud, a failing build is loud, **a skipped deploy is silent**.
+
+Two details worth keeping. `needs` is not redundant with branch protection —
+protection governs *merging* and says nothing about a `workflow_dispatch` run,
+whereas `needs` makes the job structurally unable to start on a red suite
+whatever triggered it. And the job does not treat `flyctl` exiting as success:
+it requires the live instance to answer with a mounted volume and a non-zero
+deck count, because a deploy that comes up against a fresh volume looks
+perfectly healthy while having lost every deck edit.
+
+This is also the first thing in the pipeline that holds a **credential**. The
+token is app-scoped (`fly tokens create deploy -a sylvan-library`) rather than
+org-wide, which bounds what a leak costs to "can deploy this one app".
+
 Four of those are new, and three of the four are guards against a check being
 green while not checking:
 
