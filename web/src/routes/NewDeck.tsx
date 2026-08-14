@@ -171,6 +171,11 @@ export default function NewDeck() {
     [taxonomy, tier],
   )
   const current = inTier[index] ?? null
+  // Resolved once here rather than at each of the two uses below. `leaders` is
+  // filled per key as the carousel moves, so a key that has not been fetched
+  // yet is genuinely absent rather than empty, and the two states render the
+  // same: no panel.
+  const currentLeaders = current ? leaders[current.key] ?? [] : []
 
   // Changing tier restarts the carousel; leaving the index where it was would
   // land on a different combination than the one on screen a moment ago.
@@ -625,14 +630,14 @@ export default function NewDeck() {
                   by exact colour identity rather than typed from memory, so
                   the three legends under a guild's name are that guild's
                   colours because Scryfall says they are. Hover for the card. */}
-              {leaders[current.key]?.length > 0 && (
+              {currentLeaders.length > 0 && (
                 <div className="mt-5">
                   <p className="text-xs uppercase tracking-wide"
                      style={{ color: 'var(--text-muted)' }}>
                     Most-built commanders in these colours
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {leaders[current.key].map((card) => (
+                    {currentLeaders.map((card) => (
                       <CardHover key={card.name} card={card}>
                         <button
                           onClick={() => {

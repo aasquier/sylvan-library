@@ -99,9 +99,13 @@ export default function Simulator() {
   useEffect(() => {
     api.decks().then((d) => {
       setDecks(d)
-      if (!slug && d.length) {
-        setSlug(d[0].slug)
-        setOwner(d[0].owner)
+      // `d[0]` rather than `d.length &&` -- the same test, but one that carries
+      // the deck along with the answer instead of leaving the read to a second
+      // lookup the checker has to trust.
+      const first = d[0]
+      if (!slug && first) {
+        setSlug(first.slug)
+        setOwner(first.owner)
       } else if (!owner && d.length) {
         // A bookmarked `?deck=` with no owner: resolve it the same way
         // `DeckRedirect` does, by taking the first library that has it. The

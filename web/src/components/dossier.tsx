@@ -291,14 +291,21 @@ function Passage({ title, section, sources, extra }: {
  * source below and carries the page's real title in its tooltip.
  */
 function Cites({ ids, sources }: { ids: string[]; sources: DossierBody['sources'] }) {
-  const shown = ids
-    .map((id) => ({ id, at: sources.findIndex((s) => s.id === id) }))
-    .filter((x) => x.at >= 0)
+  // Carry the source itself rather than finding its position and reading it
+  // back. Same result and one traversal fewer, and it keeps the drop-an-
+  // unresolvable-id rule in a single expression: a marker whose id is not in
+  // `sources` renders as nothing, which is ADR 19's instrument, not a
+  // convenience.
+  const shown = ids.flatMap((id) => {
+    const at = sources.findIndex((s) => s.id === id)
+    const source = sources[at]
+    return source ? [{ id, at, source }] : []
+  })
   if (!shown.length) return null
   return (
     <>
-      {shown.map(({ id, at }) => (
-        <a key={id} href={`#src-${id}`} title={sources[at].title}
+      {shown.map(({ id, at, source }) => (
+        <a key={id} href={`#src-${id}`} title={source.title}
            className="ml-1 align-super text-[10px] font-medium no-underline"
            style={{ color: 'var(--series-2)' }}>
           [{at + 1}]

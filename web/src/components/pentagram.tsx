@@ -76,7 +76,40 @@ interface Edge {
   key: string
   from: number
   to: number
+  /** The two colours themselves, so drawing an edge never re-derives them. */
+  fromColour: string
+  toColour: string
   allied: boolean
+}
+
+/**
+ * Every colour paired with the one `step` places clockwise of it, wrapping.
+ *
+ * The wrap-around is a **rotation consumed in lockstep**, not `WUBRG[(i + step)
+ * % 5]`. That is not ceremony for the type checker: `noUncheckedIndexedAccess`
+ * cannot see that a modulo is in range — correctly, because that is a fact
+ * about the arithmetic rather than about the array — so the indexed spelling
+ * needs a non-null assertion, and an assertion is a claim about the geometry
+ * that nobody re-checks when the geometry changes. Iterating makes the same
+ * ten pairs with no claim to make.
+ *
+ * `from` and `to` stay numbers because they are vertex *positions*: `vertex()`
+ * turns them into coordinates. They are arithmetic, never a lookup.
+ */
+function clockwisePairs(step: number): Omit<Edge, 'key' | 'allied'>[] {
+  const rotated = [...WUBRG.slice(step), ...WUBRG.slice(0, step)]
+  const pairs: Omit<Edge, 'key' | 'allied'>[] = []
+  let from = 0
+  for (const fromColour of WUBRG) {
+    const toColour = rotated.shift()
+    // Only reachable if `rotated` were shorter than WUBRG, which a rotation of
+    // WUBRG cannot be. Written as a stop rather than an assertion for the same
+    // reason as above.
+    if (toColour === undefined) break
+    pairs.push({ from, to: (from + step) % WUBRG.length, fromColour, toColour })
+    from += 1
+  }
+  return pairs
 }
 
 /**
@@ -87,10 +120,14 @@ interface Edge {
  * read backwards — so stepping `i+1` and `i+2` over five vertices enumerates
  * each guild exactly once.
  */
-const EDGES: Edge[] = Array.from({ length: 5 }, (_, i) => i).flatMap((i) => [
-  { key: pairKey(WUBRG[i], WUBRG[(i + 1) % 5]), from: i, to: (i + 1) % 5, allied: true },
-  { key: pairKey(WUBRG[i], WUBRG[(i + 2) % 5]), from: i, to: (i + 2) % 5, allied: false },
-])
+const EDGES: Edge[] = [
+  ...clockwisePairs(1).map((p) => ({
+    ...p, key: pairKey(p.fromColour, p.toColour), allied: true,
+  })),
+  ...clockwisePairs(2).map((p) => ({
+    ...p, key: pairKey(p.fromColour, p.toColour), allied: false,
+  })),
+]
 
 /**
  * The fifteen keys this diagram can point at: five discs and ten lines.
@@ -202,6 +239,10 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
   const marked = selected && DRAWABLE.has(selected) ? selected : null
   const shown = active ?? marked
   const captioned = shown ? byKey.get(shown) ?? null : null
+  // A mono combination names its colour; a pair describes its edge instead.
+  // Read as "the colour, if there is exactly one" rather than as a length test
+  // followed by an index, so the caption below never indexes an empty list.
+  const soleColour = captioned?.colors.length === 1 ? captioned.colors[0] : undefined
 
   /** Shared by both kinds of target: a click, Enter and Space all pick. */
   const handlers = (combo: Combination | undefined) => ({
@@ -249,8 +290,8 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
                 gradientUnits="userSpaceOnUse"
                 x1={a.x} y1={a.y} x2={b.x} y2={b.y}
               >
-                <stop offset="0%" stopColor={COLOR_VAR[WUBRG[e.from]]} />
-                <stop offset="100%" stopColor={COLOR_VAR[WUBRG[e.to]]} />
+                <stop offset="0%" stopColor={COLOR_VAR[e.fromColour]} />
+                <stop offset="100%" stopColor={COLOR_VAR[e.toColour]} />
               </linearGradient>
             )
           })}
@@ -297,6 +338,10 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
           const combo = byKey.get(code)
           const p = vertex(i)
           const on = shown === code
+          // Every WUBRG code has a glyph, and the disc is still the right
+          // drawing if one ever goes missing -- a vertex without its mark
+          // beats a vertex that throws while rendering the wheel.
+          const glyph = GLYPH_PATH[code]
           return (
             <g key={code} {...handlers(combo)} className="pentagram-vertex">
               {/* The halo is the focus and hover indicator. Drawn under the
@@ -317,10 +362,12 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
                   from the same paths as every pip in the app, so the disc a
                   vertex shows here is the disc a cost shows on a card — the
                   diagram teaches a mark the rest of the app then uses. */}
-              <g transform={`translate(${p.x - 18} ${p.y - 18}) scale(0.36)`}>
-                <path d={GLYPH_PATH[code].d} fill="#141414"
-                      fillRule={GLYPH_PATH[code].evenOdd ? 'evenodd' : 'nonzero'} />
-              </g>
+              {glyph && (
+                <g transform={`translate(${p.x - 18} ${p.y - 18}) scale(0.36)`}>
+                  <path d={glyph.d} fill="#141414"
+                        fillRule={glyph.evenOdd ? 'evenodd' : 'nonzero'} />
+                </g>
+              )}
             </g>
           )
         })}
@@ -336,8 +383,8 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
               <div className="flex flex-wrap items-baseline gap-2">
                 <h3 className="text-xl font-semibold tracking-tight">{captioned.name}</h3>
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {captioned.colors.length === 1
-                    ? COLOR_NAMES[captioned.colors[0]]
+                  {soleColour
+                    ? COLOR_NAMES[soleColour]
                     : EDGES.find((e) => e.key === captioned.key)?.allied
                       ? 'allied pair — neighbours on the wheel'
                       : 'enemy pair — opposite on the wheel'}

@@ -421,11 +421,11 @@ against a running container rather than read off the file.
 The stack is already modern: React 19, Vite 8, Tailwind 4, TypeScript 7,
 oxlint, Recharts. The gaps are testing and interaction, not framework choice.
 
-**`noUncheckedIndexedAccess` is the one strictness flag still off, and it is
-worth its own change.** Measured 2026-08-14: turning it on reports **51 errors
-across 15 files** — `pentagram.tsx` 7, `Learn.tsx` 9, `mtg.ts` 3, `App.tsx` 4,
-the rest scattered, with about a third in test files. Every one is a real
-`arr[0]` or `obj[key]` that can be `undefined` and is not treated as such.
+~~**`noUncheckedIndexedAccess` is the one strictness flag still off**~~ — **on
+since 2026-08-14.** Measured first: turning it on reported **51 errors across
+15 files** — `pentagram.tsx` 7, `Learn.tsx` 9, `mtg.ts` 3, `App.tsx` 4, the
+rest scattered, with about a third in test files. Every one is a real `arr[0]`
+or `obj[key]` that can be `undefined` and is not treated as such.
 
 It is deliberately *not* bundled with the 2026-08-14 quality pass. Each site
 needs its own judgment — a guard, a default, or a different data shape — and
@@ -455,6 +455,36 @@ change. The genuinely awkward class is `pentagram.tsx`'s `WUBRG[(i + 1) % 5]` �
 provably in range, invisible to the checker — and it is exactly where a
 non-null assertion is tempting and wrong. The fix taken there is to iterate the
 array rather than index it, so the `undefined` never enters the type.
+
+**A tuple does not help, which is worth knowing before reaching for one.**
+Measured rather than assumed: under this flag `tup[0]` on a `readonly [...]`
+tuple is fine, but `tup[i]` and `tup[(i + 1) % 5]` are both `T | undefined`
+exactly as an array's are. Only a **literal** index escapes. So the
+five-element tuple that looks like the obvious fix for the pentagram buys
+nothing, and the restructure is the real answer: `clockwisePairs()` walks a
+rotated copy in lockstep with `WUBRG`, so both ends of every edge arrive by
+iteration. Ten edges, no index, nothing asserted.
+
+**What the fixes look like**, since the rule was that a non-null assertion is
+the wrong one:
+
+- **A guard where the empty case is real.** `Learn.tsx` renders an explanatory
+  panel when `/api/colors` answers with nothing, rather than letting nine field
+  reads each decide what to do about it.
+- **A different shape where one was available.** `App.tsx`'s
+  `...NAV.slice(0, 1)` in place of `NAV[0]`; `dossier.tsx` carrying the source
+  object instead of `findIndex`-ing its position and reading it back, which
+  drops a traversal as well.
+- **Binding once instead of testing and re-reading.** `mtg.ts`'s
+  `if (GUILDS[key]) return GUILDS[key]` was two lookups of a mutable table, and
+  the checker was right that the second one proves nothing about the first.
+- **`?.` inside `expect(...)`** in test files, where an absent value fails the
+  assertion with a readable diff — which is what the test wanted anyway.
+
+`!` appears in exactly one class of site, all in test files: `findAllByRole(…)
+[0]`, where the query itself throws if nothing matched and the file already
+used that idiom. **No non-null assertion was added under `src/` outside the
+tests.**
 
 - ~~**No frontend tests at all.**~~ **Built 2026-08-10** — Vitest + Testing
   Library, 35 tests over the three pieces with real logic. `npm test` runs
@@ -616,6 +646,11 @@ green while not checking:
 - **The skip gate.** See §2 — CI ran 663 of 692 tests and said so nowhere. The
   build now fails if the skipped count is anything other than the two declared
   `needs_full_pool` tests.
+- **`tsc` under `noUncheckedIndexedAccess`**, added 2026-08-14 as its own
+  change. `strict` does not include it, so the single most common source of
+  `undefined` in this codebase stayed invisible to the checker that had just
+  been turned on to catch `undefined`. See §4 for the fixes and for why a
+  tuple is not one of them.
 - **`tsc` under `strict`.** `tsconfig.app.json` had `noUnusedLocals` and
   friends but never `"strict": true`, so `strictNullChecks` was off across all
   5,913 lines of frontend and a null deref type-checked clean. Turning it on

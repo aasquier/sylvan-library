@@ -137,23 +137,28 @@ const asked = (report: unknown) => ({ id: 'a1', status: 'done', result: report }
 const settled = (job: unknown) =>
   ({ promise: Promise.resolve(job as never), cancel: () => {} })
 
+// Named rather than reached for as `PROPOSAL.combinations[0]`. Two tests below
+// assert on its `reading`, and a fixture's first element is a thing to name
+// once, not to index twice.
+const GOLGARI = {
+  key: 'BG', name: 'Golgari', colors: ['B', 'G'], tier: 'guild',
+  tagline: 'Death and rebirth.',
+  reading: 'Dune is a book about what grows out of a wasteland.',
+  grounding: 'Golgari is Ravnica’s guild of decay and regrowth.',
+  source_ids: ['s1'],
+  commanders: [{
+    name: 'Gyome, Master Chef', prose: 'Feeds the table, then eats it.',
+    source_ids: ['s1'], mana_cost: '{2}{B}{G}',
+    type_line: 'Legendary Creature — Troll Warlock',
+    oracle_text: 'Makes Food.', color_identity: ['B', 'G'],
+    image: 'https://img.test/gyome.jpg', art_crop: 'https://img.test/gyome-art.jpg',
+  }],
+}
+
 const PROPOSAL = {
   answered_by: 'claude', mode: 'theme-proposal', model: 'claude-sonnet-5',
   asked: true, reason: '', stance: STANCE,
-  combinations: [{
-    key: 'BG', name: 'Golgari', colors: ['B', 'G'], tier: 'guild',
-    tagline: 'Death and rebirth.',
-    reading: 'Dune is a book about what grows out of a wasteland.',
-    grounding: 'Golgari is Ravnica’s guild of decay and regrowth.',
-    source_ids: ['s1'],
-    commanders: [{
-      name: 'Gyome, Master Chef', prose: 'Feeds the table, then eats it.',
-      source_ids: ['s1'], mana_cost: '{2}{B}{G}',
-      type_line: 'Legendary Creature — Troll Warlock',
-      oracle_text: 'Makes Food.', color_identity: ['B', 'G'],
-      image: 'https://img.test/gyome.jpg', art_crop: 'https://img.test/gyome-art.jpg',
-    }],
-  }],
+  combinations: [GOLGARI],
   sources: [{ id: 's1', title: 'Golgari on Ravnica', url: 'https://w.test/golgari' }],
   sources_dropped: 0, commanders_dropped: 1, combinations_dropped: 1,
   searched: 4,
@@ -221,7 +226,7 @@ async function enterTheme() {
 async function enterTarot(reader = 'fortune-teller') {
   open()
   const doors = await screen.findAllByRole('button', { name: /read my cards/i })
-  fireEvent.click(doors[0])
+  fireEvent.click(doors[0]!)
   const persona = ROSTER.personas.find((p) => p.key === reader)!
   const panel = (await screen.findByText(persona.blurb)).closest('button')!
   fireEvent.click(panel)
@@ -268,7 +273,7 @@ describe('the four doors', () => {
     open()
     const doors = await screen.findAllByRole('button',
       { name: /help me decide|take me through|i know what i want/i })
-    expect(doors[0].textContent).toMatch(/help me decide/i)
+    expect(doors[0]?.textContent).toMatch(/help me decide/i)
   })
 
   it('does not remember the theme door', async () => {
@@ -300,7 +305,7 @@ describe('the tarot door', () => {
     // adding a voice is a frontend change again.
     open()
     const doors = await screen.findAllByRole('button', { name: /read my cards/i })
-    fireEvent.click(doors[0])
+    fireEvent.click(doors[0]!)
     expect(await screen.findByText('Tell me a story')).toBeTruthy()
     expect(screen.getByText('A voice this file has never heard of.')).toBeTruthy()
   })
@@ -382,7 +387,7 @@ describe('the tarot door', () => {
     }
     await waitFor(() => expect(api.themeAsk).toHaveBeenCalled(), PAST_THE_SHUFFLE)
     expect(screen.queryByText('A question the plain one asked')).toBeNull()
-    expect(vi.mocked(api.themeAsk).mock.calls[0][0].transcript).toEqual([])
+    expect(vi.mocked(api.themeAsk).mock.calls[0]?.[0].transcript).toEqual([])
   })
 
   it('re-deals the same spread rather than remembering the cards', async () => {
@@ -397,7 +402,7 @@ describe('the tarot door', () => {
     cleanup()
     open()
     fireEvent.click((await screen.findAllByRole(
-      'button', { name: /read my cards/i }))[0])
+      'button', { name: /read my cards/i }))[0]!)
     await screen.findByText('The Root')
     expect(api.tarotReading).toHaveBeenLastCalledWith(4242)
   })
@@ -479,7 +484,7 @@ describe('the proposal', () => {
     fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
     await screen.findByText(READY.question)
     fireEvent.click(screen.getByRole('button', { name: /suggest my colours/i }))
-    return screen.findByText(PROPOSAL.combinations[0].reading)
+    return screen.findByText(GOLGARI.reading)
   }
 
   it('submits a job and reads the answer off it', async () => {
@@ -504,7 +509,7 @@ describe('the proposal', () => {
     open()
     fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
 
-    await screen.findByText(PROPOSAL.combinations[0].reading)
+    await screen.findByText(GOLGARI.reading)
     expect(vi.mocked(followJob).mock.calls[0]?.[0]).toBe('j9')
     expect(api.themePropose).not.toHaveBeenCalled()
   })

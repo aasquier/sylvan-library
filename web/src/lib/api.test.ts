@@ -368,7 +368,7 @@ describe('deck URLs', () => {
   it('puts the owner ahead of the slug', async () => {
     const fetchMock = capture()
     await api.deck(REF)
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/decks/mitch/goreclaw')
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/decks/mitch/goreclaw')
   })
 
   it('keeps the owner ahead of the slug on every sub-resource', async () => {
@@ -406,7 +406,7 @@ describe('deck URLs', () => {
   it('keeps the confirmation on the delete, after the owner', async () => {
     const fetchMock = capture()
     await api.deleteDeck(REF, 'bury')
-    expect(fetchMock.mock.calls[0][0])
+    expect(fetchMock.mock.calls[0]?.[0])
       .toBe('/api/decks/mitch/goreclaw?confirm=bury')
   })
 
@@ -416,6 +416,6 @@ describe('deck URLs', () => {
     // address bar held, so the guarantee is worth having anyway.
     const fetchMock = capture()
     await api.deck({ owner: 'a b', slug: 'c/d' })
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/decks/a%20b/c%2Fd')
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/decks/a%20b/c%2Fd')
   })
 })

@@ -964,6 +964,13 @@ arc; this is what the next few sessions actually do.
      on its own branch — re-measuring found the 51 errors cluster into ~15
      distinct sites, several of whose fixes are strictly better code.
 
+     **Both landed 2026-08-14.** The flag is on, all 51 are fixed, and no
+     non-null assertion was added under `web/src` outside test files. The one
+     finding worth carrying: **a tuple type does not satisfy the flag** — only
+     a literal index escapes it, so `WUBRG[(i + 1) % 5]` is `string | undefined`
+     whether `WUBRG` is an array or a five-element tuple. The pentagram's edge
+     list is built by walking a rotated copy in lockstep instead.
+
 7. **After that, next build work in order:** re-price automated PR review
    (ENGINEERING §5, parked), the stance dial UI, then the remaining Claude
    modes ADR 15 names and branch 5 does not build (argue a slot, deck

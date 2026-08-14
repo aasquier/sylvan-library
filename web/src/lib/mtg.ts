@@ -67,21 +67,36 @@ export const WUBRG = ['W', 'U', 'B', 'R', 'G']
 export function identityName(identity: string[]): string {
   if (!identity.length) return 'Colorless'
   const key = WUBRG.filter((c) => identity.includes(c)).join('')
-  if (GUILDS[key]) return GUILDS[key]
+  // Bound once rather than testing and re-reading. Two lookups of a mutable
+  // table are two chances to disagree, and under noUncheckedIndexedAccess the
+  // second one is `string | undefined` however the first one went.
+  const exact = GUILDS[key]
+  if (exact) return exact
   // Try every rotation, since guild names are cycle-invariant in the wedge case.
   for (let i = 0; i < WUBRG.length; i++) {
     const rotated = [...WUBRG.slice(i), ...WUBRG.slice(0, i)]
       .filter((c) => identity.includes(c))
       .join('')
-    if (GUILDS[rotated]) return GUILDS[rotated]
+    const cycled = GUILDS[rotated]
+    if (cycled) return cycled
   }
-  return identity.length === 1 ? `Mono-${COLOR_NAMES[identity[0]]}` : key
+  // `identity[0]` exists -- the empty case returned above -- but the checker
+  // cannot see that, and a colour outside WUBRG has no entry in COLOR_NAMES
+  // either. Both fall back to the key, which is the identity as written.
+  const mono = identity.length === 1 ? COLOR_NAMES[identity[0] ?? ''] : undefined
+  return mono ? `Mono-${mono}` : key
 }
 
 /** Split "{2}{B}{G}" into ["2","B","G"] for pip rendering. */
 export function manaSymbols(cost?: string | null): string[] {
   if (!cost) return []
-  return Array.from(cost.matchAll(/\{([^}]+)\}/g)).map((m) => m[1])
+  // `flatMap` over `map` to drop a match with no group 1 rather than assert it
+  // cannot happen. The pattern has exactly one group so a match always fills
+  // it, but that is a fact about the regex two lines up, not one the checker
+  // can see -- and `!` here would be a habit that costs nothing until the
+  // pattern gains an alternation with a group that does not always
+  // participate, at which point it silently yields `undefined` as a pip.
+  return Array.from(cost.matchAll(/\{([^}]+)\}/g)).flatMap((m) => m[1] ?? [])
 }
 
 /**
@@ -116,9 +131,15 @@ export function splitManaText(text: string): ManaTextPart[] {
     const start = match.index
     if (start > at) parts.push({ text: text.slice(at, start), pip: false })
 
-    const symbol = match[1].toUpperCase()
-    // A colour run is several pips; everything else is exactly one.
-    if (/^[WUBRGC]{2,}$/.test(symbol)) {
+    const symbol = match[1]?.toUpperCase()
+    if (!symbol) {
+      // Unreachable today: MANA_IN_TEXT's single group always participates in
+      // a match. Written as a branch rather than a `!` so that if the pattern
+      // ever grows an alternation whose group does not, the brace text renders
+      // as the prose it came from instead of vanishing from the output.
+      parts.push({ text: match[0], pip: false })
+    } else if (/^[WUBRGC]{2,}$/.test(symbol)) {
+      // A colour run is several pips; everything else is exactly one.
       for (const colour of symbol) parts.push({ text: colour, pip: true })
     } else {
       parts.push({ text: symbol, pip: true })

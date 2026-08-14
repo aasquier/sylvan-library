@@ -22,6 +22,18 @@
        so a null deref type-checked clean and failed in the browser. Turning
        it on is the single highest-value change available to this config. */
     "strict": true,
+    /* On 2026-08-14, its own change for the same reason `strict` was. `strict`
+       does not include this one: an `arr[0]` or `obj[key]` types as the element
+       type even when the array is empty or the key absent, so the single most
+       common source of `undefined` in this codebase was invisible to the
+       checker that had just been turned on to catch `undefined`.
+
+       51 errors across 15 files, which clustered into ~15 real sites — one bad
+       expression reports once per use. The fix at each is a guard, a default,
+       or a different data shape; deliberately never a non-null assertion,
+       which silences the check without changing the risk. See
+       docs/ENGINEERING.md §4. */
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,

@@ -110,7 +110,7 @@ describe('Import', () => {
     fireEvent.click(screen.getByText('Preview'))
 
     await waitFor(() => expect(api.importDeck).toHaveBeenCalled())
-    expect(vi.mocked(api.importDeck).mock.calls[0][0]).toMatchObject({
+    expect(vi.mocked(api.importDeck).mock.calls[0]?.[0]).toMatchObject({
       slug: 'cats', text: '1 Sol Ring', dry_run: true,
     })
     expect(navigate).not.toHaveBeenCalled()
@@ -153,7 +153,7 @@ describe('Import', () => {
     })
     fireEvent.click(screen.getByText('Preview'))
     await waitFor(() => expect(api.importDeck).toHaveBeenCalled())
-    expect(vi.mocked(api.importDeck).mock.calls[0][0].commander)
+    expect(vi.mocked(api.importDeck).mock.calls[0]?.[0].commander)
       .toEqual(['Ley Weaver', 'Lore Weaver'])
   })
 
