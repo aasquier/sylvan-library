@@ -18,7 +18,7 @@ asks the model not to draft a rationale; the reason that request is safe to
 rely on is that nothing bad happens if it is ignored.
 
 **The answer's shape has no field for one.** `RESPONSE_SCHEMA` has a slot for
-a question and a slot for the corpus fact behind it, and no slot for prose
+a question and a slot for the pool fact behind it, and no slot for prose
 about the card's merit. A model that wanted to hand over a draft rationale has
 nowhere to put it.
 
@@ -29,7 +29,7 @@ questions column is the first inch of the slope, and it now fails visibly
 rather than reading as helpful.
 
 **Facts arrive before the model does.** Rule 1 says card facts come from the
-corpus rather than recall. The mode has `get_cards` and is told to use it, but
+pool rather than recall. The mode has `get_cards` and is told to use it, but
 the card actually under discussion never depends on that: `brief()` assembles
 the oracle text, the gate's verdict, the category counts and the sibling
 rationales in deterministic Python and hands them over in the opening message.
@@ -58,7 +58,7 @@ ANGLES = ("role", "alternative", "redundancy", "cost", "cut", "legality")
 #: The shape of an answer. Note what is absent: there is no `rationale`,
 #: `draft`, `suggestion` or `summary` field, and `additionalProperties: false`
 #: means one cannot be added by the model at run time. `fact` is a citation --
-#: what the corpus or the gate said -- not an argument about the card.
+#: what the pool or the gate said -- not an argument about the card.
 RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -74,7 +74,7 @@ RESPONSE_SCHEMA: dict[str, Any] = {
                             "A question addressed to the user, in the second "
                             "person, ending in a question mark. It must be "
                             "answerable only by them -- if you could answer it "
-                            "yourself from the corpus, it is not a question "
+                            "yourself from the pool, it is not a question "
                             "for this list."),
                     },
                     "angle": {
@@ -90,7 +90,7 @@ RESPONSE_SCHEMA: dict[str, Any] = {
                     "fact": {
                         "type": "string",
                         "description": (
-                            "The one corpus or gate fact this question rests "
+                            "The one pool or gate fact this question rests "
                             "on, quoted or paraphrased plainly -- oracle text, "
                             "a mana value, a category count, a gate error. A "
                             "fact, never a view about whether the card is "
@@ -149,13 +149,13 @@ Facts:
 - Every claim you make about a card comes from the brief or from the get_cards
   tool. Your recollection of a card is not evidence. This project has already
   been wrong twice by reasoning from memory about cards it was confident about,
-  which is why the corpus is on the table in front of you.
-- Colour identity is the corpus's own field. Never infer it from a mana cost.
+  which is why the pool is on the table in front of you.
+- Colour identity is the pool's own field. Never infer it from a mana cost.
 - The gate -- legality, colour identity, singleton, deck size, category counts
   -- is deterministic Python and it has already run. Do not re-derive its
   verdict or contradict it. If it flagged this card, that is a fact to ask
   about, not a finding to report.
-- A card the corpus does not have is a card you do not know. Say so by asking
+- A card the pool does not have is a card you do not know. Say so by asking
   about it rather than assuming what it does.
 """.strip()
 
@@ -270,8 +270,8 @@ def brief(slug: str, card: str, *,
             # import, not an error, and the questions differ: with a rationale
             # the job is to interrogate it, without one it is to find it.
             "rationale_so_far": entry["why"],
-            "in_corpus": record is not None,
-            "corpus": record,
+            "in_pool": record is not None,
+            "pool": record,
         },
         "gate": {
             "about_this_card": about_card,
@@ -384,7 +384,7 @@ def ask(slug: str, card: str, *, requested: Any = None, focus: str = "",
 
     ask_for = [
         ("Here is everything the tool already knows about this card in this "
-         "deck. All of it is deterministic: the card text is the corpus's, "
+         "deck. All of it is deterministic: the card text is the pool's, "
          "the verdict is the gate's, the counts are computed."),
         "",
         json.dumps(facts, indent=2, default=str),

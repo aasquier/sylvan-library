@@ -18,9 +18,9 @@ be your commander, even if it has a 'partner with' ability." Only the
 Background exemption is real -- it is legal despite not being a creature
 because "Choose a Background" makes it a second commander.
 
-As in `companion.py`, the mechanics here were enumerated from the corpus rather
+As in `companion.py`, the mechanics here were enumerated from the pool rather
 than from memory. That turned up more than the familiar list: `Partner—<label>`
-is a generalised template, and the corpus currently carries four distinct
+is a generalised template, and the pool currently carries four distinct
 labels (Friends forever, Survivors, Character select, Father & son). Matching
 on the label rather than hardcoding "Friends forever" means a new set adds
 labels without touching this file.

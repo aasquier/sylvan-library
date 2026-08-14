@@ -1,11 +1,11 @@
-"""Turn a `deck.yaml` plus corpus records into SimCards for Tier 1.
+"""Turn a `deck.yaml` plus pool records into SimCards for Tier 1.
 
 This lived in `cli.py`, which meant the HTTP layer imported the command-line
 layer to run a simulation (`from mtglab.cli import _sim_cards`). The compiler
 belongs with the simulator it feeds.
 
 It stays dependency-light in the sense CLAUDE.md means: `cards` arrives as a
-plain mapping of name -> record, so nothing here imports DuckDB. The corpus
+plain mapping of name -> record, so nothing here imports DuckDB. The pool
 boundary stays inside `cards/db.py`.
 
 Three of the four "confidently wrong for every deck" bugs in ROADMAP were in
@@ -24,8 +24,8 @@ if TYPE_CHECKING:
     from mtglab.sim.tier1.engine import SimCard
 
 
-class CorpusRequired(RuntimeError):
-    """Raised when a simulation is asked for without the card corpus.
+class PoolRequired(RuntimeError):
+    """Raised when a simulation is asked for without the card pool.
 
     A plain exception rather than `sys.exit`, which is what this used to do --
     fine for the CLI, but it was also reachable from an API worker thread,
@@ -74,7 +74,7 @@ def compile_deck(
 ) -> tuple[list[SimCard], SimCard | None]:
     """Compile a deck into `(library, commander)` SimCards.
 
-    Raises `CorpusRequired` when `cards` is missing: mana production cannot be
+    Raises `PoolRequired` when `cards` is missing: mana production cannot be
     inferred from a deck file alone, and guessing would produce numbers that
     look authoritative and are not.
     """
@@ -82,8 +82,8 @@ def compile_deck(
     from mtglab.sim.tier1.engine import SimCard
 
     if not cards:
-        raise CorpusRequired(
-            "simulation needs the card corpus -- run `mtglab data refresh` first")
+        raise PoolRequired(
+            "simulation needs the card pool -- run `mtglab data refresh` first")
 
     def compile_one(name: str) -> SimCard | None:
         rec = cards.get(name)

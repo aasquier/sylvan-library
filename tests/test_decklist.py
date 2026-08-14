@@ -3,7 +3,7 @@
 There is no decklist standard, so the parser's contract is "the union of what
 the exports people actually paste", and these pin each dialect against a real
 sample of it. The module is pure text -> structure, which is why every one of
-these runs without a corpus, a filesystem or a database.
+these runs without a card pool, a filesystem or a database.
 
 The refusals matter as much as the successes: a line the parser cannot read has
 to come back with its line number, because the alternative is a deck that is
@@ -85,7 +85,7 @@ def test_arena_sections_and_a_sideboard_that_becomes_the_swap_board():
 
 def test_type_headings_are_headings_not_cards():
     """A `Lands (1)` heading groups the list; it does not file the cards. The
-    land category comes from the corpus, which is right about the double-faced
+    land category comes from the pool, which is right about the double-faced
     cards a heading is wrong about."""
     result = parse(TAPPEDOUT)
     assert [c.name for c in result.section("deck")] == [
@@ -141,7 +141,7 @@ def test_a_four_digit_leading_number_is_part_of_the_name():
 
 
 def test_a_bare_leading_number_is_read_as_a_quantity():
-    """The one ambiguity the parser cannot resolve without a corpus, pinned so
+    """The one ambiguity the parser cannot resolve without a card pool, pinned so
     the behaviour is deliberate rather than incidental. Written the way every
     real export writes it -- `1 3 Steps Ahead` -- it is unambiguous, and the
     importer reports the unresolved name rather than guessing."""

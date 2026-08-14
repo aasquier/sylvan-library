@@ -58,10 +58,10 @@ def _source(source: DeckSource | None) -> DeckSource:
     return source if source is not None else FileDeckSource()
 
 
-# ------------------------------------------------------------------- corpus
+# ------------------------------------------------------------------- pool
 
 def _connect() -> DuckDBPyConnection | None:
-    """A read-only handle, or None when the corpus has not been built yet.
+    """A read-only handle, or None when the pool has not been built yet.
 
     Read-only matters: DuckDB allows one writer, so a running `data refresh`
     would otherwise lock the whole app out.
@@ -69,7 +69,7 @@ def _connect() -> DuckDBPyConnection | None:
     `config.DB_PATH` is read here rather than imported as a name, for the
     reason `config.py` exists: binding it at import time makes
     `config.use_paths()` silently ineffective, so a test can never point the
-    service at a scratch corpus. `deck_paths` and `FileDeckSource` already
+    service at a scratch pool. `deck_paths` and `FileDeckSource` already
     resolve at call time; this was the last place that did not.
     """
     if not Path(config.DB_PATH).exists():
@@ -83,15 +83,15 @@ def _connect() -> DuckDBPyConnection | None:
         return None
 
 
-def corpus_stale(con: DuckDBPyConnection) -> bool:
-    """Whether the corpus predates the printed-stat columns. Never raises.
+def pool_stale(con: DuckDBPyConnection) -> bool:
+    """Whether the pool predates the printed-stat columns. Never raises.
 
     Wrapped because `health()` must answer on a database in any state at all,
     including one from a future version of this code. A health check that
     500s is worse than one that says "I could not tell".
     """
     try:
-        return db.corpus_is_stale(con)
+        return db.pool_is_stale(con)
     except Exception:                                               # noqa: BLE001
         return False
 
@@ -99,8 +99,8 @@ def corpus_stale(con: DuckDBPyConnection) -> bool:
 def health(*, source: DeckSource | None = None) -> dict[str, Any]:
     con = _connect()
     if con is None:
-        return {"corpus": False, "oracle_cards": 0, "printings": 0,
-                "message": "no corpus yet -- run `mtglab data refresh`"}
+        return {"pool": False, "oracle_cards": 0, "printings": 0,
+                "message": "no card pool yet -- run `mtglab data refresh`"}
     try:
         def count(table: str) -> int:
             # `fetchone` is typed as possibly-None. count(*) always yields a
@@ -111,7 +111,7 @@ def health(*, source: DeckSource | None = None) -> dict[str, Any]:
 
         oracle = count("oracle_cards")
         printings = count("printings")
-        stale = corpus_stale(con)
+        stale = pool_stale(con)
     finally:
         con.close()
     # `config.SCRYFALL_DIR`, not a relative literal: this is the platform's
@@ -121,17 +121,17 @@ def health(*, source: DeckSource | None = None) -> dict[str, Any]:
     files = sorted(config.SCRYFALL_DIR.glob("*.jsonl.gz")) if \
         config.SCRYFALL_DIR.exists() else []
     return {
-        "corpus": True,
+        "pool": True,
         "oracle_cards": oracle,
         "printings": printings,
         "bulk_files": [f.name for f in files],
         "decks": len(_source(source).slugs()),
-        # A corpus loaded before the printed-stat columns existed answers every
+        # A card pool loaded before the printed-stat columns existed answers every
         # question about power with NULL, which reads as "this card has no
         # power". Saying so is the difference between a prompt to re-ingest and
         # a quiet wrong answer about every creature in the library.
-        "corpus_stale": stale,
-        **({"message": "corpus predates power/toughness -- "
+        "pool_stale": stale,
+        **({"message": "pool predates power/toughness -- "
                        "run `mtglab data refresh`"} if stale else {}),
     }
 
@@ -139,7 +139,7 @@ def health(*, source: DeckSource | None = None) -> dict[str, Any]:
 # -------------------------------------------------------------------- decks
 
 
-def _corpus_for(deck: Deck,
+def _pool_for(deck: Deck,
                 con: DuckDBPyConnection | None) -> dict[str, CardRecord]:
     if con is None:
         return {}
@@ -152,7 +152,7 @@ def _corpus_for(deck: Deck,
 
 def _card_json(entry: CardEntry, rec: CardRecord | None, *,
                full: bool = False) -> dict[str, Any]:
-    """One row of the 99, merged with whatever the corpus knows about it.
+    """One row of the 99, merged with whatever the pool knows about it.
 
     `full` adds the fields only a hero panel wants — the flavour text and the
     artist. Opt-in rather than always-on because this runs 99 times per deck
@@ -204,7 +204,7 @@ def list_decks(*, source: DeckSource | None = None,
     this project, so a shelf that renders a deck with a banned card exactly
     like a clean one is hiding the only thing it is really for -- and asking
     the UI to fetch /validate per deck would be an N+1 on every page load.
-    `errors` is None when the corpus is unavailable, which is different from
+    `errors` is None when the pool is unavailable, which is different from
     zero and must not render as a pass.
     """
     decks = _source(source)
@@ -219,7 +219,7 @@ def list_decks(*, source: DeckSource | None = None,
 def list_library(lib: Library) -> list[dict[str, Any]]:
     """Every deck this caller may see, across every owner (ADR 22).
 
-    The library view once decks have owners. One corpus connection for the
+    The library view once decks have owners. One pool connection for the
     whole page rather than one per owner, which is the same N+1 the docstring
     above refuses for the gate — a shelf showing four people's decks must not
     open DuckDB four times to do it.
@@ -244,7 +244,7 @@ def list_library(lib: Library) -> list[dict[str, Any]]:
 
 def _tiles(decks: list[Deck], con: Any, *, writable: bool,
            owner: str | None) -> list[dict[str, Any]]:
-    """The shelf's payload for a run of decks sharing one owner and corpus."""
+    """The shelf's payload for a run of decks sharing one owner and pool."""
     out = []
     for deck in decks:
         art = None
@@ -335,7 +335,7 @@ def _type_parts(type_line: str) -> tuple[list[str], list[str]]:
 
 def commander_dossier(slug: str, *,
                       source: DeckSource | None = None) -> dict[str, Any]:
-    """Everything interesting the corpus knows about a deck's commander.
+    """Everything interesting the pool knows about a deck's commander.
 
     The deck page's header used to say a name and show a painting, which meant
     the one card that governs all 99 others was the card you knew least about.
@@ -346,7 +346,7 @@ def commander_dossier(slug: str, *,
     Trolls" and "Trostani has five other cards" are exactly the kind of claim
     a language model will produce fluently and wrongly, and `CLAUDE.md` rule 1
     exists because that has already happened twice on this project. So the
-    facts are counted here, in Python, over the corpus: a wrong number is a
+    facts are counted here, in Python, over the pool: a wrong number is a
     bug with a reproducible query behind it rather than a confident sentence
     nobody can check.
 
@@ -368,7 +368,7 @@ def commander_dossier(slug: str, *,
     `printings` table, so a 2012 guild leader reads differently from a card
     that arrived last year.
 
-    Returns `None` for `card` when there is no corpus, rather than failing —
+    Returns `None` for `card` when there is no card pool, rather than failing —
     this is a decorative panel and a fresh clone should still show its decks.
     """
     deck = _source(source).get(slug)
@@ -504,7 +504,7 @@ def commander_printings(slug: str, *,
     """Every printing of this deck's commander, newest first.
 
     **Non-digital only.** Arena and MTGO printings have their own art in the
-    corpus and are not things you can put in a sleeve, so offering one as a
+    pool and are not things you can put in a sleeve, so offering one as a
     deck's art is offering something that does not exist as a card. The count
     the maintainer will recognise -- Goreclaw has twelve, Gyome three -- is the
     physical count, and this is what makes it so.
@@ -566,7 +566,7 @@ def _chosen_art(deck: Any, con: Any) -> dict[str, Any] | None:
     """The printing this deck picked for its commander, if it picked one.
 
     Returns None for the common case -- no choice made -- so every caller's
-    fallback is the corpus's default printing, unchanged. A choice pointing at
+    fallback is the pool's default printing, unchanged. A choice pointing at
     a printing that no longer exists also returns None rather than blanking
     the art: a stale id is a deck showing its default, not a deck with no
     commander picture.
@@ -589,7 +589,7 @@ def get_deck(slug: str, *, source: DeckSource | None = None,
     deck = decks.get(slug)
     con = _connect()
     try:
-        cards = _corpus_for(deck, con)
+        cards = _pool_for(deck, con)
         commander_rec = cards.get(deck.commander[0]) if deck.commander else None
         commander_card = _card_json(
             type("E", (), {"name": deck.commander[0], "category": "commander",
@@ -639,7 +639,7 @@ def get_deck(slug: str, *, source: DeckSource | None = None,
             "commander_card": commander_card,
             "cards": [_card_json(e, cards.get(e.name)) for e in deck.cards],
             "swap_board": [_card_json(e, cards.get(e.name)) for e in deck.swap_board],
-            "corpus_available": con is not None,
+            "pool_available": con is not None,
         }
     finally:
         if con is not None:
@@ -650,7 +650,7 @@ def validate_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, A
     deck = _source(source).get(slug)
     con = _connect()
     try:
-        cards = _corpus_for(deck, con) if con is not None else None
+        cards = _pool_for(deck, con) if con is not None else None
         rep = validate(deck, cards)
         return {
             "ok": rep.ok,
@@ -715,11 +715,11 @@ def import_deck(*, text: str, slug: str, name: str = "",
 
     con = _connect()
     if con is None:
-        # Without the corpus every name is unknown and no land is filed, so the
+        # Without the pool every name is unknown and no land is filed, so the
         # import would produce a deck whose facts were never checked -- the one
         # thing the gate exists to prevent. Refuse rather than half-do it.
         raise ImportRejected(
-            "importing needs the card corpus -- run `mtglab data refresh`")
+            "importing needs the card pool -- run `mtglab data refresh`")
     try:
         cards = db.get_cards(con, importer.names_in(
             parsed, commander=commander, companion=companion or None))
@@ -737,7 +737,7 @@ def import_deck(*, text: str, slug: str, name: str = "",
             except DeckExists as exc:
                 raise ImportRejected(f"a deck called {slug!r} already exists") from exc
 
-        gate = validate(report.deck, _corpus_for(report.deck, con))
+        gate = validate(report.deck, _pool_for(report.deck, con))
         return {
             "slug": slug,
             "owner": owner,
@@ -821,14 +821,14 @@ def create_deck(*, slug: str, name: str = "", commander: list[str] | None = None
         # Same refusal as import, for the same reason: a deck whose commander
         # was never checked is a deck whose colour identity is a guess.
         raise CreateRejected(
-            "creating a deck needs the card corpus -- run `mtglab data refresh`")
+            "creating a deck needs the card pool -- run `mtglab data refresh`")
     try:
         names = [*commander] + ([companion] if companion else [])
         found = db.get_cards(con, names)
         missing = [n for n in names if n not in found]
         if missing:
             raise CreateRejected(
-                "not in the corpus: " + ", ".join(sorted(missing)))
+                "not in the pool: " + ", ".join(sorted(missing)))
 
         paired = len(commander) == 2
         for cmd in commander:
@@ -1072,7 +1072,7 @@ def claude_interview(*, slug: str, card: str, requested: Any = None,
     """Ask the rationale interview about one card. Returns questions.
 
     The whole of this project's Claude surface, so far. It reads the deck, the
-    corpus and the gate, and it comes back with things to ask yourself. It
+    pool and the gate, and it comes back with things to ask yourself. It
     cannot write anything -- not because this function declines to, but because
     nothing under `mtglab.claude` can name a write path at all (ADR 15).
     """
@@ -1087,7 +1087,7 @@ def claude_interview(*, slug: str, card: str, requested: Any = None,
         raise
     except ModeExhausted as exc:
         raise ClaudeFailed(str(exc)) from exc
-    except Exception as exc:                                       # noqa: BLE001
+    except Exception as exc:
         # Broad on purpose, and narrow in effect: everything reaching here is
         # the SDK failing, and `explain` is the function that already knows how
         # to turn a 401 into "your key may have expired" rather than a stack
@@ -1115,7 +1115,7 @@ def claude_dossier(*, slug: str, requested: Any = None, refresh: bool = False,
         raise
     except ModeExhausted as exc:
         raise ClaudeFailed(str(exc)) from exc
-    except Exception as exc:                                       # noqa: BLE001
+    except Exception as exc:
         raise ClaudeFailed(claude_client.explain(exc)) from exc
 
 
@@ -1165,7 +1165,7 @@ def claude_dossier_cached(*, slug: str,
 def color_taxonomy() -> dict[str, Any]:
     """The 32 colour combinations, the five colours, and the three eras.
 
-    Pure reference data -- no corpus, no deck source, no network. It is the
+    Pure reference data -- no card pool, no deck source, no network. It is the
     vocabulary the create flow teaches, and it is the same table the 32 Deck
     Challenge is scored against.
     """
@@ -1189,7 +1189,7 @@ def color_taxonomy() -> dict[str, Any]:
             "verified_by": c.verified_by,
             "lore": c.lore,
             # Names and roles only. The cards themselves come from
-            # `combination_detail` below, which needs a corpus -- this payload
+            # `combination_detail` below, which needs a card pool -- this payload
             # deliberately still does not.
             "champions": [{"card": ch.card, "role": ch.role}
                           for ch in c.champions],
@@ -1200,7 +1200,7 @@ def color_taxonomy() -> dict[str, Any]:
 
 def glossary() -> dict[str, Any]:
     """The vocabulary. Same properties as the taxonomy above: reference data,
-    no corpus, no deck source, no network."""
+    no card pool, no deck source, no network."""
     return {
         "sections": [{"key": s, "label": gloss.SECTION_LABELS[s],
                       "blurb": gloss.SECTION_BLURBS[s]}
@@ -1215,14 +1215,14 @@ def combination_detail(key: str) -> dict[str, Any]:
     """One of the 32, with its champions and signature cards resolved.
 
     The split from `color_taxonomy` is the point. That payload is the table and
-    works on a fresh clone; this one asks the corpus, so it is where every card
+    works on a fresh clone; this one asks the pool, so it is where every card
     fact enters. A named card that does not resolve is **dropped and counted**
     rather than rendered from the name alone -- the instrument ADR 19 built for
     the dossier's rivals, pointed at reference data this time, because a
     misspelled name here would otherwise render as a confident empty card.
 
     `exact_total` is counted rather than stored, and it teaches something the
-    prose cannot: exactly two cards in the corpus have the Artifice identity,
+    prose cannot: exactly two cards in the pool have the Artifice identity,
     which is a sharper statement of what a four-colour slot is than any
     paragraph about refusing green.
     """
@@ -1243,7 +1243,7 @@ def combination_detail(key: str) -> dict[str, Any]:
     }
     con = _connect()
     if con is None:
-        return {**base, "corpus": False, "champions": [], "signature": [],
+        return {**base, "pool": False, "champions": [], "signature": [],
                 "dropped": 0, "exact_total": None}
     try:
         wanted = [ch.card for ch in combo.champions] + list(combo.signature)
@@ -1277,7 +1277,7 @@ def combination_detail(key: str) -> dict[str, Any]:
     finally:
         con.close()
 
-    return {**base, "corpus": True, "champions": champions,
+    return {**base, "pool": True, "champions": champions,
             "signature": signature, "dropped": dropped,
             "exact_total": total}
 
@@ -1286,7 +1286,7 @@ def challenge_progress(*, source: DeckSource | None = None) -> dict[str, Any]:
     """Which of the 32 slots the library has filled, and which are empty.
 
     A deck's slot is `colors.of(its colour identity)`, and that identity comes
-    from the commander via the corpus -- so without one this reports the slots
+    from the commander via the pool -- so without one this reports the slots
     as unknown rather than inventing them from the deck file.
     """
     decks = _source(source)
@@ -1309,7 +1309,7 @@ def challenge_progress(*, source: DeckSource | None = None) -> dict[str, Any]:
             con.close()
 
     return {
-        "corpus": con is not None or bool(filled),
+        "pool": con is not None or bool(filled),
         "filled": len(filled),
         "total": len(colors.COMBINATIONS),
         "slots": [{
@@ -1371,7 +1371,7 @@ def _for_writing(source: DeckSource | None,
         # which is #80's answer and still the right one for a deck the caller
         # has just been listed.
         #
-        # Still ahead of any corpus work either way, so #80's other property
+        # Still ahead of any pool work either way, so #80's other property
         # holds: the refusal does not depend on how far the edit would have
         # got, and a delete cannot fail after the deck has moved.
         if getattr(decks, "hides_decks", False) and subject != _WHOLE_LIBRARY:
@@ -1381,7 +1381,7 @@ def _for_writing(source: DeckSource | None,
 
 
 def _identity_of(deck: Deck, con: DuckDBPyConnection) -> frozenset[str]:
-    """The commander's colour identity, from the corpus.
+    """The commander's colour identity, from the pool.
 
     Rule 2: read off Scryfall's `color_identity`, never derived from the mana
     cost. It already accounts for back faces, reminder text and land types --
@@ -1414,7 +1414,7 @@ def _commit(slug: str, decks: DeckSource, updated: str,
     after = decks.get(slug)
     con = _connect()
     try:
-        report = validate(after, _corpus_for(after, con))
+        report = validate(after, _pool_for(after, con))
     finally:
         if con is not None:
             con.close()
@@ -1450,7 +1450,7 @@ def add_card(slug: str, *, name: str, category: str, why: str = "",
              source: DeckSource | None = None) -> dict[str, Any]:
     """Put a card into the 99 or onto the swap board.
 
-    Checked against the corpus before anything is written -- the card has to
+    Checked against the pool before anything is written -- the card has to
     exist, be legal in Commander, and sit inside the commander's colour
     identity. That is rule 1 applied to a write: a card nobody looked up is a
     card whose legality is a guess.
@@ -1467,12 +1467,12 @@ def add_card(slug: str, *, name: str, category: str, why: str = "",
 
     con = _connect()
     if con is None:
-        raise EditRejected("adding a card needs the card corpus -- "
+        raise EditRejected("adding a card needs the card pool -- "
                            "run `mtglab data refresh`")
     try:
         rec = db.get_cards(con, [name]).get(name)
         if rec is None:
-            raise EditRejected(f"{name!r} is not a card the corpus knows")
+            raise EditRejected(f"{name!r} is not a card the pool knows")
         if not rec.legal_commander:
             raise EditRejected(f"{rec.name} is not legal in Commander")
 
@@ -1500,7 +1500,7 @@ def remove_card(slug: str, *, name: str,
                 source: DeckSource | None = None) -> dict[str, Any]:
     """Take a card out of the 99 or the swap board.
 
-    Needs no corpus: removing a card is a fact about this deck file, not about
+    Needs no card pool: removing a card is a fact about this deck file, not about
     Magic. That matters because it means a deck can still be pruned on a
     machine that has never run `data refresh`.
     """
@@ -1545,7 +1545,7 @@ def set_card_field(slug: str, *, name: str, field: str, value: Any,
 def _check_printing(deck: Any, printing_id: str) -> None:
     """Refuse an art id that is not a printing of this deck's commander.
 
-    Silence when there is no corpus: a fresh clone cannot check, and refusing
+    Silence when there is no card pool: a fresh clone cannot check, and refusing
     every art change on a machine without a 500MB download would be a worse
     answer than accepting one that renders as the default.
     """
@@ -1576,7 +1576,7 @@ def set_deck_field(slug: str, *, field: str, value: Any,
     deck is never written into a state its author has to undo.
 
     `commander_art` is checked here rather than in `edit.py`, because it is the
-    one settable field whose validity is a question for the corpus: the editor
+    one settable field whose validity is a question for the pool: the editor
     can tell a printing id from a typo by its shape, and only a query can tell
     whether that id is a printing *of this commander*. Pointing a deck at some
     other card's art would be accepted by every check that did not ask.
@@ -1644,12 +1644,12 @@ def swap_card(slug: str, *, out: str, into: str, why: str,
 
     con = _connect()
     if con is None:
-        raise SwapRejected("swapping needs the card corpus -- run `mtglab data refresh`")
+        raise SwapRejected("swapping needs the card pool -- run `mtglab data refresh`")
     try:
         found = db.get_cards(con, [into])
         rec = found.get(into)
         if rec is None:
-            raise SwapRejected(f"{into!r} is not a card the corpus knows")
+            raise SwapRejected(f"{into!r} is not a card the pool knows")
         if not rec.legal_commander:
             raise SwapRejected(f"{rec.name} is not legal in Commander")
 
@@ -1688,9 +1688,9 @@ def suggestions_for(slug: str, *, source: DeckSource | None = None,
     deck = _source(source).get(slug)
     con = _connect()
     if con is None:
-        return {"slug": slug, "corpus_available": False, "targets": []}
+        return {"slug": slug, "pool_available": False, "targets": []}
     try:
-        cards = _corpus_for(deck, con)
+        cards = _pool_for(deck, con)
         rep = validate(deck, cards)
         fixable = [(i.card, i.code) for i in rep.errors
                    if i.card and i.code in ("banned", "color-identity")]
@@ -1716,7 +1716,7 @@ def suggestions_for(slug: str, *, source: DeckSource | None = None,
                     "reasons": list(c.reasons),
                 } for c in candidates],
             })
-        return {"slug": slug, "corpus_available": True, "targets": targets}
+        return {"slug": slug, "pool_available": True, "targets": targets}
     finally:
         con.close()
 
@@ -1725,7 +1725,7 @@ def stats_for(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
     deck = _source(source).get(slug)
     con = _connect()
     try:
-        stats = deck_stats(deck, _corpus_for(deck, con))
+        stats = deck_stats(deck, _pool_for(deck, con))
         # Dataclasses in the curve buckets need flattening for JSON.
         stats["curve"] = {
             "average_mv": stats["curve"]["average_mv"],
@@ -1769,12 +1769,12 @@ def cards_named(*, names: list[str]) -> dict[str, Any]:
     """
     wanted = [n.strip() for n in names if n and n.strip()][:MAX_NAMED_CARDS]
     if not wanted:
-        return {"cards": [], "not_found": [], "corpus_available": True}
+        return {"cards": [], "not_found": [], "pool_available": True}
 
     con = _connect()
     if con is None:
-        return {"cards": [], "not_found": wanted, "corpus_available": False,
-                "message": "no corpus yet -- run `mtglab data refresh`"}
+        return {"cards": [], "not_found": wanted, "pool_available": False,
+                "message": "no card pool yet -- run `mtglab data refresh`"}
     try:
         found = db.get_cards(con, wanted)
         cards = []
@@ -1783,7 +1783,7 @@ def cards_named(*, names: list[str]) -> dict[str, Any]:
             if rec is None:
                 continue
             cards.append({
-                # The corpus's spelling, not the caller's. Asked for "arahbo,
+                # The pool's spelling, not the caller's. Asked for "arahbo,
                 # roar of the world" you get the real name back, which is what
                 # any follow-up edit has to be keyed on.
                 "name": rec.name,
@@ -1819,7 +1819,7 @@ def cards_named(*, names: list[str]) -> dict[str, Any]:
         return {
             "cards": cards,
             "not_found": [n for n in wanted if n not in found],
-            "corpus_available": True,
+            "pool_available": True,
         }
     finally:
         con.close()
@@ -1830,7 +1830,7 @@ def search_cards(*, q: str = "", identity: str = "", type_line: str = "",
                  sort: str = "edhrec", limit: int = 60,
                  identity_exact: bool = False,
                  commanders_only: bool = False) -> dict[str, Any]:
-    """Corpus search: the 'deep hits from the whole history' tool.
+    """Pool search: the 'deep hits from the whole history' tool.
 
     `identity` is a subset filter, not an exact match -- passing "BG" returns
     every card legal in a Golgari deck, which includes colorless and mono
@@ -1850,7 +1850,7 @@ def search_cards(*, q: str = "", identity: str = "", type_line: str = "",
     con = _connect()
     if con is None:
         return {"cards": [], "total": 0,
-                "message": "no corpus yet -- run `mtglab data refresh`"}
+                "message": "no card pool yet -- run `mtglab data refresh`"}
     try:
         where = ["json_extract_string(legalities, 'commander') = 'legal'"]
         params: list[Any] = []
@@ -1936,7 +1936,7 @@ def upcoming_sets(*, force: bool = False) -> dict[str, Any]:
     """Unreleased sets, live from Scryfall, cached for the process lifetime.
 
     This is the one route that reaches the network on demand. Spoiler scanning
-    is meaningless against a corpus that by definition does not have the cards
+    is meaningless against a card pool that by definition does not have the cards
     yet, so the set list has to come from upstream.
     """
     today = date.today().isoformat()

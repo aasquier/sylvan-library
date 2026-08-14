@@ -82,7 +82,7 @@ const DECK = {
   warnings: 0,
   notes: {},
   commander_card: null,
-  corpus_available: true,
+  pool_available: true,
   swap_board: [],
   cards: [{
     name: 'Primeval Titan', category: 'ramp', why: 'Ramp and threat in one card.',
@@ -105,7 +105,7 @@ const REPORT: ValidationReport = {
 
 const SHORTLIST: Suggestions = {
   slug: 'goreclaw-stompy',
-  corpus_available: true,
+  pool_available: true,
   targets: [{
     card: 'Primeval Titan',
     code: 'banned',
@@ -121,7 +121,7 @@ const SHORTLIST: Suggestions = {
   }],
 }
 
-/** What `service.commander_dossier` counts off the corpus. */
+/** What `service.commander_dossier` counts off the pool. */
 const DOSSIER: CommanderDossier = {
   slug: 'goreclaw-stompy',
   card: null,
@@ -222,7 +222,7 @@ const WRITTEN_DOSSIER = {
   asked: true, reason: '', model: 'claude-sonnet-5',
   usage: { input_tokens: 800, output_tokens: 900 },
   never: 'This is Claude’s writing over cited pages. The card facts above it '
-         + 'are the corpus’s.',
+         + 'are the pool’s.',
   dossier: {
     who: { prose: 'A bear god of Qal Sisma.', source_ids: ['s1'] },
     archetype: { name: 'Mono-green stompy',
@@ -367,7 +367,7 @@ describe('DeckDetail validation tab', () => {
 
   it('shows the error alone when there is no shortlist for it', async () => {
     vi.mocked(api.suggestions).mockResolvedValue({
-      slug: 'goreclaw-stompy', corpus_available: false, targets: [],
+      slug: 'goreclaw-stompy', pool_available: false, targets: [],
     })
     renderDeck()
     await screen.findByRole('button', { name: 'Validation' })
@@ -533,7 +533,7 @@ describe('DeckDetail rationale editor', () => {
   })
 
   /**
-   * The rationale interview, in the same column as the corpus text.
+   * The rationale interview, in the same column as the pool text.
    *
    * The test that matters here is the second one: asking for questions must
    * leave the textarea exactly as the user left it. Every other guard on this
@@ -625,7 +625,7 @@ describe('DeckDetail rationale editor', () => {
       .toBeNull()
   })
 
-  it('shows the card as the corpus has it, beside the box', async () => {
+  it('shows the card as the pool has it, beside the box', async () => {
     // Rule 1 made useful: you argue about the card against what it says, not
     // against what you remember it saying. Asserted on the type line because
     // `ManaText` splits the oracle text into symbol elements, so a plain
@@ -633,7 +633,7 @@ describe('DeckDetail rationale editor', () => {
     vi.mocked(api.deck).mockResolvedValue(DRAFT)
     const row = await openEditorFor('Sol Ring')
     expect(within(row).getByText('Artifact')).toBeTruthy()
-    expect(within(row).queryByText(/No corpus text/)).toBeNull()
+    expect(within(row).queryByText(/No card text in the pool/)).toBeNull()
   })
 
   it('surfaces a refusal instead of pretending the edit landed', async () => {
@@ -775,8 +775,8 @@ describe('DeckDetail hero', () => {
     expect(card.getAttribute('src')).toBe('https://example.test/goreclaw-full.jpg')
   })
 
-  it('renders without a commander card when the corpus has no art', async () => {
-    // A fresh clone has no corpus, so `commander_card` is null and the hero
+  it('renders without a commander card when the pool has no art', async () => {
+    // A fresh clone has no card pool, so `commander_card` is null and the hero
     // has nothing to lift out of the band. It must still render the deck.
     renderDeck()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
@@ -785,10 +785,10 @@ describe('DeckDetail hero', () => {
 })
 
 /**
- * The corpus facts under the header.
+ * The pool facts under the header.
  *
  * Every number in this panel was counted by `service.commander_dossier` over
- * the corpus, and these tests exist to keep it that way: the panel renders
+ * the pool, and these tests exist to keep it that way: the panel renders
  * what it was handed and computes nothing, so a wrong figure is always a bug
  * in a query somebody can re-run.
  */
@@ -811,7 +811,7 @@ describe('DeckDetail commander facts', () => {
     expect(await screen.findByText('Surrak and Goreclaw')).toBeTruthy()
   })
 
-  it('renders nothing at all when the corpus had nothing to say', async () => {
+  it('renders nothing at all when the pool had nothing to say', async () => {
     // A fresh clone. An empty "About this commander" heading is worse than
     // no heading, and the deck page must still work.
     vi.mocked(api.commander).mockResolvedValue({
@@ -885,8 +885,8 @@ describe('DeckDetail commander dossier', () => {
   })
 
   it('renders a rival as a real card with its cost', async () => {
-    // Rivals survived a corpus lookup server-side, so the name and cost here
-    // are the corpus's. A reader who doubts the sentence can hover the card.
+    // Rivals survived a card pool lookup server-side, so the name and cost here
+    // are the pool's. A reader who doubts the sentence can hover the card.
     renderDeck()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
@@ -994,7 +994,7 @@ describe('DeckDetail commander dossier', () => {
   })
 
   it('keeps the counted strip and the written prose apart', async () => {
-    // The whole point of ADR 19's UI half: the corpus's counted facts and
+    // The whole point of ADR 19's UI half: the pool's counted facts and
     // Claude's prose are adjacent, never merged into one voice.
     renderDeck()
     expect(await screen.findByText(/about this commander/i)).toBeTruthy()

@@ -136,11 +136,11 @@ describe('followJob', () => {
   it('rejects with the job error when the job fails', async () => {
     respondWith(job({
       status: 'error',
-      error: 'simulation needs the card corpus -- run `mtglab data refresh`',
+      error: 'simulation needs the card pool -- run `mtglab data refresh`',
     }))
 
     const { promise } = followJob('j1', () => {})
-    await expect(promise).rejects.toThrow(/needs the card corpus/)
+    await expect(promise).rejects.toThrow(/needs the card pool/)
   })
 
   it('rejects with a fallback message when a failed job carries no error text', async () => {

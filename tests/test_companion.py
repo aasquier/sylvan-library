@@ -21,7 +21,7 @@ from mtglab.decks import companion
 from mtglab.decks.model import CardEntry, Deck
 from mtglab.decks.validate import validate
 
-# Real oracle sentences, copied from the corpus. The checkers parse these, so
+# Real oracle sentences, copied from the pool. The checkers parse these, so
 # paraphrasing them here would test the wrong thing.
 CONDITIONS = {
     "Gyruda, Doom of Depths":
@@ -79,9 +79,9 @@ def comp(name: str, **kw) -> Fake:
 
 def run(name, cards):
     """Check `name` against a starting deck given as {card_name: Fake}."""
-    corpus = dict(cards)
-    corpus[name] = comp(name)
-    return companion.check(name, list(cards.items()), corpus)
+    pool = dict(cards)
+    pool[name] = comp(name)
+    return companion.check(name, list(cards.items()), pool)
 
 
 # ------------------------------------------------------- condition parsing
@@ -210,9 +210,9 @@ def test_zirda_is_heuristic_and_reports_inexact():
 def test_an_unknown_companion_warns_rather_than_passing_silently():
     """The single most important behaviour here. Reporting 'no violations'
     for a rule that was never evaluated is worse than reporting nothing."""
-    corpus = {"Mystery": comp("Mystery")}
-    corpus["Mystery"].oracle_text = "Companion — Some rule we do not implement."
-    res = companion.check("Mystery", [], corpus)
+    pool = {"Mystery": comp("Mystery")}
+    pool["Mystery"].oracle_text = "Companion — Some rule we do not implement."
+    res = companion.check("Mystery", [], pool)
     assert not res.ok
     assert res.unsupported
     assert res.violations == []
@@ -220,16 +220,16 @@ def test_an_unknown_companion_warns_rather_than_passing_silently():
 
 def test_conditions_about_printings_report_that_they_cannot_be_checked():
     """Expansion symbols and retro frames are per-printing, not oracle data."""
-    corpus = {"Treizeci, Sun of Serra": Fake(
+    pool = {"Treizeci, Sun of Serra": Fake(
         "Treizeci, Sun of Serra",
         oracle_text="Companion — Your starting deck contains only nostalgic cards.")}
-    res = companion.check("Treizeci, Sun of Serra", [], corpus)
+    res = companion.check("Treizeci, Sun of Serra", [], pool)
     assert "per-printing" in res.unsupported
 
 
 def test_a_card_with_no_companion_ability_is_reported():
-    corpus = {"Bear": Fake("Bear", oracle_text="Flying")}
-    res = companion.check("Bear", [], corpus)
+    pool = {"Bear": Fake("Bear", oracle_text="Flying")}
+    res = companion.check("Bear", [], pool)
     assert "no Companion ability" in res.unsupported
 
 
@@ -241,7 +241,7 @@ def deck_with(companion_name, cards, commander="Arahbo, Roar of the World"):
                 companion=companion_name, cards=entries)
 
 
-def corpus_with(deck, cards, companion_name, **kw):
+def pool_with(deck, cards, companion_name, **kw):
     out = dict(cards)
     out[deck.commander[0]] = Fake(deck.commander[0],
                                   "Legendary Creature — Cat Avatar")
@@ -253,7 +253,7 @@ def test_gate_reports_a_companion_restriction_as_an_error():
     cards = {"Ocelot": Fake("Ocelot", "Creature — Cat"),
              "Elves": Fake("Elves", "Creature — Elf")}
     deck = deck_with("Kaheera, the Orphanguard", cards)
-    rep = validate(deck, corpus_with(deck, cards, "Kaheera, the Orphanguard"),
+    rep = validate(deck, pool_with(deck, cards, "Kaheera, the Orphanguard"),
                    expected_size=2)
     codes = [i.code for i in rep.errors]
     assert "companion-restriction" in codes
@@ -266,10 +266,10 @@ def test_gate_counts_the_commander_as_part_of_the_starting_deck():
     breaks Kaheera even when all 99 are Cats."""
     cards = {"Ocelot": Fake("Ocelot", "Creature — Cat")}
     deck = deck_with("Kaheera, the Orphanguard", cards, commander="Gyome")
-    corpus = dict(cards)
-    corpus["Gyome"] = Fake("Gyome", "Legendary Creature — Troll Chef")
-    corpus["Kaheera, the Orphanguard"] = comp("Kaheera, the Orphanguard")
-    rep = validate(deck, corpus, expected_size=1)
+    pool = dict(cards)
+    pool["Gyome"] = Fake("Gyome", "Legendary Creature — Troll Chef")
+    pool["Kaheera, the Orphanguard"] = comp("Kaheera, the Orphanguard")
+    rep = validate(deck, pool, expected_size=1)
     assert any(i.code == "companion-restriction" and "Gyome" in i.message
                for i in rep.errors)
 
@@ -277,7 +277,7 @@ def test_gate_counts_the_commander_as_part_of_the_starting_deck():
 def test_gate_downgrades_a_heuristic_check_to_a_warning():
     cards = {"Vanilla": Fake("Vanilla", "Creature — Cat", oracle_text="Flying")}
     deck = deck_with("Zirda, the Dawnwaker", cards)
-    rep = validate(deck, corpus_with(deck, cards, "Zirda, the Dawnwaker"),
+    rep = validate(deck, pool_with(deck, cards, "Zirda, the Dawnwaker"),
                    expected_size=1)
     assert not any(i.code == "companion-restriction" for i in rep.errors)
     assert any(i.code == "companion-restriction" for i in rep.warnings)
@@ -286,25 +286,25 @@ def test_gate_downgrades_a_heuristic_check_to_a_warning():
 def test_gate_rejects_a_companion_outside_the_commanders_identity():
     cards = {"Ocelot": Fake("Ocelot", "Creature — Cat")}
     deck = deck_with("Kaheera, the Orphanguard", cards)
-    corpus = corpus_with(deck, cards, "Kaheera, the Orphanguard",
+    pool = pool_with(deck, cards, "Kaheera, the Orphanguard",
                          color_identity=frozenset("UB"))
-    rep = validate(deck, corpus, expected_size=1)
+    rep = validate(deck, pool, expected_size=1)
     assert any(i.code == "companion-color-identity" for i in rep.errors)
 
 
 def test_gate_rejects_a_companion_that_is_banned():
     cards = {"Ocelot": Fake("Ocelot", "Creature — Cat")}
     deck = deck_with("Kaheera, the Orphanguard", cards)
-    corpus = corpus_with(deck, cards, "Kaheera, the Orphanguard",
+    pool = pool_with(deck, cards, "Kaheera, the Orphanguard",
                          legal_commander=False)
-    rep = validate(deck, corpus, expected_size=1)
+    rep = validate(deck, pool, expected_size=1)
     assert any(i.code == "companion-banned" for i in rep.errors)
 
 
 def test_gate_rejects_a_companion_also_present_in_the_99():
     cards = {"Kaheera, the Orphanguard": comp("Kaheera, the Orphanguard")}
     deck = deck_with("Kaheera, the Orphanguard", cards)
-    rep = validate(deck, corpus_with(deck, cards, "Kaheera, the Orphanguard"),
+    rep = validate(deck, pool_with(deck, cards, "Kaheera, the Orphanguard"),
                    expected_size=1)
     assert any(i.code == "companion-in-99" for i in rep.errors)
 
@@ -312,7 +312,7 @@ def test_gate_rejects_a_companion_also_present_in_the_99():
 def test_yorion_raises_the_expected_deck_size_by_twenty():
     cards = {"Ocelot": Fake("Ocelot", "Creature — Cat")}
     deck = deck_with("Yorion, Sky Nomad", cards)
-    rep = validate(deck, corpus_with(deck, cards, "Yorion, Sky Nomad"),
+    rep = validate(deck, pool_with(deck, cards, "Yorion, Sky Nomad"),
                    expected_size=1)
     size = [i for i in rep.errors if i.code == "deck-size"]
     assert size, "a 1-card Yorion deck should fail the size check"
@@ -323,16 +323,16 @@ def test_yorion_raises_the_expected_deck_size_by_twenty():
 def test_a_deck_with_no_companion_is_untouched():
     cards = {"Ocelot": Fake("Ocelot", "Creature — Cat")}
     deck = deck_with(None, cards)
-    corpus = dict(cards)
-    corpus[deck.commander[0]] = Fake(deck.commander[0],
+    pool = dict(cards)
+    pool[deck.commander[0]] = Fake(deck.commander[0],
                                      "Legendary Creature — Cat Avatar")
-    rep = validate(deck, corpus, expected_size=1)
+    rep = validate(deck, pool, expected_size=1)
     assert not [i for i in rep.issues if i.code.startswith("companion")]
 
 
 @pytest.mark.parametrize("name", sorted(CONDITIONS))
 def test_every_condition_in_this_file_has_a_checker(name):
-    """Guards against adding a companion to the corpus expectations without
+    """Guards against adding a companion to the pool expectations without
     teaching the gate how to check it."""
     res = companion.check(name, [], {name: comp(name)})
     assert not res.unsupported, f"{name}: {res.unsupported}"

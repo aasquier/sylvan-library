@@ -33,13 +33,13 @@ pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 pytest.importorskip("argon2")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-import tiny_corpus  # noqa: E402
-from mtglab import config  # noqa: E402
-from mtglab.api import jobs  # noqa: E402
-from mtglab.api.app import create_app  # noqa: E402
-from mtglab.auth import db, users  # noqa: E402
+import tiny_pool
+from mtglab import config
+from mtglab.api import jobs
+from mtglab.api.app import create_app
+from mtglab.auth import db, users
 
 OWNER_PASSWORD = "correct-horse-battery-staple"
 GUEST_PASSWORD = "a-different-long-passphrase"
@@ -272,18 +272,18 @@ if __name__ == "__main__":                                    # pragma: no cover
 # --------------------------------------------- ADR 22: a guest has a library
 
 @pytest.fixture
-def corpus(instance):
-    """A queryable corpus inside the instance's scratch data directory.
+def pool(instance):
+    """A queryable pool inside the instance's scratch data directory.
 
     Depends on `instance` so it is built inside that fixture's
     `config.use_paths` and both share one app. Creating a deck is refused
-    without a corpus -- a commander nobody checked is a colour identity nobody
+    without a card pool -- a commander nobody checked is a colour identity nobody
     checked -- so only the two tests that create decks pay for it.
     """
-    return tiny_corpus.build(config.DB_PATH)
+    return tiny_pool.build(config.DB_PATH)
 
 
-def test_a_guest_may_create_in_their_own_library(instance, corpus):
+def test_a_guest_may_create_in_their_own_library(instance, pool):
     """The consequence #80 deliberately deferred, now built.
 
     A guest could not create a deck at all while there was nowhere to put one;
@@ -307,7 +307,7 @@ def test_a_guest_may_create_in_their_own_library(instance, corpus):
 
 
 def test_a_guest_still_cannot_create_inside_the_curated_library(
-        instance, corpus):
+        instance, pool):
     """Creating writes to the caller's own tier and cannot be aimed elsewhere.
 
     `POST /api/decks` carries no owner segment at all, which is the structural
@@ -325,7 +325,7 @@ def test_a_guest_still_cannot_create_inside_the_curated_library(
 
 # --------------------------------------------------- the shelf's two halves
 
-def test_the_listing_marks_the_showcase_and_nothing_else(instance, corpus):
+def test_the_listing_marks_the_showcase_and_nothing_else(instance, pool):
     """`GET /api/decks` says which owner the curated six belong to (ADR 22).
 
     The browse tab needs three groups out of one flat list -- yours, the
@@ -354,7 +354,7 @@ def test_the_listing_marks_the_showcase_and_nothing_else(instance, corpus):
     assert tiles["theirs"]["writable"] is True
 
 
-def test_a_private_deck_is_absent_from_somebody_else_s_shelf(instance, corpus):
+def test_a_private_deck_is_absent_from_somebody_else_s_shelf(instance, pool):
     """And so cannot be marked anything at all.
 
     The tile's `shared` flag is only ever a fact about a deck the caller can

@@ -110,7 +110,7 @@ function ShareToggle({ deck, deckRef, onChanged }: {
  * these six commanders do not have.
  *
  * Everything below the fold is `CommanderDossier`, and every number in it was
- * counted over the corpus by `service.commander_dossier`. That is rule 1 in
+ * counted over the pool by `service.commander_dossier`. That is rule 1 in
  * the place it would have been easiest to ignore: "one of eight legendary
  * Trolls" is exactly the sentence a model writes fluently and wrongly.
  */
@@ -264,7 +264,7 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
           adjacency plus the label the panel carries. */}
       {/* Gated on the deck's own commander list, not on `commander_card`.
           The dossier is about the character, and the deck knows its name
-          without a corpus — on a fresh clone the panel should still say what
+          without a card pool — on a fresh clone the panel should still say what
           it is rather than vanish along with the card row. */}
       {deck.commander.length > 0 && (
         <CommanderDossierPanel
@@ -281,10 +281,10 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
 }
 
 /**
- * The strip of corpus facts under the header.
+ * The strip of pool facts under the header.
  *
  * Renders nothing at all when it has nothing to say — a deck on a clone with
- * no corpus, or a commander whose type line has no subtypes and whose name
+ * no card pool, or a commander whose type line has no subtypes and whose name
  * matches no other card. An empty "About" heading is worse than no heading.
  */
 function CommanderFacts({ dossier }: { dossier: CommanderDossier }) {
@@ -378,7 +378,7 @@ export default function DeckDetail() {
   const { owner = '', slug = '' } = useParams()
   // Memoised because it is a dependency of the effects below, and a fresh
   // object literal every render would re-run all of them on every keystroke
-  // anywhere on the page — including the one that costs a corpus query.
+  // anywhere on the page — including the one that costs a card pool query.
   const deckRef = useMemo<DeckRef>(() => ({ owner, slug }), [owner, slug])
   const [deck, setDeck] = useState<Deck | null>(null)
   const [stats, setStats] = useState<DeckStats | null>(null)
@@ -388,7 +388,7 @@ export default function DeckDetail() {
   const [groupBy, setGroupBy] = useState('category')
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null)
   // Fetched alongside the deck rather than with it, and never awaited with
-  // it: the panel it fills is decorative and runs several extra corpus
+  // it: the panel it fills is decorative and runs several extra pool
   // queries, so a slow one must not hold up the 99. A failure is silent for
   // the same reason — the deck is still perfectly usable without trivia.
   const [dossier, setDossier] = useState<CommanderDossier | null>(null)
@@ -685,9 +685,9 @@ export default function DeckDetail() {
                 </label>
               )}
             </div>
-            {!deck.corpus_available && (
+            {!deck.pool_available && (
               <span className="text-xs" style={{ color: 'var(--status-warning)' }}>
-                No corpus — card text and art unavailable.
+                No card pool — card text and art unavailable.
               </span>
             )}
           </div>
@@ -704,7 +704,7 @@ export default function DeckDetail() {
           {deck.writable && claudeReady && (
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Stuck on a <code>why</code>? <strong>Ask Claude</strong> on any card
-              and it will interview you about that slot — corpus text, the gate’s
+              and it will interview you about that slot — pool text, the gate’s
               verdict and the neighbours it competes with. It asks; you answer.
               No stance lets it write the rationale.
             </p>

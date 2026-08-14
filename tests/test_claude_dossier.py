@@ -4,7 +4,7 @@ No network, no key, no tokens — same rule as `test_claude_interview.py`, and
 for the same reason. What is here is the part that has to hold whatever the
 model says, and for this mode that is a larger surface than for the interview,
 because the dossier is the first mode allowed to cite something other than the
-corpus.
+pool.
 
 Three checks carry [ADR 19](../docs/adr/0019-the-dossier-cites-three-sources.md):
 
@@ -13,7 +13,7 @@ Three checks carry [ADR 19](../docs/adr/0019-the-dossier-cites-three-sources.md)
   no citations, so a URL in the payload is a string the model typed and nothing
   more. `keep_sources` is what puts something behind it, and the tests below
   include the case that matters — a real-looking URL that was never fetched.
-* **Every rival is a corpus row or it is not there.** Rule 1, in the sentence
+* **Every rival is a card pool row or it is not there.** Rule 1, in the sentence
   most likely to break it.
 * **No source survived means no dossier.** Rendering one anyway would be the
   unattributed paragraph the ADR rejected, reached by accident.
@@ -31,11 +31,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import tiny_corpus  # noqa: E402
-from mtglab import config  # noqa: E402
-from mtglab.claude import client, dossier, modes, stance, tools  # noqa: E402
-from mtglab.decks.model import Deck  # noqa: E402
-from mtglab.decks.source import MemoryDeckSource  # noqa: E402
+import tiny_pool
+from mtglab import config
+from mtglab.claude import client, dossier, modes, stance, tools
+from mtglab.decks.model import Deck
+from mtglab.decks.source import MemoryDeckSource
 
 DECK_YAML = """\
 slug: mini
@@ -60,10 +60,10 @@ def source(tmp_path):
 
 
 @pytest.fixture
-def corpus(tmp_path):
-    """A real DuckDB corpus, and a scratch `app.db` for the dossier store."""
+def pool(tmp_path):
+    """A real DuckDB pool, and a scratch `app.db` for the dossier store."""
     with config.use_paths(data_dir=tmp_path / "data"):
-        yield tiny_corpus.build(config.DB_PATH)
+        yield tiny_pool.build(config.DB_PATH)
 
 
 @pytest.fixture
@@ -211,7 +211,7 @@ def test_a_section_cannot_cite_a_source_that_was_dropped():
 
 # ----------------------------------------------------- rivals are real cards
 
-def test_a_rival_the_corpus_does_not_have_is_dropped(corpus):
+def test_a_rival_the_pool_does_not_have_is_dropped(pool):
     """Rule 1 in the sentence most likely to break it.
 
     'Gyome's obvious rival is X' is exactly the shape of claim a model
@@ -225,7 +225,7 @@ def test_a_rival_the_corpus_does_not_have_is_dropped(corpus):
     assert dropped == 1
 
 
-def test_a_kept_rival_carries_the_corpus_row(corpus):
+def test_a_kept_rival_carries_the_pool_row(pool):
     """The prose sits next to the real card, which is what lets a reader catch
     a wrong claim about it. A first live run described a rival as making Food
     tokens when it makes Soldiers; the card being right there is the half of
@@ -237,8 +237,8 @@ def test_a_kept_rival_carries_the_corpus_row(corpus):
     assert "trample" in (rivals[0]["oracle_text"] or "").lower()
 
 
-def test_rivals_survive_a_corpus_that_is_not_there(tmp_path):
-    """A fresh clone has no corpus. That is an empty rivals list, not a 500.
+def test_rivals_survive_a_pool_that_is_not_there(tmp_path):
+    """A fresh clone has no card pool. That is an empty rivals list, not a 500.
 
     The scratch data dir is not optional. Without it this reads whatever
     `data/mtg.duckdb` happens to hold on the machine running it — green on a
@@ -252,7 +252,7 @@ def test_rivals_survive_a_corpus_that_is_not_there(tmp_path):
 
 # ----------------------------------------------------------- refusing to lie
 
-def test_no_surviving_source_means_no_dossier(corpus, source, monkeypatch):
+def test_no_surviving_source_means_no_dossier(pool, source, monkeypatch):
     """ADR 19: an unsourced dossier is the blended paragraph the design
     rejected, arrived at by accident. It is refused instead."""
     invented = json.dumps({
@@ -272,7 +272,7 @@ def test_no_surviving_source_means_no_dossier(corpus, source, monkeypatch):
     assert "No source survived" in report["reason"]
 
 
-def test_the_dropped_counts_are_reported(corpus, source, monkeypatch):
+def test_the_dropped_counts_are_reported(pool, source, monkeypatch):
     """A number that climbs is a prompt inventing citations. Nobody checks a
     number they cannot see, so it is in the payload."""
     payload = json.dumps({
@@ -299,7 +299,7 @@ def test_the_dropped_counts_are_reported(corpus, source, monkeypatch):
     assert body["who"]["source_ids"] == ["s1"]
 
 
-def test_an_answer_that_does_not_parse_stores_nothing(corpus, source, monkeypatch):
+def test_an_answer_that_does_not_parse_stores_nothing(pool, source, monkeypatch):
     monkeypatch.setattr(dossier, "converse", lambda *a, **k: modes.Turn(
         mode="commander-dossier", model="m", stop_reason="max_tokens",
         text="{\"who\": {\"prose\": \"trunc", tool_calls=[],
@@ -312,7 +312,7 @@ def test_an_answer_that_does_not_parse_stores_nothing(corpus, source, monkeypatc
 
 # ------------------------------------------------------------- the stance
 
-def test_the_stance_being_off_makes_no_call(corpus, source, no_network):
+def test_the_stance_being_off_makes_no_call(pool, source, no_network):
     """`no_network` is the assertion: reaching the API here fails the test."""
     report = dossier.ask("mini", requested="off", source=source)
     assert report["asked"] is False
@@ -320,7 +320,7 @@ def test_the_stance_being_off_makes_no_call(corpus, source, no_network):
     assert report["dossier"] == {}
 
 
-def test_a_stored_dossier_is_served_even_at_stance_off(corpus, source,
+def test_a_stored_dossier_is_served_even_at_stance_off(pool, source,
                                                        no_network):
     """Off means no calls, not a feature that hides what already exists.
 
@@ -328,7 +328,7 @@ def test_a_stored_dossier_is_served_even_at_stance_off(corpus, source,
     nothing, so refusing it would be a different rule than the one ADR 15 set.
     """
     oracle_id = dossier.brief("mini", source=source)["card"]["oracle_id"]
-    assert oracle_id, "the tiny corpus should carry Gyome's oracle id"
+    assert oracle_id, "the tiny pool should carry Gyome's oracle id"
     dossier.put(dossier.cache_key(oracle_id), oracle_id=oracle_id,
                 commander="Gyome, Master Chef",
                 result={"who": {"prose": "stored", "source_ids": []}})
@@ -370,7 +370,7 @@ def test_changing_the_model_invalidates_them_too(monkeypatch):
     assert dossier.cache_key("abc") != before
 
 
-def test_a_dossier_round_trips_through_the_store(corpus):
+def test_a_dossier_round_trips_through_the_store(pool):
     key = dossier.cache_key("oracle-1")
     dossier.put(key, oracle_id="oracle-1", commander="Gyome, Master Chef",
                 result={"who": {"prose": "hello", "source_ids": []}})
@@ -382,7 +382,7 @@ def test_a_dossier_round_trips_through_the_store(corpus):
     assert dossier.get(key) is None
 
 
-def test_a_broken_store_is_a_miss_and_never_an_exception(corpus, monkeypatch):
+def test_a_broken_store_is_a_miss_and_never_an_exception(pool, monkeypatch):
     """A cache that can fail the feature is worse than no cache — the same
     rule `sim/cache.py` holds, for the same reason."""
     import sqlite3
@@ -397,7 +397,7 @@ def test_a_broken_store_is_a_miss_and_never_an_exception(corpus, monkeypatch):
 
 # ------------------------------------------------------------ no commander
 
-def test_a_deck_with_no_commander_is_refused_clearly(tmp_path, corpus):
+def test_a_deck_with_no_commander_is_refused_clearly(tmp_path, pool):
     yaml = DECK_YAML.replace("commander:\n  - Gyome, Master Chef\n",
                              "commander: []\n")
     path = tmp_path / "headless" / "deck.yaml"

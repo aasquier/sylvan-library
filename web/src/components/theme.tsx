@@ -657,7 +657,7 @@ export function ThemeInterview({
               </button>
               <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
                 {/* Measured at three to four minutes: it reads a dozen-odd
-                    pages and checks every legend against the corpus. Saying so
+                    pages and checks every legend against the pool. Saying so
                     is cheaper than a spinner somebody assumes has hung — and
                     the clock on the button is cheaper still, because a number
                     that moves is the difference between slow and stuck. */}

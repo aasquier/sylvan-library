@@ -77,11 +77,11 @@ arc; this is what the next few sessions actually do.
 
    **2 — The commander dossier, and alternative arts.** Landed 2026-08-12 in
    [#57](https://github.com/aasquier/sylvan-library/pull/57), with
-   [ADR 19](docs/adr/0019-the-dossier-cites-three-sources.md) written first. Branch 1 answered "what does this card do" with corpus counts; this
+   [ADR 19](docs/adr/0019-the-dossier-cites-three-sources.md) written first. Branch 1 answered "what does this card do" with pool counts; this
    is the *interesting* half — who this character is, what archetype they
    define and where it came from, their rivals, where they sit in Magic's
    history. The second Claude mode, and the first whose facts do not all come
-   from the corpus.
+   from the pool.
 
    What the build settled, beyond the decisions below:
 
@@ -104,7 +104,7 @@ arc; this is what the next few sessions actually do.
      described Trostani Discordant as making Food tokens; she makes 1/1
      Soldiers. Comparing two commanders is exactly the sentence that wants a
      half-remembered ability, so the mode now must call `get_cards` on every
-     rival before writing about it, and the rival's real corpus text rides in
+     rival before writing about it, and the rival's real pool text rides in
      the payload so the card sits next to the sentence. The second half is what
      does not depend on the model complying.
    - **Cost:** about 800 uncached input tokens and 2,100 out per commander,
@@ -115,7 +115,7 @@ arc; this is what the next few sessions actually do.
    these:
 
    - **Three sources, and a rule about which may support which claim.** Card
-     facts — cost, type, text, legality, identity — come from the corpus,
+     facts — cost, type, text, legality, identity — come from the pool,
      always; never from web search and never from recall. The meta, archetype
      history and "where does this sit in Magic" come from **server-side web
      search with its sources shown** (`web_search_20260209`; Anthropic-hosted,
@@ -130,7 +130,7 @@ arc; this is what the next few sessions actually do.
    - **Generated automatically for new and imported decks**, on a button for
      the existing six. At stance `off` the button does not appear, because off
      means no calls (ADR 15).
-   - **Any card the model names is validated against the corpus**, the way the
+   - **Any card the model names is validated against the pool**, the way the
      interview drops anything that is not a question.
    - **Alternative arts**: a `commander_art` field on `deck.yaml` holding a
      printing id, a picker showing every **non-digital** printing newest first
@@ -170,7 +170,7 @@ arc; this is what the next few sessions actually do.
      reason is not licensing: **a pip is inline in a sentence**. The deck files
      carry 174 across `why`, `strategy` and `notes`, the gate's own errors are
      the densest of them, and `/api/colors` is the one page that works with no
-     corpus and no network. Card art is decorative and lazy; prose is neither.
+     pool and no network. Card art is decorative and lazy; prose is neither.
      Checking Scryfall's own path data in would also be redistributing their
      asset rather than hotlinking it, which is the line rule 5 draws. ~2 kB,
      no requests, works offline.
@@ -226,7 +226,7 @@ arc; this is what the next few sessions actually do.
    The decision, made before any code: **the depth is checked-in reference
    prose, not a Claude surface.** A guild is exactly the kind of question
    ADR 19's dossier answers well, so it is worth writing down why not.
-   `/api/colors` is the one page in the app that works with no corpus and no
+   `/api/colors` is the one page in the app that works with no card pool and no
    network — a stated property, pinned in `tests/test_isolation.py` — and a
    model call would spend it on the screen a brand-new player meets first. The
    set is finite: ten guilds, five shards, five wedges, written once, ever, so
@@ -261,14 +261,14 @@ arc; this is what the next few sessions actually do.
      "Exactly these colours" is also the most direct available answer to what
      a combination is *for*.
    - **`exact_total` is counted live and teaches more than the paragraph does.**
-     Exactly **two** cards in the corpus have the Artifice identity, and the
+     Exactly **two** cards in the pool have the Artifice identity, and the
      page says so. No four-colour blurb about refusing green lands as hard.
-   - **144 card names, every one verified against the corpus before it landed**
+   - **144 card names, every one verified against the pool before it landed**
      — 51 champions and 93 signature slots. Two rules, and they are not the
      same rule: signature and `verified_by` must be *exactly* the
      combination's identity, a champion need only be a *subset*, because a
      faction is a story and the story owes the colour pie no exact match.
-     Folded into the existing `needs_full_corpus` test rather than added as a
+     Folded into the existing `needs_full_pool` test rather than added as a
      second one, so CI's skip gate stays pinned at two.
    - **The vocabulary is one table with two kinds of entry**, deliberately:
      Magic words (commander, colour identity, ramp, goldfish) and *this
@@ -436,7 +436,7 @@ arc; this is what the next few sessions actually do.
      is what makes a deck. That is the same shape the rationale interview has,
      arrived at from the other direction, and it is a feature: the deck is
      made by the person whose deck it is.
-   - **Every commander it names comes from the corpus.** The theme half is
+   - **Every commander it names comes from the pool.** The theme half is
      opinion and is exactly what Claude is for; the moment it starts naming
      cards, rule 1 binds. `search_cards` with `commanders_only` and an identity
      filter is the tool, and a name that does not resolve gets dropped and
@@ -511,7 +511,7 @@ arc; this is what the next few sessions actually do.
      confidence.
    - **Two-sided cards show one face.** Scryfall renders a small flip control;
      this app does not, anywhere. The most concrete item in the list — the
-     corpus already carries both faces, and `CardRecord.front_type_line` exists
+     pool already carries both faces, and `CardRecord.front_type_line` exists
      because the commander dossier already had to care.
    - **"Entomb" as the delete button's label for commanders.** The label only:
      the typed confirmation **stays `bury`** (`service.DELETE_WORD`, branch 1),
@@ -909,7 +909,51 @@ arc; this is what the next few sessions actually do.
    An absent request is the proof of a stripped link *and* of a thing nobody
    did; the log cannot tell them apart, and only a live tail during a real
    attempt could.
-6. **After that, next build work in order:** re-price automated PR review
+6. ~~**A second quality pass.**~~ Landed 2026-08-14. Not a feature branch —
+   vocabulary, documentation, lint reach and workflow hygiene, done while the
+   instance was already live.
+
+   - **"Corpus" is now "the card pool"**, across 1,016 occurrences in 106
+     files: prose, comments, identifiers, UI strings, the pytest marker, and
+     the `/api/health` and deck-response **wire fields**. The word came from
+     linguistics rather than from Magic, and "card pool" is a term the game
+     already uses for the set of cards you may build from. **ADRs 2 and 7 keep
+     the old word** — they are records of what was decided and how it was said,
+     and `docs/adr/README.md` carries a note saying both names mean one thing.
+     One place resisted the rename and was more interesting than the rest:
+     `tests/mana_oracle.py` used "corpus" for its enumerated set of
+     differential test cases, a different sense entirely, and the file already
+     used `pool` for a pool of mana sources — a blind sweep produced
+     `pool_pools()`. Those are `all_cases()` and a **case set** now.
+   - **The README is a README**, not a tutorial: 297 lines to 180, leading with
+     the idea rather than with `pip install`. The setup path, the full command
+     reference and the deck workflow moved to `CONTRIBUTING.md`, which is where
+     somebody who has decided to use the thing actually looks.
+   - **Stale claims across the docs**, nearly all of one kind: they were
+     written before the deploy and still said so. The ADR index stopped at 20
+     with 21 and 22 on disk, described 14 and 15's modes and stances as
+     unbuilt, and called 4 and 5 decisions about "a deployment that does not
+     exist". HOSTING §7 framed itself as a pre-deploy checklist. Three
+     documents disagreed about the size of the mypy exemption list; two said
+     "ten", `pyproject.toml` said eight, and eight was right.
+   - **Ruff's rule set widened** to add C4, RET, PTH, TID, PIE and RUF, chosen
+     by measuring each against the tree rather than by taste — three reported
+     nothing at all. RUF earns its place on RUF100 alone: **71 `# noqa`
+     directives were suppressing rules that no longer fire**, and a dead
+     suppression reads exactly like a live one.
+   - **Workflow hygiene**: `permissions: contents: read`, a `concurrency` group,
+     `timeout-minutes` on all four jobs, and pip caching. See ENGINEERING §5.
+   - **Five new tests** on the three background-job error translations, which
+     had none. That is the code deciding whether an expired key reads as "your
+     key may have expired" or as a stack trace in a job's error field — and the
+     key has a fixed lifetime, so it is a question of when. Verified by
+     mutation, not by going green: stripping `explain()` fails all three.
+   - **Deferred, with the measurement written down:** `noUncheckedIndexedAccess`
+     (51 errors across 15 files, ENGINEERING §4) and `ruff format` (101 of 111
+     files, ~15,000 lines, and it would fight the deliberate argparse table).
+     Both are their own change for the same reason `strict` was.
+
+7. **After that, next build work in order:** re-price automated PR review
    (ENGINEERING §5, parked), the stance dial UI, then the remaining Claude
    modes ADR 15 names and branch 5 does not build (argue a slot, deck
    conversation, research).
@@ -932,7 +976,7 @@ arc; this is what the next few sessions actually do.
 
 **Importing a list now works** — `mtglab decks import <slug> --from <file|->`,
 `POST /api/decks/import`, and the app's Import page. It resolves names against
-the corpus, files lands and nothing else, and writes a `stage: draft` deck with
+the pool, files lands and nothing else, and writes a `stage: draft` deck with
 an empty `why` on every card. Generating a deck from scratch is still not
 started, though import subsumes most of it. See **The deck lifecycle** below.
 
@@ -1098,7 +1142,7 @@ Three options that stay inside the rules, and they compose:
    the `tags` field already on `CardEntry` and with the macro categories in
    `decks/analyze.py`.
 3. **Let a Claude research mode answer archetype questions live.** This is
-   exactly ADR 14's half — "the questions the corpus cannot answer" — and it is
+   exactly ADR 14's half — "the questions the pool cannot answer" — and it is
    the only one of the three that scales past what we are willing to type.
 
 ### A theme interview
@@ -1115,7 +1159,7 @@ also chains into the taxonomy above: theme → colours → an empty slot in the 
 The boundary holds, and it is worth writing down why so nobody has to re-derive
 it: **a theme is not a card's `why`**, so rule 4 is not engaged by asking these
 questions. The moment the mode starts naming cards, **rule 1 is** — those come
-from corpus tools, never from recall. And it still may not pre-fill a `why`.
+from pool tools, never from recall. And it still may not pre-fill a `why`.
 
 ## 9. Shared decks and a simulation leaderboard
 
@@ -1187,7 +1231,7 @@ these without labelling them is the failure mode:
 | **Deterministic Python** (`suggest.py`, the gate, `mana.py`, `analyze.py`) | legality, colour identity, similarity, curve, category balance, price | whether the deck *wants* the card |
 | **Tier 1** | consistency, land count, castability | anything about opponents, interaction, tutors, or card text beyond mana |
 | **Forge** | whether a line actually works in a real rules engine | see the bias problem below |
-| **Claude** | the meta, why a slot exists, what a card is *for*, whether a spoiler earns a place | any card fact — those come from corpus tools, never recall |
+| **Claude** | the meta, why a slot exists, what a card is *for*, whether a spoiler earns a place | any card fact — those come from pool tools, never recall |
 
 **Every recommendation must carry its provenance**, not as a footnote but as
 part of the object: "the gate says this is illegal" and "Claude thinks this slot
@@ -1258,7 +1302,7 @@ wrong "theoretical" costs nothing. The library filters and badges on it.
 
 ### Open: two banned cards need a replacement chosen
 
-Both confirmed against Scryfall `legalities.commander`, on a corpus current to
+Both confirmed against Scryfall `legalities.commander`, on a card pool current to
 2026-11-20. Neither is a transcription slip; both lists genuinely contain them.
 
 - **Goreclaw** runs **Primeval Titan** (banned). The slot it fills is "6/6
@@ -1294,7 +1338,7 @@ one deck's preferred card comes first would be overfitting to a sample of one.
 
 ### What the migration turned up
 
-Beyond the two bans, the gate and a corpus cross-check caught five errors in
+Beyond the two bans, the gate and a card pool cross-check caught five errors in
 the source prose — a card name that does not exist (the real one was Sigarda's
 Aid), Arahbo's doubling described as an activation when it is a per-attacker
 trigger, a hand-counted curve off by a few cards per bucket, a claimed 67%
@@ -1321,7 +1365,7 @@ the commander — Arahbo is a Cat Avatar, so the cats list stays legal.
 **Two-commander pairings** (`decks/partners.py`): plain Partner, Partner
 with `<name>`, `Partner—<label>` (matched on the label, so new sets add
 labels for free), Choose a Background + Background, and Doctor's companion +
-a Time Lord Doctor — all enumerated from the corpus, with deck size correctly
+a Time Lord Doctor — all enumerated from the pool, with deck size correctly
 98 when two commanders share the zone (companions, by contrast, sit outside
 the 100). **One rule got wrong the first time and recorded so nobody repeats
 it:** Battlebond's non-legendary `Partner with` creatures do *not* gain
@@ -1354,7 +1398,7 @@ Condensed 2026-08-12; the code and its tests are the authority.
 
 - **Import** (`decks/decklist.py` grammar, `decks/importer.py` resolution):
   unknown names are kept verbatim and reported rather than dropped — dropping
-  them would hand back a 96-card deck silently. It refuses without a corpus,
+  them would hand back a 96-card deck silently. It refuses without a card pool,
   and deliberately will not pick a commander the list did not name or assume
   a Companion-ability card is *this deck's* companion.
 - **The draft stage**: a draft's missing rationales report as **one counted
@@ -1401,7 +1445,7 @@ deployment ceiling) and the **first mode**, the rationale interview — with a U
 beside the rationale box. Both are detailed below.
 
 Then the **commander dossier** (2026-08-12, ADR 19) — the second mode, and the
-first to reach past the corpus. It is also where research through server-side
+first to reach past the pool. It is also where research through server-side
 web tooling turned from a plan into code: `web_search_20260209`, with every
 cited page checked against what the search actually returned.
 
@@ -1437,7 +1481,7 @@ a confident claim gets made about the fifth. Exposed as the `get_cards` tool
 ADR 15's table always named.
 
 The same turn re-run against it calls `get_cards` for both cards and quotes the
-corpus. It also costs **less** — 19,130 input tokens against 25,142 — because a
+pool. It also costs **less** — 19,130 input tokens against 25,142 — because a
 model that can look a card up stops making speculative searches.
 
 **The lesson, which is the reason this stays in the document:** the hole was
@@ -1452,13 +1496,13 @@ whether the question has a right answer:
 | --- | --- | --- |
 | Legality, colour identity, singleton, size, companion and partner rules | Deterministic Python | There is a correct answer and it must be the same tomorrow |
 | Mana solving, Tier 1, category counts, similarity, price | Deterministic Python | Same — reproducible, tested without a network |
-| The meta, whether a spoiled card earns a slot, what a ruling means in practice, whether a plan holds together | Claude | No corpus query answers these; they need an opinion or the open internet |
+| The meta, whether a spoiled card earns a slot, what a ruling means in practice, whether a plan holds together | Claude | No card-pool query answers these; they need an opinion or the open internet |
 | Playing actual games | Forge | A real rules engine with a real AI, which took a decade to build |
 
 ### The three boundaries
 
-1. **Rule 1 still binds Claude.** Card facts come from the corpus — not from
-   the model's recall, and not from a web page. Research is for what the corpus
+1. **Rule 1 still binds Claude.** Card facts come from the pool — not from
+   the model's recall, and not from a web page. Research is for what the pool
    does not contain: discussion, meta, rulings, cards spoiled ahead of the next
    bulk refresh.
 2. **Claude may argue about a `why`; it may not write one.** It can
@@ -1481,8 +1525,8 @@ argument. Four are worth building first, and every one of them may write
 | Mode | What it is for |
 | --- | --- |
 | Rationale interview | asks about a card so the user can write its `why`; import leaves 99 of them owing |
-| Argue a slot | the case against a specific card, from corpus facts and category counts |
-| Deck conversation | anything about a deck, with the gate's output and the corpus in reach |
+| Argue a slot | the case against a specific card, from pool facts and category counts |
+| Deck conversation | anything about a deck, with the gate's output and the pool in reach |
 | Research | the meta, rulings in practice, cards spoiled ahead of the next bulk refresh |
 | **Commander dossier** | who the character is, the archetype and its history, rivals, standing — ADR 19, built 2026-08-12 |
 
@@ -1512,7 +1556,7 @@ none of it is the system prompt:
 - **Every item is checked to be a question** — it must end in a question mark,
   and what does not is dropped and *counted*. A mode that starts editorialising
   shows up as a number rather than as help.
-- **The corpus facts arrive before the model does.** `interview.brief()`
+- **The pool facts arrive before the model does.** `interview.brief()`
   assembles the oracle text, the gate's verdict, the category counts and the
   neighbouring cards' rationales in deterministic Python. Rule 1 therefore does
   not depend on the model choosing to call `get_cards` — which is the same
@@ -1526,7 +1570,7 @@ what it needed.
 
 **It also found something.** Asked about Primeval Titan, whose rationale claims
 "6/6 trample", it asked whether that was recalled from memory — because the
-corpus does not store power or toughness at all. It does not: no `power` or
+pool does not store power or toughness at all. It does not: no `power` or
 `toughness` column exists. That is a real rule-1 gap for every creature claim in
 every deck, it needs a loader change and a re-ingest, and it is its own piece of
 work. Worth recording *how* it surfaced: by running the surface against a real
@@ -1575,7 +1619,7 @@ the app call through, so there is nothing to prepare. The modes' tools are
 functions that already exist there and in `cards/db.py`: `get_cards`,
 `search_cards`, `validate`, `suggest`, `deck_stats`. That is also how rule 1 is
 enforced structurally rather than by asking the model nicely — a mode that needs
-to know what a card does calls the corpus and the tool result is the fact.
+to know what a card does calls the pool and the tool result is the fact.
 
 **Done.** `mtglab.claude.tools` wraps seven: `list_decks`, `get_deck`,
 `validate_deck`, `deck_stats`, `suggest_replacements`, `get_cards` and
@@ -1594,7 +1638,7 @@ project maintains, which keeps `CLAUDE.md`'s no-scraping rule intact.
 
 The rationale editor built in step 3 of the deck lifecycle is already the right
 shape for the interview: the box sits beside a column showing the card as the
-corpus has it, which is where a mode's questions go.
+pool has it, which is where a mode's questions go.
 
 ### The account, the model, and the order of work
 
@@ -1611,7 +1655,7 @@ no-secrets check is what keeps it out of the repository.
 **Start on Sonnet, and find out whether it is enough.** Claude Sonnet 5
 (`claude-sonnet-5`) rather than the Opus default — Aaron's call, and the
 question it answers is worth answering early: most of what the modes do is
-conversation over tool results the corpus already computed, which is not
+conversation over tool results the pool already computed, which is not
 obviously Opus-shaped work. Moving up is a model-ID change and a re-measure, so
 the cheap experiment runs first. Note Sonnet 5's request surface differs from
 its predecessor's in ways that will bite a from-memory implementation —
@@ -1878,7 +1922,7 @@ people's questions**.
 
 **It is smaller than it felt, at least for the interview.** Estimated from a
 turn shape of roughly 12K tokens in and 800 out — the deck plus one card's
-corpus facts, a question back — with the deck and system prompt sitting in a
+pool facts, a question back — with the deck and system prompt sitting in a
 cached prefix that reads at a tenth of input price:
 
 | | First turn | Cached turn | A full 99-card draft |
@@ -1913,7 +1957,7 @@ a spoiler scan across six decks.
 Wanted: follow along remotely, and eventually point friends at it. Budget is
 not the binding constraint; a few dollars a month is fine.
 
-**The constraint is data and CPU, not code.** The corpus is ~63 MB of DuckDB
+**The constraint is data and CPU, not code.** The pool is ~63 MB of DuckDB
 built from ~98 MB of compressed Scryfall bulk, gitignored on purpose — Scryfall
 asks that bulk data not be redistributed, and it is re-downloadable in one
 command. And Tier 1 is genuinely CPU-bound: `sim mana` at 20,000 games is ~30s,
@@ -1929,7 +1973,7 @@ Three things follow, and they decide the shortlist:
    boot step.** It needs several minutes, which blows any build budget and —
    with scale-to-zero putting boot on the request path — would turn a wake into
    an outage. Cron does not work either: Fly volumes attach to exactly one
-   machine, so a scheduled second Machine cannot mount the corpus. Run it by
+   machine, so a scheduled second Machine cannot mount the pool. Run it by
    hand, about monthly. Scryfall publishes daily, but deck tooling does not need
    day-fresh data, and prices only matter to `price deck`. See
    [ADR 6](docs/adr/0006-never-redistribute-scryfall-bulk-data.md).
@@ -1976,7 +2020,7 @@ Forge.
 
 **Done 2026-08-12:** the `Dockerfile`, `fly.toml`, `.dockerignore` and
 `docker-entrypoint.sh` are in the repository, CI builds and exercises the image
-on every PR, and the corpus-and-decks seeding run is documented in HOSTING §4
+on every PR, and the pool-and-decks seeding run is documented in HOSTING §4
 step 6. A refresh cron deliberately does not exist — the refresh is monthly and
 by hand, for the volume-attachment reasons in ADR 6; the runbook is the one
 item §7 still lists as prose to write.

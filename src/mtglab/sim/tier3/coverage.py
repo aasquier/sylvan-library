@@ -41,7 +41,7 @@ CARDSFOLDER = Path("res") / "cardsfolder" / "cardsfolder.zip"
 class ForgeNotInstalled(RuntimeError):
     """Raised when the Forge distribution is missing or incomplete.
 
-    A plain exception, for the same reason `CorpusRequired` is one: this is
+    A plain exception, for the same reason `PoolRequired` is one: this is
     reachable from an API worker thread as well as from the CLI, and
     `sys.exit` in a thread is a confusing way to fail.
     """

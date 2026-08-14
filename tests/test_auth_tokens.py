@@ -25,8 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 pytest.importorskip("argon2")
 
-from mtglab import config  # noqa: E402
-from mtglab.auth import db, invites, mail, sessions, tokens, users  # noqa: E402
+from mtglab import config
+from mtglab.auth import db, invites, mail, sessions, tokens, users
 
 PASSWORD = "a-perfectly-fine-passphrase"
 
@@ -566,7 +566,7 @@ def test_an_invite_carries_a_link_with_the_token_in_the_fragment(con, ada):
 
     (message,) = recorder.sent
     assert message.to == "ada@example.com"
-    link = [w for w in message.body.split() if w.startswith("https://")][0]
+    link = next(w for w in message.body.split() if w.startswith("https://"))
     base, _, token = link.partition("#token=")
     assert base == "https://mtglab.example.com/auth/claim"
     assert "?" not in link, "a token in a query string lands in an access log"
@@ -602,7 +602,7 @@ def test_a_reset_resolves_the_address_and_sends(con, ada):
 
     (message,) = recorder.sent
     assert message.to == "ada@example.com", "normalised, not as typed"
-    link = [w for w in message.body.split() if w.startswith("http")][0]
+    link = next(w for w in message.body.split() if w.startswith("http"))
     token = link.partition("#token=")[2]
     assert tokens.lookup(con, token, tokens.Purpose.RESET).user_id == ada.id
 

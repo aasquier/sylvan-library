@@ -11,7 +11,7 @@ change that. It answers a narrower, mechanical question:
 That is a measurement, not a recommendation, and the distinction is the whole
 design. Nothing here decides anything; it produces a shortlist with the reason
 each candidate scored, so a human can disagree with it quickly. Every fact it
-uses comes from the corpus -- CLAUDE.md rule 1 -- so it cannot assert a card
+uses comes from the pool -- CLAUDE.md rule 1 -- so it cannot assert a card
 does something it does not.
 
 Scoring is deliberately pure Python over `CardRecord`s. Only `candidate_pool`
@@ -246,7 +246,7 @@ def replacements_for(deck: Deck, cards: dict[str, CardRecord], con: Connection,
                      limit: int = 5) -> list[Candidate]:
     """Suggestions for one card in one deck.
 
-    Returns an empty list rather than raising when the corpus does not know the
+    Returns an empty list rather than raising when the pool does not know the
     card -- the gate has already said so, and failing twice for one problem
     helps nobody.
     """

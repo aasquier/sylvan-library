@@ -32,11 +32,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from mtglab import config  # noqa: E402
-from mtglab.mana import ManaCost, ManaSource  # noqa: E402
-from mtglab.sim import cache  # noqa: E402
-from mtglab.sim.tier1.engine import KeepRule, SimCard, run  # noqa: E402
-from test_sim_tier1 import build_golgari  # noqa: E402
+from mtglab import config
+from mtglab.mana import ManaCost, ManaSource
+from mtglab.sim import cache
+from mtglab.sim.tier1.engine import KeepRule, SimCard, run
+from test_sim_tier1 import build_golgari
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PROBE = Path(__file__).resolve().parent / "sim_cache_probe.py"
@@ -53,8 +53,8 @@ def a_key(**overrides):
     """A key over the reference deck, with any argument swapped out."""
     kind = overrides.pop("kind", "sim.mana")
     library, commander = build_golgari(34)
-    args = dict(library=library, commander=commander, games=1000, turns=10,
-                keep_rule=KeepRule(), seed=11)
+    args = {"library": library, "commander": commander, "games": 1000, "turns": 10,
+                "keep_rule": KeepRule(), "seed": 11}
     args.update(overrides)
     return cache.key(kind, **args)
 

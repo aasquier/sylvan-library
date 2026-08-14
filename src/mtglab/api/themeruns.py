@@ -1,7 +1,7 @@
 """Both halves of the theme interview (ADR 20) as background jobs.
 
 The proposal was **measured at 226 seconds**, reading a dozen-odd pages and
-resolving every legend it names against the corpus. A four-minute synchronous
+resolving every legend it names against the pool. A four-minute synchronous
 request survives a laptop and does not survive a hosted proxy -- Fly's router,
 and most others, give up long before that -- so it runs the way
 `api/simruns.py` already runs Tier 1: submitted, polled, and read back off the
@@ -119,7 +119,7 @@ def plan_ask(*, transcript: Any = None, slots: Any = None,
             raise ClaudeFailed(str(exc)) from exc
         except claude_client.ClaudeUnavailable:
             raise
-        except Exception as exc:                                # noqa: BLE001
+        except Exception as exc:
             raise ClaudeFailed(claude_client.explain(exc)) from exc
 
     return Plan(ASK_KIND, label, None, run, lane=NET)
@@ -171,7 +171,7 @@ def plan_proposal(*, transcript: Any = None, slots: Any = None,
             # Only reachable if the key vanished between the check above and
             # the worker starting. Left as itself; it is already readable.
             raise
-        except Exception as exc:                                # noqa: BLE001
+        except Exception as exc:
             # Broad on purpose and narrow in effect, the same treatment
             # `service.claude_interview` gives it: everything landing here is
             # the SDK failing, and `explain` is what turns a 401 into "your key

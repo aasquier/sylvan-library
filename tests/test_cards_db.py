@@ -4,7 +4,7 @@ These pin the Scryfall format change that broke `mtglab data refresh`: the
 index stopped publishing `download_uri` (a plain JSON array) and started
 publishing `jsonl_download_uri` (gzipped JSONL). Both shapes must keep
 loading, because a cached file downloaded before the change is still a
-perfectly good corpus.
+perfectly good pool.
 
 Nothing here touches DuckDB or the network -- the parser is deliberately
 separable from the database.
@@ -86,7 +86,7 @@ def test_reads_gzipped_jsonl():
 
 
 def test_reads_legacy_json_array():
-    """A corpus downloaded before the format change must still load."""
+    """A card pool downloaded before the format change must still load."""
     with tempfile.TemporaryDirectory() as tmp:
         path = _write(Path(tmp), "o.json", json.dumps(CARDS))
         assert [c["name"] for c in _iter_cards(path)] == [c["name"] for c in CARDS]
@@ -130,7 +130,7 @@ def test_empty_file_yields_nothing_rather_than_raising():
 # --------------------------------------------------------------- name lookup
 
 # Real shapes, because the bug was entirely about how Scryfall names faces.
-# An in-memory database keeps this independent of the downloaded corpus.
+# An in-memory database keeps this independent of the downloaded pool.
 ROWS = [
     ("id-gyome", "Gyome, Master Chef", "{2}{B}{G}", "Legendary Creature — Troll Warlock",
      ["B", "G"]),
@@ -251,9 +251,9 @@ def test_battle_with_a_creature_back_is_not_a_land():
         "Battle — Siege // Legendary Creature — Dinosaur", layout="transform").is_land
 
 
-# ------------------------------------------------------------- corpus load
+# ------------------------------------------------------------- pool load
 #
-# `load_oracle` and `load_printings` build the corpus every other number in
+# `load_oracle` and `load_printings` build the pool every other number in
 # the project is derived from, and they need no network -- they take a file.
 # Leaving them untested meant a silent ingest bug would surface as wrong
 # simulation output rather than a failing test.
@@ -335,7 +335,7 @@ def test_load_oracle_is_idempotent(tmp_path):
         load_oracle(con, path)
         load_oracle(con, path)
         total = con.execute("SELECT count(*) FROM oracle_cards").fetchone()[0]
-        assert total == 2, "a second refresh duplicated the corpus"
+        assert total == 2, "a second refresh duplicated the pool"
     finally:
         con.close()
 
@@ -417,7 +417,7 @@ def test_printed_stats_survive_the_ingest(stats_con):
 
 def test_stats_are_strings_because_star_is_a_real_value(stats_con):
     """Coercing to an integer either throws on Tarmogoyf or invents a number.
-    The corpus reports what is printed on the card."""
+    The pool reports what is printed on the card."""
     rec = get_cards(stats_con, ["Tarmogoyf"])["Tarmogoyf"]
     assert rec.power == "*"
     assert rec.toughness == "1+*"
@@ -427,7 +427,7 @@ def test_a_double_faced_card_is_not_a_free_spell(stats_con):
     """The regression path for the bug this column set was added alongside.
 
     Etali is a seven-drop whose cost lives on its front face. Before the
-    fallback the corpus stored NULL, `parse_mana_cost(None)` returned `{0}`,
+    fallback the pool stored NULL, `parse_mana_cost(None)` returned `{0}`,
     and Tier 1 cast it on turn one -- in two of the six real decks.
     """
     from mtglab.mana import parse_mana_cost
@@ -494,8 +494,8 @@ def old_con():
     c.close()
 
 
-def test_a_corpus_without_the_new_columns_still_answers(old_con):
-    """The API opens the corpus read-only, so it cannot migrate itself. A
+def test_a_pool_without_the_new_columns_still_answers(old_con):
+    """The API opens the pool read-only, so it cannot migrate itself. A
     fixed column list would turn this schema change into an immediate outage
     for every existing database rather than a prompt to re-ingest."""
     from mtglab.cards.db import oracle_columns
@@ -507,12 +507,12 @@ def test_a_corpus_without_the_new_columns_still_answers(old_con):
     assert got["Gyome, Master Chef"].game_changer is False
 
 
-def test_an_old_corpus_reports_itself_stale(old_con):
+def test_an_old_pool_reports_itself_stale(old_con):
     """So the app can say "re-ingest" rather than showing every creature as
     statless -- an all-NULL column reads exactly like "no card has power",
     which is the quiet wrong answer the column was added to prevent."""
-    from mtglab.cards.db import corpus_is_stale
-    assert corpus_is_stale(old_con) is True
+    from mtglab.cards.db import pool_is_stale
+    assert pool_is_stale(old_con) is True
 
 
 def test_connect_migrates_an_old_database_in_place(tmp_path):
@@ -533,16 +533,16 @@ def test_connect_migrates_an_old_database_in_place(tmp_path):
         con.close()
 
 
-def test_a_current_corpus_is_not_stale(stats_con):
-    from mtglab.cards.db import corpus_is_stale
-    assert corpus_is_stale(stats_con) is False
+def test_a_current_pool_is_not_stale(stats_con):
+    from mtglab.cards.db import pool_is_stale
+    assert pool_is_stale(stats_con) is False
 
 
-def test_an_empty_corpus_is_not_stale(tmp_path):
+def test_an_empty_pool_is_not_stale(tmp_path):
     """Nothing to be wrong about, and `health()` already says it is missing."""
-    from mtglab.cards.db import connect, corpus_is_stale
+    from mtglab.cards.db import connect, pool_is_stale
     con = connect(tmp_path / "empty.duckdb")
     try:
-        assert corpus_is_stale(con) is False
+        assert pool_is_stale(con) is False
     finally:
         con.close()

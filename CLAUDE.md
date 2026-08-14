@@ -31,7 +31,7 @@ those are not reachable — widen the environment's access level first, or run
 
 ```
 src/mtglab/
-  config.py               where decks and the corpus live; env-overridable
+  config.py               where decks and the pool live; env-overridable
   colors.py               the 32 combinations, and the teaching depth
   glossary.py             the vocabulary, Magic's and this tool's own
   tarot.py                the 78-card deck, the shuffle, and the three-card
@@ -43,14 +43,14 @@ src/mtglab/
   decks/model.py          deck.yaml schema
   decks/edit.py           surgical deck.yaml edits, minimal diffs
   decks/decklist.py       pasted decklist -> parsed lines; pure text
-  decks/importer.py       parsed lines + corpus -> a draft deck.yaml
+  decks/importer.py       parsed lines + pool -> a draft deck.yaml
   decks/source.py         DeckSource protocol; file-backed and in-memory
   decks/suggest.py        similarity scorer -> replacement shortlists
   decks/validate.py       the gate
   decks/companion.py      companion deckbuilding restrictions
   decks/partners.py       Partner / Background / Doctor pairings
   decks/analyze.py        macro category counts vs bracket targets
-  sim/compile.py          deck.yaml + corpus -> SimCards
+  sim/compile.py          deck.yaml + pool -> SimCards
   sim/cache.py            memoised Tier 1 results, keyed on compiled input
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
@@ -83,7 +83,7 @@ fly.toml                  the only Fly-specific file; no secrets, ever
 Deployed, **decks live on the volume at `/data/decks`, not in the image** — the
 app's editing routes write `deck.yaml`, so decks baked into a layer would lose
 every edit at the next deploy. The image carries them at `/app/decks-seed` and
-`docs/HOSTING.md` §4 step 6 copies them across once. The corpus is never in the
+`docs/HOSTING.md` §4 step 6 copies them across once. The pool is never in the
 image at all.
 
 Layering: `api/` must not import from `cli.py`. Anything both need lives in
@@ -163,7 +163,7 @@ what ADR 16 built the server not to say.
 **Tier 1 results are cached** (ADR 18), and the key is what makes that safe:
 a hash of the **compiled** deck — the SimCards the engine is handed — plus the
 clamped parameters, the seed, and a fingerprint of `engine.py` and `mana.py`'s
-source. Not a hash of `deck.yaml`: card facts come from the corpus, so a
+source. Not a hash of `deck.yaml`: card facts come from the pool, so a
 `data refresh` can change a simulation while the deck file does not move. A hit
 is a job that was born `done`, so no client changed shape, and every result now
 carries `seed`, `cached` and `computed_at` — **quote a cached number as
@@ -176,22 +176,22 @@ rather than assumed.** They are the two modules that deliberately know things
 Scryfall did not say — what a guild is, what happened to it, what a mulligan
 is — and the alternative was a Claude surface. It lost on four counts, written
 out in `colors.py`'s docstring and ROADMAP item 3 branch 4: `/api/colors` and
-`/api/glossary` work with **no corpus and no network**, the set is finite and
+`/api/glossary` work with **no card pool and no network**, the set is finite and
 written once, ADR 20 already classed `colors.py` as a fourth source that is
 free, and *bland prose is fixed by editing, which only checked-in text
 allows*. Claude answers the unbounded per-deck question about a **commander**
 — that is ADR 19, and it stays there.
 
-Card facts inside that prose still come from the corpus. `champions` and
+Card facts inside that prose still come from the pool. `champions` and
 `signature` hold **names**; `/api/colors/{key}` resolves them through
 `get_cards` and a name that does not resolve is **dropped and counted**, the
 same instrument ADR 19 built for the dossier's rivals. `signature` carries no
 prose at all — what it asserts is that the card's identity is *exactly* that
 combination, which a test checks — so the only editorial sentence attached to
 a card is a champion's story role, and the card's own oracle text renders
-beside it. Adding a name means the full-corpus test in `tests/test_colors.py`
+beside it. Adding a name means the full-pool test in `tests/test_colors.py`
 has to pass; it is one test covering all three lists, because a second
-`needs_full_corpus` marker would move CI's skip gate off two.
+`needs_full_pool` marker would move CI's skip gate off two.
 
 The simulator's parameters and reported figures are glossary entries too
 (`sim.*` for what you set, `stat.*` for what you are given), which is why they
@@ -207,11 +207,11 @@ migration ladder for the same file would be worse than the import. That boundary
 test: the solver, the gate and the simulator all take plain records, so most of
 the suite needs no database at all.
 
-The tests that *do* need one build it. `tests/tiny_corpus.py` loads 21 real
+The tests that *do* need one build it. `tests/tiny_pool.py` loads 21 real
 cards into a scratch DuckDB in about a second, and `mono_green_deck()` is a
 legal 99 built only from those cards. That is what the card-fact tests use —
 swap, add, suggestions, search, the Tier 1 endpoints, the Claude tools. It is
-**not** the ~500MB Scryfall corpus, which stays out of git and out of CI
+**not** the ~500MB Scryfall pool, which stays out of git and out of CI
 (ADR 6). Before it existed those 29 tests skipped on every pull request and
 passed only on this machine; `ci.yml` now fails if the skip count moves off the
 two tests that genuinely need the full download.
@@ -261,7 +261,7 @@ refused while any card is blank, and the five artifacts refuse a draft outright.
 Absent means `curated`, the opposite default from `status`, so the six existing
 decks are never silently demoted. [ADR 13](docs/adr/0013-an-imported-deck-is-a-draft.md).
 
-**5. Never commit** card corpus data, collection/wishlist/purchase data, or
+**5. Never commit** card pool data, collection/wishlist/purchase data, or
 credentials. CI enforces this — by filename, and by scanning the contents of
 every tracked file (the built frontend bundle included) for an API key. A
 public inventory of expensive cards tied to a real identity is a targeting
@@ -295,7 +295,7 @@ Editing, all surgical and self-verifying ([ADR 12](docs/adr/0012-decks-are-edite
 each also a route and a control on the deck page:
 
 ```bash
-mtglab decks add <slug> --card X --category ramp --why '...'  # corpus-checked
+mtglab decks add <slug> --card X --category ramp --why '...'  # pool-checked
 mtglab decks remove <slug> --card X
 mtglab decks set <slug> --card X --why '...'        # or --category / --qty
 mtglab decks set <slug> --status built              # no --card: a deck field
@@ -326,7 +326,7 @@ where they sit in Magic's history. The **theme interview** (`theme.py`,
 [ADR 20](docs/adr/0020-the-theme-interview-reads-a-person.md)) is two modes and
 the create flow's third door: a conversation whose questions are **not about
 Magic** — a film, a period, your sign, how you are at game night — and then a
-proposal of two colour combinations with three corpus-checked commanders each.
+proposal of two colour combinations with three pool-checked commanders each.
 `mtglab claude check` proves the key;
 `mtglab claude interview <slug> --card X` and `mtglab claude dossier <slug>`
 run the first two, and the deck page runs both. The other three modes ADR 15
@@ -420,8 +420,8 @@ a **live** job, because a finished one is the cache's business and a failed one
 must stay retryable. `key=None` is the default and opts out, which is right for
 a theme proposal: two at once are two different conversations.
 
-**The dossier is the first mode whose facts are not all the corpus's**, so it
-carries rules the interview did not need. Card facts still come from the corpus,
+**The dossier is the first mode whose facts are not all the pool's**, so it
+carries rules the interview did not need. Card facts still come from the pool,
 always. The meta and the history come from **Anthropic-hosted web search**
 (`web_search_20260209`) — not a crawler, and not a way around the ban: it reads
 at request time, for one commander, and shows the link. Claude supplies voice
@@ -445,7 +445,7 @@ failure wearing a different hat.
 what a surface *is*: a **mode** (a system prompt, a tool set, and what it may
 write) plus a **stance** (the user's dial over initiative, scope, and write
 autonomy). A stance may widen what a mode does, never what it is allowed to do.
-Card facts reach a mode through corpus tools rather than recall, which is how
+Card facts reach a mode through pool tools rather than recall, which is how
 rule 1 below becomes structural instead of a request. Target model is
 **Claude Sonnet 5** to begin with — the user's call, not a default to override;
 **load the `claude-api` skill before writing any integration code.**
@@ -453,14 +453,14 @@ rule 1 below becomes structural instead of a request. Target model is
 Deterministic Python owns legality, colour identity, singleton, deck size,
 companion and partner rules, mana solving, Tier 1, category counts, similarity
 and price. Reproducible, tested without a network, no model consulted. Claude
-owns conversation about a deck and the questions the corpus cannot answer — the
+owns conversation about a deck and the questions the pool cannot answer — the
 meta, whether a spoiled card earns a slot, what a ruling means in practice.
 
 Three boundaries, all of which apply to you in this session as much as to
 anything built later:
 
-1. **Rule 1 binds Claude too.** Card facts come from the corpus, not from
-   recall and not from a web page. Research is for what the corpus lacks —
+1. **Rule 1 binds Claude too.** Card facts come from the pool, not from
+   recall and not from a web page. Research is for what the pool lacks —
    discussion, meta, rulings, cards spoiled ahead of the next bulk refresh.
 2. **Argue about a `why`; never write one.** Interrogating a card's slot and
    making the case against it is the conversation the curated six came out of.
@@ -517,18 +517,20 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
 - Prefer surgical trims over mass restructuring. The user pushes back on
   aggressive cut lists and expects each cut argued against the specific slot
   it vacates.
-- Deep cuts from old Magic are actively wanted. Query the whole corpus.
+- Deep cuts from old Magic are actively wanted. Query the whole pool.
 - Price is not usually an object, but prefer the cheaper option when a genuine
   functional equivalent exists.
 - Reserved List is allowed or forbidden **per deck** — check the deck file.
 - Every bug fix gets a test. `mana.py` is subtle; `tests/test_mana.py` pins the
   cases where naive source-counting gives the wrong answer.
 - `ruff check src tests` and `mypy` before pushing. mypy is strict by default
-  with ten named exceptions in `pyproject.toml`; that list is meant to shrink,
+  with eight named exceptions in `pyproject.toml`; that list is meant to shrink,
   so a new module is strict from the day it is written.
-- Frontend: `npx tsc -b`, `npx oxlint --deny-warnings` and `npm test` in
-  `web/`, then rebuild the committed bundle with `npm --prefix web run build`
-  if anything under `web/src` changed. CI checks all four.
+- Frontend: `npm --prefix web run check` runs the typecheck, oxlint and Vitest
+  in one; then rebuild the committed bundle with `npm --prefix web run build`
+  if anything under `web/src` changed. CI checks all four, and runs the first
+  three as separate steps on purpose so a type error reports as a type error
+  rather than as an opaque build failure.
 
 ## Landing work
 

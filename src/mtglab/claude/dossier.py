@@ -1,9 +1,9 @@
 """The commander dossier: who this character is, and who says so.
 
-The second mode, and the first whose facts do not all come from the corpus --
+The second mode, and the first whose facts do not all come from the pool --
 which is the whole reason
 [ADR 19](../../../docs/adr/0019-the-dossier-cites-three-sources.md) exists.
-The deck page already counts what the corpus knows about a commander (how rare
+The deck page already counts what the pool knows about a commander (how rare
 its subtypes are, when it was first printed, what else carries the name). What
 it could not say is who the character *is*, what archetype they define and where
 that came from, who their rivals are, and where they sit in Magic's history.
@@ -11,7 +11,7 @@ None of that is a column, and none of it is a number.
 
 So three sources, each with a narrow jurisdiction:
 
-* **Card facts come from the corpus.** Cost, type, oracle text, colour identity,
+* **Card facts come from the pool.** Cost, type, oracle text, colour identity,
   legality, printing history. Never from a web page and never from recall --
   `brief()` assembles them here, in Python, before the model is called.
 * **The meta and the history come from a hosted web search**, with the page
@@ -35,7 +35,7 @@ them with the pages `Turn.searched` recorded, drops the rest and counts what it
 dropped -- the same instrument `interview.only_questions()` points at the same
 failure, one source away.
 
-**Every card the dossier names is looked up.** Rivals come back as corpus rows
+**Every card the dossier names is looked up.** Rivals come back as pool rows
 or they do not come back at all. A model listing a plausible rival commander
 that does not exist is rule 1 failing in the one place this feature would be
 most fun to read.
@@ -88,7 +88,7 @@ _PROSE: dict[str, Any] = {
     "type": "string",
     "description": (
         "Two to four sentences. Every factual claim here must rest on a source "
-        "you list, or on the corpus facts you were given."),
+        "you list, or on the pool facts you were given."),
 }
 
 _SOURCE_IDS: dict[str, Any] = {
@@ -96,7 +96,7 @@ _SOURCE_IDS: dict[str, Any] = {
     "items": {"type": "string"},
     "description": (
         "The ids of the sources this rests on, from the sources list. Empty "
-        "only when the passage rests entirely on the corpus facts in the "
+        "only when the passage rests entirely on the pool facts in the "
         "brief."),
 }
 
@@ -139,7 +139,7 @@ RESPONSE_SCHEMA: dict[str, Any] = {
                         "type": "string",
                         "description": (
                             "The rival's exact card name. It will be looked up "
-                            "in the corpus and dropped if it does not resolve, "
+                            "in the pool and dropped if it does not resolve, "
                             "so give the printed name, not a nickname."),
                     },
                     "prose": {"type": "string",
@@ -185,12 +185,12 @@ description.
 
 Three sources, and which one may support which claim is not negotiable.
 
-**Card facts come from the corpus, which you have already been given.** The
+**Card facts come from the pool, which you have already been given.** The
 brief carries the real oracle text, mana cost, type line, colour identity,
 legality, printing history and subtype counts. Use those numbers and that text.
 Do not restate them as if they were your findings, do not contradict them, and
 never substitute your own recollection of what a card does. This project has
-twice been wrong about cards it was confident about, which is why the corpus is
+twice been wrong about cards it was confident about, which is why the pool is
 on the table in front of you.
 
 **The meta, the archetype's history, the rivals and the standing come from the
@@ -202,7 +202,7 @@ what the search actually returned, and anything else is discarded before the
 user sees it.
 
 **You supply voice and framing, and nothing else.** Where you have neither a
-corpus fact nor a source, say less. A shorter dossier with three real citations
+pool fact nor a source, say less. A shorter dossier with three real citations
 is worth more than a full one with two invented ones.
 
 How to write it:
@@ -214,11 +214,11 @@ How to write it:
   changed it since? A date, a set, or a printing that shifted it is worth more
   than an adjective.
 - Rivals are commanders somebody would genuinely consider instead. Name them by
-  their exact printed card name -- each one is looked up in the corpus, and a
+  their exact printed card name -- each one is looked up in the pool, and a
   name that does not resolve is dropped. Say how they differ, not which is
   better; whose deck this is is not your call.
 - **Call get_cards on every rival before you write a word about it, in one
-  batch.** The brief only carries the corpus's facts about *this* commander;
+  batch.** The brief only carries the pool's facts about *this* commander;
   for any other card, what you remember is not evidence. This is where the rule
   is easiest to break, because comparing two commanders is exactly the sentence
   that wants a half-remembered ability in it -- and a rival described with
@@ -240,7 +240,7 @@ COMMANDER_DOSSIER = Mode(
             "they sit in Magic's history.",
     instructions=INSTRUCTIONS,
     # `get_cards` and nothing else from our side. The dossier is about one card
-    # and its neighbours in history, so the corpus reach it needs is a lookup;
+    # and its neighbours in history, so the pool reach it needs is a lookup;
     # `search_cards` would invite it to go shopping and `get_deck` would put 99
     # cards and their rationales in front of a mode that must not discuss them.
     tool_names=("get_cards",),
@@ -254,7 +254,7 @@ COMMANDER_DOSSIER = Mode(
 
 
 class NoCommander(ValueError):
-    """The deck has no commander, or the corpus does not have the card.
+    """The deck has no commander, or the pool does not have the card.
 
     Its own exception because the caller's answer differs from a missing deck:
     the deck is fine and there is simply nothing to write a dossier about.
@@ -264,7 +264,7 @@ class NoCommander(ValueError):
 # --------------------------------------------------------------- the facts
 
 def brief(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
-    """What the corpus knows about this deck's commander, before the call.
+    """What the pool knows about this deck's commander, before the call.
 
     The same assembly the interview does, and for the same reason: rule 1 must
     not depend on the model choosing to call `get_cards`. Reusing
@@ -276,15 +276,15 @@ def brief(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
     card = facts.get("card")
     if not card:
         raise NoCommander(
-            f"{slug} has no commander the corpus can find, so there is nothing "
-            f"to write a dossier about. (A deck with no corpus loaded reaches "
+            f"{slug} has no commander the pool can find, so there is nothing "
+            f"to write a dossier about. (A deck with no card pool loaded reaches "
             f"this too -- run `mtglab data refresh`.)")
     return facts
 
 
 def _ask_for(facts: dict[str, Any]) -> str:
     card = facts["card"]
-    opening = ("Here is everything the corpus knows about this commander. All "
+    opening = ("Here is everything the pool knows about this commander. All "
                "of it is a query rather than a recollection, and it is the "
                "authority on what the card does.")
     closing = (f"Write the dossier for {card['name']}. Search the web for the "
@@ -367,7 +367,7 @@ def _section(raw: Any, allowed: set[str]) -> dict[str, Any]:
 
 
 def _rivals(raw: Any, allowed: set[str]) -> tuple[list[dict[str, Any]], int]:
-    """Rivals as corpus rows, or not at all.
+    """Rivals as pool rows, or not at all.
 
     The lookup is the point. A rival that resolves comes back with its real
     type line, cost and art, so the UI can show the card rather than the claim;
@@ -401,7 +401,7 @@ def _rivals(raw: Any, allowed: set[str]) -> tuple[list[dict[str, Any]], int]:
             "image": record.get("image"),
             "art_crop": record.get("art_crop"),
             "legal_commander": record.get("legal_commander"),
-            # The corpus's own text for the rival, carried so the UI can put
+            # The pool's own text for the rival, carried so the UI can put
             # the real card next to the sentence comparing it. That is not
             # decoration: a first run described Trostani Discordant as making
             # Food tokens (she makes 1/1 Soldiers), which is rule 1 leaking in
@@ -445,7 +445,7 @@ def _report(turn: Turn | None, *, slug: str, commander: str,
                   "output_tokens": turn.output_tokens if turn else 0,
                   "cache_read_tokens": turn.cache_read_tokens if turn else 0},
         "never": ("This is Claude's writing over cited pages. The card facts "
-                  "beside it are the corpus's."),
+                  "beside it are the pool's."),
     }
 
 

@@ -9,7 +9,7 @@
  * 4 exists to prevent (ADR 8, ADR 12 rule 3).
  *
  * What the editor may do is make the rationale easier to *write*: it puts the
- * card's oracle text — a corpus fact, per rule 1 — next to the box, so the
+ * card's oracle text — a card pool fact, per rule 1 — next to the box, so the
  * thinking happens against what the card actually says rather than against
  * what someone remembers it saying. When the assistant modes arrive, their
  * questions belong in that same column, for the same reason and under the same
@@ -275,9 +275,9 @@ export function RationaleEditor({
         </div>
       </div>
 
-      {/* Rule 1, made useful: the card's actual text, from the corpus, next to
+      {/* Rule 1, made useful: the card's actual text, from the pool, next to
           the box you are arguing in — and, under it, the questions. Both are
-          in this column and neither may reach the box: the corpus states
+          in this column and neither may reach the box: the pool states
           facts, the interview asks things, and the sentence that lands in
           deck.yaml is typed on the left. */}
       <aside className="space-y-2 rounded-md p-2 text-[11px] leading-relaxed"
@@ -289,7 +289,7 @@ export function RationaleEditor({
         {card.oracle_text
           ? <p className="whitespace-pre-wrap"><ManaText size={11}>{card.oracle_text}</ManaText></p>
           : <p style={{ color: 'var(--text-muted)' }}>
-              No corpus text for this card.
+              No card text in the pool for this card.
             </p>}
         <InterviewPanel deck={deck} card={card.name} askNow={askNow} />
       </aside>
@@ -352,7 +352,7 @@ export function AddCardForm({ deck, stage, onDone }: {
           <span className="text-[11px] font-medium uppercase tracking-wide"
                 style={{ color: 'var(--text-muted)' }}>Card name</span>
           <input value={name} onChange={(e) => setName(e.target.value)}
-                 placeholder="Exact name — checked against the corpus"
+                 placeholder="Exact name — checked against the pool"
                  className="h-9 rounded-md px-2 text-sm outline-none focus:ring-2"
                  style={inputStyle} />
         </label>
@@ -392,7 +392,7 @@ export function AddCardForm({ deck, stage, onDone }: {
           Cancel
         </QuietButton>
         <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          Legality and colour identity are checked against the corpus before anything is written.
+          Legality and colour identity are checked against the pool before anything is written.
         </span>
       </div>
     </div>

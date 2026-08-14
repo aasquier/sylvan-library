@@ -60,7 +60,7 @@ repository today but all of which bind a hosted instance that ships it:
 Where an obligation *would* attach is **publishing a container image with Forge
 inside it**, which is distribution in the ordinary way. `docs/HOSTING.md` §7
 records the practical route around that, and it is the same one already used
-for the card corpus: keep it on the volume, not in the image.
+for the card pool: keep it on the volume, not in the image.
 
 Nothing here is legal advice.
 

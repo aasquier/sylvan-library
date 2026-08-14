@@ -3,7 +3,7 @@
 The importer is the first thing in this project that *writes* a deck rather
 than reading one, so the tests that matter most are the ones pinning what it
 refuses to invent: no rationale, no category beyond land, no name it could not
-find in the corpus. ADR 13 is the argument; these are the teeth.
+find in the pool. ADR 13 is the argument; these are the teeth.
 
 No DuckDB here. `build_deck` takes a name -> CardRecord mapping, so a handful
 of fakes covers the resolution rules exactly.
@@ -33,7 +33,7 @@ def card(name, *, type_line="Creature — Cat", identity=("G", "W"),
     )
 
 
-class Corpus(dict):
+class Pool(dict):
     """A stand-in for `db.get_cards`'s result, which resolves case-insensitively.
 
     Worth being faithful about: the real lookup keys its result by the name the
@@ -51,7 +51,7 @@ class Corpus(dict):
         return super().__getitem__(str(key).lower())
 
 
-CORPUS = Corpus({rec.name.lower(): rec for rec in [
+POOL = Pool({rec.name.lower(): rec for rec in [
     card("Arahbo, Roar of the World", type_line="Legendary Creature — Cat Avatar"),
     card("Sol Ring", type_line="Artifact", identity=()),
     card("Forest", type_line="Basic Land — Forest", identity=()),
@@ -67,13 +67,13 @@ CORPUS = Corpus({rec.name.lower(): rec for rec in [
 ]})
 # `db.get_cards` resolves a double-faced card by either face, and so must the
 # fake -- the whole point of the canonicalisation rule is what happens then.
-CORPUS["branchloft pathway"] = CORPUS["Branchloft Pathway // Boulderloft Pathway"]
+POOL["branchloft pathway"] = POOL["Branchloft Pathway // Boulderloft Pathway"]
 
 
 def build(text, **kwargs):
     parsed = parse(text)
     kwargs.setdefault("slug", "imported")
-    return build_deck(parsed, CORPUS, **kwargs)
+    return build_deck(parsed, POOL, **kwargs)
 
 
 # ------------------------------------------------------- what is not invented
@@ -115,7 +115,7 @@ def test_an_unknown_name_is_kept_verbatim_and_reported():
     assert report.unknown == ["Sol Rng"]
     assert [c.name for c in report.deck.cards] == ["Sol Rng"]
     # And the gate says so on its own, without the importer having to.
-    assert any(i.code == "unknown-card" for i in validate(report.deck, CORPUS).errors)
+    assert any(i.code == "unknown-card" for i in validate(report.deck, POOL).errors)
 
 
 def test_no_commander_is_a_refusal_not_a_guess():
@@ -239,6 +239,6 @@ def test_the_facts_are_checked_on_day_one_even_though_the_thinking_is_not():
     99 missing rationales are a counted warning rather than 99 errors."""
     report = build("Commander\n1 Arahbo, Roar of the World\n"
                    "Deck\n1 Primeval Titan\n")
-    rep = validate(report.deck, CORPUS)
+    rep = validate(report.deck, POOL)
     assert [i.code for i in rep.errors] == ["deck-size", "banned"]
     assert [i.code for i in rep.warnings] == ["draft-incomplete"]

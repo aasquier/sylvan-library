@@ -21,12 +21,12 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import tiny_corpus  # noqa: E402
-from mtglab import config  # noqa: E402
-from mtglab.api import service  # noqa: E402
-from mtglab.decks import edit  # noqa: E402
-from mtglab.decks.model import Deck  # noqa: E402
-from mtglab.decks.source import MemoryDeckSource  # noqa: E402
+import tiny_pool
+from mtglab import config
+from mtglab.api import service
+from mtglab.decks import edit
+from mtglab.decks.model import Deck
+from mtglab.decks.source import MemoryDeckSource
 
 DECK_YAML = """\
 slug: mini
@@ -54,9 +54,9 @@ def source(tmp_path):
 
 
 @pytest.fixture
-def corpus(tmp_path):
+def pool(tmp_path):
     with config.use_paths(data_dir=tmp_path / "data"):
-        yield tiny_corpus.build(config.DB_PATH)
+        yield tiny_pool.build(config.DB_PATH)
 
 
 # ----------------------------------------------------------------- the file
@@ -112,21 +112,21 @@ def test_the_case_of_the_id_is_preserved():
 
 # ------------------------------------------------------------- the printings
 
-def test_printings_are_listed_newest_first(corpus, source):
+def test_printings_are_listed_newest_first(pool, source):
     listing = service.commander_printings("mini", source=source)
     assert listing["commander"] == "Gyome, Master Chef"
     dates = [p["released_at"] for p in listing["printings"] if p["released_at"]]
     assert dates == sorted(dates, reverse=True)
 
 
-def test_every_listed_printing_can_actually_be_shown(corpus, source):
+def test_every_listed_printing_can_actually_be_shown(pool, source):
     """A printing with no image is a row the picker would render as a blank
     tile, so it is filtered out rather than offered."""
     for printing in service.commander_printings("mini", source=source)["printings"]:
         assert printing["image"]
 
 
-def test_the_selected_printing_is_marked(corpus, tmp_path):
+def test_the_selected_printing_is_marked(pool, tmp_path):
     yaml = DECK_YAML.replace("bracket: 4",
                              f"commander_art: {A_PRINTING}\nbracket: 4")
     path = tmp_path / "picked" / "deck.yaml"
@@ -137,13 +137,13 @@ def test_the_selected_printing_is_marked(corpus, tmp_path):
     listing = service.commander_printings("mini", source=src)
     assert listing["selected"] == A_PRINTING
     chosen = [p for p in listing["printings"] if p["selected"]]
-    # The tiny corpus carries no printings table, so this asserts the contract
+    # The tiny pool carries no printings table, so this asserts the contract
     # rather than a row: whatever is listed, at most the picked one is marked.
     assert len(chosen) <= 1
 
 
 def test_a_deck_with_no_commander_lists_nothing_rather_than_failing(tmp_path,
-                                                                    corpus):
+                                                                    pool):
     yaml = DECK_YAML.replace("commander:\n  - Gyome, Master Chef\n",
                              "commander: []\n")
     path = tmp_path / "headless" / "deck.yaml"
@@ -153,7 +153,7 @@ def test_a_deck_with_no_commander_lists_nothing_rather_than_failing(tmp_path,
     assert service.commander_printings("mini", source=src)["printings"] == []
 
 
-def test_printings_survive_a_corpus_that_is_not_there(tmp_path, source):
+def test_printings_survive_a_pool_that_is_not_there(tmp_path, source):
     """A fresh clone shows a deck with its default art and an empty picker."""
     with config.use_paths(data_dir=tmp_path / "empty"):
         assert service.commander_printings("mini", source=source)["printings"] == []
@@ -191,16 +191,16 @@ SOL_RING_PRINTING = "22222222-2222-4222-8222-222222222222"
 
 
 @pytest.fixture
-def printed(corpus):
+def printed(pool):
     """Two real printing rows: one of the commander, one of another card.
 
-    `tiny_corpus` loads oracle rows only, so without this the printings table
+    `tiny_pool` loads oracle rows only, so without this the printings table
     is empty and every id is refused — which would make the test below pass
     while proving nothing about *whose* card the printing is.
     """
     from mtglab.cards import db
 
-    con = db.connect(corpus)
+    con = db.connect(pool)
     try:
         for card, pid in (("Gyome, Master Chef", GYOME_PRINTING),
                           ("Sol Ring", SOL_RING_PRINTING)):
@@ -264,7 +264,7 @@ def source_for(yaml_text, tmp_path):
 
 
 def test_a_stale_art_id_falls_back_to_the_default_printing(printed, tmp_path):
-    """A deck pointing at a printing the corpus no longer has shows its default
+    """A deck pointing at a printing the pool no longer has shows its default
     art, not a hole where the commander should be."""
     gone = "33333333-3333-4333-8333-333333333333"
     yaml = DECK_YAML.replace("bracket: 4", f"commander_art: {gone}\nbracket: 4")
@@ -278,7 +278,7 @@ def test_a_stale_art_id_falls_back_to_the_default_printing(printed, tmp_path):
     assert "printing" not in card
 
 
-def test_no_corpus_means_the_choice_is_accepted_rather_than_blocked(tmp_path,
+def test_no_pool_means_the_choice_is_accepted_rather_than_blocked(tmp_path,
                                                                     source):
     """A machine without the 500MB download cannot check, and refusing every
     art change there would be a worse answer than accepting one that renders

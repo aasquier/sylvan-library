@@ -11,7 +11,7 @@ ways worth pinning forever:
 
 Plus the arithmetic: two commanders means a 98-card deck.
 
-Oracle text below is copied from the corpus. The detector parses these exact
+Oracle text below is copied from the pool. The detector parses these exact
 shapes, so paraphrasing would test the wrong thing.
 """
 
@@ -76,7 +76,7 @@ def test_partner_with_parses_without_reminder_text():
 
 
 def test_detects_labeled_partner_and_keeps_the_label():
-    """`Partner—<label>` is a generalised template; the corpus already has
+    """`Partner—<label>` is a generalised template; the pool already has
     four labels, so matching the label beats hardcoding one."""
     p = partners.pairing(Fake("Sophina", oracle_text="Menace\n" + FRIENDS))
     assert p.kind == partners.LABELED
@@ -208,12 +208,12 @@ def test_a_legendary_partner_with_creature_is_fine():
 
 
 def test_the_gate_explains_the_nonlegendary_partner_trap():
-    deck, corpus = build(["Lore Weaver", "Ley Weaver"], ["Sol Ring"], {
+    deck, pool = build(["Lore Weaver", "Ley Weaver"], ["Sol Ring"], {
         "Lore Weaver": Fake("Lore Weaver", "Creature — Human Wizard",
                             oracle_text="Partner with Ley Weaver"),
         "Ley Weaver": Fake("Ley Weaver", "Creature — Human Druid",
                            oracle_text="Partner with Lore Weaver")})
-    rep = validate(deck, corpus, expected_size=2)
+    rep = validate(deck, pool, expected_size=2)
     msgs = [i.message for i in rep.errors if i.code == "not-a-commander"]
     assert len(msgs) == 2, "both halves are illegal, not just one"
     assert "nonlegendary creature can't be your commander" in msgs[0]
@@ -227,78 +227,78 @@ def test_explicit_can_be_your_commander_text_is_honoured():
 
 # --------------------------------------------------------- gate wiring
 
-def build(commanders, body, corpus_extra=None):
+def build(commanders, body, pool_extra=None):
     deck = Deck(slug="t", name="T", commander=commanders,
                 cards=[CardEntry(name=n, category="ramp", why="x") for n in body])
-    corpus = {n: Fake(n, "Artifact") for n in body}
-    corpus.update(corpus_extra or {})
-    return deck, corpus
+    pool = {n: Fake(n, "Artifact") for n in body}
+    pool.update(pool_extra or {})
+    return deck, pool
 
 
 def test_two_commanders_reduce_the_expected_deck_size():
-    deck, corpus = build(["Ghost", "Silas"], ["Sol Ring"], {
+    deck, pool = build(["Ghost", "Silas"], ["Sol Ring"], {
         "Ghost": Fake("Ghost", oracle_text=PARTNER),
         "Silas": Fake("Silas", oracle_text=PARTNER)})
-    rep = validate(deck, corpus, expected_size=2)     # 2 - 1 == 1
+    rep = validate(deck, pool, expected_size=2)     # 2 - 1 == 1
     assert rep.ok, rep.render()
 
 
 def test_the_size_error_explains_the_two_commander_adjustment():
-    deck, corpus = build(["Ghost", "Silas"], ["Sol Ring", "Mox"], {
+    deck, pool = build(["Ghost", "Silas"], ["Sol Ring", "Mox"], {
         "Ghost": Fake("Ghost", oracle_text=PARTNER),
         "Silas": Fake("Silas", oracle_text=PARTNER)})
-    rep = validate(deck, corpus, expected_size=2)
+    rep = validate(deck, pool, expected_size=2)
     msg = next(i.message for i in rep.errors if i.code == "deck-size")
     assert "expected 1" in msg and "2 commanders" in msg
 
 
 def test_three_commanders_are_rejected():
-    deck, corpus = build(["A", "B", "C"], ["Sol Ring"], {
+    deck, pool = build(["A", "B", "C"], ["Sol Ring"], {
         n: Fake(n, oracle_text=PARTNER) for n in "ABC"})
-    rep = validate(deck, corpus, expected_size=3)
+    rep = validate(deck, pool, expected_size=3)
     assert any(i.code == "too-many-commanders" for i in rep.errors)
 
 
 def test_a_background_alone_is_rejected_with_a_useful_message():
-    deck, corpus = build(["Raised by Giants"], ["Sol Ring"], {
+    deck, pool = build(["Raised by Giants"], ["Sol Ring"], {
         "Raised by Giants": Fake("Raised by Giants",
                                  "Legendary Enchantment — Background")})
-    rep = validate(deck, corpus, expected_size=1)
+    rep = validate(deck, pool, expected_size=1)
     msg = next(i.message for i in rep.errors if i.code == "not-a-commander")
     assert "only legal as a second commander" in msg
 
 
 def test_a_legal_background_pairing_passes_the_gate():
     """The regression this whole module exists for."""
-    deck, corpus = build(["Jaheira", "Raised by Giants"], ["Sol Ring"], {
+    deck, pool = build(["Jaheira", "Raised by Giants"], ["Sol Ring"], {
         "Jaheira": Fake("Jaheira", oracle_text=BACKGROUND_CHOOSER),
         "Raised by Giants": Fake("Raised by Giants",
                                  "Legendary Enchantment — Background")})
-    rep = validate(deck, corpus, expected_size=2)
+    rep = validate(deck, pool, expected_size=2)
     assert rep.ok, rep.render()
 
 
 def test_an_illegal_pairing_is_reported():
-    deck, corpus = build(["Jaheira", "Ghost"], ["Sol Ring"], {
+    deck, pool = build(["Jaheira", "Ghost"], ["Sol Ring"], {
         "Jaheira": Fake("Jaheira", oracle_text=BACKGROUND_CHOOSER),
         "Ghost": Fake("Ghost", oracle_text=PARTNER)})
-    rep = validate(deck, corpus, expected_size=2)
+    rep = validate(deck, pool, expected_size=2)
     assert any(i.code == "illegal-pairing" for i in rep.errors)
 
 
 def test_colour_identity_is_the_union_of_both_commanders():
-    deck, corpus = build(["Ghost", "Silas"], ["Blue Card"], {
+    deck, pool = build(["Ghost", "Silas"], ["Blue Card"], {
         "Ghost": Fake("Ghost", oracle_text=PARTNER, color_identity=frozenset("B")),
         "Silas": Fake("Silas", oracle_text=PARTNER, color_identity=frozenset("U")),
         "Blue Card": Fake("Blue Card", "Artifact", color_identity=frozenset("U"))})
-    rep = validate(deck, corpus, expected_size=2)
+    rep = validate(deck, pool, expected_size=2)
     assert not [i for i in rep.errors if i.code == "color-identity"], rep.render()
 
 
 def test_a_single_commander_deck_is_unaffected():
-    deck, corpus = build(["Gyome"], ["Sol Ring"], {
+    deck, pool = build(["Gyome"], ["Sol Ring"], {
         "Gyome": Fake("Gyome", "Legendary Creature — Troll Chef")})
-    rep = validate(deck, corpus, expected_size=1)
+    rep = validate(deck, pool, expected_size=1)
     assert rep.ok, rep.render()
     assert not [i for i in rep.issues
                 if i.code in ("illegal-pairing", "too-many-commanders")]

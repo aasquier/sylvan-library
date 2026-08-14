@@ -134,4 +134,4 @@ Selesnya go-wide tokens built on multiplication rather than addition. Six static
 - **Yavimaya, Cradle of Growth** — Makes every land a Forest; huge fixing for the {G}{G} half of the commander.
 
 ---
-_Generated 2026-08-12 from `deck.yaml`._
+_Generated 2026-08-14 from `deck.yaml`._

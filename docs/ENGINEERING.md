@@ -116,7 +116,7 @@ would have shipped:
 
 **"A pure function of deck content" is not true, and the false half is the
 dangerous one.** `compile_deck` reads `mana_cost`, `type_line`, `oracle_text`
-and `produced_mana` out of the corpus, so a `data refresh` changes what a card
+and `produced_mana` out of the pool, so a `data refresh` changes what a card
 does while `deck.yaml` sits byte-identical. §4 of this document already records
 the shape of that bug from the other side: Scryfall retemplated "enters the
 battlefield tapped" to "enters tapped", and matching only the old wording
@@ -219,17 +219,17 @@ Neither shares code with `mana.py`. The unit expansion is reimplemented inside
 the oracle on purpose: a reference that imports the implementation cannot catch
 a bug in the part they share.
 
-Alongside the generated cases sits an **enumerated corpus** — 13,944
+Alongside the generated cases sits an **enumerated pool** — 13,944
 (cost, pool) pairs over a small alphabet chosen for structure rather than
 realism, built with `combinations_with_replacement` rather than from a seed. It
 yields the same cases in the same order on any machine in any language,
-forever, which is what makes it usable as the differential corpus for a port
+forever, which is what makes it usable as the differential case set for a port
 (§1). `python tests/mana_oracle.py` dumps it as JSON Lines; `--digest` prints
-the hash pinned by `CORPUS_ANSWER_DIGEST`.
+the hash pinned by `POOL_ANSWER_DIGEST`.
 
 ### What it found
 
-**The solver is clean.** Every generated case and all 13,944 corpus cases agree
+**The solver is clean.** Every generated case and all 13,944 pool cases agree
 with both oracles, as do the monotonicity properties (an extra source never
 hurts, widening a pip never hurts, a dearer cost is never easier) and the
 order-invariance ones. `can_pay` and `engine._consume` — a second solver, which
@@ -244,7 +244,7 @@ filed Mental Misstep as a 0-drop and Phyrexian Metamorph as a 3-drop, and
 reported an average mana value of **1.90 where the truth is 1.93**. Fixed by
 keeping Phyrexian symbols in their own `ManaCost.phyrexian` field: they count
 toward mana value and colour identity, and — correctly, because 2 life pays
-them — still place no demand at all on the mana base. The corpus digest did not
+them — still place no demand at all on the mana base. The pool digest did not
 move, which is the evidence that castability semantics did not change with it.
 
 Two things about that bug are worth keeping. It was not in the clever algorithm
@@ -265,7 +265,7 @@ mana constraint) and never asked about the half that was wrong.
 - **Across processes.** `tests/determinism_probe.py` runs a fixed simulation in
   a fresh interpreter, because hash randomisation is set at process start and
   cannot be varied in-process. At two `PYTHONHASHSEED` values both the Tier 1
-  digest and the mana corpus digest are unchanged: nothing here reads set or
+  digest and the mana pool digest are unchanged: nothing here reads set or
   dict iteration order.
 - **Against a pin.** `REFERENCE_DIGEST` is a golden, verified byte-identical on
   CPython 3.11.15 and 3.12.13. A change in what Tier 1 reports now has to be a
@@ -286,34 +286,34 @@ visible from a green check.
 should not have (ADR 6). So 29 tests opened with some variant of
 
 ```python
-if not client.get("/api/health").json()["corpus"]:
-    pytest.skip("no corpus available")
+if not client.get("/api/health").json()["pool"]:
+    pytest.skip("no card pool available")
 ```
 
 and every one of them passed on the maintainer's laptop and skipped on every
 pull request. What skipped was not incidental: the entire card-fact surface —
 swap, add, suggestions, card search, deck creation, the Tier 1 job endpoints,
-and the Claude corpus tools. **The layer that exists to enforce rule 1 was the
+and the Claude pool tools. **The layer that exists to enforce rule 1 was the
 layer no pull request ever exercised.** Locally the suite ran 692 tests at 87%;
 CI ran 663 at 82%, and reported success.
 
-The fix is `tests/tiny_corpus.py`, which now builds a genuine DuckDB corpus of
+The fix is `tests/tiny_pool.py`, which now builds a genuine DuckDB pool of
 21 real cards in about a second. Two things made that work rather than merely
 look like it:
 
-- **The cards are real, read out of the corpus and pasted verbatim.** Rule 1
+- **The cards are real, read out of the pool and pasted verbatim.** Rule 1
   applies to test data: a fixture naming Ajani and then claiming mono-white
   would teach the exact error CLAUDE.md cites. Ajani is in the fixture *with*
   its {R}{W} identity, so that cautionary tale is now executable.
 - **The decks are synthetic.** `mono_green_deck()` is a legal 99 built only
   from those 21 cards, shaped like Goreclaw's real list — mono-green
   commander, exactly one banned card — so the same assertions run without
-  needing all 35,000. Pointing the real decks at a 21-card corpus would have
+  needing all 35,000. Pointing the real decks at a 21-card pool would have
   been the other option and a worse one: 90 unknown-card errors per deck, and
   tests that assert cleanliness would have had to be weakened to survive it.
 
-Result: **740 tests and 90% coverage, with or without the real corpus.** Two
-tests still need the full download and now say so with a `needs_full_corpus`
+Result: **740 tests and 90% coverage, with or without the real pool.** Two
+tests still need the full download and now say so with a `needs_full_pool`
 marker rather than a bare skip — the 32-way colour-combination check (a fixture
 holding those 32 cards would verify the fixture rather than the table) and the
 commander-search ordering bug (which needs more cards than the query limit to
@@ -392,7 +392,7 @@ checklist that shaped the files.
       unaffected, since `/data` is a mount and never the read-only layer.
 - [x] **`HEALTHCHECK` hitting `/api/health`**, using stdlib `urllib` rather
       than installing `curl` for one request. That path is on `PUBLIC_PATHS`,
-      so it answers with auth on, and CI pins that it reports `"corpus": false`
+      so it answers with auth on, and CI pins that it reports `"pool": false`
       on a fresh volume instead of failing — an unseeded instance is a correct
       state between deploy and seeding, and a health check that 500s there
       would have the platform restarting a healthy machine forever.
@@ -401,9 +401,9 @@ checklist that shaped the files.
 - [x] **Image scanning** — Trivy, failing on HIGH/CRITICAL, `ignore-unfixed`
       because a CVE with no available patch is not something the build can act
       on and would turn the gate into noise that gets disabled.
-- [x] **Never bake the corpus in.** Scryfall asks that bulk data not be
+- [x] **Never bake the pool in.** Scryfall asks that bulk data not be
       redistributed, and it belongs on the volume. Enforced twice now: the
-      `no-secrets-or-corpus` job checks what is *tracked*, and the `image` job
+      `no-secrets-or-card-data` job checks what is *tracked*, and the `image` job
       greps the *built image*, which is a different question the moment a
       `.dockerignore` line is deleted.
 
@@ -418,8 +418,22 @@ against a running container rather than read off the file.
 
 ## 4. Frontend
 
-The stack is already modern: React 19, Vite 8, Tailwind 4, TypeScript 6,
+The stack is already modern: React 19, Vite 8, Tailwind 4, TypeScript 7,
 oxlint, Recharts. The gaps are testing and interaction, not framework choice.
+
+**`noUncheckedIndexedAccess` is the one strictness flag still off, and it is
+worth its own change.** Measured 2026-08-14: turning it on reports **51 errors
+across 15 files** — `pentagram.tsx` 7, `Learn.tsx` 9, `mtg.ts` 3, `App.tsx` 4,
+the rest scattered, with about a third in test files. Every one is a real
+`arr[0]` or `obj[key]` that can be `undefined` and is not treated as such.
+
+It is deliberately *not* bundled with the 2026-08-14 quality pass. Each site
+needs its own judgment — a guard, a default, or a different data shape — and
+the wrong fix is a non-null assertion, which silences the check without
+changing the risk. Fifty-one of those judgments buried inside a
+thousand-occurrence rename is how a real review turns into a rubber stamp. The
+same argument that made `strict` its own change applies here: it landed alone,
+and it was reviewable because of that.
 
 - ~~**No frontend tests at all.**~~ **Built 2026-08-10** — Vitest + Testing
   Library, 35 tests over the three pieces with real logic. `npm test` runs
@@ -444,10 +458,10 @@ oxlint, Recharts. The gaps are testing and interaction, not framework choice.
   number. Writing a frontend test for it would have tested nothing.
 
   **It found a real bug.** `/api/decks` carries `errors: null` to mean "the
-  corpus was missing, so the gate never ran", explicitly so that it is not
+  pool was missing, so the gate never ran", explicitly so that it is not
   rendered as a pass — and the library card rendered it exactly like a clean
   deck, because the condition was `errors !== null && errors > 0`. With no
-  corpus, Goreclaw and Atla Palani, both of which run a banned card, looked
+  pool, Goreclaw and Atla Palani, both of which run a banned card, looked
   precisely as clean as the four decks that pass. Fixed with a `not checked`
   badge, and pinned by the test that caught it.
 
@@ -467,7 +481,7 @@ oxlint, Recharts. The gaps are testing and interaction, not framework choice.
 
 - ~~**A four-colour deck would render as "WUBR".**~~ **Fixed 2026-08-12,
   twice.** The first fix added the Nephilim names, verified against the
-  corpus — and the same day's review pass caught that `src/mtglab/colors.py`
+  pool — and the same day's review pass caught that `src/mtglab/colors.py`
   had already decided the convention the other way: the Scryfall/C16 names
   (Artifice, Chaos, Aggression, Altruism, Growth) are canonical and the
   Nephilim are aliases, and the Start-a-deck grid renders the canonical name.
@@ -491,19 +505,41 @@ oxlint, Recharts. The gaps are testing and interaction, not framework choice.
 
 ## 5. CI/CD
 
-Current pipeline, as of 2026-08-12: pytest on 3.11/3.12, coverage with a **90%**
+Current pipeline, as of 2026-08-14: pytest on 3.11/3.12, coverage with a **90%**
 floor, a **skip-count gate**, ruff, **mypy**, frontend typecheck under
 **`strict`**, **oxlint with `--deny-warnings`**, `npm test`, the build,
-committed-bundle drift check, a secrets/corpus guard, and — since
+committed-bundle drift check, a secrets/card-data guard, and — since
 containerisation landed — an **`image` job** that builds the Dockerfile for two
 architectures, runs it, and scans it (§3).
+
+**Workflow hygiene, added 2026-08-14.** Four things the pipeline had been
+running without, none of which changes what is checked:
+
+- **`permissions: contents: read` at the top of `ci.yml`.** `dependency-review.yml`
+  had declared this since it landed and `ci.yml` never had, so the whole suite
+  ran with whatever the repository default happened to be. Nothing in it
+  writes — no job pushes an image, comments, or updates a check.
+- **A `concurrency` group per ref**, cancelling in progress on pull requests
+  only. Three pushes in a minute used to start three full builds, arm64 QEMU
+  image job included, and the first two were obsolete before they finished.
+  Pushes to `main` are deliberately *not* cancelled: every commit there should
+  keep its own recorded result.
+- **`timeout-minutes` on all four jobs** — 20/15/5/45 against a default of six
+  hours. A stuck build should cost minutes of runner time, not a morning.
+- **pip caching** on `setup-python`, keyed on `pyproject.toml`. numpy and
+  duckdb are large wheels and were re-downloaded on every job of every run.
+
+Renaming `no-secrets-or-corpus` to `no-secrets-or-card-data` in the same pass
+is exactly the hazard the protection table below names: **the required-check
+list had to be updated in the same change, or the check would have stopped
+gating while still appearing to pass.**
 
 Four of those are new, and three of the four are guards against a check being
 green while not checking:
 
 - **The skip gate.** See §2 — CI ran 663 of 692 tests and said so nowhere. The
   build now fails if the skipped count is anything other than the two declared
-  `needs_full_corpus` tests.
+  `needs_full_pool` tests.
 - **`tsc` under `strict`.** `tsconfig.app.json` had `noUnusedLocals` and
   friends but never `"strict": true`, so `strictNullChecks` was off across all
   5,913 lines of frontend and a null deref type-checked clean. Turning it on
@@ -513,8 +549,9 @@ green while not checking:
   and a function is not a valid React key.
 - **oxlint.** A devDependency with a `lint` script that CI never ran. Both
   warnings it had to report were dead re-exports.
-- **mypy**, strict by default with a named list of ten modules that are not
-  there yet. Direction over starting point: lax-by-default means a new module
+- **mypy**, strict by default with a named list of modules that are not there
+  yet — ten when it landed, **eight** now that `api/service.py` and
+  `api/simruns.py` have graduated. Direction over starting point: lax-by-default means a new module
   is born unchecked and nobody notices. 24 of 42 modules passed `--strict` on
   the first run, including all of `mana.py`, `sim/tier1/` and `sim/tier3/`. It
   found three real latent problems — a `str | None` reaching `.lower()` on the
@@ -535,7 +572,7 @@ both classic protection and rulesets return `403 — Upgrade to GitHub Pro or
 make this repository public`. So the choice was $4/month, a local git hook that
 only guards one machine, or making the repository public. Public won on its own
 merits: this document is explicitly written for the case where peers read the
-repo, the history audit came back clean (no corpus, collection, credential or
+repo, the history audit came back clean (no card pool, collection, credential or
 `.env` file in any of 29 commits), and public repositories get unmetered
 Actions minutes. The cost, stated plainly: the author's email address is in the
 metadata of 19 commits and is now public.
@@ -545,7 +582,7 @@ The settings on `main`, recorded so they can be rebuilt:
 | Setting | Value | Why |
 | --- | --- | --- |
 | Pull request required | yes, **0 approvals** | A solo maintainer cannot approve their own PR, so requiring 1 would deadlock the repo |
-| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-corpus`, `image` | The whole pipeline. Renaming a CI job silently stops gating until this list is updated |
+| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-card-data`, `image` | The whole pipeline. Renaming a CI job silently stops gating until this list is updated |
 | Strict (branch up to date) | yes | Checks that passed against a stale base did not test what is being merged |
 | Enforce for admins | **yes** | Off, it does not apply to the only contributor, which makes it decorative |
 | Force pushes, deletions | blocked | |
@@ -607,7 +644,7 @@ jobs:
             Review this PR. This is a Magic: the Gathering toolkit; read
             CLAUDE.md first. Weight these heavily:
               - Any card behaviour asserted from memory rather than looked up
-                in the corpus. This project has a written history of exactly
+                in the pool. This project has a written history of exactly
                 that going wrong.
               - Numbers in prose or generated artifacts that no test pins.
               - Silent-wrong-answer risks: a change that makes a simulation or
@@ -687,18 +724,18 @@ They are immutable once accepted: a decision that changes gets a new ADR that
 supersedes the old one, and the old one stays, because reasoning that turned out
 to be wrong is usually the most useful thing in the directory.
 
-Six were the seed list — deck.yaml in git, DuckDB for the corpus, Tier 1 stays
+Six were the seed list — deck.yaml in git, DuckDB for the pool, Tier 1 stays
 Python, two embedded databases, sessions over JWTs, and never redistributing
 Scryfall bulk. Four more earned a place because they were already argued here
 and a reader would otherwise have to reconstruct them: card facts come from the
-corpus rather than memory (7), the gate blocks rather than routing around an
+pool rather than memory (7), the gate blocks rather than routing around an
 illegal deck (8), the built frontend bundle is committed (9), and correctness is
 established against independent oracles (10).
 
 Writing them found one thing worth having found: **three documents disagreed
-about when the corpus gets refreshed.** This file said "at boot", ROADMAP said
+about when the pool gets refreshed.** This file said "at boot", ROADMAP said
 "weekly by cron", and HOSTING said neither works — Fly volumes attach to exactly
-one machine, so a scheduled second Machine cannot mount the corpus, and boot is
+one machine, so a scheduled second Machine cannot mount the pool, and boot is
 on the request path under scale-to-zero. ADR 6 records the resolution and both
 stale lines are corrected. Forcing every decision into "options considered ·
 decision · consequences" is what surfaced it.
@@ -718,10 +755,10 @@ than after it.
 
 1. ~~**Property-based tests on `mana.py`** plus determinism tests.~~ **Done
    2026-08-10** — see §2. It found one real bug (Phyrexian mana value) and
-   produced the enumerated corpus a port would be tested against.
+   produced the enumerated pool a port would be tested against.
 2. ~~**ADRs for the decisions already made.**~~ **Done 2026-08-10** — ten of
    them in [`docs/adr/`](adr/README.md); see §6. Writing them caught a
-   three-way contradiction about corpus refresh.
+   three-way contradiction about pool refresh.
 3. ~~**A `DeckSource` abstraction and a request scope.**~~ **Done 2026-08-10** —
    `decks/source.py` and `api/deps.py`. Every deck-facing route now takes the
    request scope, and the API is tested against an in-memory source.
@@ -776,7 +813,7 @@ landed on top of them without reworking a handler. Kept because the
   is written down here so it is found before the build fails rather than after.
   The same profile derandomises, so a pull request never goes red because
   Hypothesis rolled different examples; deterministic coverage comes from the
-  enumerated corpus instead.
+  enumerated pool instead.
 
 **Worth doing now, because it is cheap now and invasive later:**
 
@@ -839,6 +876,6 @@ Two items in the sections above stayed on the near-term list even though the
 port is parked, because they pay off on the Python engine on their own terms:
 **property-based testing of `mana.py`** (§2) and **determinism tests**. Both
 shipped on 2026-08-10, and both earned their place in the branch where the port
-never happens — one real bug found, and Tier 1's output now pinned. The corpus
+never happens — one real bug found, and Tier 1's output now pinned. The pool
 and the pinned digests are also exactly what a port would be tested against, so
 neither branch of the §1 decision wasted the work.

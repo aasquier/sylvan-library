@@ -41,4 +41,4 @@ Divine Visitation is the clean cut if you would rather run the populate plan unc
 Populate copies a token you control; Divine Visitation's replacement fully overwrites the copy. Minas Tirith and The Shire enter untapped because Trostani is legendary. Ojer Taq triples token creation only while it is a creature, and flips to a land when it dies.
 
 ---
-_Generated 2026-08-12 from `deck.yaml`._
+_Generated 2026-08-14 from `deck.yaml`._

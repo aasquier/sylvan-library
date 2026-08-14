@@ -37,7 +37,7 @@ notes:
     Tier 1's land-count mulligan models — do not quote sim mulligan rates for
     this deck as if they described this rule.
   curve_plan: >
-    — not yet recounted from the corpus, and not worth counting by hand.
+    — not yet recounted from the pool, and not worth counting by hand.
   pitfalls: >
     (1) The Time Sieve loop needs FIVE artifacts per iteration and you only get
     five votes with three living opponents — kill someone and the loop breaks

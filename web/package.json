@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "lint": "oxlint --deny-warnings",
+    "typecheck": "tsc -b",
+    "check": "npm run typecheck && npm run lint && npm run test",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

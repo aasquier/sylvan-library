@@ -35,7 +35,7 @@ notes:
     T6, mana screw 15.0%) from an earlier tool; re-derive with mtglab rather
     than inheriting it.
   curve_plan: >
-    — not yet recounted from the corpus, and not worth counting by hand.
+    — not yet recounted from the pool, and not worth counting by hand.
   pitfalls: >
     (1) Divine Visitation replaces a populated token's characteristics
     ENTIRELY, including abilities — so while it is out you cannot populate a

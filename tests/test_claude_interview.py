@@ -24,9 +24,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from mtglab.claude import client, interview, modes, stance, tools  # noqa: E402
-from mtglab.decks.model import Deck  # noqa: E402
-from mtglab.decks.source import MemoryDeckSource  # noqa: E402
+from mtglab.claude import client, interview, modes, stance, tools
+from mtglab.decks.model import Deck
+from mtglab.decks.source import MemoryDeckSource
 
 # A deck shaped like the case this mode exists for: an imported draft where one
 # card owes a rationale and its neighbours already have theirs, so a question
@@ -188,19 +188,19 @@ def test_a_malformed_item_is_dropped_rather_than_crashing():
 
 # ---------------------------------------------------------------- the brief
 
-def test_the_brief_assembles_without_a_corpus(source, no_network):
+def test_the_brief_assembles_without_a_pool(source, no_network):
     """A fresh clone has no `data/mtg.duckdb`. The brief still has to render,
     saying the card is unknown rather than pretending to know it."""
     facts = interview.brief("mini", "Sol Ring", source=source)
     assert facts["card"]["name"] == "Sol Ring"
     assert facts["card"]["category"] == "ramp"
     assert facts["deck"]["slug"] == "mini"
-    assert isinstance(facts["card"]["in_corpus"], bool)
+    assert isinstance(facts["card"]["in_pool"], bool)
 
 
 def test_the_brief_matches_a_card_the_way_someone_would_type_it(source, no_network):
     facts = interview.brief("mini", "  sol ring  ", source=source)
-    assert facts["card"]["name"] == "Sol Ring", "the corpus's spelling comes back"
+    assert facts["card"]["name"] == "Sol Ring", "the pool's spelling comes back"
 
 
 def test_a_card_the_deck_does_not_run_is_refused(source, no_network):

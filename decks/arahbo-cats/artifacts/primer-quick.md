@@ -20,7 +20,7 @@ Keep 2-5 lands. Do not demand mana pieces on top of that. From a Tier 1 policy s
 
 ## Turn-by-turn shape
 
-63 nonlands at 9 / 13 / 20 / 13 / 4 / 4 across MV 1-6, average nonland MV 3.03, counted from the corpus rather than by hand. The mass sits at three because eminence rewards having a body on the board every turn from turn one, and because the deck wants three mana spare from turn five onward.
+63 nonlands at 9 / 13 / 20 / 13 / 4 / 4 across MV 1-6, average nonland MV 3.03, counted from the pool rather than by hand. The mass sits at three because eminence rewards having a body on the board every turn from turn one, and because the deck wants three mana spare from turn five onward.
 
 ## Three things that will kill you
 
@@ -42,4 +42,4 @@ Keep 2-5 lands. Do not demand mana pieces on top of that. From a Tier 1 policy s
 | Lands | 36 |
 
 ---
-_Generated 2026-08-12 from `deck.yaml`. Edit the deck file, not this document._
+_Generated 2026-08-14 from `deck.yaml`. Edit the deck file, not this document._

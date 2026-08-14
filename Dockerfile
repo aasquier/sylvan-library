@@ -100,11 +100,11 @@ COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
  && command -v setpriv >/dev/null
 
-# **The corpus is never in this image.** Scryfall asks that bulk data not be
+# **The pool is never in this image.** Scryfall asks that bulk data not be
 # redistributed; it is ~63MB built from ~98MB of downloads; and it belongs on
-# the volume where it survives a deploy. CI fails the build if a corpus file is
+# the volume where it survives a deploy. CI fails the build if a card pool file is
 # ever tracked, and `.dockerignore` keeps `data/` out of the build context so a
-# local corpus cannot reach a layer by accident either.
+# local pool cannot reach a layer by accident either.
 
 EXPOSE 8080
 
@@ -112,8 +112,8 @@ EXPOSE 8080
 # package for one HTTP request is a package to patch forever.
 #
 # `/api/health` is on `PUBLIC_PATHS`, so this answers with `MTGLAB_REQUIRE_AUTH`
-# on. It reports corpus state rather than merely being 200, but *liveness* is
-# what a health check is for here — an instance with no corpus yet is a correct
+# on. It reports pool state rather than merely being 200, but *liveness* is
+# what a health check is for here — an instance with no card pool yet is a correct
 # state to be in between deploy and seeding, not an unhealthy one.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4)"]

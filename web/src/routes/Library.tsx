@@ -147,8 +147,8 @@ function DeleteDialog({ deck, onCancel, onDeleted }: {
  * exactly that. Every other card image in the app is a hotlink to this CDN
  * too; the only difference here is that the URL is a constant.
  *
- * Which is itself a deliberate choice. It cannot come from the corpus: `art_crop`
- * hangs off the oracle card, so the corpus only knows Scryfall's *default*
+ * Which is itself a deliberate choice. It cannot come from the pool: `art_crop`
+ * hangs off the oracle card, so the pool only knows Scryfall's *default*
  * printing — a different painting by a different artist. Picking this one means
  * naming this printing. The `?<timestamp>` cache-buster Scryfall appends is
  * dropped; the bare URL serves the same bytes and does not rot when they
@@ -203,9 +203,9 @@ function LibraryMasthead({ decks, health }: {
           <h1 className="text-2xl font-semibold tracking-tight">Deck library</h1>
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
             {decks} deck{decks === 1 ? '' : 's'} ·{' '}
-            {health?.corpus
-              ? `${health.oracle_cards.toLocaleString()} cards in the local corpus`
-              : 'no corpus yet — run `mtglab data refresh`'}
+            {health?.pool
+              ? `${health.oracle_cards.toLocaleString()} cards in the local pool`
+              : 'no card pool yet — run `mtglab data refresh`'}
           </p>
           <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
             <em>Sylvan Library</em> by Yeong-Hao Han, Commander&rsquo;s Arsenal —
@@ -240,7 +240,7 @@ function FirstRun() {
         <p className="mt-2 max-w-xl text-sm leading-relaxed"
            style={{ color: 'var(--text-secondary)' }}>
           Paste a decklist from Moxfield, Archidekt, Arena or anywhere else.
-          Names resolve against the local corpus, the gate checks legality and
+          Names resolve against the local pool, the gate checks legality and
           colour identity immediately, and the deck arrives as a draft — with a
           count of the cards whose slot you have not argued for yet.
         </p>
@@ -316,7 +316,7 @@ function DeckCard({ deck, onDelete, heading: Heading = 'h2' }: {
                   deck of somebody else's is not in this response at all, so
                   the absence of this badge elsewhere says nothing. */}
               {deck.writable && !deck.shared && <Badge>private</Badge>}
-              {/* null is "the corpus was missing, so the gate never ran" --
+              {/* null is "the pool was missing, so the gate never ran" --
                   which is not the same as passing. Rendering it like a clean
                   deck throws away the distinction the list endpoint carries
                   these counts to preserve. */}
@@ -476,9 +476,9 @@ export default function Library() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Deck library</h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {health?.corpus
-              ? `${health.oracle_cards.toLocaleString()} cards in the local corpus`
-              : 'no corpus yet — run `mtglab data refresh`'}
+            {health?.pool
+              ? `${health.oracle_cards.toLocaleString()} cards in the local pool`
+              : 'no card pool yet — run `mtglab data refresh`'}
           </p>
         </div>
       )}

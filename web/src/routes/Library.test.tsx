@@ -2,7 +2,7 @@
  *
  * The filtering is a `useMemo` over three independent controls, which is the
  * kind of code that is obviously correct until two of them are set at once.
- * The gate badge matters more: `errors: null` means the corpus was missing and
+ * The gate badge matters more: `errors: null` means the pool was missing and
  * the gate never ran, which is not the same as passing, and the whole reason
  * `/api/decks` carries those counts at all.
  */
@@ -61,7 +61,7 @@ const DECKS: DeckTile[] = [
          total_cards: 99, errors: 1 }),
 ]
 
-const HEALTHY: Health = { corpus: true, oracle_cards: 35000, printings: 107000 }
+const HEALTHY: Health = { pool: true, oracle_cards: 35000, printings: 107000 }
 
 function renderLibrary() {
   return render(<MemoryRouter><Library /></MemoryRouter>)
@@ -175,15 +175,15 @@ describe('Library', () => {
   })
 
   it('distinguishes "the gate did not run" from "the deck passed"', async () => {
-    // `errors: null` means the corpus was unavailable. `/api/decks` goes to the
+    // `errors: null` means the pool was unavailable. `/api/decks` goes to the
     // trouble of carrying that distinction; rendering it identically to a clean
     // deck throws it away, which is the exact failure the counts exist to stop.
     vi.mocked(api.decks).mockResolvedValue([
       deck({ slug: 'unchecked', name: 'Unchecked', errors: null, warnings: null }),
     ])
     vi.mocked(api.health).mockResolvedValue({
-      corpus: false, oracle_cards: 0, printings: 0,
-      message: 'no corpus yet -- run `mtglab data refresh`',
+      pool: false, oracle_cards: 0, printings: 0,
+      message: 'no card pool yet -- run `mtglab data refresh`',
     })
     renderLibrary()
     await waitFor(() => expect(shownNames()).toHaveLength(1))

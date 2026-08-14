@@ -168,4 +168,4 @@ Selesnya cats-only aggro in two phases. Arahbo has two abilities in two differen
 - **Temur Sabertooth** — Saves a Cat from removal and rebuys ETBs.
 
 ---
-_Generated 2026-08-12 from `deck.yaml`._
+_Generated 2026-08-14 from `deck.yaml`._

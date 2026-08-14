@@ -17,13 +17,13 @@ explicit act: send another seed.
 
 *Planning happens in the request, running happens in the job.* The key is a
 hash of the compiled deck, so knowing whether this is a hit means compiling
-first -- a deck parse and one indexed corpus query, milliseconds against the
+first -- a deck parse and one indexed pool query, milliseconds against the
 eighteen seconds it saves. `plan_mana` and `plan_lands` do that and hand back
 either a finished result or the closure that would produce one. On a miss the
 compiled cards are passed *into* the closure, so nothing is compiled twice.
 
 *A planning failure is not a new failure mode.* Compiling in the request means
-a missing deck or an absent corpus now fails earlier than it used to, and it
+a missing deck or an absent pool now fails earlier than it used to, and it
 must not fail *differently*: the exception is carried into the job and thrown
 from the worker, so the caller still gets a 200 and then a job in state
 `error`, which is the shape the UI already knows. An optimisation that turns a
@@ -43,7 +43,7 @@ from collections.abc import Callable
 from typing import Any
 
 from mtglab.api.jobs import Plan, Progress
-from mtglab.api.service import _connect, _corpus_for, _source
+from mtglab.api.service import _connect, _pool_for, _source
 from mtglab.decks.model import Deck
 from mtglab.decks.source import DeckSource
 from mtglab.sim import cache
@@ -80,13 +80,13 @@ def _compile(slug: str, *, source: DeckSource | None = None
     deck = _source(source).get(slug)
     con = _connect()
     try:
-        cards = _corpus_for(deck, con)
+        cards = _pool_for(deck, con)
     finally:
         if con is not None:
             con.close()
     if not cards:
         raise RuntimeError(
-            "simulation needs the card corpus -- run `mtglab data refresh`")
+            "simulation needs the card pool -- run `mtglab data refresh`")
     library, commander = compile_deck(deck, cards)
     return deck, library, commander
 
@@ -115,7 +115,7 @@ def _deferred_failure(exc: BaseException) -> Callable[[Progress], dict[str, Any]
     """Re-raise a planning failure inside the job it would have been.
 
     Compilation moved into the request when the cache arrived, so a deck that
-    is missing, has no corpus or has no lands now fails *earlier* than it used
+    is missing, has no card pool or has no lands now fails *earlier* than it used
     to. It must not fail differently: before the cache, that error reached the
     caller as a job in state `error`, and the UI knows how to show one. So the
     exception is caught, carried, and thrown again from the worker -- same

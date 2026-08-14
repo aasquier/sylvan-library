@@ -119,7 +119,7 @@ primary_region = "iad"          # change to the region nearest you
 [[mounts]]
   source = "mtglab_data"
   destination = "/data"
-  # 3GB, sized in §4 step 3 to hold the ~63MB corpus, the ~98MB of Scryfall
+  # 3GB, sized in §4 step 3 to hold the ~63MB pool, the ~98MB of Scryfall
   # downloads it is built from, `app.db`, the decks, and a backup. Both halves
   # of that download now actually land here — until 2026-08-12 `download_bulk`
   # wrote to a relative `data/scryfall`, which in this container would have
@@ -169,7 +169,7 @@ primary_region = "iad"          # change to the region nearest you
   # worth more than every micro-optimisation in that section combined.
   #
   # `suspend` rather than `stop`: it resumes from memory, so a wake is fast.
-  # This is also why seeding the corpus is not a boot step — several minutes of
+  # This is also why seeding the pool is not a boot step — several minutes of
   # download on the wake path would turn a visit into an outage.
   #
   # auto_stop_machines = "suspend"
@@ -188,7 +188,7 @@ primary_region = "iad"          # change to the region nearest you
   # The same endpoint as the image's HEALTHCHECK, checked from outside the
   # container. `/api/health` is on `PUBLIC_PATHS`, so it answers 200 with auth
   # on — that is what makes it usable here rather than a login redirect. It
-  # reports corpus state in its body, but an unseeded instance is a correct
+  # reports pool state in its body, but an unseeded instance is a correct
   # state between deploy and §4 step 6, not an unhealthy one.
   [[http_service.checks]]
     interval = "30s"

@@ -1,7 +1,7 @@
-"""Local card corpus: Scryfall bulk data in DuckDB.
+"""Local card pool: Scryfall bulk data in DuckDB.
 
 Why local, and why DuckDB: "deep hits from the entire history of Magic" is a
-query over ~35k oracle cards, not a recall exercise. Holding the whole corpus
+query over ~35k oracle cards, not a recall exercise. Holding the whole pool
 locally turns colour-identity checks, legality checks, and best-in-slot
 searches into things that are *verified* rather than remembered -- which is
 exactly where card-evaluation mistakes come from.
@@ -115,10 +115,10 @@ CREATE INDEX IF NOT EXISTS idx_printings_oracle ON printings(oracle_id);
 
 #: Columns added to `oracle_cards` after the table first shipped. `CREATE TABLE
 #: IF NOT EXISTS` does nothing to a database that already has the table, so an
-#: existing corpus would keep the old shape and every query naming a new column
+#: existing pool would keep the old shape and every query naming a new column
 #: would fail. Adding them here makes an old database *readable*; it does not
 #: make it *correct*, because the values only arrive on the next ingest --
-#: which is why `corpus_is_stale` exists rather than leaving a silently
+#: which is why `pool_is_stale` exists rather than leaving a silently
 #: all-NULL column to be mistaken for "no card has power".
 _ADDED_COLUMNS = (
     ("power", "VARCHAR"), ("toughness", "VARCHAR"), ("loyalty", "VARCHAR"),
@@ -144,7 +144,7 @@ def oracle_columns(con) -> set[str]:
     """The columns `oracle_cards` actually has on this connection.
 
     Needed because the migration in `connect()` cannot always run: the API
-    opens the corpus **read-only** so a `data refresh` cannot lock the app out,
+    opens the pool **read-only** so a `data refresh` cannot lock the app out,
     and `ALTER TABLE` on a read-only handle fails. Without this, pulling a
     schema change would break every card query for anyone with an existing
     database — not on their next ingest, immediately.
@@ -155,8 +155,8 @@ def oracle_columns(con) -> set[str]:
     return {r[0] for r in rows}
 
 
-def corpus_is_stale(con) -> bool:
-    """Does this corpus predate the power/toughness columns?
+def pool_is_stale(con) -> bool:
+    """Does this pool predate the power/toughness columns?
 
     Worth a named question rather than a silent NULL. A database loaded before
     those columns existed answers every query about them with NULL, which reads
@@ -166,11 +166,11 @@ def corpus_is_stale(con) -> bool:
     every creature as statless.
 
     Cheap: one scan short-circuited by LIMIT, and creatures are over half the
-    corpus, so a current database answers immediately.
+    pool, so a current database answers immediately.
     """
     if not con.execute("SELECT 1 FROM oracle_cards LIMIT 1").fetchall():
-        # An empty corpus is not a stale one — there is nothing to be wrong
-        # about, and `health()` already reports the corpus as missing.
+        # An empty pool is not a stale one — there is nothing to be wrong
+        # about, and `health()` already reports the pool as missing.
         return False
     if "power" not in oracle_columns(con):
         return True
@@ -212,7 +212,7 @@ def download_bulk(kind: str, dest_dir: str | Path | None = None) -> Path:
     default to a *relative* `data/scryfall`, so the download landed beside the
     process's working directory no matter what `MTGLAB_DATA_DIR` said. In a
     container that put half a gigabyte of JSON on the ephemeral layer while the
-    corpus built from it went to the volume.
+    pool built from it went to the volume.
 
     The file is stored exactly as served, compression included -- `_iter_cards`
     decompresses on the fly. `default_cards` is ~2GB expanded but well under
@@ -258,7 +258,7 @@ def _front(c: dict, field: str):
     """A field from the card, falling back to its front face.
 
     **This is a correctness fix, not tidiness.** `mana_cost` is absent at the
-    top level for all 501 double-faced cards, so the corpus recorded them as
+    top level for all 501 double-faced cards, so the pool recorded them as
     NULL, `parse_mana_cost(None)` returns a cost of `{0}`, and the Tier 1
     compiler handed every one of them to the simulator as a *free spell*. Etali
     is a seven-drop; it was being cast on turn one. Two of the six decks were
@@ -560,9 +560,9 @@ def _select(con) -> str:
     """The SELECT clause, with any column this database lacks filled as NULL.
 
     The alternative — a fixed column list — turns a schema change into an
-    immediate outage for every existing corpus, because the read-only handle
+    immediate outage for every existing pool, because the read-only handle
     the API uses cannot migrate itself. Filling with NULL degrades to "we do
-    not know this card's power", which is true, and `corpus_is_stale` is what
+    not know this card's power", which is true, and `pool_is_stale` is what
     stops that from being mistaken for "this card has no power".
     """
     have = oracle_columns(con)
@@ -622,7 +622,7 @@ def get_cards(con, names: Iterable[str]) -> dict[str, CardRecord]:
 
 def search(con, where: str, params: Sequence[Any] = (), limit: int = 100,
            order_by: str | None = None) -> list[CardRecord]:
-    """Escape hatch for ad-hoc corpus queries, e.g.
+    """Escape hatch for ad-hoc pool queries, e.g.
 
         search(con, "oracle_text ILIKE ? AND list_contains(color_identity,'G')",
                ['%create a Food token%'])

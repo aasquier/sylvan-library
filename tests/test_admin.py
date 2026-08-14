@@ -28,12 +28,12 @@ pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 pytest.importorskip("argon2")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from mtglab import config  # noqa: E402
-from mtglab.api import jobs  # noqa: E402
-from mtglab.api.app import create_app  # noqa: E402
-from mtglab.auth import bootstrap, db, mail, sessions, tokens, users  # noqa: E402
+from mtglab import config
+from mtglab.api import jobs
+from mtglab.api.app import create_app
+from mtglab.auth import bootstrap, db, mail, sessions, tokens, users
 
 PASSWORD = "correct-horse-battery-staple"
 OTHER = "a-different-long-passphrase"

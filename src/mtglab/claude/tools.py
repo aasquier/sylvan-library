@@ -2,10 +2,10 @@
 
 This is how [rule 1](../../../CLAUDE.md) stops being a request and starts being
 a mechanism. A prompt saying "do not rely on your memory of card text" is not
-enforcement -- a model asked what Arahbo does with no corpus access answers
+enforcement -- a model asked what Arahbo does with no card pool access answers
 from its weights, and that is precisely the failure `CLAUDE.md` records as
 having already happened twice. A model that must call `search_cards` to learn
-what a card does gets the corpus row as the fact, because there is nothing else
+what a card does gets the pool row as the fact, because there is nothing else
 on the table.
 
 **The registry is the capability set.** `READ_ONLY` below is the complete list
@@ -35,7 +35,7 @@ makes **a banned card invisible**.
 
 That was a real hole in rule 1, found by running a turn rather than by
 reasoning about one: asked what the two cards failing the gate do, a first turn
-could not look up Emrakul, the Aeons Torn or Primeval Titan, said the corpus
+could not look up Emrakul, the Aeons Torn or Primeval Titan, said the pool
 had nothing, and answered from labelled recall. ADR 14's third boundary
 working; its first boundary not. `get_cards` closes it -- no filters at all,
 `legal_commander` reported per card, so a banned card returns its real oracle
@@ -129,7 +129,7 @@ READ_ONLY: dict[str, Tool] = {
             properties={"slug": _SLUG},
             description=(
                 "The full contents of one deck: every card with its category, "
-                "quantity, corpus-verified card text, and the rationale "
+                "quantity, pool-verified card text, and the rationale "
                 "('why') the user wrote for its slot. Call this before "
                 "discussing any specific deck -- it is the only way to know "
                 "what is actually in it and what the user claimed for each "
@@ -200,7 +200,7 @@ READ_ONLY: dict[str, Tool] = {
                 },
             },
             description=(
-                "Look up named cards in the corpus and return what they "
+                "Look up named cards in the pool and return what they "
                 "actually do: oracle text, mana cost, mana value, type line, "
                 "colour identity, keywords, power and toughness, loyalty, "
                 "Commander legality, Game Changer status, Reserved List "
@@ -208,7 +208,7 @@ READ_ONLY: dict[str, Tool] = {
                 "**Every claim you make about a specific card must come from "
                 "this tool, including cards you are certain you remember.** "
                 "Your recollection of a card is not evidence; this is. Colour "
-                "identity in particular is the corpus's own field and accounts "
+                "identity in particular is the pool's own field and accounts "
                 "for back faces, so never infer it from a mana cost. "
                 "Power and toughness are strings, because '*' and '1+*' are "
                 "real printed values, and are the front face's on a "

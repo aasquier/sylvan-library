@@ -228,7 +228,7 @@ def test_quantities_survive_a_swap():
 def test_adding_a_card_is_a_pure_insertion():
     out = add_card(DECK, name="Arcane Signet", category="ramp",
                    why="Two mana rock, on colour.")
-    lines = [line for line in changed(DECK, out)]
+    lines = list(changed(DECK, out))
     assert all(line.startswith("+") for line in lines), lines
     assert len(lines) == 3, lines
     assert yaml.safe_load(out)["cards"][3] == {

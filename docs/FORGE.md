@@ -6,7 +6,7 @@ here. This is how to install it and what the bridge does.
 
 Nothing on this page is committed. Forge's distribution, its card data and the
 JVM all live under `~/.local/share/mtglab/`, outside the repository, because
-`res/cardsfolder` is a second engine's card corpus and `CLAUDE.md` rule 5
+`res/cardsfolder` is a second engine's card pool and `CLAUDE.md` rule 5
 covers it.
 
 ## Install

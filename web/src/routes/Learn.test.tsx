@@ -7,9 +7,9 @@
  * - a combination that is **not** a faction must not render an empty "What
  *   happened" heading, because writing to fill a field is exactly how
  *   Mono-Blue ends up with a story;
- * - a named card that the corpus does not have is **dropped and counted**,
+ * - a named card that the pool does not have is **dropped and counted**,
  *   not drawn from its name;
- * - with no corpus at all the page still teaches — names and prose, and an
+ * - with no card pool at all the page still teaches — names and prose, and an
  *   honest note about what is missing.
  *
  * The fourth is the same rule the wheel is pinned by from both sides: nothing
@@ -70,7 +70,7 @@ const TAXONOMY: ColorTaxonomy = {
 
 const GOLGARI_DETAIL: CombinationDetail = {
   ...TAXONOMY.combinations.find((c) => c.key === 'BG')!,
-  corpus: true,
+  pool: true,
   champions: [{
     name: 'Jarad, Golgari Lich Lord', role: 'Dead, and in charge.',
     mana_cost: '{B}{B}{G}{G}', type_line: 'Legendary Creature — Zombie Elf',
@@ -143,11 +143,11 @@ describe('the colours tab', () => {
     expect(screen.queryByText('Who they are')).toBeNull()
   })
 
-  it('shows the champion the corpus resolved and drops the one it did not',
+  it('shows the champion the pool resolved and drops the one it did not',
      async () => {
        renderLearn('/learn?c=BG')
        // Wait for the resolved cards rather than the name: before the fetch
-       // lands the page shows the taxonomy's own list, which is the no-corpus
+       // lands the page shows the taxonomy's own list, which is the no-pool
        // rendering and legitimately includes every name.
        expect(await screen.findByText('Legendary Creature — Zombie Elf'))
          .toBeTruthy()
@@ -170,13 +170,13 @@ describe('the colours tab', () => {
     expect(await screen.findByText(/the whole set/)).toBeTruthy()
   })
 
-  it('teaches without a corpus, and says what is missing', async () => {
+  it('teaches without a card pool, and says what is missing', async () => {
     vi.mocked(api.combination).mockResolvedValue({
-      ...GOLGARI_DETAIL, corpus: false, champions: [], signature: [],
+      ...GOLGARI_DETAIL, pool: false, champions: [], signature: [],
       dropped: 0, exact_total: null,
     })
     renderLearn('/learn?c=BG')
-    // The names and the roles come from the taxonomy, which needs no corpus,
+    // The names and the roles come from the taxonomy, which needs no card pool,
     // so the page still says who Jarad is.
     expect(await screen.findByText('Jarad, Golgari Lich Lord')).toBeTruthy()
     expect(screen.getByText(/Dead, and in charge/)).toBeTruthy()

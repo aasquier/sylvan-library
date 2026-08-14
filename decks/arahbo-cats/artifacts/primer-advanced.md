@@ -42,4 +42,4 @@ Command Beacon comes in if Arahbo keeps dying. Doubling Season goes back in if t
 Ajani, Nacatl Pariah is illegal here — the back face Ajani, Nacatl Avenger carries a colour indicator making him white AND red, so his identity is R/W and outside Selesnya. Eladamri's Call cannot find Arahbo; he is in the command zone, not the library. Loam Lion's Forest condition is almost never live on turn one — Temple Garden is the only land that is both a Forest and a white source.
 
 ---
-_Generated 2026-08-12 from `deck.yaml`._
+_Generated 2026-08-14 from `deck.yaml`._

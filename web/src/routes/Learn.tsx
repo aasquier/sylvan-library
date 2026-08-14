@@ -13,7 +13,7 @@
  *
  * - **The colours** reads `/api/colors` for the 32 and `/api/colors/{key}` for
  *   one of them with its cards resolved. The split matters: the first works on
- *   a fresh clone with no corpus, the second is where every card fact enters,
+ *   a fresh clone with no card pool, the second is where every card fact enters,
  *   and a name that does not resolve is dropped and counted rather than drawn
  *   as an empty card.
  * - **Vocabulary** reads `/api/glossary`, the same table `<Term>` and
@@ -51,7 +51,7 @@ const TIER_ERA: Record<string, string> = {
 /* ----------------------------------------------------------------- a card */
 
 /**
- * A real card, rendered from the corpus and captioned with nothing.
+ * A real card, rendered from the pool and captioned with nothing.
  *
  * `note` is the champion's story role and is the only sentence attached to a
  * card anywhere in this page. The signature list passes none at all, which is
@@ -183,7 +183,7 @@ function CombinationPanel({ combo, taxonomy }: {
         </p>
       )}
 
-      {/* Names without a corpus, cards with one. The champion list is drawn
+      {/* Names without a card pool, cards with one. The champion list is drawn
           from `colors.py` either way, so a fresh clone still learns who
           Trostani is — it just does not get her card. */}
       {combo.champions.length > 0 && (
@@ -192,7 +192,7 @@ function CombinationPanel({ combo, taxonomy }: {
               style={{ color: 'var(--text-muted)' }}>
             Who they are
           </h3>
-          {detail?.corpus ? (
+          {detail?.pool ? (
             <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {detail.champions.map((c) => (
                 <RefCard key={c.name} card={c} note={c.role} />
@@ -221,17 +221,17 @@ function CombinationPanel({ combo, taxonomy }: {
            style={{ color: 'var(--text-muted)' }}>
           Cards whose colour identity is precisely {combo.name} — they can go in
           this deck and in no narrower one.
-          {/* Counted over the corpus rather than stored, and it is the
+          {/* Counted over the pool rather than stored, and it is the
               sharpest sentence available about a four-colour slot: two cards,
               in the entire game. */}
           {detail?.exact_total != null && (
-            <> The corpus has <strong style={{ color: 'var(--text-secondary)' }}>
+            <> The pool has <strong style={{ color: 'var(--text-secondary)' }}>
               {detail.exact_total.toLocaleString()}</strong> of them
               {detail.exact_total <= 5 && ' — the whole set'}.
             </>
           )}
         </p>
-        {detail?.corpus ? (
+        {detail?.pool ? (
           <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {detail.signature.map((c) => <RefCard key={c.name} card={c} />)}
           </div>
@@ -239,7 +239,7 @@ function CombinationPanel({ combo, taxonomy }: {
           <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
             {combo.signature.join(' · ')}
             <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
-              The cards themselves need the corpus — run <code>mtglab data
+              The cards themselves need the pool — run <code>mtglab data
               refresh</code>.
             </span>
           </p>
@@ -249,11 +249,11 @@ function CombinationPanel({ combo, taxonomy }: {
       <p className="mt-5 text-xs" style={{ color: 'var(--text-muted)' }}>
         Colour identity here is Scryfall’s, checked against{' '}
         <em>{combo.verified_by}</em>.
-        {/* A dropped name is a bug in the reference table, not in the corpus,
+        {/* A dropped name is a bug in the reference table, not in the pool,
             so it says so rather than failing quietly. */}
         {detail && detail.dropped > 0
           && ` ${detail.dropped} named card${detail.dropped === 1 ? '' : 's'} `
-             + 'could not be found in the corpus and are not shown.'}
+             + 'could not be found in the pool and are not shown.'}
       </p>
     </article>
   )

@@ -193,7 +193,7 @@ describe('Import', () => {
     fireEvent.click(screen.getByText('Preview'))
 
     await waitFor(() =>
-      expect(screen.getByText(/1 name the\s+corpus does not know/)).toBeTruthy())
+      expect(screen.getByText(/1 name the\s+pool does not know/)).toBeTruthy())
     expect(screen.getByText('Sol Rng')).toBeTruthy()
     expect(screen.getByText(/Nothing was guessed/)).toBeTruthy()
   })

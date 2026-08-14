@@ -1,7 +1,7 @@
 """The vocabulary.
 
 Structural, and every test here runs everywhere -- there is nothing in this
-module that needs a corpus, which is the property the Learn page depends on.
+module that needs a card pool, which is the property the Learn page depends on.
 
 The one test worth reading twice is the last: the simulator's controls look
 their help text up by key, so a renamed key would empty a tooltip silently.

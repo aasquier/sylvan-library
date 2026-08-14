@@ -32,8 +32,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from mtglab.api import service  # noqa: E402
-from mtglab.claude import tools  # noqa: E402
+from mtglab.api import service
+from mtglab.claude import tools
 
 CLAUDE_PKG = Path(__file__).resolve().parents[1] / "src" / "mtglab" / "claude"
 
