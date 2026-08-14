@@ -22,7 +22,13 @@ from mtglab.decks.analyze import deck_stats
 from mtglab.decks.edit import EditFailed
 from mtglab.decks.importer import ImportRefused
 from mtglab.decks.model import CATEGORIES, DECK_STATUSES, Deck
-from mtglab.decks.source import DeckExists, DeckNotFound, DeckSource, FileDeckSource
+from mtglab.decks.source import (
+    DeckExists,
+    DeckNotFound,
+    DeckSource,
+    FileDeckSource,
+    ReadOnlySource,
+)
 from mtglab.decks.validate import validate
 
 if TYPE_CHECKING:
@@ -199,10 +205,11 @@ def list_decks(*, source: DeckSource | None = None) -> list[dict[str, Any]]:
     `errors` is None when the corpus is unavailable, which is different from
     zero and must not render as a pass.
     """
+    decks = _source(source)
     con = _connect()
     try:
         out = []
-        for deck in _source(source).all():
+        for deck in decks.all():
             art = None
             identity: list[str] = []
             errors = warnings = None
@@ -227,6 +234,11 @@ def list_decks(*, source: DeckSource | None = None) -> list[dict[str, Any]]:
             out.append({
                 "slug": deck.slug,
                 "name": deck.name,
+                # On the shelf as well as the deck page, so the library grid can
+                # decide whether to offer a delete control without asking who
+                # the viewer is. Per deck rather than per response because that
+                # is what it becomes when decks have owners.
+                "writable": decks.writable,
                 "status": deck.status,
                 "stage": deck.stage,
                 # The draft's to-do list, as a number. Carried on the library
@@ -522,7 +534,8 @@ def _chosen_art(deck: Any, con: Any) -> dict[str, Any] | None:
 
 
 def get_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
-    deck = _source(source).get(slug)
+    decks = _source(source)
+    deck = decks.get(slug)
     con = _connect()
     try:
         cards = _corpus_for(deck, con)
@@ -545,6 +558,16 @@ def get_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
             "commander_art": deck.commander_art,
             "slug": deck.slug,
             "name": deck.name,
+            # Whether *this caller* may change *this deck*. Sent as data rather
+            # than re-derived in the client from `is_admin`, because that rule
+            # is about to stop being the rule: when decks have owners, the
+            # answer is a comparison the server can make and the browser
+            # cannot. A UI that hides its buttons on `is_admin` today would
+            # have to be found and changed then; one that reads this will not.
+            #
+            # It is a courtesy, not the enforcement. Every write route refuses
+            # independently -- see `api/app.py`'s `ReadOnlySource` handler.
+            "writable": decks.writable,
             "status": deck.status,
             "stage": deck.stage,
             "needs_rationale": len(deck.unjustified),
@@ -611,9 +634,11 @@ def import_deck(*, text: str, slug: str, name: str = "",
     thinking is counted rather than fabricated, and the artifacts stay shut
     until a human has done it.
     """
-    decks = _source(source)
-    if not decks.writable:
-        raise ImportRejected("this library is read-only")
+    # The library, not the slug: this runs before the slug is even validated,
+    # and a caller who may not write should not learn whether their slug was
+    # acceptable. A fourth bespoke exception (`ImportRejected`) collapsed into
+    # `ReadOnlySource` with the other three.
+    decks = _for_writing(source)
 
     slug = slug.strip().lower()
     if not _SLUG.match(slug):
@@ -708,14 +733,12 @@ def create_deck(*, slug: str, name: str = "", commander: list[str] | None = None
     colour taxonomy is how a person *finds* a commander, not how a deck records
     what it is.
     """
-    # Checked here rather than via `_for_writing`, which raises `EditRejected`
-    # -- the wrong exception for a route that only catches `CreateRejected`,
-    # and the wrong words too: nothing is being edited, and the deck whose
-    # writability is in question does not exist yet. This matches what
-    # `import_deck` does, for the same reasons.
-    decks = _source(source)
-    if not decks.writable:
-        raise CreateRejected("this library is read-only")
+    # The deck does not exist yet, so the subject of the refusal is the library
+    # rather than a slug. It goes through `_for_writing` like everything else
+    # now -- the separate check here existed because `EditRejected` was the
+    # wrong exception for a route catching `CreateRejected`, and there is only
+    # one exception left for it to be wrong about.
+    decks = _for_writing(source)
     commander = [c.strip() for c in (commander or []) if c.strip()]
 
     slug = slug.strip().lower()
@@ -851,12 +874,9 @@ def delete_deck(*, slug: str, confirm: str,
     about the work's importance is the same failure as one that edits a deck
     without asking — it is your library, and the confirmation is the check.
     """
-    # Checked here rather than via `_for_writing`, which raises `EditRejected`
-    # -- the wrong exception for a route that catches `DeleteRejected`, and the
-    # wrong word too: nothing is being edited. Same reasoning as `create_deck`.
-    decks = _source(source)
-    if not decks.writable:
-        raise DeleteRejected("this library is read-only")
+    # Refused before the deck is even looked up, which is the ordering that
+    # matters most here: this is the one operation that moves a directory.
+    decks = _for_writing(source, slug)
     deck = decks.get(slug)                       # raises DeckNotFound
 
     typed = confirm.strip().casefold() if isinstance(confirm, str) else ""
@@ -1258,10 +1278,30 @@ def _issues(report: ValidationReport) -> dict[str, list[dict[str, Any]]]:
     }
 
 
-def _for_writing(source: DeckSource | None) -> DeckSource:
+def _for_writing(source: DeckSource | None,
+                 subject: str = "this library") -> DeckSource:
+    """The source, if this caller may write to it. `ReadOnlySource` if not.
+
+    **This used to raise `EditRejected`, and so answered 422.** That was
+    defensible while "read-only" was a property of the *source* — there was one
+    library, everybody who could see it could write it, and the flag was
+    unreachable in production because `FileDeckSource.writable` was hardcoded
+    `True`. It stopped being defensible the moment the answer depended on *who
+    was asking*: 422 says the request was malformed, and there is nothing wrong
+    with this request except the person making it.
+
+    So all three bespoke refusals — `EditRejected` here, `CreateRejected` in
+    `create_deck` and `import_deck`, `DeleteRejected` in `delete_deck`, each
+    chosen to match what its own route happened to catch — collapse into the
+    one exception the protocol already defines, handled once in `api/app.py`
+    as a 403. No client has ever seen the 422, so nothing is being broken.
+
+    `subject` is what the message names: a slug where there is one, and the
+    library itself where the deck does not exist yet.
+    """
     decks = _source(source)
     if not decks.writable:
-        raise EditRejected("this deck is read-only")
+        raise ReadOnlySource(subject)
     return decks
 
 
@@ -1347,7 +1387,7 @@ def add_card(slug: str, *, name: str, category: str, why: str = "",
     if to not in edit.CARD_LISTS:
         raise EditRejected(f"cards go into {' or '.join(edit.CARD_LISTS)}, not {to!r}")
     category = _check_category(category)
-    decks = _for_writing(source)
+    decks = _for_writing(source, slug)
     deck = decks.get(slug)
 
     con = _connect()
@@ -1389,7 +1429,7 @@ def remove_card(slug: str, *, name: str,
     Magic. That matters because it means a deck can still be pruned on a
     machine that has never run `data refresh`.
     """
-    decks = _for_writing(source)
+    decks = _for_writing(source, slug)
     entry = _find_card(decks.get(slug), name)
     if entry is None:
         raise EditRejected(f"{name!r} is not in this deck")
@@ -1413,7 +1453,7 @@ def set_card_field(slug: str, *, name: str, field: str, value: Any,
     is rule 4, and [ADR 12](docs/adr/0012) rule 3 is where it binds a tool
     rather than a person.
     """
-    decks = _for_writing(source)
+    decks = _for_writing(source, slug)
     entry = _find_card(decks.get(slug), name)
     if entry is None:
         raise EditRejected(f"{name!r} is not in this deck")
@@ -1466,7 +1506,7 @@ def set_deck_field(slug: str, *, field: str, value: Any,
     whether that id is a printing *of this commander*. Pointing a deck at some
     other card's art would be accepted by every check that did not ask.
     """
-    decks = _for_writing(source)
+    decks = _for_writing(source, slug)
     deck = decks.get(slug)              # 404 before anything else
     if field == "commander_art" and str(value or "").strip():
         _check_printing(deck, str(value).strip())
@@ -1486,7 +1526,7 @@ def set_note(slug: str, *, key: str, value: str,
     than in an artifact precisely so that regenerating the five deliverables
     cannot lose them.
     """
-    decks = _for_writing(source)
+    decks = _for_writing(source, slug)
     decks.get(slug)                     # 404 before anything else
     try:
         updated = edit.set_note(decks.read_text(slug), key=key, value=value)
@@ -1507,10 +1547,11 @@ def swap_card(slug: str, *, out: str, into: str, why: str,
     Everything is checked before anything is written, and the edit itself is
     surgical -- see `decks/edit.py` for why a load-and-dump was not an option.
     """
-    try:
-        decks = _for_writing(source)
-    except EditRejected as exc:
-        raise SwapRejected(str(exc)) from exc
+    # No longer wrapped into `SwapRejected`: that translation existed only to
+    # turn `_for_writing`'s `EditRejected` into something this route caught,
+    # and both ends of it are gone. `ReadOnlySource` goes straight to the 403
+    # handler, like every other refused write.
+    decks = _for_writing(source, slug)
     if not why.strip():
         # Rule 4, enforced at the boundary as well as in the editor: a card
         # that cannot justify its slot is a card to cut.

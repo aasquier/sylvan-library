@@ -61,6 +61,9 @@ const job = (result: unknown, status: 'queued' | 'done' = 'done') => ({
 const DECK = {
   slug: 'goreclaw-stompy',
   name: 'Goreclaw — Mono-Green Stompy',
+  // The owner's view. Every editing test below describes what the maintainer
+  // sees; `READ_ONLY_DECK` is the other half.
+  writable: true,
   commander: ['Goreclaw, Terror of Qal Sisma'],
   companion: null,
   bracket: 4,
@@ -1119,5 +1122,65 @@ describe('DeckDetail rationale interview discoverability', () => {
     await screen.findByText(DECK.name)
 
     expect(screen.queryByRole('button', { name: /ask claude/i })).toBeNull()
+  })
+})
+
+/**
+ * A deck somebody may read but not change.
+ *
+ * The mirror of `tests/test_library_write_gate.py`, and it exists for the same
+ * reason: before the write gate landed, every account that could see the
+ * curated six could also edit and delete them, and no test on either side of
+ * the wire ever logged in as a second person to find out.
+ *
+ * Hiding a control is a courtesy and never the defence — the server refuses
+ * independently with a 403. What these pin is that the app does not offer
+ * somebody a button that cannot work.
+ */
+describe('DeckDetail for a reader', () => {
+  beforeEach(() => {
+    vi.mocked(api.deck).mockReset()
+      .mockResolvedValue({ ...DECK, writable: false } as unknown as Deck)
+  })
+
+  it('shows the deck', async () => {
+    // The control. If this fails the gate has gone too far: the library is
+    // meant to be readable by everyone, and only writing was taken away.
+    renderDeck()
+    expect(await screen.findByText('Goreclaw — Mono-Green Stompy')).toBeTruthy()
+  })
+
+  it('offers no way to edit or remove a card', async () => {
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(screen.queryByTitle('Remove Sol Ring from the deck')).toBeNull()
+    expect(screen.queryByText('Edit why')).toBeNull()
+    expect(screen.queryByText('Write why')).toBeNull()
+  })
+
+  it('does not offer the rationale interview', async () => {
+    // Gated with the writes although it only asks questions: its whole point
+    // is helping somebody write a `why` they could not save.
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(screen.queryByText('Ask Claude')).toBeNull()
+  })
+
+  it('still shows the notes it cannot edit', async () => {
+    // The distinction worth pinning: a note is the deck's *thinking*, so it
+    // renders for a reader. Only the Edit control goes.
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    fireEvent.click(screen.getByRole('button', { name: 'Notes' }))
+    expect(screen.queryByText('Edit')).toBeNull()
+  })
+
+  it('still shows the swap shortlist, without the swap', async () => {
+    // Analysis stays; acting on it goes. Reading why a card is a candidate is
+    // worth having without the power to make the change.
+    renderDeck()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    openValidation()
+    expect(screen.queryByText('Use this card')).toBeNull()
   })
 })

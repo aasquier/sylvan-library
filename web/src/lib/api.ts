@@ -19,6 +19,10 @@ export interface DeckSummary {
    * reasoned about. Orthogonal to `status` — all four combinations are real.
    */
   stage: string
+  /** Whether this viewer may change this deck. See `DeckDetail.writable` —
+   *  same field, carried on the shelf so the grid can decide whether to offer
+   *  a delete control. A courtesy; the server refuses independently. */
+  writable: boolean
   /** Cards with no `why` yet. A draft's to-do list, as a number. */
   needs_rationale: number
   commander: string[]
@@ -79,6 +83,18 @@ export interface DeckDetail extends DeckSummary {
    *  default. A deck property rather than a viewer preference: it lives in
    *  `deck.yaml` and travels with the deck through git. */
   commander_art: string
+  /** Whether this viewer may change this deck.
+   *
+   *  Read from the server rather than derived from `auth.is_admin`, and the
+   *  difference matters: today those two are the same answer, because there
+   *  is one library and it is the maintainer's. When decks have owners they
+   *  stop being the same answer, and a component gating on `is_admin` would
+   *  be quietly wrong rather than loudly broken.
+   *
+   *  **Hiding a control is a courtesy, not a defence.** Every write route
+   *  refuses independently with a 403; this only stops the app offering
+   *  somebody a button that cannot work. */
+  writable: boolean
 }
 
 /** One printing of the commander, as the art picker offers it. */

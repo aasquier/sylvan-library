@@ -24,7 +24,7 @@ from mtglab.api import admin, auth, jobs, service
 from mtglab.api.deps import Scope, UserScope, deck_source
 from mtglab.auth import bootstrap
 from mtglab.auth.mail import EmailSender
-from mtglab.decks.source import DeckNotFound, DeckSource
+from mtglab.decks.source import DeckNotFound, DeckSource, ReadOnlySource
 
 # The request scope, as one annotation. Every deck-facing route takes it, so
 # when auth arrives the change is to `deps.deck_source` and nowhere else.
@@ -171,6 +171,27 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     async def _deck_missing(_request, exc: DeckNotFound):
         return JSONResponse(status_code=404,
                             content={"detail": f"no deck '{exc}'"})
+
+    @app.exception_handler(ReadOnlySource)
+    async def _deck_read_only(_request, exc: ReadOnlySource):
+        """A deck this caller may read but not change.
+
+        Registered here rather than caught in each write route, for the reason
+        the middleware exists: there are nine routes that write a deck and the
+        tenth is the one somebody adds in a year. A handler on the exception
+        cannot be forgotten by a route that raises it, because raising it *is*
+        how a source refuses.
+
+        **403 and not ADR 5's 404**, which is the same exception ADR 17 makes
+        for `/api/admin` and for the same reason. ADR 5 hides resources whose
+        *existence* is the secret; this deck's existence is not — it is in a
+        public repository, `GET /api/decks` lists it to every account, and the
+        caller has very likely just been reading it. A 404 would hide nothing
+        and would tell somebody their deck had vanished.
+        """
+        return JSONResponse(
+            status_code=403,
+            content={"detail": f"read-only: {exc} is not yours to change"})
 
     # ------------------------------------------------------------- meta
 

@@ -779,10 +779,80 @@ arc; this is what the next few sessions actually do.
       is `max(id)` over rows that exist, and a deleted id is not one of them. It
       stops the next reissue, not the last one.
 
-   Still owed from the test list itself, and none of it done: **the theme
-   interview on the instance** (both modes, and now both readers), **a deck edit
-   surviving a machine restart**, and **delete → re-invite → claim with a chosen
-   username**, which #67 and #68 built and nobody has run end to end.
+   6. **The curated library was writable by every invited account.** Found
+      2026-08-14, minutes after the first non-admin claimed their invite and
+      became a real second person on the instance. `deps.deck_source` handed
+      the same `FileDeckSource()` to everybody and `FileDeckSource.writable`
+      was hardcoded `True`, so `mitch` could swap cards in, or delete, any of
+      the curated six. Recoverable — a delete moves the directory to `.trash/`
+      and the decks are in git — but an edit to `/data/decks` is the live
+      source of truth and nothing else records it.
+
+      **Nothing was wrong with the classification; it was answering a
+      different question.** `tests/test_isolation.py` files every deck route as
+      *shared*, with reasons like "edits a shared deck", and that is correct
+      about **reading**. Before there was a second account, "everyone sees the
+      same decks" and "everyone may edit them" were indistinguishable
+      statements. An invite made them different and nothing in the suite was
+      watching the seam: the read-only path *existed* in `service.py` and was
+      dead code, because no source ever reported `writable=False`.
+
+      Fixed by deriving writability from the caller in the one place that
+      already decides what a request may see, and by collapsing four bespoke
+      refusals — `EditRejected`, `CreateRejected`, `DeleteRejected`,
+      `ImportRejected`, each chosen to match whatever its own route caught —
+      into `ReadOnlySource`, handled once as a **403**. It answered 422 before,
+      which was defensible while read-only was a property of the *source* and
+      is not once it is a property of the *caller*: nothing is wrong with the
+      request except the person making it. No client had ever seen the 422,
+      since the path was unreachable.
+
+      Two things worth carrying. **The test that would have caught it is the
+      one nobody writes**: `test_api.py` covered read-only sources through
+      `dependency_overrides`, proving what a route does *when handed* one, and
+      never that anybody is handed one. Same shape as the dossier's missing
+      HTTP tests. And **`/api/decks` is no longer byte-identical per caller** —
+      it carries `writable`, which is about the viewer — so the "shared really
+      is shared" assertion had to get sharper rather than looser: every field
+      but that one is identical, and that one must actually differ.
+
+      **The consequence is deliberate and is not the end state.** There is
+      nowhere for a non-admin's decks to live, so the app is read-only for
+      them, the three "start a deck" doors included. That is the correct
+      interim answer — the alternative is their decks landing in somebody
+      else's library — and it is the argument for doing the ownership tier
+      next rather than eventually.
+
+   7. **Deck ownership and sharing — designed, not built.** Asked for
+      2026-08-14: people should be able to show each other their decks, the
+      maintainer's should always be visible, and it should be a tab somebody
+      opts into rather than something in the way. Leaderboards and macro deck
+      stats are named as later work on top of it.
+
+      This is HOSTING.md step 6 / ADR 4 arriving with a second requirement
+      attached, and it **wants its own ADR** because it changes what ADR 1 and
+      ADR 5 mean in practice. The decisions already taken: the curated six
+      become the maintainer's own decks, **shared by default**, rather than an
+      ownerless library; and a shared deck is readable but not writable by
+      anyone else, which is the gate item 6 just built generalised from
+      `is_admin` to an owner comparison. The hard part is ADR 5 — another
+      person's **private** deck must be 404 and not 403, which is the opposite
+      of the 403 item 6 chose for a deck that is deliberately visible.
+
+   Still owed from the test list itself: **the theme interview on the
+   instance** (both modes, and now both readers) — the deployed React half,
+   specifically; the environment itself is proven.
+
+   **Done since:** a deck edit surviving a machine restart (2026-08-13), and
+   **delete → re-invite → claim with a chosen username**, completed
+   2026-08-14T00:25Z. The claim is worth a sentence because it was open for
+   three sessions on a wrong theory: a stripped URL fragment was suspected, and
+   `POST /api/auth/claim/preview` answering 200 disproved it — that call reads
+   the token and spends nothing, so its success means the fragment had been
+   arriving the whole time and **the claim had simply never been attempted.**
+   An absent request is the proof of a stripped link *and* of a thing nobody
+   did; the log cannot tell them apart, and only a live tail during a real
+   attempt could.
 6. **After that, next build work in order:** re-price automated PR review
    (ENGINEERING §5, parked), the stance dial UI, then the remaining Claude
    modes ADR 15 names and branch 5 does not build (argue a slot, deck

@@ -386,16 +386,18 @@ export default function Library() {
             {/* Muted until the card is hovered or the button is focused:
                 deleting a deck should be reachable without being the thing
                 your eye lands on. */}
-            <button
-              onClick={() => setDeleting(deck)}
-              title={`Delete ${deck.name}`}
-              aria-label={`Delete ${deck.name}`}
-              className="absolute right-2 top-2 z-10 rounded-md px-2 py-1 text-[11px] opacity-0 transition focus:opacity-100 group-hover/card:opacity-100"
-              style={{ background: 'var(--surface-1)', color: 'var(--text-muted)',
-                       border: '1px solid var(--hairline)' }}
-            >
-              Delete
-            </button>
+            {deck.writable && (
+              <button
+                onClick={() => setDeleting(deck)}
+                title={`Delete ${deck.name}`}
+                aria-label={`Delete ${deck.name}`}
+                className="absolute right-2 top-2 z-10 rounded-md px-2 py-1 text-[11px] opacity-0 transition focus:opacity-100 group-hover/card:opacity-100"
+                style={{ background: 'var(--surface-1)', color: 'var(--text-muted)',
+                         border: '1px solid var(--hairline)' }}
+              >
+                Delete
+              </button>
+            )}
             <Link to={`/decks/${deck.slug}`}
                   className="card-surface block overflow-hidden rounded-xl transition hover:-translate-y-0.5 hover:shadow-lg">
               {/* 626/457 is `art_crop`'s own shape, so the tile shows the

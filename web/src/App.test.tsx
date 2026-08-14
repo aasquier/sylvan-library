@@ -196,6 +196,11 @@ describe('with auth on and somebody signed in', () => {
     // The real chain: a 401 from any endpoint reaches the interceptor in
     // api.ts, which announces a lost session; the shell re-asks the one
     // endpoint that answers without one rather than assuming what happened.
+    //
+    // Signed in as an admin purely so `Import` is in the nav to navigate
+    // through — this test is about a session ending, not about who may write,
+    // and it needs some second lazy screen to leave the library for.
+    routes['/api/auth/me'] = { body: signedIn('ada', true) }
     renderApp()
     await screen.findByText('Card search')
     // Off the library and back, so its mount fetch runs again — the session

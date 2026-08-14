@@ -517,7 +517,7 @@ def test_a_read_only_source_refuses_every_swap():
     with TestClient(app) as client:
         resp = client.post("/api/decks/mono-green/swap", json={
             "out": "Primeval Titan", "into": "Cultivator Colossus", "why": "x"})
-        assert resp.status_code == 422
+        assert resp.status_code == 403
         assert "read-only" in resp.json()["detail"]
 
 
@@ -755,7 +755,7 @@ def test_a_read_only_source_refuses_every_edit():
             client.patch(base, json={"field": "status", "value": "built"}),
         ]
         for resp in responses:
-            assert resp.status_code == 422
+            assert resp.status_code == 403
             assert "read-only" in resp.json()["detail"]
 
 
@@ -879,7 +879,7 @@ def test_a_read_only_library_refuses_import():
     with TestClient(app) as client:
         resp = client.post("/api/decks/import",
                            json={"slug": "new-deck", "text": "1 Sol Ring\n"})
-        assert resp.status_code == 422
+        assert resp.status_code == 403
         assert "read-only" in resp.json()["detail"]
 
 
@@ -1381,7 +1381,7 @@ def test_create_is_refused_on_a_read_only_library():
     with TestClient(app) as client:
         r = client.post("/api/decks", json={
             "slug": "nope", "commander": ["Gyome, Master Chef"]})
-    assert r.status_code == 422
+    assert r.status_code == 403
 
 
 @pytest.mark.needs_full_corpus
@@ -1514,7 +1514,7 @@ def test_a_read_only_library_refuses_a_deletion(client):
     client.app.dependency_overrides[deck_source] = lambda: source
     try:
         r = client.request("DELETE", "/api/decks/doomed?confirm=doomed")
-        assert r.status_code == 422
+        assert r.status_code == 403
         assert "read-only" in r.json()["detail"]
         assert source.slugs() == ["doomed"]
     finally:

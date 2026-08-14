@@ -195,6 +195,70 @@ def test_a_read_only_source_refuses_writes(decks_root):
         source.create("new", "slug: new\n")
 
 
+def test_a_read_only_file_source_refuses_all_three_writes(decks_root):
+    """The same contract, on the implementation that has a filesystem.
+
+    `MemoryDeckSource` has always honoured `writable`; `FileDeckSource`
+    hardcoded `True` and so the flag was, for the only source the API actually
+    served, decorative. Every one of these three raised nothing before.
+    """
+    source = FileDeckSource(decks_root, writable=False)
+    assert source.writable is False
+    with pytest.raises(ReadOnlySource):
+        source.write_text("mini", "slug: mini\n")
+    with pytest.raises(ReadOnlySource):
+        source.create("new", "slug: new\n")
+    with pytest.raises(ReadOnlySource):
+        source.delete("mini")
+
+
+def test_a_read_only_file_source_leaves_the_disk_alone(decks_root):
+    """The assertion that matters: refusing is not the same as not writing.
+
+    An implementation that raised after `shutil.move` would pass the test
+    above and still have destroyed the deck.
+    """
+    before = (decks_root / "mini" / "deck.yaml").read_text(encoding="utf-8")
+    source = FileDeckSource(decks_root, writable=False)
+    for attempt in (lambda: source.write_text("mini", "wrecked: true\n"),
+                    lambda: source.delete("mini"),
+                    lambda: source.create("fresh", "slug: fresh\n")):
+        with pytest.raises(ReadOnlySource):
+            attempt()
+    assert (decks_root / "mini" / "deck.yaml").read_text(
+        encoding="utf-8") == before
+    assert sorted(source.slugs()) == ["mini", "other"]
+    assert not (decks_root / ".trash").exists()
+    assert not (decks_root / "fresh").exists()
+
+
+def test_read_only_refusal_does_not_depend_on_the_deck_existing(decks_root):
+    """A refused write says the same thing whether or not the deck is there.
+
+    Otherwise the pair (403, 404) is a membership oracle for the library. It
+    is a readable library, so this leaks nothing today -- but the ordering is
+    the part that survives into the per-user tier, where it will.
+    """
+    source = FileDeckSource(decks_root, writable=False)
+    with pytest.raises(ReadOnlySource):
+        source.write_text("mini", "slug: mini\n")
+    with pytest.raises(ReadOnlySource):
+        source.write_text("no-such-deck", "slug: no-such-deck\n")
+    with pytest.raises(ReadOnlySource):
+        source.delete("no-such-deck")
+    # And a *writable* source still tells the difference, so the ordering
+    # above is the read-only path's doing rather than a lost 404.
+    with pytest.raises(DeckNotFound):
+        FileDeckSource(decks_root).write_text("no-such-deck", "x: 1\n")
+
+
+def test_a_file_source_is_writable_by_default(decks_root):
+    """Every caller that is not the API -- the CLI, the artifact generator,
+    the tests above -- constructs one positionally and must be unaffected."""
+    assert FileDeckSource(decks_root).writable is True
+    assert FileDeckSource().writable is True
+
+
 # ---------------------------------------------------------------- creating
 
 def test_create_makes_a_new_deck_and_its_directory(decks_root):
