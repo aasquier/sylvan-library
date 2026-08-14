@@ -54,6 +54,7 @@ pytest.importorskip("argon2")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+import tiny_corpus  # noqa: E402
 from mtglab import config  # noqa: E402
 from mtglab.api import jobs  # noqa: E402
 from mtglab.api.app import create_app  # noqa: E402
@@ -69,23 +70,18 @@ SRC = Path(__file__).resolve().parents[1] / "src" / "mtglab"
 # is the justification -- if it does not read as a reason, the route is
 # probably user-scoped and mis-filed.
 SHARED = {
-    "/api/decks": "the curated library (ADR 1); the same six for everyone",
-    "/api/decks/import": "writes into the curated library, which is shared",
-    "/api/decks/{slug}": "one deck out of that same shared library",
-    "/api/decks/{slug}/validate": "the gate's verdict on a shared deck",
-    "/api/decks/{slug}/stats": "counts over a shared deck",
-    "/api/decks/{slug}/swap": "edits a shared deck",
-    "/api/decks/{slug}/cards": "edits a shared deck",
-    "/api/decks/{slug}/cards/{name}": "edits a shared deck",
-    "/api/decks/{slug}/notes/{key}": "edits a shared deck",
-    "/api/decks/{slug}/suggestions": "derived from a shared deck and the corpus",
-    "/api/decks/{slug}/commander": "corpus facts about a shared deck's commander",
-    "/api/decks/{slug}/printings": "which arts a shared deck's commander has",
-    "/api/decks/{slug}/interview": "questions about a shared deck's card",
-    # Both verbs, one entry: the dossier is about the commander of a deck
-    # everybody can already see, and ADR 19 keys it on the card's oracle id
-    # precisely so it is shared rather than per-person.
-    "/api/decks/{slug}/dossier": "who a shared deck's commander is",
+    # The three collection routes. They stay shared because every account may
+    # *call* them -- what differs is what comes back, and a route that filters
+    # its own answer per caller cannot be checked by asking for somebody
+    # else's copy of it. The per-deck routes below are where ADR 22's 404 is
+    # actually enforced, and they are user-scoped now.
+    "/api/decks": "every caller may list; the list is filtered to what they "
+                  "may see, and carries an owner per deck (ADR 22)",
+    "/api/decks/import": "writes into the caller's OWN library, never into an "
+                         "owner named in the path",
+    "/api/sim/mana": "submits a job against a deck the caller may see; the "
+                     "owner is resolved through Library and the job is scoped",
+    "/api/sim/lands": "submits a job too, same resolution, and the job is scoped",
     "/api/cards/search": "the public Scryfall corpus",
     "/api/sets/upcoming": "Scryfall's own release calendar",
     "/api/colors": "a fixed taxonomy, no data at all",
@@ -112,8 +108,6 @@ SHARED = {
     # the server to reach), and the job it hands back is scoped by `jobs.get`.
     "/api/claude/theme/proposal": "submits a job; colours and commanders out of "
                                   "the shared corpus, and the job is scoped",
-    "/api/sim/mana": "submits a job against a shared deck; the job is scoped",
-    "/api/sim/lands": "submits a job too, and the job it returns is scoped",
 }
 
 # Belongs to one person. Each entry says how to make one as user A and where to
@@ -121,6 +115,28 @@ SHARED = {
 USER_SCOPED = {
     "/api/jobs": "list",
     "/api/jobs/{job_id}": "item",
+    # ADR 22. Every per-deck route is addressed `/{owner}/{slug}` and answers
+    # **404** for another account's *private* deck -- not 403, which is
+    # reserved for a deck the caller can already read (a shared one they do
+    # not own). `test_a_private_deck_is_a_404_to_another_account` is the
+    # adversarial check; the write half is `tests/test_library_write_gate.py`.
+    #
+    # These were filed SHARED until 2026-08-14, which was correct about
+    # *reading the curated six* and silent about everything else -- the gap
+    # #80 fell through. A deck is now somebody's.
+    "/api/decks/{owner}/{slug}": "item",
+    "/api/decks/{owner}/{slug}/validate": "item",
+    "/api/decks/{owner}/{slug}/stats": "item",
+    "/api/decks/{owner}/{slug}/swap": "item",
+    "/api/decks/{owner}/{slug}/cards": "item",
+    "/api/decks/{owner}/{slug}/cards/{name}": "item",
+    "/api/decks/{owner}/{slug}/notes/{key}": "item",
+    "/api/decks/{owner}/{slug}/shared": "item",
+    "/api/decks/{owner}/{slug}/suggestions": "item",
+    "/api/decks/{owner}/{slug}/commander": "item",
+    "/api/decks/{owner}/{slug}/printings": "item",
+    "/api/decks/{owner}/{slug}/interview": "item",
+    "/api/decks/{owner}/{slug}/dossier": "item",
 }
 
 # Needs a session belonging to an admin (ADR 17). The value is the
@@ -556,3 +572,132 @@ def test_shared_entries_carry_a_reason():
 
 if __name__ == "__main__":                                    # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+# ------------------------------------------------------- ADR 22: deck owners
+
+@pytest.fixture
+def corpus(instance):
+    """A queryable corpus inside the instance's own scratch data directory.
+
+    Depends on `instance` rather than standing alone so it is built *inside*
+    that fixture's `config.use_paths`, and so both share one app. Creating a
+    deck is refused without a corpus (a commander nobody checked is a colour
+    identity nobody checked), so the ownership tests below need one — and only
+    they pay the second it costs.
+    """
+    return tiny_corpus.build(config.DB_PATH)
+
+
+def _make_private_deck(client, owner: str, slug: str) -> None:
+    """Create a deck in `owner`'s own tier and leave it private.
+
+    Written through the API rather than straight into SQLite, so what the
+    adversarial tests below reach for is a deck the app itself made — the
+    default really is private (ADR 22), and this fails if that ever changes.
+    """
+    r = client.post("/api/decks", json={
+        "slug": slug, "name": slug, "commander": ["Gyome, Master Chef"]})
+    assert r.status_code in (200, 201), r.text
+    body = client.get(f"/api/decks/{owner}/{slug}").json()
+    assert body["shared"] is False, "a new deck in the SQL tier must be private"
+
+
+@pytest.mark.parametrize("suffix", [
+    "", "/validate", "/stats", "/suggestions", "/commander", "/printings",
+])
+def test_a_private_deck_is_a_404_to_another_account(instance, corpus, suffix):
+    """ADR 22's hard case, and the opposite call from #80's.
+
+    A 403 here would confirm the deck exists, which is the leak ADR 5 exists to
+    prevent. #80 chose 403 for a *curated* deck because its existence is
+    published in a public repository and `GET /api/decks` had just listed it to
+    that caller — neither is true of somebody's private brew.
+    """
+    client, alice, _bob = instance
+    login(client, "alice", PASSWORD_A)
+    _make_private_deck(client, "alice", "secret-brew")
+    client.post("/api/auth/logout")
+
+    login(client, "bob", PASSWORD_B)
+    r = client.get(f"/api/decks/alice/secret-brew{suffix}")
+    assert r.status_code == 404, (
+        f"bob got {r.status_code} for alice's private deck{suffix}; a 403 "
+        f"would confirm it exists (ADR 5)")
+
+
+def test_a_private_deck_is_a_404_to_writes_too(instance, corpus):
+    """The half that is easy to get wrong.
+
+    A refused *write* on a private deck must be 404 rather than #80's 403, for
+    the same reason the reads above are: the write refusal is an answer about
+    a deck the caller cannot see, and 403 would tell them it is there.
+    """
+    client, _alice, _bob = instance
+    login(client, "alice", PASSWORD_A)
+    _make_private_deck(client, "alice", "secret-brew")
+    client.post("/api/auth/logout")
+
+    login(client, "bob", PASSWORD_B)
+    assert client.patch("/api/decks/alice/secret-brew",
+                        json={"field": "status", "value": "built"}
+                        ).status_code == 404
+    assert client.request("DELETE",
+                          "/api/decks/alice/secret-brew?confirm=secret-brew"
+                          ).status_code == 404
+    assert client.put("/api/decks/alice/secret-brew/shared",
+                      json={"shared": True}).status_code == 404
+
+
+def test_a_shared_deck_is_readable_but_403_to_write(instance, corpus):
+    """The other side of ADR 22's rule, and why it is not simply "404 always".
+
+    Once alice shares a deck bob can read it, so answering 404 to his write
+    would be a lie he can disprove by reloading the page. 403 is the honest
+    answer and it is #80's, unchanged.
+    """
+    client, _alice, _bob = instance
+    login(client, "alice", PASSWORD_A)
+    _make_private_deck(client, "alice", "on-display")
+    assert client.put("/api/decks/alice/on-display/shared",
+                      json={"shared": True}).status_code == 200
+    client.post("/api/auth/logout")
+
+    login(client, "bob", PASSWORD_B)
+    assert client.get("/api/decks/alice/on-display").status_code == 200
+    assert client.patch("/api/decks/alice/on-display",
+                        json={"field": "status", "value": "built"}
+                        ).status_code == 403
+
+
+def test_an_unknown_owner_is_a_404_and_not_a_different_error(instance):
+    """The owner segment must not enumerate the account list.
+
+    If "no such person" answered differently from "nothing of theirs for you",
+    the path would be an oracle for which accounts exist. One answer for both.
+    """
+    client, _alice, _bob = instance
+    login(client, "bob", PASSWORD_B)
+    assert client.get("/api/decks/nobody-here/whatever").status_code == 404
+    assert client.get("/api/decks/alice/not-a-deck").status_code == 404
+
+
+def test_an_admin_still_cannot_write_another_persons_deck(instance, corpus):
+    """Administering the instance is not owning everybody's decks.
+
+    The same property `test_an_admin_still_cannot_see_another_persons_job`
+    asserts for jobs, and the assertion that would catch somebody "fixing" the
+    ownership check by exempting admins from it. Alice is the admin here.
+    """
+    client, _alice, _bob = instance
+    login(client, "bob", PASSWORD_B)
+    _make_private_deck(client, "bob", "bobs-brew")
+    assert client.put("/api/decks/bob/bobs-brew/shared",
+                      json={"shared": True}).status_code == 200
+    client.post("/api/auth/logout")
+
+    login(client, "alice", PASSWORD_A)
+    assert client.get("/api/decks/bob/bobs-brew").status_code == 200
+    assert client.patch("/api/decks/bob/bobs-brew",
+                        json={"field": "status", "value": "built"}
+                        ).status_code == 403

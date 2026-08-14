@@ -35,6 +35,7 @@ pytest.importorskip("argon2")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+import tiny_corpus  # noqa: E402
 from mtglab import config  # noqa: E402
 from mtglab.api import jobs  # noqa: E402
 from mtglab.api.app import create_app  # noqa: E402
@@ -111,34 +112,38 @@ def test_a_guest_can_read_the_library(instance):
     listing = client.get("/api/decks")
     assert listing.status_code == 200
     assert [d["slug"] for d in listing.json()] == ["mini"]
-    assert client.get("/api/decks/mini").status_code == 200
+    assert client.get("/api/decks/local/mini").status_code == 200
 
 
 # ------------------------------------------------------ writing is not
 
 @pytest.mark.parametrize("verb,path,payload", [
-    ("put", "/api/decks/mini/notes/mulligan", {"value": "keep two lands"}),
-    ("patch", "/api/decks/mini", {"field": "status", "value": "built"}),
-    ("patch", "/api/decks/mini/cards/Sol Ring", {"field": "why",
+    ("put", "/api/decks/local/mini/notes/mulligan", {"value": "keep two lands"}),
+    ("patch", "/api/decks/local/mini", {"field": "status", "value": "built"}),
+    ("patch", "/api/decks/local/mini/cards/Sol Ring", {"field": "why",
                                                  "value": "rewritten"}),
-    ("delete", "/api/decks/mini/cards/Sol Ring", None),
-    ("post", "/api/decks/mini/swap", {"out": "Sol Ring",
+    ("delete", "/api/decks/local/mini/cards/Sol Ring", None),
+    ("post", "/api/decks/local/mini/swap", {"out": "Sol Ring",
                                       "into": "Arcane Signet", "why": "x"}),
-    ("post", "/api/decks/mini/cards", {"name": "Forest", "category": "land",
+    ("post", "/api/decks/local/mini/cards", {"name": "Forest", "category": "land",
                                        "why": "x"}),
-    ("post", "/api/decks/import", {"slug": "theirs", "text": "1 Sol Ring\n"}),
-    ("post", "/api/decks", {"slug": "theirs",
-                            "commander": ["Gyome, Master Chef"]}),
-    ("delete", "/api/decks/mini?confirm=mini", None),
+    ("delete", "/api/decks/local/mini?confirm=mini", None),
 ])
 def test_a_guest_cannot_write_anything(instance, verb, path, payload):
     """Every deck-writing route, refused to a signed-in non-owner.
 
     Parametrised over the route table rather than written as one test with
     nine asserts, so a regression names the endpoint that regressed. The list
-    is every write verb `api/app.py` declares against a deck; a tenth added
-    without a thought about ownership will not appear here, which is what
-    `test_isolation.py`'s generated classification is for.
+    is every write verb `api/app.py` declares against *an existing deck*; one
+    added without a thought about ownership will not appear here, which is
+    what `test_isolation.py`'s generated classification is for.
+
+    **`POST /api/decks` and `/api/decks/import` are deliberately no longer in
+    this list.** They used to be, and answering 403 to them was the interim
+    state ADR 22 exists to end: with nowhere for a guest's decks to live, the
+    only safe answer was that they could not make one. They write into
+    `lib.mine()` now, so a guest creating a deck is the feature rather than
+    the leak — see `test_a_guest_may_create_in_their_own_library`.
     """
     client, decks_dir = instance
     login(client, "guest", GUEST_PASSWORD)
@@ -165,25 +170,34 @@ def test_the_refusal_is_403_and_not_404(instance):
     """
     client, _ = instance
     login(client, "guest", GUEST_PASSWORD)
-    assert client.get("/api/decks/mini").status_code == 200
-    refused = client.put("/api/decks/mini/notes/mulligan", json={"value": "x"})
+    assert client.get("/api/decks/local/mini").status_code == 200
+    refused = client.put("/api/decks/local/mini/notes/mulligan", json={"value": "x"})
     assert refused.status_code == 403
 
 
-def test_a_refused_write_does_not_reveal_whether_the_deck_exists(instance):
-    """A guest gets the same answer for a real slug and an invented one.
+def test_a_refused_write_distinguishes_a_visible_deck_from_an_absent_one(instance):
+    """**This assertion inverted with ADR 22, and the old docstring said why.**
 
-    Not a live leak -- the library is readable, so the listing already answers
-    this. It is pinned because the ordering is what carries into the per-user
-    tier, where the pair (403, 404) *would* be a membership oracle over other
-    people's private decks.
+    It used to require 403 for a real slug *and* an invented one, on the
+    argument that the pair (403, 404) would become a membership oracle once
+    there were private decks. That was the right worry and the wrong place to
+    answer it. ADR 22 answers it where it actually bites: a deck the caller
+    **cannot see** answers 404 to everything, writes included, so no pair
+    exists to read. `tests/test_isolation.py` pins that half.
+
+    Here the caller can see the whole library -- `GET /api/decks` just listed
+    it to them -- so the two answers may differ, and they should. 403 says
+    "not yours to change"; 404 says "no such deck". Collapsing them would only
+    tell somebody their deck had vanished.
     """
     client, _ = instance
     login(client, "guest", GUEST_PASSWORD)
-    real = client.put("/api/decks/mini/notes/mulligan", json={"value": "x"})
-    absent = client.put("/api/decks/no-such-deck/notes/mulligan",
+    real = client.put("/api/decks/local/mini/notes/mulligan",
+                      json={"value": "x"})
+    absent = client.put("/api/decks/local/no-such-deck/notes/mulligan",
                         json={"value": "x"})
-    assert real.status_code == absent.status_code == 403
+    assert real.status_code == 403, "a shared deck the guest may read"
+    assert absent.status_code == 404, "no such deck"
 
 
 # --------------------------------------------------------- the owner still can
@@ -195,7 +209,7 @@ def test_the_owner_can_still_write(instance):
     """
     client, decks_dir = instance
     login(client, "owner", OWNER_PASSWORD)
-    response = client.put("/api/decks/mini/notes/mulligan",
+    response = client.put("/api/decks/local/mini/notes/mulligan",
                           json={"value": "keep two lands"})
     assert response.status_code == 200, response.text
     assert "keep two lands" in on_disk(decks_dir)
@@ -205,7 +219,7 @@ def test_the_owner_can_delete(instance):
     """The operation the flag exists for, from the permitted side."""
     client, decks_dir = instance
     login(client, "owner", OWNER_PASSWORD)
-    response = client.request("DELETE", "/api/decks/mini?confirm=mini")
+    response = client.request("DELETE", "/api/decks/local/mini?confirm=mini")
     assert response.status_code == 200, response.text
     assert not (decks_dir / "mini").exists()
 
@@ -216,12 +230,12 @@ def test_a_guest_is_refused_even_after_the_owner_has_written(instance):
     module-level source would fail this and pass everything above."""
     client, decks_dir = instance
     login(client, "owner", OWNER_PASSWORD)
-    assert client.put("/api/decks/mini/notes/mulligan",
+    assert client.put("/api/decks/local/mini/notes/mulligan",
                       json={"value": "owner wrote this"}).status_code == 200
     client.post("/api/auth/logout")
 
     login(client, "guest", GUEST_PASSWORD)
-    refused = client.put("/api/decks/mini/notes/mulligan",
+    refused = client.put("/api/decks/local/mini/notes/mulligan",
                          json={"value": "guest wrote this"})
     assert refused.status_code == 403
     assert "owner wrote this" in on_disk(decks_dir)
@@ -244,7 +258,7 @@ def test_with_auth_off_the_local_user_still_writes(tmp_path):
 
     with config.use_paths(data_dir=tmp_path / "data", decks_dir=decks_dir), \
             TestClient(create_app()) as client:
-        response = client.put("/api/decks/mini/notes/mulligan",
+        response = client.put("/api/decks/local/mini/notes/mulligan",
                               json={"value": "local edit"})
         assert response.status_code == 200, response.text
     assert "local edit" in (decks_dir / "mini" / "deck.yaml").read_text(
@@ -253,3 +267,199 @@ def test_with_auth_off_the_local_user_still_writes(tmp_path):
 
 if __name__ == "__main__":                                    # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+# --------------------------------------------- ADR 22: a guest has a library
+
+@pytest.fixture
+def corpus(instance):
+    """A queryable corpus inside the instance's scratch data directory.
+
+    Depends on `instance` so it is built inside that fixture's
+    `config.use_paths` and both share one app. Creating a deck is refused
+    without a corpus -- a commander nobody checked is a colour identity nobody
+    checked -- so only the two tests that create decks pay for it.
+    """
+    return tiny_corpus.build(config.DB_PATH)
+
+
+def test_a_guest_may_create_in_their_own_library(instance, corpus):
+    """The consequence #80 deliberately deferred, now built.
+
+    A guest could not create a deck at all while there was nowhere to put one;
+    the alternative was their decks landing in the maintainer's library. They
+    have their own tier now (ADR 22), so this is the route working rather than
+    the gate failing -- and the deck lands under *their* name, not `local`.
+    """
+    client, decks_dir = instance
+    login(client, "guest", GUEST_PASSWORD)
+
+    response = client.post("/api/decks", json={
+        "slug": "theirs", "commander": ["Gyome, Master Chef"]})
+    assert response.status_code in (200, 201), response.text
+    assert response.json()["owner"] == "guest"
+
+    # And it did not touch the file-backed library on its way.
+    assert sorted(p.name for p in decks_dir.iterdir()) == ["mini"]
+
+    # Private by default, so nothing is published the moment it exists.
+    assert client.get("/api/decks/guest/theirs").json()["shared"] is False
+
+
+def test_a_guest_still_cannot_create_inside_the_curated_library(
+        instance, corpus):
+    """Creating writes to the caller's own tier and cannot be aimed elsewhere.
+
+    `POST /api/decks` carries no owner segment at all, which is the structural
+    version of this rule: the API has no way to express "make a deck in
+    somebody else's library", so there is no check here to forget. Even a slug
+    that collides with a curated deck lands in the guest's own tier.
+    """
+    client, decks_dir = instance
+    login(client, "guest", GUEST_PASSWORD)
+    client.post("/api/decks", json={"slug": "mini",
+                                    "commander": ["Gyome, Master Chef"]})
+    assert sorted(p.name for p in decks_dir.iterdir()) == ["mini"]
+    assert on_disk(decks_dir) == DECK_YAML
+
+
+# --------------------------------------------------- the shelf's two halves
+
+def test_the_listing_marks_the_showcase_and_nothing_else(instance, corpus):
+    """`GET /api/decks` says which owner the curated six belong to (ADR 22).
+
+    The browse tab needs three groups out of one flat list -- yours, the
+    showcase, everybody else's -- and it can only work two of them out for
+    itself. `writable` identifies the caller's own decks; **nothing identifies
+    the maintainer's**, because the client is never told who that is. Without
+    this field a browser would have to infer the showcase from the *order* of
+    this response, and ordering is not a contract.
+
+    Read the two flags together: they are what "mine and the showcase in front,
+    everybody else behind a tab" is made of.
+    """
+    client, _ = instance
+    login(client, "guest", GUEST_PASSWORD)
+    client.post("/api/decks", json={"slug": "theirs",
+                                    "commander": ["Gyome, Master Chef"]})
+
+    tiles = {d["slug"]: d for d in client.get("/api/decks").json()}
+    assert set(tiles) == {"mini", "theirs"}
+
+    # The file tier: the showcase, and not this caller's to change.
+    assert tiles["mini"]["showcase"] is True
+    assert tiles["mini"]["writable"] is False
+    # Their own: theirs to change, and not the showcase.
+    assert tiles["theirs"]["showcase"] is False
+    assert tiles["theirs"]["writable"] is True
+
+
+def test_a_private_deck_is_absent_from_somebody_else_s_shelf(instance, corpus):
+    """And so cannot be marked anything at all.
+
+    The tile's `shared` flag is only ever a fact about a deck the caller can
+    already see, which is why the app may render "private" from it without
+    ever claiming that about a stranger's deck: a stranger's private deck is
+    not in this response. It is the same fact its 404 states, arrived at the
+    same way -- `Library` never hands out a source that can see it.
+    """
+    client, _ = instance
+    login(client, "guest", GUEST_PASSWORD)
+    client.post("/api/decks", json={"slug": "theirs",
+                                    "commander": ["Gyome, Master Chef"]})
+    client.post("/api/auth/logout")
+
+    login(client, "owner", OWNER_PASSWORD)
+    slugs = {d["slug"] for d in client.get("/api/decks").json()}
+    assert slugs == {"mini"}, "the guest's private deck is not on this shelf"
+
+    # Shared, and now it is -- under its owner's name, and not writable here.
+    client.post("/api/auth/logout")
+    login(client, "guest", GUEST_PASSWORD)
+    assert client.put("/api/decks/guest/theirs/shared",
+                      json={"shared": True}).status_code == 200
+    client.post("/api/auth/logout")
+
+    login(client, "owner", OWNER_PASSWORD)
+    tiles = {d["slug"]: d for d in client.get("/api/decks").json()}
+    assert set(tiles) == {"mini", "theirs"}
+    assert tiles["theirs"]["owner"] == "guest"
+    assert tiles["theirs"]["writable"] is False
+    assert tiles["theirs"]["showcase"] is False
+
+
+# ------------------------ a laptop, with a maintainer address in the .env
+
+def test_a_laptop_with_an_admin_address_still_has_exactly_one_library(
+        tmp_path, monkeypatch):
+    """`MTGLAB_ADMIN_EMAIL` set and auth **off** — the maintainer's own laptop.
+
+    This is the configuration every test had, and no test had. `.env` sets the
+    address on the machine where `mtglab ui` runs with auth off, and the two
+    halves of `Library` disagreed about what that meant: `my_owner` answered
+    `local` because nobody is signed in, `_file_owner` answered the maintainer's
+    username because the variable is set, and `visible()` added the one
+    file-backed library under both names. The shelf showed all six curated decks
+    **twice**, and the tiles filed under `local` linked to a route that 404ed,
+    because `source_for("local")` fell through to the SQL tier and found no such
+    account.
+
+    Every existing test missed it from one side or the other: the auth-off
+    fixtures `monkeypatch.delenv` the address precisely so they do not create an
+    `app.db`, and every fixture that sets it also turns auth on.
+
+    Found by loading the page, which is the fourth time that has been the only
+    way to see something.
+    """
+    monkeypatch.setenv("MTGLAB_ADMIN_EMAIL", "maintainer@example.com")
+    monkeypatch.setenv("MTGLAB_ADMIN_USERNAME", "gyome")
+    jobs.clear()
+    decks_dir = tmp_path / "decks"
+    (decks_dir / "mini").mkdir(parents=True)
+    (decks_dir / "mini" / "deck.yaml").write_text(DECK_YAML, encoding="utf-8")
+
+    with config.use_paths(data_dir=tmp_path / "data", decks_dir=decks_dir), \
+            TestClient(create_app()) as client:
+        tiles = client.get("/api/decks").json()
+        assert [d["slug"] for d in tiles] == ["mini"], "one deck, listed once"
+        assert tiles[0]["owner"] == "local"
+        assert tiles[0]["writable"] is True
+        assert tiles[0]["showcase"] is True
+
+        # And the address on the tile is the one that works. The shelf's own
+        # link 404ing is what this looked like on the page.
+        assert client.get("/api/decks/local/mini").status_code == 200
+        assert client.get("/api/decks/gyome/mini").status_code == 404
+
+        # A stray owner segment is a 404 rather than a lookup that enumerates.
+        assert client.get("/api/decks/nobody/mini").status_code == 404
+
+    # No assertion about `app.db` here, deliberately: `auth/bootstrap.py`
+    # reconciles the maintainer account at every start of the app whenever
+    # `MTGLAB_ADMIN_EMAIL` is set, so the file exists in this configuration by
+    # design. The test below is the one that can see the difference.
+
+
+def test_a_bare_laptop_acquires_no_database_from_a_typed_deck_url(tmp_path,
+                                                                  monkeypatch):
+    """Nothing set, auth off, and somebody types an owner segment.
+
+    `test_the_local_app_touches_no_database` pins the *listing*, and
+    `Library.visible()` carries a paragraph about why it must not reach
+    `shared_decks()`. The per-deck path had no such guard and a URL reaches it
+    directly: `source_for("nobody")` fell through to a user lookup, which opens
+    `app.db` -- and on a laptop, opening it creates it. A single mistyped
+    address would leave a database behind for a feature this run does not use.
+    """
+    monkeypatch.delenv("MTGLAB_ADMIN_EMAIL", raising=False)
+    jobs.clear()
+    decks_dir = tmp_path / "decks"
+    (decks_dir / "mini").mkdir(parents=True)
+    (decks_dir / "mini" / "deck.yaml").write_text(DECK_YAML, encoding="utf-8")
+
+    with config.use_paths(data_dir=tmp_path / "data", decks_dir=decks_dir), \
+            TestClient(create_app()) as client:
+        assert client.get("/api/decks/nobody/mini").status_code == 404
+        assert client.get("/api/decks/local/mini").status_code == 200
+
+    assert not (tmp_path / "data" / "app.db").exists()

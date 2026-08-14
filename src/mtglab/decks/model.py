@@ -116,6 +116,20 @@ class Deck:
     name: str
     status: str = "theoretical"
     stage: str = "curated"
+    # Whether anybody with a session may read this deck, or only its owner
+    # (ADR 22). A third orthogonal axis: `status` is about cardboard, `stage`
+    # is about thinking, and this is about who may look.
+    #
+    # Defaults to True when absent -- the same argument `stage` makes, pointed
+    # the other way. The curated six are the showcase and predate the field, so
+    # absent must never silently hide them. A deck created in the SQL tier is
+    # written with `shared: false` explicitly, because `decks import` produces
+    # a draft with an empty `why` on all 99 cards and publishing that the
+    # instant it exists is nobody's intent.
+    #
+    # Sharing governs *reading*. Writing is the owner's alone either way, which
+    # is `Library`'s rule and not this flag's.
+    shared: bool = True
     commander: list[str] = field(default_factory=list)
     # Which printing's art the deck shows for its commander: a Scryfall
     # printing id, or empty for "whatever the corpus considers the default".
@@ -205,6 +219,9 @@ class Deck:
             name=raw.get("name") or slug or "",
             status=str(raw.get("status") or "theoretical").strip().lower(),
             stage=str(raw.get("stage") or "curated").strip().lower(),
+            # `is None` rather than `or True`: `shared: false` is falsey, and
+            # the whole point of the field is that it can say no.
+            shared=True if raw.get("shared") is None else bool(raw["shared"]),
             commander=list(commander),
             commander_art=str(raw.get("commander_art") or "").strip(),
             companion=raw.get("companion"),
@@ -224,6 +241,12 @@ class Deck:
             "stage": self.stage,
             "commander": self.commander,
         }
+        # Written only when it says no, for the same reason `commander_art` is
+        # written only when set: absent already means shared, so emitting
+        # `shared: true` would rewrite all six curated files to assert the
+        # default they already had.
+        if not self.shared:
+            payload["shared"] = False
         # Omitted when unset, so the six decks that predate it are unchanged by
         # a round trip and a `commander_art:` line in a diff always means
         # somebody picked one.

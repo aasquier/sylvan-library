@@ -46,6 +46,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   api,
+  deckUrl,
   type Card,
   type Combination,
   type ColorTaxonomy,
@@ -324,7 +325,7 @@ export default function NewDeck() {
       const made = await api.createDeck({
         slug, commander: [commander.name], name: name || commander.name,
       })
-      navigate(`/decks/${made.slug}`)
+      navigate(deckUrl(made))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setCreating(false)

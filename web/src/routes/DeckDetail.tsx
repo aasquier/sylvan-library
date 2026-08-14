@@ -7,6 +7,7 @@ import {
   type ClaudeStatus,
   type CommanderDossier,
   type DeckDetail as Deck,
+  type DeckRef,
   type DeckStats,
   type Suggestions,
   type ValidationReport,
@@ -26,6 +27,61 @@ import { ArtPicker } from '../components/artpicker'
 import { CommanderDossierPanel } from '../components/dossier'
 
 type Tab = 'cards' | 'stats' | 'validation' | 'notes'
+
+/**
+ * Put this deck on display to the other accounts on this instance, or take it
+ * off (ADR 22).
+ *
+ * Shown only to the owner, and it is the only control in the app that changes
+ * who can see something — so it says what it will *do* rather than what the
+ * deck currently *is*, and the current state is the sentence underneath. A
+ * button labelled with a state is the one people click expecting to select it.
+ *
+ * Nothing here is a permission model: sharing makes a deck readable by anybody
+ * signed in to this instance and by nobody else. The wording avoids "public"
+ * for exactly that reason — there are no unlisted links and nothing outside the
+ * auth boundary, which ADR 22 rejected on purpose.
+ */
+function ShareToggle({ deck, deckRef, onChanged }: {
+  deck: Deck
+  deckRef: DeckRef
+  onChanged: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function toggle() {
+    setBusy(true)
+    setError(null)
+    try {
+      await api.setShared(deckRef, !deck.shared)
+      onChanged()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <span className="flex flex-col gap-1">
+      <button onClick={() => void toggle()} disabled={busy}
+              className="rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+              style={{ border: '1px solid var(--hairline)',
+                       color: 'var(--text-secondary)' }}>
+        {busy ? 'Saving…' : deck.shared ? 'Make private' : 'Share this deck'}
+      </button>
+      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        {deck.shared
+          ? 'Anyone signed in here can read it.'
+          : 'Only you can see it.'}
+      </span>
+      {error && <span className="text-xs" style={{ color: 'var(--status-critical)' }}>
+        {error}
+      </span>}
+    </span>
+  )
+}
 
 /**
  * The deck's header: who leads it, what that card says, and who they are.
@@ -58,8 +114,12 @@ type Tab = 'cards' | 'stats' | 'validation' | 'notes'
  * the place it would have been easiest to ignore: "one of eight legendary
  * Trolls" is exactly the sentence a model writes fluently and wrongly.
  */
-function DeckHero({ deck, report, dossier, claude, onRefresh }: {
+function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
   deck: Deck
+  /** The deck's address. Taken from the URL rather than rebuilt from `deck`,
+   *  so every call this page makes is aimed at the deck the reader asked for
+   *  even if the payload's own `owner` ever disagreed. */
+  deckRef: DeckRef
   report: ValidationReport
   dossier: CommanderDossier | null
   /** Null until known. `stance.axes[0].level === 'off'` is what decides
@@ -116,6 +176,15 @@ function DeckHero({ deck, report, dossier, claude, onRefresh }: {
               : <Badge tone="critical">{report.errors.length} error(s)</Badge>}
           </div>
 
+          {/* Whose deck this is, and only when it is not the reader's. On your
+              own deck it would be a line telling you your own username. */}
+          {!deck.writable && (
+            <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+              Shared by <span style={{ color: 'var(--text-secondary)' }}>{deck.owner}</span>
+              {' '}— you can read this deck, not change it.
+            </p>
+          )}
+
           {/* The identity, loud — it constrains all 99 other cards and it used
               to be a row of 12px dots. The mana cost deliberately sits on the
               card's line below instead of next to this: both are rows of
@@ -159,7 +228,8 @@ function DeckHero({ deck, report, dossier, claude, onRefresh }: {
           )}
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <Link to={`/simulate?deck=${deck.slug}`}
+            <Link to={`/simulate?owner=${encodeURIComponent(deckRef.owner)}`
+                     + `&deck=${encodeURIComponent(deckRef.slug)}`}
                   className="rounded-lg px-4 py-2 text-sm font-medium"
                   style={{ background: 'var(--series-1)', color: '#fff' }}>
               Simulate this deck
@@ -169,7 +239,9 @@ function DeckHero({ deck, report, dossier, claude, onRefresh }: {
                 about the shape of the app but would offer a row of dead
                 buttons to somebody who is only ever going to read; the
                 server refuses either way. */}
-            {deck.writable && <ArtPicker slug={deck.slug} onPicked={onRefresh} />}
+            {deck.writable && <ShareToggle deck={deck} deckRef={deckRef}
+                                           onChanged={onRefresh} />}
+            {deck.writable && <ArtPicker deck={deckRef} onPicked={onRefresh} />}
             {card?.artist && (
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 {/* The artist belongs to the printing being shown, so when a
@@ -196,7 +268,7 @@ function DeckHero({ deck, report, dossier, claude, onRefresh }: {
           it is rather than vanish along with the card row. */}
       {deck.commander.length > 0 && (
         <CommanderDossierPanel
-          slug={deck.slug}
+          deck={deckRef}
           commander={deck.commander[0]}
           canGenerate={
             !!claude?.installed && !!claude?.configured
@@ -303,7 +375,11 @@ function CommanderFacts({ dossier }: { dossier: CommanderDossier }) {
 }
 
 export default function DeckDetail() {
-  const { slug = '' } = useParams()
+  const { owner = '', slug = '' } = useParams()
+  // Memoised because it is a dependency of the effects below, and a fresh
+  // object literal every render would re-run all of them on every keystroke
+  // anywhere on the page — including the one that costs a corpus query.
+  const deckRef = useMemo<DeckRef>(() => ({ owner, slug }), [owner, slug])
   const [deck, setDeck] = useState<Deck | null>(null)
   const [stats, setStats] = useState<DeckStats | null>(null)
   const [report, setReport] = useState<ValidationReport | null>(null)
@@ -349,7 +425,7 @@ export default function DeckDetail() {
    * that took a second round trip. */
   async function refresh() {
     const [d, s, v] = await Promise.all([
-      api.deck(slug), api.stats(slug), api.validate(slug),
+      api.deck(deckRef), api.stats(deckRef), api.validate(deckRef),
     ])
     setDeck(d)
     setStats(s)
@@ -363,7 +439,7 @@ export default function DeckDetail() {
     setSwapBusy(true)
     setSwapError(null)
     try {
-      await api.swapCard(slug, { ...swapping, why: swapWhy.trim() })
+      await api.swapCard(deckRef, { ...swapping, why: swapWhy.trim() })
       await refresh()
       setSwapping(null)
       setSwapWhy('')
@@ -375,7 +451,7 @@ export default function DeckDetail() {
   }
 
   async function saveRationale(name: string, why: string) {
-    await api.setCardField(slug, name, 'why', why)
+    await api.setCardField(deckRef, name, 'why', why)
     await refresh()
     setEditing(null)
   }
@@ -383,7 +459,7 @@ export default function DeckDetail() {
   async function removeCard(name: string) {
     setEditError(null)
     try {
-      await api.removeCard(slug, name)
+      await api.removeCard(deckRef, name)
       await refresh()
     } catch (e) {
       setEditError(errorMessage(e))
@@ -394,7 +470,7 @@ export default function DeckDetail() {
     setPromoteError(null)
     setPromoting(true)
     try {
-      await api.setDeckField(slug, 'stage', 'curated')
+      await api.setDeckField(deckRef, 'stage', 'curated')
       await refresh()
     } catch (e) {
       setPromoteError(errorMessage(e))
@@ -406,7 +482,7 @@ export default function DeckDetail() {
   useEffect(() => {
     setDeck(null)
     setError(null)
-    Promise.all([api.deck(slug), api.stats(slug), api.validate(slug)])
+    Promise.all([api.deck(deckRef), api.stats(deckRef), api.validate(deckRef)])
       .then(([d, s, v]) => {
         setDeck(d)
         setStats(s)
@@ -414,12 +490,14 @@ export default function DeckDetail() {
       })
       .catch((e) => setError(errorMessage(e)))
     setDossier(null)
-    api.commander(slug).then(setDossier).catch(() => setDossier(null))
+    api.commander(deckRef).then(setDossier).catch(() => setDossier(null))
     setClaude(null)
-    api.claudeStatus({ slug }).then(setClaude).catch(() => setClaude(null))
+    // `owner` alongside `slug`: this route takes its deck as a query parameter
+    // rather than a path segment, so the URL says nothing about whose it is.
+    api.claudeStatus({ slug, owner }).then(setClaude).catch(() => setClaude(null))
     setSuggestions(null)
     requested.current = null
-  }, [slug])
+  }, [deckRef, owner, slug])
 
   // Lazily, and only for the tab that shows them: building a shortlist means a
   // pool query per offending card, which is real work to do on a page most
@@ -429,10 +507,14 @@ export default function DeckDetail() {
   // `suggestions` looks equivalent and is not: it stays null until the response
   // lands, so switching tabs twice in that window fires the query again.
   useEffect(() => {
-    if (tab !== 'validation' || requested.current === slug) return
-    requested.current = slug
-    api.suggestions(slug).then(setSuggestions).catch(() => setSuggestions(null))
-  }, [tab, slug])
+    // Keyed on the whole address, not the slug: two owners may both have a
+    // `goreclaw`, and a ref that only remembered the slug would serve one
+    // person's shortlist on the other's deck.
+    const key = `${owner}/${slug}`
+    if (tab !== 'validation' || requested.current === key) return
+    requested.current = key
+    api.suggestions(deckRef).then(setSuggestions).catch(() => setSuggestions(null))
+  }, [tab, deckRef, owner, slug])
 
   const groups = useMemo(() => {
     if (!deck) return []
@@ -480,7 +562,8 @@ export default function DeckDetail() {
 
   return (
     <div className="space-y-6">
-      <DeckHero deck={deck} report={report} dossier={dossier} claude={claude}
+      <DeckHero deck={deck} deckRef={deckRef} report={report} dossier={dossier}
+                claude={claude}
                 onRefresh={() => { void refresh() }} />
 
       {/* A draft is a to-do list with a number on it (ADR 13), so the number
@@ -629,7 +712,7 @@ export default function DeckDetail() {
 
           {deck.writable && (
             <div className="flex flex-wrap items-center gap-3">
-              <AddCardForm slug={slug} stage={deck.stage} onDone={() => void refresh()} />
+              <AddCardForm deck={deckRef} stage={deck.stage} onDone={() => void refresh()} />
             </div>
           )}
           {editError && <ErrorNote>{editError}</ErrorNote>}
@@ -734,7 +817,7 @@ export default function DeckDetail() {
                    </div>
                    {editing === card.name && (
                      <RationaleEditor
-                       slug={slug}
+                       deck={deckRef}
                        card={card}
                        askNow={askNow}
                        onSave={(why) => saveRationale(card.name, why)}
@@ -948,14 +1031,14 @@ export default function DeckDetail() {
                     style={{ color: 'var(--text-muted)' }}>
                   {key.replace(/_/g, ' ')}
                 </h3>
-                <NoteEditor slug={slug} noteKey={key} value={value}
+                <NoteEditor deck={deckRef} noteKey={key} value={value}
                             writable={deck.writable}
                             onDone={() => void refresh()} />
               </section>
             ))}
           </div>
           {deck.writable && (
-            <AddNoteForm slug={slug} existing={Object.keys(deck.notes)}
+            <AddNoteForm deck={deckRef} existing={Object.keys(deck.notes)}
                          onDone={() => void refresh()} />
           )}
         </div>

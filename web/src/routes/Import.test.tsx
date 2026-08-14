@@ -22,6 +22,10 @@ vi.mock('react-router-dom', async () => ({
 vi.mock('../lib/api', async () => ({
   errorMessage: (await vi.importActual<typeof import('../lib/api')>(
     '../lib/api')).errorMessage,
+  // Real: it is what turns the response into the deck's address, and a stub
+  // would let this navigate to the pre-ADR-22 path with every test passing.
+  deckUrl: (await vi.importActual<typeof import('../lib/api')>(
+    '../lib/api')).deckUrl,
   api: { importDeck: vi.fn() },
   ApiError: class extends Error {},
 }))
@@ -31,6 +35,7 @@ const { api } = await import('../lib/api')
 function result(overrides: Partial<ImportResult> = {}): ImportResult {
   return {
     slug: 'arahbo-cats',
+    owner: 'aasquier',
     name: 'Arahbo — Cats',
     stage: 'draft',
     status: 'theoretical',
@@ -133,7 +138,10 @@ describe('Import', () => {
     paste('1 Sol Ring')
     fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
     fireEvent.click(screen.getByText('Import as draft'))
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/decks/arahbo-cats'))
+    // Owner-qualified, and read off the response rather than assumed: the
+    // server chooses which library a new deck lands in (ADR 22).
+    await waitFor(() => expect(navigate)
+      .toHaveBeenCalledWith('/decks/aasquier/arahbo-cats'))
   })
 
   it('splits a comma-separated commander field into a partner pair', async () => {

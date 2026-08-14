@@ -86,7 +86,7 @@ def test_a_version_one_database_migrates_in_place(tmp_path):
     users.create(old, "ada", password=PASSWORD)
     # Wind it back to what version 1 left behind.
     old.executescript("DROP TABLE auth_tokens; DROP TABLE sim_cache; "
-                      "DROP TABLE dossier_cache; PRAGMA user_version = 1;")
+                      "DROP TABLE dossier_cache; DROP TABLE user_decks; PRAGMA user_version = 1;")
     old.commit()
     old.close()
 
@@ -116,7 +116,7 @@ def test_a_version_two_database_gains_the_sim_cache(tmp_path):
     path = tmp_path / "v2.db"
     old = auth_db.connect(path)
     users.create(old, "ada", password=PASSWORD)
-    old.executescript("DROP TABLE sim_cache; DROP TABLE dossier_cache; "
+    old.executescript("DROP TABLE sim_cache; DROP TABLE dossier_cache; DROP TABLE user_decks; "
                       "PRAGMA user_version = 2;")
     old.commit()
     old.close()
@@ -187,6 +187,7 @@ def test_migrating_to_autoincrement_keeps_sessions_and_tokens(tmp_path):
                                     is_admin, disabled_at, created_at FROM users;
         DROP TABLE users;
         ALTER TABLE users_v4 RENAME TO users;
+        DROP TABLE user_decks;
         PRAGMA user_version = 4;
         COMMIT;
     """)
@@ -230,7 +231,7 @@ def test_a_version_three_database_gains_the_dossier_cache(tmp_path):
     users.create(old, "ada", password=PASSWORD)
     old.execute("INSERT INTO sim_cache (key, kind, result_json, created_at, "
                 "last_used_at) VALUES ('k', 'sim.mana', '{}', 'then', 'then')")
-    old.executescript("DROP TABLE dossier_cache; PRAGMA user_version = 3;")
+    old.executescript("DROP TABLE dossier_cache; DROP TABLE user_decks; PRAGMA user_version = 3;")
     old.commit()
     old.close()
 

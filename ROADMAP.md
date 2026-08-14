@@ -823,21 +823,77 @@ arc; this is what the next few sessions actually do.
       else's library — and it is the argument for doing the ownership tier
       next rather than eventually.
 
-   7. **Deck ownership and sharing — designed, not built.** Asked for
-      2026-08-14: people should be able to show each other their decks, the
-      maintainer's should always be visible, and it should be a tab somebody
-      opts into rather than something in the way. Leaderboards and macro deck
-      stats are named as later work on top of it.
+   7. **Deck ownership and sharing — built, both halves
+      ([ADR 22](docs/adr/0022-decks-have-owners-and-sharing-is-a-flag.md)), and
+      not yet exercised on the instance.** Asked for 2026-08-14: people should be able to
+      show each other their decks, the maintainer's should always be visible,
+      it should be a tab somebody opts into rather than something in the way,
+      and other players' decks should be organised **by username**. Leaderboards
+      and macro deck stats are named as later work on top of it.
 
-      This is HOSTING.md step 6 / ADR 4 arriving with a second requirement
-      attached, and it **wants its own ADR** because it changes what ADR 1 and
-      ADR 5 mean in practice. The decisions already taken: the curated six
-      become the maintainer's own decks, **shared by default**, rather than an
-      ownerless library; and a shared deck is readable but not writable by
-      anyone else, which is the gate item 6 just built generalised from
-      `is_admin` to an owner comparison. The hard part is ADR 5 — another
-      person's **private** deck must be 404 and not 403, which is the opposite
-      of the 403 item 6 chose for a deck that is deliberately visible.
+      **Decided, on the branch `deck-ownership-and-sharing`:**
+
+      - **Paths are owner-qualified — `/api/decks/{owner}/{slug}`.** Slugs are
+        unique *per owner*, never globally, which is what stops "is this slug
+        free" from being a question about everybody's private decks at once. A
+        global namespace was rejected for exactly that leak; an opaque deck id
+        was rejected for breaking the slug/directory correspondence ADR 1 keeps
+        permanently.
+      - **Sharing is a per-deck flag.** Curated six shared by default (absent
+        means shared, so they are never silently hidden); a deck in the SQL
+        tier is **private** by default, because `decks import` writes 99 empty
+        `why` fields and publishing that instantly is nobody's intent.
+      - **The 403/404 split resolves as one sentence: *403 is only ever an
+        answer about a deck the caller can already read.*** A private deck is
+        absent from the source, so every verb answers 404 — writes included,
+        because a 403 there confirms it exists. A shared deck answers 403 to a
+        write, which is item 6's answer unchanged.
+      - **The file tier's owner is a rule, not a column.** `MTGLAB_ADMIN_EMAIL`
+        names them; unset, the six fall back to `local` and stay visible, since
+        the alternative is an instance whose showcase nobody owns and therefore
+        nobody sees.
+
+      **What that cost, and what it caught.** Two bugs the sweep found rather
+      than the design: the sim routes take their slug in the *payload*, so they
+      resolved a deck by name with nobody asked whose it was; and
+      `_for_writing` refused on writability before resolving the deck, so a
+      write to somebody's private deck answered 403 and confirmed it. Both are
+      the same shape as item 6 — a check that was correct while there was one
+      library. `tests/test_isolation.py` files every per-deck route as
+      **user-scoped** now, with ten new adversarial tests.
+
+      **The browser half, and the two things it needed that the server half did
+      not have.** Every deck call takes a `DeckRef` — `{owner, slug}` as an
+      object rather than two positional strings, because transposing two
+      strings is a runtime 404 against somebody else's library and named fields
+      make it a compile error. `deckUrl` is the single place an in-app deck link
+      is built, and `lib/api.test.ts` asserts the **URL shape** directly:
+      a screen mocking `api` passes its tests while the real client asks for a
+      route that no longer exists, which is precisely the failure this half
+      exists to prevent.
+
+      - **`GET /api/decks` gained one field, `showcase`.** The browse tab needs
+        three groups out of one flat list — yours, the showcase, everybody
+        else's — and could only work out two. `writable` identifies the
+        caller's own decks; *nothing* identified the maintainer's, because the
+        client is never told who that is. Inferring it from the response's
+        order was the alternative, and ordering is not a contract.
+      - **`/decks/:slug` survives as a resolver, not as a deck route.** That
+        was every deck's address for the life of the app and the instance has
+        been driven for days, so a bookmark or a link sent to a friend still
+        works: it looks the slug up and redirects, first match winning, which
+        is your own deck before the showcase before a stranger's because that
+        is the order the library is listed in.
+      - **The authoring doors are no longer gated on `is_admin`.** That gate
+        said it would disappear rather than move when decks got owners, and it
+        did — everybody has a library to put a deck in now.
+      - **The sharing toggle is the deck page's, owner-only.** Without it a
+        SQL-tier deck is private forever and the browse tab can never have
+        anything in it.
+
+      **Owed: exercising it on the instance.** A non-admin account driving the
+      write gate, ADR 5's 404 and ADR 17's 403 against the deployed app, which
+      is where every fault in this project has actually lived.
 
    Still owed from the test list itself: **the theme interview on the
    instance** (both modes, and now both readers) — the deployed React half,

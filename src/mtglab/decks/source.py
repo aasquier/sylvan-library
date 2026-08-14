@@ -90,6 +90,16 @@ class DeckSource(Protocol):
         Raises `DeckNotFound` or `ReadOnlySource`.
         """
 
+    def set_shared(self, slug: str, shared: bool) -> None:
+        """Put the deck on display to other accounts, or take it off (ADR 22).
+
+        Its own operation rather than a `set_deck_field(field="shared")`,
+        because the two tiers keep this fact in different places -- the file
+        tier in `deck.yaml`, the SQL tier in a column it treats as the truth --
+        and a caller should not have to know which. Raises `DeckNotFound` or
+        `ReadOnlySource`.
+        """
+
     @property
     def writable(self) -> bool:
         """Whether this caller may edit these decks.
@@ -238,6 +248,24 @@ class FileDeckSource:
         shutil.move(str(path.parent), str(trash))
         return str(trash)
 
+    def set_shared(self, slug: str, shared: bool) -> None:
+        """Write `shared:` into the deck file. The YAML is this tier's truth.
+
+        A re-dump rather than a surgical edit, which is the one place this
+        tier departs from ADR 12 -- and it is departing from it for a field
+        ADR 12 was never about. `shared` is a single boolean with no prose
+        attached, so there is no comment to destroy and no folded block to
+        reflow; `dump` omits it entirely when true, so putting a deck back on
+        display leaves the file exactly as it was.
+        """
+        self._writable_or_raise(slug)
+        path = self._path(slug)                      # raises DeckNotFound
+        deck = Deck.load(path)
+        if deck.shared == shared:
+            return
+        deck.shared = shared
+        deck.dump(path)
+
     @property
     def writable(self) -> bool:
         return self._writable
@@ -304,6 +332,11 @@ class MemoryDeckSource:
         # file-backed one makes: a delete is recoverable, and the return value
         # names where from.
         return f"memory:.trash/{slug}"
+
+    def set_shared(self, slug: str, shared: bool) -> None:
+        if not self._writable:
+            raise ReadOnlySource(slug)
+        self.get(slug).shared = shared
 
     @property
     def writable(self) -> bool:

@@ -38,6 +38,8 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request
 
+from mtglab.auth.bootstrap import maintainer_username
+from mtglab.decks.library import Library
 from mtglab.decks.source import DeckSource, FileDeckSource
 
 
@@ -132,5 +134,30 @@ def deck_source(caller: Scope) -> DeckSource:
 
     Note `LOCAL.is_admin` is `True`, so a laptop with auth off is untouched —
     one person holding the file the app reads, which is what that scope means.
+
+    **Superseded by `library` below for anything owner-addressed** (ADR 22).
+    Kept for the routes that are about *this instance* rather than about one
+    person's decks — `/api/health` counts decks and has no owner to name.
     """
     return FileDeckSource(writable=caller.is_admin)
+
+
+def library(caller: Scope) -> Library:
+    """Every deck this caller may reach, across both tiers (ADR 22).
+
+    The successor to `deck_source` for owner-addressed routes, and the same
+    bet one level up: the visibility rule lives here, so a handler asks a
+    source for a slug and never learns that ownership exists.
+
+    The maintainer is read from the environment rather than from a column,
+    because the file tier's owner is a *rule* (ADR 22) — `MTGLAB_ADMIN_EMAIL`
+    names them and `auth/bootstrap.py` reconciles the account. Unset, there is
+    no maintainer and no file tier owner, which is a laptop.
+    """
+    return Library(username=caller.username, user_id=caller.user_id,
+                   maintainer=maintainer_username(),
+                   authenticated=caller.authenticated,
+                   is_admin=caller.is_admin)
+
+
+Deck_Library = Annotated[Library, Depends(library)]

@@ -10,18 +10,28 @@
 import { cleanup, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DeckSummary, Health } from '../lib/api'
+import type { DeckTile, Health } from '../lib/api'
 import Library from './Library'
 
-vi.mock('../lib/api', () => ({
+vi.mock('../lib/api', async () => ({
+  // Real, and it has to be: the shelf's links are the only thing that says
+  // where a deck lives, and a stub would let them all point at the pre-ADR-22
+  // path while every assertion below still passed.
+  deckUrl: (await vi.importActual<typeof import('../lib/api')>('../lib/api')).deckUrl,
   api: { decks: vi.fn(), health: vi.fn(), deleteDeck: vi.fn() },
 }))
 
 const { api } = await import('../lib/api')
 
-function deck(overrides: Partial<DeckSummary> & { slug: string }): DeckSummary {
+function deck(overrides: Partial<DeckTile> & { slug: string }): DeckTile {
   return {
     name: overrides.slug,
+    // The maintainer's own instance by default: their decks, their showcase.
+    // A reader's view of somebody else's is `writable: false`, and the browse
+    // tab's subject is `writable: false, showcase: false`.
+    owner: 'aasquier',
+    shared: true,
+    showcase: true,
     status: 'built',
     stage: 'curated',
     // The maintainer's own view by default, so existing tests describe the
@@ -42,7 +52,7 @@ function deck(overrides: Partial<DeckSummary> & { slug: string }): DeckSummary {
   }
 }
 
-const DECKS: DeckSummary[] = [
+const DECKS: DeckTile[] = [
   deck({ slug: 'tivit', name: 'Tivit', bracket: 5, color_identity: ['W', 'U', 'B'],
          total_cards: 100, status: 'theoretical' }),
   deck({ slug: 'arahbo', name: 'Arahbo', bracket: 3, color_identity: ['G', 'W'],
@@ -459,7 +469,7 @@ describe('Library deck deletion', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /delete this deck/i }))
 
     await waitFor(() => expect(api.deleteDeck).toHaveBeenCalledWith(
-      'goreclaw', 'bury'))
+      expect.objectContaining({ owner: 'aasquier', slug: 'goreclaw' }), 'bury'))
   })
 
   it('drops the deck from the shelf and says where it went', async () => {
@@ -493,5 +503,156 @@ describe('Library deck deletion', () => {
 
     await within(dialog).findByText(/read-only/)
     expect(shownNames()).toContain('Goreclaw')
+  })
+})
+
+/**
+ * Two shelves, and which decks land on which (ADR 22).
+ *
+ * The rule the whole tab rests on is that both tests come from the server:
+ * `writable` is the caller's own decks, `showcase` is the curated six's owner.
+ * Neither is a comparison this client could make — it is never told who the
+ * maintainer is — so a browser that tried to infer the split from the order of
+ * the response would be reading an ordering that is not a contract.
+ */
+describe('Library, browsing by player', () => {
+  /** The maintainer's showcase, this reader's own deck, and two strangers'. */
+  const MIXED: DeckTile[] = [
+    deck({ slug: 'my-deck', name: 'Mine', owner: 'mitch', showcase: false,
+           writable: true, shared: false }),
+    deck({ slug: 'goreclaw', name: 'Goreclaw', owner: 'aasquier',
+           showcase: true, writable: false }),
+    deck({ slug: 'zoe-deck', name: 'Zoe deck', owner: 'zoe',
+           showcase: false, writable: false }),
+    deck({ slug: 'amy-deck', name: 'Amy deck', owner: 'amy',
+           showcase: false, writable: false }),
+  ]
+
+  /** Deck names on the browse shelf, where they sit under an owner's `h2`. */
+  function browsedNames(): string[] {
+    return screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent ?? '')
+  }
+
+  function openBrowse() {
+    fireEvent.click(screen.getByRole('tab', { name: /other players/i }))
+  }
+
+  it('offers no tabs at all when nobody else has shared anything', async () => {
+    // The default: a laptop, and any instance where the showcase is the only
+    // library. A tab strip here would be the "something in the way" ADR 22
+    // asked the browse view not to be.
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    expect(screen.queryByRole('tab')).toBeNull()
+  })
+
+  it('keeps your own decks and the showcase together, and the rest behind a tab',
+     async () => {
+    vi.mocked(api.decks).mockResolvedValue(MIXED)
+    renderLibrary()
+    // The showcase is "always visible", so it is here rather than filed under
+    // its owner's username with the strangers.
+    await waitFor(() => expect(shownNames()).toEqual(['Goreclaw', 'Mine']))
+    expect(screen.queryByText('Zoe deck')).toBeNull()
+
+    openBrowse()
+    expect(browsedNames()).toEqual(['Amy deck', 'Zoe deck'])
+    expect(screen.queryByText('Mine')).toBeNull()
+  })
+
+  it('groups the browse shelf by username, alphabetically', async () => {
+    vi.mocked(api.decks).mockResolvedValue(MIXED)
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    openBrowse()
+
+    const owners = screen.getAllByRole('heading', { level: 2 })
+      .map((h) => h.textContent ?? '')
+    expect(owners[0]).toContain('amy')
+    expect(owners[1]).toContain('zoe')
+  })
+
+  it('counts each shelf on its own tab', async () => {
+    vi.mocked(api.decks).mockResolvedValue(MIXED)
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    expect(screen.getByRole('tab', { name: /my decks/i }).textContent).toContain('2')
+    expect(screen.getByRole('tab', { name: /other players/i }).textContent).toContain('2')
+  })
+
+  it('keeps the filters working inside a group', async () => {
+    vi.mocked(api.decks).mockResolvedValue([
+      ...MIXED,
+      deck({ slug: 'zoe-two', name: 'Zoe two', owner: 'zoe', showcase: false,
+             writable: false, bracket: 5 }),
+    ])
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    openBrowse()
+    expect(browsedNames()).toHaveLength(3)
+
+    fireEvent.change(screen.getByLabelText('Bracket'), { target: { value: '5' } })
+    expect(browsedNames()).toEqual(['Zoe two'])
+  })
+
+  // ------------------------------------------------------------ what a tile says
+
+  it('names the owner on somebody else\'s deck and not on your own', async () => {
+    vi.mocked(api.decks).mockResolvedValue(MIXED)
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    const showcase = screen.getByText('Goreclaw').closest('a')!
+    const own = screen.getByText('Mine').closest('a')!
+    expect(within(showcase).getByText('aasquier')).toBeTruthy()
+    // Not "mitch" on the reader's own tile: a label reading "yours" on every
+    // deck is not information.
+    expect(within(own).queryByText('mitch')).toBeNull()
+  })
+
+  it('marks your own deck private, and never claims that about anyone else\'s',
+     async () => {
+    vi.mocked(api.decks).mockResolvedValue(MIXED)
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    // `shared: false` on the reader's own deck: only they can see it.
+    expect(within(screen.getByText('Mine').closest('a')!)
+      .getByText('private')).toBeTruthy()
+    // Somebody else's private deck is not in this response at all, so the
+    // badge must never be rendered from another owner's `shared`.
+    openBrowse()
+    expect(screen.queryByText('private')).toBeNull()
+  })
+
+  it('links to the deck under its owner, not to a bare slug', async () => {
+    // The failure this catches is the whole reason the browser half cannot be
+    // skipped: `/decks/goreclaw` is a route that no longer exists server-side.
+    vi.mocked(api.decks).mockResolvedValue(MIXED)
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    expect(screen.getByText('Goreclaw').closest('a')!.getAttribute('href'))
+      .toBe('/decks/aasquier/goreclaw')
+    expect(screen.getByText('Mine').closest('a')!.getAttribute('href'))
+      .toBe('/decks/mitch/my-deck')
+  })
+
+  it('deletes the deck of the owner whose tile was clicked', async () => {
+    // Two owners with the same slug: the shelf must drop one tile, not both.
+    vi.mocked(api.decks).mockResolvedValue([
+      deck({ slug: 'goreclaw', name: 'My Goreclaw', owner: 'mitch',
+             showcase: false, writable: true }),
+      deck({ slug: 'goreclaw', name: 'Their Goreclaw', owner: 'aasquier',
+             showcase: true, writable: false }),
+    ])
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete My Goreclaw' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(within(dialog).getByRole('textbox'),
+                     { target: { value: 'bury' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /delete this deck/i }))
+
+    await waitFor(() => expect(shownNames()).toEqual(['Their Goreclaw']))
+    expect(api.deleteDeck).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: 'mitch', slug: 'goreclaw' }), 'bury')
   })
 })

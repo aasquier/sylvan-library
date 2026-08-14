@@ -27,7 +27,12 @@ vi.mock('react-router-dom', async () => ({
   useNavigate: () => navigate,
 }))
 
-vi.mock('../lib/api', () => ({
+vi.mock('../lib/api', async () => ({
+  // Real: it is what turns the create response into the deck's address, and a
+  // stub would let this navigate to the pre-ADR-22 path with every test
+  // passing.
+  deckUrl: (await vi.importActual<typeof import('../lib/api')>(
+    '../lib/api')).deckUrl,
   api: {
     colors: vi.fn(), searchCards: vi.fn(), createDeck: vi.fn(),
     claudeStatus: vi.fn(), themeAsk: vi.fn(), themePropose: vi.fn(),
@@ -233,7 +238,8 @@ beforeEach(() => {
   navigate.mockReset()
   vi.mocked(api.colors).mockReset().mockResolvedValue(TAXONOMY as never)
   vi.mocked(api.searchCards).mockReset().mockResolvedValue({ cards: [], total: 0 } as never)
-  vi.mocked(api.createDeck).mockReset().mockResolvedValue({ slug: 'x' } as never)
+  vi.mocked(api.createDeck).mockReset()
+    .mockResolvedValue({ slug: 'x', owner: 'aasquier' } as never)
   vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(CLAUDE_STATUS as never)
   vi.mocked(api.themeAsk).mockReset().mockResolvedValue(asked(PARTWAY) as never)
   vi.mocked(api.themePropose).mockReset()

@@ -15,6 +15,7 @@ import { api, onSessionLost, type AuthState, type Health } from './lib/api'
 const Admin = lazy(() => import('./routes/Admin'))
 const CardSearch = lazy(() => import('./routes/CardSearch'))
 const DeckDetail = lazy(() => import('./routes/DeckDetail'))
+const DeckRedirect = lazy(() => import('./routes/DeckRedirect'))
 const Import = lazy(() => import('./routes/Import'))
 const Learn = lazy(() => import('./routes/Learn'))
 const NewDeck = lazy(() => import('./routes/NewDeck'))
@@ -23,8 +24,7 @@ const Simulator = lazy(() => import('./routes/Simulator'))
 const NAV = [
   { to: '/', label: 'Library', end: true },
   { to: '/search', label: 'Card search', end: false },
-  // `/new` and `/import` are spliced in after Library when the viewer may
-  // actually create a deck — see AUTHORING_NAV.
+  // `/new` and `/import` are spliced in after Library — see AUTHORING_NAV.
   { to: '/simulate', label: 'Simulator', end: false },
   // Last, and deliberately not first: it is reference rather than a task, and
   // somebody who needs it usually arrives from a word on another screen.
@@ -36,16 +36,14 @@ const NAV = [
 // so this decides what is offered and never what is allowed.
 const ADMIN_NAV = { to: '/admin', label: 'Accounts', end: false }
 
-// The two doors that create a deck. Shown only to somebody who may write to
-// the library, because there is currently exactly one library and it is the
-// maintainer's — a deck started by anybody else has nowhere to go but into
-// somebody else's shelf, which is the thing the write gate exists to stop.
+// The two doors that create a deck, and they are shown to everybody.
 //
-// Gated on `is_admin` rather than on a deck's `writable`, and that asymmetry
-// is deliberate: `writable` is a fact about *a deck*, and these routes create
-// one that does not exist yet. When decks have owners this gate does not move
-// somewhere better — it disappears, because everybody will be able to start
-// their own.
+// They used to be gated on `is_admin`, because there was exactly one library
+// and it was the maintainer's: a deck started by anybody else had nowhere to
+// go but onto somebody else's shelf. That gate said it would not move
+// somewhere better when decks got owners — it would **disappear** — and this
+// is that. Every account has its own library now (ADR 22), so there is nobody
+// left for whom these doors open onto nothing.
 const AUTHORING_NAV = [
   { to: '/new', label: 'Start a deck', end: false },
   { to: '/import', label: 'Import', end: false },
@@ -205,11 +203,12 @@ export default function App() {
     )
   }
 
-  // Library first, then the authoring doors if this viewer has anywhere to put
-  // a deck, then the rest, then Accounts for an admin.
-  const nav = auth?.is_admin
-    ? [NAV[0], ...AUTHORING_NAV, ...NAV.slice(1), ADMIN_NAV]
-    : NAV
+  // Library first, then the authoring doors — everybody has somewhere to put a
+  // deck now — then the rest, then Accounts for an admin.
+  const nav = [
+    NAV[0], ...AUTHORING_NAV, ...NAV.slice(1),
+    ...(auth?.is_admin ? [ADMIN_NAV] : []),
+  ]
   // Only ever true on an instance that requires a login. With auth off there is
   // nobody to be signed out of, and offering it would be the regression this
   // whole flag exists to avoid.
@@ -275,7 +274,12 @@ export default function App() {
         <Suspense fallback={<Spinner label="Loading…" />}>
         <Routes>
           <Route path="/" element={<Library />} />
-          <Route path="/decks/:slug" element={<DeckDetail />} />
+          {/* A deck's address is `owner/slug` now: slugs are unique per owner
+              rather than globally, so the shorter form below cannot identify
+              one on its own (ADR 22). It is kept as a resolver for links made
+              before this changed — it looks the slug up and redirects. */}
+          <Route path="/decks/:owner/:slug" element={<DeckDetail />} />
+          <Route path="/decks/:slug" element={<DeckRedirect />} />
           <Route path="/new" element={<NewDeck />} />
           <Route path="/import" element={<Import />} />
           <Route path="/search" element={<CardSearch />} />
