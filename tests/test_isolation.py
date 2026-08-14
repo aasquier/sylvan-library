@@ -104,7 +104,8 @@ SHARED = {
     # the person and is held by their browser, so there is nothing here
     # belonging to one account for another to reach. What comes back is a
     # suggestion; making the deck goes through the shared create route.
-    "/api/claude/theme": "a conversation the client holds; no stored state",
+    "/api/claude/theme": "submits a job; the conversation is the client's and "
+                         "nothing is stored, and the job is scoped",
     # Submits a job rather than answering — 226 seconds is longer than a hosted
     # proxy will hold a POST. Filed here for the same reason the two sim routes
     # are: the *submission* is shared (there is no deck and nothing personal on

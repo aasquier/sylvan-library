@@ -66,7 +66,7 @@ src/mtglab/
   api/jobs.py             the job registry; two pools, CPU and NET, and a
                           `key` that makes asking twice at once one job
   api/simruns.py          Tier 1 planned in the request, run in a job
-  api/themeruns.py        the theme proposal, same shape (226s, ADR 20)
+  api/themeruns.py        both theme halves, same shape (226s / 134s, ADR 20)
   api/dossierruns.py      the commander dossier, same shape (236s, ADR 19)
   api/auth.py             the deny-by-default middleware and login routes
   api/deps.py             the request scope: who is asking, what they see
@@ -378,6 +378,20 @@ socket goes in `NET`, so a thirty-second sweep never queues behind four minutes
 of somebody's conversation. Nothing is cached — a proposal is not reproducible
 and its subject does not outlive the conversation — but the **client keeps the
 job id**, so a reload reattaches rather than paying twice.
+
+**And so is the theme conversation turn**, which is the same module's
+`plan_ask` and the weakest case of the three on its own numbers: 4.3–37.7s
+across eleven measured turns, with one at 133.8s that did not reproduce. It
+moved anyway, because the docstring keeping it synchronous said *"it is a few
+seconds"* — the sentence that left the dossier synchronous until it broke — and
+because the transport ceiling is known only as **at or below 236s**, with
+133.8s inside the unmeasured region. **A duration measured for one surface is a
+question to ask of every sibling surface**; this was the sibling nobody asked.
+Two differences from the proposal, both deliberate: a no-call turn (stance
+`off`, or past `MAX_EXCHANGES`) is a **job born finished**, so the client passes
+it to `followJob` as `initial` and the cheap case still costs one request; and
+it takes **`key=None`**, because two turns in flight are two conversations
+rather than one question asked twice.
 
 **So is the dossier** (`api/dossierruns.py`), and the reason it took a second
 session to get there is worth keeping. It was measured at **236 seconds on the

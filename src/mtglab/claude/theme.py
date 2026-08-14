@@ -883,29 +883,105 @@ def _report(turn: Turn | None, *, mode: str, effective: stance_mod.Stance,
     }
 
 
+@dataclass(frozen=True)
+class AskRequest:
+    """A conversation turn that has passed every check not needing the network.
+
+    The same split `ProposalRequest` makes, and made for the same reason one
+    surface later: a turn was measured at 4.3-37.7 seconds with **one outlier at
+    133.8s**, and the transport ceiling it has to fit under is bounded above at
+    236s only because that is where the dossier broke. Nobody knows where it
+    actually is. A turn that overruns it fails the way that one did -- no status
+    code, no access-log line, and a finished answer thrown away -- so the call
+    goes in a job and the refusals stay in the request.
+
+    Two of them, both decidable here: a malformed transcript (422) and an
+    unknown persona or unusable seed (422, `UnknownPersona` being a
+    `ValueError`). 503 for a missing key is the planner's, as it is for the
+    proposal.
+    """
+
+    history: list[dict[str, str]]
+    #: The slots the client carried, re-grounded against the transcript on the
+    #: way in -- the client is not the authority on what its user said.
+    carried: list[dict[str, str]]
+    effective: stance_mod.Stance
+    persona: str = persona_mod.DEFAULT
+    seed: int | None = None
+
+    @property
+    def exchanges(self) -> int:
+        return _exchanges(self.history)
+
+    @property
+    def exhausted(self) -> bool:
+        """Whether the conversation has already gone as long as it goes."""
+        return self.exchanges >= MAX_EXCHANGES
+
+    @property
+    def needs_call(self) -> bool:
+        """Whether running this reaches Anthropic at all.
+
+        False at stance `off` and false past `MAX_EXCHANGES`. Neither is an
+        error -- both are answers, and both are available immediately, so a
+        caller that queues work can hand back a job born finished rather than
+        making somebody poll for a sentence Python already had.
+        """
+        return bool(self.effective.allows_calls) and not self.exhausted
+
+
+def check_ask(transcript: Any = None, slots: Any = None, *,
+              requested: Any = None, persona: Any = None,
+              seed: Any = None) -> AskRequest:
+    """Everything that can refuse a turn, done before anything is spent.
+
+    Unlike `check_proposal` there is no floor to fail: a conversation with
+    nothing in it yet is exactly the case this mode exists for.
+    """
+    history = check_transcript(transcript)
+    effective = _stance(requested)
+    # Resolved here rather than in the worker, the same argument
+    # `check_proposal` makes: an unknown persona is a malformed request and
+    # belongs with the other 422s, not a moment later as a job in state `error`.
+    who = persona_mod.get(persona)
+    _reading_for(who, seed)              # raises now if the seed is unusable
+    carried, _ = ground(list(slots or []), history)
+
+    return AskRequest(history=history, carried=carried, effective=effective,
+                      persona=who.key,
+                      seed=int(seed) if who.deals and seed is not None
+                      else None)
+
+
 def ask(transcript: Any = None, slots: Any = None, *,
         requested: Any = None, persona: Any = None, seed: Any = None
         ) -> dict[str, Any]:
     """One turn of the theme conversation: a question back, and what it heard.
+
+    Check and run in one call, which is what the tests of the whole path use.
+    The app splits the two so the network half can be a job; see `check_ask`.
+    """
+    return run_ask(check_ask(transcript, slots, requested=requested,
+                             persona=persona, seed=seed))
+
+
+def run_ask(req: AskRequest, *,
+            on_turn: Callable[[int, int], None] | None = None) -> dict[str, Any]:
+    """The half that reaches Anthropic: ask the next question, hear the answer.
 
     Stateless. The transcript arrives from the client and leaves again; nothing
     is stored, which is why this needs no table, no expiry sweep and no ADR 5
     ownership rule -- and, as it turns out, is the reason the most personal
     thing this app handles never touches the server's disk.
 
-    `persona` picks the voice and `seed` re-deals the spread it is reading
-    from. Both are client-held for the same reason the transcript is, and both
-    default to what every client sent before they existed.
+    `req.persona` picks the voice and `req.seed` re-deals the spread it is
+    reading from. Both are client-held for the same reason the transcript is,
+    and both default to what every client sent before they existed.
     """
-    history = check_transcript(transcript)
-    effective = _stance(requested)
-    who = persona_mod.get(persona)
+    history, carried, effective = req.history, req.carried, req.effective
+    who = persona_mod.PERSONAS[req.persona]
     mode = CONVERSATION_MODES[who.key]
-    reading = _reading_for(who, seed)
-    # Grounded against the transcript on the way *in* as well as out, because
-    # the client carried them and the client is not the authority on what its
-    # user said.
-    carried, _ = ground(list(slots or []), history)
+    reading = _reading_for(who, req.seed)
 
     if not effective.allows_calls:
         return _report(None, mode=mode.name, effective=effective, persona=who.key,
@@ -915,7 +991,7 @@ def ask(transcript: Any = None, slots: Any = None, *,
                        exchanges=_exchanges(history), max_exchanges=MAX_EXCHANGES,
                        reason="The stance is off, so no call was made.")
 
-    if _exchanges(history) >= MAX_EXCHANGES:
+    if req.exhausted:
         # The conversation ceiling, and it is not the tool loop's. Reported as
         # a finished conversation rather than an error: what it has is what it
         # has, and if that is three grounded slots there is still a proposal.
@@ -934,7 +1010,8 @@ def ask(transcript: Any = None, slots: Any = None, *,
                     stance=effective,
                     # No client tools at all, so the only reason to go round
                     # again is the one search resuming after a pause_turn.
-                    max_turns=4)
+                    max_turns=4,
+                    on_turn=on_turn)
 
     if turn.refused:
         return _report(turn, mode=mode.name, effective=effective, persona=who.key,

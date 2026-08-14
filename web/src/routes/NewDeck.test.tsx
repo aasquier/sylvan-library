@@ -108,6 +108,30 @@ const READY = {
   slots_dropped: 0, grounded: 3, may_propose: true, exchanges: 3,
 }
 
+/**
+ * A turn, wrapped the way the route now answers one: as a **job**.
+ *
+ * `/api/claude/theme` was a plain POST returning the report until it was
+ * measured — 4.3–37.7s on the instance with one at 133.8s, against a transport
+ * ceiling known only to be at or below 236s, which is where the dossier broke.
+ * These come back already `done`, which is what `followJob` short-circuits on,
+ * so nothing here polls and the shape stays honest.
+ */
+const asked = (report: unknown) => ({ id: 'a1', status: 'done', result: report })
+
+/**
+ * What the real `followJob` does with a job that is already `done`: resolve it
+ * and never poll.
+ *
+ * Every override below is written for the **proposal's** poller, and both
+ * theme calls come through that one function now — so an override that does
+ * not pass a finished job through answers the *conversation* with whatever the
+ * proposal test wanted, and the interview never reaches the button being
+ * clicked. Cost of the shared seam, paid once here.
+ */
+const settled = (job: unknown) =>
+  ({ promise: Promise.resolve(job as never), cancel: () => {} })
+
 const PROPOSAL = {
   answered_by: 'claude', mode: 'theme-proposal', model: 'claude-sonnet-5',
   asked: true, reason: '', stance: STANCE,
@@ -211,14 +235,22 @@ beforeEach(() => {
   vi.mocked(api.searchCards).mockReset().mockResolvedValue({ cards: [], total: 0 } as never)
   vi.mocked(api.createDeck).mockReset().mockResolvedValue({ slug: 'x' } as never)
   vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(CLAUDE_STATUS as never)
-  vi.mocked(api.themeAsk).mockReset().mockResolvedValue(PARTWAY as never)
+  vi.mocked(api.themeAsk).mockReset().mockResolvedValue(asked(PARTWAY) as never)
   vi.mocked(api.themePropose).mockReset()
     .mockResolvedValue({ id: 'j1', status: 'queued' } as never)
-  vi.mocked(followJob).mockReset().mockImplementation((id) => ({
-    promise: Promise.resolve(
-      { id, status: 'done', result: PROPOSAL } as never),
-    cancel: () => {},
-  }))
+  // Honours `initial` the way the real one does, which is not decoration: both
+  // theme calls come through here now, and a turn is handed back a job that is
+  // already `done`. A mock that ignored `initial` would answer every turn with
+  // the *proposal*, and would also hide the one property that keeps a cheap
+  // turn cheap — that it resolves without polling.
+  vi.mocked(followJob).mockReset()
+    .mockImplementation((id, _onTick, _ms, initial) => ({
+      promise: Promise.resolve(
+        (initial?.status === 'done'
+          ? initial
+          : { id, status: 'done', result: PROPOSAL }) as never),
+      cancel: () => {},
+    }))
   vi.mocked(api.personas).mockReset().mockResolvedValue(ROSTER as never)
   vi.mocked(api.tarotReading).mockReset().mockResolvedValue(READING as never)
 })
@@ -418,7 +450,7 @@ describe('the theme conversation', () => {
   })
 
   it('opens up once three things are known', async () => {
-    vi.mocked(api.themeAsk).mockResolvedValue(READY as never)
+    vi.mocked(api.themeAsk).mockResolvedValue(asked(READY) as never)
     open()
     fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
     await screen.findByText(READY.question)
@@ -436,7 +468,7 @@ describe('the theme conversation', () => {
 
 describe('the proposal', () => {
   async function propose() {
-    vi.mocked(api.themeAsk).mockResolvedValue(READY as never)
+    vi.mocked(api.themeAsk).mockResolvedValue(asked(READY) as never)
     open()
     fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
     await screen.findByText(READY.question)
@@ -449,7 +481,10 @@ describe('the proposal', () => {
     // POST does not survive a hosted proxy. The POST now returns a job and the
     // proposal arrives from the poller.
     await propose()
-    expect(vi.mocked(followJob).mock.calls[0]?.[0]).toBe('j1')
+    // The last call, not the first: the conversation turn that got us to the
+    // button is a job of its own now and reached this poller before the
+    // proposal did.
+    expect(vi.mocked(followJob).mock.calls.at(-1)?.[0]).toBe('j1')
   })
 
   it('reattaches to a run in flight instead of paying for a second', async () => {
@@ -472,7 +507,8 @@ describe('the proposal', () => {
     // Found by reloading during a real 226-second run: the timer restarted at
     // 0s against a job already a minute old, which is exactly the confusion a
     // clock was put there to remove. The job carries its own `created_at`.
-    vi.mocked(followJob).mockImplementation((_id, onTick) => {
+    vi.mocked(followJob).mockImplementation((_id, onTick, _ms, initial) => {
+      if (initial?.status === 'done') return settled(initial)
       onTick({
         id: 'j9', kind: 'claude.theme.proposal', status: 'running',
         done: 3, total: 8, percent: 38, label: '', result: null, error: null,
@@ -480,7 +516,7 @@ describe('the proposal', () => {
       })
       return { promise: new Promise(() => {}), cancel: () => {} }
     })
-    vi.mocked(api.themeAsk).mockResolvedValue(READY as never)
+    vi.mocked(api.themeAsk).mockResolvedValue(asked(READY) as never)
     open()
     fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
     await screen.findByText(READY.question)
@@ -496,11 +532,12 @@ describe('the proposal', () => {
     // Jobs live in the server's memory and die with it (`api/jobs.py`). A
     // restart mid-run is the one way this fails that is nobody's mistake.
     const { ApiError } = await import('../lib/api')
-    vi.mocked(followJob).mockImplementation(() => ({
-      promise: Promise.reject(new ApiError('no job', 404)),
-      cancel: () => {},
-    }))
-    vi.mocked(api.themeAsk).mockResolvedValue(READY as never)
+    vi.mocked(followJob).mockImplementation((_id, _onTick, _ms, initial) => (
+      initial?.status === 'done' ? settled(initial) : {
+        promise: Promise.reject(new ApiError('no job', 404)),
+        cancel: () => {},
+      }))
+    vi.mocked(api.themeAsk).mockResolvedValue(asked(READY) as never)
     open()
     fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
     await screen.findByText(READY.question)

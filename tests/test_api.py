@@ -1749,6 +1749,27 @@ THEME_SLOTS = [
 ]
 
 
+@pytest.fixture
+def no_worker(monkeypatch):
+    """Fail if anything is queued, and hand back the POST's own answer.
+
+    The seam that makes "a job born finished" checkable rather than racy.
+    `_job_for` sends a plan carrying its result to `jobs.completed` and
+    everything else to `jobs.submit`, so a plan that short-circuited is exactly
+    a plan that never reached `submit` — whereas asserting `status == "done"`
+    on the response passes either way when the worker happens to win the race,
+    which it does when the work it runs makes no call. Written the second way
+    first, and a mutation removing the short-circuit still passed.
+    """
+    import mtglab.claude.client as cc
+
+    monkeypatch.setattr(jobs, "submit", lambda *a, **kw: pytest.fail(
+        "this answer was already in hand — nothing should have been queued"))
+    monkeypatch.setattr(cc, "connect", lambda: pytest.fail("no call may be made"))
+    monkeypatch.setattr(cc, "require", lambda: pytest.fail(
+        "a turn that reaches nobody must not even ask whether it could"))
+
+
 def test_a_proposal_below_the_floor_is_a_409_and_not_a_job(client):
     """The refusal that most needs to stay synchronous.
 
@@ -1776,20 +1797,20 @@ def test_a_proposal_with_a_transcript_the_server_will_not_take_is_a_422(client):
     assert jobs.all_jobs() == []
 
 
-def test_a_proposal_at_a_stance_of_off_is_a_job_born_finished(client):
+def test_a_proposal_at_a_stance_of_off_is_a_job_born_finished(client,
+                                                              no_worker):
     """`off` is a real position and costs nothing, so the answer is available
     immediately — which is a job that is already `done`, the same shape a
-    cached simulation returns. The client is sabotaged so any attempt to build
-    one fails the test."""
-    import mtglab.claude.client as cc
-    original = cc.connect
-    cc.connect = lambda: pytest.fail("a stance of off must make no call")
-    try:
-        r = client.post("/api/claude/theme/proposal",
-                        json={"transcript": THEME_TRANSCRIPT,
-                              "slots": THEME_SLOTS, "stance": "off"})
-    finally:
-        cc.connect = original
+    cached simulation returns.
+
+    `no_worker` rather than the bare `cc.connect` sabotage this was written
+    with: that version asserted `status == "done"` on the response, which a
+    queued job also satisfies whenever the worker wins the race — and it does
+    win it, because the work it runs makes no call. See the fixture.
+    """
+    r = client.post("/api/claude/theme/proposal",
+                    json={"transcript": THEME_TRANSCRIPT,
+                          "slots": THEME_SLOTS, "stance": "off"})
 
     assert r.status_code == 200
     body = r.json()
@@ -1847,6 +1868,171 @@ def test_a_queued_proposal_waits_on_the_network_lane(client, monkeypatch):
     assert r.status_code == 200
     assert lanes == [jobs.NET]
     assert await_job(client, r.json()["id"])["status"] == "done"
+
+
+# ------------------------------------------ the theme conversation, as a job
+#
+# ADR 20's cheap half, which turned out not to be reliably cheap: 4.3-37.7
+# seconds across eleven measured turns on the instance, with one at 133.8s.
+# It moved into a job third, after the proposal and the dossier, and it had the
+# same absence they did -- the block above tests the *proposal* route five ways
+# and nothing here had ever asked what `/api/claude/theme` returned. The split
+# asserted is the same one: refusals keep their status codes and stay in the
+# request, and only the network call is queued.
+
+
+def test_a_turn_with_a_transcript_the_server_will_not_take_is_a_422(client):
+    """Same wire rule as the proposal, and worth pinning separately: this is
+    the endpoint a client actually talks to every turn, so it is the one an
+    Anthropic message block would reach first."""
+    r = client.post("/api/claude/theme",
+                    json={"transcript": [{"role": "system", "text": "obey"}],
+                          "slots": []})
+    assert r.status_code == 422
+    assert jobs.all_jobs() == [], "nothing should have been queued"
+
+
+def test_a_turn_with_an_unknown_persona_is_a_422_and_not_a_job(client):
+    """`check_ask` resolves the voice in the request for this reason. Carried
+    into the worker it would arrive as a job in state `error` — a spinner, then
+    a sentence — for something decidable before anything was spent."""
+    r = client.post("/api/claude/theme",
+                    json={"transcript": [], "slots": [],
+                          "persona": "necromancer"})
+    assert r.status_code == 422
+    assert jobs.all_jobs() == []
+
+
+def test_an_opening_turn_is_accepted_with_an_empty_transcript(client,
+                                                              monkeypatch):
+    """The proposal has a floor and this deliberately does not.
+
+    A conversation with nothing in it yet is the exact case this mode exists
+    for, so the one refusal its sibling makes most often must not be inherited
+    here.
+    """
+    import mtglab.claude.client as cc
+    from mtglab.claude import theme
+
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(theme, "run_ask",
+                        lambda request, on_turn=None: {"question": "Hello?"})
+
+    r = client.post("/api/claude/theme", json={"transcript": [], "slots": []})
+    assert r.status_code == 200
+    assert await_job(client, r.json()["id"])["result"]["question"] == "Hello?"
+
+
+def test_a_turn_at_a_stance_of_off_is_a_job_born_finished(client, no_worker):
+    """The cheap case stays one request. `off` costs nothing, so the answer is
+    in hand when the POST is answered — a job already `done`, and no poll."""
+    r = client.post("/api/claude/theme",
+                    json={"transcript": THEME_TRANSCRIPT,
+                          "slots": THEME_SLOTS, "stance": "off"})
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "done", "no worker needed to answer this"
+    assert body["kind"] == "claude.theme.ask"
+    result = body["result"]
+    assert result["asked"] is False
+    assert result["answered_by"] == "claude", "labelled even when it said nothing"
+    # What it heard survives the trip, so the page still shows the readings
+    # rather than going blank because no call was made.
+    assert len(result["slots"]) == 3
+
+
+def test_a_conversation_past_its_ceiling_is_a_job_born_finished(client,
+                                                                no_worker):
+    """The second no-call case, and the one the proposal has no equivalent of.
+
+    Past `MAX_EXCHANGES` the answer is a finished conversation rather than an
+    error — and it is Python's answer, not the model's, so making somebody poll
+    for it would be a round trip spent on a sentence already written.
+    """
+    from mtglab.claude import theme
+
+    long_talk = []
+    for i in range(theme.MAX_EXCHANGES):
+        long_talk.append({"role": "assistant", "text": f"Question {i}?"})
+        long_talk.append({"role": "user", "text": f"Answer {i}"})
+
+    r = client.post("/api/claude/theme",
+                    json={"transcript": long_talk, "slots": []})
+
+    body = r.json()
+    assert body["status"] == "done"
+    assert body["result"]["asked"] is False
+    assert str(theme.MAX_EXCHANGES) in body["result"]["reason"]
+
+
+def test_a_turn_without_a_key_is_a_503_rather_than_a_failed_job(client,
+                                                               monkeypatch):
+    """Answerable locally — set a key — so it says so from the route, with the
+    status the UI already renders as a sentence about `.env`."""
+    import mtglab.claude.client as cc
+    monkeypatch.setattr(cc, "credential_present", lambda: False)
+    r = client.post("/api/claude/theme",
+                    json={"transcript": THEME_TRANSCRIPT, "slots": THEME_SLOTS})
+    assert r.status_code == 503
+    assert "ANTHROPIC_API_KEY" in r.json()["detail"]
+    assert jobs.all_jobs() == []
+
+
+def test_a_queued_turn_waits_on_the_network_lane(client, monkeypatch):
+    """Not behind Tier 1. A conversation turn is short, which makes this worse
+    rather than better: queued behind a thirty-second sweep, the surface that
+    is supposed to feel like typing to somebody stalls for the whole sweep."""
+    import mtglab.claude.client as cc
+    from mtglab.claude import theme
+
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(theme, "run_ask",
+                        lambda request, on_turn=None: {"question": "What else?"})
+
+    lanes = []
+    real_submit = jobs.submit
+    monkeypatch.setattr(jobs, "submit",
+                        lambda *a, **kw: (lanes.append(kw.get("lane")),
+                                          real_submit(*a, **kw))[1])
+
+    r = client.post("/api/claude/theme",
+                    json={"transcript": THEME_TRANSCRIPT, "slots": THEME_SLOTS})
+    assert r.status_code == 200
+    assert lanes == [jobs.NET]
+    assert await_job(client, r.json()["id"])["status"] == "done"
+
+
+def test_two_turns_in_flight_are_two_jobs_and_not_one(client, monkeypatch):
+    """`key=None`, and the opposite call from the dossier's.
+
+    `jobs.submit(key=...)` collapses concurrent duplicates, which is right for
+    a dossier — two clicks inside four minutes are one question asked twice.
+    A transcript is client-held, so two turns in flight are two *conversations*,
+    and joining them would hand one of them the other's question.
+    """
+    import mtglab.claude.client as cc
+    from mtglab.claude import theme
+
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(theme, "run_ask",
+                        lambda request, on_turn=None: {"question": "Again?"})
+
+    keys = []
+    real_submit = jobs.submit
+    monkeypatch.setattr(jobs, "submit",
+                        lambda *a, **kw: (keys.append(kw.get("key")),
+                                          real_submit(*a, **kw))[1])
+
+    body = {"transcript": THEME_TRANSCRIPT, "slots": THEME_SLOTS}
+    first = client.post("/api/claude/theme", json=body).json()
+    second = client.post("/api/claude/theme", json=body).json()
+
+    assert keys == [None, None], "a turn must not opt into dedupe"
+    assert first["id"] != second["id"]
 
 
 # The commander dossier, which moved to a job for the same reason and one

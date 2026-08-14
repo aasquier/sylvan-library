@@ -1,12 +1,22 @@
-"""The theme proposal as a background job.
+"""Both halves of the theme interview (ADR 20) as background jobs.
 
-The conversational half of the theme interview (ADR 20) is a few seconds and
-stays a plain POST. The proposal is not: it was **measured at 226 seconds**,
-reading a dozen-odd pages and resolving every legend it names against the
-corpus. A four-minute synchronous request survives a laptop and does not
-survive a hosted proxy -- Fly's router, and most others, give up long before
-that -- so it runs the way `api/simruns.py` already runs Tier 1: submitted,
-polled, and read back off the job.
+The proposal was **measured at 226 seconds**, reading a dozen-odd pages and
+resolving every legend it names against the corpus. A four-minute synchronous
+request survives a laptop and does not survive a hosted proxy -- Fly's router,
+and most others, give up long before that -- so it runs the way
+`api/simruns.py` already runs Tier 1: submitted, polled, and read back off the
+job.
+
+The **conversation** turn joined it later and against its own docstring, which
+had justified staying synchronous with "it is a few seconds". Measured on the
+deployed instance it is 4.3-37.7 seconds across eleven turns, with one at
+133.8s that did not reproduce -- and the ceiling a synchronous response has to
+fit under is known only to be *at or below* 236s, because that is where the
+dossier broke. One outlier inside an unmeasured region is not a reason to
+restructure a chat box on its own; the reason is that "it is a few seconds" is
+the exact sentence that left the dossier synchronous until it failed deployed,
+and a duration measured for one surface is a question to ask of every sibling
+surface. See `plan_ask`.
 
 **Checking happens in the request; calling happens in the job.** That division
 is the whole of this module, and it is the same one `plan_mana` makes for the
@@ -47,6 +57,72 @@ from mtglab.api.service import ClaudeFailed
 #: What `/api/jobs` calls one of these. Namespaced like `sim.mana` so a job
 #: list reads as what produced it rather than as an opaque id.
 KIND = "claude.theme.proposal"
+
+#: The conversational half. Its own kind rather than a flag on the one above,
+#: so a job list distinguishes "asked me something" from "spent four minutes".
+ASK_KIND = "claude.theme.ask"
+
+
+def plan_ask(*, transcript: Any = None, slots: Any = None,
+             requested: Any = None, persona: Any = None,
+             seed: Any = None) -> Plan:
+    """One conversation turn, planned in the request and called in a job.
+
+    **Why this is a job at all**, given the docstring below spent two years'
+    worth of confidence on "the conversational half stays synchronous; it is a
+    few seconds": because that is the identical sentence that left the dossier
+    synchronous until it broke deployed at 236 seconds, and because "a few
+    seconds" turned out to mean 4.3-37.7s across eleven measured turns **with
+    one at 133.8s**. The ceiling those have to fit under is bounded above at
+    236s and has never been measured; 133.8s sits inside the unknown region.
+    The failure mode there is the bad one -- a transport error, so no status
+    code reaches the client, no access-log line is written because uvicorn
+    writes one when a response completes, and a finished answer is discarded.
+
+    What it costs is a poll, and less than it looks: a turn that reaches nobody
+    -- stance `off`, or a conversation past `MAX_EXCHANGES` -- is a job born
+    finished, so the client reads the answer off the POST and never polls at
+    all. That is the same shape a cached simulation has under ADR 18.
+
+    **`key=None`, deliberately.** `jobs.submit`'s dedupe is right for a dossier,
+    where two clicks inside four minutes are one question asked twice. Two turns
+    in flight here are two different conversations -- the transcript is
+    client-held, so a second tab is a second person's evening -- and collapsing
+    them would hand one of them the other's question.
+    """
+    from mtglab.claude import client as claude_client
+    from mtglab.claude import theme
+    from mtglab.claude.modes import ModeExhausted
+
+    request = theme.check_ask(transcript, slots, requested=requested,
+                              persona=persona, seed=seed)
+
+    label = (f"theme: a question, from {len(request.carried)} thing"
+             f"{'' if len(request.carried) == 1 else 's'} known")
+
+    if not request.needs_call:
+        # Stance `off`, or the conversation ceiling. Both are answers rather
+        # than errors, and both are already in hand -- so this is the honest
+        # "this job took no time" rather than a pretence that it is not a job.
+        answer = theme.run_ask(request)
+        return Plan(ASK_KIND, label, answer, lambda _progress: answer, lane=NET)
+
+    # Raised here rather than inside a job that was never going to work, which
+    # preserves the 503 the UI already handles. `require` rather than `connect`,
+    # for the reason `plan_proposal` gives below.
+    claude_client.require()
+
+    def run(progress: Progress) -> dict[str, Any]:
+        try:
+            return theme.run_ask(request, on_turn=progress)
+        except ModeExhausted as exc:
+            raise ClaudeFailed(str(exc)) from exc
+        except claude_client.ClaudeUnavailable:
+            raise
+        except Exception as exc:                                # noqa: BLE001
+            raise ClaudeFailed(claude_client.explain(exc)) from exc
+
+    return Plan(ASK_KIND, label, None, run, lane=NET)
 
 
 def plan_proposal(*, transcript: Any = None, slots: Any = None,

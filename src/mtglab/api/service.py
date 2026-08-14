@@ -1040,36 +1040,17 @@ def claude_dossier(*, slug: str, requested: Any = None, refresh: bool = False,
         raise ClaudeFailed(claude_client.explain(exc)) from exc
 
 
-def claude_theme_ask(*, transcript: Any = None, slots: Any = None,
-                     requested: Any = None, persona: Any = None,
-                     seed: Any = None) -> dict[str, Any]:
-    """One turn of the theme interview (ADR 20). Asks about you, not about Magic.
-
-    Note what is absent from the signature: there is no `slug` and no `source`.
-    This mode runs *before a deck exists* and never sees one, which is what
-    makes "it builds, it does not critique" structural rather than requested.
-    """
-    from mtglab.claude import client as claude_client
-    from mtglab.claude.modes import ModeExhausted
-    from mtglab.claude.theme import TranscriptRejected, ask
-
-    try:
-        return ask(transcript, slots, requested=requested,
-                   persona=persona, seed=seed)
-    except (claude_client.ClaudeUnavailable, TranscriptRejected):
-        raise
-    except ModeExhausted as exc:
-        raise ClaudeFailed(str(exc)) from exc
-    except Exception as exc:                                       # noqa: BLE001
-        raise ClaudeFailed(claude_client.explain(exc)) from exc
-
-
-# The theme *proposal* has no function here, and its absence is deliberate
-# rather than an omission. Every other Claude surface answers inside its
-# request, so a service function is the natural seam; that one was measured at
-# 226 seconds and is a background job, which makes its seam a `Plan` rather
-# than a return value. It lives in `api/themeruns.py`, beside `api/simruns.py`,
-# for exactly the reason the sim planners are not in this file either.
+# **Neither half of the theme interview has a function here**, and the absence
+# is deliberate rather than an omission. A service function is the natural seam
+# for a Claude surface that answers inside its own request — which is what the
+# rationale interview above still does. Both theme surfaces are background jobs,
+# so their seam is a `Plan` rather than a return value, and both live in
+# `api/themeruns.py` beside `api/simruns.py` for exactly the reason the sim
+# planners are not in this file either.
+#
+# The proposal went first, at 226 measured seconds. The conversation turn
+# followed it once somebody measured *that* too instead of trusting the
+# docstring which said it was a few seconds; see `themeruns.plan_ask`.
 
 
 def claude_dossier_cached(*, slug: str,

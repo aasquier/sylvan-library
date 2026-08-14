@@ -1113,13 +1113,24 @@ export const api = {
   // the same conversation as last turn has to travel with it. `seed` re-deals
   // the identical spread rather than carrying the cards, which is why three
   // pictures cost one integer.
+  //
+  // Returns a **job**, like the proposal below and for a weaker-looking but
+  // identical reason. A turn is 4.3–37.7s measured, with one at 133.8s, and
+  // the transport ceiling is known only as "at or below 236s" — that is where
+  // the dossier broke, and nobody has narrowed it. Follow it with `followJob`
+  // and read `job.result` as a `ThemeReport`.
+  //
+  // Pass the job straight back in as `initial`: a turn that reaches nobody
+  // (stance `off`, or a finished conversation) arrives already `done`, and
+  // `followJob` resolves it without a single poll. The cheap case still costs
+  // exactly one request.
   themeAsk: (body: {
     transcript: ThemeTurn[]
     slots: ThemeSlot[]
     stance?: string
     persona?: string
     seed?: number
-  }) => post<ThemeReport>('/api/claude/theme', body),
+  }) => post<Job>('/api/claude/theme', body),
   // Returns a **job**, not a proposal — this one was measured at 226 seconds
   // and no hosted proxy holds a POST open that long. Follow it with
   // `followJob` and read `job.result` as a `ThemeProposal`, exactly as the

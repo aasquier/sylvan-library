@@ -487,8 +487,9 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         return tarot.deal(seed).as_dict()
 
     @app.post("/api/claude/theme")
-    def claude_theme(payload: dict[str, Any]) -> dict[str, Any]:
-        """One turn of the theme interview (ADR 20).
+    def claude_theme(payload: dict[str, Any],
+                     caller: Scope) -> dict[str, Any]:
+        """One turn of the theme interview (ADR 20). Returns a **job**.
 
         Takes no deck and no `Decks` dependency, and that absence is the
         feature: this surface exists to help somebody *start* a deck, and a
@@ -499,12 +500,27 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         `{role, text}` turns and never Anthropic message blocks; an endpoint
         that accepted those would be a free proxy for somebody else's spend.
         `check_transcript` refuses everything else as a 422.
+
+        This was a synchronous POST until it was measured: 4.3–37.7 seconds
+        across eleven turns on the instance, and one at 133.8s. The docstring
+        that justified keeping it synchronous said "it is a few seconds", which
+        is word for word what left the dossier synchronous until it broke
+        deployed at 236s — and 236s is the *only* thing known about the
+        transport ceiling, as an upper bound nobody has narrowed. What is no
+        longer here is the 502: a call that came back unusable is now a job in
+        state `error`, which is where it belongs once the response has been
+        sent. 422 and 503 are still decided here, by `plan_ask`.
+
+        A turn that reaches nobody — stance `off`, or a conversation past its
+        exchange ceiling — comes back as a job already `done`, so the common
+        cheap case still costs exactly one request.
         """
+        from mtglab.api.themeruns import plan_ask
         from mtglab.claude.client import ClaudeUnavailable
         from mtglab.claude.theme import TranscriptRejected
 
         try:
-            return service.claude_theme_ask(
+            plan = plan_ask(
                 transcript=payload.get("transcript"),
                 slots=payload.get("slots"),
                 requested=payload.get("stance") or None,
@@ -516,8 +532,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ClaudeUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
-        except service.ClaudeFailed as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return _job_for(plan, caller).as_dict()
 
     @app.post("/api/claude/theme/proposal")
     def claude_theme_proposal(payload: dict[str, Any],
