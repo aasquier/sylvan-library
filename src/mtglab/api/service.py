@@ -21,6 +21,7 @@ from mtglab.decks import decklist, edit, importer, partners, suggest
 from mtglab.decks.analyze import deck_stats
 from mtglab.decks.edit import EditFailed
 from mtglab.decks.importer import ImportRefused
+from mtglab.decks.library import Library
 from mtglab.decks.model import CATEGORIES, DECK_STATUSES, Deck
 from mtglab.decks.source import (
     DeckExists,
@@ -194,7 +195,8 @@ def _card_json(entry: CardEntry, rec: CardRecord | None, *,
     return out
 
 
-def list_decks(*, source: DeckSource | None = None) -> list[dict[str, Any]]:
+def list_decks(*, source: DeckSource | None = None,
+               owner: str | None = None) -> list[dict[str, Any]]:
     """The library view. Includes the commander's art so the UI has a hero
     image without a second round trip per deck.
 
@@ -208,59 +210,98 @@ def list_decks(*, source: DeckSource | None = None) -> list[dict[str, Any]]:
     decks = _source(source)
     con = _connect()
     try:
-        out = []
-        for deck in decks.all():
-            art = None
-            identity: list[str] = []
-            errors = warnings = None
-            if con is not None:
-                names = deck.card_names() + [c.name for c in deck.swap_board]
-                if deck.companion:
-                    names.append(deck.companion)
-                cards = db.get_cards(con, sorted(set(names)))
-                rep = validate(deck, cards)
-                errors, warnings = len(rep.errors), len(rep.warnings)
-                rec = cards.get(deck.commander[0]) if deck.commander else None
-                if rec is not None:
-                    art = getattr(rec, "image_art_crop", None) or rec.image_normal
-                    identity = sorted(rec.color_identity)
-                # A deck's chosen printing shows on the shelf too. The library
-                # is where somebody notices they picked one, and a tile that
-                # kept the default while the deck page showed a Secret Lair
-                # would read as a bug in one of the two.
-                chosen = _chosen_art(deck, con)
-                if chosen:
-                    art = chosen["art_crop"] or chosen["image"] or art
-            out.append({
-                "slug": deck.slug,
-                "name": deck.name,
-                # On the shelf as well as the deck page, so the library grid can
-                # decide whether to offer a delete control without asking who
-                # the viewer is. Per deck rather than per response because that
-                # is what it becomes when decks have owners.
-                "writable": decks.writable,
-                "status": deck.status,
-                "stage": deck.stage,
-                # The draft's to-do list, as a number. Carried on the library
-                # payload for the same reason the gate counts are: a shelf that
-                # renders an unreasoned list exactly like a curated deck hides
-                # the distinction the stage exists to draw.
-                "needs_rationale": len(deck.unjustified),
-                "commander": deck.commander,
-                "companion": deck.companion,
-                "bracket": deck.bracket,
-                "total_cards": deck.total_cards,
-                "land_count": deck.land_count,
-                "strategy": deck.strategy,
-                "art_crop": art,
-                "color_identity": identity,
-                "errors": errors,
-                "warnings": warnings,
-            })
+        return _tiles(decks.all(), con, writable=decks.writable, owner=owner)
+    finally:
+        if con is not None:
+            con.close()
+
+
+def list_library(lib: Library) -> list[dict[str, Any]]:
+    """Every deck this caller may see, across every owner (ADR 22).
+
+    The library view once decks have owners. One corpus connection for the
+    whole page rather than one per owner, which is the same N+1 the docstring
+    above refuses for the gate — a shelf showing four people's decks must not
+    open DuckDB four times to do it.
+
+    Each tile carries its `owner`, which is what the browse tab groups on and
+    what the client needs to build the deck's URL at all.
+    """
+    con = _connect()
+    try:
+        out: list[dict[str, Any]] = []
+        for owner, src in lib.visible():
+            out.extend(_tiles(src.all(), con, writable=src.writable,
+                              owner=owner))
         return out
     finally:
         if con is not None:
             con.close()
+
+
+def _tiles(decks: list[Deck], con: Any, *, writable: bool,
+           owner: str | None) -> list[dict[str, Any]]:
+    """The shelf's payload for a run of decks sharing one owner and corpus."""
+    out = []
+    for deck in decks:
+        art = None
+        identity: list[str] = []
+        errors = warnings = None
+        if con is not None:
+            names = deck.card_names() + [c.name for c in deck.swap_board]
+            if deck.companion:
+                names.append(deck.companion)
+            cards = db.get_cards(con, sorted(set(names)))
+            rep = validate(deck, cards)
+            errors, warnings = len(rep.errors), len(rep.warnings)
+            rec = cards.get(deck.commander[0]) if deck.commander else None
+            if rec is not None:
+                art = getattr(rec, "image_art_crop", None) or rec.image_normal
+                identity = sorted(rec.color_identity)
+            # A deck's chosen printing shows on the shelf too. The library
+            # is where somebody notices they picked one, and a tile that
+            # kept the default while the deck page showed a Secret Lair
+            # would read as a bug in one of the two.
+            chosen = _chosen_art(deck, con)
+            if chosen:
+                art = chosen["art_crop"] or chosen["image"] or art
+        out.append({
+            "slug": deck.slug,
+            # Whose deck this is. Half of its address now (ADR 22), so the
+            # client cannot build a link without it, and the key the browse
+            # tab groups on.
+            "owner": owner,
+            "name": deck.name,
+            # On the shelf as well as the deck page, so the library grid can
+            # decide whether to offer a delete control without asking who
+            # the viewer is. Per deck rather than per response because that
+            # is what it becomes when decks have owners -- which they now do,
+            # so this genuinely differs between tiles in one response.
+            "writable": writable,
+            # Whether anybody signed in may read it, or only its owner. Shown
+            # so somebody can see at a glance which of their decks are on
+            # display, and never a claim about somebody *else's* deck being
+            # private: a private deck of another owner is not in this list.
+            "shared": deck.shared,
+            "status": deck.status,
+            "stage": deck.stage,
+            # The draft's to-do list, as a number. Carried on the library
+            # payload for the same reason the gate counts are: a shelf that
+            # renders an unreasoned list exactly like a curated deck hides
+            # the distinction the stage exists to draw.
+            "needs_rationale": len(deck.unjustified),
+            "commander": deck.commander,
+            "companion": deck.companion,
+            "bracket": deck.bracket,
+            "total_cards": deck.total_cards,
+            "land_count": deck.land_count,
+            "strategy": deck.strategy,
+            "art_crop": art,
+            "color_identity": identity,
+            "errors": errors,
+            "warnings": warnings,
+        })
+    return out
 
 
 def _type_parts(type_line: str) -> tuple[list[str], list[str]]:
@@ -533,7 +574,8 @@ def _chosen_art(deck: Any, con: Any) -> dict[str, Any] | None:
             "set_name": row[1], "set_code": (row[2] or "").upper()}
 
 
-def get_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
+def get_deck(slug: str, *, source: DeckSource | None = None,
+             owner: str | None = None) -> dict[str, Any]:
     decks = _source(source)
     deck = decks.get(slug)
     con = _connect()
@@ -568,6 +610,12 @@ def get_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
             # It is a courtesy, not the enforcement. Every write route refuses
             # independently -- see `api/app.py`'s `ReadOnlySource` handler.
             "writable": decks.writable,
+            # Whose deck this is, and whether anybody signed in may read it
+            # (ADR 22). `owner` is what the client needs to build any URL
+            # back to this deck at all, so it travels with the deck rather
+            # than being remembered from the list that linked here.
+            "owner": owner,
+            "shared": deck.shared,
             "status": deck.status,
             "stage": deck.stage,
             "needs_rationale": len(deck.unjustified),
@@ -620,7 +668,7 @@ _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 def import_deck(*, text: str, slug: str, name: str = "",
                 commander: list[str] | None = None, companion: str = "",
                 bracket: int | None = None, status: str = "theoretical",
-                dry_run: bool = False,
+                dry_run: bool = False, owner: str | None = None,
                 source: DeckSource | None = None) -> dict[str, Any]:
     """Turn a pasted decklist into a draft deck.
 
@@ -683,6 +731,7 @@ def import_deck(*, text: str, slug: str, name: str = "",
         gate = validate(report.deck, _corpus_for(report.deck, con))
         return {
             "slug": slug,
+            "owner": owner,
             "name": report.deck.name,
             "stage": report.deck.stage,
             "status": report.deck.status,
@@ -714,7 +763,7 @@ class CreateRejected(Exception):
 
 def create_deck(*, slug: str, name: str = "", commander: list[str] | None = None,
                 companion: str = "", bracket: int | None = None,
-                status: str = "theoretical",
+                status: str = "theoretical", owner: str | None = None,
                 source: DeckSource | None = None) -> dict[str, Any]:
     """Start a new deck from a commander and nothing else.
 
@@ -803,6 +852,7 @@ def create_deck(*, slug: str, name: str = "", commander: list[str] | None = None
         combo = colors.of(identity)
         return {
             "slug": slug,
+            "owner": owner,
             "name": deck.name,
             "stage": deck.stage,
             "status": deck.status,
@@ -1278,8 +1328,11 @@ def _issues(report: ValidationReport) -> dict[str, list[dict[str, Any]]]:
     }
 
 
+_WHOLE_LIBRARY = "this library"
+
+
 def _for_writing(source: DeckSource | None,
-                 subject: str = "this library") -> DeckSource:
+                 subject: str = _WHOLE_LIBRARY) -> DeckSource:
     """The source, if this caller may write to it. `ReadOnlySource` if not.
 
     **This used to raise `EditRejected`, and so answered 422.** That was
@@ -1301,6 +1354,19 @@ def _for_writing(source: DeckSource | None,
     """
     decks = _source(source)
     if not decks.writable:
+        # **Resolve the deck first when the source hides things** (ADR 22).
+        # For a deck this caller cannot see the answer must be 404, and a 403
+        # raised before the lookup would confirm it exists — the leak ADR 5
+        # exists to prevent. So ask for it: a hidden deck raises
+        # `DeckNotFound` here and a visible one falls through to the 403,
+        # which is #80's answer and still the right one for a deck the caller
+        # has just been listed.
+        #
+        # Still ahead of any corpus work either way, so #80's other property
+        # holds: the refusal does not depend on how far the edit would have
+        # got, and a delete cannot fail after the deck has moved.
+        if getattr(decks, "hides_decks", False) and subject != _WHOLE_LIBRARY:
+            decks.get(subject)
         raise ReadOnlySource(subject)
     return decks
 

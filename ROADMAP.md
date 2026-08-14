@@ -823,21 +823,52 @@ arc; this is what the next few sessions actually do.
       else's library — and it is the argument for doing the ownership tier
       next rather than eventually.
 
-   7. **Deck ownership and sharing — designed, not built.** Asked for
-      2026-08-14: people should be able to show each other their decks, the
-      maintainer's should always be visible, and it should be a tab somebody
-      opts into rather than something in the way. Leaderboards and macro deck
-      stats are named as later work on top of it.
+   7. **Deck ownership and sharing — the server half is built
+      ([ADR 22](docs/adr/0022-decks-have-owners-and-sharing-is-a-flag.md)); the
+      browser half is not.** Asked for 2026-08-14: people should be able to
+      show each other their decks, the maintainer's should always be visible,
+      it should be a tab somebody opts into rather than something in the way,
+      and other players' decks should be organised **by username**. Leaderboards
+      and macro deck stats are named as later work on top of it.
 
-      This is HOSTING.md step 6 / ADR 4 arriving with a second requirement
-      attached, and it **wants its own ADR** because it changes what ADR 1 and
-      ADR 5 mean in practice. The decisions already taken: the curated six
-      become the maintainer's own decks, **shared by default**, rather than an
-      ownerless library; and a shared deck is readable but not writable by
-      anyone else, which is the gate item 6 just built generalised from
-      `is_admin` to an owner comparison. The hard part is ADR 5 — another
-      person's **private** deck must be 404 and not 403, which is the opposite
-      of the 403 item 6 chose for a deck that is deliberately visible.
+      **Decided, on the branch `deck-ownership-and-sharing`:**
+
+      - **Paths are owner-qualified — `/api/decks/{owner}/{slug}`.** Slugs are
+        unique *per owner*, never globally, which is what stops "is this slug
+        free" from being a question about everybody's private decks at once. A
+        global namespace was rejected for exactly that leak; an opaque deck id
+        was rejected for breaking the slug/directory correspondence ADR 1 keeps
+        permanently.
+      - **Sharing is a per-deck flag.** Curated six shared by default (absent
+        means shared, so they are never silently hidden); a deck in the SQL
+        tier is **private** by default, because `decks import` writes 99 empty
+        `why` fields and publishing that instantly is nobody's intent.
+      - **The 403/404 split resolves as one sentence: *403 is only ever an
+        answer about a deck the caller can already read.*** A private deck is
+        absent from the source, so every verb answers 404 — writes included,
+        because a 403 there confirms it exists. A shared deck answers 403 to a
+        write, which is item 6's answer unchanged.
+      - **The file tier's owner is a rule, not a column.** `MTGLAB_ADMIN_EMAIL`
+        names them; unset, the six fall back to `local` and stay visible, since
+        the alternative is an instance whose showcase nobody owns and therefore
+        nobody sees.
+
+      **What that cost, and what it caught.** Two bugs the sweep found rather
+      than the design: the sim routes take their slug in the *payload*, so they
+      resolved a deck by name with nobody asked whose it was; and
+      `_for_writing` refused on writability before resolving the deck, so a
+      write to somebody's private deck answered 403 and confirmed it. Both are
+      the same shape as item 6 — a check that was correct while there was one
+      library. `tests/test_isolation.py` files every per-deck route as
+      **user-scoped** now, with ten new adversarial tests.
+
+      **Still owed: the whole browser half.** `web/src/lib/api.ts` builds every
+      deck URL in one place (20 call sites) and none of them carry an owner
+      yet; the router's `/decks/:slug` needs the segment; `Library.tsx` needs
+      the browse-by-username tab; and the committed `web_dist` bundle has to be
+      rebuilt. **This branch must not merge until that lands** — the bundle is
+      in git, so a server-only merge ships a frontend calling routes that no
+      longer exist.
 
    Still owed from the test list itself: **the theme interview on the
    instance** (both modes, and now both readers) — the deployed React half,

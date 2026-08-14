@@ -35,6 +35,7 @@ pytest.importorskip("argon2")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+import tiny_corpus  # noqa: E402
 from mtglab import config  # noqa: E402
 from mtglab.api import jobs  # noqa: E402
 from mtglab.api.app import create_app  # noqa: E402
@@ -111,34 +112,38 @@ def test_a_guest_can_read_the_library(instance):
     listing = client.get("/api/decks")
     assert listing.status_code == 200
     assert [d["slug"] for d in listing.json()] == ["mini"]
-    assert client.get("/api/decks/mini").status_code == 200
+    assert client.get("/api/decks/local/mini").status_code == 200
 
 
 # ------------------------------------------------------ writing is not
 
 @pytest.mark.parametrize("verb,path,payload", [
-    ("put", "/api/decks/mini/notes/mulligan", {"value": "keep two lands"}),
-    ("patch", "/api/decks/mini", {"field": "status", "value": "built"}),
-    ("patch", "/api/decks/mini/cards/Sol Ring", {"field": "why",
+    ("put", "/api/decks/local/mini/notes/mulligan", {"value": "keep two lands"}),
+    ("patch", "/api/decks/local/mini", {"field": "status", "value": "built"}),
+    ("patch", "/api/decks/local/mini/cards/Sol Ring", {"field": "why",
                                                  "value": "rewritten"}),
-    ("delete", "/api/decks/mini/cards/Sol Ring", None),
-    ("post", "/api/decks/mini/swap", {"out": "Sol Ring",
+    ("delete", "/api/decks/local/mini/cards/Sol Ring", None),
+    ("post", "/api/decks/local/mini/swap", {"out": "Sol Ring",
                                       "into": "Arcane Signet", "why": "x"}),
-    ("post", "/api/decks/mini/cards", {"name": "Forest", "category": "land",
+    ("post", "/api/decks/local/mini/cards", {"name": "Forest", "category": "land",
                                        "why": "x"}),
-    ("post", "/api/decks/import", {"slug": "theirs", "text": "1 Sol Ring\n"}),
-    ("post", "/api/decks", {"slug": "theirs",
-                            "commander": ["Gyome, Master Chef"]}),
-    ("delete", "/api/decks/mini?confirm=mini", None),
+    ("delete", "/api/decks/local/mini?confirm=mini", None),
 ])
 def test_a_guest_cannot_write_anything(instance, verb, path, payload):
     """Every deck-writing route, refused to a signed-in non-owner.
 
     Parametrised over the route table rather than written as one test with
     nine asserts, so a regression names the endpoint that regressed. The list
-    is every write verb `api/app.py` declares against a deck; a tenth added
-    without a thought about ownership will not appear here, which is what
-    `test_isolation.py`'s generated classification is for.
+    is every write verb `api/app.py` declares against *an existing deck*; one
+    added without a thought about ownership will not appear here, which is
+    what `test_isolation.py`'s generated classification is for.
+
+    **`POST /api/decks` and `/api/decks/import` are deliberately no longer in
+    this list.** They used to be, and answering 403 to them was the interim
+    state ADR 22 exists to end: with nowhere for a guest's decks to live, the
+    only safe answer was that they could not make one. They write into
+    `lib.mine()` now, so a guest creating a deck is the feature rather than
+    the leak — see `test_a_guest_may_create_in_their_own_library`.
     """
     client, decks_dir = instance
     login(client, "guest", GUEST_PASSWORD)
@@ -165,25 +170,34 @@ def test_the_refusal_is_403_and_not_404(instance):
     """
     client, _ = instance
     login(client, "guest", GUEST_PASSWORD)
-    assert client.get("/api/decks/mini").status_code == 200
-    refused = client.put("/api/decks/mini/notes/mulligan", json={"value": "x"})
+    assert client.get("/api/decks/local/mini").status_code == 200
+    refused = client.put("/api/decks/local/mini/notes/mulligan", json={"value": "x"})
     assert refused.status_code == 403
 
 
-def test_a_refused_write_does_not_reveal_whether_the_deck_exists(instance):
-    """A guest gets the same answer for a real slug and an invented one.
+def test_a_refused_write_distinguishes_a_visible_deck_from_an_absent_one(instance):
+    """**This assertion inverted with ADR 22, and the old docstring said why.**
 
-    Not a live leak -- the library is readable, so the listing already answers
-    this. It is pinned because the ordering is what carries into the per-user
-    tier, where the pair (403, 404) *would* be a membership oracle over other
-    people's private decks.
+    It used to require 403 for a real slug *and* an invented one, on the
+    argument that the pair (403, 404) would become a membership oracle once
+    there were private decks. That was the right worry and the wrong place to
+    answer it. ADR 22 answers it where it actually bites: a deck the caller
+    **cannot see** answers 404 to everything, writes included, so no pair
+    exists to read. `tests/test_isolation.py` pins that half.
+
+    Here the caller can see the whole library -- `GET /api/decks` just listed
+    it to them -- so the two answers may differ, and they should. 403 says
+    "not yours to change"; 404 says "no such deck". Collapsing them would only
+    tell somebody their deck had vanished.
     """
     client, _ = instance
     login(client, "guest", GUEST_PASSWORD)
-    real = client.put("/api/decks/mini/notes/mulligan", json={"value": "x"})
-    absent = client.put("/api/decks/no-such-deck/notes/mulligan",
+    real = client.put("/api/decks/local/mini/notes/mulligan",
+                      json={"value": "x"})
+    absent = client.put("/api/decks/local/no-such-deck/notes/mulligan",
                         json={"value": "x"})
-    assert real.status_code == absent.status_code == 403
+    assert real.status_code == 403, "a shared deck the guest may read"
+    assert absent.status_code == 404, "no such deck"
 
 
 # --------------------------------------------------------- the owner still can
@@ -195,7 +209,7 @@ def test_the_owner_can_still_write(instance):
     """
     client, decks_dir = instance
     login(client, "owner", OWNER_PASSWORD)
-    response = client.put("/api/decks/mini/notes/mulligan",
+    response = client.put("/api/decks/local/mini/notes/mulligan",
                           json={"value": "keep two lands"})
     assert response.status_code == 200, response.text
     assert "keep two lands" in on_disk(decks_dir)
@@ -205,7 +219,7 @@ def test_the_owner_can_delete(instance):
     """The operation the flag exists for, from the permitted side."""
     client, decks_dir = instance
     login(client, "owner", OWNER_PASSWORD)
-    response = client.request("DELETE", "/api/decks/mini?confirm=mini")
+    response = client.request("DELETE", "/api/decks/local/mini?confirm=mini")
     assert response.status_code == 200, response.text
     assert not (decks_dir / "mini").exists()
 
@@ -216,12 +230,12 @@ def test_a_guest_is_refused_even_after_the_owner_has_written(instance):
     module-level source would fail this and pass everything above."""
     client, decks_dir = instance
     login(client, "owner", OWNER_PASSWORD)
-    assert client.put("/api/decks/mini/notes/mulligan",
+    assert client.put("/api/decks/local/mini/notes/mulligan",
                       json={"value": "owner wrote this"}).status_code == 200
     client.post("/api/auth/logout")
 
     login(client, "guest", GUEST_PASSWORD)
-    refused = client.put("/api/decks/mini/notes/mulligan",
+    refused = client.put("/api/decks/local/mini/notes/mulligan",
                          json={"value": "guest wrote this"})
     assert refused.status_code == 403
     assert "owner wrote this" in on_disk(decks_dir)
@@ -244,7 +258,7 @@ def test_with_auth_off_the_local_user_still_writes(tmp_path):
 
     with config.use_paths(data_dir=tmp_path / "data", decks_dir=decks_dir), \
             TestClient(create_app()) as client:
-        response = client.put("/api/decks/mini/notes/mulligan",
+        response = client.put("/api/decks/local/mini/notes/mulligan",
                               json={"value": "local edit"})
         assert response.status_code == 200, response.text
     assert "local edit" in (decks_dir / "mini" / "deck.yaml").read_text(
@@ -253,3 +267,57 @@ def test_with_auth_off_the_local_user_still_writes(tmp_path):
 
 if __name__ == "__main__":                                    # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+# --------------------------------------------- ADR 22: a guest has a library
+
+@pytest.fixture
+def corpus(instance):
+    """A queryable corpus inside the instance's scratch data directory.
+
+    Depends on `instance` so it is built inside that fixture's
+    `config.use_paths` and both share one app. Creating a deck is refused
+    without a corpus -- a commander nobody checked is a colour identity nobody
+    checked -- so only the two tests that create decks pay for it.
+    """
+    return tiny_corpus.build(config.DB_PATH)
+
+
+def test_a_guest_may_create_in_their_own_library(instance, corpus):
+    """The consequence #80 deliberately deferred, now built.
+
+    A guest could not create a deck at all while there was nowhere to put one;
+    the alternative was their decks landing in the maintainer's library. They
+    have their own tier now (ADR 22), so this is the route working rather than
+    the gate failing -- and the deck lands under *their* name, not `local`.
+    """
+    client, decks_dir = instance
+    login(client, "guest", GUEST_PASSWORD)
+
+    response = client.post("/api/decks", json={
+        "slug": "theirs", "commander": ["Gyome, Master Chef"]})
+    assert response.status_code in (200, 201), response.text
+    assert response.json()["owner"] == "guest"
+
+    # And it did not touch the file-backed library on its way.
+    assert sorted(p.name for p in decks_dir.iterdir()) == ["mini"]
+
+    # Private by default, so nothing is published the moment it exists.
+    assert client.get("/api/decks/guest/theirs").json()["shared"] is False
+
+
+def test_a_guest_still_cannot_create_inside_the_curated_library(
+        instance, corpus):
+    """Creating writes to the caller's own tier and cannot be aimed elsewhere.
+
+    `POST /api/decks` carries no owner segment at all, which is the structural
+    version of this rule: the API has no way to express "make a deck in
+    somebody else's library", so there is no check here to forget. Even a slug
+    that collides with a curated deck lands in the guest's own tier.
+    """
+    client, decks_dir = instance
+    login(client, "guest", GUEST_PASSWORD)
+    client.post("/api/decks", json={"slug": "mini",
+                                    "commander": ["Gyome, Master Chef"]})
+    assert sorted(p.name for p in decks_dir.iterdir()) == ["mini"]
+    assert on_disk(decks_dir) == DECK_YAML

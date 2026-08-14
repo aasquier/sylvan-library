@@ -39,7 +39,7 @@ from mtglab import config
 
 # Bumped when `_MIGRATIONS` grows. Stored in SQLite's own `user_version`, which
 # costs no table and cannot be forgotten in a schema dump.
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 # One entry per version, applied in order to whatever the file is at. A fresh
 # database runs all of them; an existing one runs the tail. The invite and
@@ -234,6 +234,58 @@ _MIGRATIONS: tuple[str, ...] = (
     ALTER TABLE users_rebuilt RENAME TO users;
 
     COMMIT;
+    """,
+    # -- 6 ------------------------------------------------------------------
+    # ADR 4's second deck tier, arriving as ADR 22. The curated six stay
+    # file-backed in git permanently and are *not* in here; this is where
+    # everybody else's decks live, one row each.
+    #
+    # `yaml` holds the same text `deck.yaml` holds, which is the property ADR 4
+    # bought and this table spends: `Deck.from_text` parses both, so the gate,
+    # the compiler and the artifact generator never learn there are two tiers.
+    #
+    # Three columns are denormalised copies of what the YAML already says --
+    # `slug`, `name` and `shared`. The YAML is the truth and they are the
+    # index: "list the decks I may see" and "is this slug free" must not parse
+    # every row to answer, and the browse tab groups by owner across all of
+    # them. `_write` sets them from the parsed deck on every write, so they
+    # cannot drift from the text they summarise.
+    """
+    CREATE TABLE user_decks (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        -- CASCADE matches `sessions` and `auth_tokens`: deleting an account
+        -- takes its decks. That is a real consequence rather than a default
+        -- copied across, and ADR 22 records it as one -- before this table
+        -- there were no decks to orphan.
+        owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        slug       TEXT NOT NULL,
+        name       TEXT NOT NULL,
+        yaml       TEXT NOT NULL,
+        -- 0 or 1. Governs reading only; writing is the owner's either way.
+        shared     INTEGER NOT NULL DEFAULT 0,
+        -- A delete marks the row rather than removing it, which is the promise
+        -- `DeckSource.delete` makes on the protocol: an implementation that
+        -- cannot say where the deck went has destroyed it rather than removed
+        -- it. The file source moves a directory into `.trash/`; this is the
+        -- same guarantee for a row.
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+
+    -- Unique per owner, never globally: ADR 22's whole namespace argument is
+    -- that "is this slug free" must be answerable without consulting anybody
+    -- else's decks. Partial, so deleting a deck frees its slug again -- a
+    -- plain UNIQUE would make a trashed deck block the name forever.
+    CREATE UNIQUE INDEX user_decks_slug
+        ON user_decks(owner_id, slug) WHERE deleted_at IS NULL;
+
+    CREATE INDEX user_decks_by_owner
+        ON user_decks(owner_id) WHERE deleted_at IS NULL;
+
+    -- The browse tab's query: every shared deck, everybody's, grouped by owner.
+    CREATE INDEX user_decks_shared
+        ON user_decks(shared) WHERE shared = 1 AND deleted_at IS NULL;
     """,
 )
 

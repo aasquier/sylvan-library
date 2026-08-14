@@ -107,6 +107,38 @@ def _unique_username(con: sqlite3.Connection, wanted: str) -> str:
     raise users.UserExists(f"no free username near {wanted!r}")
 
 
+def maintainer_username(con: sqlite3.Connection | None = None) -> str | None:
+    """The maintainer's *handle*, or `None` when there is no maintainer.
+
+    ADR 22 makes the curated six the maintainer's own decks by a rule rather
+    than by an `owner:` field in six files, and this is the rule. Resolved
+    through the address because that is what names them (ADR 17) and because
+    the handle is the half that may have been renamed since.
+
+    **Returns the username and never the address.** `MTGLAB_ADMIN_EMAIL` is the
+    input, the output goes into a URL, and CLAUDE.md rule 5 is specific: an
+    address may be serialised only into a response an admin authenticated for.
+    A deck path is not that response.
+
+    Reconciles nothing. `ensure_maintainer` is the write; this is the read, and
+    it runs per request.
+    """
+    address = config.admin_email()
+    if not address:
+        return None
+    if con is None:
+        with db.connection() as owned:
+            return maintainer_username(owned)
+    try:
+        normalised = users.normalise_email(address)
+    except users.InvalidEmail:
+        return None
+    if normalised is None:
+        return None
+    account = users.get_by_email(con, normalised)
+    return account.username if account is not None else None
+
+
 def ensure_maintainer(con: sqlite3.Connection | None = None) -> users.User | None:
     """Make the configured address an enabled admin. `None` when unconfigured.
 

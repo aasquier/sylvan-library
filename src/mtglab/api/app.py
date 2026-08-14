@@ -21,14 +21,21 @@ from fastapi.staticfiles import StaticFiles
 import mtglab
 from mtglab import config
 from mtglab.api import admin, auth, jobs, service
-from mtglab.api.deps import Scope, UserScope, deck_source
+from mtglab.api.deps import Scope, UserScope, deck_source, library
 from mtglab.auth import bootstrap
 from mtglab.auth.mail import EmailSender
+from mtglab.decks.library import Library
 from mtglab.decks.source import DeckNotFound, DeckSource, ReadOnlySource
 
 # The request scope, as one annotation. Every deck-facing route takes it, so
 # when auth arrives the change is to `deps.deck_source` and nowhere else.
+#
+# `Decks` is now only for routes that are about the instance rather than about
+# one person's decks -- `/api/health` counts decks and has no owner to name.
+# Anything owner-addressed takes `Lib` and resolves the path's owner segment
+# through it, which is ADR 22 and `decks/library.py`.
 Decks = Annotated[DeckSource, Depends(deck_source)]
+Lib = Annotated[Library, Depends(library)]
 
 WEB_DIST = Path(__file__).resolve().parent.parent / "web_dist"
 
@@ -213,11 +220,21 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     # ------------------------------------------------------------ decks
 
     @app.get("/api/decks")
-    def list_decks(decks: Decks) -> list[dict[str, Any]]:
-        return service.list_decks(source=decks)
+    def list_decks(lib: Lib) -> list[dict[str, Any]]:
+        """Every deck this caller may see, their own first (ADR 22).
+
+        Spans owners now, and each tile says which one — so this is the route
+        the browse tab groups, and the only place a client learns the owner
+        segment it needs to build any other deck URL.
+
+        A private deck belonging to somebody else is simply not here. That is
+        the same fact its 404 states, arrived at the same way: `Library` never
+        hands out a source that can see it.
+        """
+        return service.list_library(lib)
 
     @app.post("/api/decks/import")
-    def import_deck(payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
+    def import_deck(payload: dict[str, Any], lib: Lib) -> dict[str, Any]:
         """Turn a pasted decklist into a draft deck.
 
         Declared before `/api/decks/{slug}` so the literal path wins the match
@@ -234,6 +251,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         bracket = payload.get("bracket")
         try:
             return service.import_deck(
+                owner=lib.my_owner,
                 text=str(payload.get("text", "")),
                 slug=str(payload.get("slug", "")),
                 name=str(payload.get("name", "")),
@@ -242,7 +260,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 bracket=int(bracket) if bracket not in (None, "") else None,
                 status=str(payload.get("status") or "theoretical"),
                 dry_run=bool(payload.get("dry_run")),
-                source=decks,
+                source=lib.mine(),
             )
         except (ValueError, TypeError) as exc:
             raise HTTPException(status_code=422,
@@ -251,7 +269,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/api/decks")
-    def create_deck(payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
+    def create_deck(payload: dict[str, Any], lib: Lib) -> dict[str, Any]:
         """Start a new deck from a commander and nothing else.
 
         The last gap in the deck lifecycle. Like the import route it is
@@ -268,13 +286,14 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         bracket = payload.get("bracket")
         try:
             return service.create_deck(
+                owner=lib.my_owner,
                 slug=str(payload.get("slug", "")),
                 name=str(payload.get("name", "")),
                 commander=[str(c) for c in commander],
                 companion=str(payload.get("companion") or ""),
                 bracket=int(bracket) if bracket not in (None, "") else None,
                 status=str(payload.get("status") or "theoretical"),
-                source=decks,
+                source=lib.mine(),
             )
         except (ValueError, TypeError) as exc:
             raise HTTPException(status_code=422,
@@ -282,12 +301,12 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         except service.CreateRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    @app.get("/api/decks/{slug}")
-    def get_deck(slug: str, decks: Decks) -> dict[str, Any]:
-        return service.get_deck(slug, source=decks)
+    @app.get("/api/decks/{owner}/{slug}")
+    def get_deck(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
+        return service.get_deck(slug, source=lib.source_for(owner), owner=owner)
 
-    @app.delete("/api/decks/{slug}")
-    def delete_deck(slug: str, decks: Decks,
+    @app.delete("/api/decks/{owner}/{slug}")
+    def delete_deck(owner: str, slug: str, lib: Lib,
                     confirm: str = Query("", description="must equal the slug"),
                     ) -> dict[str, Any]:
         """Remove a deck from the library, recoverably.
@@ -298,20 +317,20 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         mis-aimed request from being indistinguishable from an intended one.
         """
         try:
-            return service.delete_deck(slug=slug, confirm=confirm, source=decks)
+            return service.delete_deck(slug=slug, confirm=confirm, source=lib.source_for(owner))
         except service.DeleteRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    @app.get("/api/decks/{slug}/validate")
-    def validate_deck(slug: str, decks: Decks) -> dict[str, Any]:
-        return service.validate_deck(slug, source=decks)
+    @app.get("/api/decks/{owner}/{slug}/validate")
+    def validate_deck(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
+        return service.validate_deck(slug, source=lib.source_for(owner))
 
-    @app.get("/api/decks/{slug}/stats")
-    def deck_stats(slug: str, decks: Decks) -> dict[str, Any]:
-        return service.stats_for(slug, source=decks)
+    @app.get("/api/decks/{owner}/{slug}/stats")
+    def deck_stats(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
+        return service.stats_for(slug, source=lib.source_for(owner))
 
-    @app.post("/api/decks/{slug}/swap")
-    def swap_card(slug: str, payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
+    @app.post("/api/decks/{owner}/{slug}/swap")
+    def swap_card(owner: str, slug: str, payload: dict[str, Any], lib: Lib) -> dict[str, Any]:
         """Carry out a swap the caller has already decided on.
 
         A write endpoint on an otherwise read-only API, so it is narrow on
@@ -325,7 +344,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 out=str(payload.get("out", "")),
                 into=str(payload.get("into", "")),
                 why=str(payload.get("why", "")),
-                source=decks,
+                source=lib.source_for(owner),
             )
         except service.SwapRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -336,8 +355,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     # whatever the caller typed, and an empty one on a curated deck is a 422
     # rather than a blank the tool fills in.
 
-    @app.post("/api/decks/{slug}/cards")
-    def add_card(slug: str, payload: dict[str, Any], decks: Decks) -> dict[str, Any]:
+    @app.post("/api/decks/{owner}/{slug}/cards")
+    def add_card(owner: str, slug: str, payload: dict[str, Any], lib: Lib) -> dict[str, Any]:
         try:
             return service.add_card(
                 slug,
@@ -346,7 +365,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 why=str(payload.get("why") or ""),
                 qty=int(payload.get("qty") or 1),
                 to=str(payload.get("to") or "cards"),
-                source=decks,
+                source=lib.source_for(owner),
             )
         except (TypeError, ValueError) as exc:
             raise HTTPException(status_code=422,
@@ -354,16 +373,16 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    @app.delete("/api/decks/{slug}/cards/{name}")
-    def remove_card(slug: str, name: str, decks: Decks) -> dict[str, Any]:
+    @app.delete("/api/decks/{owner}/{slug}/cards/{name}")
+    def remove_card(owner: str, slug: str, name: str, lib: Lib) -> dict[str, Any]:
         try:
-            return service.remove_card(slug, name=name, source=decks)
+            return service.remove_card(slug, name=name, source=lib.source_for(owner))
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    @app.patch("/api/decks/{slug}/cards/{name}")
-    def set_card_field(slug: str, name: str, payload: dict[str, Any],
-                       decks: Decks) -> dict[str, Any]:
+    @app.patch("/api/decks/{owner}/{slug}/cards/{name}")
+    def set_card_field(owner: str, slug: str, name: str, payload: dict[str, Any],
+                       lib: Lib) -> dict[str, Any]:
         """Change one field of one card: its category, quantity or rationale.
 
         The rationale editor's write path. A PATCH of one field rather than a
@@ -375,13 +394,13 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=422, detail="value is required")
         try:
             return service.set_card_field(slug, name=name, field=field,
-                                          value=payload["value"], source=decks)
+                                          value=payload["value"], source=lib.source_for(owner))
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    @app.patch("/api/decks/{slug}")
-    def set_deck_field(slug: str, payload: dict[str, Any],
-                       decks: Decks) -> dict[str, Any]:
+    @app.patch("/api/decks/{owner}/{slug}")
+    def set_deck_field(owner: str, slug: str, payload: dict[str, Any],
+                       lib: Lib) -> dict[str, Any]:
         """Change one of the deck's own fields: stage, status or bracket.
 
         `stage` to `curated` is promotion, the last step of an import. It is
@@ -392,27 +411,47 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=422, detail="value is required")
         try:
             return service.set_deck_field(slug, field=str(payload.get("field", "")),
-                                          value=payload["value"], source=decks)
+                                          value=payload["value"], source=lib.source_for(owner))
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    @app.put("/api/decks/{slug}/notes/{key}")
-    def set_note(slug: str, key: str, payload: dict[str, Any],
-                 decks: Decks) -> dict[str, Any]:
+    @app.put("/api/decks/{owner}/{slug}/notes/{key}")
+    def set_note(owner: str, slug: str, key: str, payload: dict[str, Any],
+                 lib: Lib) -> dict[str, Any]:
         try:
             return service.set_note(slug, key=key,
                                     value=str(payload.get("value", "")),
-                                    source=decks)
+                                    source=lib.source_for(owner))
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    @app.get("/api/decks/{slug}/suggestions")
-    def deck_suggestions(slug: str, decks: Decks,
-                         limit: int = Query(5, ge=1, le=20)) -> dict[str, Any]:
-        return service.suggestions_for(slug, source=decks, limit=limit)
+    @app.put("/api/decks/{owner}/{slug}/shared")
+    def set_deck_shared(owner: str, slug: str, payload: dict[str, Any],
+                        lib: Lib) -> dict[str, Any]:
+        """Put a deck on display to other accounts, or take it off (ADR 22).
 
-    @app.get("/api/decks/{slug}/commander")
-    def deck_commander(slug: str, decks: Decks) -> dict[str, Any]:
+        Its own route rather than a `field` on the PATCH beside it, because
+        the two tiers hold this fact in different places and the source is
+        what knows which — `deck.yaml` for the curated six, a column for
+        everybody else.
+
+        Refusals are the ordinary two and neither is written here: somebody
+        else's shared deck raises `ReadOnlySource` (403), and their private
+        one was never in the source at all, so it raises `DeckNotFound` (404).
+        """
+        if "shared" not in payload:
+            raise HTTPException(status_code=422, detail="shared is required")
+        source = lib.source_for(owner)
+        source.set_shared(slug, bool(payload["shared"]))
+        return service.get_deck(slug, source=source, owner=owner)
+
+    @app.get("/api/decks/{owner}/{slug}/suggestions")
+    def deck_suggestions(owner: str, slug: str, lib: Lib,
+                         limit: int = Query(5, ge=1, le=20)) -> dict[str, Any]:
+        return service.suggestions_for(slug, source=lib.source_for(owner), limit=limit)
+
+    @app.get("/api/decks/{owner}/{slug}/commander")
+    def deck_commander(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
         """Who leads this deck, and what the corpus knows about them.
 
         Its own route rather than more fields on `GET /api/decks/{slug}`,
@@ -422,17 +461,17 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         And it answers with `card: null` rather than a 404 when there is no
         corpus, which is a different contract from the deck itself.
         """
-        return service.commander_dossier(slug, source=decks)
+        return service.commander_dossier(slug, source=lib.source_for(owner))
 
-    @app.get("/api/decks/{slug}/printings")
-    def deck_printings(slug: str, decks: Decks) -> dict[str, Any]:
+    @app.get("/api/decks/{owner}/{slug}/printings")
+    def deck_printings(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
         """Every non-digital printing of this deck's commander, newest first.
 
         Its own route rather than fields on the deck: Goreclaw has twelve and
         most decks never open the picker, so this is a query the deck page
         should not pay for on every load.
         """
-        return service.commander_printings(slug, source=decks)
+        return service.commander_printings(slug, source=lib.source_for(owner))
 
     # ------------------------------------------------------------ cards
 
@@ -457,8 +496,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     # ----------------------------------------------------------- claude
 
     @app.get("/api/claude")
-    def claude_status(decks: Decks, stance: str = "",
-                      slug: str = "") -> dict[str, Any]:
+    def claude_status(lib: Lib, stance: str = "", slug: str = "",
+                      owner: str = "") -> dict[str, Any]:
         """Is the Claude surface installed, configured, and switched on?
 
         Three separate answers — a UI that collapses them tells someone their
@@ -468,7 +507,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         """
         try:
             return service.claude_status(
-                requested=stance or None, slug=slug or None, source=decks)
+                requested=stance or None, slug=slug or None,
+                source=lib.source_for(owner or lib.my_owner))
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -596,9 +636,9 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         return _job_for(plan, caller).as_dict()
 
-    @app.post("/api/decks/{slug}/interview")
-    def claude_interview(slug: str, payload: dict[str, Any],
-                         decks: Decks) -> dict[str, Any]:
+    @app.post("/api/decks/{owner}/{slug}/interview")
+    def claude_interview(owner: str, slug: str, payload: dict[str, Any],
+                         lib: Lib) -> dict[str, Any]:
         """Ask the rationale interview about one card. Returns questions.
 
         A POST because it costs money and makes a network call, not because it
@@ -622,7 +662,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 slug=slug, card=card,
                 requested=payload.get("stance") or None,
                 focus=str(payload.get("focus") or ""),
-                source=decks)
+                source=lib.source_for(owner))
         except CardNotInDeck as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ValueError as exc:
@@ -634,8 +674,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         except service.ClaudeFailed as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    @app.get("/api/decks/{slug}/dossier")
-    def claude_dossier_cached(slug: str, decks: Decks) -> dict[str, Any]:
+    @app.get("/api/decks/{owner}/{slug}/dossier")
+    def claude_dossier_cached(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
         """A stored commander dossier, or an empty one. Never calls Anthropic.
 
         A GET on purpose, and a *different function* from the POST below rather
@@ -643,11 +683,11 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         deck page can ask for it on every load, and no amount of refreshing can
         turn it into spend.
         """
-        return service.claude_dossier_cached(slug=slug, source=decks)
+        return service.claude_dossier_cached(slug=slug, source=lib.source_for(owner))
 
-    @app.post("/api/decks/{slug}/dossier")
-    def claude_dossier(slug: str, payload: dict[str, Any],
-                       decks: Decks, caller: Scope) -> dict[str, Any]:
+    @app.post("/api/decks/{owner}/{slug}/dossier")
+    def claude_dossier(owner: str, slug: str, payload: dict[str, Any],
+                       lib: Lib, caller: Scope) -> dict[str, Any]:
         """Write the commander dossier (ADR 19). Returns a **job**, not a dossier.
 
         Measured at 236 seconds on the deployed instance — longer than the
@@ -679,7 +719,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 slug=slug,
                 requested=payload.get("stance") or None,
                 refresh=bool(payload.get("refresh")),
-                source=decks)
+                source=lib.source_for(owner))
         except NoCommander as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ValueError as exc:
@@ -747,22 +787,36 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     # carries nothing about whose deck produced it.
 
     @app.post("/api/sim/mana")
-    def sim_mana(payload: dict[str, Any], decks: Decks,
+    def sim_mana(payload: dict[str, Any], lib: Lib,
                  caller: Scope) -> dict[str, Any]:
+        """Queue a Tier 1 mana run against one deck.
+
+        The slug rides in the payload rather than the path, which is why this
+        needs `owner` in the payload too (ADR 22). Resolving a bare slug would
+        reach a deck by name with nobody asked whose it is — and somebody
+        else's private deck must answer 404 here exactly as it does on `GET`.
+        Absent, `owner` means the caller's own library, which is what every
+        existing client sends.
+        """
         slug = payload.get("slug")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
+        owner = str(payload.get("owner") or lib.my_owner)
         from mtglab.api.simruns import plan_mana
-        return _job_for(plan_mana(slug, payload, source=decks), caller).as_dict()
+        return _job_for(plan_mana(slug, payload, source=lib.source_for(owner)),
+                        caller).as_dict()
 
     @app.post("/api/sim/lands")
-    def sim_lands(payload: dict[str, Any], decks: Decks,
+    def sim_lands(payload: dict[str, Any], lib: Lib,
                   caller: Scope) -> dict[str, Any]:
+        """Queue a Tier 1 land sweep. `owner` as for `/api/sim/mana` above."""
         slug = payload.get("slug")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
+        owner = str(payload.get("owner") or lib.my_owner)
         from mtglab.api.simruns import plan_lands
-        return _job_for(plan_lands(slug, payload, source=decks), caller).as_dict()
+        return _job_for(plan_lands(slug, payload, source=lib.source_for(owner)),
+                        caller).as_dict()
 
     @app.get("/api/jobs")
     def list_jobs(caller: Scope) -> list[dict[str, Any]]:
