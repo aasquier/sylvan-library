@@ -463,3 +463,122 @@ def test_a_bare_laptop_acquires_no_database_from_a_typed_deck_url(tmp_path,
         assert client.get("/api/decks/local/mini").status_code == 200
 
     assert not (tmp_path / "data" / "app.db").exists()
+
+
+# ------------------- a deployment: auth on, and a maintainer configured
+
+@pytest.fixture
+def deployed(tmp_path, monkeypatch):
+    """Auth **on** with `MTGLAB_ADMIN_EMAIL` set — what the instance runs.
+
+    The third of three configurations, the only one a deployment is ever in,
+    and until now the only one with no test at all. The other two each miss it
+    from one side:
+
+    - `instance` above is auth-on with **no** maintainer, so
+      `Library._file_owner` falls back to `local` and the write gate is the
+      `self._maintainer is None and self._is_admin` clause.
+    - `test_a_laptop_with_an_admin_address_still_has_exactly_one_library` sets
+      the address but with auth **off**, where `_file_owner` returns `local`
+      before the maintainer is ever consulted.
+
+    Neither reaches the branch every request on the instance takes, where
+    `_file_owner` is a real username and the `is_admin` escape hatch is dead
+    code. `tests/conftest.py` clears both variables for every test by design —
+    inheriting the maintainer's own `.env` makes a suite that passes in CI and
+    fails on their laptop — so reaching this branch has to be opted into, and
+    nothing had.
+
+    Three accounts, because the distinction this branch draws needs three.
+    `gyome` is the maintainer. `deputy` administers the instance and is not the
+    maintainer — the account the fallback branch cannot tell from `gyome`, and
+    this one must. `guest` is neither.
+    """
+    monkeypatch.setenv("MTGLAB_ADMIN_EMAIL", "maintainer@example.com")
+    monkeypatch.setenv("MTGLAB_ADMIN_USERNAME", "gyome")
+    jobs.clear()
+    decks_dir = tmp_path / "decks"
+    (decks_dir / "mini").mkdir(parents=True)
+    (decks_dir / "mini" / "deck.yaml").write_text(DECK_YAML, encoding="utf-8")
+
+    with config.use_paths(data_dir=tmp_path / "data", decks_dir=decks_dir):
+        con = db.connect()
+        try:
+            users.create(con, "gyome", password=OWNER_PASSWORD,
+                         email="maintainer@example.com", is_admin=True)
+            users.create(con, "deputy", password=GUEST_PASSWORD, is_admin=True)
+            users.create(con, "guest", password=GUEST_PASSWORD)
+        finally:
+            con.close()
+        app = create_app(require_auth=True, secure_cookies=False)
+        with TestClient(app) as client:
+            yield client
+
+
+def test_the_curated_library_sits_under_the_maintainer(deployed):
+    """The URL shape a deployment serves, which no test had exercised.
+
+    Every assertion above this line addresses the file tier as
+    `/api/decks/local/mini`, because with no maintainer configured that is
+    where `_file_owner` puts it. A deployment files it under a username
+    instead — so the deck paths the frontend builds in production are a shape
+    the suite had never once produced.
+    """
+    client = deployed
+    login(client, "gyome", OWNER_PASSWORD)
+    assert client.get("/api/decks/gyome/mini").status_code == 200
+    assert client.get("/api/decks/local/mini").status_code == 404, (
+        "with a maintainer configured the file tier is theirs, not `local`'s")
+
+
+def test_the_maintainer_writes_their_own_library(deployed):
+    """The control for the refusal below: the gate is shut, not jammed."""
+    client = deployed
+    login(client, "gyome", OWNER_PASSWORD)
+    assert client.put("/api/decks/gyome/mini/notes/mulligan",
+                      json={"value": "keep two lands"}).status_code == 200
+
+
+def test_an_admin_who_is_not_the_maintainer_cannot_write_the_library(deployed):
+    """The assertion the fallback branch is structurally unable to make.
+
+    With no maintainer configured `Library` grants the file tier to any admin,
+    which is #80's rule and is the right answer when the six are nobody's in
+    particular. Configure one and that clause is dead: ownership is `mine`, and
+    administering the instance stops conferring it (ADR 22 §5, the same
+    property `test_an_admin_still_cannot_see_another_persons_job` asserts for
+    jobs).
+
+    Moot on the instance *today*, where the only admin is also the maintainer
+    and the two are one account. It stops being moot the first time there are
+    two admins, and this is already the branch every real request takes — so
+    the coverage should not wait for the second admin to arrive.
+
+    Read is 200 and write is 403 rather than 404, which is #80's call
+    unchanged: the curated library is deliberately visible, so refusing the
+    write with 404 would be a lie the caller disproves by reloading.
+    """
+    client = deployed
+    login(client, "deputy", GUEST_PASSWORD)
+    assert client.get("/api/decks/gyome/mini").status_code == 200
+    refused = client.put("/api/decks/gyome/mini/notes/mulligan",
+                         json={"value": "keep two lands"})
+    assert refused.status_code == 403, (
+        f"an admin who is not the maintainer wrote the curated library "
+        f"(got {refused.status_code}); ADR 22 §5 makes ownership the test, "
+        f"not the admin flag")
+
+
+def test_a_guest_reads_the_showcase_and_is_refused_the_write(deployed):
+    """The same pair for somebody with no privileges, under the real owner.
+
+    Covered above under `local`; repeated here because it is a different
+    branch of `source_for` and because a fix that over-corrected — filing the
+    six under the maintainer and then hiding them — would pass every other
+    test in this fixture.
+    """
+    client = deployed
+    login(client, "guest", GUEST_PASSWORD)
+    assert client.get("/api/decks/gyome/mini").status_code == 200
+    assert client.put("/api/decks/gyome/mini/notes/mulligan",
+                      json={"value": "keep two lands"}).status_code == 403
