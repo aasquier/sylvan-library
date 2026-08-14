@@ -34,6 +34,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 DOCKERFILE = ROOT / "Dockerfile"
 FLY_TOML = ROOT / "fly.toml"
+CI_YML = ROOT / ".github" / "workflows" / "ci.yml"
 
 # Extras the runtime image must install, and the surface each one is there for.
 # An entry is a promise the UI already makes: a control the app renders whose
@@ -145,3 +146,88 @@ def test_the_deployment_sets_what_makes_it_private(name):
     assert name in env, (
         f"fly.toml's [env] no longer sets {name} -- {REQUIRED_ENV[name]}")
     assert env[name].strip(), f"{name} is set to an empty value in fly.toml"
+
+
+# ------------------------------------------- what the deploy job may deploy
+
+def deploy_condition() -> str:
+    """The `if:` expression on `ci.yml`'s `deploy` job, whitespace collapsed.
+
+    Read as text for the same reason `fly_env` is: the point is a check a
+    person can audit against the file, and a YAML parser would add a
+    dependency to assert one string.
+    """
+    text = CI_YML.read_text(encoding="utf-8")
+    job = text.split("\n  deploy:\n", 1)
+    assert len(job) == 2, "no `deploy` job in ci.yml"
+    # `if: >-` folds the following indented block into one expression; it ends
+    # at the next key at the same indentation.
+    found = re.search(r"^    if: >-\n((?:      .*\n)+)", job[1], re.MULTILINE)
+    assert found, "the deploy job has no `if:` condition at all"
+    return " ".join(found.group(1).split())
+
+
+def deploys(event: str, ref: str) -> bool:
+    """Would the deploy job run, for this event and ref?
+
+    Evaluates the real condition rather than matching text against it. That is
+    not over-engineering, it is the whole point: the first version of this test
+    asserted `"github.ref == 'refs/heads/main'" in condition`, which **passes
+    against the bug it was written to catch** -- the broken condition contains
+    that substring too, nested inside the `push` arm where it does not apply to
+    a dispatch. A truth table can tell those apart and a substring cannot.
+
+    The grammar is tiny and fully known: `==`, `&&`, `||`, parentheses, single-
+    quoted literals, and the two context fields. Translating it to Python and
+    evaluating with no builtins and no names beyond those two is a closer
+    reading of GitHub's semantics than a hand-rolled parser would be.
+    """
+    expr = deploy_condition()
+    python = expr.replace("&&", "and").replace("||", "or")
+    scope = {"__builtins__": {}}
+    context = {"event_name": event, "ref": ref}
+    # `github.event_name` is an attribute path, so hand it an object.
+    python = python.replace("github.", "gh.")
+    scope["gh"] = type("Ctx", (), context)()
+    return bool(eval(python, scope))
+
+
+# What may reach the instance, and what may not. The third row is the bug.
+DEPLOY_CASES = [
+    ("push", "refs/heads/main", True,
+     "the ordinary case -- a merge to main is a deploy (ADR 23)"),
+    ("workflow_dispatch", "refs/heads/main", True,
+     "ADR 23's manual button, pointed at main"),
+    ("workflow_dispatch", "refs/heads/some-feature", False,
+     "a dispatch from a branch must NOT deploy that branch"),
+    ("push", "refs/heads/some-feature", False,
+     "a push to a branch is not a release"),
+    ("pull_request", "refs/pull/17/merge", False,
+     "a fork's PR must never reach the instance"),
+]
+
+
+@pytest.mark.parametrize(("event", "ref", "expected", "why"), DEPLOY_CASES)
+def test_the_deploy_job_deploys_main_and_nothing_else(event, ref, expected, why):
+    """A green feature branch is still the wrong thing to put on the instance.
+
+    This was wrong from the moment ADR 23 landed until later the same day. The
+    condition read `workflow_dispatch || (push && ref == main)`, so the ref
+    check applied to pushes only and a manual dispatch deployed **whatever
+    branch it was launched from** -- appearing in the Actions list as an
+    ordinary deploy, because it is the same workflow with the same job names.
+
+    `needs` is no help: it proves the four checks passed, not that the ref is
+    the one anybody agreed to ship. And the mistake does not undo itself.
+    `auth/db.py`'s ladder is forward-only, so a branch carrying a schema change
+    migrates the volume on boot and deploying `main` afterwards leaves the new
+    schema in place under the old code.
+
+    Asserting the job's condition rather than the workflow's trigger is the
+    point. Dispatching the suite on a branch stays available; only the deploy
+    job refuses.
+    """
+    assert deploys(event, ref) is expected, (
+        f"ci.yml's deploy job would {'not ' if expected else ''}run for "
+        f"{event} on {ref}, and it should{'' if expected else ' not'}: {why}. "
+        f"Condition is: {deploy_condition()}")

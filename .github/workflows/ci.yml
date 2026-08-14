@@ -442,11 +442,30 @@ jobs:
   # merging and has nothing to say about a workflow_dispatch run.
   deploy:
     needs: [test, frontend, no-secrets-or-card-data, image]
+    # Two conditions, and the ref one is deliberately outside the event check.
+    #
     # Never from a pull request: a fork's PR must not be able to reach the
     # instance, and `secrets.FLY_API_TOKEN` is not exposed to one anyway.
+    #
+    # And never from a branch. This was wrong until 2026-08-14: the ref check
+    # sat on the `push` arm alone, so a `workflow_dispatch` from *any* branch
+    # deployed that branch -- and the run reads as an ordinary deploy in the
+    # Actions list, because it is the same workflow with the same job names.
+    # `needs` does not help here; a feature branch can be perfectly green and
+    # still be the wrong thing to put on the instance.
+    #
+    # What makes it worth a guard rather than a note is that it is not
+    # recoverable by redeploying. `auth/db.py`'s ladder is forward-only (ADR
+    # 23), so a branch carrying a schema change migrates the volume on boot and
+    # deploying `main` afterwards does not migrate it back.
+    #
+    # The trigger itself stays open on purpose: dispatching the *suite* on a
+    # branch is a reasonable thing to want, and it is only the deploy job that
+    # must refuse. ADR 23's manual button is unchanged -- it just has to be
+    # pointed at `main`, which is what it always meant.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # One deploy at a time, ever. The workflow-level group already serialises

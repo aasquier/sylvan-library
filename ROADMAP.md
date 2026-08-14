@@ -953,6 +953,17 @@ arc; this is what the next few sessions actually do.
      files, ~15,000 lines, and it would fight the deliberate argparse table).
      Both are their own change for the same reason `strict` was.
 
+     **Both decided 2026-08-14.** `ruff format` is a **no**, recorded as
+     [ADR 24](docs/adr/0024-no-python-autoformatter.md) — the first rejection in
+     the directory, because "why is there no formatter?" is a question that will
+     be asked again and an answer nobody wrote down gets relitigated. The
+     deciding measurement was not the diff size but the line-length one: 117
+     lines of 39,823 over 88 characters, and 60 of the 61 over 100 are oracle
+     text in `tests/tiny_pool.py` that a formatter cannot split. The discipline
+     it would impose is already there. `noUncheckedIndexedAccess` is a **yes**,
+     on its own branch — re-measuring found the 51 errors cluster into ~15
+     distinct sites, several of whose fixes are strictly better code.
+
 7. **After that, next build work in order:** re-price automated PR review
    (ENGINEERING §5, parked), the stance dial UI, then the remaining Claude
    modes ADR 15 names and branch 5 does not build (argue a slot, deck
