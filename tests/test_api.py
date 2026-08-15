@@ -3226,3 +3226,176 @@ def test_the_job_registry_evicts_finished_jobs_over_its_bound(monkeypatch):
         held = list(jobs._JOBS.values())
     assert len(held) <= 4, "the bound must hold (live job + MAX_JOBS finished)"
     assert any(j.id == live.id for j in held), "a live job must never be evicted"
+
+
+# ------------------------------------------------- the argue sweep (mass argue)
+#
+# `/api/decks/{owner}/{slug}/argue/deck` is the fourth planner of the
+# themeruns/dossierruns shape: one Claude call per selected card means the
+# sweep was never going to fit under the transport ceiling the single-card
+# endpoint measures itself against, so it is a job -- one job for the whole
+# selection, sequential inside the NET lane, with everything refusable
+# refused in the request.
+
+
+def test_an_empty_selection_is_a_422_and_not_a_job(in_memory_client):
+    jobs.clear()
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        r = client.post("/api/decks/local/mono-green/argue/deck",
+                        json={"cards": []})
+        assert r.status_code == 422
+        assert jobs.all_jobs() == [], "nothing should have been queued"
+
+
+def test_a_card_the_deck_does_not_hold_is_a_422_that_names_it(in_memory_client):
+    """Named, not counted: the deck page sent the selection, so a miss means
+    its list is stale, and "which card" is the actionable part."""
+    jobs.clear()
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        r = client.post("/api/decks/local/mono-green/argue/deck",
+                        json={"cards": ["Sol Ring", "Island"]})
+        assert r.status_code == 422
+        assert "Island" in r.json()["detail"]
+        assert jobs.all_jobs() == []
+
+
+def test_a_malformed_stance_is_a_422_rather_than_a_sweep(in_memory_client):
+    jobs.clear()
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        r = client.post("/api/decks/local/mono-green/argue/deck",
+                        json={"cards": ["Sol Ring"], "stance": "omniscient"})
+        assert r.status_code == 422
+        assert jobs.all_jobs() == []
+
+
+def test_a_sweep_with_no_key_is_a_503_before_anything_is_queued(
+        in_memory_client, monkeypatch):
+    import mtglab.claude.client as cc
+
+    jobs.clear()
+    monkeypatch.setattr(cc, "credential_present", lambda: False)
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        r = client.post("/api/decks/local/mono-green/argue/deck",
+                        json={"cards": ["Sol Ring"]})
+        assert r.status_code == 503
+        assert jobs.all_jobs() == []
+
+
+def test_a_sweep_at_a_stance_of_off_is_a_job_born_finished(in_memory_client,
+                                                           no_worker):
+    """One report saying no calls were made -- never N copies of it, and never
+    a queued job. `no_worker` is what makes the second half checkable rather
+    than racy; see the fixture."""
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        r = client.post("/api/decks/local/mono-green/argue/deck",
+                        json={"cards": ["Sol Ring", "Regal Behemoth"],
+                              "stance": "off"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "done", "no worker needed to answer this"
+        assert body["kind"] == "claude.argue.deck"
+        assert body["result"]["asked"] is False
+        assert "stance is off" in body["result"]["reason"]
+        assert body["result"]["reports"] == []
+
+
+def test_a_sweep_is_one_job_in_the_net_lane_reporting_progress(
+        in_memory_client, monkeypatch):
+    """One job for the selection, not one per card: the NET lane is two
+    workers wide and shared with the dossier and the theme proposal, and a
+    selection submitted as N jobs would starve every sibling surface."""
+    import mtglab.claude.client as cc
+    from mtglab.api import service as service_mod
+
+    jobs.clear()
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(
+        service_mod, "claude_argue",
+        lambda *, slug, card, requested=None, focus="", source=None:
+            {"card": card, "asked": True})
+
+    lanes = []
+    real_submit = jobs.submit
+    monkeypatch.setattr(jobs, "submit",
+                        lambda *a, **kw: (lanes.append(kw.get("lane")),
+                                          real_submit(*a, **kw))[1])
+
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        r = client.post("/api/decks/local/mono-green/argue/deck",
+                        json={"cards": ["Sol Ring", "Regal Behemoth"]})
+        assert r.status_code == 200
+        assert lanes == [jobs.NET], "one job, in the NET lane"
+
+        body = await_job(client, r.json()["id"])
+        assert body["status"] == "done"
+        result = body["result"]
+        # The reports come back in selection order, one per card.
+        assert [rep["card"] for rep in result["reports"]] == [
+            "Sol Ring", "Regal Behemoth"]
+        assert result["errors"] == {}
+        assert body["total"] == 2 and body["done"] == 2
+
+
+def test_one_failed_card_does_not_cost_the_rest_of_the_sweep(
+        in_memory_client, monkeypatch):
+    """Partial results are the point of paying for a sweep. A single flaky
+    call is recorded against its card and the sweep continues."""
+    import mtglab.claude.client as cc
+    from mtglab.api import service as service_mod
+    from mtglab.api.service import ClaudeFailed
+
+    def flaky(*, slug, card, requested=None, focus="", source=None):
+        if card == "Sol Ring":
+            raise ClaudeFailed("the model was rate limited")
+        return {"card": card, "asked": True}
+
+    jobs.clear()
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(service_mod, "claude_argue", flaky)
+
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        r = client.post("/api/decks/local/mono-green/argue/deck",
+                        json={"cards": ["Sol Ring", "Regal Behemoth"]})
+        body = await_job(client, r.json()["id"])
+        assert body["status"] == "done", "one bad call is not a failed sweep"
+        result = body["result"]
+        assert [rep["card"] for rep in result["reports"]] == ["Regal Behemoth"]
+        assert "rate limited" in result["errors"]["Sol Ring"]
+
+
+def test_the_same_selection_twice_in_flight_is_one_sweep(in_memory_client,
+                                                         monkeypatch):
+    """The dossier's argument, per selection: a double-click inside the
+    minutes a sweep takes is one question asked twice. A different order or
+    case is still the same selection; a different selection is its own job."""
+    import mtglab.claude.client as cc
+    from mtglab.api import service as service_mod
+
+    started = []
+
+    def slow(*, slug, card, requested=None, focus="", source=None):
+        started.append(card)
+        time.sleep(0.3)
+        return {"card": card, "asked": True}
+
+    jobs.clear()
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(service_mod, "claude_argue", slow)
+
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        first = client.post("/api/decks/local/mono-green/argue/deck",
+                            json={"cards": ["Sol Ring", "Regal Behemoth"]}).json()
+        second = client.post("/api/decks/local/mono-green/argue/deck",
+                             json={"cards": ["regal behemoth", "SOL RING"]}).json()
+        other = client.post("/api/decks/local/mono-green/argue/deck",
+                            json={"cards": ["Sol Ring"]}).json()
+
+        assert first["id"] == second["id"], "a second click must join the sweep"
+        assert other["id"] != first["id"], "a different selection is new work"
+        await_job(client, first["id"])
+        await_job(client, other["id"])
+        assert started.count("Regal Behemoth") == 1, \
+            "the sweep must not have been paid for twice"

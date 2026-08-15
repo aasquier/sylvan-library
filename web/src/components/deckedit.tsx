@@ -272,8 +272,6 @@ export function SlotArgumentPanel({ deck, card, onClose, writable = false, onSwa
   const [report, setReport] = useState<SlotArgumentReport | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // The alternative being swapped in, if any. The composer owns the why.
-  const [swapInto, setSwapInto] = useState<string | null>(null)
   const [pin, setPin] = useStance()
 
   useEffect(() => {
@@ -312,13 +310,6 @@ export function SlotArgumentPanel({ deck, card, onClose, writable = false, onSwa
     return <ClaudeUnavailable installed={status.installed} className="mt-2" />
   }
 
-  const dropped = report?.alternatives_dropped
-  const droppedLines: [string, string[]][] = dropped ? [
-    ['not in the card pool', dropped.not_in_pool],
-    ['banned in Commander', dropped.banned],
-    ["outside the deck's colour identity", dropped.off_colour],
-  ] : []
-
   return (
     <div className="mt-2 space-y-2 border-t pt-2 text-xs"
          style={{ borderColor: 'var(--hairline)' }}>
@@ -341,6 +332,37 @@ export function SlotArgumentPanel({ deck, card, onClose, writable = false, onSwa
       )}
 
       {report?.asked && (
+        <SlotArgumentBody deck={deck} report={report}
+                          writable={writable} onSwapped={onSwapped} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * One argued slot's answer, rendered. Shared by the per-card panel above and
+ * the deck review's queue — same payload, same rules, and in particular the
+ * same absence: nothing here writes or pre-fills a rationale, and the only
+ * way an alternative becomes the card of record is the swap composer, with a
+ * why the user typed (ADR 11).
+ */
+export function SlotArgumentBody({ deck, report, writable = false, onSwapped }: {
+  deck: DeckRef
+  report: SlotArgumentReport
+  writable?: boolean
+  onSwapped?: () => void
+}) {
+  // The alternative being swapped in, if any. The composer owns the why.
+  const [swapInto, setSwapInto] = useState<string | null>(null)
+
+  const dropped = report.alternatives_dropped
+  const droppedLines: [string, string[]][] = dropped ? [
+    ['not in the card pool', dropped.not_in_pool],
+    ['banned in Commander', dropped.banned],
+    ["outside the deck's colour identity", dropped.off_colour],
+  ] : []
+
+  return (
         <div className="space-y-2">
           {/* ADR 14 boundary 3, and this mode needs it more than the interview
               does: questions are never mistaken for a verdict, and a reasoned
@@ -430,7 +452,7 @@ export function SlotArgumentPanel({ deck, card, onClose, writable = false, onSwa
               {swapInto && (
                 <SwapComposer
                   deck={deck}
-                  out={card}
+                  out={report.card}
                   into={swapInto}
                   onDone={() => { setSwapInto(null); onSwapped?.() }}
                   onCancel={() => setSwapInto(null)}
@@ -453,8 +475,6 @@ export function SlotArgumentPanel({ deck, card, onClose, writable = false, onSwa
           )}
           <p style={{ color: 'var(--text-muted)' }}>{report.never}</p>
         </div>
-      )}
-    </div>
   )
 }
 
