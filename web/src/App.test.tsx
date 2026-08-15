@@ -104,6 +104,35 @@ describe('with auth off', () => {
   })
 })
 
+describe('the Claude menu in the header', () => {
+  const claude = {
+    installed: true, configured: true, model: 'claude-sonnet-5',
+    stance: { preset: 'consultant', allows_calls: true, may_write: false, axes: [] },
+    ceiling: { preset: null, allows_calls: true, may_write: false, axes: [] },
+    default: { preset: 'consultant', allows_calls: true, may_write: false, axes: [] },
+    presets: [
+      { name: 'off', blurb: 'No calls.', available: true,
+        stance: { preset: 'off', allows_calls: false, may_write: false, axes: [] } },
+    ],
+    never: 'No stance lets Claude write a card’s rationale.',
+    modes: [],
+  }
+
+  it('appears when this instance has Claude configured', async () => {
+    routes['/api/claude'] = { body: claude }
+    renderApp()
+    expect(await screen.findByRole('button', { name: /Claude/ })).toBeTruthy()
+  })
+
+  it('stays out of the header when it is not', async () => {
+    // The default mock 404s `/api/claude`, which is what an instance without
+    // the extra effectively is to this menu: nothing to control.
+    renderApp()
+    await screen.findByText('Card search')
+    expect(screen.queryByRole('button', { name: /Claude/ })).toBeNull()
+  })
+})
+
 describe('with auth on and nobody signed in', () => {
   beforeEach(() => {
     routes['/api/auth/me'] = { body: auth({ auth_required: true, is_admin: false }) }

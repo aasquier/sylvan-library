@@ -37,7 +37,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import { StanceDial } from '../components/stance'
+import { StanceReadout } from '../components/stance'
 import {
   Badge, CardHover, ErrorNote, ManaCost, PageMasthead, Spinner,
 } from '../components/ui'
@@ -192,12 +192,12 @@ export default function Research() {
           {unavailable && (
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
               {status?.installed
-                ? 'No API key is configured on this instance.'
-                : 'The Claude extra is not installed here.'}
+                ? 'Claude has no key to call with on this server.'
+                : 'Claude isn’t installed on this server.'}
             </span>
           )}
         </div>
-        {status && <StanceDial status={status} pin={pin} onPin={setPin} />}
+        {status && <StanceReadout status={status} pin={pin} />}
       </form>
 
       {!report && !busy && (

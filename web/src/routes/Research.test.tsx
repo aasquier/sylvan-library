@@ -253,7 +253,7 @@ describe('when the surface is unavailable', () => {
   it('says a key is missing rather than disabling the box silently', async () => {
     vi.mocked(api.claudeStatus).mockResolvedValue({ ...STATUS, configured: false })
     draw()
-    expect(await screen.findByText(/No API key is configured/)).toBeTruthy()
+    expect(await screen.findByText(/no key to call with/)).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Your question'), {
       target: { value: 'anything' },
     })

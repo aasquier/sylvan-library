@@ -29,10 +29,14 @@ them as separate steps on purpose, so a type error reports as a type error.
   `lib/api.test.ts` asserts the URL shape directly.
 - **A 401 is handled once**, in `lib/api.ts`, which announces a lost session
   so `App.tsx` re-asks `/api/auth/me`. Screens do not catch it themselves.
-- **The stance dial is a readout, not a computer.** `lib/stance.ts` pins a
-  preset *name* only; the axes shown come from the server's resolved answer,
-  never recomputed here, and a refused pin is dropped and the call retried
-  bare. See ADR 15 and the dial notes in `ROADMAP.md`.
+- **The stance control is a header menu; the panels keep a readout.**
+  `components/stancemenu.tsx` is the one control (the pin was always one
+  global value), `components/stance.tsx` is the per-surface line that says
+  what it resolved to, and `lib/claudecopy.ts` is the only place a wire token
+  (`second-opinion`, `on-request`) becomes a label. The readout is still not
+  a computer: the axes shown come from the server's resolved answer, never
+  recomputed here, and a refused pin is dropped and the call retried bare.
+  See ADR 15 and the dial notes in `ROADMAP.md`.
 - **Only the five colours get a drawn glyph** (`components/manasymbol.tsx`,
   the `hasGlyph` branch). A numeral is a numeral, `{X}` is a letter, a hybrid
   is two colours no single glyph states. A drawn pip carries `role="img"` and
