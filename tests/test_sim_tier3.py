@@ -13,6 +13,8 @@ is a property of Forge, not of this code.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from mtglab.decks.model import CardEntry, Deck
@@ -413,3 +415,104 @@ def test_ensure_profile_refuses_a_missing_forge_home(tmp_path):
     from mtglab.sim.tier3 import run as forge
     with pytest.raises(forge.ForgeNotInstalled):
         forge.ensure_profile(tmp_path / "absent")
+
+
+# ------------------------------------------- the card index, from a real zip
+
+def _forge_home(tmp_path, names=("Sol Ring", "Forest")):
+    """An unpacked-Forge lookalike: just the cardsfolder zip, three entries."""
+    import zipfile
+    home = tmp_path / "forge"
+    folder = home / "res" / "cardsfolder"
+    folder.mkdir(parents=True)
+    with zipfile.ZipFile(folder / "cardsfolder.zip", "w") as z:
+        for name in names:
+            slug = name.lower().replace(" ", "_")
+            z.writestr(f"{slug[:1]}/{slug}.txt",
+                       f"Name:{name}\nManaCost:1\nTypes:Artifact\n")
+        z.writestr("readme.md", "not a card script")
+        z.writestr("s/", "")   # a directory entry, skipped
+    return home
+
+
+def test_implemented_names_reads_forges_own_scripts(tmp_path):
+    names = coverage.implemented_names(_forge_home(tmp_path))
+    assert names == frozenset({"Sol Ring", "Forest"})
+
+
+def test_implemented_names_is_cached_until_the_zip_changes(tmp_path):
+    home = _forge_home(tmp_path)
+    first = coverage.implemented_names(home)
+    assert coverage.implemented_names(home) is first, \
+        "same path, same mtime, same size -- the index must not be re-read"
+
+
+def test_a_missing_distribution_names_the_env_var(tmp_path):
+    with pytest.raises(coverage.ForgeNotInstalled, match="MTGLAB_FORGE_HOME"):
+        coverage.implemented_names(tmp_path / "nowhere")
+
+
+def test_a_clean_report_mentions_its_face_renames():
+    deck = make_deck(cards=[
+        CardEntry(name="Bala Ged Recovery // Bala Ged Sanctuary",
+                  category="utility", why="x")])
+    report = coverage.check(deck, INDEX)
+    assert report.ok
+    assert "resolved to a face name" in report.summary()
+
+
+# ---------------------------------------------- the run, faked at subprocess
+
+def _stub_forge(monkeypatch, stdout: str, captured: dict | None = None):
+    from mtglab.sim.tier3 import run
+
+    monkeypatch.setattr(run, "implemented_names", lambda *a, **k: INDEX)
+    monkeypatch.setattr(run, "ensure_profile", lambda *a, **k: None)
+    monkeypatch.setattr(run.dck, "write_dck",
+                        lambda d, *a, **k: type("P", (), {"name": "x.dck"})())
+    monkeypatch.setattr(run, "java_binary", lambda: "java")
+    monkeypatch.setattr(run, "desktop_jar", lambda *a: "forge.jar")
+
+    def fake_run(argv, **kw):
+        if captured is not None:
+            captured["argv"] = argv
+        return type("Proc", (), {"stdout": stdout, "stderr": ""})()
+    monkeypatch.setattr(run.subprocess, "run", fake_run)
+    return run
+
+
+def test_run_games_maps_seats_and_carries_the_seed(monkeypatch):
+    """The full path around the subprocess: Ai(2) resolves to the second
+    deck's slug, startup time is wall minus play, and `-s` rides the argv."""
+    captured: dict = {}
+    run = _stub_forge(monkeypatch, WON, captured)
+    a = make_deck()
+    b = make_deck(slug="second", commander=["Gyome, Master Chef"])
+    result = run.run_games([a, b], games=1, clock=300, seed=7)
+    assert "-s" in captured["argv"] and "7" in captured["argv"]
+    game = result.games[0]
+    assert result.winner_slug(game) == "second"
+    assert result.startup_seconds >= 0.0
+
+
+def test_a_dropped_card_raises_rather_than_reporting(monkeypatch):
+    """The Forge-plays-on-with-96-cards failure: the result parses fine and
+    must still be refused, because a flag would eventually be ignored."""
+    run = _stub_forge(monkeypatch, DROPPED)
+    with pytest.raises(run.ResultsUntrustworthy, match="dropped card"):
+        run.run_games([make_deck(), make_deck()], games=1)
+
+
+def test_a_run_with_no_games_at_all_is_refused_with_forges_output(monkeypatch):
+    run = _stub_forge(monkeypatch, "Read cards: 33617 archived files in 1 ms\n")
+    with pytest.raises(run.ResultsUntrustworthy, match="no game results"):
+        run.run_games([make_deck(), make_deck()], games=1)
+
+
+def test_a_java_probe_that_cannot_execute_is_none(monkeypatch):
+    from mtglab.sim.tier3 import run
+
+    def boom(argv, **kw):
+        raise OSError("not executable")
+    monkeypatch.setattr(run.subprocess, "run", boom)
+    assert run._java_major(Path("java-that-is-not-there")) is None

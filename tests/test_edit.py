@@ -694,3 +694,94 @@ def test_an_empty_deck_cannot_promote_itself_to_curated():
     )
     with pytest.raises(EditFailed, match="no cards yet"):
         set_deck_field(text, field="stage", value="curated")
+
+
+# ------------------------------------------------- the refusals and the diff
+
+def test_a_file_that_does_not_parse_is_refused_with_the_parser_error():
+    with pytest.raises(EditFailed, match="does not parse"):
+        remove_card("cards:\n  - name: [unclosed", name="x")
+
+
+def test_a_file_that_is_not_a_mapping_is_refused():
+    with pytest.raises(EditFailed, match="not a mapping"):
+        remove_card("- just\n- a\n- list\n", name="x")
+
+
+def test_add_refuses_the_malformed_before_touching_the_text():
+    with pytest.raises(EditFailed, match="cards live in"):
+        add_card(DECK, name="Sol Ring", category="ramp", why="x",
+                 list_key="sideboard")
+    with pytest.raises(EditFailed, match="needs a name"):
+        add_card(DECK, name="  ", category="ramp", why="x")
+    with pytest.raises(EditFailed, match="needs a category"):
+        add_card(DECK, name="Sol Ring", category=" ", why="x")
+    with pytest.raises(EditFailed, match="at least 1"):
+        add_card(DECK, name="Sol Ring", category="ramp", why="x", qty=0)
+
+
+def test_set_category_to_blank_is_refused():
+    with pytest.raises(EditFailed, match="needs a category"):
+        set_card_field(DECK, name="Sol Ring", field="category", value="  ")
+
+
+def test_a_note_key_must_be_a_word():
+    with pytest.raises(EditFailed, match="needs a key"):
+        set_note(DECK, key=" ", value="something")
+    with pytest.raises(EditFailed, match="not a usable note key"):
+        set_note(DECK, key="bad key!", value="something")
+
+
+def test_a_notes_block_that_is_not_a_mapping_is_refused():
+    broken = DECK + "\nnotes:\n  - a list entry\n"
+    with pytest.raises(EditFailed, match="`notes:` is not a mapping"):
+        set_note(broken, key="mulligan", value="keep lands")
+
+
+def test_removing_from_a_list_that_ends_the_file():
+    """`_block_span`'s run-to-EOF branch: every curated deck has keys after
+    `cards`, so only a file that ends mid-list exercises it."""
+    text = ("slug: tail\nname: Tail\ncommander:\n  - Gyome, Master Chef\n"
+            "cards:\n"
+            "  - name: Sol Ring\n    category: ramp\n    why: Rocks.\n"
+            "  - name: Swamp\n    category: land\n    why: Mana.\n")
+    updated = remove_card(text, name="Sol Ring")
+    assert "Sol Ring" not in updated
+    assert "Swamp" in updated
+
+
+def test_first_difference_names_the_earliest_divergence():
+    """The sentence a refused self-check shows -- each shape of drift has its
+    own wording, and the wording is the debugging surface."""
+    from mtglab.decks.edit import _first_difference as diff
+
+    assert diff({"a": 1}, {"a": 1, "b": 2}) == ".b appeared"
+    assert diff({"a": 1, "b": 2}, {"a": 1}) == ".b disappeared"
+    assert diff({"a": {"b": 1}}, {"a": {"b": 2}}) == \
+        ".a.b is 2, expected 1"
+    assert diff([1, 2], [1]) == "the list has 1 entries, expected 2"
+    assert diff([1, 2], [1, 3]) == "[1] is 3, expected 2"
+    assert diff("x", "y") == "the document is 'y', expected 'x'"
+
+
+def test_unquote_survives_text_yaml_cannot_read():
+    from mtglab.decks.edit import _unquote
+
+    assert _unquote("plain words") == "plain words"
+    # A scalar YAML refuses to parse falls back to the text as typed.
+    assert _unquote("[unclosed") == "[unclosed"
+    # A scalar that parses to a non-string keeps the typed spelling too:
+    # `why: 42` means the text "42", not the number.
+    assert _unquote("42") == "42"
+
+
+def test_a_fold_that_would_not_read_back_falls_back_to_plain():
+    """`_render(fold=True)` folds long prose -- but folding collapses single
+    newlines, so a value it would damage is rendered unfolded instead."""
+    from mtglab.decks.edit import _render
+
+    value = "line one\nline two"
+    lines = _render("why", value, 4, width=40, fold=True)
+    rendered = "\n".join(line[4:] if line[:4] == "    " else line
+                         for line in lines)
+    assert yaml.safe_load(rendered) == {"why": value}

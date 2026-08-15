@@ -367,3 +367,155 @@ def test_a_read_only_source_refuses_a_delete(decks_root):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+# ------------------------------------------------------------- the SQL tier
+#
+# ADR 22's second tier, exercised directly rather than through the routes that
+# wrap it. Everything here runs against a scratch `app.db`; nothing touches
+# the real one, per `config.use_paths`.
+
+SQL_DECK = """\
+slug: theirs
+name: Their Deck
+commander:
+  - Gyome, Master Chef
+cards: []
+"""
+
+
+@pytest.fixture
+def sql_owner(tmp_path):
+    from mtglab.auth import db as auth_db
+    from mtglab.auth import users
+    with config.use_paths(data_dir=tmp_path / "data"):
+        with auth_db.connection() as con:
+            user = users.create(con, "keeper", password="a-fine-password-9")
+        yield user.id
+
+
+def test_sql_source_round_trips_create_read_update(sql_owner):
+    from mtglab.decks.sqlsource import SqlDeckSource
+    src = SqlDeckSource(sql_owner, writable=True)
+    src.create("theirs", SQL_DECK)
+    assert src.slugs() == ["theirs"]
+    assert src.get("theirs").name == "Their Deck"
+    assert "Their Deck" in src.read_text("theirs")
+
+    src.write_text("theirs", SQL_DECK.replace("Their Deck", "Renamed"))
+    assert src.get("theirs").name == "Renamed"
+    assert [d.slug for d in src.all()] == ["theirs"]
+
+
+def test_sql_source_create_refuses_a_taken_slug(sql_owner):
+    from mtglab.decks.sqlsource import SqlDeckSource
+    src = SqlDeckSource(sql_owner, writable=True)
+    src.create("theirs", SQL_DECK)
+    with pytest.raises(DeckExists):
+        src.create("theirs", SQL_DECK)
+
+
+def test_sql_source_delete_marks_the_row_and_frees_the_slug(sql_owner):
+    """The protocol's requirement: `delete` says where the deck went, and a
+    trashed deck must not block its own name forever."""
+    from mtglab.decks.sqlsource import SqlDeckSource
+    src = SqlDeckSource(sql_owner, writable=True)
+    src.create("theirs", SQL_DECK)
+    where = src.delete("theirs")
+    assert where.startswith("user_decks:")
+    with pytest.raises(DeckNotFound):
+        src.get("theirs")
+    # The partial unique index frees the slug on delete.
+    src.create("theirs", SQL_DECK)
+
+
+def test_sql_source_sharing_is_owner_only_and_read_only_hides_private(
+        sql_owner):
+    """ADR 22 in two sentences: a private deck is absent to everybody else
+    (404, never 403), and a shared one is visible but not writable."""
+    from mtglab.decks.sqlsource import SqlDeckSource
+    mine = SqlDeckSource(sql_owner, writable=True)
+    mine.create("theirs", SQL_DECK)
+
+    stranger = SqlDeckSource(sql_owner, writable=False, shared_only=True)
+    with pytest.raises(DeckNotFound):
+        stranger.get("theirs")          # private: absent, not forbidden
+    assert stranger.slugs() == []
+
+    mine.set_shared("theirs", True)
+    assert stranger.get("theirs").slug == "theirs"
+    with pytest.raises(ReadOnlySource):
+        stranger.write_text("theirs", SQL_DECK)
+    with pytest.raises(ReadOnlySource):
+        stranger.delete("theirs")
+    with pytest.raises(ReadOnlySource):
+        stranger.set_shared("theirs", False)
+
+    mine.set_shared("theirs", False)
+    with pytest.raises(DeckNotFound):
+        stranger.get("theirs")
+
+
+def test_sql_source_repr_names_owner_and_mode(sql_owner):
+    from mtglab.decks.sqlsource import SqlDeckSource
+    ro = SqlDeckSource(sql_owner, writable=False, shared_only=True)
+    assert repr(ro) == f"SqlDeckSource(owner={sql_owner}, ro, shared-only)"
+
+
+# --------------------------------------------------- the shared-only view
+
+def test_shared_only_hides_an_unshared_file_deck(decks_root):
+    """`_SharedOnly` is the file tier's WHERE clause: a `shared: false` deck
+    is absent to a stranger -- DeckNotFound, the same fact as not existing --
+    and every write raises through the read-only inner source."""
+    from mtglab.decks.library import _SharedOnly
+
+    hidden = (decks_root / "other" / "deck.yaml")
+    hidden.write_text(hidden.read_text().replace("slug: other",
+                                                 "slug: other\nshared: false"),
+                      encoding="utf-8")
+    view = _SharedOnly(FileDeckSource(decks_root, writable=False))
+
+    assert view.slugs() == ["mini"]
+    assert [d.slug for d in view.all()] == ["mini"]
+    assert view.hides_decks is True
+    assert view.writable is False
+    assert "_SharedOnly" in repr(view)
+
+    with pytest.raises(DeckNotFound):
+        view.get("other")
+    with pytest.raises(DeckNotFound):
+        view.read_text("other")
+    with pytest.raises(DeckNotFound):
+        view.set_shared("other", True)
+
+    # A shared deck is readable and still not writable: 403 territory, which
+    # is the one answer ADR 22 allows about a deck the caller can read.
+    assert view.get("mini").slug == "mini"
+    assert "mini" in view.read_text("mini")
+    with pytest.raises(ReadOnlySource):
+        view.write_text("mini", DECK_YAML)
+    with pytest.raises(ReadOnlySource):
+        view.create("brand-new", DECK_YAML)
+    with pytest.raises(ReadOnlySource):
+        view.delete("mini")
+
+
+def test_library_resolution_edges():
+    """The `None` branches: no username is nobody, no maintainer is no match,
+    and the maintainer's own `mine()` is the file tier, writable."""
+    from mtglab.decks.library import Library
+
+    nobody = Library(username=None, user_id=None, maintainer="gyome",
+                     authenticated=True)
+    with pytest.raises(DeckNotFound):
+        nobody.source_for("someone-else")
+
+    no_maintainer = Library(username="ada", user_id=7, maintainer=None,
+                            authenticated=True)
+    assert no_maintainer.file_owner == "local"
+
+    keeper = Library(username="gyome", user_id=1, maintainer="gyome",
+                     authenticated=True)
+    assert keeper.my_owner == "gyome"
+    assert keeper.mine().writable is True

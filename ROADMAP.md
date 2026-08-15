@@ -1134,6 +1134,21 @@ arc; this is what the next few sessions actually do.
      variant saved nothing; the ~200ms shelf union is the scan itself, and
      the 2026-08-14 CTE rewrite already took the cheap half).
 
+9. **Coverage to ~96%, floor to 95** — landed 2026-08-14. The suite stood at
+   90% (both CI and local; the old two-point gap between them is gone) and the
+   floor had been 90 since 2026-08-12. A deliberate pass took it to ~96 — the
+   ground gained is itemised in `pyproject.toml`'s `fail_under` comment, and
+   the largest single piece was the CLI's three Claude renderers, which had
+   *no* output tests at all: the argue, dossier and research printing is where
+   ADR 14's "say which system answered" lives in a terminal, and none of it
+   was pinned. Also new: the theme modes' full call path faked at `Turn`, the
+   Forge run faked at `subprocess` (seat mapping, the dropped-card refusal,
+   the no-games refusal), the Scryfall ingest against fake bulk files, and
+   ADR 22's `SqlDeckSource` exercised directly — create/read/update/delete,
+   the freed slug, and the private-is-absent rule, which had only ever been
+   tested through the routes. The floor sits a point under the suite so a
+   change that costs a full point is loud and ordinary churn is not.
+
 ---
 
 ## 1. Analyse or generate decks with simulation

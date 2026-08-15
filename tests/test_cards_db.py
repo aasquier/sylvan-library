@@ -546,3 +546,98 @@ def test_an_empty_pool_is_not_stale(tmp_path):
         assert pool_is_stale(con) is False
     finally:
         con.close()
+
+
+# -------------------------------------------------------- ingest, end to end
+
+def _bulk(tmp: Path, cards, name="oracle.jsonl.gz") -> Path:
+    text = "\n".join(json.dumps(c) for c in cards)
+    return _write(tmp, name, text, gz=name.endswith(".gz"))
+
+
+def test_load_oracle_skips_tokens_and_batches(tmp_path):
+    from mtglab.cards import db
+    con = db.connect(tmp_path / "t.duckdb")
+    path = _bulk(tmp_path, [
+        {"name": "Sol Ring", "oracle_id": "o1", "layout": "normal",
+         "type_line": "Artifact", "legalities": {"commander": "legal"}},
+        {"name": "Food", "layout": "token"},
+        {"name": "Gyome, Master Chef", "oracle_id": "o2", "layout": "normal",
+         "type_line": "Legendary Creature — Troll Chef",
+         "legalities": {"commander": "legal"}},
+    ])
+    # batch=1 drives the mid-loop flush as well as the tail one.
+    assert db.load_oracle(con, path, batch=1) == 2
+    row = con.execute("SELECT count(*) FROM oracle_cards").fetchone()
+    assert row[0] == 2
+    con.close()
+
+
+def test_load_printings_skips_digital_and_snapshots_prices(tmp_path):
+    from mtglab.cards import db
+    con = db.connect(tmp_path / "t.duckdb")
+    path = _bulk(tmp_path, [
+        {"id": "p1", "oracle_id": "o1", "name": "Sol Ring", "set": "c21",
+         "prices": {"usd": "1.50", "usd_foil": None},
+         "image_uris": {"normal": "https://img/normal/p1.jpg"}},
+        {"id": "p2", "oracle_id": "o1", "name": "Sol Ring", "set": "arena",
+         "digital": True},
+        # A double-faced printing carries its images on the faces.
+        {"id": "p3", "oracle_id": "o2", "name": "A // B", "set": "neo",
+         "prices": {"usd": None},
+         "card_faces": [{"image_uris": {"normal": "https://img/normal/p3.jpg"}}]},
+    ], name="printings.jsonl")
+    assert db.load_printings(con, path, batch=1) == 2
+
+    img = con.execute("SELECT image_normal FROM printings WHERE id = 'p3'"
+                      ).fetchone()
+    assert img[0] == "https://img/normal/p3.jpg", \
+        "a DFC's image comes off its front face"
+
+    # The daily price snapshot: only priced printings land in history.
+    assert db.snapshot_prices(con, on_date="2026-08-14") == 1
+    con.close()
+
+
+def test_download_bulk_writes_once_and_reuses_the_copy(tmp_path, monkeypatch):
+    import urllib.request
+
+    from mtglab.cards import db
+
+    monkeypatch.setattr(db, "_fetch_json", lambda url: {"data": [
+        {"type": "oracle_cards", "updated_at": "2026-08-14T09:00:00Z",
+         "jsonl_download_uri": "https://data.scryfall.io/o.jsonl.gz"}]})
+
+    class FakeResp:
+        def __init__(self):
+            self.chunks = [b"payload-bytes", b""]
+
+        def read(self, n):
+            return self.chunks.pop(0)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    fetched = []
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        lambda req, timeout: fetched.append(1) or FakeResp())
+
+    target = db.download_bulk("oracle_cards", dest_dir=tmp_path)
+    assert target.name == "oracle_cards-2026-08-14.jsonl.gz"
+    assert target.read_bytes() == b"payload-bytes"
+    assert not list(tmp_path.glob("*.part")), "the temp file must be renamed"
+
+    # Same stamp, second ask: the cached copy answers and nothing is fetched.
+    again = db.download_bulk("oracle_cards", dest_dir=tmp_path)
+    assert again == target
+    assert len(fetched) == 1
+
+
+def test_download_bulk_refuses_an_unknown_kind(monkeypatch):
+    from mtglab.cards import db
+    monkeypatch.setattr(db, "_fetch_json", lambda url: {"data": []})
+    with pytest.raises(ValueError, match="unknown bulk type"):
+        db.download_bulk("no_such_kind")
