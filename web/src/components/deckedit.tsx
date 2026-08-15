@@ -23,7 +23,8 @@ import {
 import { CATEGORY_LABELS, categoryLabel } from '../lib/mtg'
 import { presetLabel } from '../lib/claudecopy'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
-import { ErrorNote, ManaText, Select } from '../components/ui'
+import { CardArt, CardHover, ErrorNote, ManaCost, ManaText, Select } from '../components/ui'
+import { SwapComposer } from './swap'
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS).filter((k) => k !== 'commander')
 
@@ -256,15 +257,23 @@ function ClaudeUnavailable({ installed, className = '' }: {
  * text, because that is better evidence than a sentence about it and it is the
  * sentence nobody is allowed to write.
  */
-export function SlotArgumentPanel({ deck, card, onClose }: {
+export function SlotArgumentPanel({ deck, card, onClose, writable = false, onSwapped }: {
   deck: DeckRef
   card: string
   onClose: () => void
+  /** Whether to offer "Use this card" on an alternative. The alternatives
+   *  are analysis and render either way; only the swap is gated. */
+  writable?: boolean
+  /** Called after a swap landed — the argued card is gone, so the caller
+   *  should refresh the deck and close this panel. */
+  onSwapped?: () => void
 }) {
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
   const [report, setReport] = useState<SlotArgumentReport | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The alternative being swapped in, if any. The composer owns the why.
+  const [swapInto, setSwapInto] = useState<string | null>(null)
   const [pin, setPin] = useStance()
 
   useEffect(() => {
@@ -369,25 +378,64 @@ export function SlotArgumentPanel({ deck, card, onClose }: {
           )}
 
           {report.alternatives.length > 0 && (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <p style={{ color: 'var(--text-secondary)' }}>
                 Could do the job instead — checked against the pool, the ban
                 list and this deck&apos;s colour identity:
               </p>
               <ul className="space-y-1">
                 {report.alternatives.map((a) => (
-                  <li key={a.name}>
-                    <span style={{ color: 'var(--text-primary)' }}>{a.name}</span>
-                    {a.mana_cost && (
-                      <span className="ml-1"><ManaText>{a.mana_cost}</ManaText></span>
+                  <li key={a.name}
+                      className="flex flex-wrap items-center gap-3 rounded-lg p-2"
+                      style={{ background: 'var(--surface-1)' }}>
+                    {/* Same affordance as the validation shortlist: the art is
+                        what you recognise, the full card is what you read
+                        before taking a suggestion. */}
+                    {a.art_crop && (
+                      <CardHover card={{ name: a.name, image: a.image }}>
+                        <CardArt src={a.art_crop} alt={a.name}
+                                 ratio="aspect-[626/457]"
+                                 className="w-16 shrink-0 cursor-help" />
+                      </CardHover>
                     )}
-                    {a.oracle_text && (
-                      <span className="mt-0.5 block text-[10px]"
-                            style={{ color: 'var(--text-muted)' }}>{a.oracle_text}</span>
+                    <div className="min-w-0 flex-1 basis-52">
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <span className="text-sm font-medium"
+                              style={{ color: 'var(--text-primary)' }}>{a.name}</span>
+                        {a.mana_cost && <ManaCost cost={a.mana_cost} />}
+                      </div>
+                      {a.oracle_text && (
+                        <p className="mt-0.5 text-[10px] leading-relaxed"
+                           style={{ color: 'var(--text-muted)' }}>
+                          <ManaText size={10}>{a.oracle_text}</ManaText>
+                        </p>
+                      )}
+                    </div>
+                    {/* The argument is one-sided by design (ADR 25); the swap
+                        is not part of the argument. The card of record still
+                        changes only through the composer below, with a why the
+                        user wrote — the button names the card, nothing more. */}
+                    {writable && (
+                      <button
+                        onClick={() => setSwapInto(swapInto === a.name ? null : a.name)}
+                        className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
+                        style={{ background: 'var(--gridline)',
+                                 color: 'var(--text-primary)' }}>
+                        Use this card
+                      </button>
                     )}
                   </li>
                 ))}
               </ul>
+              {swapInto && (
+                <SwapComposer
+                  deck={deck}
+                  out={card}
+                  into={swapInto}
+                  onDone={() => { setSwapInto(null); onSwapped?.() }}
+                  onCancel={() => setSwapInto(null)}
+                />
+              )}
             </div>
           )}
           {/* Named rather than silently shortened. Which filter removed a card

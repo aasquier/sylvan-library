@@ -25,6 +25,7 @@ import {
 } from '../components/deckedit'
 import { ArtPicker } from '../components/artpicker'
 import { CommanderDossierPanel } from '../components/dossier'
+import { SwapComposer } from '../components/swap'
 import { StanceReadout } from '../components/stance'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 
@@ -425,12 +426,9 @@ export default function DeckDetail() {
   // clear one this build no longer serves.
   const [pin, setPinFor] = useStance()
   const requested = useRef<string | null>(null)
-  // The card the user is proposing to swap in, and the rationale they are
-  // writing for it. Null means no swap is being composed.
+  // The card the user is proposing to swap in. Null means no swap is being
+  // composed; the composer itself (`SwapComposer`) owns the rationale text.
   const [swapping, setSwapping] = useState<{ out: string; into: string } | null>(null)
-  const [swapWhy, setSwapWhy] = useState('')
-  const [swapError, setSwapError] = useState<string | null>(null)
-  const [swapBusy, setSwapBusy] = useState(false)
   // The card whose rationale is being written, and whether the list is filtered
   // down to the ones a draft still owes.
   const [editing, setEditing] = useState<string | null>(null)
@@ -466,22 +464,6 @@ export default function DeckDetail() {
     setReport(v)
     requested.current = null
     setSuggestions(null)
-  }
-
-  async function applySwap() {
-    if (!swapping || !swapWhy.trim()) return
-    setSwapBusy(true)
-    setSwapError(null)
-    try {
-      await api.swapCard(deckRef, { ...swapping, why: swapWhy.trim() })
-      await refresh()
-      setSwapping(null)
-      setSwapWhy('')
-    } catch (e) {
-      setSwapError(errorMessage(e))
-    } finally {
-      setSwapBusy(false)
-    }
   }
 
   async function saveRationale(name: string, why: string) {
@@ -892,6 +874,8 @@ export default function DeckDetail() {
                      <SlotArgumentPanel
                        deck={deckRef}
                        card={card.name}
+                       writable={deck.writable}
+                       onSwapped={() => { setArguing(null); void refresh() }}
                        onClose={() => setArguing(null)} />
                    )}
                    {editing === card.name && (
@@ -1018,11 +1002,7 @@ export default function DeckDetail() {
                               Only the swap is taken away. */}
                           {deck.writable && (
                             <button
-                              onClick={() => {
-                                setSwapping({ out: shortlist.card, into: c.name })
-                                setSwapWhy('')
-                                setSwapError(null)
-                              }}
+                              onClick={() => setSwapping({ out: shortlist.card, into: c.name })}
                               className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
                               style={{ background: 'var(--gridline)',
                                        color: 'var(--text-primary)' }}>
@@ -1034,43 +1014,13 @@ export default function DeckDetail() {
                     </ul>
 
                     {swapping?.out === shortlist.card && (
-                      <div className="space-y-2 rounded-lg p-3"
-                           style={{ background: 'var(--surface-1)' }}>
-                        <p className="text-xs font-medium">
-                          Swap {swapping.out} → {swapping.into}
-                        </p>
-                        {/* Rule 4: every card carries a rationale, and one
-                            written by the tool is exactly the empty
-                            justification that rule exists to prevent. So the
-                            button stays disabled until a human writes one. */}
-                        <textarea
-                          value={swapWhy}
-                          onChange={(e) => setSwapWhy(e.target.value)}
-                          rows={3}
-                          placeholder="Why does this card earn the slot? Required — the gate will not accept a card without a rationale."
-                          className="w-full rounded-md px-2 py-1.5 text-xs outline-none focus:ring-2"
-                          style={{ background: 'var(--surface-2, var(--gridline))',
-                                   color: 'var(--text-primary)',
-                                   border: '1px solid var(--hairline)' }}
-                        />
-                        {swapError && <ErrorNote>{swapError}</ErrorNote>}
-                        <div className="flex items-center gap-2">
-                          <button onClick={applySwap}
-                                  disabled={!swapWhy.trim() || swapBusy}
-                                  className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                                  style={{ background: 'var(--series-1)', color: '#fff' }}>
-                            {swapBusy ? 'Swapping…' : 'Apply swap'}
-                          </button>
-                          <button onClick={() => setSwapping(null)}
-                                  className="text-xs underline"
-                                  style={{ color: 'var(--text-muted)' }}>
-                            Cancel
-                          </button>
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Writes deck.yaml. Commit it — deck history is git history.
-                          </span>
-                        </div>
-                      </div>
+                      <SwapComposer
+                        deck={deckRef}
+                        out={swapping.out}
+                        into={swapping.into}
+                        onDone={async () => { await refresh(); setSwapping(null) }}
+                        onCancel={() => setSwapping(null)}
+                      />
                     )}
                   </div>
                 )}
