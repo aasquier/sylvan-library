@@ -570,7 +570,7 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
 - Every bug fix gets a test. `mana.py` is subtle; `tests/test_mana.py` pins the
   cases where naive source-counting gives the wrong answer.
 - `ruff check src tests` and `mypy` before pushing. mypy is strict by default
-  with eight named exceptions in `pyproject.toml`; that list is meant to shrink,
+  with two named exceptions in `pyproject.toml`; that list is meant to shrink,
   so a new module is strict from the day it is written.
 - Frontend: `npm --prefix web run check` runs the typecheck, oxlint and Vitest
   in one; then rebuild the committed bundle with `npm --prefix web run build`

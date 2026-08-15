@@ -86,7 +86,9 @@
 > nothing had ever had cause to check this one.** `/api/claude` takes a
 > `surface` now, and the default is asked of the module that owns it.
 >
-> **Not built:** the other three modes and the activity log.
+> **Not built:** research, deck conversation, and the activity log. The slot
+> argument — the third of the "other three" this line used to count — landed
+> 2026-08-14 as its own decision, [ADR 25](0025-argue-a-slot-argues-one-direction.md).
 
 Refines [ADR 14](0014-python-decides-claude-advises.md), which drew the line
 between what Python decides and what Claude advises on. This one says what a

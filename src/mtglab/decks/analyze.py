@@ -15,10 +15,13 @@ The pool is passed in as a `{name: CardRecord}` dict, matching
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from mtglab.decks.model import CATEGORIES, Deck
 from mtglab.mana import COLORS, parse_mana_cost
+
+if TYPE_CHECKING:
+    from mtglab.cards.db import CardRecord
 
 # Rough coverage targets by bracket. These are conventional Commander
 # deckbuilding guidance, not computed truth, and are reported as guidance
@@ -48,7 +51,7 @@ GAME_CHANGER_LIMITS: dict[int, int | None] = {
 }
 
 
-def game_changers(deck: Deck, cards: dict | None = None) -> dict[str, Any]:
+def game_changers(deck: Deck, cards: dict[str, CardRecord] | None = None) -> dict[str, Any]:
     """Which Game Changers the deck runs, and what its bracket allows.
 
     Returns `allowed: None` for an unlimited bracket and `verdict: "unknown"`
@@ -106,7 +109,7 @@ def _is_land(rec: Any) -> bool:
     return bool(rec) and "Land" in (getattr(rec, "type_line", "") or "")
 
 
-def curve(deck: Deck, cards: dict | None = None) -> dict[str, Any]:
+def curve(deck: Deck, cards: dict[str, CardRecord] | None = None) -> dict[str, Any]:
     """MV histogram over the nonland 99, plus the average nonland MV.
 
     Lands are excluded: a land has no mana value worth curving, and including
@@ -135,7 +138,7 @@ def curve(deck: Deck, cards: dict | None = None) -> dict[str, Any]:
     }
 
 
-def color_sources(deck: Deck, cards: dict) -> dict[str, int]:
+def color_sources(deck: Deck, cards: dict[str, CardRecord]) -> dict[str, int]:
     """How many permanents can produce each color.
 
     Uses Scryfall's `produced_mana`, which already accounts for lands that make
@@ -153,7 +156,7 @@ def color_sources(deck: Deck, cards: dict) -> dict[str, int]:
     return counts
 
 
-def commander_identity(deck: Deck, cards: dict) -> frozenset[str]:
+def commander_identity(deck: Deck, cards: dict[str, CardRecord]) -> frozenset[str]:
     """The deck's legal colors, taken from the commander's Scryfall identity.
 
     Never derived from mana costs -- identity already accounts for back faces,
@@ -167,7 +170,7 @@ def commander_identity(deck: Deck, cards: dict) -> frozenset[str]:
     return frozenset(identity)
 
 
-def pip_requirements(deck: Deck, cards: dict) -> list[ColorNeed]:
+def pip_requirements(deck: Deck, cards: dict[str, CardRecord]) -> list[ColorNeed]:
     """Colored pip demand against colored source supply, per color.
 
     This is the number that explains color screw and nothing else computes it.
@@ -239,7 +242,7 @@ def category_report(deck: Deck) -> list[dict[str, Any]]:
     return out
 
 
-def type_breakdown(deck: Deck, cards: dict) -> dict[str, int]:
+def type_breakdown(deck: Deck, cards: dict[str, CardRecord]) -> dict[str, int]:
     """Counts by primary card type, taking the front face of split cards."""
     out: dict[str, int] = {}
     for entry in deck.cards:
@@ -255,7 +258,7 @@ def type_breakdown(deck: Deck, cards: dict) -> dict[str, int]:
     return dict(sorted(out.items(), key=lambda kv: -kv[1]))
 
 
-def deck_stats(deck: Deck, cards: dict | None = None) -> dict[str, Any]:
+def deck_stats(deck: Deck, cards: dict[str, CardRecord] | None = None) -> dict[str, Any]:
     """The whole deterministic report, as plain data ready to serialise."""
     cards = cards or {}
     return {

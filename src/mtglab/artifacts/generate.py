@@ -21,9 +21,12 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from mtglab.decks.model import CATEGORIES, Deck
+
+if TYPE_CHECKING:
+    from mtglab.cards.db import CardRecord
 
 CATEGORY_TITLES = {
     "land": "Lands",
@@ -145,7 +148,7 @@ def advanced_primer(deck: Deck, stats: dict[str, Any] | None = None) -> str:
 
 # -------------------------------------------------------------- 3. annotated
 
-def annotated_decklist(deck: Deck, cards: dict | None = None) -> str:
+def annotated_decklist(deck: Deck, cards: dict[str, CardRecord] | None = None) -> str:
     lines = [f"# {deck.name} — Annotated Decklist", "", _header(deck), ""]
     if deck.strategy:
         lines += [deck.strategy, ""]
@@ -201,7 +204,7 @@ def moxfield_txt(deck: Deck) -> str:
 
 # ------------------------------------------------------------------ 5. swaps
 
-def swap_list(deck: Deck, previous: Deck, cards: dict | None = None,
+def swap_list(deck: Deck, previous: Deck, cards: dict[str, CardRecord] | None = None,
               prices: dict[str, float] | None = None) -> str:
     """Diff two versions of a deck into an out/in list plus a shopping list.
 
@@ -253,7 +256,7 @@ class DraftDeck(Exception):
     """Artifacts were requested for a deck nobody has finished reasoning about."""
 
 
-def write_all(deck: Deck, outdir: str | Path, *, cards: dict | None = None,
+def write_all(deck: Deck, outdir: str | Path, *, cards: dict[str, CardRecord] | None = None,
               previous: Deck | None = None, prices: dict[str, float] | None = None,
               stats: dict[str, Any] | None = None) -> list[Path]:
     """Write the five deliverables. Raises `DraftDeck` for a draft.

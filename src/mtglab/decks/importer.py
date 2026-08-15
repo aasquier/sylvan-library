@@ -26,11 +26,16 @@ project was built to stop.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
+from typing import TYPE_CHECKING
 
 from mtglab.decks.decklist import ParsedCard, ParsedList
 from mtglab.decks.model import CardEntry, Deck
+
+if TYPE_CHECKING:
+    from mtglab.cards.db import CardRecord
 
 HEADER = """\
 # Imported {today} from a pasted decklist, and NOT yet reasoned about.
@@ -86,7 +91,8 @@ def names_in(parsed: ParsedList, *, commander: list[str] | None = None,
     return sorted({n for n in names if n})
 
 
-def _canonical(written: str, cards: dict) -> tuple[str, object | None]:
+def _canonical(written: str,
+               cards: dict[str, CardRecord]) -> tuple[str, CardRecord | None]:
     """The name as the pool spells it, and the record behind it.
 
     Casing is corrected, but a double-faced card written by its front face
@@ -104,7 +110,7 @@ def _canonical(written: str, cards: dict) -> tuple[str, object | None]:
     return rec.name, rec
 
 
-def build_deck(parsed: ParsedList, cards: dict, *, slug: str,
+def build_deck(parsed: ParsedList, cards: dict[str, CardRecord], *, slug: str,
                name: str | None = None, commander: list[str] | None = None,
                companion: str | None = None, bracket: int | None = None,
                status: str = "theoretical") -> ImportReport:
@@ -118,7 +124,7 @@ def build_deck(parsed: ParsedList, cards: dict, *, slug: str,
     report_notes: list[str] = []
     unknown: list[str] = []
 
-    def resolve(written: str) -> tuple[str, object | None]:
+    def resolve(written: str) -> tuple[str, CardRecord | None]:
         canonical, rec = _canonical(written, cards)
         if rec is None and canonical not in unknown:
             unknown.append(canonical)
@@ -194,7 +200,9 @@ def build_deck(parsed: ParsedList, cards: dict, *, slug: str,
                         skipped=list(parsed.skipped), notes=report_notes)
 
 
-def _entries(lines: list[ParsedCard], resolve, outside: set[str],
+def _entries(lines: list[ParsedCard],
+             resolve: Callable[[str], tuple[str, CardRecord | None]],
+             outside: set[str],
              notes: list[str]) -> tuple[list[CardEntry], list[str]]:
     """Resolve parsed lines into card entries, merging repeated names."""
     by_key: dict[str, CardEntry] = {}
@@ -224,7 +232,8 @@ def _entries(lines: list[ParsedCard], resolve, outside: set[str],
     return list(by_key.values()), removed
 
 
-def _companion_hints(swaps: list[CardEntry], cards: dict) -> list[str]:
+def _companion_hints(swaps: list[CardEntry],
+                     cards: dict[str, CardRecord]) -> list[str]:
     """Point out a companion sitting on the swap board, without assuming one.
 
     Our own moxfield.txt puts the commander *and* the companion under

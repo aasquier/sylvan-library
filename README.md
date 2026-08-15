@@ -67,7 +67,10 @@ progress, and a teaching layer for Magic's colour combinations and vocabulary.
 It needs no Node to run: the built frontend is committed.
 
 **Claude surfaces**, opt-in and behind their own install extra. A rationale
-interview that asks about a card's slot so you can write its `why`; a commander
+interview that asks about a card's slot so you can write its `why`; a slot
+argument that makes the case *against* a card and is built with no field for
+the case in favour, because the balanced version would be a rationale
+generator; a commander
 dossier that says who a commander is and where they sit in Magic's history,
 citing sources checked against what the search actually returned; and a theme
 interview whose questions are *not about Magic* — a film, a period, how you are
@@ -93,7 +96,7 @@ decks/<slug>/deck.yaml   the source of truth
 | Monte Carlo, result cache, the Forge bridge | `sim/` |
 | The five generated documents | `artifacts/generate.py` |
 | Colour and vocabulary reference prose | `colors.py`, `glossary.py` |
-| Client, stance, personas, and the four modes | `claude/` |
+| Client, stance, personas, and the five modes | `claude/` |
 | Accounts, sessions, invites, admin bootstrap | `auth/` |
 | HTTP API, background jobs, request scope | `api/` |
 | React frontend (source, and committed build) | `web/`, `web_dist/` |
@@ -130,14 +133,16 @@ a playgroup rather than to sign the public up.
 
 **Built:** the gate, the mana solver, Tier 1 with a result cache, the Tier 3
 Forge bridge, the artifact generator, the web app, accounts with invites and
-email password resets, admin authorization, deck ownership and sharing, and
-four Claude modes across three features.
+email password resets, admin authorization, deck ownership and sharing, the
+stance dial, and five Claude modes across four features — the rationale
+interview, the slot argument, the commander dossier, and the theme interview's
+two halves.
 
 **Not built**, stated plainly so nothing here reads as a promise: the Tier 2
-pod simulator, the deck tier list that depends on a pod measurement, three of
-the Claude modes [ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md)
-names, a UI for the stance dial, card-level spoiler scanning, and deal-watching
-or cart generation.
+pod simulator, the deck tier list that depends on a pod measurement, the two
+Claude modes [ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md)
+names that remain (research and deck conversation), card-level spoiler
+scanning, and deal-watching or cart generation.
 
 Two decks deliberately fail the gate on one card each — Goreclaw runs Primeval
 Titan and Atla Palani runs Emrakul, the Aeons Torn, both banned in Commander.
@@ -166,7 +171,7 @@ That is the gate working, and picking the replacement is a human's call.
 | [docs/ENGINEERING.md](docs/ENGINEERING.md) | Testing rigor, containers, CI/CD — with the measurements behind each call, including the ones that say *don't* |
 | [docs/HOSTING.md](docs/HOSTING.md) | Deploying a shared instance: auth, per-user data, costs, and a Fly.io runbook |
 | [docs/FORGE.md](docs/FORGE.md) | The Tier 3 bridge: setup, coverage checking, measured timings |
-| [docs/adr/](docs/adr/) | 22 architecture decision records — context, options, decision, consequences. Immutable once accepted |
+| [docs/adr/](docs/adr/) | 25 architecture decision records — context, options, decision, consequences. Immutable once accepted |
 
 ## Licence and fan content
 

@@ -1377,7 +1377,11 @@ describe('DeckDetail slot argument', () => {
     // server's own text back at itself is not testing the renderer.
     const row = await argueAbout('Sol Ring')
     await within(row).findByText('The case against')
-    expect(within(row).getByText(/rationale is yours to write/)).toBeTruthy()
+    // Awaited, not `getByText`: the heading above renders as soon as the
+    // status check resolves, and `report.never` only when the argue call
+    // does. A sync assertion here lands in that gap under load — this test
+    // was the suite's one flake until it waited.
+    await within(row).findByText(/rationale is yours to write/)
   })
 
   it('labels the answer as Claude’s rather than the gate’s', async () => {

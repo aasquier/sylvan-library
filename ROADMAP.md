@@ -1548,9 +1548,14 @@ first to reach past the pool. It is also where research through server-side
 web tooling turned from a plan into code: `web_search_20260209`, with every
 cited page checked against what the search actually returned.
 
-What is *not* built: the other three modes ADR 15 names, a UI for the stance
-dial itself, the activity log the top of the write axis needs, and the Forge
-half.
+Then the **theme interview** (2026-08-13, ADR 20 — two modes, conversation and
+proposal, plus the tarot door of ADR 21), the **stance dial UI** (2026-08-14,
+#88), and the **slot argument** (2026-08-14, ADR 25, #89) — five modes across
+four features.
+
+What is *not* built: the two modes ADR 15 names that remain — research, then
+deck conversation, in that order (item 7 above argues why) — the activity log
+the top of the write axis needs, and the Forge half.
 
 The plumbing was already in place: an API key reaches the app from a gitignored
 `.env` or `fly secrets`, named in `.env.example` and in the CI reviewer workflow

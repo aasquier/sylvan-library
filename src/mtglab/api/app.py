@@ -8,12 +8,12 @@ never drift into disagreeing about a deck.
 from __future__ import annotations
 
 import mimetypes
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -165,6 +165,47 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                  email_sender=email_sender)
     admin.install(app, email_sender=email_sender)
 
+    # Registered *after* auth.install on purpose: `add_middleware` prepends, so
+    # the later registration is the outer layer and these headers land on the
+    # auth middleware's own refusals (the 401 and the admin 403) as well as on
+    # every routed response.
+    #
+    # What is deliberately absent is a Content-Security-Policy. The app inlines
+    # styles (React style props throughout) and loads card art from Scryfall's
+    # CDN, so a real policy needs `style-src 'unsafe-inline'` and an img-src
+    # allowlist -- and a policy got slightly wrong fails only in production,
+    # only in the browser, with a green suite behind it, which is this
+    # project's most-repeated deployment bug shape. The headers below are the
+    # ones with no such failure mode.
+    #
+    # `nosniff` is safe *because* `mimetypes.add_type` above registered
+    # `.webp`: before that fix, sniffing was what kept the tarot art rendering,
+    # and this header would have broken all 78 cards at once.
+    @app.middleware("http")
+    async def security_headers(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        response = await call_next(request)
+        headers = response.headers
+        # `setdefault`, like `Revalidated`: an explicit header on a particular
+        # response wins over the blanket one.
+        headers.setdefault("X-Content-Type-Options", "nosniff")
+        headers.setdefault("X-Frame-Options", "DENY")
+        # `same-origin` rather than the browser default: outbound links and
+        # the Scryfall image fetches need no referrer, and the one URL that
+        # must never leak -- the claim link's token -- rides in the fragment,
+        # which no Referer header ever carries. This is belt and braces.
+        headers.setdefault("Referrer-Policy", "same-origin")
+        if secure:
+            # Only when TLS fronts the app (the same condition as the cookie's
+            # `Secure` flag). A year, no preload: preload is a public,
+            # hard-to-undo registration and this instance's domain choices
+            # should not be made by a default.
+            headers.setdefault("Strict-Transport-Security",
+                               "max-age=31536000")
+        return response
+
     if dev:
         # Vite dev server runs on another port, so the browser needs CORS. Only
         # in dev -- the built app is same-origin and needs none of this.
@@ -175,12 +216,12 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         )
 
     @app.exception_handler(DeckNotFound)
-    async def _deck_missing(_request, exc: DeckNotFound):
+    async def _deck_missing(_request: Request, exc: DeckNotFound) -> JSONResponse:
         return JSONResponse(status_code=404,
                             content={"detail": f"no deck '{exc}'"})
 
     @app.exception_handler(ReadOnlySource)
-    async def _deck_read_only(_request, exc: ReadOnlySource):
+    async def _deck_read_only(_request: Request, exc: ReadOnlySource) -> JSONResponse:
         """A deck this caller may read but not change.
 
         Registered here rather than caught in each write route, for the reason
@@ -900,7 +941,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             app.mount("/assets", Revalidated(directory=assets), name="assets")
 
         @app.get("/{full_path:path}")
-        def spa(full_path: str):
+        def spa(full_path: str) -> FileResponse:
             """Serve the built app, letting the client router own real paths.
 
             A miss under /api lands here too -- FastAPI falls through to the

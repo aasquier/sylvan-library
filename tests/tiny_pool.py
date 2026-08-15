@@ -74,6 +74,8 @@ What each card is here for:
 from __future__ import annotations
 
 import json
+import shutil
+import tempfile
 from pathlib import Path
 
 CARDS = [
@@ -645,8 +647,34 @@ CARDS = [
 ]
 
 
+#: The one pool this process ever actually builds. `CARDS` is a module-level
+#: constant, so every `build` call in a run produces the same database --
+#: which makes the DuckDB ingest (~1.2s) worth doing once and the rest of the
+#: time copying the closed file (~10ms). Held as a `TemporaryDirectory` so the
+#: interpreter cleans it up on exit; each caller still gets its own private
+#: copy at `db_path`, so a test that mutated its pool would corrupt nothing
+#: but its own.
+_CACHE_DIR: tempfile.TemporaryDirectory[str] | None = None
+
+
 def build(db_path: Path) -> Path:
-    """Create a card pool at `db_path`. Returns it, so callers can chain."""
+    """Create a card pool at `db_path`. Returns it, so callers can chain.
+
+    Built once per process and copied thereafter -- see `_CACHE_DIR`. Before
+    the cache, the ~75 tests taking a `pool` fixture each paid the ingest
+    themselves, which was about two of the suite's six minutes.
+    """
+    global _CACHE_DIR
+    if _CACHE_DIR is None:
+        _CACHE_DIR = tempfile.TemporaryDirectory(prefix="tiny-pool-")
+        _build_into(Path(_CACHE_DIR.name) / "tiny.duckdb")
+    db_path = Path(db_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(Path(_CACHE_DIR.name) / "tiny.duckdb", db_path)
+    return db_path
+
+
+def _build_into(db_path: Path) -> None:
     from mtglab.cards.db import connect, load_oracle
 
     jsonl = Path(db_path).parent / "tiny-oracle.jsonl"
@@ -658,7 +686,6 @@ def build(db_path: Path) -> Path:
         load_oracle(con, jsonl)
     finally:
         con.close()
-    return Path(db_path)
 
 
 # --------------------------------------------------------------- a real deck

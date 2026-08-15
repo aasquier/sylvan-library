@@ -87,6 +87,34 @@ def test_health_reports_pool_state(client):
     assert isinstance(body["oracle_cards"], int)
 
 
+def test_every_response_carries_the_security_headers(client):
+    """On the API and on the static shell alike, because the middleware sits
+    outside routing. HSTS is deliberately absent here: this client is the
+    local, plain-HTTP configuration, and a Strict-Transport-Security header
+    served over HTTP is at best ignored."""
+    for path in ("/api/health", "/"):
+        r = client.get(path)
+        assert r.headers["X-Content-Type-Options"] == "nosniff"
+        assert r.headers["X-Frame-Options"] == "DENY"
+        assert r.headers["Referrer-Policy"] == "same-origin"
+        assert "Strict-Transport-Security" not in r.headers
+
+
+def test_a_refusal_carries_the_security_headers_too():
+    """The headers middleware wraps the auth middleware, not just the routes.
+
+    The 401 never reaches routing -- it is manufactured inside `auth.py` --
+    so this is the response that would silently lose the headers if the
+    registration order in `create_app` ever flipped."""
+    with TestClient(create_app(require_auth=True, secure_cookies=True)) as c:
+        r = c.get("/api/decks")
+        assert r.status_code == 401
+        assert r.headers["X-Content-Type-Options"] == "nosniff"
+        # And with TLS assumed (the same `secure` the cookie flag uses), the
+        # transport pin appears -- a year, no preload, argued in `create_app`.
+        assert r.headers["Strict-Transport-Security"] == "max-age=31536000"
+
+
 # ------------------------------------------------------------------- decks
 
 def test_decks_lists_the_library(client):

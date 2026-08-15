@@ -26,6 +26,7 @@ What the checklist in `docs/HOSTING.md` §1 asks for, and where each item is:
 - rate limit by account *and* address ....................... `auth/ratelimit.py`
 - regenerate the session id on login ........................ `login`, below
 - `HttpOnly; Secure; SameSite=Lax` .......................... `_set_cookie`, below
+- HSTS on the response, when TLS fronts the app .... `security_headers`, app.py
 - log auth failures with time and address, never secrets ..... `loggable`, below
 
 CSRF is handled by `SameSite=Lax`: it stops the cross-site form post, and the
