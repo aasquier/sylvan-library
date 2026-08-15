@@ -896,6 +896,20 @@ export interface SlotArgumentReport {
   never: string
 }
 
+/** The argue sweep's answer — a `Job.result` for `kind: claude.argue.deck`. */
+export interface DeckReviewResult {
+  slug: string
+  /** False when the stance was `off`: one report saying no calls were made,
+   *  never N copies of it. */
+  asked: boolean
+  reason: string
+  total: number
+  /** One per argued card, in selection order. A card whose call failed is in
+   *  `errors` instead — partial results are the point of paying for a sweep. */
+  reports: SlotArgumentReport[]
+  errors: Record<string, string>
+}
+
 /**
  * The commander dossier (ADR 19) — the half of the header the pool cannot
  * count.
@@ -1348,6 +1362,13 @@ export const api = {
   // render "the balanced view" however it lays the payload out.
   argue: (ref: DeckRef, body: { card: string; stance?: string; focus?: string }) =>
     post<SlotArgumentReport>(deckPath(ref, '/argue'), body),
+  // The sweep. Returns a **job**, not a report: one Claude call per selected
+  // card means minutes the moment the selection is more than a handful, so
+  // follow it with `followJob` and read `job.result` as a `DeckReviewResult`.
+  // The server dedupes an identical selection in flight, so a double-click
+  // joins the run rather than paying twice.
+  argueDeck: (ref: DeckRef, body: { cards: string[]; stance?: string }) =>
+    post<Job>(deckPath(ref, '/argue/deck'), body),
   // The commander dossier, in two halves that are deliberately different verbs.
   // The GET is free and reads a stored row, so the deck page can ask on every
   // load; the POST spends money and reaches the network. One function with a

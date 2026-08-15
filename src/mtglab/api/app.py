@@ -835,6 +835,39 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         except service.ClaudeFailed as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    @app.post("/api/decks/{owner}/{slug}/argue/deck")
+    def claude_argue_deck(owner: str, slug: str, payload: dict[str, Any],
+                          lib: Lib, caller: Scope) -> dict[str, Any]:
+        """The slot argument, swept over a selection. Returns a **job**.
+
+        One Claude call per selected card, so this is minutes the moment the
+        selection is more than a handful -- the single-card endpoint above
+        stays synchronous on its measured seconds, and this is the sibling
+        that was never going to fit under the transport ceiling. See
+        `api/argueruns.py` for the sweep's shape: one job, sequential, with
+        progress, partial results kept, and an in-flight dedupe on the
+        selection so a double-click joins the run rather than paying twice.
+
+        The refusals stay here, per the planning-in-the-request rule: 422 for
+        an empty selection, a card the deck does not hold (named), or a
+        malformed stance; 404 for a deck this caller cannot see; 503 when
+        there is no key. A stance of `off` comes back as a job born finished.
+        """
+        from mtglab.api.argueruns import plan_review
+        from mtglab.claude.client import ClaudeUnavailable
+
+        try:
+            plan = plan_review(
+                slug=slug, cards=payload.get("cards"),
+                requested=payload.get("stance") or None,
+                source=lib.source_for(owner))
+        except ValueError as exc:
+            # `CardNotInDeck` is a ValueError and names the missing cards.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ClaudeUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return _job_for(plan, caller).as_dict()
+
     @app.get("/api/decks/{owner}/{slug}/dossier")
     def claude_dossier_cached(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
         """A stored commander dossier, or an empty one. Never calls Anthropic.

@@ -25,6 +25,7 @@ import {
 } from '../components/deckedit'
 import { ArtPicker } from '../components/artpicker'
 import { CommanderDossierPanel } from '../components/dossier'
+import { DeckReviewPanel } from '../components/review'
 import { SwapComposer } from '../components/swap'
 import { StanceReadout } from '../components/stance'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
@@ -746,6 +747,13 @@ export default function DeckDetail() {
             <div className="flex flex-wrap items-center gap-3">
               <AddCardForm deck={deckRef} stage={deck.stage} onDone={() => void refresh()} />
             </div>
+          )}
+          {/* The sweep. Gated exactly as the per-card argue is — it is the
+              same mode, multiplied — and mounted as its own section because
+              its selection list and results queue do not fit a button row. */}
+          {deck.writable && claudeReady && (
+            <DeckReviewPanel deck={deck} deckRef={deckRef} status={claude}
+                             onChanged={() => void refresh()} />
           )}
           {editError && <ErrorNote>{editError}</ErrorNote>}
 

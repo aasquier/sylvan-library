@@ -145,6 +145,7 @@ USER_SCOPED = {
     "/api/decks/{owner}/{slug}/printings": "item",
     "/api/decks/{owner}/{slug}/interview": "item",
     "/api/decks/{owner}/{slug}/argue": "item",
+    "/api/decks/{owner}/{slug}/argue/deck": "item",
     "/api/decks/{owner}/{slug}/dossier": "item",
 }
 

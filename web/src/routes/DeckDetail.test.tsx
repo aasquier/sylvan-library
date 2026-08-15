@@ -38,6 +38,7 @@ vi.mock('../lib/api', async () => ({
     setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),
     setShared: vi.fn(),
     claudeStatus: vi.fn(), interview: vi.fn(), argue: vi.fn(),
+    argueDeck: vi.fn(),
     commander: vi.fn(),
     dossier: vi.fn(), writeDossier: vi.fn(), printings: vi.fn(),
     job: vi.fn(),
@@ -332,6 +333,7 @@ beforeEach(() => {
   vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(CLAUDE_STATUS)
   vi.mocked(api.interview).mockReset().mockResolvedValue(INTERVIEW)
   vi.mocked(api.argue).mockReset().mockResolvedValue(ARGUMENT)
+  vi.mocked(api.argueDeck).mockReset()
   // No dossier stored by default — the ordinary state for five of the six
   // decks, and the one the collapsed panel has to handle without noise.
   vi.mocked(api.dossier).mockReset().mockResolvedValue(NO_DOSSIER)
@@ -1455,5 +1457,86 @@ describe('DeckDetail slot argument', () => {
     renderDeck()
     await screen.findByText(DECK.name)
     expect(screen.queryByRole('button', { name: /argue slot/i })).toBeNull()
+  })
+})
+
+/**
+ * The deck review — the slot argument swept over a selection, as a job.
+ *
+ * The panel's obligations are the sweep's economics: nothing runs on open,
+ * the count is stated before the click, one job covers the selection, a
+ * stored job id reattaches instead of paying twice, and the queue renders
+ * through the same `SlotArgumentBody` the per-card panel uses — so the swap
+ * path (and only the swap path) can change the deck.
+ */
+describe('DeckDetail deck review', () => {
+  const REVIEW = {
+    slug: 'goreclaw-stompy', asked: true, reason: '', total: 2,
+    reports: [
+      { ...ARGUMENT, card: 'Primeval Titan' },
+      { ...ARGUMENT, card: 'Sol Ring' },
+    ],
+    errors: { 'Vorinclex, Voice of Hunger': 'the model was rate limited' },
+  }
+
+  async function openPanel() {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    fireEvent.click(screen.getByRole('button', { name: 'Review with Claude' }))
+  }
+
+  it('opens with spells preselected and runs nothing until asked', async () => {
+    await openPanel()
+    // DECK's one card is a spell, so the button counts it — and no job has
+    // been submitted by merely opening the panel.
+    expect(screen.getByRole('button', { name: /argue 1 slot/i })).toBeTruthy()
+    expect(screen.getByText(/1 card → 1 Claude conversation/)).toBeTruthy()
+    expect(api.argueDeck).not.toHaveBeenCalled()
+  })
+
+  it('starts one job for the selection and follows it', async () => {
+    vi.mocked(api.argueDeck).mockResolvedValue(job(null, 'queued'))
+    vi.mocked(followJob).mockReturnValue({
+      promise: Promise.resolve(job(REVIEW)),
+      cancel: () => {},
+    })
+    await openPanel()
+    fireEvent.click(screen.getByRole('button', { name: /argue 1 slot/i }))
+
+    await waitFor(() => expect(api.argueDeck).toHaveBeenCalledWith(
+      REF, { cards: ['Primeval Titan'] }))
+    // The queue rendered, through the shared body: one entry per report, so
+    // the shared charge text appears once per argued card.
+    const charges = await screen.findAllByText(
+      'Six other cards already ramp for two or less.')
+    expect(charges).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Use this card' }).length)
+      .toBeGreaterThan(0)
+    // A failed card is reported against its name, not silently dropped.
+    expect(screen.getByText(/rate limited/)).toBeTruthy()
+  })
+
+  it('reattaches to a stored run instead of paying twice', async () => {
+    localStorage.setItem('mtglab-deck-review:aasquier/goreclaw-stompy', 'job-9')
+    vi.mocked(followJob).mockReturnValue({
+      promise: Promise.resolve(job(REVIEW)),
+      cancel: () => {},
+    })
+    renderDeck()
+    await screen.findByText(DECK.name)
+
+    await waitFor(() => expect(vi.mocked(followJob)).toHaveBeenCalledWith(
+      'job-9', expect.any(Function), 2000))
+    expect(api.argueDeck).not.toHaveBeenCalled()
+    // Finished: the id is spent, so a reload does not chase a dead job.
+    await waitFor(() => expect(
+      localStorage.getItem('mtglab-deck-review:aasquier/goreclaw-stompy')).toBeNull())
+  })
+
+  it('is not offered on a deck you cannot edit', async () => {
+    vi.mocked(api.deck).mockResolvedValue({ ...DECK, writable: false } as Deck)
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(screen.queryByRole('button', { name: 'Review with Claude' })).toBeNull()
   })
 })
