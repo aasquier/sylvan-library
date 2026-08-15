@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   api,
@@ -401,6 +401,50 @@ function CommanderFacts({ dossier }: { dossier: CommanderDossier }) {
   )
 }
 
+/**
+ * A destructive control that arms on the first click and acts on the second.
+ *
+ * The confirmation structure ADR 27 chose over a dialog: one accidental click
+ * does nothing except turn the button solid red for a few seconds, and a
+ * deliberate deletion is still two quick clicks in place — no modal to dismiss
+ * ten times while tuning a deck. The arm times out rather than staying
+ * cocked, because a button left armed yesterday firing today is the mis-click
+ * this exists to prevent.
+ */
+function ArmedButton({ children, armedLabel, title, onConfirm }: {
+  children: ReactNode
+  /** What the armed state says — name the consequence, not "are you sure". */
+  armedLabel: string
+  title?: string
+  onConfirm: () => void
+}) {
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (!armed) return
+    const timer = setTimeout(() => setArmed(false), 4000)
+    return () => clearTimeout(timer)
+  }, [armed])
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-pressed={armed}
+      className={'card-action card-action-danger rounded-md px-2 py-1 '
+                 + `text-[11px] font-medium${armed ? ' armed' : ''}`}
+      onClick={() => {
+        if (armed) {
+          setArmed(false)
+          onConfirm()
+        } else {
+          setArmed(true)
+        }
+      }}
+    >
+      {armed ? armedLabel : children}
+    </button>
+  )
+}
+
 export default function DeckDetail() {
   const { owner = '', slug = '' } = useParams()
   // Memoised because it is a dependency of the effects below, and a fresh
@@ -473,10 +517,72 @@ export default function DeckDetail() {
     setEditing(null)
   }
 
-  async function removeCard(name: string) {
+  /** Rows currently sinking into the graveyard — they get the send-off class
+   *  and lose their pointer events while the server is asked. */
+  const [leaving, setLeaving] = useState<Set<string>>(new Set())
+  // Bulk entombment (ADR 27): a mode you enter, not checkboxes always there —
+  // 99 permanent checkboxes would make every visit look like a form.
+  const [selecting, setSelecting] = useState(false)
+  const [chosen, setChosen] = useState<Set<string>>(new Set())
+
+  /** The animation's length. Awaited alongside the API call so the row is
+   *  never yanked out mid-sink: whichever finishes last ends the rite. */
+  const RITE = 360
+
+  async function entombCard(name: string) {
+    setEditError(null)
+    setLeaving((prev) => new Set(prev).add(name))
+    const rite = new Promise((r) => setTimeout(r, RITE))
+    try {
+      await api.entombCard(deckRef, name)
+      await rite
+      await refresh()
+    } catch (e) {
+      setEditError(errorMessage(e))
+    } finally {
+      setLeaving((prev) => {
+        const next = new Set(prev)
+        next.delete(name)
+        return next
+      })
+    }
+  }
+
+  async function entombChosen() {
+    const names = [...chosen]
+    if (!names.length) return
+    setEditError(null)
+    setLeaving((prev) => new Set([...prev, ...names]))
+    const rite = new Promise((r) => setTimeout(r, RITE))
+    try {
+      // One request, one write, one gate verdict — and all-or-nothing on the
+      // server, so a partial sweep can never read as a chosen deck state.
+      await api.entombCards(deckRef, names)
+      await rite
+      await refresh()
+      setChosen(new Set())
+      setSelecting(false)
+    } catch (e) {
+      setEditError(errorMessage(e))
+    } finally {
+      setLeaving(new Set())
+    }
+  }
+
+  async function returnCard(name: string) {
     setEditError(null)
     try {
-      await api.removeCard(deckRef, name)
+      await api.returnCard(deckRef, name)
+      await refresh()
+    } catch (e) {
+      setEditError(errorMessage(e))
+    }
+  }
+
+  async function exileCard(name: string) {
+    setEditError(null)
+    try {
+      await api.exileCard(deckRef, name)
       await refresh()
     } catch (e) {
       setEditError(errorMessage(e))
@@ -746,6 +852,32 @@ export default function DeckDetail() {
           {deck.writable && (
             <div className="flex flex-wrap items-center gap-3">
               <AddCardForm deck={deckRef} stage={deck.stage} onDone={() => void refresh()} />
+              {/* Bulk entombment is a mode, not a standing row of checkboxes:
+                  entering it is the first deliberate step, the armed button
+                  naming the count is the second, so a sweep is never one
+                  stray click. */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelecting(!selecting)
+                  setChosen(new Set())
+                }}
+                className="card-action rounded-md px-2 py-1 text-[11px] font-medium"
+              >
+                {selecting ? 'Done selecting' : 'Bulk entomb…'}
+              </button>
+              {selecting && (
+                chosen.size > 0
+                  ? <ArmedButton
+                      armedLabel={`Entomb ${chosen.size} — sure?`}
+                      title="One write: the chosen cards go to the graveyard together"
+                      onConfirm={() => void entombChosen()}>
+                      Entomb {chosen.size} selected
+                    </ArmedButton>
+                  : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      Tick the cards to entomb.
+                    </span>
+              )}
             </div>
           )}
           {/* The sweep. Gated exactly as the per-card argue is — it is the
@@ -768,7 +900,9 @@ export default function DeckDetail() {
               </h3>
               <ul className="space-y-1">
                 {cards.map((card) => (
-                  <li key={card.name} className="card-surface rounded-lg p-2">
+                  <li key={card.name}
+                      className={'card-surface rounded-lg p-2'
+                                 + (leaving.has(card.name) ? ' entombing' : '')}>
                    {/* `flex-wrap` plus the text column's `basis-52`: on a
                        phone the four action buttons cannot share a line with
                        the rationale, and without the wrap they crushed it to
@@ -776,6 +910,19 @@ export default function DeckDetail() {
                        basis is what makes the wrap deterministic — the text
                        claims 13rem before the buttons may have the rest. */}
                    <div className="flex flex-wrap items-center gap-3">
+                    {selecting && deck.writable && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Choose ${card.name} for entombment`}
+                        checked={chosen.has(card.name)}
+                        onChange={() => setChosen((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(card.name)) next.delete(card.name)
+                          else next.add(card.name)
+                          return next
+                        })}
+                      />
+                    )}
                     {/* The art crop, not the full card: at this size a whole
                         card scan is an unreadable smudge, while the art alone
                         is what the eye actually recognises a card by. Hover
@@ -825,6 +972,10 @@ export default function DeckDetail() {
                           somebody write a `why`, and offering that to a
                           reader who cannot save one would spend a Claude call
                           on a dead end. */}
+                      {/* `card-action`, not inline muted-on-hairline: these
+                          are live controls, and muted text with no hover
+                          state is the universal disabled idiom — driving the
+                          deployed app found people not clicking them. */}
                       {deck.writable && claudeReady && (
                         <button
                           onClick={() => {
@@ -833,9 +984,7 @@ export default function DeckDetail() {
                           }}
                           title={`Claude interviews you about ${card.name}'s slot`
                                  + ' to help you write its why — it asks, you write'}
-                          className="rounded-md px-2 py-1 text-[11px]"
-                          style={{ border: '1px solid var(--hairline)',
-                                   color: 'var(--text-secondary)' }}>
+                          className="card-action rounded-md px-2 py-1 text-[11px]">
                           Ask Claude
                         </button>
                       )}
@@ -849,9 +998,7 @@ export default function DeckDetail() {
                           onClick={() => setArguing(
                             arguing === card.name ? null : card.name)}
                           title={`The case against ${card.name}'s slot`}
-                          className="rounded-md px-2 py-1 text-[11px]"
-                          style={{ border: '1px solid var(--hairline)',
-                                   color: 'var(--text-secondary)' }}>
+                          className="card-action rounded-md px-2 py-1 text-[11px]">
                           Argue slot
                         </button>
                       )}
@@ -867,13 +1014,20 @@ export default function DeckDetail() {
                                      color: 'var(--text-primary)' }}>
                             {card.why ? 'Edit why' : 'Write why'}
                           </button>
-                          <button
-                            onClick={() => removeCard(card.name)}
-                            title={`Remove ${card.name} from the deck`}
-                            className="rounded-md px-2 py-1 text-[11px]"
-                            style={{ color: 'var(--text-muted)' }}>
-                            Remove
-                          </button>
+                          {/* Two clicks, red, and reversible: the arm is the
+                              confirmation and the graveyard is the undo.
+                              This used to be "Remove" in muted text, firing
+                              on one click with nothing to walk it back —
+                              which is how a whole handful of Gyome's cards
+                              died in one afternoon. */}
+                          <ArmedButton
+                            title={`Send ${card.name} to the graveyard — its `
+                                   + 'rationale goes with it, and Return brings '
+                                   + 'it back'}
+                            armedLabel="To the graveyard?"
+                            onConfirm={() => void entombCard(card.name)}>
+                            Entomb
+                          </ArmedButton>
                         </>
                       )}
                     </div>
@@ -899,6 +1053,86 @@ export default function DeckDetail() {
               </ul>
             </section>
           ))}
+
+          {/* The graveyard (ADR 27). Rendered for readers too — an entombed
+              card is deck state, not a private undo buffer — but the two ways
+              out of it are the owner's. Absent entirely while empty, which is
+              its normal state. */}
+          {deck.graveyard.length > 0 && (
+            <section className="space-y-2 border-t pt-4"
+                     style={{ borderColor: 'var(--hairline)' }}>
+              <h3 className="flex items-baseline gap-2 text-sm font-semibold">
+                <span aria-hidden>⚰</span> Graveyard
+                <span className="tabular text-xs font-normal"
+                      style={{ color: 'var(--text-muted)' }}>
+                  {deck.graveyard.length}
+                </span>
+              </h3>
+              <p className="max-w-2xl text-xs" style={{ color: 'var(--text-muted)' }}>
+                Entombed from the 99, rationale and all. Return puts a card
+                back exactly as it left; exile is for good.
+              </p>
+              <ul className="space-y-1">
+                {deck.graveyard.map((card) => (
+                  <li key={card.name} className="card-surface rounded-lg p-2"
+                      style={{ opacity: 0.85 }}>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {/* Desaturated by the wrapper, not the art component:
+                          a dead card's art dims with the row. */}
+                      <CardHover card={card}>
+                        <span className="shrink-0" style={{ filter: 'grayscale(0.7)' }}>
+                          <CardArt src={card.art_crop} alt={card.name}
+                                   ratio="aspect-[626/457]"
+                                   className="w-16 cursor-help" />
+                        </span>
+                      </CardHover>
+                      <div className="min-w-0 flex-1 basis-52">
+                        <div className="flex flex-wrap items-baseline gap-2">
+                          <CardHover card={card}>
+                            <span className="cursor-help text-sm font-medium">
+                              {card.qty > 1 && <span className="tabular mr-1">{card.qty}×</span>}
+                              {card.name}
+                            </span>
+                          </CardHover>
+                          <ManaCost cost={card.mana_cost} />
+                          <span className="text-[10px] uppercase tracking-wide"
+                                style={{ color: 'var(--text-muted)' }}>
+                            {categoryLabel(card.category)}
+                          </span>
+                        </div>
+                        {card.why && (
+                          <p className="mt-0.5 text-xs leading-relaxed"
+                             style={{ color: 'var(--text-muted)' }}>
+                            <ManaText>{card.why}</ManaText>
+                          </p>
+                        )}
+                      </div>
+                      {deck.writable && (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            onClick={() => void returnCard(card.name)}
+                            title={`Return ${card.name} to the 99, rationale intact`}
+                            className="card-action rounded-md px-2 py-1 text-[11px] font-medium">
+                            Return
+                          </button>
+                          {/* The only permanent delete left — and it can only
+                              ever act on a card already entombed, so exiling
+                              is two deliberate steps by construction, plus
+                              the arm. */}
+                          <ArmedButton
+                            title={`Exile ${card.name} — gone from the graveyard for good`}
+                            armedLabel="Gone forever?"
+                            onConfirm={() => void exileCard(card.name)}>
+                            Exile
+                          </ArmedButton>
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
       )}
 

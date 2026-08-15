@@ -50,6 +50,13 @@ _KEY = re.compile(r"^(?P<indent>\s*)(?P<key>[A-Za-z_][\w-]*):(?P<rest>.*)$")
 # outside the 99 with the reason they did not make it.
 CARD_LISTS = ("cards", "swap_board")
 
+# Where an entombed card waits (ADR 27). Not in `CARD_LISTS` deliberately:
+# `_locate_card` serves the editing operations, and a card in the graveyard is
+# frozen -- it cannot have its `why` edited or its quantity changed until it is
+# returned to the 99. The only operations that reach it are `return_card` and
+# `exile_card`.
+GRAVEYARD = "graveyard"
+
 # What `set_card_field` will write. Deliberately short. `name` belongs to
 # `replace_card`, which also drops the overrides identifying the outgoing card;
 # `scryfall_id` and `mana_cost` are overrides for cards the pool does not yet
@@ -67,7 +74,7 @@ SETTABLE_DECK_FIELDS = ("stage", "status", "bracket", "commander_art")
 # every deck in the repository.
 _DECK_KEY_ORDER = ("slug", "name", "status", "stage", "commander",
                    "commander_art", "companion", "bracket", "strategy",
-                   "notes", "cards", "swap_board")
+                   "notes", "cards", "swap_board", "graveyard")
 
 # A Scryfall printing id: a plain UUID. Checked by shape rather than against
 # the pool, because `edit.py` is pure text surgery over YAML and reaching for
@@ -238,6 +245,7 @@ def _split_tail(body: list[str], key_indent: int) -> tuple[list[str], list[str]]
 
 
 def _locate_card(doc: dict[str, Any], lines: list[str], name: str,
+                 lists: tuple[str, ...] = CARD_LISTS,
                  ) -> tuple[str, int, _Entry]:
     """Find a card, agreeing on both its parsed position and its lines.
 
@@ -246,9 +254,12 @@ def _locate_card(doc: dict[str, Any], lines: list[str], name: str,
     name appearing in both `cards` and `swap_board` is enough to do it -- an
     edit could check one entry and rewrite a different one, which is the exact
     failure the verification exists to catch.
+
+    `lists` is which lists to search: the editing operations look through
+    `CARD_LISTS`, the graveyard operations look only at the graveyard.
     """
     wanted = name.strip().lower()
-    for key in CARD_LISTS:
+    for key in lists:
         items = doc.get(key) or []
         if not isinstance(items, list):
             continue
@@ -522,10 +533,18 @@ def add_card(text: str, *, name: str, category: str, why: str = "",
         raise EditFailed(
             "a card in a curated deck needs a `why`; refusing to invent one")
 
-    for key in CARD_LISTS:
+    for key in (*CARD_LISTS, GRAVEYARD):
         for item in doc.get(key) or []:
             if isinstance(item, dict) and \
                     str(item.get("name", "")).strip().lower() == name.lower():
+                if key == GRAVEYARD:
+                    # A second entry alongside a graveyard copy would leave the
+                    # deck showing one card in two places with two rationales.
+                    # The graveyard copy carries the user's own `why` already,
+                    # which is exactly what a return restores.
+                    raise EditFailed(
+                        f"{name!r} is in the graveyard; return it or exile it "
+                        "instead of adding a second entry")
                 where = "the deck" if key == "cards" else "the swap board"
                 raise EditFailed(
                     f"{name!r} is already in {where}; change its quantity or "
@@ -605,6 +624,180 @@ def remove_card(text: str, *, name: str) -> str:
 
     updated = "\n".join(lines[:entry.start] + lines[cut:])
     return _verified(updated, expected)
+
+
+def entomb_card(text: str, *, name: str) -> str:
+    """Move a card from the 99 to the graveyard, keeping everything it carries.
+
+    The delete with an undo (ADR 27). The entry's lines move verbatim --
+    category, quantity, overrides and above all the `why`, which is the user's
+    own text and the thing a later `return_card` restores without anything
+    being re-invented. Newest entombment first, so the graveyard reads as a
+    history.
+
+    Only the 99 has a graveyard. A swap-board card is already outside the deck
+    with the reason it did not make it, and burying that reason would say less
+    than the board does.
+    """
+    doc, lines = _open(text)
+    list_key, position, entry = _locate_card(doc, lines, name)
+    if list_key != "cards":
+        raise EditFailed(
+            f"{name!r} is on the swap board, which has no graveyard; "
+            "remove it instead")
+
+    content, tail = _split_tail(lines[entry.start:entry.end], entry.key_indent)
+    cut = entry.start + len(content)
+    # The same gap rules as `remove_card`: an entry owns the blank line after
+    # it unless that blank leads to a section banner, which owns it instead.
+    leads_to_a_banner = any(line.strip().startswith("#") for line in tail)
+    if position < len(doc[list_key]) - 1 and not leads_to_a_banner:
+        while cut < entry.end and not lines[cut].strip():
+            cut += 1
+
+    moved = dict(doc[list_key][position])
+    expected = copy.deepcopy(doc)
+    del expected[list_key][position]
+    expected[GRAVEYARD] = [moved, *(expected.get(GRAVEYARD) or [])]
+
+    remaining = lines[:entry.start] + lines[cut:]
+    if not expected[list_key]:
+        header = _block_header(remaining, list_key)
+        remaining = [*remaining[:header], f"{list_key}: []",
+                     *remaining[header + 1:]]
+
+    try:
+        header = _block_header(remaining, GRAVEYARD)
+    except EditFailed:
+        # First burial: the block goes at the end of the file, where
+        # `Deck.dump` and `_DECK_KEY_ORDER` both put it, after any trailing
+        # blank lines so the key sits against the content above it.
+        end = len(remaining)
+        while end > 0 and not remaining[end - 1].strip():
+            end -= 1
+        updated = [*remaining[:end], f"{GRAVEYARD}:", *content, *remaining[end:]]
+        return _verified("\n".join(updated), expected)
+
+    if re.match(rf"^{GRAVEYARD}:\s*\[\s*\]", remaining[header]):
+        # A hand-written `graveyard: []` cannot carry block items beneath it.
+        remaining = [*remaining[:header], f"{GRAVEYARD}:",
+                     *remaining[header + 1:]]
+    updated = [*remaining[:header + 1], *content, *remaining[header + 1:]]
+    return _verified("\n".join(updated), expected)
+
+
+def return_card(text: str, *, name: str) -> str:
+    """Move a card from the graveyard back into the 99.
+
+    The undo half of `entomb_card`. The entry returns exactly as it left --
+    the `why` is the user's own words, so restoring it invents nothing and
+    rule 4 is untouched -- and it is filed next to the cards it belongs with,
+    the same category-anchored placement `add_card` uses.
+    """
+    doc, lines = _open(text)
+    try:
+        _, position, entry = _locate_card(doc, lines, name, lists=(GRAVEYARD,))
+    except EditFailed as exc:
+        raise EditFailed(f"{name!r} is not in the graveyard") from exc
+
+    moved = dict(doc[GRAVEYARD][position])
+    category = str(moved.get("category") or "utility")
+
+    for key in CARD_LISTS:
+        for item in doc.get(key) or []:
+            if isinstance(item, dict) and str(item.get("name", "")).strip() \
+                    .lower() == moved["name"].strip().lower():
+                where = "the deck" if key == "cards" else "the swap board"
+                raise EditFailed(
+                    f"{moved['name']!r} is already in {where}; exile the "
+                    "graveyard copy instead of returning it")
+    for commander in doc.get("commander") or []:
+        if str(commander).strip().lower() == moved["name"].strip().lower():
+            raise EditFailed(
+                f"{moved['name']!r} is the commander, which sits outside the 99")
+
+    content, _tail = _split_tail(lines[entry.start:entry.end], entry.key_indent)
+    cut = entry.start + len(content)
+    if position < len(doc[GRAVEYARD]) - 1:
+        while cut < entry.end and not lines[cut].strip():
+            cut += 1
+
+    expected = copy.deepcopy(doc)
+    del expected[GRAVEYARD][position]
+    remaining = lines[:entry.start] + lines[cut:]
+    if not expected[GRAVEYARD]:
+        # An emptied graveyard is removed rather than left as `graveyard: []`:
+        # absent is the field's normal state, and six curated decks should not
+        # keep an empty coffin at the bottom of the file.
+        del expected[GRAVEYARD]
+        remaining = _drop_block_header(remaining, GRAVEYARD)
+
+    span = _block_span(remaining, "cards")
+    spans = _entry_spans(remaining, span)
+    items = list(expected.get("cards") or [])
+    if len(spans) != len(items):
+        raise EditFailed(
+            f"`cards` parses to {len(items)} entries but {len(spans)} were "
+            "found in the text; this file uses YAML the editor cannot edit "
+            "safely")
+
+    if not spans:
+        header = _block_header(remaining, "cards")
+        remaining = [*remaining[:header], "cards:", *remaining[header + 1:]]
+        insert_at, at = 0, header + 1
+    else:
+        anchor = len(spans) - 1
+        for i, item in enumerate(items):
+            if isinstance(item, dict) and \
+                    str(item.get("category", "")).strip().lower() == category.lower():
+                anchor = i
+        shape = spans[anchor]
+        body, _tail = _split_tail(remaining[shape.start:shape.end],
+                                  shape.key_indent)
+        insert_at, at = anchor + 1, shape.start + len(body)
+
+    expected["cards"] = list(expected.get("cards") or [])
+    expected["cards"].insert(insert_at, moved)
+    updated = remaining[:at] + content + remaining[at:]
+    return _verified("\n".join(updated), expected)
+
+
+def exile_card(text: str, *, name: str) -> str:
+    """Remove a card from the graveyard for good.
+
+    The one genuinely permanent delete, and it only ever acts on a card that
+    was already entombed -- so reaching it takes two deliberate steps, which
+    is the confirmation structure ADR 27 wants rather than a dialog asking
+    "are you sure" about a click that already happened.
+    """
+    doc, lines = _open(text)
+    try:
+        _, position, entry = _locate_card(doc, lines, name, lists=(GRAVEYARD,))
+    except EditFailed as exc:
+        raise EditFailed(f"{name!r} is not in the graveyard") from exc
+
+    content, _tail = _split_tail(lines[entry.start:entry.end], entry.key_indent)
+    cut = entry.start + len(content)
+    if position < len(doc[GRAVEYARD]) - 1:
+        while cut < entry.end and not lines[cut].strip():
+            cut += 1
+
+    expected = copy.deepcopy(doc)
+    del expected[GRAVEYARD][position]
+    remaining = lines[:entry.start] + lines[cut:]
+    if not expected[GRAVEYARD]:
+        del expected[GRAVEYARD]
+        remaining = _drop_block_header(remaining, GRAVEYARD)
+    return _verified("\n".join(remaining), expected)
+
+
+def _drop_block_header(lines: list[str], key: str) -> list[str]:
+    """Remove an emptied block's own line, and the blank line that led to it."""
+    header = _block_header(lines, key)
+    start = header
+    while start > 0 and not lines[start - 1].strip():
+        start -= 1
+    return lines[:start] + lines[header + 1:]
 
 
 def set_card_field(text: str, *, name: str, field: str, value: Any) -> str:

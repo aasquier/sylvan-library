@@ -687,17 +687,86 @@ def test_a_draft_accepts_a_card_that_still_owes_its_rationale(draft_client):
         assert resp.json()["needs_rationale"] == before + 1
 
 
-def test_a_card_can_be_removed_without_a_pool(swappable):
-    """Removing a card is a fact about this deck file, not about Magic, so it
-    works on a machine that has never run `data refresh`."""
+def test_removing_a_99_card_entombs_it(swappable):
+    """ADR 27: the delete from the 99 is an entombment, not a disappearance.
+
+    The card leaves the 99 and lands in the graveyard with its category and
+    its `why` intact -- and the response says `entombed`, not `removed`, so a
+    client can tell the user where the card went. Still needs no pool:
+    burying a card is a fact about this deck file, not about Magic.
+    """
     with swappable as client:
         resp = client.request("DELETE",
                               "/api/decks/local/mono-green/cards/Primeval Titan")
         assert resp.status_code == 200, resp.json()
-        assert resp.json()["removed"] == "Primeval Titan"
-        names = {c["name"] for c in
-                 client.get("/api/decks/local/mono-green").json()["cards"]}
-        assert "Primeval Titan" not in names
+        assert resp.json()["entombed"] == "Primeval Titan"
+        deck = client.get("/api/decks/local/mono-green").json()
+        assert "Primeval Titan" not in {c["name"] for c in deck["cards"]}
+        dead = deck["graveyard"]
+        assert [c["name"] for c in dead] == ["Primeval Titan"]
+        assert dead[0]["why"], "the rationale rides into the graveyard"
+
+
+def test_a_bulk_entombment_is_one_write(swappable):
+    with swappable as client:
+        resp = client.post("/api/decks/local/mono-green/entomb",
+                           json={"names": ["Sol Ring", "Primeval Titan"]})
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["entombed"] == ["Sol Ring", "Primeval Titan"]
+        deck = client.get("/api/decks/local/mono-green").json()
+        assert {c["name"] for c in deck["graveyard"]} == \
+            {"Sol Ring", "Primeval Titan"}
+
+
+def test_a_bulk_entombment_is_all_or_nothing(swappable):
+    """A sweep that silently skipped two of its ten cards would report a deck
+    state nobody chose, so one bad name refuses the whole batch."""
+    with swappable as client:
+        resp = client.post("/api/decks/local/mono-green/entomb",
+                           json={"names": ["Sol Ring", "Black Lotus"]})
+        assert resp.status_code == 422
+        assert "Black Lotus" in resp.json()["detail"]
+        deck = client.get("/api/decks/local/mono-green").json()
+        assert deck["graveyard"] == []
+        assert "Sol Ring" in {c["name"] for c in deck["cards"]}
+
+        assert client.post("/api/decks/local/mono-green/entomb",
+                           json={"names": "Sol Ring"}).status_code == 422
+
+
+def test_a_returned_card_keeps_the_words_it_left_with(swappable):
+    """The undo. The `why` that comes back is the user's own text preserved
+    through the graveyard -- nothing composed, which is what keeps rule 4 out
+    of this path entirely."""
+    with swappable as client:
+        before = next(c["why"] for c in
+                      client.get("/api/decks/local/mono-green").json()["cards"]
+                      if c["name"] == "Sol Ring")
+        client.request("DELETE", "/api/decks/local/mono-green/cards/Sol Ring")
+        resp = client.post(
+            "/api/decks/local/mono-green/graveyard/Sol Ring/return")
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["returned"] == "Sol Ring"
+        deck = client.get("/api/decks/local/mono-green").json()
+        card = next(c for c in deck["cards"] if c["name"] == "Sol Ring")
+        assert card["why"] == before
+        assert deck["graveyard"] == []
+
+
+def test_exile_is_permanent_and_only_reaches_the_buried(swappable):
+    with swappable as client:
+        client.request("DELETE", "/api/decks/local/mono-green/cards/Sol Ring")
+        resp = client.request(
+            "DELETE", "/api/decks/local/mono-green/graveyard/Sol Ring")
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["exiled"] == "Sol Ring"
+        deck = client.get("/api/decks/local/mono-green").json()
+        assert deck["graveyard"] == []
+        assert "Sol Ring" not in {c["name"] for c in deck["cards"]}
+        # Exile cannot touch a living card: it only ever acts on the buried.
+        assert client.request(
+            "DELETE",
+            "/api/decks/local/mono-green/graveyard/Forest").status_code == 422
 
 
 def test_removing_a_card_that_is_not_there_is_refused(swappable):

@@ -291,11 +291,31 @@ def test_import_dry_run_writes_nothing(decks, capsys):
 # removing a card, setting a field and writing a note are facts about the deck
 # file rather than about Magic. Adding a card needs the pool and says so.
 
-def test_remove_takes_a_card_out_without_a_pool(decks, capsys):
+def test_remove_entombs_a_99_card_without_a_pool(decks, capsys):
+    """ADR 27: the card leaves the 99 for the graveyard, why intact, and the
+    terminal says so and names the way back."""
     code, msg = run(["decks", "remove", "mini", "--card", "Sol Ring"])
     assert code == 0, msg
-    assert "Sol Ring" not in (decks / "mini" / "deck.yaml").read_text()
-    assert "- Sol Ring" in capsys.readouterr().out
+    text = (decks / "mini" / "deck.yaml").read_text()
+    assert "graveyard:" in text and "Sol Ring" in text
+    out = capsys.readouterr().out
+    assert "graveyard" in out and "decks return" in out
+
+
+def test_return_and_exile_walk_the_graveyard_both_ways(decks, capsys):
+    run(["decks", "remove", "mini", "--card", "Sol Ring"])
+    code, msg = run(["decks", "return", "mini", "--card", "Sol Ring"])
+    assert code == 0, msg
+    text = (decks / "mini" / "deck.yaml").read_text()
+    assert "graveyard" not in text
+    assert "Sol Ring" in text
+
+    run(["decks", "remove", "mini", "--card", "Sol Ring"])
+    code, msg = run(["decks", "exile", "mini", "--card", "Sol Ring"])
+    assert code == 0, msg
+    text = (decks / "mini" / "deck.yaml").read_text()
+    assert "Sol Ring" not in text
+    assert "exiled" in capsys.readouterr().out
 
 
 def test_set_writes_the_rationale_it_was_given(decks, capsys):

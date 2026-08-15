@@ -302,7 +302,37 @@ def cmd_decks_remove(args):
     except service.EditRejected as exc:
         sys.exit(f"refused: {exc}")
 
-    print(f"  - {result['removed']}")
+    if "entombed" in result:
+        # ADR 27: a 99-card is entombed rather than deleted, and the file
+        # keeps its rationale. Say where it went and how to walk it back.
+        print(f"  ⚰ {result['entombed']} -> graveyard "
+              f"(return with `mtglab decks return`, or `decks exile` for good)")
+    else:
+        print(f"  - {result['removed']}")
+    _report_edit(result)
+
+
+def cmd_decks_return(args):
+    from mtglab.api import service
+
+    try:
+        result = service.return_card(args.slug, name=args.card)
+    except service.EditRejected as exc:
+        sys.exit(f"refused: {exc}")
+
+    print(f"  + {result['returned']} <- graveyard, rationale intact")
+    _report_edit(result)
+
+
+def cmd_decks_exile(args):
+    from mtglab.api import service
+
+    try:
+        result = service.exile_card(args.slug, name=args.card)
+    except service.EditRejected as exc:
+        sys.exit(f"refused: {exc}")
+
+    print(f"  x {result['exiled']} exiled -- gone from the graveyard for good")
     _report_edit(result)
 
 
@@ -1380,9 +1410,18 @@ def main(argv=None):
     a.add_argument("--qty", type=int, default=1)
     a.add_argument("--to", default="cards", choices=["cards", "swap_board"])
     a.set_defaults(func=cmd_decks_add)
-    rm = decks.add_parser("remove", help="take a card out")
+    rm = decks.add_parser(
+        "remove", help="take a card out -- a 99-card goes to the graveyard")
     rm.add_argument("slug"); rm.add_argument("--card", required=True)
     rm.set_defaults(func=cmd_decks_remove)
+    rt = decks.add_parser(
+        "return", help="bring an entombed card back to the 99, why intact")
+    rt.add_argument("slug"); rt.add_argument("--card", required=True)
+    rt.set_defaults(func=cmd_decks_return)
+    ex = decks.add_parser(
+        "exile", help="drop a card from the graveyard for good")
+    ex.add_argument("slug"); ex.add_argument("--card", required=True)
+    ex.set_defaults(func=cmd_decks_exile)
     st = decks.add_parser("set", help="change one field, of a card or of the deck")
     st.add_argument("slug")
     st.add_argument("--card", help="the card to change; omit for a deck field")

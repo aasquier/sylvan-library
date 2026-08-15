@@ -75,9 +75,9 @@ function DeleteDialog({ deck, onCancel, onDeleted }: {
          onClick={onCancel}>
       <div className="card-surface w-full max-w-md rounded-xl p-6"
            role="dialog" aria-modal="true"
-           aria-label={`Delete ${deck.name}`}
+           aria-label={`Entomb ${deck.name}`}
            onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold tracking-tight">Delete {deck.name}?</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Entomb {deck.name}?</h2>
         <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
           {deck.total_cards} cards · {deck.stage} · {deck.status}
         </p>
@@ -103,7 +103,7 @@ function DeleteDialog({ deck, onCancel, onDeleted }: {
               if (e.key === 'Enter' && matches) void remove()
             }}
             placeholder={DELETE_WORD}
-            aria-label={`Type ${DELETE_WORD} to confirm deleting ${deck.name}`}
+            aria-label={`Type ${DELETE_WORD} to confirm entombing ${deck.name}`}
             className="mt-1 w-full rounded-md px-3 py-2 font-mono text-sm"
             style={{ background: 'var(--page)', color: 'var(--text-primary)',
                      border: '1px solid var(--hairline)' }}
@@ -124,7 +124,7 @@ function DeleteDialog({ deck, onCancel, onDeleted }: {
           <button onClick={remove} disabled={!matches || busy}
                   className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40"
                   style={{ background: 'var(--status-critical)', color: '#fff' }}>
-            {busy ? 'Deleting…' : 'Delete this deck'}
+            {busy ? 'Entombing…' : 'Entomb this deck'}
           </button>
           <button onClick={onCancel} disabled={busy}
                   className="rounded-lg px-3 py-2 text-sm"
@@ -278,13 +278,13 @@ function DeckCard({ deck, onDelete, heading: Heading = 'h2' }: {
       {deck.writable && (
         <button
           onClick={() => onDelete(deck)}
-          title={`Delete ${deck.name}`}
-          aria-label={`Delete ${deck.name}`}
+          title={`Entomb ${deck.name} — the whole deck moves to the trash`}
+          aria-label={`Entomb ${deck.name}`}
           className="absolute right-2 top-2 z-10 rounded-md px-2 py-1 text-[11px] opacity-0 transition focus:opacity-100 group-hover/card:opacity-100"
-          style={{ background: 'var(--surface-1)', color: 'var(--text-muted)',
-                   border: '1px solid var(--hairline)' }}
+          style={{ background: 'var(--surface-1)', color: 'var(--status-critical)',
+                   border: '1px solid color-mix(in srgb, var(--status-critical) 45%, transparent)' }}
         >
-          Delete
+          Entomb
         </button>
       )}
       <Link to={deckUrl(deck)}

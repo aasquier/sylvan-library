@@ -18,8 +18,11 @@ import yaml
 from mtglab.decks.edit import (
     EditFailed,
     add_card,
+    entomb_card,
+    exile_card,
     remove_card,
     replace_card,
+    return_card,
     set_card_field,
     set_deck_field,
     set_note,
@@ -785,3 +788,130 @@ def test_a_fold_that_would_not_read_back_falls_back_to_plain():
     rendered = "\n".join(line[4:] if line[:4] == "    " else line
                          for line in lines)
     assert yaml.safe_load(rendered) == {"why": value}
+
+
+# ------------------------------------------------- the graveyard (ADR 27)
+
+def test_entomb_moves_the_entry_verbatim():
+    """The whole entry -- category, qty, folded why -- moves to the graveyard.
+
+    Verbatim matters because the `why` is the user's own words: a return has
+    to restore exactly what left, or the graveyard is a lossy delete wearing
+    an undo's name.
+    """
+    after = entomb_card(DECK, name="Primeval Titan")
+    doc = yaml.safe_load(after)
+    assert [c["name"] for c in doc["cards"]] == ["Swamp", "Sol Ring"]
+    assert len(doc["graveyard"]) == 1
+    dead = doc["graveyard"][0]
+    assert dead["name"] == "Primeval Titan"
+    assert dead["category"] == "ramp"
+    assert "fetching two lands" in dead["why"]
+    # The folded scalar's own lines moved untouched -- text surgery, not a
+    # re-render.
+    assert "6/6 trample fetching two lands on ETB and on attack." in after
+
+
+def test_the_graveyard_is_newest_first():
+    once = entomb_card(DECK, name="Primeval Titan")
+    twice = entomb_card(once, name="Sol Ring")
+    doc = yaml.safe_load(twice)
+    assert [c["name"] for c in doc["graveyard"]] == \
+        ["Sol Ring", "Primeval Titan"]
+
+
+def test_entomb_is_a_small_edit():
+    after = entomb_card(DECK, name="Sol Ring")
+    # The entry's lines plus the new `graveyard:` header, and nothing else.
+    assert changed_lines(DECK, after) <= 8
+
+
+def test_entomb_near_a_banner_leaves_the_banner():
+    after = entomb_card(BANNERED, name="Dryad Arbor")
+    assert "# ------------------------------------------------------------------- RAMP" in after
+    doc = yaml.safe_load(after)
+    assert [c["name"] for c in doc["cards"]] == ["Forest", "Sol Ring"]
+    assert doc["graveyard"][0]["name"] == "Dryad Arbor"
+
+
+def test_a_swap_board_card_has_no_graveyard():
+    with pytest.raises(EditFailed, match="swap board"):
+        entomb_card(DECK, name="Reliquary Tower")
+
+
+def test_return_restores_the_entry_next_to_its_category():
+    buried = entomb_card(DECK, name="Sol Ring")
+    back = return_card(buried, name="Sol Ring")
+    doc = yaml.safe_load(back)
+    # Anchored after the last ramp card, exactly where `add_card` files one.
+    assert [c["name"] for c in doc["cards"]] == \
+        ["Swamp", "Primeval Titan", "Sol Ring"]
+    assert doc["cards"][2]["why"] == "Two mana for one."
+    # The emptied graveyard is gone, not left as `graveyard: []`.
+    assert "graveyard" not in doc
+    assert "graveyard" not in back
+
+
+def test_a_round_trip_is_byte_identical():
+    """Entomb then return puts the file back exactly as it was.
+
+    Stronger than the doc-level checks above: if either half re-rendered,
+    reflowed or reordered anything, this is where it shows.
+    """
+    buried = entomb_card(DECK, name="Sol Ring")
+    assert return_card(buried, name="Sol Ring") == DECK
+
+
+def test_return_refuses_a_card_that_is_not_buried():
+    with pytest.raises(EditFailed, match="not in the graveyard"):
+        return_card(DECK, name="Sol Ring")
+
+
+def test_return_refuses_a_duplicate_in_the_99():
+    buried = entomb_card(DECK, name="Sol Ring")
+    # Somebody re-added the card while its ghost sat in the graveyard.
+    readded = buried.replace("graveyard:", "cards2_placeholder:")  # keep ghost
+    readded = add_card(readded, name="Sol Ring", category="ramp",
+                       why="Fresh copy.")
+    readded = readded.replace("cards2_placeholder:", "graveyard:")
+    with pytest.raises(EditFailed, match="already in the deck"):
+        return_card(readded, name="Sol Ring")
+
+
+def test_exile_is_the_permanent_half():
+    buried = entomb_card(DECK, name="Sol Ring")
+    gone = exile_card(buried, name="Sol Ring")
+    doc = yaml.safe_load(gone)
+    assert "graveyard" not in doc
+    assert all(c["name"] != "Sol Ring" for c in doc["cards"])
+    with pytest.raises(EditFailed, match="not in the graveyard"):
+        exile_card(DECK, name="Sol Ring")
+
+
+def test_exile_keeps_the_rest_of_the_graveyard():
+    once = entomb_card(DECK, name="Primeval Titan")
+    twice = entomb_card(once, name="Sol Ring")
+    after = exile_card(twice, name="Sol Ring")
+    doc = yaml.safe_load(after)
+    assert [c["name"] for c in doc["graveyard"]] == ["Primeval Titan"]
+
+
+def test_add_refuses_a_card_waiting_in_the_graveyard():
+    """One copy, one place. A fresh add beside a graveyard ghost would show
+    the card in two places with two rationales."""
+    buried = entomb_card(DECK, name="Sol Ring")
+    with pytest.raises(EditFailed, match="graveyard"):
+        add_card(buried, name="Sol Ring", category="ramp", why="Again.")
+
+
+def test_entombing_the_last_card_leaves_a_readable_file():
+    text = DECK
+    for name in ("Swamp", "Primeval Titan", "Sol Ring"):
+        text = entomb_card(text, name=name)
+    doc = yaml.safe_load(text)
+    assert doc["cards"] == []
+    assert [c["name"] for c in doc["graveyard"]] == \
+        ["Sol Ring", "Primeval Titan", "Swamp"]
+    # And the way back works from the emptied state.
+    back = return_card(text, name="Swamp")
+    assert yaml.safe_load(back)["cards"][0]["name"] == "Swamp"

@@ -138,6 +138,11 @@ USER_SCOPED = {
     "/api/decks/{owner}/{slug}/swap": "item",
     "/api/decks/{owner}/{slug}/cards": "item",
     "/api/decks/{owner}/{slug}/cards/{name}": "item",
+    # ADR 27: the entombment routes are deck writes like any other -- the
+    # graveyard is part of the deck file, so its reach is the deck's.
+    "/api/decks/{owner}/{slug}/entomb": "item",
+    "/api/decks/{owner}/{slug}/graveyard/{name}": "item",
+    "/api/decks/{owner}/{slug}/graveyard/{name}/return": "item",
     "/api/decks/{owner}/{slug}/notes/{key}": "item",
     "/api/decks/{owner}/{slug}/shared": "item",
     "/api/decks/{owner}/{slug}/suggestions": "item",
