@@ -769,7 +769,13 @@ export default function DeckDetail() {
               <ul className="space-y-1">
                 {cards.map((card) => (
                   <li key={card.name} className="card-surface rounded-lg p-2">
-                   <div className="flex items-center gap-3">
+                   {/* `flex-wrap` plus the text column's `basis-52`: on a
+                       phone the four action buttons cannot share a line with
+                       the rationale, and without the wrap they crushed it to
+                       a word per line and pushed Remove off-screen. The
+                       basis is what makes the wrap deterministic — the text
+                       claims 13rem before the buttons may have the rest. */}
+                   <div className="flex flex-wrap items-center gap-3">
                     {/* The art crop, not the full card: at this size a whole
                         card scan is an unreadable smudge, while the art alone
                         is what the eye actually recognises a card by. Hover
@@ -779,8 +785,8 @@ export default function DeckDetail() {
                                ratio="aspect-[626/457]"
                                className="w-16 shrink-0 cursor-help" />
                     </CardHover>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-2">
+                    <div className="min-w-0 flex-1 basis-52">
+                      <div className="flex flex-wrap items-baseline gap-2">
                         <CardHover card={card}>
                           <span className="cursor-help text-sm font-medium">
                             {card.qty > 1 && <span className="tabular mr-1">{card.qty}×</span>}
@@ -975,7 +981,7 @@ export default function DeckDetail() {
                     <ul className="space-y-1">
                       {shortlist.candidates.map((c) => (
                         <li key={c.name}
-                            className="flex items-center gap-3 rounded-lg p-2"
+                            className="flex flex-wrap items-center gap-3 rounded-lg p-2"
                             style={{ background: 'var(--surface-1)' }}>
                           {/* Same affordance as the decklist: the art is what
                               you recognise, the full card is what you need to
@@ -985,8 +991,8 @@ export default function DeckDetail() {
                                      ratio="aspect-[626/457]"
                                      className="w-16 shrink-0 cursor-help" />
                           </CardHover>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-baseline gap-2">
+                          <div className="min-w-0 flex-1 basis-52">
+                            <div className="flex flex-wrap items-baseline gap-2">
                               <span className="text-sm font-medium">{c.name}</span>
                               <ManaCost cost={c.mana_cost} />
                             </div>
