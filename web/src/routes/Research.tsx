@@ -38,7 +38,20 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { StanceDial } from '../components/stance'
-import { Badge, CardHover, ErrorNote, ManaCost, Spinner } from '../components/ui'
+import {
+  Badge, CardHover, ErrorNote, ManaCost, PageMasthead, Spinner,
+} from '../components/ui'
+
+/**
+ * Compulsive Research, Kristina Collantes, Strixhaven Mystical Archive
+ * (2021) — draw three, keep what survives scrutiny, which is this page's
+ * whole method: read many pages, cite the ones that check out, drop the
+ * rest and count them. Part of the Mystical Archive cycle the page mastheads
+ * share; see `CardSearch.tsx` for why that cycle, and `PageMasthead` for the
+ * hotlink-and-credit rules.
+ */
+const COMPULSIVE_RESEARCH_ART =
+  'https://cards.scryfall.io/art_crop/front/0/f/0f578fbf-c3c7-4407-9fda-3c13b165798c.jpg'
 import {
   api, errorMessage, followJob, hasResearch,
   type ClaudeStatus, type ResearchBody, type ResearchCard, type ResearchReport,
@@ -116,24 +129,31 @@ export default function Research() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Research</h1>
-        <p className="max-w-2xl text-sm leading-relaxed"
-           style={{ color: 'var(--text-secondary)' }}>
+      <PageMasthead
+        art={COMPULSIVE_RESEARCH_ART}
+        alt="Compulsive Research, painted by Kristina Collantes: a scholar
+             haloed by dense golden charts and diagrams that fill the sky
+             around them."
+        title="Research"
+        credit={<>
+          <em>Compulsive Research</em> by Kristina Collantes, Strixhaven
+          Mystical Archive — draw three, keep what survives scrutiny.
+        </>}>
+        <p className="max-w-2xl leading-relaxed">
           Ask about the things this tool cannot compute: the meta, what a ruling
           means in practice, a card spoiled since the last data refresh. Every
           answer comes back with the pages it was read from.
         </p>
         {/* Said on the screen rather than only in an ADR, and said before the
             first question rather than in an apology afterwards. */}
-        <p className="max-w-2xl text-sm leading-relaxed"
+        <p className="mt-2 max-w-2xl leading-relaxed"
            style={{ color: 'var(--text-muted)' }}>
           It cannot see your decks. That is deliberate — this surface has no
           access to your library at all, so ask about the card and the format,
           and let the deck page&rsquo;s gate, simulator and slot argument answer
           the rest.
         </p>
-      </header>
+      </PageMasthead>
 
       <form className="card-surface flex flex-col gap-3 rounded-xl px-5 py-4"
             onSubmit={(e) => { e.preventDefault(); void ask(question) }}>

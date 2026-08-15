@@ -395,6 +395,49 @@ export function Caveat({ children }: { children: React.ReactNode }) {
 
 /* ------------------------------------------------------------------- art */
 
+/**
+ * A page's nameplate: a whole painting beside the title, never behind it.
+ *
+ * Generalised from the library's masthead, which is where the layout was
+ * argued: `art_crop` is 626x457, about 1.37:1, and a full-bleed band across
+ * the page keeps less than half of the painting's height, so the art is shown
+ * at its own ratio and the words sit next to it. Every painting is a Scryfall
+ * hotlink (rule 5 and ADR 6 — never redistribute), chosen by naming a
+ * printing at the call site with the provenance in a comment, and credited
+ * under the title — the credit is the licence made visible, not decoration.
+ *
+ * The `h1` lives here, so a page that uses this must not render another.
+ */
+export function PageMasthead({ art, alt, title, credit, children }: {
+  art: string
+  alt: string
+  title: React.ReactNode
+  /** Card, artist, printing — and one clause on why this painting. */
+  credit: React.ReactNode
+  children?: React.ReactNode
+}) {
+  return (
+    <section className="card-surface overflow-hidden rounded-xl">
+      <div className="flex flex-col sm:flex-row">
+        {/* No ratio and no crop: the container takes the image's own shape,
+            so there is nothing to anchor and nothing to lose. Eager, not
+            lazy — the masthead is above the fold on every page that has one. */}
+        <img src={art} alt={alt}
+             className="masthead-art w-full object-cover sm:w-[260px]" />
+        <div className="flex min-w-0 flex-col justify-center gap-1 px-5 py-4 sm:px-6">
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            {children}
+          </div>
+          <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {credit}
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function CardArt({
   src, alt, className = '', ratio = 'aspect-[626/457]', position,
 }: {

@@ -312,7 +312,9 @@ look like it:
   been the other option and a worse one: 90 unknown-card errors per deck, and
   tests that assert cleanliness would have had to be weakened to survive it.
 
-Result: **740 tests and 90% coverage, with or without the real pool.** Two
+Result: **740 tests and 90% coverage, with or without the real pool** — the
+numbers when this section landed; the suite has since grown to ~1,700 tests at
+~96%, with the floor at 95 (#96). Two
 tests still need the full download and now say so with a `needs_full_pool`
 marker rather than a bare skip — the 32-way colour-combination check (a fixture
 holding those 32 cards would verify the fixture rather than the table) and the
@@ -556,8 +558,9 @@ tests.**
 
 ## 5. CI/CD
 
-Current pipeline, as of 2026-08-14: pytest on 3.11/3.12, coverage with a **90%**
-floor, a **skip-count gate**, ruff, **mypy**, frontend typecheck under
+Current pipeline, as of 2026-08-15: pytest on 3.11/3.12, coverage with a **95%**
+floor (90 until the 2026-08-14 coverage pass, #96), a **skip-count gate**,
+ruff, **mypy**, frontend typecheck under
 **`strict`**, **oxlint with `--deny-warnings`**, `npm test`, the build,
 committed-bundle drift check, a secrets/card-data guard, and — since
 containerisation landed — an **`image` job** that builds the Dockerfile for two
@@ -673,8 +676,9 @@ which is the one a linter does not already cover, measures at nothing here:
 oracle text in `tests/tiny_pool.py`, which no formatter can split. The stated
 trigger for revisiting is **a second regular contributor**, not a line count.
 - **mypy**, strict by default with a named list of modules that are not there
-  yet — ten when it landed, **eight** now that `api/service.py` and
-  `api/simruns.py` have graduated. Direction over starting point: lax-by-default means a new module
+  yet — ten when it landed, **two** now (`cli.py` and `cards/db.py`, since
+  #90): `api/service.py` and `api/simruns.py` graduated first, and the other
+  six followed on 2026-08-14. Direction over starting point: lax-by-default means a new module
   is born unchecked and nobody notices. 24 of 42 modules passed `--strict` on
   the first run, including all of `mana.py`, `sim/tier1/` and `sim/tier3/`. It
   found three real latent problems — a `str | None` reaching `.lower()` on the
@@ -852,6 +856,14 @@ The first three landed 2026-08-12:
       protection table for the context name, and for why the deploy job's
       `needs` list stays at four.
 - [x] **Dependabot**, weekly, grouped per ecosystem (actions, pip, npm).
+- [x] **CodeQL** (`codeql.yml`, added 2026-08-15) — the one scanner that reads
+      the *source*: Trivy scans the image's packages, dependency-review diffs
+      the graph, the secrets job greps literals, and nothing before this
+      analysed the code's own data flow. Python and TypeScript, on PRs, main
+      and a weekly cron; `web_dist/` excluded so minified output cannot bury a
+      real finding. Free on a public repo. **Deliberately not a required check
+      yet** — the second of the two steps is a decision to make after a few
+      weeks of watching its signal-to-noise, not a default.
 - [ ] Generate an SBOM (`syft`) and attach it to releases.
 - [ ] Sign container images with `cosign`, publish via OIDC rather than
       long-lived registry credentials.

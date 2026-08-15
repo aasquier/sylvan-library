@@ -165,7 +165,7 @@ module = [
 # top level only, so `strict = false` here would be silently ignored and these
 # modules would fail the build anyway. The flags it turns on have to be named
 # one at a time, which is tedious but at least makes the exemption explicit:
-# these eight are relaxed, and everything else `strict` implies still applies.
+# these two are relaxed, and everything else `strict` implies still applies.
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 disallow_untyped_calls = false

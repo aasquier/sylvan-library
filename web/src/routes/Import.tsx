@@ -1,7 +1,20 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, deckUrl, errorMessage, type ImportResult } from '../lib/api'
-import { Badge, ErrorNote, ManaText, Spinner, TextField } from '../components/ui'
+import {
+  Badge, ErrorNote, ManaText, PageMasthead, Spinner, TextField,
+} from '../components/ui'
+
+/**
+ * Cultivate, Jason Felix, Strixhaven Mystical Archive (2021) — search for two,
+ * keep both, one ready now and one for later: an import in miniature, where
+ * every name that resolves lands and every one that does not is kept and
+ * reported. Part of the Mystical Archive cycle the page mastheads share; see
+ * `CardSearch.tsx` for why that cycle, and `PageMasthead` for the
+ * hotlink-and-credit rules.
+ */
+const CULTIVATE_ART =
+  'https://cards.scryfall.io/art_crop/front/b/3/b3896717-1e46-4aa2-88b7-1c4fe76edde1.jpg'
 
 /**
  * Paste a decklist, see exactly what it resolves to, then create it.
@@ -81,19 +94,24 @@ export default function Import() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Import a decklist</h1>
-          <p className="mt-1 max-w-2xl text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Paste an export from Moxfield, Archidekt, Arena or anywhere else.
-            Names are resolved against the local pool — anything that does not
-            resolve is reported, never guessed.
-          </p>
-        </div>
-        <Link to="/" className="text-sm underline" style={{ color: 'var(--series-1)' }}>
-          ← Back to the library
-        </Link>
-      </header>
+      <PageMasthead
+        art={CULTIVATE_ART}
+        alt="Cultivate, painted by Jason Felix: a gardener cradling a young
+             sprout inside a golden wreath of blossoms."
+        title="Import a decklist"
+        credit={<>
+          <em>Cultivate</em> by Jason Felix, Strixhaven Mystical Archive —
+          search for two, keep both.
+        </>}>
+        <p className="max-w-2xl">
+          Paste an export from Moxfield, Archidekt, Arena or anywhere else.
+          Names are resolved against the local pool — anything that does not
+          resolve is reported, never guessed.{' '}
+          <Link to="/" className="underline" style={{ color: 'var(--series-1)' }}>
+            Back to the library
+          </Link>
+        </p>
+      </PageMasthead>
 
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
         <section className="space-y-3">

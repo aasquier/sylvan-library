@@ -207,17 +207,16 @@ npm --prefix web run check      # tsc, oxlint and vitest in one
 npm --prefix web run build      # if anything under web/src changed
 ```
 
-CI runs all of it. `main` is protected: pull request required, all five checks
+CI runs all of it. `main` is protected: pull request required, all six checks
 green, branch up to date, squash merge, linear history. A direct push to `main`
 is rejected.
 
-**Your local coverage number will be lower than CI's, and that is expected.**
-CI reports 90% against a `fail_under = 90` floor; the same suite on a machine
-with a real `data/` directory reports about 88%. Nothing is wrong — a populated
-`data/mtg.duckdb` means the "no card pool" and "fresh instance" fallback
-branches never execute locally, so the lines that handle a degraded install go
-uncovered on the one machine that can never be in that state. Judge a coverage
-change by CI's number, not by your own.
+**Coverage runs against a `fail_under = 95` floor** (the suite sits around
+96–97%). The floor is deliberately a point under the suite, so a change that
+costs a full point is loud and ordinary churn is not. Local and CI numbers
+agree to within a point these days; when they disagree, judge a coverage
+change by CI's number — a populated `data/` directory means the "no card
+pool" fallback branches never execute locally.
 
 The `image` job builds the container and **cannot be run locally** on macOS 12
 or older, where no container runtime installs — treat a red `image` job as the

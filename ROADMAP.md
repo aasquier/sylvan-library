@@ -1149,6 +1149,41 @@ arc; this is what the next few sessions actually do.
    tested through the routes. The floor sits a point under the suite so a
    change that costs a full point is loud and ordinary churn is not.
 
+10. **A shore-up pass** — landed 2026-08-15. A full audit first (every screen
+    driven in the browser, desktop and phone, both themes; suites, ruff, mypy
+    all green; no console errors anywhere), then the gaps it found:
+
+    - **The page nameplates.** The library's masthead — a whole painting at
+      its own ratio beside the title, credited — was the app's best screen
+      and four screens were plain grey next to it. `PageMasthead` in
+      `components/ui.tsx` is that layout made shared (the library uses it
+      too now), and Card search, Simulator, Research and Import each carry a
+      painting from the **Strixhaven Mystical Archive** cycle — an archive
+      of the game's definitive spells, for an app named after a library:
+      *Demonic Tutor* (search your library for a card), *Strategic Planning*
+      (look at the top three, keep what the plan needs), *Compulsive
+      Research* (draw three, keep what survives scrutiny), *Cultivate*
+      (search for two, keep both). All hotlinked and credited, chosen by
+      printing id resolved through the pool, none committed — the branch-3
+      decision unchanged, just applied to more screens. Each attribution
+      clause was checked against the card's oracle text, because rule 1
+      does not stop applying when the card fact is in a caption.
+    - **CodeQL** (`codeql.yml`) — see ENGINEERING §5. The one scanner that
+      reads the source; free on a public repo; not a required check until
+      its signal-to-noise has been watched for a few weeks.
+    - **A preconnect to `cards.scryfall.io`** in `index.html` — every screen
+      hotlinks card art from that one host, and the handshake now happens
+      while the bundle parses instead of in front of the first painting.
+    - **Stale doc claims**: ENGINEERING §5 still said the coverage floor was
+      90 (it is 95, item 9) and the mypy exemption list was eight (it is
+      two, #90); CONTRIBUTING said five required checks (six) and described
+      a local-vs-CI coverage gap that item 9 closed.
+    - **`web/README.md`** — the frontend conventions map for a fresh
+      session: what serves what, the load-bearing conventions (lazy routes,
+      `DeckRef`, the stance readout, `hasGlyph`, glossary keys, the
+      masthead rules, both-themes), and the testing habits with a history
+      behind them.
+
 ---
 
 ## 1. Analyse or generate decks with simulation

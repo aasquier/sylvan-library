@@ -5,6 +5,10 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌳</text></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
+    <!-- Every card image on every screen hotlinks from this one host (rule 5:
+         hotlink, never rehost), so warm the DNS+TCP+TLS handshake while the
+         bundle is still parsing instead of paying it on the first painting. -->
+    <link rel="preconnect" href="https://cards.scryfall.io" />
     <title>sylvan-library</title>
     <script type="module" crossorigin src="/assets/app.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/app.css">
