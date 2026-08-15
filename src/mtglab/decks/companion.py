@@ -30,9 +30,17 @@ Arahbo, Roar of the World is a Cat Avatar, so the cats list is legal.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from mtglab.cards.db import CardRecord
+
+#: The starting deck as (card name, its pool record) pairs -- the 99 and the
+#: commander, never the companion itself. Every rule below takes the same
+#: shape, which is what lets `check` dispatch through one table.
+Entries = Sequence[tuple[str, "CardRecord"]]
 
 # Card types that make a card a permanent card. A card's types are those of
 # its front face, which is why the MDFC split matters here.
@@ -116,25 +124,26 @@ def _has_activated_ability(rec: Any) -> bool:
 # Each takes the cards making up the starting deck (commander included,
 # companion excluded) and returns the names that break the restriction.
 
-def _even_mana_values(entries, rec) -> list[str]:
+def _even_mana_values(entries: Entries, rec: CardRecord) -> list[str]:
     # Gyruda has no land exception -- but lands are mana value 0, which is
     # even, so they pass on their own merits.
     return [n for n, r in entries if int(r.cmc) % 2 != 0]
 
 
-def _odd_mana_values_or_land(entries, rec) -> list[str]:
+def _odd_mana_values_or_land(entries: Entries, rec: CardRecord) -> list[str]:
     return [n for n, r in entries if not _is_land(r) and int(r.cmc) % 2 == 0]
 
 
-def _mv_three_or_greater_or_land(entries, rec) -> list[str]:
+def _mv_three_or_greater_or_land(entries: Entries,
+                                 rec: CardRecord) -> list[str]:
     return [n for n, r in entries if not _is_land(r) and r.cmc < 3]
 
 
-def _permanent_mv_two_or_less(entries, rec) -> list[str]:
+def _permanent_mv_two_or_less(entries: Entries, rec: CardRecord) -> list[str]:
     return [n for n, r in entries if _is_permanent(r) and r.cmc > 2]
 
 
-def _creature_types(entries, rec) -> list[str]:
+def _creature_types(entries: Entries, rec: CardRecord) -> list[str]:
     """Kaheera. The allowed types are read out of her own oracle text."""
     m = re.search(r"is an? (.+?) card", rec.oracle_text or "")
     if not m:
@@ -145,7 +154,7 @@ def _creature_types(entries, rec) -> list[str]:
             and not any(t in _front(r.type_line) for t in allowed)]
 
 
-def _no_repeated_mana_symbol(entries, rec) -> list[str]:
+def _no_repeated_mana_symbol(entries: Entries, rec: CardRecord) -> list[str]:
     out = []
     for n, r in entries:
         syms = _mana_symbols(r.mana_cost)
@@ -154,7 +163,7 @@ def _no_repeated_mana_symbol(entries, rec) -> list[str]:
     return out
 
 
-def _distinct_nonland_names(entries, rec) -> list[str]:
+def _distinct_nonland_names(entries: Entries, rec: CardRecord) -> list[str]:
     seen: dict[str, int] = {}
     for n, r in entries:
         if not _is_land(r):
@@ -162,7 +171,7 @@ def _distinct_nonland_names(entries, rec) -> list[str]:
     return sorted(n for n, c in seen.items() if c > 1)
 
 
-def _nonland_shares_a_type(entries, rec) -> list[str]:
+def _nonland_shares_a_type(entries: Entries, rec: CardRecord) -> list[str]:
     nonland = [(n, r) for n, r in entries if not _is_land(r)]
     if not nonland:
         return []
@@ -184,7 +193,8 @@ def _nonland_shares_a_type(entries, rec) -> list[str]:
     return [n for n, r in nonland if best not in _front(r.type_line)]
 
 
-def _permanents_have_activated_abilities(entries, rec) -> list[str]:
+def _permanents_have_activated_abilities(entries: Entries,
+                                         rec: CardRecord) -> list[str]:
     return [n for n, r in entries
             if _is_permanent(r) and not _has_activated_ability(r)]
 
@@ -240,7 +250,8 @@ def is_companion(rec: Any) -> bool:
     return bool(condition_text(rec))
 
 
-def check(companion_name: str, entries, cards: dict) -> CompanionCheck:
+def check(companion_name: str, entries: Entries,
+          cards: dict[str, CardRecord]) -> CompanionCheck:
     """Check a companion's restriction against the starting deck.
 
     `entries` is a sequence of (card_name, CardRecord) covering the whole

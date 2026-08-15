@@ -21,9 +21,13 @@ answer to "what is this deck", not a caller's opinion of it.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from mtglab.decks import companion, partners
 from mtglab.decks.model import CATEGORIES, DECK_STAGES, DECK_STATUSES, Deck
+
+if TYPE_CHECKING:
+    from mtglab.cards.db import CardRecord
 
 SINGLETON_EXEMPT = {
     "plains", "island", "swamp", "mountain", "forest", "wastes",
@@ -69,7 +73,7 @@ class ValidationReport:
         return "\n".join(str(i) for i in self.issues)
 
 
-def validate(deck: Deck, cards: dict | None = None, *,
+def validate(deck: Deck, cards: dict[str, CardRecord] | None = None, *,
              expected_size: int = 99) -> ValidationReport:
     """Validate a deck. `cards` maps name -> CardRecord from the local pool.
 
@@ -217,23 +221,25 @@ def validate(deck: Deck, cards: dict | None = None, *,
                 rep.add("error", "illegal-pairing", problem)
 
         for card in deck.cards:
-            rec = cards.get(card.name)
-            if rec is None:
+            # A fresh name: `rec` above is the loop variable over commander
+            # records and is never None, and reusing it here would widen it.
+            card_rec = cards.get(card.name)
+            if card_rec is None:
                 continue
-            illegal = rec.color_identity - identity
+            illegal = card_rec.color_identity - identity
             if illegal:
                 rep.add("error", "color-identity",
-                        f"identity {{{''.join(sorted(rec.color_identity))}}} includes "
+                        f"identity {{{''.join(sorted(card_rec.color_identity))}}} includes "
                         f"{{{''.join(sorted(illegal))}}}, outside the commander's "
                         f"{{{''.join(sorted(identity)) or 'C'}}}", card.name)
-            if not rec.legal_commander:
+            if not card_rec.legal_commander:
                 rep.add("error", "banned",
                         "not legal in Commander", card.name)
-            if card.category == "land" and not rec.is_land:
+            if card.category == "land" and not card_rec.is_land:
                 rep.add("warn", "category-mismatch",
-                        f"filed under 'land' but type line is {rec.type_line!r}",
+                        f"filed under 'land' but type line is {card_rec.type_line!r}",
                         card.name)
-            if card.category != "land" and rec.is_land:
+            if card.category != "land" and card_rec.is_land:
                 rep.add("warn", "category-mismatch",
                         f"is a land but filed under {card.category!r}", card.name)
 
@@ -244,7 +250,7 @@ def validate(deck: Deck, cards: dict | None = None, *,
     return rep
 
 
-def _check_companion(deck: Deck, cards: dict,
+def _check_companion(deck: Deck, cards: dict[str, CardRecord],
                      identity: frozenset[str] | None,
                      rep: ValidationReport) -> None:
     """Validate the companion itself and its deckbuilding restriction.
@@ -307,7 +313,7 @@ def _check_companion(deck: Deck, cards: dict,
                 name)
 
 
-def reserved_list(deck: Deck, cards: dict) -> list[str]:
+def reserved_list(deck: Deck, cards: dict[str, CardRecord]) -> list[str]:
     """Reserved List cards in the deck -- surfaced because it is a standing
     constraint the user toggles per deck, not a fixed rule."""
     return sorted(c.name for c in deck.cards

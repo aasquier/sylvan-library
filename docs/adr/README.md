@@ -139,12 +139,12 @@ test — is untouched.
 14 and 15 were Proposed for exactly one day, which was the point: they drew the
 boundary for a model integration before the first client call rather than after
 it. Both are Accepted, and most of what they describe now exists: the client,
-the tools, the stance, Forge, four modes across three features, and the rule
-that no code path writes a `why` — which is enforced over the package's syntax
-tree rather than by prompt. Three of the modes 15 tabulates are still unbuilt,
-and there is still no UI for the stance dial. The notes at the top of each say
-which half is which, because a status of Accepted on its own would overstate
-it.
+the tools, the stance and its dial, Forge, five modes across four features, and
+the rule that no code path writes a `why` — which is enforced over the
+package's syntax tree rather than by prompt. Two of the modes 15 tabulates are
+still unbuilt — research and deck conversation — as is the activity log. The
+notes at the top of each say which half is which, because a status of Accepted
+on its own would overstate it.
 
 ## Where the longer arguments live
 

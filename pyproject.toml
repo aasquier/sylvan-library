@@ -135,28 +135,22 @@ strict = true
 # Show the rule name so a failure says which knob it came from.
 show_error_codes = true
 
-# The eight modules that do not pass `--strict` yet, with the count at the time
-# the checker landed. They are here to be worked down, not to be permanent --
-# and until then the *rest* of the package cannot regress, which is the point.
-# `check_untyped_defs` still applies to every one of them (that was clean
-# across the whole package on day one), so this is a weaker check rather than
-# no check.
+# The modules that do not pass `--strict` yet, with the count at the time the
+# checker landed. They are here to be worked down, not to be permanent -- and
+# until then the *rest* of the package cannot regress, which is the point.
+# `check_untyped_defs` still applies to both (that was clean across the whole
+# package on day one), so this is a weaker check rather than no check.
 #
-#   cli.py            33     cards/db.py       24     decks/companion   11
-#   decks/analyze.py   7     decks/importer.py  4     decks/validate.py  3
-#   artifacts/gen      3     api/app.py         3
+#   cli.py   79     cards/db.py   24
 #
-# api/service.py and api/simruns.py graduated 2026-08-12.
+# api/service.py and api/simruns.py graduated 2026-08-12. The other six of the
+# original eight -- api/app.py, artifacts/generate.py, and decks/{analyze,
+# companion, importer, validate}.py -- graduated 2026-08-14; nearly all of it
+# was bare `dict` where the value type was `CardRecord` all along.
 [[tool.mypy.overrides]]
 module = [
     "mtglab.cli",
-    "mtglab.api.app",
-    "mtglab.artifacts.generate",
     "mtglab.cards.db",
-    "mtglab.decks.analyze",
-    "mtglab.decks.companion",
-    "mtglab.decks.importer",
-    "mtglab.decks.validate",
 ]
 # `strict` is not a per-module setting -- it is shorthand that expands at the
 # top level only, so `strict = false` here would be silently ignored and these
