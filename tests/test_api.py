@@ -102,6 +102,33 @@ def test_every_response_carries_the_security_headers(client):
         assert "Strict-Transport-Security" not in r.headers
 
 
+def test_large_responses_are_gzipped(client):
+    """The wire format for anything over a kilobyte, when the client asks.
+
+    Fly's proxy passes bodies through untouched, so if the app does not
+    compress, nobody does: before this middleware a deck's JSON went out as
+    81 kB of oracle text per navigation. `/api/colors` is the probe because it
+    is comfortably over the floor and needs no pool. The client re-inflates
+    transparently, so the body must still parse -- asserting the header alone
+    would pass against a response gzip had mangled.
+    """
+    r = client.get("/api/colors", headers={"Accept-Encoding": "gzip"})
+    assert r.status_code == 200
+    assert r.headers.get("Content-Encoding") == "gzip"
+    assert r.json()["combinations"]
+
+
+def test_small_responses_are_not_gzipped(client):
+    """Under the floor the body ships whole -- a handful of bytes saved is not
+    worth a Content-Encoding header and a decompress on every poll. The probe
+    is `/api/jobs` on a cleared registry: two bytes, and the polling endpoint
+    is exactly the traffic the floor exists to spare. Not `/api/health`, whose
+    size depends on whether the machine running the suite has a pool."""
+    r = client.get("/api/jobs", headers={"Accept-Encoding": "gzip"})
+    assert r.status_code == 200
+    assert r.headers.get("Content-Encoding") != "gzip"
+
+
 def test_a_refusal_carries_the_security_headers_too():
     """The headers middleware wraps the auth middleware, not just the routes.
 

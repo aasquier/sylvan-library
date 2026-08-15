@@ -15,6 +15,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -158,9 +159,27 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                   description="Local Commander deckbuilding and simulation.",
                   lifespan=startup)
 
-    # First, and before any route is declared: the middleware runs ahead of
-    # routing, so what it protects is every path the app will ever serve rather
-    # than the ones remembered at review time.
+    # Nothing else on the wire compresses: Fly's proxy passes bodies through as
+    # the app sends them, so before this the 84 kB the bundle gzips to went out
+    # as 266 kB and a deck's JSON — 81 kB of oracle text, measured on Arahbo —
+    # went out whole, per navigation, over whatever a phone is on.
+    #
+    # Registered FIRST, which makes it the INNERMOST layer, and that placement
+    # is load-bearing rather than stylistic: `minimum_size` reads the response's
+    # Content-Length, and the decorator-style middlewares below re-wrap every
+    # response as a stream without one — registered outermost, this compressed
+    # two-byte job polls. Innermost it sees the real response, so the floor
+    # keeps 304s and small JSON whole. Known waste, accepted: a tarot WebP over
+    # the floor is gzipped for no byte saved — on first load only, since
+    # `Revalidated` turns every later request into a bodyless 304. Card art
+    # never passes through here at all; it hotlinks from Scryfall's CDN.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+    # Before any route is declared: the middleware runs ahead of routing, so
+    # what it protects is every path the app will ever serve rather than the
+    # ones remembered at review time. (The gzip registration above is not an
+    # exception — `add_middleware` mounts a wrapper, and the auth middleware
+    # still sees every request before any route does.)
     auth.install(app, require=required, secure_cookies=secure,
                  email_sender=email_sender)
     admin.install(app, email_sender=email_sender)

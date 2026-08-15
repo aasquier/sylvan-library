@@ -60,8 +60,15 @@ _LANES: dict[str, ThreadPoolExecutor] = {
 _LOCK = threading.Lock()
 _JOBS: dict[str, Job] = {}
 
-# Keep the registry from growing without bound in a long-lived session.
-MAX_JOBS = 50
+# Keep the registry from growing without bound in a long-lived session. The
+# bound is global, not per owner, and eviction takes the oldest *finished*
+# job — which on a shared instance is very likely one somebody's tab is still
+# polling, since a job born `done` (a cache hit) is finished the moment it is
+# handed out. Fifty was sized for one laptop; a hundred accounts sharing fifty
+# slots would evict results mid-poll under entirely ordinary use. Two hundred
+# costs memory only when occupied (a Tier 1 result is a few kB of curves), and
+# the LRU-by-`created_at` order is unchanged.
+MAX_JOBS = 200
 
 #: What a worker is handed to report with: `progress(done, total)`.
 Progress = Callable[[int, int], None]

@@ -38,7 +38,7 @@ from typing import Any
 
 import yaml
 
-from mtglab.decks.model import DECK_STAGES, DECK_STATUSES
+from mtglab.decks.model import DECK_STAGES, DECK_STATUSES, load_yaml
 
 # `  - name: Primeval Titan` -- the first line of a card entry. The name may be
 # quoted, and a card name can contain almost anything, so the value is taken
@@ -105,7 +105,7 @@ class _Entry:
 def _open(text: str) -> tuple[dict[str, Any], list[str]]:
     """Parse the deck and split its lines, the way every operation starts."""
     try:
-        doc = yaml.safe_load(text) or {}
+        doc = load_yaml(text) or {}
     except yaml.YAMLError as exc:
         raise EditFailed(f"deck.yaml does not parse: {exc}") from exc
     if not isinstance(doc, dict):
@@ -116,7 +116,7 @@ def _open(text: str) -> tuple[dict[str, Any], list[str]]:
 def _unquote(value: str) -> str:
     """Parse a YAML scalar the way the loader will, so quoting never matters."""
     try:
-        parsed = yaml.safe_load(value)
+        parsed = load_yaml(value)
     except yaml.YAMLError:
         return value.strip()
     return parsed if isinstance(parsed, str) else value.strip()
@@ -316,7 +316,7 @@ def _render(key: str, value: Any, indent: int, *, width: int = 96,
     text = yaml.dump(payload, Dumper=_FoldedDumper, default_flow_style=False,
                      allow_unicode=True, sort_keys=False,
                      width=max(20, width - indent))
-    if fold and yaml.safe_load(text) != {key: value}:
+    if fold and load_yaml(text) != {key: value}:
         return _render(key, value, indent, width=width, fold=False)
     pad = " " * indent
     return [pad + line if line else line for line in text.rstrip("\n").split("\n")]
@@ -435,7 +435,7 @@ def _verified(updated: str, expected: dict[str, Any]) -> str:
     writing it.
     """
     try:
-        after = yaml.safe_load(updated)
+        after = load_yaml(updated)
     except yaml.YAMLError as exc:
         raise EditFailed(
             f"the edit produced YAML that no longer parses: {exc}") from exc
