@@ -369,9 +369,9 @@ def only_grounded(items: list[Any], allowed: set[str],
 def resolve_cards(names: list[Any]) -> tuple[list[dict[str, Any]], int]:
     """Resolve every named card against the pool. Label what is missing.
 
-    **The deliberate difference from `dossier._rivals`, and the reason ADR 26
-    exists.** A rival commander that does not resolve is a card the model
-    invented, so the dossier drops it. A card that does not resolve *here* may
+    **The deliberate difference from `dossier._competitors`, and the reason
+    ADR 26 exists.** A competing commander that does not resolve is a card the
+    model invented, so the dossier drops it. A card that does not resolve *here* may
     be that -- or it may be a card spoiled since the last `data refresh`, which
     is one of the three things this surface is for. The two are
     indistinguishable from inside `get_cards`, so the mode does not try: it

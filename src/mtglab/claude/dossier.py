@@ -6,8 +6,9 @@ which is the whole reason
 The deck page already counts what the pool knows about a commander (how rare
 its subtypes are, when it was first printed, what else carries the name). What
 it could not say is who the character *is*, what archetype they define and where
-that came from, who their rivals are, and where they sit in Magic's history.
-None of that is a column, and none of it is a number.
+that came from, who competes for their seat and who they fought in the story,
+and where they sit in Magic's history. None of that is a column, and none of it
+is a number.
 
 So three sources, each with a narrow jurisdiction:
 
@@ -35,10 +36,10 @@ them with the pages `Turn.searched` recorded, drops the rest and counts what it
 dropped -- the same instrument `interview.only_questions()` points at the same
 failure, one source away.
 
-**Every card the dossier names is looked up.** Rivals come back as pool rows
-or they do not come back at all. A model listing a plausible rival commander
-that does not exist is rule 1 failing in the one place this feature would be
-most fun to read.
+**Every card the dossier names is looked up.** Competitors come back as pool
+rows or they do not come back at all. A model listing a plausible competing
+commander that does not exist is rule 1 failing in the one place this feature
+would be most fun to read.
 
 It writes nothing. `may_write` is empty, this package has no write door, and
 `tests/test_claude_boundary.py` fails on the commit that adds one.
@@ -79,10 +80,16 @@ WEB_SEARCH: dict[str, Any] = {
     "max_uses": 4,
 }
 
-#: The four questions, in the order they are asked and rendered. An enum rather
+#: The five questions, in the order they are asked and rendered. An enum rather
 #: than free-form headings so the UI can lay them out and a missing one is
 #: visible as a gap rather than as prose that quietly changed shape.
-SECTIONS = ("who", "archetype", "rivals", "standing")
+#:
+#: `competitors` and `rivals` are deliberately two sections, split 2026-08-15
+#: after the first Gyome dossier blurred them: the commanders somebody would
+#: build *instead* are a shopping question, and the characters this one fought
+#: in the story are a lore question. The old single "rivals" list answered the
+#: first while wearing the second's name.
+SECTIONS = ("who", "archetype", "competitors", "rivals", "standing")
 
 _PROSE: dict[str, Any] = {
     "type": "string",
@@ -113,7 +120,14 @@ _SOURCED: dict[str, Any] = {
 RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "who": _SOURCED,
+        "who": {
+            **_SOURCED,
+            "description": (
+                "The character, not the card. Where they are from, what "
+                "happened to them in the story, why anyone remembers them. "
+                "What the card mechanically does belongs in archetype, not "
+                "here."),
+        },
         "archetype": {
             "type": "object",
             "properties": {
@@ -126,21 +140,23 @@ RESPONSE_SCHEMA: dict[str, Any] = {
             "required": ["name", "prose", "source_ids"],
             "additionalProperties": False,
         },
-        "rivals": {
+        "competitors": {
             "type": "array",
             "description": (
                 "Two to four commanders that compete with this one for the "
                 "same seat -- same archetype, same colours, or the obvious "
-                "alternative someone would consider instead."),
+                "alternative someone would consider instead. A deckbuilding "
+                "question, not a story one."),
             "items": {
                 "type": "object",
                 "properties": {
                     "card": {
                         "type": "string",
                         "description": (
-                            "The rival's exact card name. It will be looked up "
-                            "in the pool and dropped if it does not resolve, "
-                            "so give the printed name, not a nickname."),
+                            "The competitor's exact card name. It will be "
+                            "looked up in the pool and dropped if it does not "
+                            "resolve, so give the printed name, not a "
+                            "nickname."),
                     },
                     "prose": {"type": "string",
                               "description": "One or two sentences on how they "
@@ -150,6 +166,15 @@ RESPONSE_SCHEMA: dict[str, Any] = {
                 "required": ["card", "prose", "source_ids"],
                 "additionalProperties": False,
             },
+        },
+        "rivals": {
+            **_SOURCED,
+            "description": (
+                "The story's rivals, not the shop's: who this character "
+                "fought, feared or betrayed in the lore, and the plot lines "
+                "they figure in -- Bolas and Ugin is the shape. A minor "
+                "character may honestly have none; then say so in a sentence "
+                "rather than inventing a feud."),
         },
         "standing": _SOURCED,
         "sources": {
@@ -170,7 +195,8 @@ RESPONSE_SCHEMA: dict[str, Any] = {
             },
         },
     },
-    "required": ["who", "archetype", "rivals", "standing", "sources"],
+    "required": ["who", "archetype", "competitors", "rivals", "standing",
+                 "sources"],
     "additionalProperties": False,
 }
 
@@ -179,9 +205,9 @@ INSTRUCTIONS = """
 You are the commander dossier in sylvan-library, a Commander deckbuilding tool.
 Somebody is looking at a deck page and wants to know who the legendary creature
 leading it actually is: the character, the archetype they define and where it
-came from, who their rivals are, and where they sit in Magic's history. You are
-writing the paragraphs a knowledgeable friend would say out loud, not a card
-description.
+came from, who competes for their seat and who they fought in the story, and
+where they sit in Magic's history. You are writing the paragraphs a
+knowledgeable friend would say out loud, not a card description.
 
 Three sources, and which one may support which claim is not negotiable.
 
@@ -209,20 +235,31 @@ How to write it:
 
 - Write for somebody who plays Magic but may never have met this character.
   Assume the rules, not the lore.
-- The archetype section is the one people came for. What does a deck built
+- **Who they are is mythology, not mechanics.** Open with the character: the
+  plane they are from, what they did in the story, what became of them, why
+  anyone remembers the name. The brief already states what the card does and
+  the archetype section will say what a deck does with it -- a who section
+  that reads like a card description has answered the wrong question. This is
+  the paragraph the search is mostly for.
+- The archetype section is the deckbuilding half. What does a deck built
   around this commander actually *do*, when did that become a thing, and what
   changed it since? A date, a set, or a printing that shifted it is worth more
   than an adjective.
-- Rivals are commanders somebody would genuinely consider instead. Name them by
-  their exact printed card name -- each one is looked up in the pool, and a
-  name that does not resolve is dropped. Say how they differ, not which is
-  better; whose deck this is is not your call.
-- **Call get_cards on every rival before you write a word about it, in one
-  batch.** The brief only carries the pool's facts about *this* commander;
+- Competitors are commanders somebody would genuinely consider building
+  instead. Name them by their exact printed card name -- each one is looked up
+  in the pool, and a name that does not resolve is dropped. Say how they
+  differ, not which is better; whose deck this is is not your call.
+- **Call get_cards on every competitor before you write a word about it, in
+  one batch.** The brief only carries the pool's facts about *this* commander;
   for any other card, what you remember is not evidence. This is where the rule
   is easiest to break, because comparing two commanders is exactly the sentence
-  that wants a half-remembered ability in it -- and a rival described with
+  that wants a half-remembered ability in it -- and a competitor described with
   somebody else's card text is worse than one you left out.
+- Rivals are the story's, not the shop's: who this character fought, feared or
+  betrayed, and the plot lines they figure in -- Bolas and Ugin is the shape.
+  Rest every claim on a cited page, the same as the rest of the lore. A minor
+  character may honestly have no rivals worth the name; one plain sentence
+  saying so beats an invented feud every time.
 - Standing is history, not power level. Where does this card sit in the game's
   story -- an old guild leader, a beloved precon face, a card that defined a
   format for a year? The gate decides legality and the simulator decides
@@ -288,8 +325,9 @@ def _ask_for(facts: dict[str, Any]) -> str:
                "of it is a query rather than a recollection, and it is the "
                "authority on what the card does.")
     closing = (f"Write the dossier for {card['name']}. Search the web for the "
-               f"archetype, the rivals and the standing; take the card's own "
-               f"facts from above.")
+               f"character's story, the archetype, the competitors, the "
+               f"rivals and the standing; take the card's own facts from "
+               f"above.")
     return "\n".join([
         opening,
         "",
@@ -366,12 +404,12 @@ def _section(raw: Any, allowed: set[str]) -> dict[str, Any]:
     return {"prose": str(obj.get("prose") or "").strip(), "source_ids": ids}
 
 
-def _rivals(raw: Any, allowed: set[str]) -> tuple[list[dict[str, Any]], int]:
-    """Rivals as pool rows, or not at all.
+def _competitors(raw: Any, allowed: set[str]) -> tuple[list[dict[str, Any]], int]:
+    """Competitors as pool rows, or not at all.
 
-    The lookup is the point. A rival that resolves comes back with its real
-    type line, cost and art, so the UI can show the card rather than the claim;
-    a rival that does not resolve is a card the model invented, and it is
+    The lookup is the point. A competitor that resolves comes back with its
+    real type line, cost and art, so the UI can show the card rather than the
+    claim; one that does not resolve is a card the model invented, and it is
     dropped and counted rather than rendered as a name nobody can check.
     """
     items = [r for r in (raw or []) if isinstance(r, dict)]
@@ -401,14 +439,14 @@ def _rivals(raw: Any, allowed: set[str]) -> tuple[list[dict[str, Any]], int]:
             "image": record.get("image"),
             "art_crop": record.get("art_crop"),
             "legal_commander": record.get("legal_commander"),
-            # The pool's own text for the rival, carried so the UI can put
-            # the real card next to the sentence comparing it. That is not
+            # The pool's own text for the competitor, carried so the UI can
+            # put the real card next to the sentence comparing it. That is not
             # decoration: a first run described Trostani Discordant as making
             # Food tokens (she makes 1/1 Soldiers), which is rule 1 leaking in
             # the one sentence that most invites a half-remembered ability.
-            # The prompt now demands a lookup per rival; this is the half that
-            # does not depend on the model complying, because the reader can
-            # see the card.
+            # The prompt now demands a lookup per competitor; this is the half
+            # that does not depend on the model complying, because the reader
+            # can see the card.
             "oracle_text": record.get("oracle_text"),
         })
     return out, dropped
@@ -581,7 +619,8 @@ def run_dossier(request: DossierRequest, *,
 
     allowed = {s["id"] for s in sources}
     archetype_raw = payload.get("archetype") or {}
-    rivals, rivals_dropped = _rivals(payload.get("rivals"), allowed)
+    competitors, competitors_dropped = _competitors(
+        payload.get("competitors"), allowed)
 
     body = {
         "who": _section(payload.get("who"), allowed),
@@ -589,14 +628,19 @@ def run_dossier(request: DossierRequest, *,
             "name": str((archetype_raw or {}).get("name") or "").strip(),
             **_section(archetype_raw, allowed),
         },
-        "rivals": rivals,
+        "competitors": competitors,
+        # The story's rivals are prose like `who` and `standing`, not a card
+        # list: a plot line is not a pool row, and Bolas has a dozen printings
+        # none of which is the point. A named character who *is* a card still
+        # gets checked the way any lore claim does -- against a cited page.
+        "rivals": _section(payload.get("rivals"), allowed),
         "standing": _section(payload.get("standing"), allowed),
         "sources": sources,
         # Surfaced rather than swallowed. A number that climbs is a prompt
         # that has started inventing citations, and nobody checks a number
         # they cannot see.
         "sources_dropped": dropped,
-        "rivals_dropped": rivals_dropped,
+        "competitors_dropped": competitors_dropped,
         "searched": len(turn.searched),
     }
     put(key, oracle_id=oracle_id, commander=name, result=body, path=path)
@@ -628,7 +672,11 @@ def ask(slug: str, *, requested: Any = None, refresh: bool = False,
 #: Bumped when a stored dossier's *shape* changes -- a new section, a renamed
 #: field -- so old rows are missed rather than rendered into a UI that expects
 #: something else.
-DOSSIER_VERSION = 1
+#:
+#: 2: the single "rivals" card list split into "competitors" (pool-resolved
+#: cards) and "rivals" (the story's, as cited prose), and the who section was
+#: given its brief back -- character first, mechanics elsewhere.
+DOSSIER_VERSION = 2
 
 
 def _fingerprint() -> str:

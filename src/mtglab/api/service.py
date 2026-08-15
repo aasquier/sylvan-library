@@ -1320,7 +1320,7 @@ def combination_detail(key: str) -> dict[str, Any]:
     works on a fresh clone; this one asks the pool, so it is where every card
     fact enters. A named card that does not resolve is **dropped and counted**
     rather than rendered from the name alone -- the instrument ADR 19 built for
-    the dossier's rivals, pointed at reference data this time, because a
+    the dossier's competitors, pointed at reference data this time, because a
     misspelled name here would otherwise render as a confident empty card.
 
     `exact_total` is counted rather than stored, and it teaches something the
@@ -1905,7 +1905,7 @@ def cards_named(*, names: list[str]) -> dict[str, Any]:
                 "edhrec_rank": rec.edhrec_rank,
                 "image": rec.image_normal,
                 # Cropped art, for callers rendering a card as a chip rather
-                # than as a scan -- the dossier's rivals, for one.
+                # than as a scan -- the dossier's competitors, for one.
                 "art_crop": getattr(rec, "image_art_crop", None),
                 # Strings, because "*" and "1+*" are real printed values. For
                 # a double-faced card these are the front face's, matching

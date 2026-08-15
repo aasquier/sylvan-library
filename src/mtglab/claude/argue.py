@@ -311,7 +311,7 @@ def resolve_alternatives(names: list[Any], *, identity: list[str],
 
     Returns the survivors and a breakdown of what went, by reason. Dropped and
     *counted*, never dropped quietly -- the same instrument ADR 19 built for
-    the dossier's rivals, and for the same reason: a list that silently got
+    the dossier's competitors, and for the same reason: a list that silently got
     shorter reads as a model that had less to say. A dropped card is reported
     under **the pool's spelling**, which for a double-faced card is the full
     `A // B` name: naming both faces is what makes an off-colour verdict on

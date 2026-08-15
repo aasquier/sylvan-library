@@ -38,10 +38,12 @@ const jobKey = ({ owner, slug }: DeckRef) => `mtglab-dossier-job:${owner}/${slug
  *   citation that scrolls to the source. The sources are listed with their
  *   real titles and real URLs — every one of which the server has already
  *   checked against the pages the search actually fetched.
- * * A rival is a real card, hoverable, showing its pool text. That is the
- *   half of rule 1 that does not depend on the model complying: a first run
- *   described a rival as making Food tokens when it makes Soldiers, and the
- *   card being right there is what lets a reader catch it.
+ * * A competitor is a real card, hoverable, showing its pool text. That is
+ *   the half of rule 1 that does not depend on the model complying: a first
+ *   run described a competitor as making Food tokens when it makes Soldiers,
+ *   and the card being right there is what lets a reader catch it. The
+ *   story's rivals are a cited passage instead — a plot line is not a pool
+ *   row.
  *
  * Collapsed by default. The maintainer's note was that the deck page must not
  * get busy, and four paragraphs of prose above the 99 would bury the deck.
@@ -329,21 +331,21 @@ function DossierBodyView({ body, report }: {
       <Passage title="The archetype" section={body.archetype}
                sources={body.sources} extra={body.archetype.name} />
 
-      {body.rivals.length > 0 && (
+      {body.competitors.length > 0 && (
         <section className="max-w-3xl">
           <h3 className="text-xs font-medium uppercase tracking-wide"
               style={{ color: 'var(--text-muted)' }}>
-            Rivals
+            Competitors
           </h3>
           <div className="mt-2 flex flex-col gap-3">
-            {body.rivals.map((rival) => (
-              <div key={rival.name} className="flex items-start gap-3">
+            {body.competitors.map((competitor) => (
+              <div key={competitor.name} className="flex items-start gap-3">
                 {/* Hoverable, showing the real card. A reader who doubts a
-                    sentence about a rival can check it without leaving. */}
-                <CardHover card={{ name: rival.name, image: rival.image }}>
+                    sentence about a competitor can check it without leaving. */}
+                <CardHover card={{ name: competitor.name, image: competitor.image }}>
                   <span className="shrink-0 cursor-help">
-                    {rival.art_crop
-                      ? <img src={rival.art_crop} alt="" loading="lazy"
+                    {competitor.art_crop
+                      ? <img src={competitor.art_crop} alt="" loading="lazy"
                              className="h-12 w-20 rounded object-cover" />
                       : <span className="flex h-12 w-20 items-center justify-center rounded text-[10px]"
                               style={{ border: '1px solid var(--hairline)',
@@ -354,9 +356,9 @@ function DossierBodyView({ body, report }: {
                 </CardHover>
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-x-2 text-sm font-medium">
-                    {rival.name}
-                    {rival.mana_cost && <ManaCost cost={rival.mana_cost} size={13} />}
-                    {rival.legal_commander === false && (
+                    {competitor.name}
+                    {competitor.mana_cost && <ManaCost cost={competitor.mana_cost} size={13} />}
+                    {competitor.legal_commander === false && (
                       <span className="text-[10px] uppercase"
                             style={{ color: 'var(--status-critical)' }}>
                         banned
@@ -365,8 +367,8 @@ function DossierBodyView({ body, report }: {
                   </p>
                   <p className="text-sm leading-relaxed"
                      style={{ color: 'var(--text-secondary)' }}>
-                    {rival.prose}
-                    <Cites ids={rival.source_ids} sources={body.sources} />
+                    {competitor.prose}
+                    <Cites ids={competitor.source_ids} sources={body.sources} />
                   </p>
                 </div>
               </div>
@@ -374,6 +376,12 @@ function DossierBodyView({ body, report }: {
           </div>
         </section>
       )}
+
+      {/* The story's rivals — prose, not cards, because a plot line is not a
+          pool row. Renders nothing for a character the lore gives no enemies,
+          which the prompt prefers to an invented feud. */}
+      <Passage title="Rivals in the story" section={body.rivals}
+               sources={body.sources} />
 
       <Passage title="Where they sit in Magic's history" section={body.standing}
                sources={body.sources} />
@@ -394,14 +402,14 @@ function DossierBodyView({ body, report }: {
             </li>
           ))}
         </ol>
-        {(body.sources_dropped > 0 || body.rivals_dropped > 0) && (
+        {(body.sources_dropped > 0 || body.competitors_dropped > 0) && (
           // Shown, not logged. A number that climbs means the model has
           // started inventing citations, and nobody checks what they cannot
           // see. Silence here means everything it cited, it had read.
           <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
             Discarded before you saw it: {body.sources_dropped} cited page(s)
-            the search never returned, {body.rivals_dropped} rival(s) not in
-            the pool.
+            the search never returned, {body.competitors_dropped} competitor(s)
+            not in the pool.
           </p>
         )}
         <p className="mt-2 text-xs leading-relaxed"

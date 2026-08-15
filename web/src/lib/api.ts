@@ -631,7 +631,7 @@ export interface Combination {
  *
  * `dropped` counts names that did not resolve, which are left out rather than
  * rendered from the name alone — the same instrument ADR 19 uses for the
- * dossier's rivals. `exact_total` is how many cards in the whole pool have
+ * dossier's competitors. `exact_total` is how many cards in the whole pool have
  * exactly this identity, and it is the sharpest thing on the page: two, for
  * Artifice.
  */
@@ -929,7 +929,7 @@ export interface DossierSection {
   source_ids: string[]
 }
 
-export interface DossierRival extends DossierSection {
+export interface DossierCompetitor extends DossierSection {
   name: string
   mana_cost?: string | null
   type_line?: string | null
@@ -937,22 +937,26 @@ export interface DossierRival extends DossierSection {
   image?: string | null
   art_crop?: string | null
   legal_commander?: boolean
-  /** The pool's own text for the rival, so the real card sits next to the
-   *  sentence comparing it. */
+  /** The pool's own text for the competitor, so the real card sits next to
+   *  the sentence comparing it. */
   oracle_text?: string | null
 }
 
 export interface DossierBody {
   who: DossierSection
   archetype: DossierSection & { name: string }
-  rivals: DossierRival[]
+  /** Commanders somebody would build instead — every one a pool row. */
+  competitors: DossierCompetitor[]
+  /** The story's rivals: cited prose, not a card list. A plot line is not a
+   *  pool row, which is why this has `who`'s shape and not `competitors`'. */
+  rivals: DossierSection
   standing: DossierSection
   sources: { id: string; title: string; url: string }[]
   /** Cited pages the search never returned. A number that climbs is a prompt
    *  inventing citations, which is why it is rendered rather than logged. */
   sources_dropped: number
-  /** Named rivals the pool does not have. */
-  rivals_dropped: number
+  /** Named competitors the pool does not have. */
+  competitors_dropped: number
   /** How many pages were read to produce this. */
   searched: number
 }

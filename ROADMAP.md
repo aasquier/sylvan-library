@@ -524,12 +524,19 @@ arc; this is what the next few sessions actually do.
      **Done in branch 4**, which is what it turned out to be the brief for:
      every faction has what happened to it, two or three named champions with
      their real cards, and the cards that are exactly its colours.
-   - **Lore rivals on the commander dossier.** He likes ADR 19's Rivals, and
-     reads them as *strategic* rivals; he also wants **story** rivals — "like
-     Bolas and Ugin, for instance." A second, separately-labelled kind rather
-     than a replacement, and it inherits ADR 19's rules: a rival that is a card
-     resolves through `get_cards` or is dropped, and a claim about the story
-     rests on a cited page.
+   - ~~**Lore rivals on the commander dossier.**~~ **Done 2026-08-15**, after
+     the first Gyome dossier showed why it mattered: the single "rivals" list
+     answered the deckbuilding question while wearing the story's name, and
+     the `who` section — the only one whose prompt gave no guidance at all —
+     regressed to a mechanical description. The split: **Competitors** is the
+     old list (pool-resolved cards, `get_cards` or dropped, unchanged
+     machinery), **Rivals** is the story's — cited prose like `who` and
+     `standing`, because a plot line is not a pool row, with the prompt
+     explicit that a minor character honestly has none rather than an invented
+     feud. `who` got its brief back: character first, mechanics belong to
+     archetype. `DOSSIER_VERSION` bumped to 2, and the prompt fingerprint in
+     the cache key means every stored dossier regenerates on next request —
+     one call per commander, which is the price of the fix reaching Gyome.
    - **Searchable infinite combos**, linked to a deck's wincons or its
      breakdown — "that is good info to know and I think there are websites
      devoted to it." There are, and **the no-crawler rule is what shapes this**:

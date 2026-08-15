@@ -2448,7 +2448,8 @@ def test_a_stored_dossier_is_a_job_born_finished(dossier_client, monkeypatch):
 
     monkeypatch.setattr(dossier, "get", lambda key, path=None: {
         "result": {"who": {"prose": "A bear.", "source_ids": []},
-                   "sources": [], "rivals": [], "searched": 0},
+                   "sources": [], "competitors": [],
+                   "rivals": {"prose": "", "source_ids": []}, "searched": 0},
         "created_at": "2026-08-13T18:08:16+00:00"})
     monkeypatch.setattr(cc, "connect",
                         lambda: pytest.fail("a stored dossier must make no call"))
