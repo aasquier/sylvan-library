@@ -1205,14 +1205,16 @@ def cmd_claude_dossier(args):
     passage("WHO", body["who"])
     passage("ARCHETYPE", body["archetype"],
             extra=f" — {body['archetype']['name']}" if body["archetype"]["name"] else "")
-    if body["rivals"]:
-        print("  RIVALS")
-        for rival in body["rivals"]:
-            cost = f" {rival['mana_cost']}" if rival.get("mana_cost") else ""
-            cites = " ".join(f"[{i}]" for i in rival["source_ids"])
-            print(f"    {rival['name']}{cost}{'  ' + cites if cites else ''}")
-            print(_wrapped(rival["prose"], indent="      "))
+    if body["competitors"]:
+        print("  COMPETITORS")
+        for competitor in body["competitors"]:
+            cost = f" {competitor['mana_cost']}" if competitor.get("mana_cost") else ""
+            cites = " ".join(f"[{i}]" for i in competitor["source_ids"])
+            print(f"    {competitor['name']}{cost}{'  ' + cites if cites else ''}")
+            print(_wrapped(competitor["prose"], indent="      "))
         print()
+    if body["rivals"]["prose"]:
+        passage("RIVALS", body["rivals"])
     passage("STANDING", body["standing"])
 
     print("  SOURCES — every one of these was actually fetched\n")
@@ -1224,10 +1226,10 @@ def cmd_claude_dossier(args):
     # The dropped counts are printed rather than logged, because a number that
     # climbs is a prompt inventing citations and nobody checks what they cannot
     # see. Silence here means everything the model cited, it had read.
-    if body["sources_dropped"] or body["rivals_dropped"]:
+    if body["sources_dropped"] or body["competitors_dropped"]:
         print(f"  dropped: {body['sources_dropped']} cited page(s) the search "
-              f"never returned, {body['rivals_dropped']} rival(s) not in the "
-              f"pool.")
+              f"never returned, {body['competitors_dropped']} competitor(s) "
+              f"not in the pool.")
     print(f"  {body['searched']} pages searched, {len(body['sources'])} cited.")
     usage = report["usage"]
     if report["cached"]:

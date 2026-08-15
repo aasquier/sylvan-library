@@ -229,7 +229,7 @@ const WRITTEN_DOSSIER = {
     who: { prose: 'A bear god of Qal Sisma.', source_ids: ['s1'] },
     archetype: { name: 'Mono-green stompy',
                  prose: 'Big creatures, cheaper.', source_ids: ['s1', 's2'] },
-    rivals: [{
+    competitors: [{
       name: 'Ghalta, Primal Hunger', prose: 'Bigger, and dumber about it.',
       source_ids: ['s2'], mana_cost: '{10}{G}{G}',
       type_line: 'Legendary Creature — Elder Dinosaur',
@@ -237,12 +237,14 @@ const WRITTEN_DOSSIER = {
       art_crop: 'https://cards.scryfall.io/art_crop/ghalta.jpg',
       legal_commander: true, oracle_text: 'Trample',
     }],
+    rivals: { prose: 'The lore pits the bear against the humans of Qal Sisma.',
+              source_ids: ['s1'] },
     standing: { prose: 'A 2018 mythic that never left.', source_ids: ['s2'] },
     sources: [
       { id: 's1', title: 'Goreclaw | EDHREC', url: 'https://edhrec.com/g' },
       { id: 's2', title: 'Stompy primer', url: 'https://example.com/stompy' },
     ],
-    sources_dropped: 0, rivals_dropped: 0, searched: 18,
+    sources_dropped: 0, competitors_dropped: 0, searched: 18,
   },
 }
 
@@ -915,13 +917,25 @@ describe('DeckDetail commander dossier', () => {
     expect(source.getAttribute('rel')).toContain('noopener')
   })
 
-  it('renders a rival as a real card with its cost', async () => {
-    // Rivals survived a card pool lookup server-side, so the name and cost here
-    // are the pool's. A reader who doubts the sentence can hover the card.
+  it('renders a competitor as a real card with its cost', async () => {
+    // Competitors survived a card pool lookup server-side, so the name and
+    // cost here are the pool's. A reader who doubts the sentence can hover
+    // the card.
     renderDeck()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
     expect(await screen.findByText('Ghalta, Primal Hunger')).toBeTruthy()
+  })
+
+  it('renders the story rivals as their own cited passage', async () => {
+    // The story's rivals are prose, not cards (a plot line is not a pool
+    // row), labelled apart from the competitors so the two kinds of rival
+    // never blur again.
+    renderDeck()
+    fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
+    fireEvent.click(await screen.findByText(/write the dossier/i))
+    expect(await screen.findByText(/rivals in the story/i)).toBeTruthy()
+    expect(screen.getByText(/pits the bear against the humans/i)).toBeTruthy()
   })
 
   it('shows what was discarded rather than hiding it', async () => {
@@ -930,7 +944,7 @@ describe('DeckDetail commander dossier', () => {
     vi.mocked(followJob).mockReturnValue({
       promise: Promise.resolve(job({
         ...WRITTEN_DOSSIER,
-        dossier: { ...WRITTEN_DOSSIER.dossier, sources_dropped: 2, rivals_dropped: 1 },
+        dossier: { ...WRITTEN_DOSSIER.dossier, sources_dropped: 2, competitors_dropped: 1 },
       })),
       cancel: () => {},
     })

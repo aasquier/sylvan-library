@@ -209,45 +209,45 @@ def test_a_section_cannot_cite_a_source_that_was_dropped():
     assert section["source_ids"] == ["s2"]
 
 
-# ----------------------------------------------------- rivals are real cards
+# ----------------------------------------- competitors are real cards
 
-def test_a_rival_the_pool_does_not_have_is_dropped(pool):
+def test_a_competitor_the_pool_does_not_have_is_dropped(pool):
     """Rule 1 in the sentence most likely to break it.
 
-    'Gyome's obvious rival is X' is exactly the shape of claim a model
+    'Gyome's obvious competitor is X' is exactly the shape of claim a model
     produces fluently about a card that does not exist.
     """
-    rivals, dropped = dossier._rivals(
+    competitors, dropped = dossier._competitors(
         [{"card": "Sol Ring", "prose": "Fast mana.", "source_ids": []},
          {"card": "Gyome, Sous Chef", "prose": "Invented.", "source_ids": []}],
         allowed=set())
-    assert [r["name"] for r in rivals] == ["Sol Ring"]
+    assert [c["name"] for c in competitors] == ["Sol Ring"]
     assert dropped == 1
 
 
-def test_a_kept_rival_carries_the_pool_row(pool):
+def test_a_kept_competitor_carries_the_pool_row(pool):
     """The prose sits next to the real card, which is what lets a reader catch
-    a wrong claim about it. A first live run described a rival as making Food
-    tokens when it makes Soldiers; the card being right there is the half of
-    the fix that does not depend on the model complying."""
-    rivals, _ = dossier._rivals(
+    a wrong claim about it. A first live run described a competitor as making
+    Food tokens when it makes Soldiers; the card being right there is the half
+    of the fix that does not depend on the model complying."""
+    competitors, _ = dossier._competitors(
         [{"card": "Craterhoof Behemoth", "prose": "Ends games.",
           "source_ids": []}], allowed=set())
-    assert rivals[0]["mana_cost"] == "{5}{G}{G}{G}"
-    assert "trample" in (rivals[0]["oracle_text"] or "").lower()
+    assert competitors[0]["mana_cost"] == "{5}{G}{G}{G}"
+    assert "trample" in (competitors[0]["oracle_text"] or "").lower()
 
 
-def test_rivals_survive_a_pool_that_is_not_there(tmp_path):
-    """A fresh clone has no card pool. That is an empty rivals list, not a 500.
+def test_competitors_survive_a_pool_that_is_not_there(tmp_path):
+    """A fresh clone has no card pool. An empty competitors list, not a 500.
 
     The scratch data dir is not optional. Without it this reads whatever
     `data/mtg.duckdb` happens to hold on the machine running it — green on a
     laptop with the 500MB download, and testing nothing.
     """
     with config.use_paths(data_dir=tmp_path / "empty"):
-        rivals, dropped = dossier._rivals(
+        competitors, dropped = dossier._competitors(
             [{"card": "Sol Ring", "prose": "x", "source_ids": []}], allowed=set())
-    assert rivals == [] and dropped == 1
+    assert competitors == [] and dropped == 1
 
 
 # ----------------------------------------------------------- refusing to lie
@@ -258,7 +258,9 @@ def test_no_surviving_source_means_no_dossier(pool, source, monkeypatch):
     invented = json.dumps({
         "who": {"prose": "A troll.", "source_ids": ["s1"]},
         "archetype": {"name": "Food", "prose": "Food.", "source_ids": ["s1"]},
-        "rivals": [], "standing": {"prose": "Niche.", "source_ids": ["s1"]},
+        "competitors": [],
+        "rivals": {"prose": "None worth the name.", "source_ids": []},
+        "standing": {"prose": "Niche.", "source_ids": ["s1"]},
         "sources": [{"id": "s1", "title": "Made up",
                      "url": "https://example.com/never-fetched"}],
     })
@@ -278,8 +280,10 @@ def test_the_dropped_counts_are_reported(pool, source, monkeypatch):
     payload = json.dumps({
         "who": {"prose": "A troll.", "source_ids": ["s1", "s2"]},
         "archetype": {"name": "Food", "prose": "Food.", "source_ids": ["s1"]},
-        "rivals": [{"card": "Not A Real Card", "prose": "x",
-                    "source_ids": ["s1"]}],
+        "competitors": [{"card": "Not A Real Card", "prose": "x",
+                         "source_ids": ["s1"]}],
+        "rivals": {"prose": "The story pits them against nobody.",
+                   "source_ids": ["s1"]},
         "standing": {"prose": "Niche.", "source_ids": []},
         "sources": [
             {"id": "s1", "title": "t", "url": "https://edhrec.com/real"},
@@ -293,7 +297,10 @@ def test_the_dropped_counts_are_reported(pool, source, monkeypatch):
 
     body = dossier.ask("mini", requested="consultant", source=source)["dossier"]
     assert body["sources_dropped"] == 1
-    assert body["rivals_dropped"] == 1
+    assert body["competitors_dropped"] == 1
+    # The story rivals survive as a cited passage, the same shape as `who`.
+    assert body["rivals"]["prose"] == "The story pits them against nobody."
+    assert body["rivals"]["source_ids"] == ["s1"]
     assert [s["id"] for s in body["sources"]] == ["s1"]
     # And the passage that cited the dropped source no longer points at it.
     assert body["who"]["source_ids"] == ["s1"]

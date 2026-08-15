@@ -38,7 +38,7 @@ model to set. `may_propose()` counts grounded slots and answers in Python.
 
 **Every commander is resolved through the pool.** `search_cards` with
 `commanders_only` and an exact identity, then `get_cards` to confirm -- or the
-name is dropped and counted, the same as a dossier's rivals.
+name is dropped and counted, the same as a dossier's competitors.
 
 It writes nothing. `may_write` is empty on both, this package has no write door,
 and `tests/test_claude_boundary.py` fails on the commit that adds one. The
@@ -1308,7 +1308,7 @@ def _combinations(raw: Any, allowed: set[str]
     Two checks in one pass, and both drop rather than repair. A `key` that is
     not one of the 32 is a combination that cannot be rendered or turned into a
     create-flow state, and a commander that does not resolve is a card the
-    model invented -- the same instrument `dossier._rivals()` points at the
+    model invented -- the same instrument `dossier._competitors()` points at the
     same failure.
     """
     valid = {c["key"]: c for c in service.color_taxonomy()["combinations"]}

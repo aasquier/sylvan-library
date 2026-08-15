@@ -949,9 +949,13 @@ def _dossier_report(**over):
         "dossier": {
             "who": dict(section),
             "archetype": {**section, "name": "Food value engine"},
-            "rivals": [{"name": "Trostani Discordant", "mana_cost": "{3}{G}{W}",
-                        "prose": "The other token general at the table.",
-                        "source_ids": [2]}],
+            "competitors": [{"name": "Trostani Discordant",
+                             "mana_cost": "{3}{G}{W}",
+                             "prose": "The other token general at the table.",
+                             "source_ids": [2]}],
+            "rivals": {"prose": "The lore gives him no nemesis; the kitchen "
+                                "is the story.",
+                       "source_ids": [1]},
             "standing": dict(section),
             "sources": [
                 {"id": 1, "title": "Gyome, Master Chef — EDHREC",
@@ -959,7 +963,7 @@ def _dossier_report(**over):
                 {"id": 2, "title": "Commander tier history",
                  "url": "https://example.com/tiers"},
             ],
-            "sources_dropped": 1, "rivals_dropped": 2, "searched": 54,
+            "sources_dropped": 1, "competitors_dropped": 2, "searched": 54,
         },
         "never": "Card facts come from the pool; the web supplied the history.",
         "usage": {"input_tokens": 800, "output_tokens": 2100,
@@ -969,7 +973,7 @@ def _dossier_report(**over):
     return report
 
 
-def test_claude_dossier_renders_passages_rivals_and_sources(
+def test_claude_dossier_renders_passages_competitors_and_sources(
         decks, monkeypatch, capsys):
     from mtglab.api import service
     monkeypatch.setattr(service, "claude_dossier",
@@ -981,10 +985,13 @@ def test_claude_dossier_renders_passages_rivals_and_sources(
     assert "written by claude-sonnet-5" in out
     assert "WHO" in out and "STANDING" in out
     assert "ARCHETYPE — Food value engine" in out
+    assert "COMPETITORS" in out
     assert "Trostani Discordant {3}{G}{W}" in out
+    # The story rivals render as their own passage, and only when there is one.
+    assert "RIVALS" in out and "no nemesis" in out
     assert "[1]" in out and "https://example.com/gyome" in out
     # The counters that climb when a prompt starts inventing.
-    assert "dropped: 1 cited page(s)" in out and "2 rival(s)" in out
+    assert "dropped: 1 cited page(s)" in out and "2 competitor(s)" in out
     assert "54 pages searched, 2 cited." in out
     assert "tokens: 800 in / 2100 out (57000 cached)" in out
 
