@@ -76,7 +76,8 @@ src/mtglab/
   api/deps.py             the request scope: who is asking, what they see
   web_dist/               built frontend, committed so `mtglab ui` needs no Node
   cli.py
-web/                      frontend source (React + Vite); `npm test` is Vitest
+web/                      frontend source (React + Vite); `npm test` is Vitest,
+                          and web/README.md is the conventions map
 decks/<slug>/deck.yaml    SOURCE OF TRUTH
 decks/<slug>/artifacts/   GENERATED — never edit by hand
 Dockerfile                two stages, no Node; app runs non-root

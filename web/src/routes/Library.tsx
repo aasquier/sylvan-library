@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { api, deckUrl, type DeckTile, type Health } from '../lib/api'
 import { identityName } from '../lib/mtg'
 import {
-  Badge, CardArt, ColorPips, ErrorNote, ManaText, Select, Spinner,
+  Badge, CardArt, ColorPips, ErrorNote, ManaText, PageMasthead, Select,
+  Spinner,
 } from '../components/ui'
 
 /**
@@ -188,32 +189,23 @@ function LibraryMasthead({ decks, health }: {
   health: Health | null
 }) {
   return (
-    <section className="card-surface overflow-hidden rounded-xl">
-      <div className="flex flex-col sm:flex-row">
-        {/* No `ratio` prop and no cropping: the container takes the image's
-            own shape, so there is nothing to anchor and nothing to lose. */}
-        <img
-          src={SYLVAN_LIBRARY_ART}
-          alt="Sylvan Library, painted by Yeong-Hao Han: a canyon of mossy
-               trunks riddled with alcoves, with three tiny figures on the path
-               below for scale."
-          className="masthead-art w-full object-cover sm:w-[260px]"
-        />
-        <div className="flex min-w-0 flex-col justify-center gap-1 px-5 py-4 sm:px-6">
-          <h1 className="text-2xl font-semibold tracking-tight">Deck library</h1>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {decks} deck{decks === 1 ? '' : 's'} ·{' '}
-            {health?.pool
-              ? `${health.oracle_cards.toLocaleString()} cards in the local pool`
-              : 'no card pool yet — run `mtglab data refresh`'}
-          </p>
-          <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-            <em>Sylvan Library</em> by Yeong-Hao Han, Commander&rsquo;s Arsenal —
-            the card this project is named after.
-          </p>
-        </div>
-      </div>
-    </section>
+    <PageMasthead
+      art={SYLVAN_LIBRARY_ART}
+      alt="Sylvan Library, painted by Yeong-Hao Han: a canyon of mossy
+           trunks riddled with alcoves, with three tiny figures on the path
+           below for scale."
+      title="Deck library"
+      credit={<>
+        <em>Sylvan Library</em> by Yeong-Hao Han, Commander&rsquo;s Arsenal —
+        the card this project is named after.
+      </>}>
+      <p>
+        {decks} deck{decks === 1 ? '' : 's'} ·{' '}
+        {health?.pool
+          ? `${health.oracle_cards.toLocaleString()} cards in the local pool`
+          : 'no card pool yet — run `mtglab data refresh`'}
+      </p>
+    </PageMasthead>
   )
 }
 

@@ -2,9 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage, type Card } from '../lib/api'
 import { money } from '../lib/mtg'
 import {
-  Badge, CardArt, CardHover, ErrorNote, ManaCost, NumberField, Select, Spinner,
-  TextField,
+  Badge, CardArt, CardHover, ErrorNote, ManaCost, NumberField, PageMasthead,
+  Select, Spinner, TextField,
 } from '../components/ui'
+
+/**
+ * Demonic Tutor, Anato Finnstark, Strixhaven Mystical Archive (2021) — the
+ * library search every other search is measured against. The Mystical Archive
+ * is Strixhaven's vault of the game's definitive spells, which is why the
+ * page mastheads draw on it: an archive of the whole printed history is what
+ * this screen queries. Hotlinked, never committed (rule 5, ADR 6); the
+ * printing is named because the pool only knows the default one, and the
+ * `?<timestamp>` cache-buster is dropped as it is on the library's masthead.
+ */
+const DEMONIC_TUTOR_ART =
+  'https://cards.scryfall.io/art_crop/front/3/0/3009ba46-c9f8-46dc-8ffc-2aa4cef7b17c.jpg'
 
 const IDENTITIES = [
   { value: '', label: 'Any identity' },
@@ -62,14 +74,22 @@ export default function CardSearch() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Card search</h1>
-        <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+      <PageMasthead
+        art={DEMONIC_TUTOR_ART}
+        alt="Demonic Tutor, painted by Anato Finnstark: a robed scholar bent
+             over a glowing book whose roots spill across the floor, while a
+             horned demon looms in the radiance above."
+        title="Card search"
+        credit={<>
+          <em>Demonic Tutor</em> by Anato Finnstark, Strixhaven Mystical
+          Archive — search your library for a card.
+        </>}>
+        <p>
           The whole printed history, queried locally. Identity is a subset filter:
           asking for Golgari returns colorless and mono-black cards too, because
           those are legal in the deck.
         </p>
-      </header>
+      </PageMasthead>
 
       <div className="card-surface flex flex-wrap items-end gap-3 rounded-xl p-4">
         <TextField label="Text" value={q} onChange={setQ}

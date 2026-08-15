@@ -1,0 +1,59 @@
+# Static security analysis, free on a public repository. CodeQL is the one
+# scanner in the pipeline that reads the *source* — Trivy (ci.yml) scans the
+# built image's packages, dependency-review diffs the dependency graph, and
+# the secrets job greps for literals, so before this nothing analysed the
+# code's own data flow (taint from a request parameter to a filesystem path,
+# SQL built by concatenation, and the like).
+#
+# Findings land in the Security tab; the PR check fails only on new alerts.
+# Like every other job here it is pinned by commit SHA with the version in a
+# trailing comment, which Dependabot understands and keeps current.
+#
+# NOT a required check yet — "adding a CI job is two steps" (ENGINEERING §5),
+# and the second step is deliberately a decision rather than a default: a
+# scanner that blocks merges on a query-pack update is a gate that gets
+# disabled in anger. Watch it for a few weeks first.
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, so a new query pack sweeps the unchanged code too — a PR-only
+    # trigger analyses only what moves, and most of the tree does not.
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # `build-mode: none` for both: Python and TypeScript are analysed
+        # from source, no build required — which also keeps this job from
+        # ever needing the pool, Node, or a virtualenv.
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd  # v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          # The committed bundle is generated output — minified, and already
+          # measured at 75–88% of any tool's read of this repo (ENGINEERING
+          # §5's review re-price). Scanning it would bury every real finding
+          # under minified noise; the same code is analysed in `web/src`.
+          config: |
+            paths-ignore:
+              - src/mtglab/web_dist
+      - uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd  # v4
+        with:
+          category: "/language:${{ matrix.language }}"

@@ -6,7 +6,8 @@ import {
 } from '../lib/api'
 import { percent } from '../lib/mtg'
 import {
-  Badge, Caveat, ErrorNote, NumberField, Select, Spinner, StatTile,
+  Badge, Caveat, ErrorNote, NumberField, PageMasthead, Select, Spinner,
+  StatTile,
 } from '../components/ui'
 import {
   ByTurnChart, CommanderCurve, DataTable, LandSweepChart, LandTradeoffChart,
@@ -31,6 +32,16 @@ type Mode = 'mana' | 'lands'
  * opening.
  */
 const help = (key: string) => <HelpTip name={key} />
+
+/**
+ * Strategic Planning, Robbie Trevino, Strixhaven Mystical Archive (2021) —
+ * look at the top three, keep the one the plan needs, which is a goldfish run
+ * in two sentences of rules text. Part of the Mystical Archive cycle the page
+ * mastheads share; see `CardSearch.tsx` for why that cycle, and `PageMasthead`
+ * for the hotlink-and-credit rules.
+ */
+const STRATEGIC_PLANNING_ART =
+  'https://cards.scryfall.io/art_crop/front/f/d/fd7b2ee8-9f2f-4624-a788-15b88e6a2d50.jpg'
 
 /** The seed a run gets unless you ask for another. Matches
  * `simruns.DEFAULT_SEED`, so the app and the CLI describe the same sample. */
@@ -166,15 +177,23 @@ export default function Simulator() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Simulator</h1>
-        <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+      <PageMasthead
+        art={STRATEGIC_PLANNING_ART}
+        alt="Strategic Planning, painted by Robbie Trevino: open hands over
+             three glowing cards laid in a triangle, sight-lines drawn between
+             them toward an eye at the apex."
+        title="Simulator"
+        credit={<>
+          <em>Strategic Planning</em> by Robbie Trevino, Strixhaven Mystical
+          Archive — look at the top three, keep what the plan needs.
+        </>}>
+        <p>
           <Term name="tier-1">Tier 1</Term> Monte Carlo: shuffle, draw, pay
           costs, repeat. It is a <Term name="goldfish">goldfish</Term> — nobody
           is playing against you — so it answers questions about mana and no
           others.
         </p>
-      </header>
+      </PageMasthead>
 
       <div className="card-surface flex flex-wrap items-end gap-3 rounded-xl p-4">
         {/* The value is the deck's whole address, because a slug is unique
