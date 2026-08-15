@@ -159,10 +159,14 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                   description="Local Commander deckbuilding and simulation.",
                   lifespan=startup)
 
-    # Nothing else on the wire compresses: Fly's proxy passes bodies through as
-    # the app sends them, so before this the 84 kB the bundle gzips to went out
-    # as 266 kB and a deck's JSON — 81 kB of oracle text, measured on Arahbo —
-    # went out whole, per navigation, over whatever a phone is on.
+    # Compression the app owns. The premise this landed under — "Fly's proxy
+    # passes bodies through as sent" — was wrong, and a skipped deploy is what
+    # proved it: the old code, still live, was already answering
+    # `Content-Encoding: gzip`, so Fly's edge compresses on its own. What this
+    # buys anyway, measured on the instance on 2026-08-14: level-9 gzip sends
+    # the bundle at 84.5 kB where the edge's compressor sent 119.6 kB, the
+    # behaviour is the app's own on any host rather than one proxy's
+    # undocumented habit, and `mtglab ui` on a laptop has no edge at all.
     #
     # Registered FIRST, which makes it the INNERMOST layer, and that placement
     # is load-bearing rather than stylistic: `minimum_size` reads the response's

@@ -1102,13 +1102,20 @@ arc; this is what the next few sessions actually do.
      in DuckDB. `model.load_yaml` is the one entry point now, `edit.py`
      included: 36ms → 7ms per deck, the shelf 430ms → 245ms, the deck page
      228ms → 124ms, with a pure-Python fallback where libyaml is absent.
-   - **Nothing on the wire compressed.** Fly's proxy passes bodies through as
-     sent, so the 266 kB bundle and a deck's 81 kB JSON went out whole per
-     navigation. `GZipMiddleware` now, registered *innermost* because
-     `minimum_size` reads Content-Length and the decorator-style middlewares
-     re-wrap every response as a stream without one — registered outermost it
-     compressed two-byte job polls. Two tests pin both sides, verified by
-     mutation.
+   - **"Nothing on the wire compressed" — half wrong, and a skipped deploy
+     proved it.** The premise was that Fly's proxy passes bodies through; a
+     flaky frontend test skipped the deploy, which left the old code live long
+     enough to catch it answering `Content-Encoding: gzip` already — Fly's
+     edge compresses on its own, undocumented. `GZipMiddleware` stays for what
+     was measured once the deploy landed: the app's level-9 gzip puts the
+     bundle at 84.5 kB where the edge's compressor sent 119.6 kB, the
+     behaviour is owned rather than inherited from one host, and `mtglab ui`
+     on a laptop has no edge. Registered *innermost* because `minimum_size`
+     reads Content-Length and the decorator-style middlewares re-wrap every
+     response as a stream without one — registered outermost it compressed
+     two-byte job polls. Two tests pin both sides, verified by mutation. The
+     flaky test read the tarot stash the instant 'The Root' rendered, before
+     the writing effect flushed, and waits now.
    - **The session lookup could block the event loop.** `sessions.lookup`
      writes — the five-minute `last_seen_at` touch, the delete of an expired
      row — and a write that finds the file locked waits up to `busy_timeout`,
