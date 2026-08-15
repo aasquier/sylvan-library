@@ -10,7 +10,6 @@ way a wrong password is.
 
 import sqlite3
 import sys
-import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -427,13 +426,26 @@ def test_a_success_clears_the_count(con):
 
 
 def test_the_window_lapses(con):
-    """Fixed window: once it has passed, the budget is whole again."""
+    """Fixed window: once it has passed, the budget is whole again.
+
+    The lapse is *backdated* rather than slept through. The first version
+    used a 40ms window and a real `time.sleep`, and on a loaded CI runner
+    those 40ms could elapse between recording the failures and the first
+    assertion -- a flake, and one with teeth: it failed the push run for
+    #105 on `main`, and a red push run is a deploy that silently never
+    happens (the #94 lesson, again). Rewriting `window_start` tests the
+    same lapse arithmetic with no clock in the race at all.
+    """
     key = ratelimit.account_key("ada")
-    limit = ratelimit.Limit(failures=2, window=timedelta(milliseconds=40))
+    limit = ratelimit.Limit(failures=2, window=timedelta(minutes=15))
     ratelimit.record_failure(con, key, limit)
     ratelimit.record_failure(con, key, limit)
     assert ratelimit.exhausted(con, key, limit)
-    time.sleep(0.06)
+
+    lapsed = datetime.now(UTC) - limit.window - timedelta(seconds=1)
+    con.execute("UPDATE login_attempts SET window_start = ? WHERE key = ?",
+                (lapsed.isoformat(), key))
+    con.commit()
     assert not ratelimit.exhausted(con, key, limit)
 
 
