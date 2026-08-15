@@ -244,17 +244,29 @@ def list_library(lib: Library) -> list[dict[str, Any]]:
 
 def _tiles(decks: list[Deck], con: Any, *, writable: bool,
            owner: str | None) -> list[dict[str, Any]]:
-    """The shelf's payload for a run of decks sharing one owner and pool."""
+    """The shelf's payload for a run of decks sharing one owner and pool.
+
+    One pool lookup for the whole shelf, not one per deck -- the same N+1 the
+    `list_decks` docstring refuses for `/validate`, one layer further down.
+    Six decks were six ~60ms queries; the union of their names is one. Safe
+    because `validate` and everything below only ever *look up* names in the
+    dict, so a superset spanning other decks changes no answer.
+    """
+    all_names: set[str] = set()
+    for deck in decks:
+        all_names.update(deck.card_names())
+        all_names.update(c.name for c in deck.swap_board)
+        if deck.companion:
+            all_names.add(deck.companion)
+    cards = (db.get_cards(con, sorted(all_names))
+             if con is not None and all_names else {})
+
     out = []
     for deck in decks:
         art = None
         identity: list[str] = []
         errors = warnings = None
         if con is not None:
-            names = deck.card_names() + [c.name for c in deck.swap_board]
-            if deck.companion:
-                names.append(deck.companion)
-            cards = db.get_cards(con, sorted(set(names)))
             rep = validate(deck, cards)
             errors, warnings = len(rep.errors), len(rep.warnings)
             rec = cards.get(deck.commander[0]) if deck.commander else None
