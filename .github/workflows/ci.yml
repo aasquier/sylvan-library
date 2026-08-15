@@ -73,7 +73,11 @@ jobs:
         run: |
           set -o pipefail
           if [ "${{ matrix.python-version }}" = "3.12" ]; then
-            coverage run -m pytest -q | tee pytest.log
+            # `--durations` on one interpreter only, like coverage and for the
+            # same reason. It is how the tiny_pool rebuild -- a third of the
+            # suite's runtime hiding in fixture setup -- was found, and a
+            # regression of that shape is visible here or nowhere.
+            coverage run -m pytest -q --durations=15 | tee pytest.log
             coverage report
           else
             pytest -q | tee pytest.log

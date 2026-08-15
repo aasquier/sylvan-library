@@ -97,6 +97,8 @@ def test_every_response_carries_the_security_headers(client):
         assert r.headers["X-Content-Type-Options"] == "nosniff"
         assert r.headers["X-Frame-Options"] == "DENY"
         assert r.headers["Referrer-Policy"] == "same-origin"
+        assert r.headers["Permissions-Policy"] == (
+            "camera=(), microphone=(), geolocation=()")
         assert "Strict-Transport-Security" not in r.headers
 
 

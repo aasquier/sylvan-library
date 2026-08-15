@@ -197,6 +197,10 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         # must never leak -- the claim link's token -- rides in the fragment,
         # which no Referer header ever carries. This is belt and braces.
         headers.setdefault("Referrer-Policy", "same-origin")
+        # Nothing in the app wants a sensor, so say it outright: an XSS that
+        # got this far still cannot ask the browser for one.
+        headers.setdefault("Permissions-Policy",
+                           "camera=(), microphone=(), geolocation=()")
         if secure:
             # Only when TLS fronts the app (the same condition as the cookie's
             # `Secure` flag). A year, no preload: preload is a public,
