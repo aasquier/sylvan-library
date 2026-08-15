@@ -44,6 +44,8 @@ import {
   type TarotReading,
   type ThemeCommander,
 } from '../lib/api'
+import { deal as dealSound, flip as flipSound, riffle, setSound, soundOn }
+  from '../lib/tablesounds'
 import { ThemeInterview } from './theme'
 import { CardArt } from './ui'
 
@@ -189,8 +191,13 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
   )
   // Dealt with a stagger, so three cards land one after another rather than
   // appearing at once. The delay is a custom property because the keyframes
-  // are shared and only the offset differs.
-  const style = { '--deal-delay': `${index * 150}ms` } as React.CSSProperties
+  // are shared and only the offset differs — and each card settles with its
+  // own slight rotation, because a machine deals parallel and a hand does
+  // not. Fixed per slot rather than random: the same table on a reload.
+  const style = {
+    '--deal-delay': `${index * 150}ms`,
+    '--settle-rot': `${SETTLE_ROT[index] ?? 0}deg`,
+  } as React.CSSProperties
 
   return (
     <div className={`tarot-slot${small ? ' is-small' : ''}`} style={style}>
@@ -229,6 +236,9 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
   )
 }
 
+/** How far off square each dealt card lands, in reading order. */
+const SETTLE_ROT = [-2.2, 1.6, -1.2]
+
 /** The three places, laid out. `small` is the strip the conversation runs
  *  under, once the ceremony is over and the cards are context rather than
  *  the event. */
@@ -261,6 +271,61 @@ function ShufflingDeck() {
         </div>
       ))}
     </div>
+  )
+}
+
+/**
+ * The reader's crystal ball, sitting at the table's edge. Decorative and
+ * marked so; the gleam breathes in CSS (`.crystal-gleam`) and holds still
+ * under `prefers-reduced-motion`. Inline SVG like `CardBack`, so it costs
+ * no asset and takes both themes' colours from the stylesheet.
+ */
+function CrystalBall() {
+  const id = useId()
+  return (
+    <svg aria-hidden viewBox="0 0 48 58" className="crystal-ball">
+      <defs>
+        <radialGradient id={`${id}-glass`} cx="38%" cy="32%" r="75%">
+          <stop offset="0%" stopColor="#cfd8ff" stopOpacity="0.9" />
+          <stop offset="45%" stopColor="#7d6cd1" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#241b4d" stopOpacity="0.95" />
+        </radialGradient>
+      </defs>
+      {/* the stand */}
+      <path d="M13 47h22l-4 8H17z" fill="#241b3e" />
+      <ellipse cx="24" cy="47.5" rx="12" ry="3" fill="#382a5c" />
+      {/* the glass */}
+      <circle cx="24" cy="27" r="17.5" fill={`url(#${id}-glass)`} />
+      <circle cx="24" cy="27" r="17.5" fill="none"
+              stroke="rgba(255,255,255,0.25)" strokeWidth="0.8" />
+      {/* the gleam that breathes */}
+      <path className="crystal-gleam" d="M13.5 20 A 13.5 13.5 0 0 1 22 12"
+            fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.2"
+            strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/**
+ * The sound toggle. Off by default and structural about it — until this is
+ * switched on, `lib/tablesounds` constructs no AudioContext at all. The
+ * first switch-on is necessarily a click, which is also what the browser's
+ * autoplay policy wants to see.
+ */
+function SoundToggle() {
+  const [on, setOn] = useState(soundOn)
+  return (
+    <button type="button"
+            onClick={() => { setSound(!on); setOn(!on) }}
+            aria-pressed={on}
+            title={on
+              ? 'Table sounds are on'
+              : 'Turn on table sounds — the shuffle, the deal, the flip'}
+            className="rounded-md px-3 py-1.5 text-sm"
+            style={{ border: '1px solid var(--hairline)',
+                     color: on ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+      {on ? '♪ Sound on' : '♪ Sound off'}
+    </button>
   )
 }
 
@@ -424,12 +489,14 @@ export function TarotTable({ onPick, onLeave }: {
     // you sat down would not feel like one — this is the door where that
     // matters, and ADR 21 says so in as many words.
     setShuffling(true)
+    riffle()
     try {
       const dealt = await api.tarotReading()
       later(() => {
         setReading(dealt)
         setTable({ persona: persona.key, seed: dealt.seed, turned: [] })
         setShuffling(false)
+        dealSound()
       }, 1100)
     } catch (e) {
       setShuffling(false)
@@ -439,6 +506,9 @@ export function TarotTable({ onPick, onLeave }: {
 
   const turn = (i: number) => {
     turnedHere.current = true
+    // The sound outside the updater: React may re-run an updater, and a card
+    // must not flip twice in the ear when it flips once on the table.
+    if (!table.turned.includes(i)) flipSound()
     setTable((t) => (t.turned.includes(i) ? t : { ...t, turned: [...t.turned, i] }))
   }
 
@@ -492,12 +562,15 @@ export function TarotTable({ onPick, onLeave }: {
               on the table.
             </p>
           </div>
-          <button onClick={onLeave}
-                  className="ml-auto rounded-md px-3 py-1.5 text-sm"
-                  style={{ border: '1px solid var(--hairline)',
-                           color: 'var(--text-secondary)' }}>
-            ← Pick colours myself
-          </button>
+          <span className="ml-auto flex items-center gap-2">
+            <SoundToggle />
+            <button onClick={onLeave}
+                    className="rounded-md px-3 py-1.5 text-sm"
+                    style={{ border: '1px solid var(--hairline)',
+                             color: 'var(--text-secondary)' }}>
+              ← Pick colours myself
+            </button>
+          </span>
         </div>
 
         {error && (
@@ -506,9 +579,10 @@ export function TarotTable({ onPick, onLeave }: {
 
         {shuffling
           ? (
-            <div className="flex flex-col items-center gap-4 py-10">
+            <div className="tarot-table-felt relative flex flex-col items-center gap-4 py-10">
+              <CrystalBall />
               <ShufflingDeck />
-              <p className="text-sm tracking-wide" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-sm tracking-wide" style={{ color: 'var(--tarot-felt-text)' }}>
                 Shuffling, and cutting the deck…
               </p>
             </div>
@@ -562,24 +636,34 @@ export function TarotTable({ onPick, onLeave }: {
               Your spread
             </p>
             )}
-        <button onClick={leaveTable}
-                className="ml-auto rounded-md px-3 py-1.5 text-sm"
-                style={{ border: '1px solid var(--hairline)',
-                         color: 'var(--text-muted)' }}>
-          Different reader
-        </button>
+        <span className="ml-auto flex items-center gap-2">
+          <SoundToggle />
+          <button onClick={leaveTable}
+                  className="rounded-md px-3 py-1.5 text-sm"
+                  style={{ border: '1px solid var(--hairline)',
+                           color: 'var(--text-muted)' }}>
+            Different reader
+          </button>
+        </span>
       </div>
 
       {error && (
         <p className="text-sm" style={{ color: 'var(--status-critical)' }}>{error}</p>
       )}
 
-      {/* The spread. Centred and large while it is the event; a strip against
+      {/* The spread. Centred and large while it is the event — on the felt,
+          with the reader's crystal ball at the table's edge; a strip against
           the left margin once the conversation is, where it sits over the
           column the questions are in rather than floating in the middle of
-          the page with nothing under it. */}
+          the page with nothing under it. The felt goes when the table folds:
+          a green rectangle beside a chat column is furniture, not ceremony. */}
       {cards.length > 0 && (
-        <div className={dealing ? 'py-4' : ''}>
+        <div className={dealing ? 'tarot-table-felt relative px-4 py-8' : ''}>
+          {dealing && (
+            <div className="absolute right-4 top-3 hidden sm:block">
+              <CrystalBall />
+            </div>
+          )}
           <Spread cards={cards} turned={table.turned} small={!dealing}
                   onTurn={dealing ? turn : undefined} />
         </div>

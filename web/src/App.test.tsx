@@ -104,6 +104,25 @@ describe('with auth off', () => {
   })
 })
 
+describe('the nav', () => {
+  it('labels the research surface as the Laboratory, at the same address', async () => {
+    renderApp()
+    const lab = await screen.findByRole('link', { name: 'Laboratory' })
+    expect(lab.getAttribute('href')).toBe('/research')
+    expect(lab.getAttribute('title')).toMatch(/ask about magic/i)
+  })
+
+  it('gives every entry a hover hint saying what is behind it', async () => {
+    renderApp()
+    await screen.findByRole('link', { name: 'Laboratory' })
+    for (const label of ['Library', 'Start a deck', 'Import', 'Card search',
+                         'Simulator', 'Laboratory', 'Learn', 'Accounts']) {
+      const title = screen.getByRole('link', { name: label }).getAttribute('title')
+      expect(title, `${label} has no hint`).toBeTruthy()
+    }
+  })
+})
+
 describe('the Claude menu in the header', () => {
   const claude = {
     installed: true, configured: true, model: 'claude-sonnet-5',

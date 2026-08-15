@@ -364,6 +364,10 @@ body {
   background: none;
   border: 0;
   padding: 0;
+  /* Each card settles a hair off square (set per slot in `TarotCard`) —
+     a hand deals like that and a machine does not. On the hinge rather than
+     in the deal keyframes, so it survives the animation's `to { none }`. */
+  transform: rotate(var(--settle-rot, 0deg));
 }
 
 button.tarot-hinge {
@@ -503,6 +507,96 @@ button:hover .tarot-fan-card {
   }
 }
 
+/* The table itself: a pool of light on green baize, vignetted at the edge.
+   Both themes get felt — lighter and warmer in the light theme, deep parlour
+   green in the dark — because a reading dealt straight onto page background
+   read as a form with candles on it. The text tokens are *redefined inside
+   the felt* so every label that inlines `var(--text-muted)` stays legible on
+   green without knowing where it is sitting; the explicit `data-theme`
+   selectors must win in both directions (theme toggle, see index.css head). */
+.tarot-table-felt {
+  --felt-pool: #6f9a7c;
+  --felt-base: #547b61;
+  --felt-edge: #3d5d49;
+  --tarot-felt-text: rgba(250, 253, 250, 0.88);
+  --text-muted: rgba(240, 246, 240, 0.72);
+  --text-secondary: rgba(250, 253, 250, 0.9);
+  border-radius: 1rem;
+  background: radial-gradient(ellipse at 50% 36%,
+    var(--felt-pool), var(--felt-base) 58%, var(--felt-edge));
+  box-shadow: inset 0 0 56px rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tarot-table-felt {
+    --felt-pool: #2e5943;
+    --felt-base: #1f4132;
+    --felt-edge: #132b21;
+  }
+}
+
+:root[data-theme='dark'] .tarot-table-felt {
+  --felt-pool: #2e5943;
+  --felt-base: #1f4132;
+  --felt-edge: #132b21;
+}
+
+:root[data-theme='light'] .tarot-table-felt {
+  --felt-pool: #6f9a7c;
+  --felt-base: #547b61;
+  --felt-edge: #3d5d49;
+}
+
+/* The reader's crystal ball (`CrystalBall` in components/tarot.tsx). The
+   gleam breathes; under reduced motion it simply shines. */
+.crystal-ball {
+  width: 54px;
+  height: 66px;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+}
+
+.crystal-gleam {
+  animation: crystal-breathe 3.4s ease-in-out infinite;
+}
+
+@keyframes crystal-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+/* The Laboratory's flask (routes/Research.tsx): bubbles rise inside the
+   glass. Held still, visible, under reduced motion. */
+.flask-bubble {
+  animation: flask-bubble 2.6s ease-in infinite;
+}
+
+.flask-bubble-2 {
+  animation-delay: 0.9s;
+}
+
+.flask-bubble-3 {
+  animation-delay: 1.7s;
+}
+
+@keyframes flask-bubble {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tarot-slot {
     animation: none;
@@ -518,6 +612,14 @@ button:hover .tarot-fan-card {
   button.tarot-hinge:hover .tarot-card:not(.is-face-up),
   button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
     transform: none;
+  }
+  .crystal-gleam {
+    animation: none;
+    opacity: 0.7;
+  }
+  .flask-bubble {
+    animation: none;
+    opacity: 0.8;
   }
 }
 

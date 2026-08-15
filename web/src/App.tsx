@@ -23,25 +23,37 @@ const NewDeck = lazy(() => import('./routes/NewDeck'))
 const Research = lazy(() => import('./routes/Research'))
 const Simulator = lazy(() => import('./routes/Simulator'))
 
+// Every entry carries a `hint`, rendered as the link's `title`: the labels
+// are one or two words, and a word like "Laboratory" earns a sentence on
+// hover saying what is actually behind it. Native tooltips rather than the
+// glossary popover — these are wayfinding, not Magic vocabulary, so they do
+// not belong in `glossary.py`'s table.
 const NAV = [
-  { to: '/', label: 'Library', end: true },
-  { to: '/search', label: 'Card search', end: false },
+  { to: '/', label: 'Library', end: true,
+    hint: 'Your decks, and what other people here have shared' },
+  { to: '/search', label: 'Card search', end: false,
+    hint: 'Search the whole card pool by name or rules text' },
   // `/new` and `/import` are spliced in after Library — see AUTHORING_NAV.
-  { to: '/simulate', label: 'Simulator', end: false },
+  { to: '/simulate', label: 'Simulator', end: false,
+    hint: 'Goldfish a deck: opening hands, castability, land counts' },
   // The two reference screens, and they sit next to each other because the
   // pair *is* the boundary: Learn is the checked-in prose this repo writes
-  // once and edits by hand, Research is the question that prose cannot answer,
-  // which costs a search and comes back with its pages (ADR 26).
-  { to: '/research', label: 'Research', end: false },
+  // once and edits by hand, the Laboratory is the question that prose cannot
+  // answer, which costs a search and comes back with its pages (ADR 26).
+  { to: '/research', label: 'Laboratory', end: false,
+    hint: 'Ask about Magic — the meta, rulings, spoiled cards. '
+        + 'Answers cite the pages they were read from' },
   // Last, and deliberately not first: it is reference rather than a task, and
   // somebody who needs it usually arrives from a word on another screen.
-  { to: '/learn', label: 'Learn', end: false },
+  { to: '/learn', label: 'Learn', end: false,
+    hint: 'The vocabulary, the five colours, and the 32 combinations' },
 ]
 
 // Appended for admins only. Hiding it is a courtesy — every route the page
 // calls is refused to anybody else by the middleware, before routing (ADR 17),
 // so this decides what is offered and never what is allowed.
-const ADMIN_NAV = { to: '/admin', label: 'Accounts', end: false }
+const ADMIN_NAV = { to: '/admin', label: 'Accounts', end: false,
+                    hint: 'Invites, accounts, and the instance’s levers' }
 
 // The two doors that create a deck, and they are shown to everybody.
 //
@@ -52,8 +64,12 @@ const ADMIN_NAV = { to: '/admin', label: 'Accounts', end: false }
 // is that. Every account has its own library now (ADR 22), so there is nobody
 // left for whom these doors open onto nothing.
 const AUTHORING_NAV = [
-  { to: '/new', label: 'Start a deck', end: false },
-  { to: '/import', label: 'Import', end: false },
+  { to: '/new', label: 'Start a deck', end: false,
+    hint: 'Three doors in: a conversation about you, a tour of the '
+        + 'colours, or straight to a commander' },
+  { to: '/import', label: 'Import', end: false,
+    hint: 'Paste a decklist and it becomes a draft deck, checked '
+        + 'against the pool' },
 ]
 
 /** Where the emailed link lands. Mirrors `auth.invites.CLAIM_PATH`. */
@@ -260,6 +276,7 @@ export default function App() {
                           lg:order-none lg:mx-0 lg:mt-0 lg:w-auto lg:overflow-visible lg:px-0">
             {nav.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.end}
+                       title={item.hint}
                        className="whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition"
                        style={({ isActive }) => ({
                          color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
