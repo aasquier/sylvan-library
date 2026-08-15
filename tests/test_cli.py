@@ -833,3 +833,655 @@ def test_an_unavailable_claude_is_a_message_not_a_traceback(decks, monkeypatch,
     code, _ = run(["claude", "interview", "mini", "--card", "Sol Ring"])
     assert code == 1
     assert "no ANTHROPIC_API_KEY" in capsys.readouterr().out
+
+
+# ------------------------------------------------- claude: the renderers
+
+def _argue_report(**over):
+    """A faithful `service.claude_argue` payload, small enough to read.
+
+    The keys mirror `argue._report`; a renderer test that invents its own
+    shape tests the invention, so anything asserted below should be checked
+    against that function when it changes.
+    """
+    report = {
+        "slug": "mini", "card": "Sol Ring", "asked": True, "reason": "",
+        "model": "claude-sonnet-5",
+        "stance": {"preset": "consultant",
+                   "axes": [{"level": "asks"}, {"level": "card"},
+                            {"level": "none"}]},
+        "tool_calls": [{"tool": "get_cards"}, {"tool": "search_cards"}],
+        "charges": [
+            {"strength": "strong", "ground": "deck",
+             "claim": "Every other rock here costs less.",
+             "fact": "why: Two mana for one."},
+            {"strength": "weak", "ground": "pool",
+             "claim": "Colourless ramp ignores the commander.",
+             "fact": "Gyome, Master Chef: {3}{B}{G}"},
+        ],
+        "charges_dropped": 1,
+        "alternatives": [
+            {"name": "Arcane Signet", "mana_cost": "{2}",
+             "type_line": "Artifact"},
+        ],
+        "alternatives_dropped": {"not_in_pool": ["Sol Talisman"],
+                                 "off_identity": [], "banned": []},
+        "never": "Claude argues one direction and never writes a why.",
+        "usage": {"input_tokens": 900, "output_tokens": 210},
+    }
+    report.update(over)
+    return report
+
+
+def test_claude_argue_renders_the_case_and_both_dropped_counts(
+        decks, monkeypatch, capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_argue",
+                        lambda **kw: _argue_report())
+    code, _ = run(["claude", "argue", "mini", "--card", "Sol Ring"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "Sol Ring — mini" in out
+    assert "asked as: consultant (scope: card)" in out
+    assert "looked up: get_cards, search_cards" in out
+    # The header says whose voice this is -- ADR 14 boundary 3 in a terminal.
+    assert "not the gate" in out
+    assert "[strong/deck]" in out and "[weak/pool]" in out
+    assert "Every other rock here costs less." in out
+    assert "(why: Two mana for one.)" in out
+    assert "Arcane Signet" in out
+    # Both kinds of dropped are said out loud, each under its own reason.
+    assert "1 charge(s) dropped: nothing cited." in out
+    assert "dropped (not in pool): Sol Talisman" in out
+    # And the empty reasons stay silent rather than printing empty lists.
+    assert "off identity" not in out
+    assert "mtglab decks remove mini" in out
+    assert "tokens: 900 in / 210 out" in out
+
+
+def test_claude_argue_at_stance_off_prints_the_reason_and_stops(
+        decks, monkeypatch, capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_argue", lambda **kw: _argue_report(
+        asked=False, reason="stance is off: no call was made.",
+        charges=[], tool_calls=[]))
+    code, _ = run(["claude", "argue", "mini", "--card", "Sol Ring"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "stance is off" in out
+    assert "The case against" not in out
+
+
+def test_claude_argue_says_when_nothing_usable_came_back(
+        decks, monkeypatch, capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_argue", lambda **kw: _argue_report(
+        charges=[], charges_dropped=3, alternatives=[],
+        reason="every charge came back citing nothing."))
+    code, _ = run(["claude", "argue", "mini", "--card", "Sol Ring"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "nothing usable came back" in out
+    assert "3 charge(s) dropped" in out
+
+
+def test_claude_argue_failure_is_a_message_not_a_traceback(
+        decks, monkeypatch, capsys):
+    from mtglab.api import service
+    from mtglab.claude.client import ClaudeUnavailable
+
+    def boom(**kw):
+        raise ClaudeUnavailable("no ANTHROPIC_API_KEY")
+    monkeypatch.setattr(service, "claude_argue", boom)
+    code, _ = run(["claude", "argue", "mini", "--card", "Sol Ring"])
+    assert code == 1
+    assert "no ANTHROPIC_API_KEY" in capsys.readouterr().out
+
+
+def _dossier_report(**over):
+    """A faithful `service.claude_dossier` payload; keys mirror the mode's."""
+    section = {"prose": "A chef who feeds the table to win it.",
+               "source_ids": [1]}
+    report = {
+        "slug": "mini", "commander": "Gyome, Master Chef",
+        "cached": False, "generated_at": "2026-08-14T00:00:00+00:00",
+        "model": "claude-sonnet-5", "reason": "",
+        "dossier": {
+            "who": dict(section),
+            "archetype": {**section, "name": "Food value engine"},
+            "rivals": [{"name": "Trostani Discordant", "mana_cost": "{3}{G}{W}",
+                        "prose": "The other token general at the table.",
+                        "source_ids": [2]}],
+            "standing": dict(section),
+            "sources": [
+                {"id": 1, "title": "Gyome, Master Chef — EDHREC",
+                 "url": "https://example.com/gyome"},
+                {"id": 2, "title": "Commander tier history",
+                 "url": "https://example.com/tiers"},
+            ],
+            "sources_dropped": 1, "rivals_dropped": 2, "searched": 54,
+        },
+        "never": "Card facts come from the pool; the web supplied the history.",
+        "usage": {"input_tokens": 800, "output_tokens": 2100,
+                  "cache_read_tokens": 57000},
+    }
+    report.update(over)
+    return report
+
+
+def test_claude_dossier_renders_passages_rivals_and_sources(
+        decks, monkeypatch, capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_dossier",
+                        lambda **kw: _dossier_report())
+    code, _ = run(["claude", "dossier", "mini"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "Gyome, Master Chef — mini" in out
+    assert "written by claude-sonnet-5" in out
+    assert "WHO" in out and "STANDING" in out
+    assert "ARCHETYPE — Food value engine" in out
+    assert "Trostani Discordant {3}{G}{W}" in out
+    assert "[1]" in out and "https://example.com/gyome" in out
+    # The counters that climb when a prompt starts inventing.
+    assert "dropped: 1 cited page(s)" in out and "2 rival(s)" in out
+    assert "54 pages searched, 2 cited." in out
+    assert "tokens: 800 in / 2100 out (57000 cached)" in out
+
+
+def test_claude_dossier_quotes_a_stored_one_as_stored(
+        decks, monkeypatch, capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_dossier",
+                        lambda **kw: _dossier_report(cached=True))
+    run(["claude", "dossier", "mini"])
+    out = capsys.readouterr().out
+    # A cached dossier is dated, not re-attributed, and costs nothing.
+    assert "stored 2026-08-14" in out
+    assert "no tokens: served from the store" in out
+    assert "tokens: 800 in" not in out
+
+
+def test_claude_dossier_refused_prints_the_reason(decks, monkeypatch, capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "claude_dossier", lambda **kw: _dossier_report(
+        dossier=None, reason="no source survived the check; refused."))
+    code, _ = run(["claude", "dossier", "mini"])
+    assert code == 0
+    assert "no source survived" in capsys.readouterr().out
+
+
+def test_claude_dossier_list_and_clear_and_the_missing_slug(
+        decks, monkeypatch, capsys):
+    from mtglab.claude import dossier as dossier_mod
+
+    monkeypatch.setattr(dossier_mod, "stored", list)
+    run(["claude", "dossier", "--list"])
+    assert "no dossiers stored yet" in capsys.readouterr().out
+
+    monkeypatch.setattr(dossier_mod, "stored", lambda: [
+        {"commander": "Gyome, Master Chef",
+         "created_at": "2026-08-14T00:00:00+00:00"}])
+    run(["claude", "dossier", "--list"])
+    out = capsys.readouterr().out
+    assert "1 stored:" in out
+    assert "Gyome, Master Chef" in out and "2026-08-14" in out
+
+    monkeypatch.setattr(dossier_mod, "clear", lambda: 6)
+    run(["claude", "dossier", "--clear"])
+    assert "cleared 6 dossier(s)" in capsys.readouterr().out
+
+    code, _ = run(["claude", "dossier"])
+    assert code == 1
+    assert "a deck slug is required" in capsys.readouterr().out
+
+
+def test_claude_dossier_failure_is_a_message_not_a_traceback(
+        decks, monkeypatch, capsys):
+    from mtglab.api import service
+    from mtglab.claude import dossier as dossier_mod
+
+    def boom(**kw):
+        raise dossier_mod.NoCommander("mini has no commander to write about")
+    monkeypatch.setattr(service, "claude_dossier", boom)
+    code, _ = run(["claude", "dossier", "mini"])
+    assert code == 1
+    assert "no commander" in capsys.readouterr().out
+
+
+def _research_report(**over):
+    """A faithful `research.ask` payload; keys mirror `research._report`."""
+    report = {
+        "question": "Is Nadu banned in Commander?",
+        "model": "claude-sonnet-5", "reason": "",
+        "stance": {"preset": "second-opinion",
+                   "axes": [{"level": "asks"}, {"level": "question"},
+                            {"level": "none"}]},
+        "research": {
+            "confidence": "settled",
+            "answer": "Yes -- banned in the September 2024 update.",
+            "findings": [
+                {"claim": "The ban announcement names combo speed.",
+                 "source_ids": [1]},
+            ],
+            "cards": [
+                {"name": "Nadu, Winged Wisdom", "in_pool": True,
+                 "mana_cost": "{1}{G}{U}",
+                 "type_line": "Legendary Creature — Bird Wizard"},
+                {"name": "Spoiled Newcomer", "in_pool": False,
+                 "mana_cost": None, "type_line": None},
+            ],
+            "sources": [{"id": 1, "title": "Commander bans, September 2024",
+                         "url": "https://example.com/bans"}],
+            "sources_dropped": 0, "findings_dropped": 1,
+            "cards_unresolved": 1, "searched": 12,
+        },
+        "never": "Research reads pages; it cannot see a deck.",
+        "usage": {"input_tokens": 700, "output_tokens": 1500,
+                  "cache_read_tokens": 40000},
+    }
+    report.update(over)
+    return report
+
+
+def test_claude_research_renders_the_two_kinds_of_card_differently(
+        decks, monkeypatch, capsys):
+    from mtglab.claude import research as research_mod
+    monkeypatch.setattr(research_mod, "ask",
+                        lambda question, requested: _research_report())
+    code, _ = run(["claude", "research", "Is", "Nadu", "banned?"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "ANSWER  [settled]" in out
+    assert "banned in the September 2024 update" in out
+    assert "FINDINGS" in out and "[1]" in out
+    # The ADR 26 seam: a pool card prints its text, a spoiler prints a label.
+    assert "Nadu, Winged Wisdom  {1}{G}{U}" in out
+    assert "Spoiled Newcomer  — not in the pool" in out
+    assert "1 named card(s) are not in the pool — expected" in out
+    assert "1 finding(s) left citing nothing" in out
+    assert "12 pages searched, 1 cited." in out
+    assert "tokens: 700 in / 1500 out (40000 cached)" in out
+
+
+def test_claude_research_refusal_prints_the_reason(decks, monkeypatch, capsys):
+    from mtglab.claude import research as research_mod
+    monkeypatch.setattr(research_mod, "ask", lambda question, requested:
+                        _research_report(research=None,
+                                         reason="no source survived; refused."))
+    code, _ = run(["claude", "research", "anything"])
+    assert code == 0
+    assert "no source survived" in capsys.readouterr().out
+
+
+def test_claude_research_rejection_is_a_message_not_a_traceback(
+        decks, monkeypatch, capsys):
+    from mtglab.claude import research as research_mod
+
+    def boom(question, requested):
+        raise research_mod.QuestionRejected(
+            "research cannot see a deck, so it cannot say what to cut")
+    monkeypatch.setattr(research_mod, "ask", boom)
+    code, _ = run(["claude", "research", "what", "should", "I", "cut?"])
+    assert code == 1
+    assert "cannot see a deck" in capsys.readouterr().out
+
+
+# ------------------------------------------------- data, art, ui, forge
+
+def test_data_refresh_loads_both_bulks_and_oracle_only_skips_one(
+        decks, monkeypatch, capsys):
+    from types import SimpleNamespace
+
+    from mtglab.cards import db as cards_db
+
+    calls = []
+    monkeypatch.setattr(cards_db, "connect",
+                        lambda path: SimpleNamespace(close=lambda: None))
+    monkeypatch.setattr(cards_db, "download_bulk",
+                        lambda kind: f"data/scryfall/{kind}.jsonl.gz")
+    monkeypatch.setattr(cards_db, "load_oracle",
+                        lambda con, p: calls.append("oracle") or 35390)
+    monkeypatch.setattr(cards_db, "load_printings",
+                        lambda con, p: calls.append("printings") or 107338)
+
+    code, _ = run(["data", "refresh"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "loaded 35,390 oracle cards" in out
+    assert "loaded 107,338 printings" in out
+    assert calls == ["oracle", "printings"]
+
+    calls.clear()
+    run(["data", "refresh", "--oracle-only"])
+    assert calls == ["oracle"], "--oracle-only must not touch default_cards"
+
+
+def test_data_snapshot_reports_the_count(decks, monkeypatch, capsys):
+    from types import SimpleNamespace
+
+    from mtglab.cards import db as cards_db
+    monkeypatch.setattr(cards_db, "connect",
+                        lambda path: SimpleNamespace(close=lambda: None))
+    monkeypatch.setattr(cards_db, "snapshot_prices", lambda con: 1234)
+    code, _ = run(["data", "snapshot"])
+    assert code == 0
+    assert "snapshotted 1,234 prices" in capsys.readouterr().out
+
+
+def _gate_clean():
+    """The edit-result keys `_report_edit` reads, with a clean gate."""
+    return {"errors": [], "warnings": []}
+
+
+def test_import_prints_what_it_kept_and_what_it_could_not_read(
+        decks, monkeypatch, capsys):
+    """The unknown/unreadable/skipped accounting, which is the import's whole
+    honesty story: nothing is guessed, so everything set aside is listed."""
+    from mtglab.api import service
+    monkeypatch.setattr(service, "import_deck", lambda **kw: {
+        "name": "Mini Deck", "slug": "mini2", "commander": ["Gyome, Master Chef"],
+        "companion": "Kaheera, the Orphanguard",
+        "total_cards": 99, "land_count": 36, "swap_board": [],
+        "notes": ["bracket defaulted to 4"],
+        "unknown": ["Definitely Not A Card"],
+        "unreadable": [{"line": 7, "text": "4x ???"}],
+        "skipped": ["Food"], "needs_rationale": 99,
+        **_gate_clean(),
+    })
+    listing = tmp_listing(decks, "1 Sol Ring\n")
+    code, _ = run(["decks", "import", "mini2", "--from", str(listing),
+                   "--commander", "Gyome, Master Chef"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "companion: Kaheera" in out
+    assert "note: bracket defaulted to 4" in out
+    assert "1 name(s) the pool does not know" in out
+    assert "Definitely Not A Card" in out
+    assert "line 7: 4x ???" in out
+    assert "1 token line(s) skipped" in out
+
+
+def test_swap_prints_the_exchange_and_reruns_the_gate(
+        decks, monkeypatch, capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "swap_card", lambda *a, **kw: {
+        "swapped_out": "Sol Ring", "swapped_in": "Arcane Signet",
+        **_gate_clean(),
+    })
+    code, _ = run(["decks", "swap", "mini", "--out", "Sol Ring",
+                   "--in", "Arcane Signet", "--why", "Coloured mana."])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "Sol Ring  ->  Arcane Signet" in out
+    assert "gate: 0 error(s), 0 warning(s)" in out
+
+
+def test_a_refused_swap_is_an_exit_message(decks, monkeypatch, capsys):
+    from mtglab.api import service
+
+    def boom(*a, **kw):
+        raise service.SwapRejected("'Sol Ring' is not in mini")
+    monkeypatch.setattr(service, "swap_card", boom)
+    code, msg = run(["decks", "swap", "mini", "--out", "Sol Ring",
+                     "--in", "Arcane Signet", "--why", "x"])
+    assert code == 1
+    assert "refused: 'Sol Ring' is not in mini" in msg
+
+
+def test_add_prints_destination_quantity_and_a_draft_reminder(
+        decks, monkeypatch, capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "add_card", lambda *a, **kw: {
+        "added": "Swamp", "category": "land",
+        "stage": "draft", "needs_rationale": 12,
+        **_gate_clean(),
+    })
+    code, _ = run(["decks", "add", "mini", "--card", "Swamp",
+                   "--category", "land", "--qty", "2", "--to", "swap_board"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "+ 2x Swamp  (land) -> the swap board" in out
+    assert "draft: 12 card(s) still owe a `why`." in out
+
+
+def _printings(*entries):
+    return {"commander": "Gyome, Master Chef",
+            "printings": [
+                {"id": e[0], "set_code": e[1], "collector_number": e[2],
+                 "rarity": "rare", "set_name": e[3]} for e in entries]}
+
+
+def test_set_art_resolves_a_set_code_to_its_one_printing(
+        decks, monkeypatch, capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "commander_printings",
+                        lambda slug: _printings(("abc-123", "C21", "1",
+                                                 "Commander 2021")))
+    seen = {}
+
+    def set_field(slug, *, field, value):
+        seen.update(field=field, value=value)
+        return _gate_clean()
+    monkeypatch.setattr(service, "set_deck_field", set_field)
+    code, _ = run(["decks", "set", "mini", "--art", "c21"])
+    assert code == 0
+    assert seen == {"field": "commander_art", "value": "abc-123"}
+    assert "commander_art -> abc-123" in capsys.readouterr().out
+
+
+def test_set_art_with_several_printings_lists_them_and_refuses(
+        decks, monkeypatch, capsys):
+    """`MUL` has four Goreclaws; picking one silently would be wrong about
+    which painting the user meant, which is the whole reason ids exist."""
+    from mtglab.api import service
+    monkeypatch.setattr(service, "commander_printings",
+                        lambda slug: _printings(
+                            ("id-1", "MUL", "42", "Multiverse Legends"),
+                            ("id-2", "MUL", "107", "Multiverse Legends")))
+    code, msg = run(["decks", "set", "mini", "--art", "MUL"])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "re-run with --art <id>" in msg
+    assert "MUL has 2 printings" in out
+    assert "id-1" in out and "#42" in out
+
+
+def test_set_art_names_the_sets_it_is_actually_in(decks, monkeypatch, capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "commander_printings",
+                        lambda slug: _printings(("id-1", "C21", "1",
+                                                 "Commander 2021")))
+    code, msg = run(["decks", "set", "mini", "--art", "ZNR"])
+    assert code == 1
+    assert "no printing in 'ZNR'" in msg
+    assert "It is in: C21" in msg
+
+
+def test_set_art_without_a_pool_says_to_load_one(decks, monkeypatch):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "commander_printings",
+                        lambda slug: {"commander": "", "printings": []})
+    code, msg = run(["decks", "set", "mini", "--art", "C21"])
+    assert code == 1
+    assert "is the pool loaded?" in msg
+
+
+def test_ui_hands_the_app_to_uvicorn_on_the_asked_address(
+        decks, monkeypatch, capsys):
+    import sys as _sys
+    from types import SimpleNamespace
+
+    served = {}
+
+    def fake_run(app, *, host, port, log_level):
+        served.update(host=host, port=port)
+    monkeypatch.setitem(_sys.modules, "uvicorn",
+                        SimpleNamespace(run=fake_run))
+    code, _ = run(["ui", "--no-open", "--host", "127.0.0.1", "--port", "8123"])
+    assert code == 0
+    assert served == {"host": "127.0.0.1", "port": 8123}
+    assert "http://127.0.0.1:8123" in capsys.readouterr().out
+
+
+def test_ui_warns_when_the_frontend_was_never_built(decks, monkeypatch, capsys):
+    import sys as _sys
+    from types import SimpleNamespace
+
+    from mtglab.api import app as app_mod
+    monkeypatch.setitem(_sys.modules, "uvicorn",
+                        SimpleNamespace(run=lambda *a, **kw: None))
+    monkeypatch.setattr(app_mod, "WEB_DIST",
+                        app_mod.WEB_DIST / "nowhere")
+    run(["ui", "--no-open"])
+    out = capsys.readouterr().out
+    assert "no built frontend" in out
+    assert "npm --prefix web run build" in out
+
+
+def _forge_result(games, *, wall=12.0, startup=6.0):
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        games=[SimpleNamespace(milliseconds=ms, timed_out=t, winner=w)
+               for ms, t, w in games],
+        wall_seconds=wall, startup_seconds=startup,
+        winner_slug=lambda game: game.winner)
+
+
+def test_sim_forge_reports_wins_draws_and_clockouts_separately(
+        decks, monkeypatch, capsys):
+    """A clock-out is the measurement giving up, not the game ending -- it is
+    reported apart from the draws it was scored as (docs/FORGE.md)."""
+    from mtglab.sim.tier3 import run as forge
+    monkeypatch.setattr(forge, "run_games", lambda *a, **kw: _forge_result([
+        (5000, False, "mini"), (7000, False, None), (300000, True, None)]))
+    code, _ = run(["sim", "forge", "mini", "mini"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "3 games in 12.0s (6.0s of it JVM + card database)" in out
+    assert "per game: 5.0s min" in out
+    assert "draw" in out
+    assert "(1 hit the 300s clock and were called draws)" in out
+    assert "Read these per archetype, not as one ranking." in out
+
+
+def test_sim_forge_check_only_prints_coverage_and_runs_nothing(
+        decks, monkeypatch, capsys):
+    from types import SimpleNamespace
+
+    from mtglab.sim.tier3 import run as forge
+    monkeypatch.setattr(forge, "check_coverage", lambda decks: [
+        SimpleNamespace(summary=lambda: "mini: 99/99 implemented")])
+    monkeypatch.setattr(forge, "run_games",
+                        lambda *a, **kw: pytest.fail("must not run games"))
+    code, _ = run(["sim", "forge", "mini", "--check-only"])
+    assert code == 0
+    assert "mini: 99/99 implemented" in capsys.readouterr().out
+
+
+def test_sim_forge_refuses_when_coverage_fails(decks, monkeypatch):
+    from mtglab.sim.tier3 import run as forge
+
+    def boom(*a, **kw):
+        raise forge.CoverageFailed("mini: 3 card(s) Forge does not implement")
+    monkeypatch.setattr(forge, "run_games", boom)
+    code, msg = run(["sim", "forge", "mini", "mini"])
+    assert code == 1
+    assert "3 card(s)" in msg
+
+
+def test_sim_lands_refuses_a_deck_with_no_lands(decks, monkeypatch):
+    import mtglab.cli as cli
+    monkeypatch.setattr(cli, "_pool", lambda deck: {})
+    monkeypatch.setattr(cli, "_sim_cards", lambda deck, cards: ([], None))
+    code, msg = run(["sim", "lands", "mini", "30", "32"])
+    assert code == 1
+    assert "no lands to sweep" in msg
+
+
+def test_sim_cache_prints_kinds_and_the_age_span(decks, monkeypatch, capsys):
+    from mtglab.sim import cache
+    monkeypatch.setattr(cache, "stats", lambda: {
+        "enabled": True, "rows": 3, "bytes": 2048,
+        "by_kind": {"sim.mana": 2, "sim.lands.count": 1},
+        "oldest": "2026-08-13T10:00:00+00:00",
+        "newest": "2026-08-14T09:00:00+00:00"})
+    code, _ = run(["sim", "cache"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "rows:    3 (2.0 kB)" in out
+    assert "sim.mana" in out and "sim.lands.count" in out
+    assert "computed between 2026-08-13T10:00:00 and 2026-08-14T09:00:00" in out
+
+
+def test_price_without_a_pool_exits_with_advice(decks):
+    code, msg = run(["price", "deck", "mini"])
+    assert code == 1
+    assert "data refresh" in msg
+
+
+def test_suggest_for_a_named_card_says_when_the_pool_cannot_help(
+        decks, monkeypatch, capsys):
+    from types import SimpleNamespace
+
+    from mtglab.cards import db as cards_db
+    from mtglab.decks import suggest as suggest_mod
+
+    (decks.parent / "data").mkdir(exist_ok=True)
+    (decks.parent / "data" / "mtg.duckdb").touch()
+    monkeypatch.setattr(cards_db, "connect",
+                        lambda path: SimpleNamespace(close=lambda: None))
+    monkeypatch.setattr(cards_db, "get_cards", lambda con, names: {})
+    monkeypatch.setattr(suggest_mod, "replacements_for",
+                        lambda *a, **kw: [])
+    code, _ = run(["decks", "suggest", "mini", "--card", "Sol Ring"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "Sol Ring (asked for)" in out
+    assert "no candidates -- the pool does not know this card." in out
+
+
+def test_suggest_ranks_candidates_with_their_reasons(
+        decks, monkeypatch, capsys):
+    from types import SimpleNamespace
+
+    from mtglab.cards import db as cards_db
+    from mtglab.decks import suggest as suggest_mod
+
+    (decks.parent / "data").mkdir(exist_ok=True)
+    (decks.parent / "data" / "mtg.duckdb").touch()
+    monkeypatch.setattr(cards_db, "connect",
+                        lambda path: SimpleNamespace(close=lambda: None))
+    monkeypatch.setattr(cards_db, "get_cards", lambda con, names: {})
+    monkeypatch.setattr(suggest_mod, "replacements_for", lambda *a, **kw: [
+        SimpleNamespace(name="Arcane Signet", score=0.91,
+                        reasons=["artifact", "ramp"],
+                        record=SimpleNamespace(mana_cost="{2}"))])
+    code, _ = run(["decks", "suggest", "mini", "--card", "Sol Ring"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "1. Arcane Signet" in out and "0.91" in out
+    assert "artifact · ramp" in out
+
+
+def test_set_art_takes_a_printing_id_verbatim(decks, monkeypatch, capsys):
+    from mtglab.api import service
+    monkeypatch.setattr(service, "commander_printings",
+                        lambda slug: _printings(("abc-123", "C21", "1",
+                                                 "Commander 2021")))
+    monkeypatch.setattr(service, "set_deck_field",
+                        lambda slug, *, field, value: _gate_clean())
+    code, _ = run(["decks", "set", "mini", "--art", "abc-123"])
+    assert code == 0
+    assert "commander_art -> abc-123" in capsys.readouterr().out
+
+
+def test_build_against_a_previous_revision_diffs_the_swaps(decks, capsys):
+    """`--against` is why `swaps.md` exists: commit first, then diff."""
+    previous = decks.parent / "previous.yaml"
+    previous.write_text(GOOD_DECK.replace("Sol Ring", "Arcane Signet"),
+                        encoding="utf-8")
+    code, _ = run(["decks", "build", "mini", "--against", str(previous)])
+    assert code == 0
+    swaps = (decks / "mini" / "artifacts" / "swaps.md").read_text("utf-8")
+    assert "Sol Ring" in swaps and "Arcane Signet" in swaps

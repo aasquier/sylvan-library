@@ -639,3 +639,125 @@ def test_the_report_says_which_system_answered(no_network):
     report = theme.ask(TRANSCRIPT, GROUNDED, requested="off")
     assert report["answered_by"] == "claude"
     assert report["mode"] == "theme-conversation"
+
+
+# ------------------------------------------------ the call path, faked at Turn
+#
+# Everything below `converse` is the SDK; everything above it -- grounding,
+# the question predicate, source checking, pool confirmation -- is this
+# project's, and it runs the same against a fake Turn as a paid one. What the
+# no_network fixture pins for the refusal paths, these pin for the answers.
+
+def _turn(payload=None, *, text=None, searched=(), refused=False):
+    from mtglab.claude.modes import Turn
+    return Turn(mode="theme", model="claude-sonnet-5", stop_reason="end_turn",
+                text=text if text is not None else json.dumps(payload),
+                tool_calls=[], input_tokens=10, output_tokens=10,
+                searched=list(searched), refused=refused)
+
+
+def test_a_conversation_turn_keeps_a_question_and_grounds_its_slots(
+        monkeypatch, no_network):
+    monkeypatch.setattr(theme, "converse", lambda *a, **kw: _turn({
+        "question": "Which century would you actually want to live in?",
+        "slots": GROUNDED,
+        "fact": {"text": "Green fears artifice.", "source": "taxonomy"},
+    }))
+    report = theme.run_ask(theme.check_ask(TRANSCRIPT, GROUNDED))
+    assert report["asked"] is True
+    assert report["question"].endswith("?")
+    assert report["fact"]["source"] == "taxonomy"
+    assert [s["kind"] for s in report["slots"]] == ["taste", "temperament",
+                                                    "posture"]
+    assert report["may_propose"] is True
+
+
+def test_a_declarative_answer_is_deleted_not_rendered(monkeypatch, no_network):
+    """The interview's own predicate: everything it returns ends in a question
+    mark, so a model telling somebody what they think comes back empty."""
+    monkeypatch.setattr(theme, "converse", lambda *a, **kw: _turn({
+        "question": "You are clearly a Golgari player.", "slots": []}))
+    report = theme.run_ask(theme.check_ask(TRANSCRIPT, GROUNDED))
+    assert report["question"] == ""
+    assert "Nothing usable came back" in report["reason"]
+
+
+def test_a_refused_turn_says_declined(monkeypatch, no_network):
+    monkeypatch.setattr(theme, "converse",
+                        lambda *a, **kw: _turn(text="", refused=True))
+    report = theme.run_ask(theme.check_ask(TRANSCRIPT, GROUNDED))
+    assert "declined" in report["reason"]
+
+
+def test_an_unparseable_answer_reports_the_stop_reason(monkeypatch, no_network):
+    monkeypatch.setattr(theme, "converse",
+                        lambda *a, **kw: _turn(text="not json at all"))
+    report = theme.run_ask(theme.check_ask(TRANSCRIPT, GROUNDED))
+    assert "did not parse" in report["reason"]
+    assert "end_turn" in report["reason"]
+
+
+def test_the_closing_instruction_tracks_what_is_still_unknown():
+    opening = theme._closing_for([], [])
+    assert "Open the conversation" in opening
+
+    partway = theme._closing_for(GROUNDED[:1], TRANSCRIPT)
+    assert "Still unknown" in partway
+    assert "temperament" in partway and "posture" in partway
+
+    done = theme._closing_for(GROUNDED, TRANSCRIPT)
+    assert "You have enough to go on" in done
+
+
+def test_a_proposal_confirms_commanders_and_counts_what_it_dropped(
+        pool, monkeypatch, no_network):
+    """The whole post-processing pass in one run: a cited source survives the
+    intersection, an invented commander is dropped and counted, and the
+    surviving combination carries the taxonomy's own name."""
+    monkeypatch.setattr(theme, "converse", lambda *a, **kw: _turn({
+        "sources": [{"id": "1", "url": SEARCHED[0]["url"],
+                     "title": SEARCHED[0]["title"]}],
+        "combinations": [{
+            "key": "bg",
+            "reading": "You build quietly and feed the table.",
+            "grounding": "quietly build something",
+            "source_ids": ["1"],
+            "commanders": [
+                {"card": "Gyome, Master Chef", "prose": "Food as patience.",
+                 "source_ids": ["1"]},
+                {"card": "Invented Legend of Nowhere", "prose": "x"},
+            ],
+        }],
+    }, searched=SEARCHED))
+    request = theme.check_proposal(TRANSCRIPT, GROUNDED, budget=100,
+                                   avoid="no blue")
+    report = theme.run_proposal(request)
+    assert [c["name"] for c in report["combinations"]] == ["Golgari"]
+    assert [c["name"] for c in report["combinations"][0]["commanders"]] == \
+        ["Gyome, Master Chef"]
+    assert report["commanders_dropped"] == 1
+    assert report["sources"][0]["url"] == SEARCHED[0]["url"]
+
+
+def test_a_proposal_with_no_surviving_combination_says_so(
+        pool, monkeypatch, no_network):
+    monkeypatch.setattr(theme, "converse", lambda *a, **kw: _turn({
+        "sources": [],
+        "combinations": [{"key": "not-a-key", "commanders": []}],
+    }))
+    report = theme.run_proposal(theme.check_proposal(TRANSCRIPT, GROUNDED))
+    assert report["combinations"] == []
+    assert "nothing to suggest" in report["reason"]
+
+
+def test_a_refused_or_unparseable_proposal_keeps_its_reason(
+        pool, monkeypatch, no_network):
+    monkeypatch.setattr(theme, "converse",
+                        lambda *a, **kw: _turn(text="", refused=True))
+    report = theme.run_proposal(theme.check_proposal(TRANSCRIPT, GROUNDED))
+    assert "declined" in report["reason"]
+
+    monkeypatch.setattr(theme, "converse",
+                        lambda *a, **kw: _turn(text="{broken"))
+    report = theme.run_proposal(theme.check_proposal(TRANSCRIPT, GROUNDED))
+    assert "did not parse" in report["reason"]

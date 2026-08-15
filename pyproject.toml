@@ -93,7 +93,16 @@ skip_empty = true
 # new test code, which is to say four of those points had been written all
 # along and were simply not being run. The rest came from the CLI's
 # pool-backed commands, the Claude conversation loop, and Forge's setup path.
-fail_under = 90
+#
+# 90 -> 95 on 2026-08-14, after a deliberate pass took the suite to ~96%. The
+# ground gained, in order of size: the CLI's three Claude renderers (the
+# argue/dossier/research printing, 70% -> 98% for cli.py), the theme modes'
+# call path faked at `Turn`, Forge's run path faked at `subprocess`, the
+# Scryfall ingest against fake bulk files, and the ADR 22 SQL deck tier
+# exercised directly. The point of the floor is a percent of headroom: the
+# suite runs about 96, so a change that costs a full point of coverage is
+# loud, and ordinary churn is not.
+fail_under = 95
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

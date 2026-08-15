@@ -2860,3 +2860,369 @@ def test_the_status_lists_research_among_the_modes_that_exist(client):
     # ADR 26's first decision, published: no deck tool in the capability list a
     # client renders.
     assert "get_deck" not in modes["research"]["tools"]
+
+
+# ------------------------------------------------- service: the seams
+#
+# The translation layer between the Claude modes and the routes, and the
+# refusals `create_deck` makes before it will touch the pool. Every test here
+# calls the service directly: what is being pinned is which exception (and
+# which sentence) crosses the boundary, not what a route does with it --
+# test_api's route tests already cover that half.
+
+@pytest.mark.parametrize("module_path", [
+    "mtglab.claude.interview", "mtglab.claude.argue", "mtglab.claude.dossier"])
+def test_an_exhausted_mode_keeps_its_own_sentence(module_path, monkeypatch):
+    """`ModeExhausted` is the tool loop hitting its limit -- a fact about the
+    conversation, not the SDK, so its message must survive the translation
+    to `ClaudeFailed` rather than arriving re-explained."""
+    import importlib
+
+    from mtglab.claude.modes import ModeExhausted
+
+    mod = importlib.import_module(module_path)
+
+    def exhausted(*a, **kw):
+        raise ModeExhausted("stopped after 8 turns without finishing")
+    monkeypatch.setattr(mod, "ask", exhausted)
+
+    call = {"mtglab.claude.interview":
+                lambda: service.claude_interview(slug="x", card="y"),
+            "mtglab.claude.argue":
+                lambda: service.claude_argue(slug="x", card="y"),
+            "mtglab.claude.dossier":
+                lambda: service.claude_dossier(slug="x")}[module_path]
+    with pytest.raises(service.ClaudeFailed, match="8 turns"):
+        call()
+
+
+@pytest.mark.parametrize("module_path", [
+    "mtglab.claude.interview", "mtglab.claude.argue", "mtglab.claude.dossier"])
+def test_an_sdk_failure_is_explained_not_dumped(module_path, monkeypatch):
+    """Anything else out of a mode is the SDK breaking, and `explain` is the
+    function that knows how to say so -- a raw exception in a 502 detail is
+    the stack-trace-in-a-job failure wearing a status code."""
+    import importlib
+    mod = importlib.import_module(module_path)
+
+    def boom(*a, **kw):
+        raise RuntimeError("socket exploded mid-call")
+    monkeypatch.setattr(mod, "ask", boom)
+
+    call = {"mtglab.claude.interview":
+                lambda: service.claude_interview(slug="x", card="y"),
+            "mtglab.claude.argue":
+                lambda: service.claude_argue(slug="x", card="y"),
+            "mtglab.claude.dossier":
+                lambda: service.claude_dossier(slug="x")}[module_path]
+    with pytest.raises(service.ClaudeFailed, match="socket exploded"):
+        call()
+
+
+def test_dossier_status_of_a_deck_with_no_commander_is_an_empty_shell(
+        monkeypatch):
+    """The status probe is a GET and must answer 200-shaped for any deck --
+    a commanderless draft asks it constantly while the create flow runs."""
+    from mtglab.claude import dossier as dossier_mod
+
+    def no_commander(slug, source=None):
+        raise dossier_mod.NoCommander("nothing leads this deck")
+    monkeypatch.setattr(dossier_mod, "brief", no_commander)
+    body = service.claude_dossier_cached(slug="empty")
+    assert body["commander"] == ""
+    assert body["cached"] is False
+    assert body["dossier"] == {}
+
+
+def test_commander_dossier_shell_when_the_pool_lacks_the_commander(pool):
+    deck = Deck.from_text(
+        "slug: ghost\nname: Ghost\ncommander:\n  - No Such Legend\ncards: []",
+        slug="ghost")
+    body = service.commander_dossier("ghost",
+                                     source=MemoryDeckSource([deck]))
+    assert body["card"] is None
+    assert body["printings"] is None
+
+
+def test_create_refuses_a_malformed_slug(pool, in_memory_client):
+    with in_memory_client([]) as c:
+        r = c.post("/api/decks", json={
+            "slug": "Bad Slug!", "commander": ["Gyome, Master Chef"]})
+    assert r.status_code == 422
+    assert "not a usable slug" in r.json()["detail"]
+
+
+def test_create_refuses_three_commanders(pool, in_memory_client):
+    with in_memory_client([]) as c:
+        r = c.post("/api/decks", json={
+            "slug": "trio", "commander": ["Gyome, Master Chef",
+                                          "Goreclaw, Terror of Qal Sisma",
+                                          "Vorinclex, Voice of Hunger"]})
+    assert r.status_code == 422
+    assert "at most two" in r.json()["detail"]
+
+
+def test_create_refuses_an_unknown_status(pool, in_memory_client):
+    with in_memory_client([]) as c:
+        r = c.post("/api/decks", json={
+            "slug": "statusy", "commander": ["Gyome, Master Chef"],
+            "status": "aspirational"})
+    assert r.status_code == 422
+    assert "is not one of" in r.json()["detail"]
+
+
+def test_create_refuses_a_commander_the_pool_does_not_know(
+        pool, in_memory_client):
+    with in_memory_client([]) as c:
+        r = c.post("/api/decks", json={
+            "slug": "ghost", "commander": ["No Such Legend"]})
+    assert r.status_code == 422
+    assert "not in the pool" in r.json()["detail"]
+
+
+def test_create_refuses_two_legends_that_cannot_pair(pool, in_memory_client):
+    """Two commanders is not 'any two legends' -- Gyome and Goreclaw are both
+    legal commanders alone and have no pairing ability between them."""
+    with in_memory_client([]) as c:
+        r = c.post("/api/decks", json={
+            "slug": "duo", "commander": ["Gyome, Master Chef",
+                                         "Goreclaw, Terror of Qal Sisma"]})
+    assert r.status_code == 422
+    assert r.json()["detail"], "a refused pair must say why"
+
+
+def test_upcoming_sets_filters_to_unreleased_paper_sets(monkeypatch):
+    """The one on-demand network route, faked at urllib: only future,
+    non-digital sets survive, sorted by release."""
+    import io
+    import json as _json
+    import urllib.request
+
+    payload = {"data": [
+        {"code": "ftr", "name": "Future Set", "released_at": "2099-01-02",
+         "card_count": 300, "icon_svg_uri": "x", "set_type": "expansion"},
+        {"code": "ftr2", "name": "Nearer Set", "released_at": "2099-01-01",
+         "card_count": 250, "icon_svg_uri": "x", "set_type": "expansion"},
+        {"code": "old", "name": "Released Set", "released_at": "2001-01-01"},
+        {"code": "dig", "name": "Arena Only", "released_at": "2099-06-01",
+         "digital": True},
+    ]}
+
+    class FakeResp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        lambda req, timeout: FakeResp(
+                            _json.dumps(payload).encode()))
+    body = service.upcoming_sets(force=True)
+    assert [s["code"] for s in body["sets"]] == ["ftr2", "ftr"]
+
+    # And the second ask the same day never reaches the network.
+    def refuse(req, timeout):
+        raise AssertionError("cache miss: urlopen reached")
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    assert service.upcoming_sets()["sets"][0]["code"] == "ftr2"
+
+
+GHOST_DECK_YAML = """\
+slug: ghost
+name: Ghost
+commander:
+  - No Such Legend
+cards: []
+"""
+
+
+def test_add_refuses_a_card_the_pool_does_not_know(pool, in_memory_client):
+    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    with in_memory_client([deck]) as c:
+        r = c.post(f"/api/decks/{LOCAL_OWNER}/gyome-food/cards", json={
+            "name": "No Such Card", "category": "ramp", "why": "x"})
+    assert r.status_code == 422
+    assert "not a card the pool knows" in r.json()["detail"]
+
+
+def test_add_refuses_a_banned_card(pool, in_memory_client):
+    """Rule 1's cheapest dividend: the pool knows Emrakul is banned, so the
+    add is refused before a rationale is ever asked for."""
+    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    with in_memory_client([deck]) as c:
+        r = c.post(f"/api/decks/{LOCAL_OWNER}/gyome-food/cards", json={
+            "name": "Emrakul, the Aeons Torn", "category": "threat",
+            "why": "big"})
+    assert r.status_code == 422
+    assert "not legal in Commander" in r.json()["detail"]
+
+
+def test_set_category_refuses_a_word_off_the_taxonomy(pool, in_memory_client):
+    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    with in_memory_client([deck]) as c:
+        r = c.patch(f"/api/decks/{LOCAL_OWNER}/gyome-food/cards/Command Tower",
+                    json={"field": "category", "value": "nonsense"})
+    # The category list is fixed so counts stay comparable across decks.
+    assert r.status_code == 422
+    assert "nonsense" in r.json()["detail"]
+
+
+def test_set_art_on_a_commanderless_deck_is_refused(pool):
+    deck = Deck.from_text("slug: headless\nname: H\ncommander: []\ncards: []",
+                          slug="headless")
+    src = MemoryDeckSource([deck])
+    with pytest.raises(service.EditRejected, match="no commander"):
+        service.set_deck_field("headless", field="commander_art",
+                               value="11111111-1111-4111-8111-111111111111",
+                               source=src)
+
+
+def test_set_art_refuses_a_printing_of_somebody_else(pool):
+    """The service half of the two-layer check: `edit.py` validates the shape,
+    and only a query can know whose painting an id names. A well-formed id
+    that is not this commander's is refused with the route that lists the
+    ones that are."""
+    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    src = MemoryDeckSource([deck])
+    with pytest.raises(service.EditRejected,
+                       match="not a printing of Gyome, Master Chef"):
+        service.set_deck_field(
+            "gyome-food", field="commander_art",
+            value="99999999-9999-4999-8999-999999999999", source=src)
+
+
+def test_suggestions_without_a_pool_say_so_instead_of_guessing(tmp_path):
+    deck = Deck.from_text(GHOST_DECK_YAML, slug="ghost")
+    with config.use_paths(data_dir=tmp_path / "absent"):
+        body = service.suggestions_for("ghost",
+                                       source=MemoryDeckSource([deck]))
+    assert body["pool_available"] is False
+    assert body["targets"] == []
+
+
+def test_challenge_progress_skips_what_it_cannot_resolve(pool):
+    """A commanderless draft and a commander the pool lacks both contribute
+    nothing -- skipped, not crashed on, and not counted as filled."""
+    headless = Deck.from_text(
+        "slug: headless\nname: H\ncommander: []\ncards: []", slug="headless")
+    ghost = Deck.from_text(GHOST_DECK_YAML, slug="ghost")
+    body = service.challenge_progress(source=MemoryDeckSource([headless, ghost]))
+    assert body["filled"] == 0
+
+
+def test_search_filters_by_type_cost_and_price(pool):
+    typed = service.search_cards(type_line="Creature")
+    assert typed["total"] >= 1
+    assert all("Creature" in c["type_line"] for c in typed["cards"])
+
+    cheap = service.search_cards(cmc_max=1)
+    assert all((c["cmc"] or 0) <= 1 for c in cheap["cards"])
+
+    priced = service.search_cards(price_max=0.01)
+    assert all(c["price_usd"] is not None and c["price_usd"] <= 0.01
+               for c in priced["cards"])
+
+
+def test_search_without_a_pool_answers_with_advice(tmp_path):
+    with config.use_paths(data_dir=tmp_path / "absent"):
+        body = service.search_cards(q="anything")
+    assert body["cards"] == []
+    assert "data refresh" in body["message"]
+
+
+def test_commander_printings_of_a_headless_deck_is_empty(pool):
+    deck = Deck.from_text("slug: headless\nname: H\ncommander: []\ncards: []",
+                          slug="headless")
+    body = service.commander_printings("headless",
+                                       source=MemoryDeckSource([deck]))
+    assert body == {"slug": "headless", "commander": "", "selected": "",
+                    "printings": []}
+
+
+def test_commander_dossier_of_a_headless_deck_is_a_shell(pool):
+    deck = Deck.from_text("slug: headless\nname: H\ncommander: []\ncards: []",
+                          slug="headless")
+    body = service.commander_dossier("headless",
+                                     source=MemoryDeckSource([deck]))
+    assert body["card"] is None
+
+
+def test_commander_dossier_reports_the_first_printing(pool):
+    """The `first_set` lookup: min(released_at) resolved back to a set name."""
+    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    body = service.commander_dossier("gyome-food",
+                                     source=MemoryDeckSource([deck]))
+    assert body["card"]["name"] == "Gyome, Master Chef"
+    assert body["printings"] is None or "first_set" in body["printings"]
+
+
+def test_art_crop_from_rejects_a_url_of_the_wrong_shape():
+    assert service.art_crop_from(None) is None
+    assert service.art_crop_from("https://c1.scryfall.com/large/x.jpg") is None
+    assert service.art_crop_from(
+        "https://c1.scryfall.com/normal/x.jpg") == \
+        "https://c1.scryfall.com/art_crop/x.jpg"
+
+
+def test_connect_answers_none_while_a_refresh_holds_the_lock(monkeypatch):
+    """`data refresh` takes DuckDB's exclusive lock; the app must degrade to
+    'no pool' rather than 500 on every request for the duration."""
+    import duckdb
+
+    def locked(path, read_only=False):
+        raise duckdb.IOException("database is locked")
+    monkeypatch.setattr(duckdb, "connect", locked)
+    assert service._connect() is None
+
+
+def test_pool_stale_never_raises(pool):
+    class Broken:
+        def execute(self, *a):
+            raise RuntimeError("catalog from the future")
+    assert service.pool_stale(Broken()) is False
+
+
+def test_import_refuses_a_slug_that_already_exists(pool, in_memory_client):
+    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    with in_memory_client([deck]) as c:
+        r = c.post("/api/decks/import", json={
+            "text": "1 Forest\n", "slug": "gyome-food",
+            "commander": "Gyome, Master Chef"})
+    assert r.status_code == 422
+    assert "already exists" in r.json()["detail"]
+
+
+def test_create_without_a_pool_refuses_rather_than_guessing(tmp_path):
+    """A deck whose commander was never checked is a deck whose colour
+    identity is a guess -- the same refusal `import` makes."""
+    with config.use_paths(data_dir=tmp_path / "absent"), \
+            pytest.raises(service.CreateRejected, match="needs the card pool"):
+        service.create_deck(slug="fresh", commander=["Gyome, Master Chef"],
+                            source=MemoryDeckSource([]))
+
+
+def test_search_by_text_matches_name_and_oracle_text(pool):
+    by_name = service.search_cards(q="Gyome")
+    assert any(c["name"] == "Gyome, Master Chef" for c in by_name["cards"])
+    by_text = service.search_cards(q="Food")
+    assert by_text["total"] >= 1
+
+
+def test_cards_named_reports_misses_rather_than_omitting_them(pool):
+    body = service.cards_named(names=["Gyome, Master Chef", "No Such Card"])
+    assert [c["name"] for c in body["cards"]] == ["Gyome, Master Chef"]
+    assert body["not_found"] == ["No Such Card"]
+
+
+def test_the_job_registry_evicts_finished_jobs_over_its_bound(monkeypatch):
+    """The eviction takes the oldest finished job and never a live one."""
+    jobs.clear()
+    monkeypatch.setattr(jobs, "MAX_JOBS", 3)
+    live = jobs.submit("test", lambda p: __import__("time").sleep(2) or "ok")
+    for i in range(5):
+        jobs.completed("test", result=i, label=f"hit-{i}")
+    with jobs._LOCK:
+        held = list(jobs._JOBS.values())
+    assert len(held) <= 4, "the bound must hold (live job + MAX_JOBS finished)"
+    assert any(j.id == live.id for j in held), "a live job must never be evicted"
