@@ -682,6 +682,48 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         except service.ClaudeFailed as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    @app.post("/api/decks/{owner}/{slug}/argue")
+    def claude_argue(owner: str, slug: str, payload: dict[str, Any],
+                     lib: Lib) -> dict[str, Any]:
+        """The case against one card's slot (ADR 25). Returns charges.
+
+        Deliberately the interview's twin, down to the status codes: the two
+        per-card modes differ in what they answer, not in how they are asked,
+        and a client driving one should not have to learn a second shape.
+
+        Synchronous, and that is a measured claim rather than an assumption
+        this time. The interview costs ~4,900 input tokens and makes no tool
+        calls because `brief()` hands the facts over; this mode shares that
+        brief and adds a tool set it uses only when it goes shopping, so it
+        sits in the same seconds-scale class rather than the theme proposal's
+        minutes. **If that ever stops being true, this is the endpoint to
+        move** -- ADR 20's lesson is that a duration measured for one surface
+        is a question to ask of every sibling, and the docstring that says "it
+        is a few seconds" without a number is the one that broke the dossier.
+        """
+        from mtglab.claude.argue import CardNotInDeck
+        from mtglab.claude.client import ClaudeUnavailable
+
+        card = str(payload.get("card", "")).strip()
+        if not card:
+            raise HTTPException(status_code=422, detail="card is required")
+        try:
+            return service.claude_argue(
+                slug=slug, card=card,
+                requested=payload.get("stance") or None,
+                focus=str(payload.get("focus") or ""),
+                source=lib.source_for(owner))
+        except CardNotInDeck as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ValueError as exc:
+            # A malformed stance. `CardNotInDeck` is a ValueError too, which is
+            # why it is caught above this rather than below it.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ClaudeUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except service.ClaudeFailed as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
     @app.get("/api/decks/{owner}/{slug}/dossier")
     def claude_dossier_cached(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
         """A stored commander dossier, or an empty one. Never calls Anthropic.

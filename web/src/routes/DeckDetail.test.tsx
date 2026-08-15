@@ -37,7 +37,8 @@ vi.mock('../lib/api', async () => ({
     swapCard: vi.fn(), addCard: vi.fn(), removeCard: vi.fn(),
     setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),
     setShared: vi.fn(),
-    claudeStatus: vi.fn(), interview: vi.fn(), commander: vi.fn(),
+    claudeStatus: vi.fn(), interview: vi.fn(), argue: vi.fn(),
+    commander: vi.fn(),
     dossier: vi.fn(), writeDossier: vi.fn(), printings: vi.fn(),
     job: vi.fn(),
   },
@@ -274,6 +275,33 @@ const INTERVIEW = {
   never: 'These are questions. The rationale is yours to write.',
 }
 
+const ARGUMENT = {
+  answered_by: 'claude', mode: 'slot-argument',
+  model: 'claude-sonnet-5', slug: 'goreclaw-stompy', card: 'Sol Ring',
+  asked: true, reason: '', stance: STANCE,
+  charges: [
+    { claim: 'Six other cards already ramp for two or less.',
+      ground: 'redundancy', fact: 'ramp: 7 against a target of 4-6.',
+      strength: 'serious' },
+  ],
+  charges_dropped: 0,
+  alternatives: [
+    { name: 'Cultivator Colossus', mana_cost: '{4}{G}{G}{G}',
+      type_line: 'Creature — Plant Elemental',
+      oracle_text: 'Trample. When Cultivator Colossus enters…',
+      color_identity: ['G'] },
+  ],
+  alternatives_dropped: {
+    not_in_pool: [], banned: ['Primeval Titan'],
+    off_colour: ['Ajani, Nacatl Pariah // Ajani, Nacatl Avenger'],
+    no_pool: [],
+  },
+  tool_calls: [], usage: { input_tokens: 10, output_tokens: 5 },
+  never: 'This is the case against the card, and only that. A card that '
+       + 'survives it still needs a rationale, and the rationale is yours to '
+       + 'write.',
+}
+
 beforeEach(() => {
   // `mockReset`, not just a fresh return value. `restoreMocks` in
   // vitest.config.ts only touches spies created with `vi.spyOn`; a bare
@@ -303,6 +331,7 @@ beforeEach(() => {
   // button rather than its "not installed" note in most tests.
   vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(CLAUDE_STATUS)
   vi.mocked(api.interview).mockReset().mockResolvedValue(INTERVIEW)
+  vi.mocked(api.argue).mockReset().mockResolvedValue(ARGUMENT)
   // No dossier stored by default — the ordinary state for five of the six
   // decks, and the one the collapsed panel has to handle without noise.
   vi.mocked(api.dossier).mockReset().mockResolvedValue(NO_DOSSIER)
@@ -1278,5 +1307,119 @@ describe('DeckDetail sharing', () => {
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.getByText('Simulate this deck').getAttribute('href'))
       .toBe('/simulate?owner=aasquier&deck=goreclaw-stompy')
+  })
+})
+
+/**
+ * The slot argument (ADR 25), on the card row rather than in the editor.
+ *
+ * Its guards are almost all server-side — the response schema has no field for
+ * a reason to keep the card, an uncited charge is dropped, and every named
+ * alternative is checked against the pool, the ban list and the deck's colour
+ * identity before it is serialised. What belongs *here* is the part only a
+ * renderer can get wrong: this is a one-sided argument and the page has to say
+ * so, and nothing on it may put text into a rationale.
+ */
+describe('DeckDetail slot argument', () => {
+  function rowFor(card: string) {
+    return screen.getByTitle(`Remove ${card} from the deck`).closest('li')!
+  }
+
+  async function argueAbout(card: string) {
+    // The draft, because it is the fixture carrying Sol Ring — and because a
+    // card owing a rationale is the one somebody is most likely to argue
+    // about before deciding whether to write one.
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    renderDeck()
+    await screen.findByText(DECK.name)
+    const row = rowFor(card)
+    fireEvent.click(within(row).getByRole('button', { name: /argue slot/i }))
+    return row
+  }
+
+  it('asks once when the panel is opened, not on page load', async () => {
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    renderDeck()
+    await screen.findByText(DECK.name)
+    // Rendering the deck must not spend money. The control says "argue"; the
+    // click is the consent.
+    expect(api.argue).not.toHaveBeenCalled()
+
+    fireEvent.click(within(rowFor('Sol Ring')).getByRole(
+      'button', { name: /argue slot/i }))
+    await waitFor(() => expect(api.argue).toHaveBeenCalledWith(
+      REF, { card: 'Sol Ring' }))
+    expect(api.argue).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders the case against and offers nothing that writes', async () => {
+    const row = await argueAbout('Sol Ring')
+    await within(row).findByText('Six other cards already ramp for two or less.')
+    // The citation is rendered too: a charge is an argument because it rests
+    // on something, and hiding the fact would leave only the assertion.
+    expect(within(row).getByText(/ramp: 7 against a target/)).toBeTruthy()
+
+    // The whole rule in one assertion. There is no textarea in this panel and
+    // no control offering to put anything into one.
+    expect(within(row).queryByRole('textbox')).toBeNull()
+    expect(within(row).queryByRole(
+      'button', { name: /use this|insert|copy|write it for me/i })).toBeNull()
+  })
+
+  it('says it is the case against, never an assessment', async () => {
+    // The misreading this design makes possible is somebody taking a
+    // one-sided argument for a verdict, so naming it is the mitigation.
+    //
+    // Matched **exactly**, on the panel's own heading. A loose
+    // `/the case against/i` passes on the `never` sentence in the payload,
+    // which means it keeps passing when the heading is relabelled
+    // "Assessment" — verified by doing exactly that. A test that asserts the
+    // server's own text back at itself is not testing the renderer.
+    const row = await argueAbout('Sol Ring')
+    await within(row).findByText('The case against')
+    expect(within(row).getByText(/rationale is yours to write/)).toBeTruthy()
+  })
+
+  it('labels the answer as Claude’s rather than the gate’s', async () => {
+    const row = await argueAbout('Sol Ring')
+    await within(row).findByText(/not the gate/)
+  })
+
+  it('names which alternatives were dropped and why', async () => {
+    // Two different failures. "You invented that card" is about the model;
+    // "that card is off-colour" is about the deck. A single count says
+    // neither, which is why the payload keeps them apart and this renders them
+    // apart.
+    const row = await argueAbout('Sol Ring')
+    await within(row).findByText('Cultivator Colossus')
+    expect(within(row).getByText(/banned in Commander: Primeval Titan/)).toBeTruthy()
+    expect(within(row).getByText(/colour identity: Ajani, Nacatl Pariah/)).toBeTruthy()
+  })
+
+  it('reports dropped charges rather than hiding them', async () => {
+    vi.mocked(api.argue).mockResolvedValue({
+      ...ARGUMENT, charges: [], charges_dropped: 2,
+    })
+    const row = await argueAbout('Sol Ring')
+    await within(row).findByText(/2 charges cited nothing/)
+  })
+
+  it('says a stance of off made no call, rather than an empty case', async () => {
+    vi.mocked(api.argue).mockResolvedValue({
+      ...ARGUMENT, asked: false, charges: [], alternatives: [],
+      reason: 'The stance is off, so no call was made.',
+    })
+    const row = await argueAbout('Sol Ring')
+    await within(row).findByText(/stance is off/)
+  })
+
+  it('is not offered on a deck you cannot edit', async () => {
+    // Gated with the writes, and it is a spend argument: arguing a slot on
+    // somebody else's deck spends a call to reach a conclusion you cannot act
+    // on.
+    vi.mocked(api.deck).mockResolvedValue({ ...DRAFT, writable: false } as Deck)
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(screen.queryByRole('button', { name: /argue slot/i })).toBeNull()
   })
 })

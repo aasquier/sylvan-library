@@ -18,6 +18,7 @@
     mtglab users disable|enable <name>
     mtglab users promote|demote <name>  admin, and never the last one
     mtglab claude check                 one real API call -- is the key live?
+    mtglab claude argue <slug>          the case against a card's slot
     mtglab claude dossier <slug>        who the commander is, with sources
     mtglab claude interview <slug>      questions about a card's slot; you
                             --card X    write the rationale, it never does
@@ -1076,6 +1077,73 @@ def _wrapped(text, indent="  ", width=76):
                          subsequent_indent=indent)
 
 
+def cmd_claude_argue(args):
+    """The case against one card's slot (ADR 25). One direction, on purpose.
+
+    Prints charges and alternatives and no case in favour, because there is no
+    case in favour in the response to print -- the schema has no field for one.
+    Labelled as Claude's for the same reason the interview is, and with more
+    need: a reasoned case against a card reads like a verdict, and the gate's
+    verdicts are the reproducible ones.
+    """
+    from mtglab.api import service
+    from mtglab.claude.argue import CardNotInDeck
+    from mtglab.claude.client import ClaudeUnavailable
+
+    try:
+        report = service.claude_argue(
+            slug=args.slug, card=args.card,
+            requested=args.stance, focus=args.focus or "")
+    except (CardNotInDeck, ClaudeUnavailable, service.ClaudeFailed) as exc:
+        print(f"  {exc}")
+        sys.exit(1)
+
+    stance = report["stance"]
+    print(f"\n  {report['card']} — {report['slug']}")
+    print(f"  asked as: {stance['preset'] or 'custom'} "
+          f"(scope: {stance['axes'][1]['level']})")
+
+    if not report["asked"]:
+        print(f"\n  {report['reason']}")
+        return
+
+    if report["tool_calls"]:
+        looked = ", ".join(sorted({c["tool"] for c in report["tool_calls"]}))
+        print(f"  looked up: {looked}")
+
+    print(f"\n  The case against — {report['model']}, not the gate:\n")
+    for i, charge in enumerate(report["charges"], 1):
+        print(f"  {i}. [{charge['strength']}/{charge['ground']}]")
+        print(_wrapped(charge["claim"], indent="     "))
+        print(_wrapped(f"({charge['fact']})", indent="       "))
+    if not report["charges"]:
+        print(f"  nothing usable came back. {report['reason']}")
+    if report["charges_dropped"]:
+        print(f"\n  {report['charges_dropped']} charge(s) dropped: nothing cited.")
+
+    if report["alternatives"]:
+        print("\n  Cards that could do the job instead — pool-checked, "
+              "in-identity:\n")
+        for card in report["alternatives"]:
+            print(f"    {card['name']}  {card['mana_cost'] or ''}  "
+                  f"{card['type_line']}")
+    # Said out loud rather than left as a shorter list. Which filter removed a
+    # name is the informative part: "you made that up" and "that is off-colour"
+    # are different failures and only one of them is about the deck.
+    for reason, names in report["alternatives_dropped"].items():
+        if names:
+            print(f"\n  dropped ({reason.replace('_', ' ')}): "
+                  f"{', '.join(names)}")
+
+    print(f"\n{_wrapped(report['never'])}")
+    print(f"  Cut it with:   mtglab decks remove {args.slug} "
+          f"--card {report['card']!r}")
+    print(f"  Keep it with:  mtglab decks set {args.slug} "
+          f"--card {report['card']!r} --why '...'")
+    usage = report["usage"]
+    print(f"  tokens: {usage['input_tokens']} in / {usage['output_tokens']} out")
+
+
 def cmd_claude_dossier(args):
     """Who a deck's commander is (ADR 19), from the pool and the open web.
 
@@ -1352,6 +1420,14 @@ def main(argv=None):
                     help="off | consultant | second-opinion | collaborator")
     ci.add_argument("--focus", help="what you are stuck on, in your own words")
     ci.set_defaults(func=cmd_claude_interview)
+    ca = claude.add_parser("argue",
+                           help="the case against one card's slot -- never for it")
+    ca.add_argument("slug")
+    ca.add_argument("--card", required=True, help="a card already in the deck")
+    ca.add_argument("--stance", default="consultant",
+                    help="off | consultant | second-opinion | collaborator")
+    ca.add_argument("--focus", help="what you are weighing, in your own words")
+    ca.set_defaults(func=cmd_claude_argue)
     cd = claude.add_parser("dossier",
                            help="who a deck's commander is, with its sources")
     cd.add_argument("slug", nargs="?")
