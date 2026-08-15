@@ -225,7 +225,15 @@ export default function App() {
                 background: 'color-mix(in srgb, var(--page) 88%, transparent)',
                 borderBottom: '1px solid var(--hairline)',
               }}>
-        <div className="mx-auto flex max-w-7xl items-center gap-6 px-6 py-3">
+        {/* One row on a laptop; two on a phone. Below `lg` the seven nav
+            entries cannot share a 375px line with the wordmark and the theme
+            button — they used to wrap *inside their own labels* ("Start a
+            deck" on three lines) and clip everything past Import off-screen —
+            so the nav drops to its own full-width line and scrolls
+            horizontally if it must. `flex-wrap` plus `order-last` is the
+            whole mechanism; at `lg` the nav rejoins the row and none of the
+            mobile classes apply. */}
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 px-4 py-3 sm:px-6">
           {/* `shrink-0` and no wrapping: the signed-in name and Sign out add a
               second cluster to this row, and without it a narrow window breaks
               the wordmark across two lines before it touches anything else. */}
@@ -234,10 +242,18 @@ export default function App() {
             <span className="font-semibold tracking-tight">sylvan-library</span>
           </NavLink>
 
-          <nav className="flex gap-1">
+          {/* The negative margin lets the scrolled row bleed to the viewport
+              edge rather than clipping mid-padding, which is what makes the
+              overflow read as "more this way" instead of as a defect. */}
+          {/* The scrollbar is hidden because the cut-off last label already
+              says "more this way", and a bar under the nav reads as clutter
+              on the one row that is supposed to look effortless. */}
+          <nav className="order-last -mx-4 mt-2 flex w-full gap-1 overflow-x-auto px-4
+                          [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+                          lg:order-none lg:mx-0 lg:mt-0 lg:w-auto lg:overflow-visible lg:px-0">
             {nav.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.end}
-                       className="rounded-md px-3 py-1.5 text-sm font-medium transition"
+                       className="whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition"
                        style={({ isActive }) => ({
                          color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
                          background: isActive ? 'var(--gridline)' : 'transparent',
