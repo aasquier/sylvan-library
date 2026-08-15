@@ -1091,6 +1091,42 @@ arc; this is what the next few sessions actually do.
    deck inside a Claude surface has to supersede ADR 26 and say what it does
    about the five things listed under the stance dial above.
 
+8. **An efficiency pass against a stated load** — landed 2026-08-14. The
+   target was named rather than assumed: 100 accounts, 10 concurrent, one
+   `shared-cpu-1x` machine. Measured first, on the real pool and the real six
+   decks, and the findings were not where intuition pointed:
+
+   - **PyYAML was the shelf.** `yaml.safe_load` takes the pure-Python path
+     even with libyaml compiled in — the C loader is opt-in per call — so each
+     deck file cost ~36ms to parse and the shelf spent more time in YAML than
+     in DuckDB. `model.load_yaml` is the one entry point now, `edit.py`
+     included: 36ms → 7ms per deck, the shelf 430ms → 245ms, the deck page
+     228ms → 124ms, with a pure-Python fallback where libyaml is absent.
+   - **Nothing on the wire compressed.** Fly's proxy passes bodies through as
+     sent, so the 266 kB bundle and a deck's 81 kB JSON went out whole per
+     navigation. `GZipMiddleware` now, registered *innermost* because
+     `minimum_size` reads Content-Length and the decorator-style middlewares
+     re-wrap every response as a stream without one — registered outermost it
+     compressed two-byte job polls. Two tests pin both sides, verified by
+     mutation.
+   - **The session lookup could block the event loop.** `sessions.lookup`
+     writes — the five-minute `last_seen_at` touch, the delete of an expired
+     row — and a write that finds the file locked waits up to `busy_timeout`,
+     five seconds, on the loop, stalling every request in flight rather than
+     this one. It runs in the threadpool now. The docstring that kept it
+     inline priced the hop against the read alone, which is the "it is a few
+     seconds" shape at a smaller scale.
+   - **`jobs.MAX_JOBS` was sized for a laptop.** Fifty global slots shared by
+     100 accounts evicts a finished job somebody's tab is still polling —
+     cache hits are born finished, so ordinary use fills the registry with
+     exactly the jobs eviction takes first. 200 now.
+   - **Measured and deliberately left alone:** the per-request DuckDB connect
+     (~15ms, but holding one open would lock `mtglab data refresh` out of the
+     volume for the life of the process — the transient handle is what keeps
+     that workflow possible), and `get_cards`' query shape (an array-bind
+     variant saved nothing; the ~200ms shelf union is the scan itself, and
+     the 2026-08-14 CTE rewrite already took the cheap half).
+
 ---
 
 ## 1. Analyse or generate decks with simulation

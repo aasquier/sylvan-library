@@ -65,6 +65,7 @@ from typing import Any
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from mtglab import config
 from mtglab.api.deps import ANONYMOUS, LOCAL, Scope, UserScope
@@ -240,6 +241,10 @@ def install(app: FastAPI, *, require: bool, secure_cookies: bool,
     sends mail: the tests pass a recorder instead.
     """
 
+    def _resolve(token: str) -> UserScope:
+        with db.connection() as con:
+            return scope_for_token(con, token)
+
     @app.middleware("http")
     async def authenticate(
         request: Request,
@@ -247,9 +252,15 @@ def install(app: FastAPI, *, require: bool, secure_cookies: bool,
     ) -> Response:
         """Resolve the caller, then refuse anything not on the allowlist.
 
-        The SQLite lookup is a primary-key hit on a local file — tens of
-        microseconds — so it runs inline rather than through a threadpool hop
-        that would cost more than the query.
+        The lookup runs in the threadpool, not inline, and the reason is not
+        the read — that is a primary-key hit, tens of microseconds. It is that
+        `sessions.lookup` sometimes *writes*: the five-minute `last_seen_at`
+        touch, and the delete of an expired row. A write commit fsyncs, and a
+        write that finds the file locked waits up to `busy_timeout` — five
+        seconds — and this coroutine runs on the event loop, where that wait
+        would stall every request in flight, not this one. The threadpool hop
+        costs more than the happy-path query and buys the loop never blocking
+        on SQLite at all.
         """
         if not require:
             request.state.scope = LOCAL
@@ -257,8 +268,7 @@ def install(app: FastAPI, *, require: bool, secure_cookies: bool,
 
         token = request.cookies.get(COOKIE_NAME, "")
         if token:
-            with db.connection() as con:
-                request.state.scope = scope_for_token(con, token)
+            request.state.scope = await run_in_threadpool(_resolve, token)
         else:
             request.state.scope = ANONYMOUS
 

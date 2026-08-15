@@ -18,6 +18,23 @@ from typing import Any
 
 import yaml
 
+#: The C loader when libyaml is compiled in, the pure-Python one otherwise.
+#: `yaml.safe_load` always takes the Python path even with libyaml bound, and
+#: the difference is not small: 36ms against 7ms for one curated deck file,
+#: measured 2026-08-14 — and the shelf parses six per request. Both loaders
+#: accept only the same safe subset, so nothing but the speed changes.
+SAFE_LOADER: type[yaml.SafeLoader] = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
+
+def load_yaml(text: str) -> Any:
+    """`yaml.safe_load`, taking the libyaml fast path when it exists.
+
+    The one YAML entry point for deck text — `edit.py` goes through it too, so
+    a parser choice is made once rather than re-decided per call site.
+    """
+    return yaml.load(text, SAFE_LOADER)
+
+
 # Macro categories tracked for balance analysis. The set is deliberately small
 # and fixed so that category counts are comparable across decks.
 CATEGORIES = (
@@ -208,7 +225,7 @@ class Deck:
         row, so the parser has to work on text. One parser, one validator, two
         sources -- which is the property ADR 4 is relying on.
         """
-        raw = yaml.safe_load(text) or {}
+        raw = load_yaml(text) or {}
 
         commander = raw.get("commander") or []
         if isinstance(commander, str):
