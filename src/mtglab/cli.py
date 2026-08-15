@@ -24,6 +24,7 @@
                                         with the pages it read; takes no deck
     mtglab claude interview <slug>      questions about a card's slot; you
                             --card X    write the rationale, it never does
+    mtglab claude usage                 what every mode has spent, in tokens
 """
 
 from __future__ import annotations
@@ -1360,6 +1361,43 @@ def cmd_claude_research(args):
     print()
 
 
+def cmd_claude_usage(args):
+    """Where the Claude money went, per mode, from the ledger in app.db.
+
+    Tokens and not dollars, deliberately: prices move (Sonnet 5's introductory
+    rate ends 2026-08-31) and a stale hardcoded price table would turn an
+    honest count into a wrong invoice. The cached column is the exception that
+    proves it — those tokens were billed at roughly a tenth of the input rate,
+    which is worth saying because it is the number that justifies the cache.
+    """
+    from mtglab.claude import ledger
+
+    since = f"{args.since}T00:00:00+00:00" if args.since else None
+    rows = ledger.summary(since=since)
+    if not rows:
+        print("  no conversations recorded"
+              + (f" since {args.since}" if args.since else "") + ".")
+        return
+
+    print(f"\n  {'mode':<22} {'conv':>5} {'req':>5} "
+          f"{'tokens in':>11} {'tokens out':>11} {'cached':>11}")
+    for row in rows:
+        print(f"  {row['mode']:<22} {row['conversations']:>5} "
+              f"{row['requests']:>5} {row['input_tokens']:>11} "
+              f"{row['output_tokens']:>11} {row['cache_read_tokens']:>11}")
+    total_in = sum(r["input_tokens"] for r in rows)
+    total_out = sum(r["output_tokens"] for r in rows)
+    total_cached = sum(r["cache_read_tokens"] for r in rows)
+    print(f"  {'total':<22} {sum(r['conversations'] for r in rows):>5} "
+          f"{sum(r['requests'] for r in rows):>5} {total_in:>11} "
+          f"{total_out:>11} {total_cached:>11}")
+    print("\n  'cached' tokens are the slice of 'tokens in' served from the "
+          "prompt cache\n  at ~a tenth of the input price.")
+    first = min(r["first_at"] for r in rows)
+    last = max(r["last_at"] for r in rows)
+    print(f"  counting {first[:10]} to {last[:10]}.\n")
+
+
 # --------------------------------------------------------------------- main
 
 def main(argv=None):
@@ -1583,6 +1621,12 @@ def main(argv=None):
                          "(default: second-opinion -- there is no deck to "
                          "derive one from)")
     cr.set_defaults(func=cmd_claude_research)
+    cu = claude.add_parser("usage",
+                           help="what every mode has spent -- tokens, "
+                                "requests, and how much the cache saved")
+    cu.add_argument("--since", metavar="YYYY-MM-DD",
+                    help="count only conversations on or after this date")
+    cu.set_defaults(func=cmd_claude_usage)
 
     args = p.parse_args(argv)
     args.func(args)

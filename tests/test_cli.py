@@ -470,6 +470,29 @@ def test_sim_cache_clear_empties_the_store(decks, capsys):
     assert cache.stats()["rows"] == 0
 
 
+def test_claude_usage_reports_an_empty_ledger(decks, capsys):
+    """The `decks` fixture points the data dir at scratch, so this reads (and
+    on first touch creates) a scratch app.db rather than the real one."""
+    main(["claude", "usage"])
+    assert "no conversations recorded" in capsys.readouterr().out
+
+
+def test_claude_usage_rolls_up_per_mode(decks, capsys):
+    from mtglab.claude import ledger
+    ledger.record(mode="argue", model="claude-sonnet-5",
+                  stop_reason="end_turn", requests=2, input_tokens=100,
+                  output_tokens=50, cache_read_tokens=25)
+    main(["claude", "usage"])
+    out = capsys.readouterr().out
+    assert "argue" in out
+    assert "total" in out
+    assert "prompt cache" in out
+
+    main(["claude", "usage", "--since", "2999-01-01"])
+    assert "no conversations recorded since 2999-01-01" \
+        in capsys.readouterr().out
+
+
 # ------------------------------------------------------------ argv handling
 
 def test_no_subcommand_is_an_error_not_a_crash(capsys):
