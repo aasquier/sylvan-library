@@ -41,6 +41,11 @@
   --mtg-r: #e49977;
   --mtg-g: #a3c095;
   --mtg-c: #cac5c0;
+
+  /* The forest's own green — vines, leaves, the whisper sprout. Darker than
+     --mtg-g in the light theme (foliage against paper), lighter in the dark
+     one (foliage against night). */
+  --vine: #4a7c59;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -65,6 +70,8 @@
     --seq-400: #3987e5;
     --seq-450: #5598e7;
     --seq-600: #86b6ef;
+
+    --vine: #6fae7f;
   }
 }
 
@@ -89,6 +96,8 @@
   --seq-400: #3987e5;
   --seq-450: #5598e7;
   --seq-600: #86b6ef;
+
+  --vine: #6fae7f;
 }
 
 html,
@@ -547,12 +556,141 @@ button:hover .tarot-fan-card {
   --felt-edge: #3d5d49;
 }
 
-/* The reader's crystal ball (`CrystalBall` in components/tarot.tsx). The
-   gleam breathes; under reduced motion it simply shines. */
+/* The reader's crystal ball (`CrystalBall` in components/tarot.tsx).
+ *
+ * Three fogs turn against each other at incommensurate speeds — 26s, 41s and
+ * 19s never line up, so the weather inside the glass does not visibly loop.
+ * The gleam breathes, four glints twinkle on their own delays, the aura the
+ * ball throws on the felt swells and settles, and a turned card surfaces
+ * through the fog (`.crystal-vision`). All of it is transform/opacity work
+ * on a handful of nodes, and all of it holds still under reduced motion.
+ *
+ * `transform-box: view-box` is load-bearing on every rotating piece: without
+ * it an SVG group rotates about the viewBox origin and the fog exits the
+ * ball on the first frame.
+ */
 .crystal-ball {
-  width: 54px;
-  height: 66px;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+  width: 118px;
+  filter: drop-shadow(0 10px 18px rgba(8, 4, 34, 0.5));
+}
+
+.crystal-fog,
+.crystal-vision {
+  transform-box: view-box;
+  transform-origin: 60px 62px;
+}
+
+.crystal-fog-a {
+  animation: crystal-swirl 26s linear infinite;
+}
+
+.crystal-fog-b {
+  animation: crystal-swirl-back 41s linear infinite;
+}
+
+.crystal-fog-c {
+  animation: crystal-heave 19s ease-in-out infinite;
+}
+
+@keyframes crystal-swirl {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes crystal-swirl-back {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes crystal-heave {
+  0%,
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.14) translateY(-2px);
+    opacity: 0.55;
+  }
+}
+
+.crystal-spark {
+  animation: crystal-twinkle 4.2s ease-in-out infinite;
+  opacity: 0;
+}
+
+.crystal-spark-2 {
+  animation-delay: 1.3s;
+}
+
+.crystal-spark-3 {
+  animation-delay: 2.4s;
+}
+
+.crystal-spark-4 {
+  animation-delay: 3.1s;
+}
+
+@keyframes crystal-twinkle {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  30% {
+    opacity: 0.15;
+  }
+}
+
+/* The fortune arriving: already there once the mist thins. The appear and
+   the sway share the transform, so the sway takes over exactly when the
+   appear ends (its delay is the appear's duration). */
+.crystal-vision {
+  opacity: 0;
+  filter: saturate(0.82) brightness(1.04);
+  animation:
+    crystal-vision-appear 1.8s ease-out forwards,
+    crystal-vision-sway 9s ease-in-out 1.8s infinite;
+}
+
+@keyframes crystal-vision-appear {
+  from {
+    opacity: 0;
+    transform: scale(1.16);
+  }
+  to {
+    opacity: 0.92;
+    transform: scale(1);
+  }
+}
+
+@keyframes crystal-vision-sway {
+  0%,
+  100% {
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    transform: scale(1.03) translateY(-2px);
+  }
+}
+
+.crystal-aura {
+  opacity: 0.22;
+  animation: crystal-aura-swell 5.2s ease-in-out infinite;
+}
+
+@keyframes crystal-aura-swell {
+  0%,
+  100% {
+    opacity: 0.16;
+  }
+  50% {
+    opacity: 0.34;
+  }
 }
 
 .crystal-gleam {
@@ -617,6 +755,18 @@ button:hover .tarot-fan-card {
     animation: none;
     opacity: 0.7;
   }
+  .crystal-fog,
+  .crystal-aura {
+    animation: none;
+  }
+  .crystal-spark {
+    animation: none;
+    opacity: 0.5;
+  }
+  .crystal-vision {
+    animation: none;
+    opacity: 0.92;
+  }
   .flask-bubble {
     animation: none;
     opacity: 0.8;
@@ -680,6 +830,302 @@ button:hover .tarot-fan-card {
   }
   .entombing {
     animation-duration: 1ms;
+  }
+}
+
+/* -------------------------------------------------------- the forest layer
+ *
+ * `components/forest.tsx` draws it; this is where it lives and breathes.
+ * The split is the two themes' weather: **fireflies at night, leaves by
+ * day** — each display-gated on the theme with the same two-selector dance
+ * every other theme rule in this file does, so the explicit toggle wins in
+ * both directions. Reduced motion removes the layer outright at the bottom
+ * of this file: frozen weather is worse than no weather.
+ */
+.forest-ambience {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.firefly {
+  display: none;
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: #ffe9a8;
+  box-shadow: 0 0 8px 2px rgba(255, 214, 110, 0.55);
+  opacity: 0;
+  animation:
+    firefly-wander var(--dur) ease-in-out var(--delay) infinite alternate,
+    firefly-glow 3.4s ease-in-out var(--delay) infinite;
+}
+
+:root[data-theme='dark'] .firefly {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .firefly {
+    display: block;
+  }
+}
+
+@keyframes firefly-wander {
+  0% {
+    transform: translate(0, 0);
+  }
+  33% {
+    transform: translate(var(--fx1), var(--fy1));
+  }
+  66% {
+    transform: translate(var(--fx2), var(--fy2));
+  }
+  100% {
+    transform: translate(var(--fx3), var(--fy3));
+  }
+}
+
+@keyframes firefly-glow {
+  0%,
+  100% {
+    opacity: 0.05;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.leaf-fall {
+  display: none;
+  position: absolute;
+  top: -6%;
+  color: var(--vine);
+  opacity: 0;
+  animation: leaf-fall var(--dur) linear var(--delay) infinite;
+}
+
+:root[data-theme='light'] .leaf-fall {
+  display: block;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:where(:not([data-theme='dark'])) .leaf-fall {
+    display: block;
+  }
+}
+
+@keyframes leaf-fall {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  6% {
+    opacity: var(--leaf-op, 0.35);
+  }
+  50% {
+    transform: translate(var(--sway), 55vh) rotate(190deg);
+  }
+  94% {
+    opacity: var(--leaf-op, 0.35);
+  }
+  100% {
+    transform: translate(calc(var(--sway) * 0.4), 112vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* The vine along the header's underside. `color` is the whole palette —
+   the SVG draws in currentColor — and the sway is one transform on one
+   element, origin at the stem so the tips travel farthest. */
+.header-canopy {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 24px;
+  pointer-events: none;
+  color: var(--vine);
+  opacity: 0.55;
+}
+
+.header-canopy svg {
+  transform-origin: 50% 0;
+  animation: canopy-sway 13s ease-in-out infinite;
+}
+
+@keyframes canopy-sway {
+  0%,
+  100% {
+    transform: skewX(-1.1deg) translateX(0);
+  }
+  50% {
+    transform: skewX(1.1deg) translateX(4px);
+  }
+}
+
+/* Navigation grows a stem under the active page. `::after` rather than a
+   border so it can scale from the left like something growing, and the
+   hover state only sprouts part way — interest, not residence. */
+.nav-link {
+  position: relative;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--vine), var(--series-3));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 240ms ease;
+}
+
+.nav-link:hover::after {
+  transform: scaleX(0.55);
+}
+
+.nav-link.is-active::after {
+  transform: scaleX(1);
+}
+
+/* The wordmark's tree answers the pointer with a small shiver of leaves. */
+.wordmark:hover .wordmark-tree {
+  display: inline-block;
+  animation: tree-shiver 700ms ease-in-out;
+}
+
+@keyframes tree-shiver {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-7deg);
+  }
+  60% {
+    transform: rotate(5deg);
+  }
+}
+
+/* Every screen enters the same way: a short rise, like coming up a path.
+   Applied to the route wrapper in App.tsx, keyed on the pathname. */
+.page-enter {
+  animation: page-enter 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The corner sprout and its whisper (`components/whisper.tsx`). */
+.library-whisper {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.whisper-sprout {
+  color: var(--vine);
+  cursor: pointer;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+  animation: sprout-bob 4.6s ease-in-out infinite;
+}
+
+.whisper-sprout:hover {
+  transform: translateY(-2px) scale(1.06);
+}
+
+@keyframes sprout-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.whisper-bubble {
+  width: min(20rem, calc(100vw - 3rem));
+  transform-origin: bottom right;
+  animation: whisper-grow 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes whisper-grow {
+  from {
+    opacity: 0;
+    transform: scale(0.86) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Deck tiles on the shelf lean toward the hand that hovers them: the tile
+   lifts, and the painting eases a step closer. Transform-only, and inert
+   under reduced motion with everything else. */
+.deck-tile {
+  transition: transform 260ms ease, box-shadow 260ms ease;
+}
+
+.deck-tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 34px rgb(0 0 0 / 0.28);
+}
+
+.deck-tile img {
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.deck-tile:hover img {
+  transform: scale(1.045);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .forest-ambience {
+    display: none;
+  }
+  .header-canopy svg,
+  .whisper-sprout,
+  .wordmark:hover .wordmark-tree {
+    animation: none;
+  }
+  .page-enter,
+  .whisper-bubble {
+    animation: none;
+  }
+  .nav-link::after,
+  .deck-tile,
+  .deck-tile img,
+  .whisper-sprout {
+    transition: none;
+  }
+  .deck-tile:hover {
+    transform: none;
+  }
+  .deck-tile:hover img {
+    transform: none;
   }
 }
 

@@ -1,1 +1,0 @@
-import{K as e,M as t,U as n}from"./app.js";var r=e(n(),1),i=null,a=null;function o(){let[e,n]=(0,r.useState)(a);return(0,r.useEffect)(()=>{if(a)return;let e=!0;return i??=t.glossary(),i.then(t=>{a=t,e&&n(t)}).catch(()=>{i=null}),()=>{e=!1}},[]),e}function s(e){return o()?.terms.find(t=>t.key===e)??null}export{s as n,o as t};

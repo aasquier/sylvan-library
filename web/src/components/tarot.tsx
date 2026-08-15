@@ -44,8 +44,8 @@ import {
   type TarotReading,
   type ThemeCommander,
 } from '../lib/api'
-import { deal as dealSound, flip as flipSound, riffle, setSound, soundOn }
-  from '../lib/tablesounds'
+import { deal as dealSound, flip as flipSound, riffle, setSound, shimmer,
+  soundOn, wake } from '../lib/tablesounds'
 import { ThemeInterview } from './theme'
 import { CardArt } from './ui'
 
@@ -275,34 +275,110 @@ function ShufflingDeck() {
 }
 
 /**
- * The reader's crystal ball, sitting at the table's edge. Decorative and
- * marked so; the gleam breathes in CSS (`.crystal-gleam`) and holds still
- * under `prefers-reduced-motion`. Inline SVG like `CardBack`, so it costs
- * no asset and takes both themes' colours from the stylesheet.
+ * The reader's crystal ball — a real one this time.
+ *
+ * Inline SVG like `CardBack`, so it costs no asset and owes nobody a licence:
+ * the glass, the fog and the brass are all geometry. Three layers of blurred
+ * fog turn against each other inside a clip of the sphere (`.crystal-fog-*`),
+ * glints twinkle on their own delays, the gleam still breathes, and an aura
+ * pools on the felt underneath. Everything holds still under
+ * `prefers-reduced-motion` — the fog is simply weather, arrested.
+ *
+ * `vision` is the trick the ball was bought for: the card most recently
+ * turned over surfaces inside the glass, under the fog, the way a fortune
+ * arrives — already there once the mist thins. A reversed card appears
+ * upside down in the glass too; the ball does not editorialise.
+ *
+ * Decorative and marked so. The spread announces every card by name; the
+ * ball repeating it to a screen reader would be saying everything twice.
  */
-function CrystalBall() {
-  const id = useId()
+function CrystalBall({ vision }: {
+  vision?: { image: string; reversed: boolean } | null
+}) {
+  const id = useId().replace(/:/g, '')
   return (
-    <svg aria-hidden viewBox="0 0 48 58" className="crystal-ball">
-      <defs>
-        <radialGradient id={`${id}-glass`} cx="38%" cy="32%" r="75%">
-          <stop offset="0%" stopColor="#cfd8ff" stopOpacity="0.9" />
-          <stop offset="45%" stopColor="#7d6cd1" stopOpacity="0.55" />
-          <stop offset="100%" stopColor="#241b4d" stopOpacity="0.95" />
-        </radialGradient>
-      </defs>
-      {/* the stand */}
-      <path d="M13 47h22l-4 8H17z" fill="#241b3e" />
-      <ellipse cx="24" cy="47.5" rx="12" ry="3" fill="#382a5c" />
-      {/* the glass */}
-      <circle cx="24" cy="27" r="17.5" fill={`url(#${id}-glass)`} />
-      <circle cx="24" cy="27" r="17.5" fill="none"
-              stroke="rgba(255,255,255,0.25)" strokeWidth="0.8" />
-      {/* the gleam that breathes */}
-      <path className="crystal-gleam" d="M13.5 20 A 13.5 13.5 0 0 1 22 12"
-            fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.2"
-            strokeLinecap="round" />
-    </svg>
+    <div className="crystal-ball" aria-hidden="true">
+      <svg viewBox="0 0 120 150" className="h-full w-full">
+        <defs>
+          <radialGradient id={`${id}-depth`} cx="50%" cy="42%" r="68%">
+            <stop offset="0%" stopColor="#3b2d73" />
+            <stop offset="55%" stopColor="#241b52" />
+            <stop offset="100%" stopColor="#0e0926" />
+          </radialGradient>
+          <radialGradient id={`${id}-sheen`} cx="36%" cy="28%" r="62%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.5)" />
+            <stop offset="38%" stopColor="rgba(255,255,255,0.12)" />
+            <stop offset="65%" stopColor="rgba(255,255,255,0)" />
+          </radialGradient>
+          <radialGradient id={`${id}-fog`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(216,201,255,0.85)" />
+            <stop offset="60%" stopColor="rgba(158,132,255,0.32)" />
+            <stop offset="100%" stopColor="rgba(158,132,255,0)" />
+          </radialGradient>
+          <clipPath id={`${id}-glass`}>
+            <circle cx="60" cy="62" r="44" />
+          </clipPath>
+          <filter id={`${id}-soft`} x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
+        </defs>
+
+        {/* The light the ball throws on the felt. */}
+        <ellipse className="crystal-aura" cx="60" cy="130" rx="42" ry="9"
+                 fill="#8f79e8" />
+
+        {/* The stand: brass cradle, one worn band, three set stones. */}
+        <path d="M34 116 C 34 103 86 103 86 116 L 81 138 C 81 145 39 145 39 138 Z"
+              fill="#40301b" />
+        <path d="M34 116 C 34 103 86 103 86 116 C 86 125 34 125 34 116 Z"
+              fill="#8a6a2f" />
+        <path d="M39 111 C 46 105 74 105 81 111" stroke="#c9a227"
+              strokeWidth="2" fill="none" opacity="0.85" />
+        <circle cx="60" cy="134" r="3.2" fill="#c9a227" opacity="0.95" />
+        <circle cx="46" cy="131" r="2.1" fill="#7d4b8f" />
+        <circle cx="74" cy="131" r="2.1" fill="#2e6f6a" />
+
+        {/* The glass, and everything it holds. */}
+        <circle cx="60" cy="62" r="44" fill={`url(#${id}-depth)`} />
+        <g clipPath={`url(#${id}-glass)`}>
+          {vision && (
+            // Keyed on the image so a new turn fades in as a new vision
+            // rather than swapping pixels inside the old one.
+            <g key={vision.image}
+               transform={vision.reversed ? 'rotate(180 60 62)' : undefined}>
+              <image className="crystal-vision" href={vision.image}
+                     x="16" y="8" width="88" height="108"
+                     preserveAspectRatio="xMidYMid slice" />
+            </g>
+          )}
+          <g className="crystal-fog crystal-fog-a" filter={`url(#${id}-soft)`}>
+            <ellipse cx="42" cy="52" rx="27" ry="14" fill={`url(#${id}-fog)`} />
+            <ellipse cx="76" cy="76" rx="23" ry="12" fill={`url(#${id}-fog)`} />
+          </g>
+          <g className="crystal-fog crystal-fog-b" filter={`url(#${id}-soft)`}>
+            <ellipse cx="68" cy="42" rx="21" ry="11" fill={`url(#${id}-fog)`} />
+            <ellipse cx="46" cy="84" rx="25" ry="12" fill={`url(#${id}-fog)`} />
+          </g>
+          <g className="crystal-fog crystal-fog-c" filter={`url(#${id}-soft)`}>
+            <ellipse cx="60" cy="64" rx="31" ry="17" fill={`url(#${id}-fog)`} />
+          </g>
+          <g fill="#fff">
+            <circle className="crystal-spark" cx="44" cy="46" r="1.4" />
+            <circle className="crystal-spark crystal-spark-2" cx="77" cy="58" r="1" />
+            <circle className="crystal-spark crystal-spark-3" cx="55" cy="86" r="1.2" />
+            <circle className="crystal-spark crystal-spark-4" cx="69" cy="33" r="0.9" />
+          </g>
+          <circle cx="60" cy="62" r="44" fill={`url(#${id}-sheen)`} />
+        </g>
+        <circle cx="60" cy="62" r="44" fill="none"
+                stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+        {/* The gleam that breathes, and its small answer across the glass. */}
+        <path className="crystal-gleam" d="M30 47 A 34 34 0 0 1 51 24"
+              fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="3"
+              strokeLinecap="round" />
+        <circle cx="80" cy="87" r="2.4" fill="rgba(255,255,255,0.35)" />
+      </svg>
+    </div>
   )
 }
 
@@ -310,13 +386,22 @@ function CrystalBall() {
  * The sound toggle. Off by default and structural about it — until this is
  * switched on, `lib/tablesounds` constructs no AudioContext at all. The
  * first switch-on is necessarily a click, which is also what the browser's
- * autoplay policy wants to see.
+ * autoplay policy wants to see — and `wake()` spends that click twice over:
+ * it constructs and resumes the context inside the one gesture every
+ * browser accepts, and it answers with two soft taps, so a working toggle
+ * is heard working. A silent "on" is indistinguishable from a broken one,
+ * which is exactly what the first version shipped as.
  */
 function SoundToggle() {
   const [on, setOn] = useState(soundOn)
   return (
     <button type="button"
-            onClick={() => { setSound(!on); setOn(!on) }}
+            onClick={() => {
+              const next = !on
+              setSound(next)
+              setOn(next)
+              if (next) wake()
+            }}
             aria-pressed={on}
             title={on
               ? 'Table sounds are on'
@@ -507,8 +592,9 @@ export function TarotTable({ onPick, onLeave }: {
   const turn = (i: number) => {
     turnedHere.current = true
     // The sound outside the updater: React may re-run an updater, and a card
-    // must not flip twice in the ear when it flips once on the table.
-    if (!table.turned.includes(i)) flipSound()
+    // must not flip twice in the ear when it flips once on the table. The
+    // shimmer rides under the flip — the ball noticing what was turned.
+    if (!table.turned.includes(i)) { flipSound(); shimmer() }
     setTable((t) => (t.turned.includes(i) ? t : { ...t, turned: [...t.turned, i] }))
   }
 
@@ -602,6 +688,13 @@ export function TarotTable({ onPick, onLeave }: {
   /* ------------------------------------------- a reader, and maybe a deal */
 
   const dealing = chosen.deals && !(allTurned && settled)
+  // What the ball is showing: the card most recently turned face up. Indexed
+  // through `turned` rather than tracked separately, so a table restored from
+  // a stash scries its last card too.
+  const lastTurnedIndex = table.turned[table.turned.length - 1]
+  const lastTurned = lastTurnedIndex === undefined
+    ? null
+    : cards[lastTurnedIndex] ?? null
   const intro = chosen.deals
     ? {
         title: 'The cards are out',
@@ -660,8 +753,10 @@ export function TarotTable({ onPick, onLeave }: {
       {cards.length > 0 && (
         <div className={dealing ? 'tarot-table-felt relative px-4 py-8' : ''}>
           {dealing && (
-            <div className="absolute right-4 top-3 hidden sm:block">
-              <CrystalBall />
+            <div className="absolute right-5 top-1/2 hidden -translate-y-1/2 sm:block">
+              <CrystalBall vision={lastTurned && lastTurned.image
+                ? { image: lastTurned.image, reversed: lastTurned.reversed }
+                : null} />
             </div>
           )}
           <Spread cards={cards} turned={table.turned} small={!dealing}
