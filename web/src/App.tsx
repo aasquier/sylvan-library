@@ -5,6 +5,8 @@ import Library from './routes/Library'
 import Login from './routes/Login'
 import { Spinner } from './components/ui'
 import { StanceMenu } from './components/stancemenu'
+import { ForestAmbience, HeaderCanopy } from './components/forest'
+import { LibraryWhisper } from './components/whisper'
 import { api, onSessionLost, type AuthState, type Health } from './lib/api'
 
 // Route-level code splitting. Library stays eager because it is the landing
@@ -243,6 +245,11 @@ export default function App() {
 
   return (
     <div className="min-h-full">
+      {/* The weather, behind everything: fireflies at night, leaves by day.
+          `main` and the footer carry `relative z-10`, so painted content
+          covers this layer and the forest shows through the gaps — which is
+          how a firefly gets to pass *behind* a card. */}
+      <ForestAmbience />
       <header className="sticky top-0 z-40 backdrop-blur"
               style={{
                 background: 'color-mix(in srgb, var(--page) 88%, transparent)',
@@ -260,8 +267,8 @@ export default function App() {
           {/* `shrink-0` and no wrapping: the signed-in name and Sign out add a
               second cluster to this row, and without it a narrow window breaks
               the wordmark across two lines before it touches anything else. */}
-          <NavLink to="/" className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-            <span aria-hidden className="text-lg">🌳</span>
+          <NavLink to="/" className="wordmark flex shrink-0 items-center gap-2 whitespace-nowrap">
+            <span aria-hidden className="wordmark-tree text-lg">🌳</span>
             <span className="font-semibold tracking-tight">sylvan-library</span>
           </NavLink>
 
@@ -277,7 +284,9 @@ export default function App() {
             {nav.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.end}
                        title={item.hint}
-                       className="whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition"
+                       className={({ isActive }) =>
+                         'nav-link whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition'
+                         + (isActive ? ' is-active' : '')}
                        style={({ isActive }) => ({
                          color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
                          background: isActive ? 'var(--gridline)' : 'transparent',
@@ -316,9 +325,16 @@ export default function App() {
             <ThemeButton theme={theme} onToggle={toggleTheme} />
           </div>
         </div>
+        {/* The vine draped along the header's underside. Inside the sticky
+            element so it travels with the chrome instead of scrolling away. */}
+        <HeaderCanopy />
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
+      <main className="relative z-10 mx-auto max-w-7xl px-6 py-8">
+        {/* Keyed on the path: navigating re-mounts this wrapper, so every
+            page enters the same way — a short rise out of the undergrowth
+            (`.page-enter`), gone entirely under reduced motion. */}
+        <div key={location.pathname} className="page-enter">
         <Suspense fallback={<Spinner label="Loading…" />}>
         <Routes>
           <Route path="/" element={<Library />} />
@@ -350,9 +366,14 @@ export default function App() {
           } />
         </Routes>
         </Suspense>
+        </div>
       </main>
 
-      <footer className="mx-auto max-w-7xl px-6 pb-10 pt-4 text-xs"
+      {/* The corner sprout: one glossary whisper at a time, on every page,
+          and it never opens itself. */}
+      <LibraryWhisper />
+
+      <footer className="relative z-10 mx-auto max-w-7xl px-6 pb-10 pt-4 text-xs"
               style={{ color: 'var(--text-muted)' }}>
         Card data and images from Scryfall. Unofficial Fan Content permitted under
         the Wizards of the Coast Fan Content Policy. Not approved or endorsed by

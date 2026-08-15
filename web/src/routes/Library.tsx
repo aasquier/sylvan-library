@@ -288,7 +288,7 @@ function DeckCard({ deck, onDelete, heading: Heading = 'h2' }: {
         </button>
       )}
       <Link to={deckUrl(deck)}
-            className="card-surface block overflow-hidden rounded-xl transition hover:-translate-y-0.5 hover:shadow-lg">
+            className="deck-tile card-surface block overflow-hidden rounded-xl">
         {/* 626/457 is `art_crop`'s own shape, so the tile shows the whole
             painting instead of a band cut out of its middle. It was 626/300,
             which threw away a third of the height and took it off the top and

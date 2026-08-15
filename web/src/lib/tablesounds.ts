@@ -2,7 +2,7 @@
  * Card-table sounds, synthesised.
  *
  * Web Audio, not audio files: the repo ships no recordings, pays no licence
- * questions and adds nothing to the bundle — a riffle is fourteen short
+ * questions and adds nothing to the bundle — a riffle is a run of short
  * bursts of band-passed noise, which is very nearly what a riffle *is*.
  *
  * Two rules, both structural:
@@ -16,11 +16,24 @@
  *   stash: it is a preference about this person, like `mtglab-theme` and
  *   `mtglab-stance`, and it should survive "different reader" resetting the
  *   table.
+ *
+ * Two lessons from the first version, which shipped and was never heard:
+ *
+ * - **Level is a correctness property.** The old bursts peaked at −20 dBFS
+ *   for thirty milliseconds — measured offline, below a laptop's own fan.
+ *   Every voice now runs through a master gain into a compressor, and the
+ *   bursts are shaped with real envelopes at levels a speaker can say.
+ * - **The toggle proves itself.** `wake()` runs inside the toggle's own
+ *   click: it constructs and resumes the context in a guaranteed gesture
+ *   (Safari refuses a context born in a `setTimeout`, and the deal lands in
+ *   one) and answers with two soft taps, so "on" is something you hear
+ *   rather than a label you take on faith.
  */
 
 const KEY = 'mtglab-table-sound'
 
 let ctx: AudioContext | null = null
+let master: GainNode | null = null
 
 export function soundOn(): boolean {
   try {
@@ -40,14 +53,50 @@ export function setSound(on: boolean): void {
 function context(): AudioContext | null {
   if (!soundOn()) return null
   if (typeof AudioContext === 'undefined') return null
-  ctx ??= new AudioContext()
+  if (!ctx) {
+    ctx = new AudioContext()
+    // Master bus: one place to set the room's volume, and a compressor so
+    // fourteen overlapping riffle snaps sum to "cards" rather than clipping.
+    master = ctx.createGain()
+    master.gain.value = 0.9
+    const glue = ctx.createDynamicsCompressor()
+    glue.threshold.value = -18
+    glue.knee.value = 12
+    glue.ratio.value = 5
+    glue.attack.value = 0.002
+    glue.release.value = 0.12
+    master.connect(glue)
+    glue.connect(ctx.destination)
+  }
   if (ctx.state === 'suspended') void ctx.resume()
   return ctx
 }
 
-/** One short burst of band-passed noise — the sound of card stock moving. */
+/**
+ * Run a voice against a context that is actually producing sound.
+ *
+ * A suspended context accepts every schedule and plays none of it — the
+ * failure mode that is silent by construction. Inside a gesture `resume()`
+ * settles fast; scheduled after it, the sound still lands within the beat
+ * it was meant for.
+ */
+function play(voice: (c: AudioContext) => void): void {
+  const c = context()
+  if (!c) return
+  if (c.state === 'running') {
+    voice(c)
+    return
+  }
+  c.resume().then(() => {
+    if (c.state === 'running') voice(c)
+  }).catch(() => { /* the policy said no; stay silent rather than throw */ })
+}
+
+/** One burst of band-passed noise with an exponential decay — the sound of
+ *  card stock moving. `gain` here is a real level, pre-compressor. */
 function burst(c: AudioContext, at: number, dur: number,
-               freq: number, gain: number): void {
+               freq: number, gain: number, q = 0.9): void {
+  if (!master) return
   const length = Math.max(1, Math.ceil(c.sampleRate * dur))
   const buffer = c.createBuffer(1, length, c.sampleRate)
   const data = buffer.getChannelData(0)
@@ -59,40 +108,107 @@ function burst(c: AudioContext, at: number, dur: number,
   const filter = c.createBiquadFilter()
   filter.type = 'bandpass'
   filter.frequency.value = freq
-  filter.Q.value = 0.8
+  filter.Q.value = q
   const g = c.createGain()
-  g.gain.value = gain
+  g.gain.setValueAtTime(gain, at)
+  g.gain.exponentialRampToValueAtTime(Math.max(gain * 0.02, 0.001), at + dur)
   source.connect(filter)
   filter.connect(g)
-  g.connect(c.destination)
+  g.connect(master)
   source.start(at)
 }
 
-/** The shuffle: a run of quick snaps, slightly irregular, like thumbs. */
+/** The felt answering: a soft low thump, pitch falling as the energy goes. */
+function thump(c: AudioContext, at: number, from: number, to: number,
+               dur: number, gain: number): void {
+  if (!master) return
+  const osc = c.createOscillator()
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(from, at)
+  osc.frequency.exponentialRampToValueAtTime(to, at + dur)
+  const g = c.createGain()
+  g.gain.setValueAtTime(gain, at)
+  g.gain.exponentialRampToValueAtTime(0.001, at + dur)
+  osc.connect(g)
+  g.connect(master)
+  osc.start(at)
+  osc.stop(at + dur)
+}
+
+/** The shuffle: a run of quick snaps that accelerates like thumbs letting a
+ *  deck go, then the square-up tap on the table. */
 export function riffle(): void {
-  const c = context()
-  if (!c) return
-  const t = c.currentTime
-  for (let i = 0; i < 14; i++) {
-    burst(c, t + i * 0.045 + Math.random() * 0.012, 0.03,
-          2000 + Math.random() * 900, 0.1)
-  }
+  play((c) => {
+    const t = c.currentTime
+    let at = t
+    for (let i = 0; i < 16; i++) {
+      // A real riffle speeds up as the thumbs run out of cards.
+      at += 0.055 - i * 0.0022 + Math.random() * 0.01
+      burst(c, at, 0.035, 1800 + Math.random() * 1400, 0.5)
+      burst(c, at + 0.004, 0.05, 350 + Math.random() * 150, 0.22)
+    }
+    // Squaring the deck: two taps, wood under felt.
+    thump(c, at + 0.22, 200, 90, 0.09, 0.5)
+    thump(c, at + 0.34, 180, 80, 0.1, 0.6)
+  })
 }
 
 /** A card leaving the deck and hitting felt. */
 export function deal(): void {
-  const c = context()
-  if (!c) return
-  const t = c.currentTime
-  burst(c, t, 0.06, 1500, 0.16)
-  burst(c, t + 0.07, 0.04, 500, 0.1)
+  play((c) => {
+    const t = c.currentTime
+    burst(c, t, 0.07, 1600, 0.55)
+    burst(c, t + 0.01, 0.09, 500, 0.35)
+    thump(c, t + 0.06, 160, 70, 0.09, 0.5)
+  })
 }
 
 /** A card turned over: a swish, then the soft settle. */
 export function flip(): void {
-  const c = context()
-  if (!c) return
-  const t = c.currentTime
-  burst(c, t, 0.05, 1900, 0.18)
-  burst(c, t + 0.06, 0.035, 800, 0.12)
+  play((c) => {
+    const t = c.currentTime
+    burst(c, t, 0.09, 2200, 0.5, 0.6)
+    burst(c, t + 0.07, 0.06, 900, 0.4)
+    thump(c, t + 0.12, 150, 75, 0.08, 0.35)
+  })
+}
+
+/** The crystal ball noticing: three soft partials of the same chord, lit one
+ *  after another, with a breath of air over the top. Quiet on purpose — it
+ *  plays under `flip`, not instead of it. */
+export function shimmer(): void {
+  play((c) => {
+    if (!master) return
+    const t = c.currentTime
+    const partials: [number, number, number][] =
+      [[660, 0.10, 0.05], [990, 0.07, 0.16], [1320, 0.05, 0.3]]
+    for (const [freq, gain, offset] of partials) {
+      const osc = c.createOscillator()
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      const g = c.createGain()
+      g.gain.setValueAtTime(0.0001, t + offset)
+      g.gain.exponentialRampToValueAtTime(gain, t + offset + 0.09)
+      g.gain.exponentialRampToValueAtTime(0.001, t + offset + 1.1)
+      osc.connect(g)
+      g.connect(master)
+      osc.start(t + offset)
+      osc.stop(t + offset + 1.2)
+    }
+    burst(c, t + 0.05, 0.5, 5200, 0.05, 0.4)
+  })
+}
+
+/**
+ * Called from the toggle's own click when sound turns on. Constructs and
+ * resumes the context inside a guaranteed user gesture — after this, a deal
+ * scheduled from a timer finds a context already running — and answers with
+ * two soft taps so the switch is heard flipping.
+ */
+export function wake(): void {
+  play((c) => {
+    const t = c.currentTime
+    burst(c, t, 0.05, 1500, 0.4)
+    thump(c, t + 0.09, 190, 85, 0.09, 0.5)
+  })
 }

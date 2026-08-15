@@ -64,6 +64,13 @@ them as separate steps on purpose, so a type error reports as a type error.
 - **No non-null assertions outside test files.** `noUncheckedIndexedAccess`
   is on and a tuple type does not satisfy it — only a literal index does —
   so walk rotated copies in lockstep rather than indexing `[(i + 1) % 5]`.
+- **The forest layer is drawn, gated, and removable.** `components/forest.tsx`
+  and the whisper sprout are inline SVG on `var(--vine)` — no assets, ever —
+  and the two themes get different weather (fireflies at night, falling
+  leaves by day), display-gated in `index.css` with the same two-selector
+  dance as every other theme rule. `prefers-reduced-motion` removes the
+  ambience outright rather than freezing it: frozen weather is a smudge.
+  Decoration is `aria-hidden`, `pointer-events: none`, and never load-bearing.
 
 ## Testing habits with a history behind them
 
