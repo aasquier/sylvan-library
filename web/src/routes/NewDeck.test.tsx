@@ -396,8 +396,17 @@ describe('the tarot door', () => {
     // server, which is why a reading needs no table anywhere.
     await enterTarot()
     await screen.findByText('The Root', {}, PAST_THE_SHUFFLE)
-    const stashed = JSON.parse(localStorage.getItem('mtglab-tarot-table')!)
-    expect(stashed).toEqual({ persona: 'fortune-teller', seed: 4242, turned: [] })
+    // Waited for, not read once: the stash is written by an effect, and 'The
+    // Root' rendering does not promise that effect has flushed with the
+    // reading's values yet -- the mount writes a null table first. Read at the
+    // wrong instant this saw {persona: null, seed: null}, which is what
+    // skipped a deploy on 2026-08-14 (run 31866988085): green on the PR,
+    // flaky on the push, under CI's slower threaded Vitest only.
+    await waitFor(() => {
+      const stashed = JSON.parse(localStorage.getItem('mtglab-tarot-table')!)
+      expect(stashed).toEqual(
+        { persona: 'fortune-teller', seed: 4242, turned: [] })
+    }, PAST_THE_SHUFFLE)
 
     cleanup()
     open()

@@ -105,12 +105,13 @@ def test_every_response_carries_the_security_headers(client):
 def test_large_responses_are_gzipped(client):
     """The wire format for anything over a kilobyte, when the client asks.
 
-    Fly's proxy passes bodies through untouched, so if the app does not
-    compress, nobody does: before this middleware a deck's JSON went out as
-    81 kB of oracle text per navigation. `/api/colors` is the probe because it
-    is comfortably over the floor and needs no pool. The client re-inflates
-    transparently, so the body must still parse -- asserting the header alone
-    would pass against a response gzip had mangled.
+    Fly's edge turns out to compress on its own -- discovered on the deployed
+    instance after this middleware merged -- but that is one proxy's
+    undocumented habit, and the app owning compression is what holds on any
+    host, including a laptop with no edge in front of it. `/api/colors` is the
+    probe because it is comfortably over the floor and needs no pool. The
+    client re-inflates transparently, so the body must still parse --
+    asserting the header alone would pass against a response gzip had mangled.
     """
     r = client.get("/api/colors", headers={"Accept-Encoding": "gzip"})
     assert r.status_code == 200
