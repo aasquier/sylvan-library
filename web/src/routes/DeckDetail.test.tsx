@@ -1352,18 +1352,48 @@ describe('DeckDetail slot argument', () => {
     expect(api.argue).toHaveBeenCalledTimes(1)
   })
 
-  it('renders the case against and offers nothing that writes', async () => {
+  it('renders the case against and offers nothing that writes a rationale', async () => {
     const row = await argueAbout('Sol Ring')
     await within(row).findByText('Six other cards already ramp for two or less.')
     // The citation is rendered too: a charge is an argument because it rests
     // on something, and hiding the fact would leave only the assertion.
     expect(within(row).getByText(/ramp: 7 against a target/)).toBeTruthy()
 
-    // The whole rule in one assertion. There is no textarea in this panel and
-    // no control offering to put anything into one.
+    // The rule, adjusted for ADR 11: an alternative can be *taken* — that is
+    // the swap tested below — but until somebody chooses one there is no
+    // textbox here, and never a control that inserts model text into one.
     expect(within(row).queryByRole('textbox')).toBeNull()
     expect(within(row).queryByRole(
-      'button', { name: /use this|insert|copy|write it for me/i })).toBeNull()
+      'button', { name: /insert|copy|write it for me/i })).toBeNull()
+  })
+
+  it('takes an alternative to the swap composer, whose box opens empty', async () => {
+    const row = await argueAbout('Sol Ring')
+    await within(row).findByText('Cultivator Colossus')
+    fireEvent.click(within(row).getByRole('button', { name: 'Use this card' }))
+
+    // Rule 4, at the moment it is easiest to break: the argue payload is full
+    // of plausible sentences about this exact card, and none of them may
+    // arrive in the box.
+    const box = within(row).getByRole('textbox') as HTMLTextAreaElement
+    expect(box.value).toBe('')
+    const apply = within(row).getByRole('button', { name: /apply swap/i })
+    expect((apply as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('swaps with the user’s words once they write them', async () => {
+    const row = await argueAbout('Sol Ring')
+    await within(row).findByText('Cultivator Colossus')
+    fireEvent.click(within(row).getByRole('button', { name: 'Use this card' }))
+    fireEvent.change(within(row).getByRole('textbox'),
+      { target: { value: 'Lands onto the battlefield untapped and swings.' } })
+    fireEvent.click(within(row).getByRole('button', { name: /apply swap/i }))
+
+    await waitFor(() => expect(api.swapCard).toHaveBeenCalledWith(
+      REF, { out: 'Sol Ring', into: 'Cultivator Colossus',
+             why: 'Lands onto the battlefield untapped and swings.' }))
+    // The argued card is gone, so the page refreshes and the panel closes.
+    await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2))
   })
 
   it('says it is the case against, never an assessment', async () => {
