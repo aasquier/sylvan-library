@@ -180,9 +180,13 @@ const ROSTER = {
   personas: [
     { key: 'plain', label: 'Just talk to me',
       blurb: 'A few questions, and a suggestion at the end.', deals: false },
-    { key: 'fortune-teller', label: 'Read my cards',
+    { key: 'fortune-teller', label: 'Read my fortune',
       blurb: 'Three cards, and close attention.', deals: true },
-    { key: 'storyteller', label: 'Tell me a story',
+    // `storyteller` used to be the unknown voice here, until it was written
+    // for real (and got a tile painting). The unknown one has to stay
+    // unknown — the assertion is that a voice with no client-side anything,
+    // art included, still renders from the roster alone.
+    { key: 'necromancer', label: 'Speak with the dead',
       blurb: 'A voice this file has never heard of.', deals: false },
   ],
   default: 'plain',
@@ -208,29 +212,32 @@ function open() {
   return render(<MemoryRouter><NewDeck /></MemoryRouter>)
 }
 
-/** Walk in through the third door. */
-async function enterTheme() {
+/**
+ * Walk in through the Claude door and sit down with a named voice.
+ *
+ * One door now: "Help me decide" opens the persona grid, and the
+ * fortune-teller tile is where the old tarot door went. The tile is found by
+ * its blurb rather than its label, because a label is one word away from
+ * matching two things.
+ */
+async function sitWith(reader: string) {
   open()
   fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
-  return screen.findByText(PARTWAY.question)
-}
-
-/**
- * Walk in through the fourth, and sit down with a named reader.
- *
- * The door pill and the fortune teller's own panel are both called "Read my
- * cards" — deliberately, because that is what the door promises and what the
- * reader delivers — so the reader is found by its blurb rather than by a name
- * that matches two things.
- */
-async function enterTarot(reader = 'fortune-teller') {
-  open()
-  const doors = await screen.findAllByRole('button', { name: /read my cards/i })
-  fireEvent.click(doors[0]!)
   const persona = ROSTER.personas.find((p) => p.key === reader)!
   const panel = (await screen.findByText(persona.blurb)).closest('button')!
   fireEvent.click(panel)
   return panel
+}
+
+/** The plain interview, which is the grid's first tile. */
+async function enterTheme() {
+  await sitWith('plain')
+  return screen.findByText(PARTWAY.question)
+}
+
+/** The fortune-teller (or any other reader) at the same door. */
+async function enterTarot(reader = 'fortune-teller') {
+  return sitWith(reader)
 }
 
 /** The shuffle is a real 1.1s beat before the cards land, so anything waiting
@@ -268,7 +275,7 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-describe('the four doors', () => {
+describe('the three doors', () => {
   it('offers the one that assumes least first', async () => {
     open()
     const doors = await screen.findAllByRole('button',
@@ -276,18 +283,18 @@ describe('the four doors', () => {
     expect(doors[0]?.textContent).toMatch(/help me decide/i)
   })
 
-  it('does not remember the theme door', async () => {
+  it('does not remember the Claude door', async () => {
     // Landing back in a Claude conversation because you tried one last week is
     // a bill nobody asked for, so this is the one mode that is not sticky.
     await enterTheme()
     expect(localStorage.getItem('mtglab-new-deck-mode')).not.toBe('theme')
   })
 
-  it('does not remember the tarot door either', async () => {
-    // Same argument, and more so: this one opens with a shuffle and then
-    // spends money on the first question.
+  it('does not remember it for a dealt reader either', async () => {
+    // Same door now, and the same argument goes double: this voice opens
+    // with a shuffle and then spends money on the first question.
     await enterTarot()
-    expect(localStorage.getItem('mtglab-new-deck-mode')).not.toBe('tarot')
+    expect(localStorage.getItem('mtglab-new-deck-mode')).not.toBe('theme')
   })
 
   it('still remembers the other two', async () => {
@@ -300,13 +307,13 @@ describe('the four doors', () => {
 
 describe('the tarot door', () => {
   it('renders whatever readers the server has, not a list of its own', async () => {
-    // ADR 21's payoff, as a test: `storyteller` exists nowhere in this app's
-    // source. If it stops appearing, somebody has hard-coded the roster and
-    // adding a voice is a frontend change again.
+    // ADR 21's payoff, as a test: `necromancer` exists nowhere in this app's
+    // source — no label, no blurb, and (now that tiles carry paintings) no
+    // art either. If it stops appearing, somebody has hard-coded the roster
+    // and adding a voice is a frontend change again.
     open()
-    const doors = await screen.findAllByRole('button', { name: /read my cards/i })
-    fireEvent.click(doors[0]!)
-    expect(await screen.findByText('Tell me a story')).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
+    expect(await screen.findByText('Speak with the dead')).toBeTruthy()
     expect(screen.getByText('A voice this file has never heard of.')).toBeTruthy()
   })
 
@@ -410,8 +417,9 @@ describe('the tarot door', () => {
 
     cleanup()
     open()
-    fireEvent.click((await screen.findAllByRole(
-      'button', { name: /read my cards/i }))[0]!)
+    // The stash remembers who was reading, so re-entering the door skips the
+    // grid and goes straight back to the table.
+    fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
     await screen.findByText('The Root')
     expect(api.tarotReading).toHaveBeenLastCalledWith(4242)
   })
@@ -471,8 +479,7 @@ describe('the theme conversation', () => {
 
   it('opens up once three things are known', async () => {
     vi.mocked(api.themeAsk).mockResolvedValue(asked(READY) as never)
-    open()
-    fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
+    await sitWith('plain')
     await screen.findByText(READY.question)
 
     expect(screen.getByRole('button', { name: /suggest my colours/i })
@@ -489,8 +496,7 @@ describe('the theme conversation', () => {
 describe('the proposal', () => {
   async function propose() {
     vi.mocked(api.themeAsk).mockResolvedValue(asked(READY) as never)
-    open()
-    fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
+    await sitWith('plain')
     await screen.findByText(READY.question)
     fireEvent.click(screen.getByRole('button', { name: /suggest my colours/i }))
     return screen.findByText(GOLGARI.reading)
@@ -515,8 +521,7 @@ describe('the proposal', () => {
       transcript: [{ role: 'assistant', text: READY.question }],
       slots: READY.slots, job: 'j9', proposal: null,
     }))
-    open()
-    fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
+    await sitWith('plain')
 
     await screen.findByText(GOLGARI.reading)
     expect(vi.mocked(followJob).mock.calls[0]?.[0]).toBe('j9')
@@ -537,8 +542,7 @@ describe('the proposal', () => {
       return { promise: new Promise(() => {}), cancel: () => {} }
     })
     vi.mocked(api.themeAsk).mockResolvedValue(asked(READY) as never)
-    open()
-    fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
+    await sitWith('plain')
     await screen.findByText(READY.question)
     fireEvent.click(screen.getByRole('button', { name: /suggest my colours/i }))
 
@@ -558,8 +562,7 @@ describe('the proposal', () => {
         cancel: () => {},
       }))
     vi.mocked(api.themeAsk).mockResolvedValue(asked(READY) as never)
-    open()
-    fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
+    await sitWith('plain')
     await screen.findByText(READY.question)
     fireEvent.click(screen.getByRole('button', { name: /suggest my colours/i }))
 
@@ -623,10 +626,11 @@ describe('the proposal', () => {
 
 describe('when the surface is not available', () => {
   it('says which of the two things is missing', async () => {
+    // The grid itself renders either way — it costs nothing — and the answer
+    // arrives when a voice is picked, from the interview's own status check.
     vi.mocked(api.claudeStatus).mockResolvedValue(
       { ...CLAUDE_STATUS, configured: false } as never)
-    open()
-    fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
+    await sitWith('plain')
 
     expect(await screen.findByText(/ANTHROPIC_API_KEY/)).toBeTruthy()
     expect(api.themeAsk).not.toHaveBeenCalled()

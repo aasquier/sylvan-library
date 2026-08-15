@@ -555,9 +555,14 @@ arc; this is what the next few sessions actually do.
      fourth stance axis — stance is how much the model does, persona is who it
      sounds like — and the voice is *appended* to the interview's instructions
      rather than replacing them, so its rules stay out of a persona's reach.
-     `plain` and `fortune-teller` are built. **Storyteller, scientist and
-     confessor/therapist are not**, and each is now a `Persona` and a prompt
-     with nothing else to move.
+     `plain` and `fortune-teller` were built first; **the costumed five
+     followed on 2026-08-15** — therapist, scientist, chef, storyteller,
+     barkeep — and ADR 21's "a `Persona` and a prompt with nothing else to
+     move" held exactly: the client changes for that PR were tiles and art,
+     not plumbing. The same change merged the theme and tarot doors into one
+     persona-grid door ("Help me decide"), so the reader picker is now the
+     first thing the create flow's Claude door shows and the fortune-teller
+     tile is where "Read my cards" went.
    - ~~**A tarot reading as a door of its own.**~~ **Built 2026-08-13** —
      backend first, then the door: a fourth entry on "Start a deck" that picks
      a reader from the roster, shuffles, deals three cards face down, and turns

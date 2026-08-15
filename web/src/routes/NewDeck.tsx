@@ -56,7 +56,6 @@ import { COLOR_VAR } from '../lib/mtg'
 import { CardHover, ColorRing, ManaText } from '../components/ui'
 import { ColorPentagram, TierGlyph } from '../components/pentagram'
 import { TarotTable } from '../components/tarot'
-import { ThemeInterview } from '../components/theme'
 
 /** The era whose story named a tier, so the lesson has its setting attached. */
 const TIER_ERA: Record<string, string> = {
@@ -76,10 +75,16 @@ function keyFor(identity: string[] | undefined): string {
   return key || 'C'
 }
 
-/** The four ways in, least-assuming first. */
+/** The three ways in, least-assuming first.
+ *
+ * There used to be four: the theme interview and the tarot table were
+ * separate doors, which meant the persona choice lived behind one of them
+ * and the other was hard-wired to the plain voice. They are one door now —
+ * the interview's first step is choosing who you talk to (the tile grid in
+ * `components/tarot.tsx`), and the fortune-teller tile deals the cards
+ * exactly as the old door did. Same interview, same slots, same proposal. */
 const DOORS = [
   { key: 'theme', label: 'Help me decide' },
-  { key: 'tarot', label: 'Read my cards' },
   { key: 'guided', label: 'Take me through the colours' },
   { key: 'direct', label: 'I know what I want' },
 ] as const
@@ -87,10 +92,9 @@ const DOORS = [
 type Mode = (typeof DOORS)[number]['key']
 
 const DOOR_BLURBS: Record<Mode, string> = {
-  theme: 'A few questions about you — none of them about Magic — and then a '
-       + 'suggestion you are free to ignore.',
-  tarot: 'Pick a reader, turn over three cards, and answer what they ask. '
-       + 'The cards colour the questions; the answers are still yours.',
+  theme: 'Pick who you talk to — a therapist, a chef, a fortune-teller with '
+       + 'real cards — and answer a few questions about you, none of them '
+       + 'about Magic. Then a suggestion you are free to ignore.',
   guided: 'Pick a colour combination, then a commander. There are 32 '
         + 'combinations in Magic, and building one of each is a challenge '
         + 'people spend years on.',
@@ -117,15 +121,15 @@ export default function NewDeck() {
   const [taxonomyError, setTaxonomyError] = useState<string | null>(null)
 
   // Remembered, so the tutorial is offered once rather than every visit —
-  // except for the two Claude doors, which are not stored. Landing straight
-  // back in a conversation because you tried one last week is a bill nobody
-  // asked for, and that goes double for the one that opens with a shuffle.
+  // except for the Claude door, which is not stored. Landing straight back
+  // in a conversation because you tried one last week is a bill nobody
+  // asked for, and it goes double when the reader opens with a shuffle.
   const [mode, setMode] = useState<Mode>(
     () => (localStorage.getItem('mtglab-new-deck-mode') === 'direct'
       ? 'direct' : 'guided'),
   )
   useEffect(() => {
-    if (mode !== 'theme' && mode !== 'tarot') {
+    if (mode !== 'theme') {
       localStorage.setItem('mtglab-new-deck-mode', mode)
     }
   }, [mode])
@@ -389,16 +393,12 @@ export default function NewDeck() {
         )}
       </header>
 
-      {/* ------------------------------------- step 1, theme: ask about them */}
+      {/* ---------------- step 1, theme: pick who you talk to, then answer.
+          The persona grid and the tarot table share a component (ADR 21) —
+          the fortune-teller tile deals three cards for the three slot kinds,
+          every other voice goes straight to the questions, and all of them
+          reach step 3 by exactly the same route. */}
       {!chosen && !commander && mode === 'theme' && (
-        <ThemeInterview onPick={takeProposal} onLeave={() => setMode('guided')} />
-      )}
-
-      {/* ---------------------- step 1, tarot: the same interview, with a
-          reader and three cards in front of it (ADR 21). The spread's three
-          positions *are* the slot kinds, so this reaches step 3 by exactly the
-          route the plain interview does — one door, dressed. */}
-      {!chosen && !commander && mode === 'tarot' && (
         <TarotTable onPick={takeProposal} onLeave={() => setMode('guided')} />
       )}
 
