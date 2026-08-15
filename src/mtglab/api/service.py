@@ -975,22 +975,34 @@ def delete_deck(*, slug: str, confirm: str,
 # -------------------------------------------------------------------- claude
 
 #: Modes whose default stance is not the deck's, because they have no deck.
-#: One entry today; a set rather than an `if` so the second one is a row.
-_SURFACE_DEFAULTS = {"theme"}
+#: A table rather than an `if`, so the second entry was a row -- and it was:
+#: research (ADR 26) joined the theme interview here, and joined it for exactly
+#: the same reason. **The value is the owning module's own function**, never a
+#: literal; a default copied into this file is a second copy to disagree with.
+_SURFACE_DEFAULTS = {"theme", "research"}
+
+
+def _surface_stance_for(surface: str) -> Any:
+    """Ask the module that owns `surface` what "no preference" means to it."""
+    if surface == "research":
+        from mtglab.claude.research import stance_for as research_stance_for
+        return research_stance_for(None)
+    from mtglab.claude.theme import stance_for as theme_stance_for
+    return theme_stance_for(None)
 
 
 def _default_stance(deck: Any, surface: str | None) -> Any:
     """What "no preference" resolves to, asked of whoever owns the answer.
 
-    Three cases and none of them is a literal here: the theme interview has its
-    own (`theme.stance_for`), a deck has one derived from its `status`
-    (`stance.default_for`), and a caller who named neither gets `off`, because
-    "I have no idea what this is about" is the one case where silence is right.
+    Three cases and none of them is a literal here: a deckless surface has its
+    own (`theme.stance_for`, `research.stance_for`), a deck has one derived
+    from its `status` (`stance.default_for`), and a caller who named neither
+    gets `off`, because "I have no idea what this is about" is the one case
+    where silence is right.
     """
     from mtglab.claude import stance as claude_stance
     if surface in _SURFACE_DEFAULTS and deck is None:
-        from mtglab.claude.theme import stance_for
-        return stance_for(None)
+        return _surface_stance_for(surface)
     return claude_stance.default_for(deck) if deck else claude_stance.OFF
 
 
@@ -1025,8 +1037,11 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
     # theme interview is the one mode with no deck to derive from and a default
     # that is emphatically not `off` — see `theme.stance_for`.
     if surface in _SURFACE_DEFAULTS and deck is None:
-        from mtglab.claude.theme import stance_for
-        effective = stance_for(requested)
+        if surface == "research":
+            from mtglab.claude.research import stance_for as surface_stance_for
+        else:
+            from mtglab.claude.theme import stance_for as surface_stance_for
+        effective = surface_stance_for(requested)
     else:
         effective = claude_stance.resolve(requested, deck=deck)
     limit = claude_stance.ceiling()
@@ -1054,7 +1069,7 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
         # user should be able to read next to the dial.
         "never": "No stance lets Claude write a card's rationale.",
         # The modes that exist, so a UI can offer what is built rather than
-        # what ADR 15 planned. Four today, across three features.
+        # what ADR 15 planned. Six today, across five features.
         "modes": [{
             "name": mode.name,
             "purpose": mode.purpose,
@@ -1065,7 +1080,8 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
             # about in a way "get_cards" is not.
             "server_tools": [t["name"] for t in mode.server_tools],
             "writes": list(mode.may_write),
-        } for mode in (interview, claude_dossier_mode(), *claude_theme_modes())],
+        } for mode in (interview, claude_argue_mode(), claude_dossier_mode(),
+                       claude_research_mode(), *claude_theme_modes())],
     }
 
 
@@ -1091,6 +1107,17 @@ def claude_dossier_mode() -> Mode:
     """The commander dossier's mode object (ADR 19). Imported lazily too."""
     from mtglab.claude.dossier import COMMANDER_DOSSIER
     return COMMANDER_DOSSIER
+
+
+def claude_research_mode() -> Mode:
+    """The research mode's object (ADR 26). Imported lazily too.
+
+    Worth reading its `tool_names` here rather than trusting the name: it is
+    `("get_cards",)` and a hosted search, with every deck-facing tool absent on
+    purpose. A UI listing this mode's capabilities is listing the argument.
+    """
+    from mtglab.claude.research import RESEARCH
+    return RESEARCH
 
 
 def claude_theme_modes() -> tuple[Mode, Mode]:

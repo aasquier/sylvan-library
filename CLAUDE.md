@@ -55,11 +55,12 @@ src/mtglab/
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
   artifacts/generate.py   the five deliverables
-  claude/                 client, tools, stance, persona, and five modes across
-                          four features: interview.py (a card's `why`),
+  claude/                 client, tools, stance, persona, and six modes across
+                          five features: interview.py (a card's `why`),
                           argue.py (the case against a slot), dossier.py (the
-                          commander), theme.py (two — a conversation about
-                          you, then a proposal)
+                          commander), research.py (a question about Magic, and
+                          it cannot see a deck), theme.py (two — a
+                          conversation about you, then a proposal)
   claude/persona.py       who a mode sounds like; a voice, never a stance
   auth/                   app.db, Argon2id, accounts, sessions, rate limit,
                           invite/reset tokens, the EmailSender seam
@@ -69,6 +70,8 @@ src/mtglab/
   api/simruns.py          Tier 1 planned in the request, run in a job
   api/themeruns.py        both theme halves, same shape (226s / 134s, ADR 20)
   api/dossierruns.py      the commander dossier, same shape (236s, ADR 19)
+  api/researchruns.py     research, same shape (265s, ADR 26) — and the first
+                          one that was a job before it was a failure
   api/auth.py             the deny-by-default middleware and login routes
   api/deps.py             the request scope: who is asking, what they see
   web_dist/               built frontend, committed so `mtglab ui` needs no Node
@@ -319,11 +322,14 @@ research.**
 
 **Started, not finished.** `src/mtglab/claude/` is the pipe — a client on
 `ANTHROPIC_API_KEY` and seven read-only tool schemas over `api/service.py` —
-plus the stance (`stance.py`, three axes, off by default) and **five** modes
-across four features. The **rationale interview** (`interview.py`) asks about
+plus the stance (`stance.py`, three axes, off by default) and **six** modes
+across five features. The **rationale interview** (`interview.py`) asks about
 a card's slot so you can write its `why`. The **slot argument** (`argue.py`,
 [ADR 25](docs/adr/0025-argue-a-slot-argues-one-direction.md)) makes the case
-against that slot. The **commander dossier**
+against that slot. **Research** (`research.py`,
+[ADR 26](docs/adr/0026-research-answers-about-magic-not-about-your-deck.md))
+answers a question about Magic from pages it read — and **cannot see a deck**.
+The **commander dossier**
 (`dossier.py`, [ADR 19](docs/adr/0019-the-dossier-cites-three-sources.md)) says
 who a deck's commander is, what archetype they define, who their rivals are and
 where they sit in Magic's history. The **theme interview** (`theme.py`,
@@ -334,8 +340,33 @@ proposal of two colour combinations with three pool-checked commanders each.
 `mtglab claude check` proves the key;
 `mtglab claude interview <slug> --card X`, `mtglab claude argue <slug> --card X`
 and `mtglab claude dossier <slug>` run the first three, and the deck page runs
-all three. **Research and deck conversation do not exist**, nor does the
-activity log — check what is actually there before assuming either way.
+all three. `mtglab claude research "<question>"` and the `/research` page run
+the fourth — note it takes **no slug**, which is the feature and not an
+omission. **Deck conversation does not exist**, nor does the activity log —
+check what is actually there before assuming either way, and read ADR 26
+before adding a deck to any surface that does not already have one.
+
+**Research answers about Magic, never about your deck**
+([ADR 26](docs/adr/0026-research-answers-about-magic-not-about-your-deck.md)).
+The meta, a ruling in practice, a card spoiled ahead of the next bulk refresh —
+the three questions the pool cannot hold. Its contract is an **absence**: no
+`DeckSource`, no slug, no deck tool, and a route outside `/api/decks`. That
+puts rule 4 out of reach (no rationale to read, no 99 to be asked what to cut
+from) and stops **deck conversation being built by accident**, which was the
+real risk, since "should I cut X" is what somebody types first and answering it
+well *is* that mode under another name.
+
+Three consequences. **Every finding cites a page the search actually returned**
+— `keep_sources` reused from `dossier.py`, not copied — and a finding whose
+citations all failed the check is **dropped and counted**, one step past what
+the dossier does to a section, because a dossier passage may rest on its brief
+and research has no brief. **If no source survives, the answer is refused.**
+And **a card the pool lacks is labelled `in_pool: false`, not dropped** — the
+deliberate opposite of the dossier's rivals, because a spoiled card is the
+question rather than an error; `cards_unresolved` is reported apart from the
+dropped counts, since above zero is the *right* answer for a spoiler. Nothing
+is cached (the subject is the part of Magic that moves) but two identical
+questions in flight are one job.
 
 **The slot argument argues one direction, and that is the whole design**
 ([ADR 25](docs/adr/0025-argue-a-slot-argues-one-direction.md)). The interview
