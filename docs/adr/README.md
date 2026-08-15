@@ -40,6 +40,7 @@ they differ.
 | [24](0024-no-python-autoformatter.md) | No Python autoformatter; the lint rules hold the line instead | Accepted |
 | [25](0025-argue-a-slot-argues-one-direction.md) | Argue a slot argues one direction, and that asymmetry is the guard | Accepted |
 | [26](0026-research-answers-about-magic-not-about-your-deck.md) | Research answers about Magic, never about your deck | Accepted |
+| [27](0027-entomb-is-the-delete-and-the-graveyard-is-the-undo.md) | Entomb is the delete, and the graveyard is the undo | Accepted |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the

@@ -144,7 +144,7 @@ def _pool_for(deck: Deck,
     if con is None:
         return {}
     names = deck.commander + [c.name for c in deck.cards] + \
-        [c.name for c in deck.swap_board]
+        [c.name for c in deck.swap_board] + [c.name for c in deck.graveyard]
     if deck.companion:
         names.append(deck.companion)
     return db.get_cards(con, names)
@@ -651,6 +651,10 @@ def get_deck(slug: str, *, source: DeckSource | None = None,
             "commander_card": commander_card,
             "cards": [_card_json(e, cards.get(e.name)) for e in deck.cards],
             "swap_board": [_card_json(e, cards.get(e.name)) for e in deck.swap_board],
+            # Entombed cards (ADR 27): out of the 99, waiting on a return or
+            # an exile. Rendered with the same pool facts as the living so the
+            # graveyard panel can show real cards, not just names.
+            "graveyard": [_card_json(e, cards.get(e.name)) for e in deck.graveyard],
             "pool_available": con is not None,
         }
     finally:
@@ -1600,21 +1604,98 @@ def add_card(slug: str, *, name: str, category: str, why: str = "",
 
 def remove_card(slug: str, *, name: str,
                 source: DeckSource | None = None) -> dict[str, Any]:
-    """Take a card out of the 99 or the swap board.
+    """Take a card out of the deck -- to the graveyard, if it was in the 99.
 
-    Needs no card pool: removing a card is a fact about this deck file, not about
-    Magic. That matters because it means a deck can still be pruned on a
-    machine that has never run `data refresh`.
+    Since ADR 27 a removal from the 99 is an **entombment**: the entry moves to
+    the deck's graveyard with its category and its `why` intact, and can be
+    returned or exiled from there. A swap-board card is still removed outright
+    -- it was already outside the deck, and the board is its own record of why.
+
+    Needs no card pool either way: removing a card is a fact about this deck
+    file, not about Magic. That matters because it means a deck can still be
+    pruned on a machine that has never run `data refresh`.
     """
     decks = _for_writing(source, slug)
-    entry = _find_card(decks.get(slug), name)
+    deck = decks.get(slug)
+    entry = _find_card(deck, name)
     if entry is None:
         raise EditRejected(f"{name!r} is not in this deck")
+    in_99 = any(c.name == entry.name for c in deck.cards)
     try:
-        updated = edit.remove_card(decks.read_text(slug), name=entry.name)
+        if in_99:
+            updated = edit.entomb_card(decks.read_text(slug), name=entry.name)
+        else:
+            updated = edit.remove_card(decks.read_text(slug), name=entry.name)
     except EditFailed as exc:
         raise EditRejected(str(exc)) from exc
+    if in_99:
+        return _commit(slug, decks, updated, entombed=entry.name)
     return _commit(slug, decks, updated, removed=entry.name)
+
+
+def entomb_cards(slug: str, *, names: list[str],
+                 source: DeckSource | None = None) -> dict[str, Any]:
+    """Entomb several cards from the 99 in one write.
+
+    All or nothing: a name that is not in the 99 refuses the whole batch
+    before anything is written, because a sweep that silently skipped two of
+    its ten cards would report a deck state nobody chose. One write, one gate
+    verdict, one entry in the deck's git history when the file tier is the
+    source.
+    """
+    wanted = [n.strip() for n in names if str(n).strip()]
+    if not wanted:
+        raise EditRejected("nothing to entomb; give at least one card name")
+    decks = _for_writing(source, slug)
+    deck = decks.get(slug)
+    in_99 = {c.name.lower(): c.name for c in deck.cards}
+    resolved: list[str] = []
+    for name in wanted:
+        match = in_99.get(name.lower())
+        if match is None:
+            raise EditRejected(
+                f"{name!r} is not in the 99, so nothing was entombed")
+        if match in resolved:
+            raise EditRejected(f"{match!r} is listed twice")
+        resolved.append(match)
+    text = decks.read_text(slug)
+    try:
+        for name in resolved:
+            text = edit.entomb_card(text, name=name)
+    except EditFailed as exc:
+        raise EditRejected(str(exc)) from exc
+    return _commit(slug, decks, text, entombed=resolved)
+
+
+def return_card(slug: str, *, name: str,
+                source: DeckSource | None = None) -> dict[str, Any]:
+    """Bring an entombed card back into the 99, exactly as it left.
+
+    The `why` that returns is the user's own words, preserved through the
+    graveyard -- nothing is composed or re-invented, which is what keeps
+    rule 4 out of this path entirely.
+    """
+    decks = _for_writing(source, slug)
+    try:
+        updated = edit.return_card(decks.read_text(slug), name=name)
+    except EditFailed as exc:
+        raise EditRejected(str(exc)) from exc
+    return _commit(slug, decks, updated, returned=name)
+
+
+def exile_card(slug: str, *, name: str,
+               source: DeckSource | None = None) -> dict[str, Any]:
+    """Remove an entombed card from the graveyard permanently.
+
+    The only genuinely destructive delete left, and it can only ever act on a
+    card that was already entombed -- two deliberate steps, by construction.
+    """
+    decks = _for_writing(source, slug)
+    try:
+        updated = edit.exile_card(decks.read_text(slug), name=name)
+    except EditFailed as exc:
+        raise EditRejected(str(exc)) from exc
+    return _commit(slug, decks, updated, exiled=name)
 
 
 def set_card_field(slug: str, *, name: str, field: str, value: Any,

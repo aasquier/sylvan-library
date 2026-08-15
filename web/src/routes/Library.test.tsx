@@ -413,13 +413,13 @@ describe('Library deck deletion', () => {
   async function openDialogFor(name: string) {
     renderLibrary()
     await waitFor(() => expect(shownNames()).toHaveLength(3))
-    fireEvent.click(screen.getByRole('button', { name: `Delete ${name}` }))
+    fireEvent.click(screen.getByRole('button', { name: `Entomb ${name}` }))
     return screen.getByRole('dialog')
   }
 
   it('will not delete until the word is typed', async () => {
     const dialog = await openDialogFor('Goreclaw')
-    const confirm = within(dialog).getByRole('button', { name: /delete this deck/i })
+    const confirm = within(dialog).getByRole('button', { name: /entomb this deck/i })
     expect(confirm.hasAttribute('disabled')).toBe(true)
 
     fireEvent.change(within(dialog).getByRole('textbox'),
@@ -435,7 +435,7 @@ describe('Library deck deletion', () => {
     // The regression. Whatever the label renders has to be an answer the
     // dialog takes, and CSS is free to change how a label renders.
     const dialog = await openDialogFor('Goreclaw')
-    const confirm = within(dialog).getByRole('button', { name: /delete this deck/i })
+    const confirm = within(dialog).getByRole('button', { name: /entomb this deck/i })
     fireEvent.change(within(dialog).getByRole('textbox'),
                      { target: { value: 'BURY' } })
     expect(confirm.hasAttribute('disabled')).toBe(false)
@@ -443,7 +443,7 @@ describe('Library deck deletion', () => {
 
   it('still accepts the slug, in any case, for anyone who prefers it', async () => {
     const dialog = await openDialogFor('Goreclaw')
-    const confirm = within(dialog).getByRole('button', { name: /delete this deck/i })
+    const confirm = within(dialog).getByRole('button', { name: /entomb this deck/i })
     fireEvent.change(within(dialog).getByRole('textbox'),
                      { target: { value: 'GORECLAW' } })
     expect(confirm.hasAttribute('disabled')).toBe(false)
@@ -466,7 +466,7 @@ describe('Library deck deletion', () => {
     const dialog = await openDialogFor('Goreclaw')
     fireEvent.change(within(dialog).getByRole('textbox'),
                      { target: { value: '  BURY ' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: /delete this deck/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /entomb this deck/i }))
 
     await waitFor(() => expect(api.deleteDeck).toHaveBeenCalledWith(
       expect.objectContaining({ owner: 'aasquier', slug: 'goreclaw' }), 'bury'))
@@ -476,7 +476,7 @@ describe('Library deck deletion', () => {
     const dialog = await openDialogFor('Goreclaw')
     fireEvent.change(within(dialog).getByRole('textbox'),
                      { target: { value: 'goreclaw' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: /delete this deck/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /entomb this deck/i }))
 
     await waitFor(() => expect(shownNames()).toEqual(['Arahbo', 'Tivit']))
     // "Deleted" and "recoverable" are separate facts, and the second one is
@@ -499,7 +499,7 @@ describe('Library deck deletion', () => {
     const dialog = await openDialogFor('Goreclaw')
     fireEvent.change(within(dialog).getByRole('textbox'),
                      { target: { value: 'goreclaw' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: /delete this deck/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /entomb this deck/i }))
 
     await within(dialog).findByText(/read-only/)
     expect(shownNames()).toContain('Goreclaw')
@@ -645,11 +645,11 @@ describe('Library, browsing by player', () => {
     ])
     renderLibrary()
     await waitFor(() => expect(shownNames()).toHaveLength(2))
-    fireEvent.click(screen.getByRole('button', { name: 'Delete My Goreclaw' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Entomb My Goreclaw' }))
     const dialog = screen.getByRole('dialog')
     fireEvent.change(within(dialog).getByRole('textbox'),
                      { target: { value: 'bury' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: /delete this deck/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /entomb this deck/i }))
 
     await waitFor(() => expect(shownNames()).toEqual(['Their Goreclaw']))
     expect(api.deleteDeck).toHaveBeenCalledWith(

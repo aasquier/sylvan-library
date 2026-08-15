@@ -138,6 +138,9 @@ export interface DeckDetail extends DeckSummary {
   commander_card: Card | null
   cards: Card[]
   swap_board: Card[]
+  /** Entombed cards (ADR 27): out of the 99 but not gone, each keeping the
+   *  category and `why` it left with. Newest first. */
+  graveyard: Card[]
   pool_available: boolean
   /** The Scryfall printing id whose art this deck shows, or '' for the
    *  default. A deck property rather than a viewer preference: it lives in
@@ -1270,8 +1273,22 @@ export const api = {
     ref: DeckRef,
     body: { name: string; category: string; why?: string; qty?: number; to?: string },
   ) => post<EditResult>(deckPath(ref, '/cards'), body),
-  removeCard: (ref: DeckRef, name: string) =>
+  // The delete from the 99 is an entombment (ADR 27): the server moves the
+  // card to the deck's graveyard with its `why` intact, where `returnCard`
+  // and `exileCard` reach it. The route is the old DELETE — what changed is
+  // where the card goes, not how it is asked for.
+  entombCard: (ref: DeckRef, name: string) =>
     send<EditResult>('DELETE', deckPath(ref, `/cards/${encodeURIComponent(name)}`)),
+  // Several at once, in one write and one gate verdict. All or nothing on the
+  // server, so a partial sweep can never be mistaken for a chosen deck state.
+  entombCards: (ref: DeckRef, names: string[]) =>
+    post<EditResult>(deckPath(ref, '/entomb'), { names }),
+  returnCard: (ref: DeckRef, name: string) =>
+    post<EditResult>(deckPath(ref, `/graveyard/${encodeURIComponent(name)}/return`), {}),
+  // The only genuinely permanent delete left, and it only reaches a card that
+  // was already entombed — two deliberate steps by construction.
+  exileCard: (ref: DeckRef, name: string) =>
+    send<EditResult>('DELETE', deckPath(ref, `/graveyard/${encodeURIComponent(name)}`)),
   // One field at a time, matching the operation underneath. `why` goes through
   // here: it is the rationale editor's write path, and the value is whatever
   // the user typed — nothing composes, tidies or infers one.

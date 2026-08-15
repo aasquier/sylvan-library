@@ -443,8 +443,42 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
     @app.delete("/api/decks/{owner}/{slug}/cards/{name}")
     def remove_card(owner: str, slug: str, name: str, lib: Lib) -> dict[str, Any]:
+        """Entomb a 99-card (ADR 27); a swap-board card is removed outright."""
         try:
             return service.remove_card(slug, name=name, source=lib.source_for(owner))
+        except service.EditRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post("/api/decks/{owner}/{slug}/entomb")
+    def entomb_cards(owner: str, slug: str, payload: dict[str, Any],
+                     lib: Lib) -> dict[str, Any]:
+        """The bulk entombment: several 99-cards to the graveyard in one write.
+
+        All or nothing -- a name not in the 99 refuses the batch with nothing
+        written, so the deck state after a sweep is always one somebody chose.
+        """
+        names = payload.get("names")
+        if not isinstance(names, list):
+            raise HTTPException(status_code=422, detail="names must be a list")
+        try:
+            return service.entomb_cards(slug, names=[str(n) for n in names],
+                                        source=lib.source_for(owner))
+        except service.EditRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post("/api/decks/{owner}/{slug}/graveyard/{name}/return")
+    def return_card(owner: str, slug: str, name: str, lib: Lib) -> dict[str, Any]:
+        """Bring an entombed card back to the 99, its rationale intact."""
+        try:
+            return service.return_card(slug, name=name, source=lib.source_for(owner))
+        except service.EditRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.delete("/api/decks/{owner}/{slug}/graveyard/{name}")
+    def exile_card(owner: str, slug: str, name: str, lib: Lib) -> dict[str, Any]:
+        """Remove an entombed card permanently -- the only hard delete left."""
+        try:
+            return service.exile_card(slug, name=name, source=lib.source_for(owner))
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

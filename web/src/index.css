@@ -623,6 +623,66 @@ button:hover .tarot-fan-card {
   }
 }
 
+/* Card-row actions (deck page). These live here and not inline for one
+ * reason: an inline style cannot say `:hover`, and a bordered button with no
+ * hover state in muted text is the universal *disabled* idiom — which is
+ * exactly what these looked like before. Enabled means it answers the
+ * pointer. */
+.card-action {
+  border: 1px solid var(--hairline);
+  background: var(--page);
+  color: var(--text-primary);
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.card-action:hover {
+  border-color: var(--text-muted);
+  background: var(--gridline);
+}
+
+/* The destructive family (ADR 27). Red before it is touched, because the
+ * label alone ("Entomb") should not be the only thing saying what this does
+ * — and solid red once armed, so the second click knows it is the second
+ * click. */
+.card-action-danger {
+  color: var(--status-critical);
+  border-color: color-mix(in srgb, var(--status-critical) 45%, transparent);
+}
+.card-action-danger:hover {
+  background: color-mix(in srgb, var(--status-critical) 12%, transparent);
+  border-color: var(--status-critical);
+}
+.card-action-danger.armed,
+.card-action-danger.armed:hover {
+  background: var(--status-critical);
+  border-color: var(--status-critical);
+  color: #fff;
+}
+
+/* The send-off (ADR 27): a short settle into the ground while the server is
+ * asked, so an entombment reads as "sent to the graveyard" rather than a row
+ * blinking out. `forwards` holds the sunken frame until the refreshed list
+ * arrives without the row. */
+@keyframes entomb-sink {
+  to {
+    opacity: 0;
+    transform: translateY(0.6rem) rotate(1.2deg) scale(0.97);
+    filter: grayscale(1) brightness(0.85);
+  }
+}
+.entombing {
+  animation: entomb-sink 340ms ease-in forwards;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-action {
+    transition: none;
+  }
+  .entombing {
+    animation-duration: 1ms;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

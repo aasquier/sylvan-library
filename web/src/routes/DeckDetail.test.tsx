@@ -34,7 +34,8 @@ vi.mock('../lib/api', async () => ({
   followJob: vi.fn(),
   api: {
     deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
-    swapCard: vi.fn(), addCard: vi.fn(), removeCard: vi.fn(),
+    swapCard: vi.fn(), addCard: vi.fn(), entombCard: vi.fn(),
+    entombCards: vi.fn(), returnCard: vi.fn(), exileCard: vi.fn(),
     setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),
     setShared: vi.fn(),
     claudeStatus: vi.fn(), interview: vi.fn(), argue: vi.fn(),
@@ -86,6 +87,7 @@ const DECK = {
   commander_card: null,
   pool_available: true,
   swap_board: [],
+  graveyard: [],
   cards: [{
     name: 'Primeval Titan', category: 'ramp', why: 'Ramp and threat in one card.',
     qty: 1, known: true, mana_cost: '{4}{G}{G}', cmc: 6, type_line: 'Creature — Giant',
@@ -322,7 +324,8 @@ beforeEach(() => {
     errors: [], warnings: [], stage: 'curated', total_cards: 99,
     needs_rationale: 0,
   })
-  for (const fn of [api.addCard, api.removeCard, api.setCardField, api.setNote,
+  for (const fn of [api.addCard, api.entombCard, api.entombCards,
+                    api.returnCard, api.exileCard, api.setCardField, api.setNote,
                     api.setDeckField]) {
     vi.mocked(fn).mockReset().mockResolvedValue(EDIT_RESULT)
   }
@@ -524,7 +527,8 @@ describe('DeckDetail rationale editor', () => {
    * appears twice in a row -- once on the art's hover target and once on the
    * name itself. */
   function rowFor(card: string) {
-    return screen.getByTitle(`Remove ${card} from the deck`).closest('li')!
+    return screen.getByTitle(new RegExp(`Send ${card} to the graveyard`))
+      .closest('li')!
   }
 
   async function openEditorFor(card: string) {
@@ -701,30 +705,123 @@ describe('DeckDetail rationale editor', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /show the 2 that need one/i }))
     await waitFor(() => expect(
-      screen.queryByTitle('Remove Primeval Titan from the deck')).toBeNull())
+      screen.queryByTitle(/Send Primeval Titan to the graveyard/)).toBeNull())
     expect(rowFor('Sol Ring')).toBeTruthy()
     expect(rowFor('Forest')).toBeTruthy()
   })
 
-  it('removes a card and re-reads the deck', async () => {
+  it('entombs on the second click, never the first', async () => {
+    // ADR 27's confirmation structure: the first click only arms the button
+    // — solid red, naming the consequence — and one stray click mutates
+    // nothing. This is the test for the bug that killed a handful of
+    // Gyome's cards in one afternoon.
     renderDeck()
     await screen.findByText(DECK.name)
     const row = rowFor('Primeval Titan')
-    fireEvent.click(within(row).getByRole('button', { name: 'Remove' }))
+    const button = within(row).getByRole('button', { name: 'Entomb' })
+    fireEvent.click(button)
 
-    await waitFor(() => expect(api.removeCard)
+    expect(api.entombCard).not.toHaveBeenCalled()
+    expect(button.textContent).toMatch(/graveyard\?/i)
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(button)
+    await waitFor(() => expect(api.entombCard)
       .toHaveBeenCalledWith(REF, 'Primeval Titan'))
     await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2))
   })
 
-  it('reports a refused removal rather than silently doing nothing', async () => {
-    vi.mocked(api.removeCard).mockRejectedValue(new Error('this deck is read-only'))
+  it('reports a refused entombment rather than silently doing nothing', async () => {
+    vi.mocked(api.entombCard).mockRejectedValue(new Error('this deck is read-only'))
     renderDeck()
     await screen.findByText(DECK.name)
     const row = rowFor('Primeval Titan')
-    fireEvent.click(within(row).getByRole('button', { name: 'Remove' }))
+    const button = within(row).getByRole('button', { name: 'Entomb' })
+    fireEvent.click(button)
+    fireEvent.click(button)
 
     await screen.findByText(/read-only/)
+  })
+})
+
+/**
+ * The graveyard (ADR 27): entombed cards are deck state with two ways out,
+ * and the bulk sweep is a mode you enter rather than checkboxes always there.
+ */
+describe('DeckDetail graveyard', () => {
+  const BURIED = {
+    ...DECK,
+    graveyard: [{
+      name: 'Nissa, Who Shakes the World', category: 'ramp',
+      why: 'Doubles every Forest.', qty: 1, known: true,
+      mana_cost: '{3}{G}{G}', color_identity: ['G'],
+    }],
+  } as Deck
+
+  it('lists the buried with their rationale, and both ways out', async () => {
+    vi.mocked(api.deck).mockResolvedValue(BURIED)
+    renderDeck()
+    await screen.findByText(/graveyard/i)
+    // Twice: once on the hover target, once as the row's name — same as a
+    // living card's row.
+    expect(screen.getAllByText('Nissa, Who Shakes the World').length)
+      .toBeGreaterThan(0)
+    // The why rides into the graveyard — it is what a return restores.
+    expect(screen.getByText(/doubles every forest/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Return' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Exile' })).toBeTruthy()
+  })
+
+  it('returns a card in one click — restoring is not destructive', async () => {
+    vi.mocked(api.deck).mockResolvedValue(BURIED)
+    renderDeck()
+    await screen.findByText(/graveyard/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Return' }))
+    await waitFor(() => expect(api.returnCard)
+      .toHaveBeenCalledWith(REF, 'Nissa, Who Shakes the World'))
+  })
+
+  it('exile arms first, like every permanent thing here', async () => {
+    vi.mocked(api.deck).mockResolvedValue(BURIED)
+    renderDeck()
+    await screen.findByText(/graveyard/i)
+    const button = screen.getByRole('button', { name: 'Exile' })
+    fireEvent.click(button)
+    expect(api.exileCard).not.toHaveBeenCalled()
+    fireEvent.click(button)
+    await waitFor(() => expect(api.exileCard)
+      .toHaveBeenCalledWith(REF, 'Nissa, Who Shakes the World'))
+  })
+
+  it('offers no graveyard section while it is empty', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(screen.queryByText(/graveyard/i)).toBeNull()
+  })
+
+  it('sweeps the chosen cards in one all-or-nothing request', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    // Enter the mode, tick the card, then the armed two-step.
+    fireEvent.click(screen.getByRole('button', { name: /bulk entomb/i }))
+    fireEvent.click(screen.getByRole('checkbox',
+      { name: /choose primeval titan/i }))
+    const sweep = screen.getByRole('button', { name: /entomb 1 selected/i })
+    fireEvent.click(sweep)
+    expect(api.entombCards).not.toHaveBeenCalled()
+    fireEvent.click(sweep)
+    await waitFor(() => expect(api.entombCards)
+      .toHaveBeenCalledWith(REF, ['Primeval Titan']))
+    // Wait out the send-off and the re-read, so the deferred refresh cannot
+    // leak into whichever test runs next and pad its call counts.
+    await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2),
+                  { timeout: 2000 })
+  })
+
+  it('keeps the checkboxes out of the way until the mode is entered', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(screen.queryByRole('checkbox', { name: /choose/i })).toBeNull()
   })
 })
 
@@ -1122,7 +1219,8 @@ describe('DeckDetail art picker', () => {
  */
 describe('DeckDetail rationale interview discoverability', () => {
   function rowFor(card: string) {
-    return screen.getByTitle(`Remove ${card} from the deck`).closest('li')!
+    return screen.getByTitle(new RegExp(`Send ${card} to the graveyard`))
+      .closest('li')!
   }
 
   it('says the interview exists', async () => {
@@ -1220,7 +1318,7 @@ describe('DeckDetail for a reader', () => {
   it('offers no way to edit or remove a card', async () => {
     renderDeck()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
-    expect(screen.queryByTitle('Remove Sol Ring from the deck')).toBeNull()
+    expect(screen.queryByTitle(/Send Sol Ring to the graveyard/)).toBeNull()
     expect(screen.queryByText('Edit why')).toBeNull()
     expect(screen.queryByText('Write why')).toBeNull()
   })
@@ -1338,7 +1436,8 @@ describe('DeckDetail sharing', () => {
  */
 describe('DeckDetail slot argument', () => {
   function rowFor(card: string) {
-    return screen.getByTitle(`Remove ${card} from the deck`).closest('li')!
+    return screen.getByTitle(new RegExp(`Send ${card} to the graveyard`))
+      .closest('li')!
   }
 
   async function argueAbout(card: string) {

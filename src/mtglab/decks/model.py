@@ -164,6 +164,11 @@ class Deck:
     notes: dict[str, str] = field(default_factory=dict)
     cards: list[CardEntry] = field(default_factory=list)
     swap_board: list[CardEntry] = field(default_factory=list)
+    # Cards entombed from the 99 (ADR 27): out of the deck, but not gone. Each
+    # entry keeps its category and its `why` -- the user's own words, which is
+    # what lets a return restore the card without anything being re-invented --
+    # and stays here until it is returned or exiled. Newest first.
+    graveyard: list[CardEntry] = field(default_factory=list)
     source_path: Path | None = None
 
     # ---- derived views -------------------------------------------------
@@ -247,6 +252,7 @@ class Deck:
             notes=dict(raw.get("notes", {})),
             cards=[CardEntry.from_obj(c) for c in raw.get("cards", [])],
             swap_board=[CardEntry.from_obj(c) for c in raw.get("swap_board", [])],
+            graveyard=[CardEntry.from_obj(c) for c in raw.get("graveyard", [])],
             source_path=source_path,
         )
 
@@ -288,6 +294,11 @@ class Deck:
         payload["cards"] = cards
         if self.swap_board:
             payload["swap_board"] = [c.to_obj() for c in self.swap_board]
+        # Written only when occupied, like the swap board: an empty graveyard
+        # is the normal state and six curated decks should not each grow a
+        # `graveyard: []` line asserting it.
+        if self.graveyard:
+            payload["graveyard"] = [c.to_obj() for c in self.graveyard]
 
         text = yaml.dump(payload, Dumper=_Dumper, sort_keys=False,
                          allow_unicode=True, width=100, default_flow_style=False)

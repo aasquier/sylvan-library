@@ -513,9 +513,19 @@ arc; this is what the next few sessions actually do.
      this app does not, anywhere. The most concrete item in the list — the
      pool already carries both faces, and `CardRecord.front_type_line` exists
      because the commander dossier already had to care.
-   - **"Entomb" as the delete button's label for commanders.** The label only:
-     the typed confirmation **stays `bury`** (`service.DELETE_WORD`, branch 1),
-     confirmed by him — "still fine to ask for them to type 'bury' to be sure."
+   - ~~**"Entomb" as the delete button's label for commanders.**~~ **Done
+     2026-08-15, and it grew into
+     [ADR 27](docs/adr/0027-entomb-is-the-delete-and-the-graveyard-is-the-undo.md)**
+     after a live drive showed the card-level delete firing on one unconfirmed
+     click — a handful of Gyome's cards died in an afternoon, unrecoverable on
+     the instance where deck edits have no git history. Every delete label is
+     Entomb now, red, and armed (first click cocks the button, second acts,
+     four seconds disarms); a removed 99-card goes to a `graveyard:` list in
+     `deck.yaml` with its `why` intact, with **Return** and **Exile** as the
+     two ways out and a bulk sweep that is one all-or-nothing write. The typed
+     confirmation for a whole deck **stays `bury`**, as he confirmed. The
+     card-row buttons also stopped looking disabled (`card-action` classes —
+     hover states, which inline styles could never say).
 
    *Content depth:*
 

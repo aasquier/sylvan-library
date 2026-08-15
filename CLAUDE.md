@@ -302,7 +302,9 @@ each also a route and a control on the deck page:
 
 ```bash
 mtglab decks add <slug> --card X --category ramp --why '...'  # pool-checked
-mtglab decks remove <slug> --card X
+mtglab decks remove <slug> --card X   # entombs: 99 -> graveyard, why intact
+mtglab decks return <slug> --card X   # graveyard -> 99, exactly as it left
+mtglab decks exile <slug> --card X    # the only permanent delete (ADR 27)
 mtglab decks set <slug> --card X --why '...'        # or --category / --qty
 mtglab decks set <slug> --status built              # no --card: a deck field
 mtglab decks note <slug> --key mulligan --value '...'
