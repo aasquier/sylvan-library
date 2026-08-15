@@ -43,20 +43,41 @@ import {
 } from '../components/ui'
 
 /**
- * Compulsive Research, Kristina Collantes, Strixhaven Mystical Archive
- * (2021) — draw three, keep what survives scrutiny, which is this page's
- * whole method: read many pages, cite the ones that check out, drop the
- * rest and count them. Part of the Mystical Archive cycle the page mastheads
- * share; see `CardSearch.tsx` for why that cycle, and `PageMasthead` for the
- * hotlink-and-credit rules.
+ * Novijen, Heart of Progress, Martina Pilcerova (the Commander 2021
+ * printing) — the Simic guildhall, a laboratory the size of a district and
+ * grown rather than built. The one masthead that steps outside the Mystical
+ * Archive cycle (`CardSearch.tsx` argues the cycle), deliberately: this page
+ * was renamed the Laboratory, and Simic art is what a laboratory looks like
+ * in Magic. Looked up on Scryfall, not recalled; hotlinked and credited per
+ * `PageMasthead`'s rules.
  */
-const COMPULSIVE_RESEARCH_ART =
-  'https://cards.scryfall.io/art_crop/front/0/f/0f578fbf-c3c7-4407-9fda-3c13b165798c.jpg'
+const NOVIJEN_ART =
+  'https://cards.scryfall.io/art_crop/front/9/a/9a1e15e7-4ba6-41ad-b27b-aee2d037b6a7.jpg'
 import {
   api, errorMessage, followJob, hasResearch,
   type ClaudeStatus, type ResearchBody, type ResearchCard, type ResearchReport,
 } from '../lib/api'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
+
+/** A small Simic flask beside the nameplate. Decorative, so `aria-hidden`;
+ *  the bubbles rise in CSS (`.flask-bubble`, index.css) and hold still under
+ *  `prefers-reduced-motion`. */
+function Flask() {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className="h-6 w-6 shrink-0"
+         style={{ color: 'var(--series-2)' }}>
+      <path d="M9 3h6M10 3v5.2L4.8 18a2.4 2.4 0 0 0 2.1 3.6h10.2a2.4 2.4 0 0 0 2.1-3.6L14 8.2V3"
+            fill="none" stroke="currentColor" strokeWidth="1.5"
+            strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7.4 15.5h9.2" stroke="currentColor" strokeWidth="1.2" />
+      <circle className="flask-bubble" cx="10.5" cy="18" r="0.9" fill="currentColor" />
+      <circle className="flask-bubble flask-bubble-2" cx="13.5" cy="18.8" r="0.7"
+              fill="currentColor" />
+      <circle className="flask-bubble flask-bubble-3" cx="12" cy="19.4" r="0.5"
+              fill="currentColor" />
+    </svg>
+  )
+}
 
 /** Kept short deliberately. Every one is a question the deck page cannot
  *  answer and the pool does not hold — which is the whole boundary, shown
@@ -130,14 +151,16 @@ export default function Research() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
       <PageMasthead
-        art={COMPULSIVE_RESEARCH_ART}
-        alt="Compulsive Research, painted by Kristina Collantes: a scholar
-             haloed by dense golden charts and diagrams that fill the sky
-             around them."
-        title="Research"
+        art={NOVIJEN_ART}
+        alt="Novijen, Heart of Progress, painted by Martina Pilcerova: the
+             Simic guildhall rising over Ravnica, a laboratory grown into a
+             city district."
+        title={<span className="inline-flex items-center gap-2">
+          Laboratory <Flask />
+        </span>}
         credit={<>
-          <em>Compulsive Research</em> by Kristina Collantes, Strixhaven
-          Mystical Archive — draw three, keep what survives scrutiny.
+          <em>Novijen, Heart of Progress</em> by Martina Pilcerova — the
+          Simic guildhall, a laboratory the size of a district.
         </>}>
         <p className="max-w-2xl leading-relaxed">
           Ask about the things this tool cannot compute: the meta, what a ruling
