@@ -64,7 +64,9 @@ export function ArtPicker({ deck, onPicked }: {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="rounded-lg px-3 py-1.5 text-xs font-medium"
+        // Sized to match the hero action row it sits in — see the share
+        // toggle's note; three button idioms in one row was the defect.
+        className="rounded-lg px-4 py-2 text-sm font-medium"
         style={{ border: '1px solid var(--hairline)', background: 'var(--page)',
                  color: 'var(--text-secondary)' }}
         aria-expanded={open}

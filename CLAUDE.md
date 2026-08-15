@@ -393,17 +393,22 @@ executable — *Ajani, Nacatl Pariah* is in `tiny_pool` for it. And **a weak cas
 is reported as weak** via `strength`, because removing the counter-case must
 not create pressure to invent a case.
 
-**The stance dial is built** (2026-08-14): `components/stance.tsx` over
-`lib/stance.ts`, on the deck page and in the create flow, and all four surfaces
-send what it holds. Three things about it. **"Follow the deck" is a position,
-and the default one** — `default_for` reads the deck's `status`, so a
-theoretical deck opens wider than a built one, and a dial whose bottom setting
-was `off` would throw that away the first time it was touched. **The axes are a
-readout of the server's resolved answer**, never recomputed here; a second copy
-of `clamp` in TypeScript would disagree silently. And **a pin the server
-refuses is dropped and the call retried bare**, because every Claude panel
-gates on `/api/claude` — a renamed preset would not show an error, it would
-remove the dial, which is the only control that can clear the pin.
+**The stance dial is built** (2026-08-14), and since 2026-08-15 it is a
+**header menu plus per-surface readouts** rather than a fieldset repeated on
+three screens: `components/stancemenu.tsx` is the one control (the pin was
+always one global value in `lib/stance.ts`), `components/stance.tsx` is the
+line each Claude panel keeps saying what that setting resolved to *here*, and
+`lib/claudecopy.ts` is the only place a wire token (`second-opinion`,
+`on-request`) becomes a user-facing label — no raw enum or model id renders
+anywhere. Three things about it survive the move unchanged. **"Follow the deck"
+is a position, and the default one** — `default_for` reads the deck's `status`,
+so a theoretical deck opens wider than a built one, and a control whose bottom
+setting was `off` would throw that away the first time it was touched. **The
+axes are a readout of the server's resolved answer**, never recomputed here; a
+second copy of `clamp` in TypeScript would disagree silently. And **a pin the
+server refuses is dropped and the call retried bare**, because every Claude
+panel gates on `/api/claude` — a renamed preset would not show an error, it
+would remove the menu, which is the only control that can clear the pin.
 
 `/api/claude` takes a **`surface`** because of what building the dial found:
 the create flow has no deck, so the endpoint resolved `off` while

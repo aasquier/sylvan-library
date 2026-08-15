@@ -1,21 +1,21 @@
 /**
- * The dial, and the four properties that are not layout.
+ * The stance readout, and the properties that survived the dial's move to the
+ * header (`stancemenu.test.tsx` covers the control itself):
  *
- * - **"Follow the deck" is a position and it is the default.** The per-deck
- *   default is real behaviour and this control is the only way back to it.
- * - **The presets come from the server.** Renaming one in `stance.py` must
- *   rename it here, because a list written into the component would offer
- *   levels the instance refuses.
- * - **A capped preset is shown, disabled, and labelled** — "the operator
- *   capped this" and "this does not exist" are different facts.
- * - **The `never` sentence is always present**, under every position. ADR 15
- *   says no stance widens it, so it is not conditional on the pin.
+ * - **The axes are the server's resolved answer.** `status.stance` is what
+ *   `/api/claude` said after clamping; nothing here recomputes it, and the
+ *   popover renders it as served.
+ * - **A narrowed pin is said out loud** — phrased as the instance's decision,
+ *   not the user's mistake.
+ * - **The `never` sentence is served and always present.**
+ * - **No raw wire tokens.** `second-opinion` and `on-request` are enum values,
+ *   not labels; the readout renders the friendly names from `lib/claudecopy`.
  */
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { ClaudeStatus, StanceView } from '../lib/api'
-import { StanceDial } from './stance'
+import { StanceReadout } from './stance'
 
 afterEach(cleanup)
 
@@ -44,69 +44,48 @@ function status(over: Partial<ClaudeStatus> = {}): ClaudeStatus {
   }
 }
 
-describe('StanceDial', () => {
-  it('offers "follow the deck" and selects it when nothing is pinned', () => {
-    render(<StanceDial status={status()} pin={null} onPin={vi.fn()} />)
-    const follow = screen.getByRole('radio', { name: /Follow the deck/ })
-    expect((follow as HTMLInputElement).checked).toBe(true)
+describe('StanceReadout', () => {
+  it('names the resolved position, not the pin, and says it follows the deck', () => {
+    render(<StanceReadout status={status()} pin={null} />)
+    expect(screen.getByText(/Consultant · following the deck/)).toBeTruthy()
   })
 
-  it('clears the pin back to the deck default', () => {
-    // The direction that is easy to lose: pinning is obvious, un-pinning is
-    // the one that needs a control, and `null` cannot be spelled as a preset.
-    const onPin = vi.fn()
-    render(<StanceDial status={status()} pin="consultant" onPin={onPin} />)
-    fireEvent.click(screen.getByRole('radio', { name: /Follow the deck/ }))
-    expect(onPin).toHaveBeenCalledWith(null)
+  it('shows just the resolved name when a pin is honoured', () => {
+    render(<StanceReadout status={status()} pin="consultant" />)
+    expect(screen.getByText('Consultant')).toBeTruthy()
+    expect(screen.queryByText(/limited/)).toBeNull()
   })
 
-  it('renders one position per served preset, by the served name', () => {
-    render(<StanceDial status={status()} pin={null} onPin={vi.fn()} />)
-    // Three presets plus "follow the deck".
-    expect(screen.getAllByRole('radio')).toHaveLength(4)
-    expect(screen.getByRole('radio', { name: /consultant/ })).toBeTruthy()
-    expect(screen.getByText('Speaks when spoken to.')).toBeTruthy()
+  it('says when the instance narrowed the pin, naming both positions', () => {
+    render(<StanceReadout status={status()} pin="collaborator" />)
+    expect(screen.getByText(/Consultant · limited from Collaborator/)).toBeTruthy()
   })
 
-  it('disables a preset the deployment caps, and says which it is', () => {
-    render(<StanceDial status={status()} pin={null} onPin={vi.fn()} />)
-    const capped = screen.getByRole('radio', { name: /collaborator/ }) as HTMLInputElement
-    expect(capped.disabled).toBe(true)
-    expect(screen.getByText(/capped by this instance/)).toBeTruthy()
-    // And the ones it does not cap stay selectable.
-    expect((screen.getByRole('radio', { name: /consultant/ }) as HTMLInputElement).disabled)
-      .toBe(false)
-  })
-
-  it('shows the resolved axes rather than the pin', () => {
-    // `status.stance` is the server's answer after resolving and clamping.
-    // Nothing here recomputes it — a second implementation of `stance.clamp`
-    // would disagree silently, showing a level the instance never ran.
-    render(<StanceDial status={status()} pin="collaborator" onPin={vi.fn()} />)
+  it('renders the served axes in the popover, in friendly words', () => {
+    // `status.stance` is the resolved-and-clamped answer; a second
+    // implementation of the clamp here would disagree silently.
+    render(<StanceReadout status={status()} pin={null} />)
+    fireEvent.click(screen.getByRole('button'))
     expect(screen.getByText('When may it speak?')).toBeTruthy()
-    expect(screen.getByText('on-request')).toBeTruthy()
+    expect(screen.getByText('answers when asked')).toBeTruthy()
     expect(screen.getByText(/Only when you ask it something/)).toBeTruthy()
+    // The wire token itself never renders.
+    expect(screen.queryByText('on-request')).toBeNull()
   })
 
-  it('says so when a pin is being narrowed', () => {
-    render(<StanceDial status={status()} pin="collaborator" onPin={vi.fn()} />)
-    expect(screen.getByText(/This instance caps the stance below that/)).toBeTruthy()
-  })
-
-  it('stays quiet about capping when the pin is honoured', () => {
-    render(<StanceDial status={status()} pin="consultant" onPin={vi.fn()} />)
-    expect(screen.queryByText(/This instance caps the stance below that/)).toBeNull()
-  })
-
-  it('shows the never-line under every position, including off', () => {
-    // Served rather than written here, and unconditional: a sentence that
-    // appeared only next to `collaborator` would read as a warning about that
-    // preset rather than as the rule the dial does not reach.
-    for (const pin of [null, 'off', 'consultant', 'collaborator']) {
+  it('keeps the never-line, served and unconditional', () => {
+    for (const pin of [null, 'off', 'collaborator']) {
       cleanup()
-      render(<StanceDial status={status()} pin={pin} onPin={vi.fn()} />)
+      render(<StanceReadout status={status()} pin={pin} />)
+      fireEvent.click(screen.getByRole('button'))
       expect(screen.getByText(/No stance lets Claude write a card’s rationale/))
         .toBeTruthy()
     }
+  })
+
+  it('points at the header menu, which is where the control went', () => {
+    render(<StanceReadout status={status()} pin={null} />)
+    fireEvent.click(screen.getByRole('button'))
+    expect(screen.getByText(/Claude menu in the header/)).toBeTruthy()
   })
 })

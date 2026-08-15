@@ -1,152 +1,129 @@
 /**
- * The stance dial — [ADR 15](../../../docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md)'s
- * "user's dial", and the last thing that ADR listed as unbuilt on this side.
+ * The stance readout — what a Claude panel says about the setting it obeys.
  *
- * Four decisions worth stating, because each one had an easier alternative:
+ * This used to be the dial itself, repeated as a fieldset on three screens.
+ * The pin was always one global value, so the control moved to the header
+ * (`StanceMenu`) and each panel keeps this single line instead: the resolved
+ * position, with the full answer one hover away.
  *
- * **The presets are served, never hardcoded.** `/api/claude` sends the roster
- * with a `blurb` and an `available` flag per entry, and `available` is a fact
- * about *this deployment* — `MTGLAB_CLAUDE_STANCE_CEILING` can cap what any
- * user may select, and an unreadable ceiling fails closed to `off`. A list
- * written into this file would offer levels the instance refuses, which is the
- * failure the ceiling exists to prevent, moved into the UI.
+ * Two properties survive the move unchanged, because they were never about
+ * layout:
  *
- * **"Follow the deck" is first and is the default.** See `lib/stance.ts`: the
- * per-deck default is real behaviour, not a fallback, and this is the only
- * control that can give it back once it has been overridden.
+ * - **The axes are a readout of the server's resolved answer.** `status.stance`
+ *   is what `/api/claude` said after resolving and clamping the pin; nothing
+ *   here recomputes it. A second implementation of `stance.clamp` in
+ *   TypeScript would disagree silently — the UI saying `collaborator` while
+ *   the instance ran `consultant`.
+ * - **The `never` sentence is served and always present.** ADR 15's rule is
+ *   that no stance can widen it, so it does not depend on the pin.
  *
- * **The axes are shown but not editable.** `stance.py` has three independent
- * axes and four presets over them, and the module says why the presets exist:
- * "most people will never touch the axes". So the axes render as a readout of
- * what the pin actually bought — with each axis's own question, which is
- * served for exactly this — and the dial stays a four-way choice. Three
- * dropdowns would be a truthful interface to a decision nobody is asking to
- * make at that resolution.
- *
- * **The `never` line is always visible, and is never conditional on the pin.**
- * It is served (`status.never`) rather than written here, and ADR 15's rule is
- * that no stance can widen it. A sentence that appeared only at the top of the
- * dial would read as a warning about `collaborator`; sitting under every
- * position, it reads as what it is — the one thing the dial does not control.
+ * When a pin is being narrowed by the deployment ceiling, the line says so —
+ * phrased as the instance's decision rather than the user's mistake, because
+ * they picked something legitimate and an operator capped it.
  */
 
+import { useEffect, useRef, useState } from 'react'
 import type { ClaudeStatus } from '../lib/api'
+import { levelLabel, presetLabel } from '../lib/claudecopy'
 import { isCapped, type StancePin } from '../lib/stance'
 
-/** The always-present first position. Not a preset — see `lib/stance.ts`. */
-const FOLLOW = {
-  name: null,
-  label: 'Follow the deck',
-  blurb: 'No preference. A deck being considered opens wider than one that is '
-       + 'already sleeved, and a deck that does not exist yet opens widest.',
-} as const
-
-export function StanceDial({ status, pin, onPin }: {
+export function StanceReadout({ status, pin }: {
   status: ClaudeStatus
   pin: StancePin
-  onPin: (pin: StancePin) => void
 }) {
+  const [open, setOpen] = useState(false)
+  const [pinned, setPinned] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!pinned) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setPinned(false); setOpen(false) }
+    }
+    const onClick = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) {
+        setPinned(false)
+        setOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('mousedown', onClick)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousedown', onClick)
+    }
+  }, [pinned])
+
   const capped = isCapped(pin, status)
+  // The resolved answer leads; the pin only appears when it bought less than
+  // it asked for, or when following the deck (the position worth naming
+  // because it is the one the menu can give back).
+  const resolved = presetLabel(status.stance.preset)
+  const line = pin === null
+    ? `${resolved} · following the deck`
+    : capped
+      ? `${resolved} · limited from ${presetLabel(pin)}`
+      : resolved
 
   return (
-    <fieldset className="space-y-2 border-t pt-2"
-              style={{ borderColor: 'var(--hairline)' }}>
-      <legend className="text-[11px] font-medium"
-              style={{ color: 'var(--text-primary)' }}>
-        How much should Claude do?
-      </legend>
+    <span ref={ref} className="relative inline-block text-[11px]">
+      <button
+        type="button"
+        aria-label="What is Claude allowed to do here?"
+        aria-expanded={open}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => !pinned && setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => !pinned && setOpen(false)}
+        onClick={() => { setPinned((p) => !p); setOpen(true) }}
+        className="cursor-help"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        Claude:{' '}
+        <span style={{ color: 'var(--text-secondary)',
+                       borderBottom: '1px dotted var(--text-muted)' }}>
+          {line}
+        </span>
+      </button>
 
-      <div className="space-y-1">
-        <Option
-          selected={pin === null}
-          available
-          label={FOLLOW.label}
-          blurb={FOLLOW.blurb}
-          onSelect={() => onPin(FOLLOW.name)}
-        />
-        {status.presets.map((preset) => (
-          <Option
-            key={preset.name}
-            selected={pin === preset.name}
-            available={preset.available}
-            label={preset.name}
-            blurb={preset.blurb}
-            onSelect={() => onPin(preset.name)}
-          />
-        ))}
-      </div>
-
-      {/* Only when it is true, and phrased as the instance's decision rather
-          than the user's mistake: they picked something legitimate and an
-          operator capped it. `presets[].available` is the server saying so. */}
-      {capped && (
-        <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          This instance caps the stance below that, so the setting above is
-          narrowed to what is shown below.
-        </p>
-      )}
-
-      {/* What actually applied, straight from the server — never recomputed
-          here. `status.stance` is the resolved-and-clamped answer. */}
-      <dl className="space-y-1">
-        {status.stance.axes.map((axis) => (
-          <div key={axis.axis} className="flex gap-2 text-[11px]">
-            <dt className="w-32 shrink-0" style={{ color: 'var(--text-muted)' }}>
-              {axis.question}
-            </dt>
-            <dd style={{ color: 'var(--text-primary)' }}>
-              <span className="font-mono">{axis.level}</span>
-              <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
-                — {axis.means}
+      {open && (
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute bottom-full left-0 z-50 mb-1 block w-72 rounded-lg px-3 py-2 text-left leading-relaxed shadow-xl"
+          style={{
+            background: 'var(--surface-1)',
+            border: '1px solid var(--hairline)',
+            color: 'var(--text-secondary)',
+            whiteSpace: 'normal',
+          }}
+        >
+          {/* What actually applied, straight from the server — never
+              recomputed here. */}
+          <span className="block space-y-1">
+            {status.stance.axes.map((axis) => (
+              <span key={axis.axis} className="block">
+                <span style={{ color: 'var(--text-muted)' }}>{axis.question}</span>{' '}
+                <span style={{ color: 'var(--text-primary)' }}>
+                  {levelLabel(axis.level)}
+                </span>
+                <span style={{ color: 'var(--text-muted)' }}> — {axis.means}</span>
               </span>
-            </dd>
-          </div>
-        ))}
-      </dl>
-
-      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-        {status.never}
-      </p>
-    </fieldset>
-  )
-}
-
-/**
- * One position on the dial.
- *
- * A real radio rather than a styled button, so the group is one tab stop and
- * arrow keys move within it — which is what a four-way exclusive choice is
- * supposed to do, and what a row of buttons silently would not.
- */
-function Option({ selected, available, label, blurb, onSelect }: {
-  selected: boolean
-  available: boolean
-  label: string
-  blurb: string
-  onSelect: () => void
-}) {
-  return (
-    <label className={`flex gap-2 ${available ? 'cursor-pointer' : 'opacity-50'}`}>
-      <input
-        type="radio"
-        name="claude-stance"
-        checked={selected}
-        // Disabled rather than hidden: a level this deployment will not honour
-        // is still worth showing, because "the operator capped this" and "this
-        // does not exist" are different facts and only one of them is true.
-        disabled={!available}
-        onChange={onSelect}
-        className="mt-0.5"
-      />
-      <span className="text-[11px]">
-        <span style={{ color: 'var(--text-primary)' }}>{label}</span>
-        {!available && (
-          <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
-            (capped by this instance)
+            ))}
           </span>
-        )}
-        <span className="block" style={{ color: 'var(--text-muted)' }}>{blurb}</span>
-      </span>
-    </label>
+          {capped && (
+            <span className="mt-1 block" style={{ color: 'var(--text-muted)' }}>
+              This server limits Claude below your setting, so the narrower
+              answer above is what applies.
+            </span>
+          )}
+          <span className="mt-1 block" style={{ color: 'var(--text-muted)' }}>
+            {status.never}
+          </span>
+          <span className="mt-1 block" style={{ color: 'var(--text-muted)' }}>
+            Change it from the Claude menu in the header.
+          </span>
+        </span>
+      )}
+    </span>
   )
 }

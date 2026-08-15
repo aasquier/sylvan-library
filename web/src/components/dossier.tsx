@@ -246,9 +246,9 @@ export function CommanderDossierPanel({
                   + 'this is the part that needs reading around — who the '
                   + 'character is, what archetype they define, and who their '
                   + 'rivals are. It costs one call and a few searches.'
-                : 'No dossier stored, and the Claude stance is off — so '
-                  + 'nothing here will call out. Everything else on this page '
-                  + 'works unchanged.'}
+                : 'No dossier stored, and Claude is switched off here — so '
+                  + 'nothing on this panel will call out. Everything else on '
+                  + 'this page works unchanged.'}
             </p>
           )}
           {body && <DossierBodyView body={body} report={report} />}

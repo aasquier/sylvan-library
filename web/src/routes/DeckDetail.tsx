@@ -25,7 +25,7 @@ import {
 } from '../components/deckedit'
 import { ArtPicker } from '../components/artpicker'
 import { CommanderDossierPanel } from '../components/dossier'
-import { StanceDial } from '../components/stance'
+import { StanceReadout } from '../components/stance'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 
 type Tab = 'cards' | 'stats' | 'validation' | 'notes'
@@ -67,9 +67,13 @@ function ShareToggle({ deck, deckRef, onChanged }: {
 
   return (
     <span className="flex flex-col gap-1">
+      {/* Same size and weight as its row siblings — this button sits between
+          the simulate link and the art picker, and it used to be the odd one
+          out in all three of padding, weight and vertical position. */}
       <button onClick={() => void toggle()} disabled={busy}
-              className="rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+              className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40"
               style={{ border: '1px solid var(--hairline)',
+                       background: 'var(--page)',
                        color: 'var(--text-secondary)' }}>
         {busy ? 'Saving…' : deck.shared ? 'Make private' : 'Share this deck'}
       </button>
@@ -133,7 +137,7 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
   // Read here rather than passed down: the pin lives outside React (see
   // `lib/stance.ts`), so this and the fetch in the parent see one value
   // without the prop having to exist.
-  const [pin, setPin] = useStance()
+  const [pin] = useStance()
   const card = deck.commander_card
   const stats = card?.power != null && card?.toughness != null
     ? `${card.power}/${card.toughness}`
@@ -233,7 +237,11 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
             </p>
           )}
 
-          <div className="mt-5 flex flex-wrap items-center gap-3">
+          {/* `items-start`, not `items-center`: the share toggle is a button
+              with a status caption underneath, and centring the pair made its
+              button ride higher than every sibling. Top-aligned, the buttons
+              share a line and the caption hangs below on its own. */}
+          <div className="mt-5 flex flex-wrap items-start gap-3">
             <Link to={`/simulate?owner=${encodeURIComponent(deckRef.owner)}`
                      + `&deck=${encodeURIComponent(deckRef.slug)}`}
                   className="rounded-lg px-4 py-2 text-sm font-medium"
@@ -249,7 +257,7 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
                                            onChanged={onRefresh} />}
             {deck.writable && <ArtPicker deck={deckRef} onPicked={onRefresh} />}
             {card?.artist && (
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              <span className="self-center text-xs" style={{ color: 'var(--text-muted)' }}>
                 {/* The artist belongs to the printing being shown, so when a
                     deck has picked one, name it. Otherwise two decks on the
                     same commander credit the same painter for different
@@ -285,12 +293,13 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
       )}
 
       {/* Under the dossier rather than over it, and only where Claude is
-          actually reachable. A dial on an instance with no key would be a
-          control over nothing, and the two panels that obey it — the dossier
-          above and the interview inside the rationale editor — both say for
-          themselves when the SDK or the credential is what is missing. */}
+          actually reachable. The control itself lives in the header now
+          (`StanceMenu`); this line says what that setting resolved to for
+          *this* deck, which the header cannot know. */}
       {claude?.installed && claude.configured && (
-        <StanceDial status={claude} pin={pin} onPin={setPin} />
+        <div className="px-5 pb-4 sm:px-6">
+          <StanceReadout status={claude} pin={pin} />
+        </div>
       )}
     </div>
   )
@@ -745,8 +754,9 @@ export default function DeckDetail() {
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Stuck on a <code>why</code>? <strong>Ask Claude</strong> on any card
               and it will interview you about that slot — pool text, the gate’s
-              verdict and the neighbours it competes with. It asks; you answer.
-              No stance lets it write the rationale.
+              verdict and the neighbours it competes with — to help you write the
+              rationale. It asks; you answer. No setting lets it write the
+              rationale for you.
             </p>
           )}
 
@@ -831,7 +841,8 @@ export default function DeckDetail() {
                             setAskNow(true)
                             setEditing(card.name)
                           }}
-                          title={`Have Claude ask you about ${card.name}'s slot`}
+                          title={`Claude interviews you about ${card.name}'s slot`
+                                 + ' to help you write its why — it asks, you write'}
                           className="rounded-md px-2 py-1 text-[11px]"
                           style={{ border: '1px solid var(--hairline)',
                                    color: 'var(--text-secondary)' }}>

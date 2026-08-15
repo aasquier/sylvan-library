@@ -649,7 +649,7 @@ describe('DeckDetail rationale editor', () => {
     })
     const row = await openEditorFor('Sol Ring')
 
-    await within(row).findByText(/not installed/)
+    await within(row).findByText(/isn’t available on this server/)
     expect(within(row).queryByRole('button', { name: /ask for questions/i }))
       .toBeNull()
   })
@@ -951,7 +951,7 @@ describe('DeckDetail commander dossier', () => {
     })
     renderDeck()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
-    expect(await screen.findByText(/claude stance is off/i)).toBeTruthy()
+    expect(await screen.findByText(/claude is switched off here/i)).toBeTruthy()
     expect(screen.queryByText(/write the dossier/i)).toBeNull()
   })
 
@@ -1118,7 +1118,7 @@ describe('DeckDetail rationale interview discoverability', () => {
     // The first question anybody asks is whether it writes the answer, and
     // rule 4 is easier to keep when the UI states it unprompted.
     renderDeck()
-    expect(await screen.findByText(/no stance lets it write the rationale/i))
+    expect(await screen.findByText(/no setting lets it write the rationale for you/i))
       .toBeTruthy()
   })
 

@@ -4,6 +4,7 @@ import Claim from './routes/Claim'
 import Library from './routes/Library'
 import Login from './routes/Login'
 import { Spinner } from './components/ui'
+import { StanceMenu } from './components/stancemenu'
 import { api, onSessionLost, type AuthState, type Health } from './lib/api'
 
 // Route-level code splitting. Library stays eager because it is the landing
@@ -291,6 +292,10 @@ export default function App() {
                 </button>
               </span>
             )}
+            {/* Self-gating: renders nothing unless this instance has Claude
+                installed and configured, so a laptop without the extra never
+                shows a menu over a feature it does not have. */}
+            <StanceMenu />
             <ThemeButton theme={theme} onToggle={toggleTheme} />
           </div>
         </div>

@@ -21,6 +21,7 @@ import {
   type InterviewReport, type SlotArgumentReport,
 } from '../lib/api'
 import { CATEGORY_LABELS, categoryLabel } from '../lib/mtg'
+import { presetLabel } from '../lib/claudecopy'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 import { ErrorNote, ManaText, Select } from '../components/ui'
 
@@ -128,21 +129,8 @@ function InterviewPanel({ deck, card, askNow = false }: {
   }, [askNow, status, card, askIt])
 
   if (!status) return null
-  if (!status.installed) {
-    return (
-      <p className="border-t pt-2" style={{ borderColor: 'var(--hairline)',
-                                            color: 'var(--text-muted)' }}>
-        Claude is not installed. <code>pip install -e &quot;.[claude]&quot;</code>
-      </p>
-    )
-  }
-  if (!status.configured) {
-    return (
-      <p className="border-t pt-2" style={{ borderColor: 'var(--hairline)',
-                                            color: 'var(--text-muted)' }}>
-        No <code>ANTHROPIC_API_KEY</code> set — see <code>.env.example</code>.
-      </p>
-    )
+  if (!status.installed || !status.configured) {
+    return <ClaudeUnavailable installed={status.installed} />
   }
 
   return (
@@ -158,7 +146,7 @@ function InterviewPanel({ deck, card, askNow = false }: {
           {busy ? 'Asking…' : report ? 'Ask again' : 'Ask for questions'}
         </button>
         <span style={{ color: 'var(--text-muted)' }}>
-          It asks. You answer.
+          It asks. You answer. The why stays yours.
         </span>
       </div>
 
@@ -171,10 +159,12 @@ function InterviewPanel({ deck, card, askNow = false }: {
       {report?.asked && (
         <div className="space-y-2">
           {/* ADR 14 boundary 3: the gate's output is reproducible and this is
-              not, so they never share a surface without a label. */}
+              not, so they never share a surface without a label. The label
+              names the system, not the model id — which system answered is
+              the fact a reader needs; the checkpoint string is not. */}
           <p style={{ color: 'var(--text-muted)' }}>
-            Claude — <span className="font-mono">{report.model}</span>, not the gate
-            {report.stance.preset ? ` · ${report.stance.preset}` : null}
+            Claude, not the gate
+            {report.stance.preset ? ` · ${presetLabel(report.stance.preset)}` : null}
           </p>
           {report.questions.length === 0 && (
             <p style={{ color: 'var(--text-muted)' }}>
@@ -210,9 +200,37 @@ function InterviewPanel({ deck, card, askNow = false }: {
 
 /** How a charge's weight reads. Three, matching `argue.STRENGTHS`. */
 const STRENGTH_COLOUR: Record<string, string> = {
-  decisive: 'var(--status-error)',
-  serious: 'var(--status-warning)',
+  // `--status-critical`/`--status-serious` are the defined tokens; an earlier
+  // `--status-error` here named nothing and decisive charges rendered in the
+  // inherited colour.
+  decisive: 'var(--status-critical)',
+  serious: 'var(--status-serious)',
   minor: 'var(--text-muted)',
+}
+
+/**
+ * The two unavailable states, kept apart — collapsing them tells somebody
+ * their key is missing when they simply have not installed the extra. The
+ * first sentence is for anybody; the `code` line is for whoever runs the
+ * server, which on a laptop is the same person.
+ */
+function ClaudeUnavailable({ installed, className = '' }: {
+  installed: boolean
+  className?: string
+}) {
+  return (
+    <p className={`border-t pt-2 ${className}`}
+       style={{ borderColor: 'var(--hairline)', color: 'var(--text-muted)' }}>
+      {installed
+        ? 'Claude is installed here but has no key to call with.'
+        : 'Claude isn’t available on this server.'}
+      <span className="mt-0.5 block text-[10px]">
+        {installed
+          ? <>Set <code>ANTHROPIC_API_KEY</code> — see <code>.env.example</code>.</>
+          : <><code>pip install -e &quot;.[claude]&quot;</code> adds it.</>}
+      </span>
+    </p>
+  )
 }
 
 /**
@@ -282,14 +300,7 @@ export function SlotArgumentPanel({ deck, card, onClose }: {
 
   if (!status) return null
   if (!status.installed || !status.configured) {
-    return (
-      <p className="mt-2 border-t pt-2" style={{ borderColor: 'var(--hairline)',
-                                                 color: 'var(--text-muted)' }}>
-        {status.installed
-          ? <>No <code>ANTHROPIC_API_KEY</code> set — see <code>.env.example</code>.</>
-          : <>Claude is not installed. <code>pip install -e &quot;.[claude]&quot;</code></>}
-      </p>
-    )
+    return <ClaudeUnavailable installed={status.installed} className="mt-2" />
   }
 
   const dropped = report?.alternatives_dropped
@@ -326,8 +337,8 @@ export function SlotArgumentPanel({ deck, card, onClose }: {
               does: questions are never mistaken for a verdict, and a reasoned
               case against a card reads exactly like one. */}
           <p style={{ color: 'var(--text-muted)' }}>
-            Claude — <span className="font-mono">{report.model}</span>, not the gate
-            {report.stance.preset ? ` · ${report.stance.preset}` : null}
+            Claude, not the gate
+            {report.stance.preset ? ` · ${presetLabel(report.stance.preset)}` : null}
           </p>
           {report.charges.length === 0 && (
             <p style={{ color: 'var(--text-muted)' }}>

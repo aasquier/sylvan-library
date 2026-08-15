@@ -43,7 +43,7 @@ import {
 import { COLOR_VAR } from '../lib/mtg'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 import { CardHover, ColorRing } from './ui'
-import { StanceDial } from './stance'
+import { StanceReadout } from './stance'
 
 /** Held here so a closed tab does not cost ten minutes of somebody's thinking.
  *  The server stores nothing (ADR 20), which is also why the most personal
@@ -497,8 +497,13 @@ export function ThemeInterview({
       <div className="card-surface rounded-xl px-6 py-8">
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
           {status.installed
-            ? <>This one needs an <code>ANTHROPIC_API_KEY</code> — see <code>.env.example</code>.</>
-            : <>This one needs the Claude extra: <code>pip install -e &quot;.[claude]&quot;</code></>}
+            ? 'This door needs Claude, and this server has no key for it yet.'
+            : 'This door needs Claude, which isn’t installed on this server.'}
+          <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+            {status.installed
+              ? <>Set <code>ANTHROPIC_API_KEY</code> — see <code>.env.example</code>.</>
+              : <><code>pip install -e &quot;.[claude]&quot;</code> adds it.</>}
+          </span>
         </p>
         <button onClick={onLeave} className="mt-3 rounded-md px-3 py-1.5 text-sm"
                 style={{ border: '1px solid var(--hairline)',
@@ -678,10 +683,11 @@ export function ThemeInterview({
             </div>
 
             {/* Last in the column, because it is a setting rather than a step.
-                It governs both halves of this screen — the questions and the
-                proposal — which is why it sits beside them once rather than
-                over each. */}
-            <StanceDial status={status} pin={pin} onPin={setPin} />
+                The control itself is the header's Claude menu now; this line
+                reports what that setting resolves to for this conversation. */}
+            <div className="border-t pt-2" style={{ borderColor: 'var(--hairline)' }}>
+              <StanceReadout status={status} pin={pin} />
+            </div>
           </aside>
         </div>
       )}
@@ -718,8 +724,7 @@ export function ThemeInterview({
               nobody can see is a number nobody checks. */}
           {proposal.combinations.length > 0 && (
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {proposal.never} Written by{' '}
-              <span className="font-mono">{proposal.model}</span> over{' '}
+              {proposal.never} Written by Claude over{' '}
               {proposal.searched} page{proposal.searched === 1 ? '' : 's'}
               {proposal.commanders_dropped > 0 &&
                 ` · ${proposal.commanders_dropped} named card${
