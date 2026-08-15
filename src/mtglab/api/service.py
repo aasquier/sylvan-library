@@ -1069,6 +1069,12 @@ def claude_interview_mode() -> Mode:
     return RATIONALE_INTERVIEW
 
 
+def claude_argue_mode() -> Mode:
+    """The slot argument's mode object (ADR 25). Imported lazily too."""
+    from mtglab.claude.argue import SLOT_ARGUMENT
+    return SLOT_ARGUMENT
+
+
 def claude_dossier_mode() -> Mode:
     """The commander dossier's mode object (ADR 19). Imported lazily too."""
     from mtglab.claude.dossier import COMMANDER_DOSSIER
@@ -1122,6 +1128,33 @@ def claude_interview(*, slug: str, card: str, requested: Any = None,
         # the SDK failing, and `explain` is the function that already knows how
         # to turn a 401 into "your key may have expired" rather than a stack
         # trace. Same treatment `claude check` gives it.
+        raise ClaudeFailed(claude_client.explain(exc)) from exc
+
+
+def claude_argue(*, slug: str, card: str, requested: Any = None,
+                 focus: str = "",
+                 source: DeckSource | None = None) -> dict[str, Any]:
+    """Make the case against one card's slot (ADR 25). Returns charges.
+
+    The interview's sibling and deliberately its twin: same arguments, same
+    exceptions, same status codes. What differs is the direction of the answer
+    -- the interview asks what you think, this says what is wrong -- and the
+    one thing that does not differ is that neither may say what is right about
+    a card in a form anybody could paste into `why`.
+    """
+    from mtglab.claude import client as claude_client
+    from mtglab.claude.argue import CardNotInDeck, ask
+    from mtglab.claude.modes import ModeExhausted
+
+    try:
+        return ask(slug, card, requested=requested, focus=focus, source=source)
+    except (claude_client.ClaudeUnavailable, CardNotInDeck, DeckNotFound):
+        # Answerable by the caller, and each maps to its own status code.
+        raise
+    except ModeExhausted as exc:
+        raise ClaudeFailed(str(exc)) from exc
+    except Exception as exc:
+        # See `claude_interview`: broad on purpose, narrow in effect.
         raise ClaudeFailed(claude_client.explain(exc)) from exc
 
 

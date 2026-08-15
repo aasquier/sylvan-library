@@ -55,10 +55,11 @@ src/mtglab/
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
   artifacts/generate.py   the five deliverables
-  claude/                 client, tools, stance, persona, and four modes across
-                          three features: interview.py (a card's `why`),
-                          dossier.py (the commander), theme.py (two — a
-                          conversation about you, then a proposal)
+  claude/                 client, tools, stance, persona, and five modes across
+                          four features: interview.py (a card's `why`),
+                          argue.py (the case against a slot), dossier.py (the
+                          commander), theme.py (two — a conversation about
+                          you, then a proposal)
   claude/persona.py       who a mode sounds like; a voice, never a stance
   auth/                   app.db, Argon2id, accounts, sessions, rate limit,
                           invite/reset tokens, the EmailSender seam
@@ -283,6 +284,7 @@ argument made again; `tests/test_isolation.py` is where it is pinned.
 mtglab decks import <slug> --from list.txt --commander 'X'   # -> a draft
 mtglab decks validate <slug>      # gate — fix errors before anything else
 mtglab decks suggest <slug>       # shortlist replacements for what it flagged
+mtglab claude argue <slug> --card X   # the case against a slot; never for it
 mtglab decks swap <slug> --out X --in Y --why '...'   # apply your choice
 mtglab sim mana <slug>            # baseline consistency
 mtglab sim lands <slug> 30 40     # is the land count right?
@@ -317,9 +319,11 @@ research.**
 
 **Started, not finished.** `src/mtglab/claude/` is the pipe — a client on
 `ANTHROPIC_API_KEY` and seven read-only tool schemas over `api/service.py` —
-plus the stance (`stance.py`, three axes, off by default) and **four** modes
-across three features. The **rationale interview** (`interview.py`) asks about
-a card's slot so you can write its `why`. The **commander dossier**
+plus the stance (`stance.py`, three axes, off by default) and **five** modes
+across four features. The **rationale interview** (`interview.py`) asks about
+a card's slot so you can write its `why`. The **slot argument** (`argue.py`,
+[ADR 25](docs/adr/0025-argue-a-slot-argues-one-direction.md)) makes the case
+against that slot. The **commander dossier**
 (`dossier.py`, [ADR 19](docs/adr/0019-the-dossier-cites-three-sources.md)) says
 who a deck's commander is, what archetype they define, who their rivals are and
 where they sit in Magic's history. The **theme interview** (`theme.py`,
@@ -328,10 +332,34 @@ the create flow's third door: a conversation whose questions are **not about
 Magic** — a film, a period, your sign, how you are at game night — and then a
 proposal of two colour combinations with three pool-checked commanders each.
 `mtglab claude check` proves the key;
-`mtglab claude interview <slug> --card X` and `mtglab claude dossier <slug>`
-run the first two, and the deck page runs both. The other three modes ADR 15
-names and the activity log do not exist — check what is actually there before
-assuming either way.
+`mtglab claude interview <slug> --card X`, `mtglab claude argue <slug> --card X`
+and `mtglab claude dossier <slug>` run the first three, and the deck page runs
+all three. **Research and deck conversation do not exist**, nor does the
+activity log — check what is actually there before assuming either way.
+
+**The slot argument argues one direction, and that is the whole design**
+([ADR 25](docs/adr/0025-argue-a-slot-argues-one-direction.md)). The interview
+holds rule 4 with a predicate anybody can read — everything it returns must end
+in a question mark — and this mode's output is *all* declarative sentences
+about a card's merit, so that guard would delete the feature. The replacement:
+**it makes the case against a slot and has no way to make the case for one.**
+The response schema has no `defence`, `verdict` or `summary` field and forbids
+extra properties, so a balanced answer has nowhere to go. That matters because
+the balanced version is the attractive one and it is a rationale generator: a
+paragraph explaining why a card earns its place, grounded in the user's own
+deck, is a `why` in everything but authorship. Guarding it in the UI would not
+be guarding it — the CLI renders the same payload and the endpoint is public.
+
+Three consequences. **Every charge must cite a fact or it is dropped and
+counted** — the predicate moved from "is it a question" to "does it rest on
+anything", since every item here is declarative by design. **Alternatives are
+bare names and Python judges them**: each is resolved through the pool and
+dropped if it does not exist, is banned, or falls outside the deck's colour
+identity, counted separately in each case, because "you invented that card" and
+"that card is off-colour" are different failures. That check is rule 2 made
+executable — *Ajani, Nacatl Pariah* is in `tiny_pool` for it. And **a weak case
+is reported as weak** via `strength`, because removing the counter-case must
+not create pressure to invent a case.
 
 **The stance dial is built** (2026-08-14): `components/stance.tsx` over
 `lib/stance.ts`, on the deck page and in the create flow, and all four surfaces

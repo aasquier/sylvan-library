@@ -1733,6 +1733,77 @@ def test_the_interview_at_a_stance_of_off_makes_no_call(client):
     assert body["answered_by"] == "claude", "labelled even when it said nothing"
 
 
+# ------------------------------------------------------- the slot argument
+#
+# The same paths as the interview above, and the same reason for stopping
+# short of a call. Written at the same time as the route rather than after it,
+# which the dossier is the argument for: 42 tests matched "dossier" and every
+# one exercised the module, so the endpoint shipped with no test at all and
+# broke deployed in a way no green suite could have seen.
+
+def test_the_argument_needs_a_card(client):
+    r = client.post("/api/decks/local/gyome-food/argue", json={})
+    assert r.status_code == 422
+
+
+def test_the_argument_refuses_a_card_the_deck_does_not_run(client):
+    """A 422 rather than a 404: the deck is fine, the question is not."""
+    r = client.post("/api/decks/local/gyome-food/argue",
+                    json={"card": "Black Lotus", "stance": "consultant"})
+    assert r.status_code == 422
+    assert "not in gyome-food" in r.json()["detail"]
+
+
+def test_the_argument_on_an_unknown_deck_is_a_404(client):
+    r = client.post("/api/decks/local/no-such-deck/argue",
+                    json={"card": "Sol Ring"})
+    assert r.status_code == 404
+
+
+def test_the_argument_at_a_stance_of_off_makes_no_call(client):
+    import mtglab.claude.client as cc
+    original = cc.connect
+    cc.connect = lambda: pytest.fail("a stance of off must make no call")
+    try:
+        r = client.post("/api/decks/local/gyome-food/argue",
+                        json={"card": "Bag End Banquet", "stance": "off"})
+    finally:
+        cc.connect = original
+    assert r.status_code == 200
+    body = r.json()
+    assert body["asked"] is False
+    assert body["charges"] == []
+    assert body["answered_by"] == "claude", "labelled even when it said nothing"
+
+
+def test_the_argument_carries_no_field_for_the_case_in_favour(client):
+    """ADR 25 at the HTTP surface, which is where a second client meets it.
+
+    The guard is the response schema and it lives in the mode, but the thing a
+    client can actually see is the payload — and a payload with a `defence`
+    field would make the one-direction rule a UI convention rather than a
+    property of the endpoint.
+    """
+    r = client.post("/api/decks/local/gyome-food/argue",
+                    json={"card": "Bag End Banquet", "stance": "off"})
+    body = r.json()
+    for field in ("defence", "in_favour", "verdict", "rationale", "why",
+                  "recommendation", "summary"):
+        assert field not in body, f"the argument may not carry {field}"
+
+
+def test_the_argument_is_a_different_mode_from_the_interview(client):
+    """Two per-card surfaces, and the answer says which one answered.
+
+    They share `brief()` and a request shape, so the field that distinguishes
+    them is the one a client renders from -- and rendering a one-sided
+    argument under the interview's framing is the misread worth preventing.
+    """
+    r = client.post("/api/decks/local/gyome-food/argue",
+                    json={"card": "Bag End Banquet", "stance": "off"})
+    assert r.json()["mode"] == "slot-argument"
+
+
 # ------------------------------------------------- the commander dossier
 
 def test_commander_dossier_counts_subtypes_off_the_pool(

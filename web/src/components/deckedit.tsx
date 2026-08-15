@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   api, type Card, type ClaudeStatus, type DeckRef, type EditResult,
-  type InterviewReport,
+  type InterviewReport, type SlotArgumentReport,
 } from '../lib/api'
 import { CATEGORY_LABELS, categoryLabel } from '../lib/mtg'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
@@ -199,6 +199,197 @@ function InterviewPanel({ deck, card, askNow = false }: {
               {report.questions_dropped} answer
               {report.questions_dropped === 1 ? ' was' : 's were'} not a question
               and {report.questions_dropped === 1 ? 'was' : 'were'} dropped.
+            </p>
+          )}
+          <p style={{ color: 'var(--text-muted)' }}>{report.never}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** How a charge's weight reads. Three, matching `argue.STRENGTHS`. */
+const STRENGTH_COLOUR: Record<string, string> = {
+  decisive: 'var(--status-error)',
+  serious: 'var(--status-warning)',
+  minor: 'var(--text-muted)',
+}
+
+/**
+ * The slot argument (ADR 25): the case against one card, and only against it.
+ *
+ * This panel renders a one-sided argument and **says so**, which is the whole
+ * of its presentational responsibility. The mode cannot produce the other side
+ * — its response schema has no field for one — so there is nothing here to
+ * suppress; what there is to do is make sure a user reading a one-sided case
+ * knows that is what they are reading, because the failure this design makes
+ * possible is somebody taking it for a verdict.
+ *
+ * Note what is absent, and that it is a *different* absence from the
+ * interview's. There is no control that writes anything, same as there. There
+ * is also no "and here is why it is good" section, because a balanced version
+ * of this feature would hand back a finished rationale grounded in the user's
+ * own deck — and a UI that merely declined to render it would not be a guard,
+ * since the CLI renders the same payload.
+ *
+ * The alternatives are rendered as **cards, not as recommendations**. Each one
+ * has already been through the pool, the ban list and the deck's colour
+ * identity in Python; what is shown beside a name is the card's own oracle
+ * text, because that is better evidence than a sentence about it and it is the
+ * sentence nobody is allowed to write.
+ */
+export function SlotArgumentPanel({ deck, card, onClose }: {
+  deck: DeckRef
+  card: string
+  onClose: () => void
+}) {
+  const [status, setStatus] = useState<ClaudeStatus | null>(null)
+  const [report, setReport] = useState<SlotArgumentReport | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [pin, setPin] = useStance()
+
+  useEffect(() => {
+    let live = true
+    fetchClaudeStatus({ slug: deck.slug, owner: deck.owner }, pin, () => setPin(null))
+      .then((s) => { if (live) setStatus(s) })
+      .catch(() => { if (live) setStatus(null) })
+    return () => { live = false }
+  }, [deck, pin, setPin])
+
+  const askIt = useCallback(async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      setReport(await api.argue(deck, { card, stance: effectivePin(pin, status) }))
+    } catch (e) {
+      setError(String((e as Error).message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }, [deck, card, pin, status])
+
+  // Opened by a control that already said "argue this slot", so asking again
+  // here would be a second click for a decision already made. Guarded on the
+  // card name rather than on mount, exactly as the interview is.
+  const asked = useRef('')
+  useEffect(() => {
+    if (!status?.installed || !status.configured) return
+    if (asked.current === card) return
+    asked.current = card
+    void askIt()
+  }, [status, card, askIt])
+
+  if (!status) return null
+  if (!status.installed || !status.configured) {
+    return (
+      <p className="mt-2 border-t pt-2" style={{ borderColor: 'var(--hairline)',
+                                                 color: 'var(--text-muted)' }}>
+        {status.installed
+          ? <>No <code>ANTHROPIC_API_KEY</code> set — see <code>.env.example</code>.</>
+          : <>Claude is not installed. <code>pip install -e &quot;.[claude]&quot;</code></>}
+      </p>
+    )
+  }
+
+  const dropped = report?.alternatives_dropped
+  const droppedLines: [string, string[]][] = dropped ? [
+    ['not in the card pool', dropped.not_in_pool],
+    ['banned in Commander', dropped.banned],
+    ["outside the deck's colour identity", dropped.off_colour],
+  ] : []
+
+  return (
+    <div className="mt-2 space-y-2 border-t pt-2 text-xs"
+         style={{ borderColor: 'var(--hairline)' }}>
+      <div className="flex items-center gap-2">
+        <strong style={{ color: 'var(--text-primary)' }}>The case against</strong>
+        <button onClick={askIt} disabled={busy}
+                className="rounded-md px-2 py-1 text-[11px] disabled:opacity-50"
+                style={{ border: '1px solid var(--hairline)',
+                         color: 'var(--text-primary)' }}>
+          {busy ? 'Arguing…' : report ? 'Argue again' : 'Argue'}
+        </button>
+        <button onClick={onClose} className="ml-auto text-[11px]"
+                style={{ color: 'var(--text-muted)' }}>Close</button>
+      </div>
+
+      {error && <ErrorNote>{error}</ErrorNote>}
+
+      {report && !report.asked && (
+        <p style={{ color: 'var(--text-muted)' }}>{report.reason}</p>
+      )}
+
+      {report?.asked && (
+        <div className="space-y-2">
+          {/* ADR 14 boundary 3, and this mode needs it more than the interview
+              does: questions are never mistaken for a verdict, and a reasoned
+              case against a card reads exactly like one. */}
+          <p style={{ color: 'var(--text-muted)' }}>
+            Claude — <span className="font-mono">{report.model}</span>, not the gate
+            {report.stance.preset ? ` · ${report.stance.preset}` : null}
+          </p>
+          {report.charges.length === 0 && (
+            <p style={{ color: 'var(--text-muted)' }}>
+              {report.reason || 'Nothing usable came back.'}
+            </p>
+          )}
+          <ol className="space-y-2">
+            {report.charges.map((c) => (
+              <li key={c.claim}>
+                <span className="mr-1 text-[10px] uppercase tracking-wide"
+                      style={{ color: STRENGTH_COLOUR[c.strength] ?? 'var(--text-muted)' }}>
+                  {c.strength}
+                </span>
+                <span className="mr-1 text-[10px] uppercase tracking-wide"
+                      style={{ color: 'var(--text-muted)' }}>{c.ground}</span>
+                <span style={{ color: 'var(--text-primary)' }}>{c.claim}</span>
+                <span className="mt-0.5 block text-[10px]"
+                      style={{ color: 'var(--text-muted)' }}>{c.fact}</span>
+              </li>
+            ))}
+          </ol>
+          {report.charges_dropped > 0 && (
+            <p style={{ color: 'var(--status-warning)' }}>
+              {report.charges_dropped} charge
+              {report.charges_dropped === 1 ? '' : 's'} cited nothing and
+              {report.charges_dropped === 1 ? ' was' : ' were'} dropped.
+            </p>
+          )}
+
+          {report.alternatives.length > 0 && (
+            <div className="space-y-1">
+              <p style={{ color: 'var(--text-secondary)' }}>
+                Could do the job instead — checked against the pool, the ban
+                list and this deck&apos;s colour identity:
+              </p>
+              <ul className="space-y-1">
+                {report.alternatives.map((a) => (
+                  <li key={a.name}>
+                    <span style={{ color: 'var(--text-primary)' }}>{a.name}</span>
+                    {a.mana_cost && (
+                      <span className="ml-1"><ManaText>{a.mana_cost}</ManaText></span>
+                    )}
+                    {a.oracle_text && (
+                      <span className="mt-0.5 block text-[10px]"
+                            style={{ color: 'var(--text-muted)' }}>{a.oracle_text}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {/* Named rather than silently shortened. Which filter removed a card
+              is the informative part: one of these is a fact about the model
+              and two are facts about the deck. */}
+          {droppedLines.filter(([, names]) => names.length > 0).map(([why, names]) => (
+            <p key={why} style={{ color: 'var(--text-muted)' }}>
+              Dropped, {why}: {names.join(', ')}
+            </p>
+          ))}
+          {dropped && dropped.no_pool.length > 0 && (
+            <p style={{ color: 'var(--text-muted)' }}>
+              No card pool loaded, so no alternative could be checked.
             </p>
           )}
           <p style={{ color: 'var(--text-muted)' }}>{report.never}</p>

@@ -21,7 +21,7 @@ import {
   CategoryCoverage, ColorNeedsChart, CurveChart, DataTable,
 } from '../components/charts'
 import {
-  AddCardForm, AddNoteForm, NoteEditor, RationaleEditor,
+  AddCardForm, AddNoteForm, NoteEditor, RationaleEditor, SlotArgumentPanel,
 } from '../components/deckedit'
 import { ArtPicker } from '../components/artpicker'
 import { CommanderDossierPanel } from '../components/dossier'
@@ -429,6 +429,11 @@ export default function DeckDetail() {
   // the "Ask Claude" control and cleared by "Write why", so opening the editor
   // the ordinary way still costs nothing.
   const [askNow, setAskNow] = useState(false)
+  // The card whose slot is being argued (ADR 25). Its own state rather than a
+  // mode of `editing`, because the two answer different questions and are
+  // useful at the same time: the argument says whether to keep the card, the
+  // editor is where you say why you did.
+  const [arguing, setArguing] = useState<string | null>(null)
   const [onlyUnjustified, setOnlyUnjustified] = useState(false)
   // Two error slots, not one: a refused removal belongs next to the cards and a
   // refused promotion belongs next to the button that asked for it. Sharing one
@@ -827,6 +832,22 @@ export default function DeckDetail() {
                           Ask Claude
                         </button>
                       )}
+                      {/* Gated with the writes for the same reason the
+                          interview is, and it is a spend argument rather than
+                          a privacy one: arguing a slot on a deck you cannot
+                          edit spends a call to reach a conclusion you cannot
+                          act on. */}
+                      {deck.writable && claudeReady && (
+                        <button
+                          onClick={() => setArguing(
+                            arguing === card.name ? null : card.name)}
+                          title={`The case against ${card.name}'s slot`}
+                          className="rounded-md px-2 py-1 text-[11px]"
+                          style={{ border: '1px solid var(--hairline)',
+                                   color: 'var(--text-secondary)' }}>
+                          Argue slot
+                        </button>
+                      )}
                       {deck.writable && (
                         <>
                           <button
@@ -850,6 +871,12 @@ export default function DeckDetail() {
                       )}
                     </div>
                    </div>
+                   {arguing === card.name && (
+                     <SlotArgumentPanel
+                       deck={deckRef}
+                       card={card.name}
+                       onClose={() => setArguing(null)} />
+                   )}
                    {editing === card.name && (
                      <RationaleEditor
                        deck={deckRef}

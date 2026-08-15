@@ -829,6 +829,73 @@ export interface InterviewReport {
   never: string
 }
 
+export interface SlotCharge {
+  /** One argument *against* this card's slot. There is no field here for an
+   *  argument in favour, and that is ADR 25 rather than an omission. */
+  claim: string
+  /** redundancy | cost | speed | conditionality | count | ceiling | legality */
+  ground: string
+  /** The pool, gate or brief fact the charge rests on. Never an opinion, and a
+   *  charge that arrived without one was dropped before reaching here. */
+  fact: string
+  /** decisive | serious | minor */
+  strength: string
+}
+
+/** A card the model named as an alternative, *after* Python checked it. */
+export interface SlotAlternative {
+  name: string
+  mana_cost?: string | null
+  type_line?: string | null
+  oracle_text?: string | null
+  color_identity?: string[]
+  cmc?: number | null
+  image?: string | null
+  art_crop?: string | null
+}
+
+/**
+ * What the slot argument came back with (ADR 25).
+ *
+ * Note what is not in this shape, and note that it is a different absence from
+ * the interview's. There is no rationale field for the same reason there is
+ * none there — but there is also **no field holding the case for the card**,
+ * which is this mode's whole design. A balanced version of this endpoint would
+ * return a finished `why` grounded in the user's own deck, and a UI guard
+ * against rendering it would not be a guard, because the CLI renders the same
+ * payload and the endpoint is public.
+ *
+ * `alternatives_dropped` is per reason rather than a total: "you invented that
+ * card" and "that card is off-colour" say different things, and one number
+ * says neither.
+ */
+export interface SlotArgumentReport {
+  answered_by: string
+  mode: string
+  model: string
+  slug: string
+  card: string
+  /** False when the stance was `off` — no call was made, which is not the
+   *  same as a call that found nothing to say. */
+  asked: boolean
+  reason: string
+  stance: StanceView
+  charges: SlotCharge[]
+  /** Charges that cited nothing, dropped before reaching here. A number that
+   *  climbs is a mode asserting rather than arguing. */
+  charges_dropped: number
+  alternatives: SlotAlternative[]
+  alternatives_dropped: {
+    not_in_pool: string[]
+    banned: string[]
+    off_colour: string[]
+    no_pool: string[]
+  }
+  tool_calls: { tool: string; arguments: Record<string, unknown> }[]
+  usage: { input_tokens: number; output_tokens: number }
+  never: string
+}
+
 /**
  * The commander dossier (ADR 19) — the half of the header the pool cannot
  * count.
@@ -1195,6 +1262,13 @@ export const api = {
   // response for a rationale even if it wanted to hand one over.
   interview: (ref: DeckRef, body: { card: string; stance?: string; focus?: string }) =>
     post<InterviewReport>(deckPath(ref, '/interview'), body),
+  // The slot argument (ADR 25). Same shape as the interview and the same
+  // reason for the verb, with one difference worth stating at the call site:
+  // this one is **one-directional**. It returns the case against a card and
+  // there is no field in the response for the case for it, so a caller cannot
+  // render "the balanced view" however it lays the payload out.
+  argue: (ref: DeckRef, body: { card: string; stance?: string; focus?: string }) =>
+    post<SlotArgumentReport>(deckPath(ref, '/argue'), body),
   // The commander dossier, in two halves that are deliberately different verbs.
   // The GET is free and reads a stored row, so the deck page can ask on every
   // load; the POST spends money and reaches the network. One function with a

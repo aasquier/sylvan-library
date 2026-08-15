@@ -38,6 +38,7 @@ they differ.
 | [22](0022-decks-have-owners-and-sharing-is-a-flag.md) | Decks have owners, and sharing is a flag on the deck | Accepted |
 | [23](0023-a-green-main-deploys-itself.md) | A green `main` deploys itself, and the deploy is not done until the instance answers | Accepted |
 | [24](0024-no-python-autoformatter.md) | No Python autoformatter; the lint rules hold the line instead | Accepted |
+| [25](0025-argue-a-slot-argues-one-direction.md) | Argue a slot argues one direction, and that asymmetry is the guard | Accepted |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the

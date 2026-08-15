@@ -3,9 +3,10 @@
 [ADR 15](../../../docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md)
 splits a Claude surface into a **mode** (a system prompt, a tool set, and what
 it may write) and a **stance** (the user's dial over it). This module is the
-dial. There are no modes yet -- deliberately: the stance is the frame every
-mode plugs into, and retrofitting a gate around modes that already exist is how
-the gate ends up with holes in it.
+dial. It was written before any mode existed -- deliberately: the stance is the
+frame every mode plugs into, and retrofitting a gate around modes that already
+exist is how the gate ends up with holes in it. Five modes plug into it now and
+none of them needed it changed, which is the evidence that the order was right.
 
 **Three axes, not one slider.** "Never interrupt me, but go wild when I ask" is
 a coherent and probably common setting that a single slider cannot express, so

@@ -1005,8 +1005,57 @@ arc; this is what the next few sessions actually do.
    on screen next to the thing it describes. `/api/claude` takes a `surface`
    now, and each surface's default is asked of the module that owns it.
 
-   So what is left of item 7 is the three modes: argue a slot, deck
-   conversation, research.
+   **Argue a slot landed 2026-08-14**, and the ordering was argued rather than
+   taken in table order — the reasoning is worth keeping because it corrects
+   the paragraph above. The dial made `write: proposes` selectable; ADR 15's
+   phrase for deck conversation is *"the reversible edits, at the top stance
+   only"*, and `stance.py`'s own table maps *reversible edits* to
+   `write: applies`, which **is not a preset**. `COLLABORATOR` is the top
+   preset and it is `proposes`; `lib/stance.ts` pins a preset *name* and
+   nothing else, so no client can express an axis. Below that sit four locks
+   that each say in their own words that moving them needs a superseding ADR:
+   no write tool in `tools.READ_ONLY`, `Mode.__post_init__` refusing a
+   non-empty `may_write`, `test_claude_boundary.py` forbidding the *mention*
+   of a write function anywhere under `src/mtglab/claude/` — including
+   `remove_card` and `set_card_field`, the two ADR 15 says are
+   autonomous-safe — and the activity log ADR 15 lists as required. Plus a
+   sim-results tool that `service.py` does not have. **Deck conversation is
+   the largest of the three, not the unblocked one.**
+
+   So argue a slot went first, and not only because it was cheapest. It is
+   the mode nearest the boundary while the stakes are lowest: its whole output
+   is declarative prose about a card's merit, which is exactly what
+   `only_questions()` exists to delete from the interview, so it forced the
+   question of what guards that. The answer is
+   [ADR 25](docs/adr/0025-argue-a-slot-argues-one-direction.md) — **it argues
+   one direction**, and the schema has no field for the case in favour. A
+   balanced version would return a finished `why` grounded in the user's own
+   deck, and a UI that declined to render it would not be a guard, because the
+   CLI renders the same payload and the endpoint is public.
+
+   Three things the build added that the ADR did not need to name. The
+   alternatives it offers are **bare names judged by Python** — resolved
+   through the pool and dropped if invented, banned, or outside the colour
+   identity, counted separately in each case — which makes the *Ajani, Nacatl
+   Pariah* error in CLAUDE.md an assertion that runs on every PR rather than a
+   story. Writing that filter found a real bug: a double-faced card comes back
+   under its full `A // B` name, so an index keyed on the pool's spelling
+   dropped every DFC named by its front face, **silently**, which is the one
+   thing the function exists not to do. And the UI test for "this is the case
+   against" passed against a heading relabelled *Assessment*, because it was
+   matching the `never` sentence in the payload — **a test asserting the
+   server's own text back at itself is not testing the renderer**, and it was
+   only caught by mutating the code rather than by going green.
+
+   What is left of item 7 is two modes: **research**, then **deck
+   conversation**. Research is next because it re-uses `dossier.py`'s
+   hardest-won machinery — server tools, the evidence list, container
+   threading, `pause_turn` resumption, the job shape — while that code is
+   still fresh, and because it needs a background job from day one. Its
+   unsolved problem is that it has no narrow contract to check against: the
+   dossier is safe because every rival resolves through `get_cards` or is
+   dropped and it refuses when no source survives, and "the meta, rulings,
+   spoiled cards" is three questions with no such invariant.
 
 ---
 
@@ -1575,7 +1624,7 @@ argument. Four are worth building first, and every one of them may write
 | Mode | What it is for |
 | --- | --- |
 | Rationale interview | asks about a card so the user can write its `why`; import leaves 99 of them owing |
-| Argue a slot | the case against a specific card, from pool facts and category counts |
+| **Argue a slot** | the case against a specific card, from pool facts and category counts — ADR 25, built 2026-08-14 |
 | Deck conversation | anything about a deck, with the gate's output and the pool in reach |
 | Research | the meta, rulings in practice, cards spoiled ahead of the next bulk refresh |
 | **Commander dossier** | who the character is, the archetype and its history, rivals, standing — ADR 19, built 2026-08-12 |
@@ -1596,7 +1645,8 @@ field**, and a mode may put a question beside the box but never text inside it.
 
 The first of the four. `mtglab claude interview <slug> --card X`,
 `POST /api/decks/{slug}/interview`, and a panel in the column ADR 12's
-rationale editor left empty for exactly this. The other three are not built.
+rationale editor left empty for exactly this. **Argue a slot followed on
+2026-08-14 (ADR 25); research and deck conversation are not built.**
 
 What is worth carrying forward is **where the boundary ended up living**, since
 none of it is the system prompt:
