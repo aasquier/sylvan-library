@@ -20,6 +20,8 @@
     mtglab claude check                 one real API call -- is the key live?
     mtglab claude argue <slug>          the case against a card's slot
     mtglab claude dossier <slug>        who the commander is, with sources
+    mtglab claude research "<q>"        a question the pool cannot answer,
+                                        with the pages it read; takes no deck
     mtglab claude interview <slug>      questions about a card's slot; you
                             --card X    write the rationale, it never does
 """
@@ -1237,6 +1239,95 @@ def cmd_claude_dossier(args):
     print()
 
 
+def cmd_claude_research(args):
+    """A question about Magic the pool cannot answer (ADR 26).
+
+    Note what this command does *not* take: a slug. Research is deck-blind by
+    construction, and the absence of the argument is the first place a user
+    meets the decision — asked what to cut from a deck, the mode says it cannot
+    see one, because it cannot.
+
+    Printed with the same discipline the dossier uses, and it matters more
+    here: an answer with citations under it is the exact shape of something
+    reproducible, and it is not. Two kinds of card fact are also visibly
+    different — a card the pool has prints its real text, a card it does not
+    prints as a claim resting on a page.
+    """
+    from mtglab.claude import research as research_mod
+    from mtglab.claude.client import ClaudeUnavailable
+    from mtglab.claude.modes import ModeExhausted
+
+    question = " ".join(args.question).strip()
+    try:
+        report = research_mod.ask(question, requested=args.stance)
+    except (research_mod.QuestionRejected, ClaudeUnavailable,
+            ModeExhausted) as exc:
+        print(f"  {exc}")
+        sys.exit(1)
+
+    stance = report["stance"]
+    print(f"\n  {report['question']}")
+    print(f"  asked as: {stance['preset'] or 'custom'} "
+          f"(scope: {stance['axes'][1]['level']})")
+
+    body = report["research"]
+    if not body:
+        print(f"\n  {report['reason']}\n")
+        return
+
+    print(f"  Claude's reading of cited pages, not the tool's own answer "
+          f"— {report['model']}\n")
+    print(f"  ANSWER  [{body['confidence']}]")
+    print(_wrapped(body["answer"], indent="    "))
+    print()
+
+    if body["findings"]:
+        print("  FINDINGS")
+        for finding in body["findings"]:
+            cites = " ".join(f"[{i}]" for i in finding["source_ids"])
+            print(_wrapped(f"{finding['claim']} {cites}", indent="    "))
+        print()
+
+    if body["cards"]:
+        print("  CARDS NAMED")
+        for card in body["cards"]:
+            if not card["in_pool"]:
+                # Said out loud, every time. This is the seam ADR 26 exists to
+                # keep visible: everything about this card came off a page.
+                print(f"    {card['name']}  — not in the pool; whatever is "
+                      f"said about it above rests on a cited page, not on a "
+                      f"card lookup")
+                continue
+            cost = f"  {card['mana_cost']}" if card.get("mana_cost") else ""
+            print(f"    {card['name']}{cost}  {card['type_line'] or ''}")
+        print()
+
+    print("  SOURCES — every one of these was actually fetched\n")
+    for source in body["sources"]:
+        print(f"    [{source['id']}] {source['title'][:64]}")
+        print(f"          {source['url']}")
+
+    print(f"\n  {report['never']}")
+    # Printed rather than logged, for the reason the dossier prints its own: a
+    # number that climbs is a prompt that has started inventing, and nobody
+    # checks a number they cannot see. `cards_unresolved` is the one that is
+    # not a fault — for a spoiler question the right value is above zero.
+    if body["sources_dropped"] or body["findings_dropped"]:
+        print(f"  dropped: {body['sources_dropped']} cited page(s) the search "
+              f"never returned, {body['findings_dropped']} finding(s) left "
+              f"citing nothing.")
+    if body["cards_unresolved"]:
+        print(f"  {body['cards_unresolved']} named card(s) are not in the "
+              f"pool — expected for anything spoiled since the last "
+              f"`mtglab data refresh`.")
+    print(f"  {body['searched']} pages searched, {len(body['sources'])} cited.")
+    usage = report["usage"]
+    print(f"  tokens: {usage['input_tokens']} in / "
+          f"{usage['output_tokens']} out "
+          f"({usage['cache_read_tokens']} cached)")
+    print()
+
+
 # --------------------------------------------------------------------- main
 
 def main(argv=None):
@@ -1439,6 +1530,18 @@ def main(argv=None):
                     help="what dossiers are stored, and when they were written")
     cd.add_argument("--clear", action="store_true", help="drop every one")
     cd.set_defaults(func=cmd_claude_dossier)
+    # No `slug` argument, and its absence is ADR 26 rather than an oversight:
+    # this mode cannot reach a deck, so there is nothing for a slug to name.
+    cr = claude.add_parser("research",
+                           help="a question the pool cannot answer, with its "
+                                "sources -- takes no deck")
+    cr.add_argument("question", nargs="+",
+                    help="the question, in plain words")
+    cr.add_argument("--stance", default=None,
+                    help="off | consultant | second-opinion | collaborator "
+                         "(default: second-opinion -- there is no deck to "
+                         "derive one from)")
+    cr.set_defaults(func=cmd_claude_research)
 
     args = p.parse_args(argv)
     args.func(args)

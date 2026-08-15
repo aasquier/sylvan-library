@@ -92,6 +92,13 @@ class Mode:
     effort: str = "high"
     #: A JSON schema for the final answer, or None for prose.
     response_schema: dict[str, Any] | None = field(default=None)
+    #: What each scope level means *for this mode*, keyed by the scope axis's
+    #: levels. `None` uses `_SCOPE_NOTES` below, which is written for the modes
+    #: that are about one card in one deck -- and reads as nonsense to one that
+    #: is not. A mode with no card and no deck (research, ADR 26) has to say
+    #: what its own scope axis widens, or the prompt tells it to stay on
+    #: something that does not exist.
+    scope_notes: tuple[tuple[str, str], ...] | None = None
 
     def __post_init__(self) -> None:
         if self.may_write:
@@ -121,10 +128,11 @@ class Mode:
         do (ADR 15), which is exactly the difference between this method and
         `schemas()`: the tool set does not move, the framing does.
         """
-        return f"{self.instructions.strip()}\n\n{_scope_note(stance).strip()}"
+        return f"{self.instructions.strip()}\n\n{_scope_note(stance, self.scope_notes).strip()}"
 
 
-def _scope_note(stance: Stance) -> str:
+def _scope_note(stance: Stance,
+                overrides: tuple[tuple[str, str], ...] | None = None) -> str:
     """How far from the question this stance lets a mode range.
 
     Only the scope axis says anything here, and that is deliberate rather than
@@ -134,7 +142,15 @@ def _scope_note(stance: Stance) -> str:
     moot: no mode may write. Inventing behaviour for the other two axes so the
     function looks symmetrical would be pretending the dial does more than it
     does.
+
+    `overrides` exists because the table below is not universal: it talks about
+    "the card you were asked about", which is exactly right for the interview
+    and the slot argument and meaningless to a mode that was not asked about a
+    card. A mode supplies its own table or gets this one; either way the text
+    is byte-stable per mode and stance, which is what the prompt cache needs.
     """
+    if overrides is not None:
+        return dict(overrides)[stance.scope]
     return {
         "flagged": (
             "Scope: stay on the card you were asked about, and on anything the "

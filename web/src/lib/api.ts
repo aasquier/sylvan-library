@@ -968,6 +968,85 @@ export function hasDossier(
   return !!report && 'who' in report.dossier
 }
 
+/* ------------------------------------------------------- research (ADR 26) */
+
+/**
+ * One thing the pages said, and the pages it came from.
+ *
+ * `source_ids` is never empty on a finding that reached here: the server drops
+ * a finding whose citations did not survive checking, and counts it. That is
+ * one step past what the dossier does to a section, and the reason is that a
+ * dossier passage may rest on the pool facts it was handed while this mode has
+ * no brief at all — an uncited claim here is resting on the model's recall.
+ */
+export interface ResearchFinding {
+  claim: string
+  source_ids: string[]
+}
+
+/**
+ * A card the answer named, and the one field that decides how to render it.
+ *
+ * **`in_pool` is not a detail.** A card the pool has carries the pool's own
+ * text and its facts are rule 1 facts. A card the pool lacks — anything
+ * spoiled since the last `data refresh` — carries a name and nothing else, and
+ * everything the prose says about it is a claim resting on a cited page. ADR 26
+ * keeps those apart deliberately, and a renderer that merged them would produce
+ * exactly the blended paragraph ADR 19 rejected, one source further out.
+ */
+export interface ResearchCard {
+  name: string
+  in_pool: boolean
+  mana_cost?: string | null
+  type_line?: string | null
+  oracle_text?: string | null
+  color_identity?: string[]
+  image?: string | null
+  art_crop?: string | null
+  legal_commander?: boolean
+}
+
+export interface ResearchBody {
+  answer: string
+  findings: ResearchFinding[]
+  cards: ResearchCard[]
+  /** settled | contested | thin. Rendered rather than hidden: a mode with no
+   *  way to say "people disagree" writes consensus that is not there. */
+  confidence: string
+  sources: { id: string; title: string; url: string }[]
+  /** Cited pages the search never returned. A number that climbs is a prompt
+   *  inventing citations, which is why it is shown rather than logged. */
+  sources_dropped: number
+  /** Findings left citing nothing once the pages were checked. */
+  findings_dropped: number
+  /** Named cards the pool has never seen. **Not an error** — for a spoiler
+   *  question the right value is above zero. */
+  cards_unresolved: number
+  searched: number
+}
+
+export interface ResearchReport {
+  answered_by: string
+  mode: string
+  model: string
+  question: string
+  asked: boolean
+  reason: string
+  stance?: StanceView
+  /** Empty when there is none, so a caller never has to tell "absent" from
+   *  "not yet fetched". */
+  research: ResearchBody | Record<string, never>
+  generated_at: string
+  usage?: { input_tokens: number; output_tokens: number }
+  never?: string
+}
+
+export function hasResearch(
+  report: ResearchReport | null,
+): report is ResearchReport & { research: ResearchBody } {
+  return !!report && 'answer' in report.research
+}
+
 /* ------------------------------------------------ the theme interview (ADR 20) */
 
 /**
@@ -1285,6 +1364,25 @@ export const api = {
   // Every non-digital printing of the commander, newest first. Its own call
   // because most visits never open the picker and Goreclaw has twelve.
   printings: (ref: DeckRef) => get<PrintingList>(deckPath(ref, '/printings')),
+  // Research (ADR 26). **Note there is no deck in the path, in the body, or
+  // anywhere in this signature** — that absence is the feature, not an
+  // omission. The mode cannot reach a library, so it cannot critique a deck,
+  // cannot read a rationale, and cannot quietly become the deck conversation
+  // ADR 15 leaves unbuilt. Adding an owner or a slug here is the change ADR 26
+  // exists to make somebody argue for.
+  //
+  // Returns a **job**. It searches more than the dossier, which broke deployed
+  // at 236 seconds behind a spinner and then `Load failed` — a transport
+  // error, so no status code ever reached the client. Follow it with
+  // `followJob` and read `job.result` as a `ResearchReport`; pass the job
+  // straight back in as `initial`, because a stance of `off` arrives already
+  // `done` and the cheap case should still cost exactly one request.
+  //
+  // Nothing is cached — the subject is the part of Magic that moves — but two
+  // identical questions in flight are one job, so a double click costs one
+  // search rather than two.
+  research: (body: { question: string; stance?: string }) =>
+    post<Job>('/api/claude/research', body),
   // The theme interview (ADR 20). Note there is no slug in either path: this
   // runs before a deck exists and never sees one, which is what makes "it
   // builds, it does not critique" structural rather than a request. The whole

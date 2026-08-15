@@ -1047,15 +1047,49 @@ arc; this is what the next few sessions actually do.
    server's own text back at itself is not testing the renderer**, and it was
    only caught by mutating the code rather than by going green.
 
-   What is left of item 7 is two modes: **research**, then **deck
-   conversation**. Research is next because it re-uses `dossier.py`'s
-   hardest-won machinery — server tools, the evidence list, container
-   threading, `pause_turn` resumption, the job shape — while that code is
-   still fresh, and because it needs a background job from day one. Its
-   unsolved problem is that it has no narrow contract to check against: the
-   dossier is safe because every rival resolves through `get_cards` or is
-   dropped and it refuses when no source survives, and "the meta, rulings,
-   spoiled cards" is three questions with no such invariant.
+   **Research landed 2026-08-14** — `src/mtglab/claude/research.py`,
+   `mtglab claude research "<question>"`, `POST /api/claude/research`, and a
+   `/research` page of its own in the nav, with
+   [ADR 26](docs/adr/0026-research-answers-about-magic-not-about-your-deck.md)
+   written first. Sixth mode, fourth feature, ADR 15's fourth table row.
+
+   The unsolved problem this entry used to name — *it has no narrow contract to
+   check against* — has an answer, and the answer turned out not to be about
+   facts at all. **The contract is that the mode cannot reach a deck.** No
+   `DeckSource`, no slug, no deck tool, and the route sits at
+   `/api/claude/research` rather than under `/api/decks/{owner}/{slug}`. That
+   does two jobs with one absence: rule 4 is out of reach because there is no
+   rationale to read and no 99 to be asked what to cut from, and **deck
+   conversation cannot be built by accident**, which was the real risk — the
+   question "should I cut X from my deck" is what somebody types on day one,
+   and answering it well is deck conversation under another name, with none of
+   the five things ADR 15 still owes it settled.
+
+   Three things the build settled that the ADR did not have to name:
+
+   - **A card the pool lacks is labelled, not dropped, and that is the one
+     place research must differ from the dossier.** ADR 19 drops an unresolved
+     rival because a rival that does not exist is an error; a card *spoiled
+     since the last `data refresh`* does not exist either and is one of the
+     three things this surface is for. So both are kept and marked
+     `in_pool: false`, counted separately from the dropped counts because that
+     number is not a fault. Applying the dossier's instrument here would have
+     made the mode silently worst at its own best use.
+   - **A finding whose citations all failed the check is dropped, not
+     narrowed.** One step past what `dossier._section` does, and the reason is
+     that a dossier passage may rest on the brief it was handed while research
+     has no brief — its subject is whatever was asked, so `get_cards` is the
+     only pool door rather than a second one.
+   - **265 seconds, measured on the first real question.** Longer than the
+     dossier's 236s, which is the duration that broke deployed. It was a
+     background job from its first commit rather than after an incident —
+     the first Claude surface here of which that is true — and the route had
+     tests before it had a deploy, which is the other half of that lesson.
+
+   What is left of item 7 is one mode: **deck conversation**, and it is now
+   *harder* to build rather than closer, deliberately. Anything that wants a
+   deck inside a Claude surface has to supersede ADR 26 and say what it does
+   about the five things listed under the stance dial above.
 
 ---
 
@@ -1550,12 +1584,14 @@ cited page checked against what the search actually returned.
 
 Then the **theme interview** (2026-08-13, ADR 20 — two modes, conversation and
 proposal, plus the tarot door of ADR 21), the **stance dial UI** (2026-08-14,
-#88), and the **slot argument** (2026-08-14, ADR 25, #89) — five modes across
-four features.
+#88), the **slot argument** (2026-08-14, ADR 25, #89), and **research**
+(2026-08-14, ADR 26) — six modes across five features.
 
-What is *not* built: the two modes ADR 15 names that remain — research, then
-deck conversation, in that order (item 7 above argues why) — the activity log
-the top of the write axis needs, and the Forge half.
+What is *not* built: the one mode ADR 15 names that remains — **deck
+conversation** — the activity log the top of the write axis needs, and the
+Forge half. Note that ADR 26 made deck conversation *harder* rather than
+nearer: research is deck-blind by construction precisely so that "a Claude
+surface that can see your list" stays a decision somebody has to argue for.
 
 The plumbing was already in place: an API key reaches the app from a gitignored
 `.env` or `fly secrets`, named in `.env.example` and in the CI reviewer workflow
@@ -1630,8 +1666,8 @@ argument. Four are worth building first, and every one of them may write
 | --- | --- |
 | Rationale interview | asks about a card so the user can write its `why`; import leaves 99 of them owing |
 | **Argue a slot** | the case against a specific card, from pool facts and category counts — ADR 25, built 2026-08-14 |
-| Deck conversation | anything about a deck, with the gate's output and the pool in reach |
-| Research | the meta, rulings in practice, cards spoiled ahead of the next bulk refresh |
+| Deck conversation | anything about a deck, with the gate's output and the pool in reach — the one still unbuilt |
+| **Research** | the meta, rulings in practice, cards spoiled ahead of the next bulk refresh — ADR 26, built 2026-08-14, and it cannot see a deck |
 | **Commander dossier** | who the character is, the archetype and its history, rivals, standing — ADR 19, built 2026-08-12 |
 
 Four was a guess and the dossier is the guess being wrong in the direction ADR
@@ -1651,7 +1687,8 @@ field**, and a mode may put a question beside the box but never text inside it.
 The first of the four. `mtglab claude interview <slug> --card X`,
 `POST /api/decks/{slug}/interview`, and a panel in the column ADR 12's
 rationale editor left empty for exactly this. **Argue a slot followed on
-2026-08-14 (ADR 25); research and deck conversation are not built.**
+2026-08-14 (ADR 25) and research the same day (ADR 26); deck conversation is
+not built.**
 
 What is worth carrying forward is **where the boundary ended up living**, since
 none of it is the system prompt:

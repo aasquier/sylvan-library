@@ -2604,3 +2604,231 @@ def test_an_unknown_job_lane_is_refused_before_a_job_is_recorded():
     with pytest.raises(ValueError, match="unknown job lane"):
         jobs.submit("test", lambda _p: None, lane="nope")
     assert jobs.all_jobs() == []
+
+
+# ------------------------------------------------- research, as a job (ADR 26)
+#
+# **The first Claude route in this codebase that had tests before it had a
+# deploy.** The dossier is the reason that sentence is worth writing: it shipped
+# as a 236-second synchronous POST because the 42 tests matching "dossier" all
+# exercised the module and none of them ever asked what the HTTP surface did.
+#
+# What is asserted here is the split — everything refusable is refused *by the
+# POST*, with its own status code, and only the Anthropic call was moved — plus
+# the one thing that is peculiar to this mode and not to any sibling: the route
+# takes no owner, no slug and no deck, which is ADR 26's first decision reaching
+# all the way out to the URL.
+
+
+def test_research_takes_no_deck_anywhere_in_its_signature(client):
+    """ADR 26 at the layer a diff would change first.
+
+    A deck-aware research mode is one path parameter away, and this is the
+    assertion that fails when somebody adds it. `/api/claude/research` sits
+    beside the theme routes rather than under `/api/decks/{owner}/{slug}`
+    precisely so that reaching a deck from here is a visible change.
+    """
+    paths = {r.path for r in client.app.routes}
+    assert "/api/claude/research" in paths
+    assert not any("research" in p and "decks" in p for p in paths)
+
+
+def test_an_empty_question_is_a_422_and_not_a_job(client):
+    """Refused in the request. Delivered as a job in state `error` it would be
+    a sentence the client has to pattern-match, and a round trip somebody paid
+    to discover the request was never going to run."""
+    jobs.clear()
+    r = client.post("/api/claude/research", json={"question": "   "})
+    assert r.status_code == 422
+    assert jobs.all_jobs() == [], "nothing should have been queued"
+
+
+def test_a_pasted_decklist_is_a_422_that_says_why(client):
+    """The refusal a user is most likely to hit, and the one that has to teach
+    something: this surface cannot see decks, so pasting one is not the way in."""
+    jobs.clear()
+    r = client.post("/api/claude/research",
+                    json={"question": "Sol Ring\n" * 400})
+    assert r.status_code == 422
+    assert "cannot see decks" in r.json()["detail"]
+    assert jobs.all_jobs() == []
+
+
+def test_a_malformed_stance_is_a_422_rather_than_a_job(client):
+    jobs.clear()
+    r = client.post("/api/claude/research",
+                    json={"question": "What is the meta?",
+                          "stance": "omniscient"})
+    assert r.status_code == 422
+    assert jobs.all_jobs() == []
+
+
+def test_research_with_no_key_is_a_503_before_anything_is_queued(client,
+                                                                 monkeypatch):
+    """503 means no call was possible; it is not the same answer as a call that
+    came back unusable, and collapsing them tells somebody their key is missing
+    when the model was merely rate limited."""
+    import mtglab.claude.client as cc
+
+    jobs.clear()
+    monkeypatch.setattr(cc, "credential_present", lambda: False)
+    r = client.post("/api/claude/research", json={"question": "Anything?"})
+    assert r.status_code == 503
+    assert jobs.all_jobs() == []
+
+
+def test_research_at_a_stance_of_off_is_a_job_born_finished(client, no_worker):
+    """`off` is a real position and costs nothing, so the answer is in hand —
+    which is a job already `done` rather than a pretence that it is not a job.
+
+    `no_worker` rather than asserting `status == "done"`, which a queued job
+    also satisfies whenever the worker wins the race — and it wins it here,
+    because the work it would run makes no call. See the fixture.
+    """
+    r = client.post("/api/claude/research",
+                    json={"question": "What is the meta?", "stance": "off"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "done", "no worker needed to answer this"
+    assert body["kind"] == "claude.research"
+    assert body["result"]["asked"] is False
+    assert "stance is off" in body["result"]["reason"]
+
+
+def test_research_runs_in_the_net_lane(client, monkeypatch):
+    """A Claude call waits on a socket with the GIL released. Queued behind the
+    single CPU worker it would stall a Tier 1 sweep for minutes, and be stalled
+    by one."""
+    import mtglab.claude.client as cc
+    from mtglab.claude import research
+
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(research, "run_research",
+                        lambda request, on_turn=None: {"question": "x"})
+
+    lanes = []
+    real_submit = jobs.submit
+    monkeypatch.setattr(jobs, "submit",
+                        lambda *a, **kw: (lanes.append(kw.get("lane")),
+                                          real_submit(*a, **kw))[1])
+
+    r = client.post("/api/claude/research", json={"question": "Anything?"})
+    assert r.status_code == 200
+    assert lanes == [jobs.NET]
+    assert await_job(client, r.json()["id"])["status"] == "done"
+
+
+def test_the_same_question_twice_in_flight_is_one_job(client, monkeypatch):
+    """The opposite call from the theme conversation's `key=None`, and the
+    reason is that here the question text *is* the whole input.
+
+    A transcript is client-held, so two identical-looking theme turns are two
+    conversations. Two identical question strings from one account inside the
+    minutes a search takes are one question asked twice — the argument
+    `api/dossierruns.py` had to learn after two paid runs for one commander
+    went concurrently on the deployed instance.
+    """
+    import mtglab.claude.client as cc
+    from mtglab.claude import research
+
+    started = []
+
+    def slow(request, on_turn=None):
+        started.append(request.question)
+        time.sleep(0.4)
+        return {"question": request.question}
+
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(research, "run_research", slow)
+
+    body = {"question": "Is Goreclaw still played?"}
+    first = client.post("/api/claude/research", json=body).json()
+    # Same question, different spacing and case: normalised to the same key,
+    # because neither makes it a different question.
+    second = client.post(
+        "/api/claude/research",
+        json={"question": "is  goreclaw   STILL played?"}).json()
+
+    assert first["id"] == second["id"], "a second click must join the run"
+    await_job(client, first["id"])
+    assert len(started) == 1, "the search must not have been paid for twice"
+
+
+def test_a_different_question_is_a_different_job(client, monkeypatch):
+    """The other half of the dedupe, which is the half that would be wrong: a
+    key too coarse would hand somebody an answer to a question they did not
+    ask."""
+    import mtglab.claude.client as cc
+    from mtglab.claude import research
+
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(research, "run_research",
+                        lambda request, on_turn=None: {"q": request.question})
+
+    first = client.post("/api/claude/research",
+                        json={"question": "Is Goreclaw played?"}).json()
+    second = client.post("/api/claude/research",
+                         json={"question": "Is Gyome played?"}).json()
+    assert first["id"] != second["id"]
+
+
+def test_a_call_that_comes_back_unusable_is_a_job_error_not_a_502(client,
+                                                                  monkeypatch):
+    """The status code that is deliberately *not* here. By the time the call
+    fails the response has long since been sent, so the failure belongs on the
+    job — the same move the dossier and both theme routes made."""
+    import mtglab.claude.client as cc
+    from mtglab.claude import research
+
+    def boom(request, on_turn=None):
+        raise RuntimeError("the API said no")
+
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(research, "run_research", boom)
+
+    r = client.post("/api/claude/research", json={"question": "Anything?"})
+    assert r.status_code == 200
+    finished = await_job(client, r.json()["id"])
+    assert finished["status"] == "error"
+    assert "the API said no" in finished["error"]
+
+
+def test_the_research_surface_reports_its_own_default_not_off(client):
+    """The fault the stance dial found once already, in the only other place it
+    could happen.
+
+    There is no deck here, so `/api/claude` would resolve through
+    `stance.resolve(None, None)` and report `off` — while `research.stance_for`
+    was about to run the search at `second-opinion`. A readout is a claim, and
+    this is the second surface with cause to check it.
+    """
+    from mtglab.claude.research import DEFAULT_PRESET
+
+    bare = client.get("/api/claude").json()
+    assert bare["default"]["preset"] == "off"
+
+    surface = client.get("/api/claude",
+                         params={"surface": "research"}).json()
+    assert surface["default"]["preset"] == DEFAULT_PRESET
+    assert surface["stance"]["preset"] == DEFAULT_PRESET
+    assert surface["stance"]["allows_calls"] is True
+    # And still no write, at any stance, on any surface.
+    assert surface["stance"]["may_write"] is False
+
+
+def test_the_status_lists_research_among_the_modes_that_exist(client):
+    """A UI offers what is built. `server_tools` is the field that matters
+    here: "searches the web" is something a user cares about in a way
+    "get_cards" is not."""
+    body = client.get("/api/claude").json()
+    modes = {m["name"]: m for m in body["modes"]}
+    assert "research" in modes
+    assert modes["research"]["server_tools"] == ["web_search"]
+    assert modes["research"]["writes"] == []
+    # ADR 26's first decision, published: no deck tool in the capability list a
+    # client renders.
+    assert "get_deck" not in modes["research"]["tools"]

@@ -19,6 +19,7 @@ const DeckRedirect = lazy(() => import('./routes/DeckRedirect'))
 const Import = lazy(() => import('./routes/Import'))
 const Learn = lazy(() => import('./routes/Learn'))
 const NewDeck = lazy(() => import('./routes/NewDeck'))
+const Research = lazy(() => import('./routes/Research'))
 const Simulator = lazy(() => import('./routes/Simulator'))
 
 const NAV = [
@@ -26,6 +27,11 @@ const NAV = [
   { to: '/search', label: 'Card search', end: false },
   // `/new` and `/import` are spliced in after Library — see AUTHORING_NAV.
   { to: '/simulate', label: 'Simulator', end: false },
+  // The two reference screens, and they sit next to each other because the
+  // pair *is* the boundary: Learn is the checked-in prose this repo writes
+  // once and edits by hand, Research is the question that prose cannot answer,
+  // which costs a search and comes back with its pages (ADR 26).
+  { to: '/research', label: 'Research', end: false },
   // Last, and deliberately not first: it is reference rather than a task, and
   // somebody who needs it usually arrives from a word on another screen.
   { to: '/learn', label: 'Learn', end: false },
@@ -304,6 +310,10 @@ export default function App() {
           <Route path="/import" element={<Import />} />
           <Route path="/search" element={<CardSearch />} />
           <Route path="/simulate" element={<Simulator />} />
+          {/* No `:owner` and no `:slug`, and the absence is ADR 26 rather than
+              an omission: this surface cannot reach a deck, so there is
+              nothing for a path segment to name. */}
+          <Route path="/research" element={<Research />} />
           <Route path="/learn" element={<Learn />} />
           {/* Declared unconditionally. A non-admin who types the URL gets the
               page's own 403 from the API rather than the catch-all's "nothing

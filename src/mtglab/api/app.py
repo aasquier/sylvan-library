@@ -600,6 +600,49 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         from mtglab import tarot
         return tarot.deal(seed).as_dict()
 
+    @app.post("/api/claude/research")
+    def claude_research(payload: dict[str, Any],
+                        caller: Scope) -> dict[str, Any]:
+        """Answer a question about Magic (ADR 26). Returns a **job**.
+
+        **Takes no deck, no owner and no `Decks` dependency, and that absence
+        is the feature.** This surface exists to answer what the pool cannot —
+        the meta, a ruling in practice, a card spoiled ahead of the next bulk
+        refresh — and a mode that cannot reach a deck cannot critique one. It
+        is also what keeps *deck conversation*, ADR 15's third mode and
+        deliberately unbuilt, from being built here by accident: the way to
+        make this route into that one is to add a dependency on purpose, in a
+        diff, superseding ADR 26.
+
+        A job from the first commit rather than after a deployed failure.
+        Research searches more than the dossier, which broke at 236 seconds,
+        and ADR 20's lesson — a duration measured for one surface is a question
+        to ask of every sibling — has now cost three incidents. What stays
+        here is every refusal: 422 for an empty question or one long enough to
+        be a pasted decklist, 503 for no key. A call that comes back unusable
+        is a job in state `error`, which is where it belongs once the response
+        has been sent.
+
+        Two identical questions in flight from one account are one job — see
+        `api/researchruns.py` on why that is the opposite call from the theme
+        conversation's.
+        """
+        from mtglab.api.researchruns import plan_research
+        from mtglab.claude.client import ClaudeUnavailable
+        from mtglab.claude.research import QuestionRejected
+
+        try:
+            plan = plan_research(
+                question=payload.get("question"),
+                requested=payload.get("stance") or None)
+        except (QuestionRejected, ValueError) as exc:
+            # `QuestionRejected` is a ValueError, which is why it is named
+            # first; the second catch is a malformed stance.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ClaudeUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return _job_for(plan, caller).as_dict()
+
     @app.post("/api/claude/theme")
     def claude_theme(payload: dict[str, Any],
                      caller: Scope) -> dict[str, Any]:

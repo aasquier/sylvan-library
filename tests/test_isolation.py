@@ -108,6 +108,14 @@ SHARED = {
     # the server to reach), and the job it hands back is scoped by `jobs.get`.
     "/api/claude/theme/proposal": "submits a job; colours and commanders out of "
                                   "the shared pool, and the job is scoped",
+    # ADR 26. Shared for the strongest version of the theme routes' reason:
+    # this one *cannot* reach a deck. It takes no owner, no slug and no
+    # `DeckSource`, so there is nothing belonging to one account for another to
+    # find — the question is in the request body and the answer comes back on a
+    # job `jobs.get` already scopes. Note the dedupe key is per owner too, so
+    # two accounts asking the same question get two jobs.
+    "/api/claude/research": "submits a job; the question is the caller's and "
+                            "no deck is reachable, and the job is scoped",
 }
 
 # Belongs to one person. Each entry says how to make one as user A and where to
