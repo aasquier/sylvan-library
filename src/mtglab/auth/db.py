@@ -39,7 +39,7 @@ from mtglab import config
 
 # Bumped when `_MIGRATIONS` grows. Stored in SQLite's own `user_version`, which
 # costs no table and cannot be forgotten in a schema dump.
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 # One entry per version, applied in order to whatever the file is at. A fresh
 # database runs all of them; an existing one runs the tail. The invite and
@@ -286,6 +286,44 @@ _MIGRATIONS: tuple[str, ...] = (
     -- The browse tab's query: every shared deck, everybody's, grouped by owner.
     CREATE INDEX user_decks_shared
         ON user_decks(shared) WHERE shared = 1 AND deleted_at IS NULL;
+    """,
+    # -- 7 ------------------------------------------------------------------
+    # The Claude usage ledger. One row per conversation `claude/modes.converse`
+    # ran, written by `claude/ledger.py` and read by `mtglab claude usage`.
+    # Every mode already counted its tokens and the CLI printed them; the
+    # hosted instance -- where the spending actually happens -- discarded the
+    # numbers with the job payload, so nothing could answer "what did this
+    # month's dossiers cost". This table is that answer.
+    #
+    # Deliberately aggregate: counters, a mode name and a model id. No user id,
+    # no deck slug, no question text -- so it never becomes a chat log by
+    # accretion, and ADR 17's who-may-read-what argument never has to be made
+    # for it. Derived-adjacent like `sim_cache` above (droppable without losing
+    # anything but history), and it lives here for the same reasons: same
+    # volume, same backup, same migration ladder.
+    """
+    CREATE TABLE claude_usage (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at        TEXT    NOT NULL,
+        -- The mode's own name ('rationale-interview', 'commander-dossier'...),
+        -- which is the per-surface axis every cost question starts from.
+        mode              TEXT    NOT NULL,
+        -- The model that answered, from the response rather than the request:
+        -- an A/B run via MTGLAB_CLAUDE_MODEL should be legible here later.
+        model             TEXT    NOT NULL,
+        -- 'end_turn', 'refusal', 'exhausted'... -- so spend on conversations
+        -- that produced nothing usable is visible as exactly that.
+        stop_reason       TEXT    NOT NULL,
+        -- API requests the tool loop made for this one conversation.
+        requests          INTEGER NOT NULL,
+        input_tokens      INTEGER NOT NULL,
+        output_tokens     INTEGER NOT NULL,
+        -- The slice of input served from the prompt cache at ~a tenth of the
+        -- price. The number that says whether the cache is working at all.
+        cache_read_tokens INTEGER NOT NULL
+    );
+
+    CREATE INDEX claude_usage_by_time ON claude_usage(created_at);
     """,
 )
 

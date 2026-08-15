@@ -1206,6 +1206,43 @@ arc; this is what the next few sessions actually do.
       masthead rules, both-themes), and the testing habits with a history
       behind them.
 
+11. **A Claude cost pass** — landed 2026-08-15, from an audit of the client
+    against current API guidance. The audit's headline was that the
+    integration was already clean (no deprecated parameters, `pause_turn`
+    resumed, refusals handled, the system-block cache breakpoint in place);
+    what it found were the two things below, built together:
+
+    - **The tool loop now caches its own history.** `converse` kept one
+      breakpoint, on the system block — so turn six of a dossier re-bought
+      turns one through five, search results included, at full input price.
+      A second, *moving* marker now rides the newest tool-result block each
+      turn (moved, not accumulated: the API allows four markers and the
+      theme flow already spends one inside `messages`). Cache reads bill at
+      ~a tenth of the input rate, so this is the searching modes' largest
+      single saving.
+    - **A usage ledger** (`claude/ledger.py`, `claude_usage` in app.db,
+      schema v7). Every mode counted its tokens and the CLI printed them,
+      but the hosted instance — where the spending happens — discarded them
+      with the job payload, so "what did this month's dossiers cost" had no
+      answer. `converse` now records every conversation on every way out
+      (answer, refusal, and the turn-ceiling exception, whose burned tokens
+      are exactly the ones worth seeing); `mtglab claude usage` is the
+      roll-up, per mode, most expensive first. Deliberately aggregate —
+      counters, a mode name, a model id; no user id and no question text —
+      so ADR 17's who-may-read-what argument never has to be made for it.
+      Tokens and not dollars, because prices move (Sonnet 5's introductory
+      rate ends 2026-08-31) and a stale price table is a wrong invoice.
+
+    Deferred until the ledger has numbers to argue from: an effort A/B
+    (`medium` on the brief-fed modes), a per-mode model field (Haiku on the
+    mechanical modes via the `MTGLAB_CLAUDE_MODEL` machinery), and a
+    Batch-API warm command for post-`DOSSIER_VERSION`-bump regeneration at
+    half price. Rejected outright: doing our own web searches and pasting
+    results into prompts — it would dismantle the `keep_sources` check
+    (ADRs 19/26 verify citations against pages the search *actually
+    returned*, in-band) and it is the crawler CLAUDE.md already bans, for
+    savings measured in cents.
+
 ---
 
 ## 1. Analyse or generate decks with simulation

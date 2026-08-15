@@ -200,6 +200,40 @@ def test_a_usage_without_cache_reads_reports_zero(scripted):
     assert turn.cache_read_tokens == 0
 
 
+def test_the_newest_tool_results_carry_the_moving_cache_marker(scripted, source):
+    """The second breakpoint, the one that moves. The system marker caches the
+    byte-stable prefix; this one caches the conversation as it grows, which for
+    a searching mode is where the bulk is -- without it, turn six of a dossier
+    re-buys turns one through five, search results included, at full price."""
+    stub = scripted([
+        _Response([_ToolUse("get_deck", {"slug": "mini"})], stop_reason="tool_use"),
+        _Response([_Text("done")]),
+    ])
+    converse(MODE, messages=ASK, stance=Stance(), source=source)
+
+    followup = stub.messages.calls[1]["messages"][-1]
+    assert followup["content"][-1]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_the_moving_marker_moves_rather_than_accumulating(scripted, source):
+    """Four markers per request is the API's ceiling, the system block holds
+    one and the theme flow spends another inside `messages` -- so the loop gets
+    exactly one, and each turn's marking must unmark the turn before."""
+    stub = scripted([
+        _Response([_ToolUse("get_deck", {"slug": "mini"})], stop_reason="tool_use"),
+        _Response([_ToolUse("get_deck", {"slug": "mini"}, id="tu_2")],
+                  stop_reason="tool_use"),
+        _Response([_Text("done")]),
+    ])
+    converse(MODE, messages=ASK, stance=Stance(), source=source)
+
+    final = stub.messages.calls[2]["messages"]
+    # ASK, assistant, results, assistant, results.
+    first_results, second_results = final[2], final[4]
+    assert "cache_control" not in first_results["content"][-1]
+    assert second_results["content"][-1]["cache_control"] == {"type": "ephemeral"}
+
+
 def test_a_response_schema_is_passed_as_the_output_format(scripted):
     schema = {"type": "object", "properties": {"q": {"type": "string"}}}
     structured = Mode(name="m", purpose="p", instructions="i",
@@ -380,6 +414,81 @@ def test_only_text_blocks_contribute_to_the_answer(scripted):
     scripted([_Response([_Text("first."), _Text(" second.")])])
     turn = converse(MODE, messages=ASK, stance=Stance())
     assert turn.text == "first. second."
+
+
+# -------------------------------------------------------------- the ledger
+#
+# The autouse `_no_usage_ledger` fixture in conftest.py replaces the module
+# attribute `modes.ledger` suite-wide, so these re-point it themselves: at a
+# capture to assert what the loop reports, and once at the real module to
+# prove the seam reaches SQLite -- a stub nothing ever removes is how a
+# broken seam stays green.
+
+def _capture(monkeypatch) -> dict[str, Any]:
+    from types import SimpleNamespace
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(modes, "ledger",
+                        SimpleNamespace(record=lambda **kw: seen.update(kw)))
+    return seen
+
+
+def test_every_conversation_is_recorded(scripted, monkeypatch):
+    seen = _capture(monkeypatch)
+    scripted([_Response([_Text("ok")])])
+    converse(MODE, messages=ASK, stance=Stance())
+
+    assert seen == {"mode": "test-mode", "model": "claude-sonnet-5",
+                    "stop_reason": "end_turn", "requests": 1,
+                    "input_tokens": 10, "output_tokens": 5,
+                    "cache_read_tokens": 0}
+
+
+def test_a_refusal_is_recorded_as_one(scripted, monkeypatch):
+    """Spend on conversations that produced nothing usable must be visible as
+    exactly that, or the roll-up understates what refusals cost."""
+    seen = _capture(monkeypatch)
+    scripted([_Response([], stop_reason="refusal")])
+    converse(MODE, messages=ASK, stance=Stance())
+    assert seen["stop_reason"] == "refusal"
+    assert seen["requests"] == 1
+
+
+def test_an_exhausted_loop_is_recorded_before_it_raises(scripted, source,
+                                                        monkeypatch):
+    """The tokens a conversation burned before failing are exactly the ones
+    worth seeing in a roll-up -- an exception that dropped them would hide
+    the most expensive failure mode there is."""
+    seen = _capture(monkeypatch)
+    scripted([_Response([_ToolUse("get_deck", {"slug": "mini"})],
+                        stop_reason="tool_use") for _ in range(3)])
+    with pytest.raises(ModeExhausted):
+        converse(MODE, messages=ASK, stance=Stance(), source=source,
+                 max_turns=3)
+    assert seen["stop_reason"] == "exhausted"
+    assert seen["requests"] == 3
+    assert seen["input_tokens"] == 30
+
+
+def test_the_recording_reaches_sqlite_end_to_end(scripted, monkeypatch,
+                                                 tmp_path):
+    """The one test that uses the real ledger, pointed at a scratch database,
+    so the converse -> ledger -> app.db seam is proven rather than stubbed."""
+    import functools
+    from types import SimpleNamespace
+
+    from mtglab.claude import ledger as real_ledger
+
+    db_path = tmp_path / "app.db"
+    monkeypatch.setattr(modes, "ledger", SimpleNamespace(
+        record=functools.partial(real_ledger.record, path=db_path)))
+    scripted([_Response([_Text("ok")])])
+    converse(MODE, messages=ASK, stance=Stance())
+
+    rows = real_ledger.summary(path=db_path)
+    assert len(rows) == 1
+    assert rows[0]["mode"] == "test-mode"
+    assert rows[0]["conversations"] == 1
+    assert rows[0]["input_tokens"] == 10
 
 
 # ---------------------------------------------------------------- the mode

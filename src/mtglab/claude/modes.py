@@ -47,7 +47,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from mtglab.claude import client, tools
+from mtglab.claude import client, ledger, tools
 from mtglab.claude.stance import Stance
 from mtglab.decks.source import DeckNotFound, DeckSource
 
@@ -278,6 +278,26 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
     seen_urls: set[str] = set()
     container: str | None = None
     tokens_in = tokens_out = tokens_cached = 0
+    # The one *moving* cache marker, on the newest tool-result block. The
+    # system breakpoint above caches the byte-stable prefix; this one caches
+    # the growing conversation, which for a searching mode is where the bulk
+    # is -- turn six of a dossier otherwise re-buys turns one through five,
+    # search results included, at full input price. It moves rather than
+    # accumulates because the API allows four markers per request and the
+    # theme flow already spends one inside `messages`.
+    marked: dict[str, Any] | None = None
+
+    # API requests actually made, for the ledger: a conversation's cost in
+    # round trips as well as tokens. `finish` reads it at call time.
+    requests = 0
+
+    def finish(turn: Turn) -> Turn:
+        ledger.record(mode=turn.mode, model=turn.model,
+                      stop_reason=turn.stop_reason, requests=requests,
+                      input_tokens=turn.input_tokens,
+                      output_tokens=turn.output_tokens,
+                      cache_read_tokens=turn.cache_read_tokens)
+        return turn
 
     for done in range(max_turns):
         if on_turn is not None:
@@ -312,6 +332,7 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
             output_config=output_config,
             messages=history,
         )
+        requests += 1
         tokens_in += resp.usage.input_tokens
         tokens_out += resp.usage.output_tokens
         # `or 0`: the SDK types the field `int | None`, and None means the
@@ -323,11 +344,12 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
         # empty content list and indexing into it is how this becomes an
         # IndexError instead of a message somebody can act on.
         if resp.stop_reason == "refusal":
-            return Turn(mode=mode.name, model=resp.model,
-                        stop_reason=resp.stop_reason, text="", tool_calls=calls,
-                        input_tokens=tokens_in, output_tokens=tokens_out,
-                        searched=pages, search_errors=search_errors,
-                        refused=True, cache_read_tokens=tokens_cached)
+            return finish(Turn(
+                mode=mode.name, model=resp.model,
+                stop_reason=resp.stop_reason, text="", tool_calls=calls,
+                input_tokens=tokens_in, output_tokens=tokens_out,
+                searched=pages, search_errors=search_errors,
+                refused=True, cache_read_tokens=tokens_cached))
 
         # Harvested before the stop-reason branch, so a turn that pauses or
         # ends still contributes what its searches found. Deduplicated on URL:
@@ -358,12 +380,13 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
         if resp.stop_reason != "tool_use":
             text = "".join(b.text for b in resp.content
                            if b.type == "text").strip()
-            return Turn(mode=mode.name, model=resp.model,
-                        stop_reason=resp.stop_reason, text=text,
-                        tool_calls=calls, input_tokens=tokens_in,
-                        output_tokens=tokens_out, searched=pages,
-                        search_errors=search_errors,
-                        cache_read_tokens=tokens_cached)
+            return finish(Turn(
+                mode=mode.name, model=resp.model,
+                stop_reason=resp.stop_reason, text=text,
+                tool_calls=calls, input_tokens=tokens_in,
+                output_tokens=tokens_out, searched=pages,
+                search_errors=search_errors,
+                cache_read_tokens=tokens_cached))
 
         results = []
         for block in resp.content:
@@ -385,8 +408,23 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
                 content, is_error = f"{type(exc).__name__}: {exc}", True
             results.append({"type": "tool_result", "tool_use_id": block.id,
                             "content": content, "is_error": is_error})
+        # Move the conversation's cache marker onto the newest results. The
+        # next request then reads everything before them -- the earlier turns
+        # and their search results -- from the cache at ~a tenth of the price,
+        # instead of re-buying it. Moved rather than added: markers max out at
+        # four per request, and earlier breakpoints keep working as read
+        # points after the marker itself has gone.
+        if results:
+            if marked is not None:
+                del marked["cache_control"]
+            marked = results[-1]
+            marked["cache_control"] = {"type": "ephemeral"}
         history.append({"role": "user", "content": results})
 
+    ledger.record(mode=mode.name, model=client.model(),
+                  stop_reason="exhausted", requests=requests,
+                  input_tokens=tokens_in, output_tokens=tokens_out,
+                  cache_read_tokens=tokens_cached)
     raise ModeExhausted(
         f"{mode.name} still wanted tools after {max_turns} turns "
         f"({len(calls)} calls made). Nothing was written; nothing is half-done.")

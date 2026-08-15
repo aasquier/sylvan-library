@@ -55,6 +55,28 @@ def _no_maintainer_configured(monkeypatch):
     monkeypatch.delenv("MTGLAB_ADMIN_EMAIL", raising=False)
     monkeypatch.delenv("MTGLAB_ADMIN_USERNAME", raising=False)
 
+
+@pytest.fixture(autouse=True)
+def _no_usage_ledger(monkeypatch):
+    """No test writes usage rows into the developer's real app.db.
+
+    `modes.converse` records every conversation's token accounting through
+    `claude/ledger.py`, which resolves its database from `config` -- and in a
+    test process that is the repository's real data directory. Left alone,
+    every scripted-conversation test in the suite would deposit junk rows in
+    the laptop's actual ledger. So the attribute `modes.py` holds is replaced
+    with a no-op here; the ledger module itself stays real, which is what
+    `test_claude_ledger.py` exercises against a scratch path, and one test in
+    `test_claude_modes.py` re-points a conversation at the real module to
+    prove the seam end to end -- a stub nothing ever removes is how a broken
+    seam stays green.
+    """
+    from types import SimpleNamespace
+
+    from mtglab.claude import modes
+    monkeypatch.setattr(modes, "ledger",
+                        SimpleNamespace(record=lambda **kwargs: None))
+
 settings.register_profile("dev", max_examples=200, deadline=None)
 settings.register_profile(
     "ci",
