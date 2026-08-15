@@ -45,6 +45,7 @@ import {
   type ThemeCommander,
 } from '../lib/api'
 import { ThemeInterview } from './theme'
+import { CardArt } from './ui'
 
 /** The table survives a reload, for the reason the transcript does: a reading
  *  is of one person on one evening, and re-dealing it would make it somebody
@@ -265,36 +266,82 @@ function ShufflingDeck() {
 
 /* -------------------------------------------------------------- the reader */
 
+/**
+ * Each costumed voice gets a painting, and the paintings are Scryfall art
+ * crops — hotlinked with the artist credited on the tile, never committed
+ * (rule 5, ADR 6), exactly as the page mastheads do it. Looked up on
+ * Scryfall rather than recalled (rule 1 covers art too); artist and set are
+ * what Scryfall reports for the default printing:
+ *
+ * - fortune-teller — *The Deck of Many Things*, Volkan Baǵa, Adventures in
+ *   the Forgotten Realms: a spread of cards nobody should trust.
+ * - therapist — *Alandra, Sky Dreamer*, Caroline Gariba, Murders at Karlov
+ *   Manor Commander: somebody paid to sit with what you dream.
+ * - scientist — *Rukarumel, Biologist*, Fariba Khamseh, Commander Masters:
+ *   a field scientist delighted by her specimen.
+ * - chef — *Gyome, Master Chef*, Steve Prescott: the house chef, and a nod
+ *   to the deck he leads in this library.
+ * - storyteller — *Birgi, God of Storytelling*, Eric Deschamps, Kaldheim.
+ * - barkeep — *Edgewall Innkeeper*, Matt Stewart, Throne of Eldraine.
+ *
+ * `plain` is deliberately absent: "just talk to me" is the tile with no
+ * costume, and a stand-in painting would make it one of seven characters
+ * rather than the exit from character.
+ */
+const PERSONA_ART: Record<string, { art: string; credit: string }> = {
+  'fortune-teller': {
+    art: 'https://cards.scryfall.io/art_crop/front/f/e/feddbdc6-0757-43cb-bb41-dc83c6cf42ea.jpg',
+    credit: 'Volkan Baǵa',
+  },
+  therapist: {
+    art: 'https://cards.scryfall.io/art_crop/front/5/4/54bf48d4-e350-4ca7-87da-ce04fefd4610.jpg',
+    credit: 'Caroline Gariba',
+  },
+  scientist: {
+    art: 'https://cards.scryfall.io/art_crop/front/0/b/0b2f7397-9d75-4667-8872-e58a39512583.jpg',
+    credit: 'Fariba Khamseh',
+  },
+  chef: {
+    art: 'https://cards.scryfall.io/art_crop/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg',
+    credit: 'Steve Prescott',
+  },
+  storyteller: {
+    art: 'https://cards.scryfall.io/art_crop/front/4/4/44657ab1-0a6a-4a5f-9688-86f239083821.jpg',
+    credit: 'Eric Deschamps',
+  },
+  barkeep: {
+    art: 'https://cards.scryfall.io/art_crop/front/7/c/7c5d0560-f9e6-4c70-8cce-cae61e4e74bc.jpg',
+    credit: 'Matt Stewart',
+  },
+}
+
 function ReaderPanel({ persona, onPick }: {
   persona: Persona
   onPick: () => void
 }) {
+  const art = PERSONA_ART[persona.key]
   return (
     <button onClick={onPick}
-            className="card-surface flex flex-col items-center gap-3 rounded-xl px-5 py-6 text-center transition hover:opacity-90">
-      {persona.deals
-        ? (
-          // A fan of three backs, which is the thing this reader will actually
-          // do. The other kind of reader gets no picture rather than a
-          // stand-in one.
-          <div className="tarot-fan" aria-hidden="true">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="tarot-fan-card"
-                   style={{ '--fan-index': i - 1 } as React.CSSProperties}>
-                <CardBack />
-              </div>
-            ))}
-          </div>
-          )
-        : <div className="tarot-fan tarot-fan-empty" aria-hidden="true" />}
-      <span className="text-base font-medium">{persona.label}</span>
-      <span className="text-xs leading-relaxed"
-            style={{ color: 'var(--text-secondary)' }}>
-        {persona.blurb}
-      </span>
-      <span className="text-[11px] uppercase tracking-wide"
-            style={{ color: 'var(--text-muted)' }}>
-        {persona.deals ? 'Three cards' : 'No cards — just the questions'}
+            className="card-surface flex flex-col overflow-hidden rounded-xl text-center transition hover:opacity-90">
+      {art && (
+        <CardArt src={art.art} alt="" ratio="aspect-[626/457]"
+                 className="art-fade w-full rounded-none" />
+      )}
+      <span className="flex flex-1 flex-col items-center gap-2 px-5 py-4">
+        <span className="text-base font-medium">{persona.label}</span>
+        <span className="text-xs leading-relaxed"
+              style={{ color: 'var(--text-secondary)' }}>
+          {persona.blurb}
+        </span>
+        <span className="mt-auto text-[11px] uppercase tracking-wide"
+              style={{ color: 'var(--text-muted)' }}>
+          {persona.deals ? 'Three cards' : 'No cards — just the questions'}
+        </span>
+        {art && (
+          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            Art by {art.credit}
+          </span>
+        )}
       </span>
     </button>
   )
@@ -434,14 +481,15 @@ export function TarotTable({ onPick, onLeave }: {
         <div className="flex flex-wrap items-start gap-3">
           <div>
             <h2 className="text-xl font-semibold tracking-tight">
-              Who is reading for you?
+              Who do you want across the table?
             </h2>
             <p className="mt-1 max-w-2xl text-sm"
                style={{ color: 'var(--text-secondary)' }}>
-              Either way the questions are about you and never about Magic —
-              what you already love, how you are when a plan comes apart, who
-              you become with other people in the room. One of them asks with
-              three cards face up on the table.
+              Whoever you pick, the questions are about you and never about
+              Magic — what you already love, how you are when a plan comes
+              apart, who you become with other people in the room. Only the
+              voice changes. The fortune-teller asks with three cards face up
+              on the table.
             </p>
           </div>
           <button onClick={onLeave}

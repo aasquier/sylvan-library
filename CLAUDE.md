@@ -335,9 +335,11 @@ The **commander dossier**
 who a deck's commander is, what archetype they define, who their rivals are and
 where they sit in Magic's history. The **theme interview** (`theme.py`,
 [ADR 20](docs/adr/0020-the-theme-interview-reads-a-person.md)) is two modes and
-the create flow's third door: a conversation whose questions are **not about
+the create flow's first door: a conversation whose questions are **not about
 Magic** — a film, a period, your sign, how you are at game night — and then a
 proposal of two colour combinations with three pool-checked commanders each.
+The door opens on a persona tile grid (seven voices, ADR 21) and the
+fortune-teller tile deals the tarot spread.
 `mtglab claude check` proves the key;
 `mtglab claude interview <slug> --card X`, `mtglab claude argue <slug> --card X`
 and `mtglab claude dossier <slug>` run the first three, and the deck page runs
@@ -426,12 +428,24 @@ constraint verbatim — same tools, same write scope, same schema. The voice is
 keeps the interview's own rules out of a persona's reach; a parametrised test
 asserts each of them still appears in *every* persona's prompt.
 `CONVERSATION_MODES["plain"] is THEME_CONVERSATION` — identity, not equality,
-because that block is what `converse` caches. Two voices are built, `plain`
-and `fortune-teller`; storyteller, scientist and confessor are not, and each
-is a `Persona` and a prompt with nothing else to move.
+because that block is what `converse` caches. **Seven voices are built**
+(2026-08-15): `plain`, `fortune-teller`, and five costumed ones — therapist,
+scientist, chef, storyteller, barkeep — each a `Persona` and a prompt with
+nothing else to move, which was ADR 21's claim and held when tested. Only the
+fortune-teller deals; the roster ships `{key, label, blurb, deals}` and never
+a prompt. Each costumed voice has a Scryfall art crop on its tile
+(`PERSONA_ART` in `components/tarot.tsx`, hotlinked with credit, never
+committed); `plain` is deliberately artless — the tile with no costume.
 
-**The tarot door is the fourth entry on "Start a deck", and it is the theme
-interview wearing a costume.** `tarot.py` is stdlib, holds all 78 cards and
+**"Start a deck" has three doors now, and the persona grid is the first.**
+The theme door and the tarot door merged (2026-08-15): "Help me decide" opens
+the tile grid — pick who you talk to — and the fortune-teller tile is where
+the old "Read my cards" door went, dealing exactly as before. The grid, the
+table and the resume-from-stash logic all live in `components/tarot.tsx`,
+and a stashed `{persona, seed, turned}` walks back to its table past the grid.
+
+**The tarot table is the theme interview wearing a costume.**
+`tarot.py` is stdlib, holds all 78 cards and
 **no card's meaning** — Python shuffles, the reader reads. The load-bearing
 decision is that `tarot.SPREAD`'s three positions **are** `SLOT_KINDS[:3]`
 (taste, temperament, posture) with `len(SPREAD) == FLOOR`: a card is dealt
