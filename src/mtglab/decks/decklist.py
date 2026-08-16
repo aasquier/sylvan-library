@@ -78,10 +78,19 @@ _SECTION_WORDS.update({
 })
 _SECTION_WORDS.update({"sorcery": "deck", "sorceries": "deck"})
 
-# `Commander`, `Commander:`, `COMMANDER (1)`, `Sideboard - 0`. The count is
-# whatever the exporter thought; it is not trusted, only tolerated.
-_HEADER = re.compile(
-    r"^\s*(?P<word>[A-Za-z][A-Za-z ]*?)\s*[:\-]?\s*(?:\(\s*\d+\s*\))?\s*$")
+# `Commander`, `Commander:`, `COMMANDER (1)`. The count is whatever the
+# exporter thought; it is not trusted, only tolerated.
+#
+# Taken apart in `_header_section` rather than matched by one pattern, and the
+# reason is measured. The single pattern this replaces let `[A-Za-z ]*?`, three
+# separate `\s*` runs and a final `\s*$` all compete for the same run of
+# spaces, so a line that could not match explored every way to divide it: not
+# the "polynomial, low impact" CodeQL reported but roughly ten times worse per
+# doubling, and **26 seconds on one 512-character line**. Both patterns below
+# are unambiguous -- the classes on either side of every quantifier are
+# disjoint -- so each is linear, and `test_decklist.py` pins the curve.
+_HEADER_COUNT = re.compile(r"\(\s*\d+\s*\)$")
+_HEADER_WORD = re.compile(r"[A-Za-z][A-Za-z ]*")
 
 # A leading quantity. Capped at three digits so that `1996 World Champion`
 # parses as a name rather than as 1,996 copies of "World Champion".
@@ -100,6 +109,18 @@ _PRINTING = re.compile(
 # Deckstats puts the set code in front: `1 [C17] Arahbo, Roar of the World`.
 # Safe to strip unconditionally because no card name begins with a bracket.
 _LEADING_SET = re.compile(r"^\[[A-Za-z0-9]{2,6}\]\s*")
+
+#: The longest line this will look at. Every pattern above is polynomial in
+#: the length of what it is handed and each one is applied per line, so the
+#: bound belongs here -- once, before the first `search` -- rather than
+#: anchored into five separate patterns, which is behaviour-sensitive work on
+#: a parser six decks depend on.
+#:
+#: The headroom is deliberate and Magic decides it: the longest card name ever
+#: printed is the 141-character Unhinged elemental whose name is a joke about
+#: long card names, and a line carries a quantity, a set code, a collector
+#: number and any markers besides. Nothing real comes close to this.
+MAX_LINE = 512
 
 
 @dataclass(frozen=True)
@@ -168,10 +189,23 @@ def _strip_annotations(text: str) -> tuple[str, set[str]]:
 
 
 def _header_section(line: str) -> str | None:
-    match = _HEADER.match(line)
-    if not match:
+    """Peel a section header apart: `word`, one separator, an ignored count.
+
+    The order is the one the old pattern required -- separator before count --
+    so `Commander: (1)` is a header and `Commander (1):` is not, exactly as
+    before.
+    """
+    text = line.strip()
+    count = _HEADER_COUNT.search(text)
+    if count:
+        text = text[: count.start()].rstrip()
+    # One separator, never a run: `[:\-]?` is what the pattern allowed, and
+    # `rstrip(":-")` would quietly start accepting `Deck--`.
+    if text[-1:] in (":", "-"):
+        text = text[:-1].rstrip()
+    if not _HEADER_WORD.fullmatch(text):
         return None
-    return _SECTION_WORDS.get(" ".join(match["word"].lower().split()))
+    return _SECTION_WORDS.get(" ".join(text.lower().split()))
 
 
 def parse(text: str) -> ParsedList:
@@ -182,6 +216,15 @@ def parse(text: str) -> ParsedList:
     for line_no, raw in enumerate(text.splitlines(), start=1):
         line = raw.rstrip()
         if not line.strip():
+            continue
+
+        # Over the bound is unreadable rather than fatal, because `parse` never
+        # raises and a pasted list is somebody's whole deck -- one absurd line
+        # must not cost them the other ninety-eight. The reported text is
+        # sliced for the same reason the bound exists: echoing the line back
+        # whole would hand the input straight to a response and a log.
+        if len(line) > MAX_LINE:
+            out.unreadable.append((line_no, line.strip()[:MAX_LINE]))
             continue
 
         # MTGO writes comments as `//`, which is also the double-faced card
