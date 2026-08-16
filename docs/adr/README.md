@@ -42,6 +42,7 @@ they differ.
 | [26](0026-research-answers-about-magic-not-about-your-deck.md) | Research answers about Magic, never about your deck | Accepted |
 | [27](0027-entomb-is-the-delete-and-the-graveyard-is-the-undo.md) | Entomb is the delete, and the graveyard is the undo | Accepted |
 | [28](0028-the-activity-log-records-edits-and-never-rationales.md) | The activity log records edits, and never rationales | Accepted |
+| [29](0029-an-asset-is-committed-only-with-a-recipe.md) | An asset is committed only with a recipe, and the licence gate has no override | Accepted |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the
@@ -149,6 +150,19 @@ activity log 15 lists as a prerequisite landed as 28. **Deck conversation is
 the one mode 15 tabulates that is still unbuilt**, and 28's last consequence
 lists what it is still waiting on. The notes at the top of each say which half
 is which, because a status of Accepted on its own would overstate it.
+
+29 is three older decisions meeting a new kind of file. Read it next to 6:
+"never redistribute Scryfall bulk data" and "never bake Wizards' art into a
+committed asset" are the same line, drawn once for card data and again for
+pixels. Read it next to 9: both commit generated output, and 29 records why
+the bundle's regenerate-and-diff check could not be reused — image encoders
+are not byte-stable, so assets get a contract check (`expect`, `verify`)
+where the bundle gets a byte check. And read it next to 8: the licence gate
+is the deck gate's shape — a refusal with no override flag — and
+`why_committed` is rule 4's blank-rationale refusal wearing an asset's
+clothes. The recipes it introduced also closed an old debt: both PROVENANCE
+files described scripts that were never committed, and the claim they made is
+now `tests/test_animist_recipes_repo.py`.
 
 ## Where the longer arguments live
 

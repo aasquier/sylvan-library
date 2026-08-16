@@ -26,6 +26,11 @@
     mtglab claude interview <slug>      questions about a card's slot; you
                             --card X    write the rationale, it never does
     mtglab claude usage                 what every mode has spent, in tokens
+    mtglab animist build <recipe>       wake a still image into scenery:
+                                        fetch, licence-check, transform, encode
+    mtglab animist verify --all         committed assets vs their recipes
+    mtglab animist licence <recipe>     the gate alone -- what may pass, dated
+    mtglab animist measure <recipe>     the size curve, and its knee
 """
 
 from __future__ import annotations
@@ -1462,6 +1467,190 @@ def cmd_claude_usage(args):
 
 # --------------------------------------------------------------------- main
 
+# ------------------------------------------------------------------- animist
+
+def _animist_recipe(path_str):
+    """Load and validate, or refuse with the schema's own sentence."""
+    from mtglab.animist.recipe import RecipeError, load_recipe
+
+    try:
+        return load_recipe(Path(path_str))
+    except RecipeError as exc:
+        sys.exit(f"refused: {exc}")
+
+
+def _animist_pixels():
+    """The moment pixels get touched is the moment the extra is required."""
+    from mtglab import animist
+
+    if not animist.available():
+        sys.exit("the animist extra is not installed -- "
+                 "`pip install -e '.[animist]'` brings Pillow, the one "
+                 "image dependency, and nothing else here needs it")
+
+
+def _animist_widths(spec: str) -> list[int]:
+    """`300:600:20` (start:stop:step) or `300,400,560` (a list)."""
+    try:
+        if ":" in spec:
+            start, stop, step = (int(part) for part in spec.split(":"))
+            widths = list(range(start, stop + 1, step))
+        else:
+            widths = [int(part) for part in spec.split(",") if part]
+    except ValueError:
+        sys.exit(f"refused: could not read --widths {spec!r} -- give "
+                 "start:stop:step or a comma-separated list")
+    if len(widths) < 3:
+        sys.exit("refused: a size curve needs at least three widths, or "
+                 "there is no knee to find")
+    return widths
+
+
+def cmd_animist_build(args):
+    """The whole pipeline for one recipe. The gate runs first and blocks."""
+    _animist_pixels()
+    from mtglab.animist.encode import EncodeError
+    from mtglab.animist.ops import OpError
+    from mtglab.animist.run import BuildError, build
+    from mtglab.animist.sources import LicenceRefused, SourceError
+
+    recipe = _animist_recipe(args.recipe)
+    try:
+        result = build(recipe, only=args.output, dry_run=args.dry_run)
+    except (LicenceRefused, SourceError, BuildError, OpError,
+            EncodeError) as exc:
+        sys.exit(f"refused: {exc}" if not str(exc).startswith("refused")
+                 else str(exc))
+    for name in result.skipped:
+        print(f"  skipped   {name} (filename guard)")
+    for name, size in sorted(result.sizes.items()):
+        mark = "would write" if result.dry_run else "wrote"
+        print(f"  {mark:11s} {recipe.directory / name}  ({size / 1024:.1f} KB)")
+    if result.provenance is not None:
+        print(f"  provenance {result.provenance}")
+    if result.dry_run:
+        print("  dry run -- nothing touched the asset directory")
+
+
+def cmd_animist_fetch(args):
+    """Gate, then warm the cache. No pixels are transformed."""
+    from mtglab.animist.fetch import fetch_source
+    from mtglab.animist.sources import LicenceRefused, SourceError
+
+    recipe = _animist_recipe(args.recipe)
+    try:
+        for source in recipe.sources.values():
+            confirmed, local = fetch_source(recipe, source)
+            proof = confirmed.confirmation
+            print(f"  {source.id}: {proof.licence} "
+                  f"(confirmed {proof.checked_on}), "
+                  f"{len(local)} file(s) cached")
+            for name in confirmed.skipped:
+                print(f"    skipped {name} (filename guard)")
+    except (LicenceRefused, SourceError) as exc:
+        sys.exit(f"refused: {exc}")
+
+
+def cmd_animist_licence(args):
+    """The gate alone: every source's confirmed licence, dated. No download."""
+    from mtglab.animist.sources import LicenceRefused, SourceError, confirm
+
+    recipe = _animist_recipe(args.recipe)
+    failed = False
+    for source in recipe.sources.values():
+        try:
+            confirmed = confirm(source)
+        except (LicenceRefused, SourceError) as exc:
+            print(f"  {source.id}: REFUSED -- {exc}")
+            failed = True
+            continue
+        proof = confirmed.confirmation
+        print(f"  {source.id}: {proof.licence} -- confirmed "
+              f"{proof.checked_on} via {proof.api_url}")
+        if confirmed.skipped:
+            print(f"    would skip {len(confirmed.skipped)} file(s) by the "
+                  "filename guard")
+    if failed:
+        sys.exit(1)
+
+
+def _animist_all_recipes() -> list[Path]:
+    """Every committed recipe: the package's asset tree, and -- when run from
+    a checkout -- the frontend's."""
+    import mtglab
+
+    roots = [Path(mtglab.__file__).parent / "assets",
+             Path("web") / "src" / "assets"]
+    found: list[Path] = []
+    for root in roots:
+        if root.is_dir():
+            found.extend(sorted(root.rglob("*.recipe.yaml")))
+    return found
+
+
+def cmd_animist_verify(args):
+    """Committed assets against their recipes. The suite runs this too."""
+    _animist_pixels()
+    from mtglab.animist.verify import verify_recipe
+
+    paths = [Path(r) for r in args.recipes] if args.recipes \
+        else _animist_all_recipes()
+    if not paths:
+        sys.exit("refused: no recipes named and none found -- a committed "
+                 "asset without a recipe is what ADR 29 forbids")
+    failures = []
+    for path in paths:
+        recipe = _animist_recipe(path)
+        held = verify_recipe(recipe)
+        print(f"  {recipe.path}: " + ("held" if not held
+                                      else f"{len(held)} failure(s)"))
+        failures.extend(held)
+    for failure in failures:
+        print(f"    {failure}")
+    if failures:
+        sys.exit(1)
+
+
+def cmd_animist_measure(args):
+    """The size curve for one output, and where its knee sits.
+
+    Runs the output's ops *except* any `resize`, then encodes at each width
+    in the sweep -- the question is what the final resize should be, so the
+    recipe's own answer is held out.
+    """
+    _animist_pixels()
+    from mtglab.animist.fetch import fetch_source
+    from mtglab.animist.measure import knee, size_curve
+    from mtglab.animist.ops import apply
+    from mtglab.animist.sources import LicenceRefused, SourceError
+
+    recipe = _animist_recipe(args.recipe)
+    named = [out for out in recipe.outputs if out.file == args.output]
+    if not named:
+        sys.exit(f"refused: {recipe.path.name} has no `file:` output named "
+                 f"{args.output!r} -- `measure` sweeps one file at a time")
+    (output,) = named
+    widths = _animist_widths(args.widths)
+    from PIL import Image
+
+    try:
+        _, local = fetch_source(recipe, recipe.sources[output.source])
+    except (LicenceRefused, SourceError) as exc:
+        sys.exit(f"refused: {exc}")
+    with Image.open(next(iter(local.values()))) as image:
+        image.load()
+        current: Image.Image = image
+        for op in output.ops:
+            if op.name != "resize":
+                current = apply(current, op.name, op.params)
+        curve = size_curve(current, output.encode, widths)
+    for width, size in curve:
+        print(f"  {width:5d}px  {size / 1024:8.1f} KB")
+    elbow = knee(curve)
+    print(f"  the knee is at {elbow}px -- the numbers' half of the answer; "
+          "look at the result before trusting it")
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="mtglab", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1697,6 +1886,36 @@ def main(argv=None):
     cu.add_argument("--since", metavar="YYYY-MM-DD",
                     help="count only conversations on or after this date")
     cu.set_defaults(func=cmd_claude_usage)
+
+    # Wake still images into the site's scenery -- fetched free-use,
+    # licence-checked per file, every step written down (ADR 29). The gate
+    # blocks: there is no flag past a refused licence, deliberately.
+    an = sub.add_parser("animist").add_subparsers(dest="cmd", required=True)
+    ab = an.add_parser("build", help="fetch, gate, transform, encode, and "
+                                     "write the provenance entry")
+    ab.add_argument("recipe", help="path to a *.recipe.yaml")
+    ab.add_argument("--output", help="build only this `file:` output")
+    ab.add_argument("--dry-run", action="store_true",
+                    help="report what would be written, write nothing")
+    ab.set_defaults(func=cmd_animist_build)
+    af = an.add_parser("fetch", help="licence-check and cache the originals; "
+                                     "transform nothing")
+    af.add_argument("recipe"); af.set_defaults(func=cmd_animist_fetch)
+    al = an.add_parser("licence", help="the gate alone -- each source's "
+                                       "confirmed licence, dated")
+    al.add_argument("recipe"); al.set_defaults(func=cmd_animist_licence)
+    av = an.add_parser("verify", help="committed assets vs their recipes: "
+                                      "dimensions, budgets, count, no metadata")
+    av.add_argument("recipes", nargs="*",
+                    help="recipe paths; none means every committed recipe")
+    av.set_defaults(func=cmd_animist_verify)
+    am = an.add_parser("measure", help="the size curve for one output, and "
+                                       "its knee")
+    am.add_argument("recipe")
+    am.add_argument("--output", required=True, help="the `file:` output to sweep")
+    am.add_argument("--widths", default="300:600:20",
+                    help="start:stop:step, or a comma-separated list")
+    am.set_defaults(func=cmd_animist_measure)
 
     args = p.parse_args(argv)
     args.func(args)
