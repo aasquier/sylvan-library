@@ -213,7 +213,20 @@ state, never checklists.
      and the list has been "meant to shrink" since it was written. **The number
      going up is the argument for doing it**: a module on the list absorbs
      every new untyped function without a word.
-  2. **`api/service.py` reaches past `cards/db.py` to `duckdb` directly**
+  2. **Adopt Claude Code hooks for the two traps that have already cost hours.**
+     `.claude/` holds `launch.json` and `skills/` and **no `settings.json`**, so
+     the harness enforces nothing. Two of this project's most expensive rules
+     are prose-only — *never `git add -A`* (`decks/` is the app's live data
+     directory; it once swept a test deck into a "docs only" PR) and *never
+     `git stash` on this repo* (index corruption; commit WIP instead). A
+     `PreToolUse` hook on `Bash` matching those two command shapes turns both
+     into a refusal instead of a paragraph somebody has to have read. This run's
+     whole thesis is that a rule enforced by nothing drifts, and these are the
+     two with a measured cost. Queued rather than done because it changes how
+     every session behaves and that is Aaron's call, not a polish run's.
+     A third candidate, weaker: a `PostToolUse` hook reminding that `web_dist/`
+     needs rebuilding after an edit under `web/src`.
+  3. **`api/service.py` reaches past `cards/db.py` to `duckdb` directly**
      (`import duckdb; duckdb.connect(..., read_only=True)`), which is the one
      live exception to CLAUDE.md's "DuckDB stays behind `cards/db.py`". It is
      justified — `db.connect` creates the file, runs DDL and `ALTER`s, none of
