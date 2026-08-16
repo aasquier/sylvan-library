@@ -16,6 +16,7 @@ import {
   type ValidationReport,
 } from '../lib/api'
 import { categoryLabel, identityName } from '../lib/mtg'
+import { SceneBackdrop } from '../components/forest'
 import {
   Badge, CardArt, CardHover, Caveat, ColorRing, ErrorNote, ManaCost, ManaText,
   Select, Spinner, StatTile,
@@ -192,6 +193,10 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
           <CardArt src={card.art_crop} alt="" ratio="aspect-[1200/300]"
                    className="rounded-none" position="center top" />
           <div className="deck-hero-scrim" />
+          {/* The deck page's room is its commander's painting (punch list
+              item 10) — the same wash every masthead page gets, from the
+              same crop the hero band already shows. */}
+          <SceneBackdrop art={card.art_crop} />
         </div>
       )}
 

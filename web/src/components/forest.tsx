@@ -15,10 +15,19 @@
  * The positions and timings are constant tables, not `Math.random()`: the
  * same forest on every render, nothing for a test to flake on, and the
  * numbers were picked so no two cycles share a period — the sky does not
- * visibly loop.
+ * visibly loop. The one source of variety that is not a table — the leaves
+ * the canopy sheds when the header is clicked — derives its jitter
+ * arithmetically from a counter, for the same reason.
+ *
+ * Punch list 2026-08-15, items 4 and 10, both land here: the vine grew
+ * detail, a twist and an interaction; the weather brightened and stopped
+ * hiding by theme; pages fall among the leaves, because this forest grew
+ * through a library; and `SceneBackdrop` is the room itself — each page's
+ * own painting washed across the whole screen, with sunlight through a
+ * window that was never quite cleaned.
  */
 
-import { useId } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 /* ------------------------------------------------------------ the ambience */
 
@@ -53,11 +62,22 @@ interface Leaf {
 }
 
 const LEAVES: Leaf[] = [
-  { left: '12%', dur: 41, delay: 0, sway: 90, size: 13, opacity: 0.4 },
-  { left: '34%', dur: 53, delay: 17, sway: -70, size: 10, opacity: 0.3 },
-  { left: '61%', dur: 47, delay: 8, sway: 110, size: 15, opacity: 0.35 },
-  { left: '83%', dur: 59, delay: 29, sway: -90, size: 11, opacity: 0.3 },
-  { left: '48%', dur: 37, delay: 40, sway: 60, size: 9, opacity: 0.25 },
+  { left: '12%', dur: 41, delay: 0, sway: 90, size: 13, opacity: 0.55 },
+  { left: '34%', dur: 53, delay: 17, sway: -70, size: 10, opacity: 0.45 },
+  { left: '61%', dur: 47, delay: 8, sway: 110, size: 15, opacity: 0.5 },
+  { left: '83%', dur: 59, delay: 29, sway: -90, size: 11, opacity: 0.45 },
+  { left: '48%', dur: 37, delay: 40, sway: 60, size: 9, opacity: 0.4 },
+  { left: '22%', dur: 44, delay: 33, sway: 75, size: 12, opacity: 0.45 },
+  { left: '72%', dur: 57, delay: 21, sway: -60, size: 10, opacity: 0.4 },
+]
+
+/** Loose pages, fallen out of some book upstairs. Same contract as the
+ *  leaves — a constant table, periods that never coincide — but far fewer
+ *  and slower: paper is lighter than it looks and rarer than leaves. */
+const PAGES: Leaf[] = [
+  { left: '27%', dur: 61, delay: 6, sway: 130, size: 15, opacity: 0.4 },
+  { left: '56%', dur: 73, delay: 31, sway: -110, size: 12, opacity: 0.34 },
+  { left: '79%', dur: 67, delay: 52, sway: 95, size: 14, opacity: 0.38 },
 ]
 
 /** One drawn leaf — a willow-ish blade with a midrib, on `currentColor`. */
@@ -68,6 +88,22 @@ function LeafShape({ size }: { size: number }) {
             fill="currentColor" />
       <path d="M6 2 L 6 16" stroke="currentColor" strokeWidth="0.7"
             opacity="0.6" />
+    </svg>
+  )
+}
+
+/** One loose page — parchment, a turned corner, and lines too small to read.
+ *  The text is rules text from no card at all: five strokes of varying
+ *  length, which is what a page looks like from across a room. */
+function PageShape({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size * 1.3} viewBox="0 0 14 18" fill="none">
+      <path d="M1 0 H 10 L 13 3 V 18 H 1 Z" fill="#f0e4c2" />
+      <path d="M10 0 L 10 3 L 13 3 Z" fill="#d9c89a" />
+      {[5, 7.5, 10, 12.5, 15].map((y, i) => (
+        <path key={y} d={`M3 ${y} H ${i === 4 ? 8 : 11}`} stroke="#8a7a55"
+              strokeWidth="0.8" opacity="0.55" />
+      ))}
     </svg>
   )
 }
@@ -106,50 +142,213 @@ export function ForestAmbience() {
           <LeafShape size={l.size} />
         </span>
       ))}
+      {/* Pages fall in both themes — paper catches whatever light there is —
+          and tumble on a second axis the leaves do not use, because paper
+          planes and flutters where a leaf glides. */}
+      {PAGES.map((p, i) => (
+        <span key={i} className="page-fall" style={{
+          left: p.left,
+          '--dur': `${p.dur}s`,
+          '--delay': `${p.delay}s`,
+          '--sway': `${p.sway}px`,
+          '--leaf-op': p.opacity,
+        } as React.CSSProperties}>
+          <PageShape size={p.size} />
+        </span>
+      ))}
     </div>
   )
 }
 
 /* -------------------------------------------------------------- the canopy */
 
+/** A leaf the canopy shed. Everything the animation needs, precomputed —
+ *  the jitter is arithmetic on the id, not `Math.random()`, so a test can
+ *  predict a burst exactly. */
+interface ShedLeaf {
+  id: number
+  /** px from the canopy's left edge. */
+  x: number
+  drift: number
+  rot: number
+  size: number
+  delay: number
+}
+
 /**
- * The vine that drapes from the header — one tile of stem, leaves and
- * berries, repeated as an SVG pattern across whatever width the window has.
- * It hangs *below* the sticky bar (absolute, `top: 100%`) so the chrome
- * stays legible and the greenery reads as growing off it rather than
- * through it. The sway is on the `<svg>`, one element, transform-only.
+ * The vine that drapes from the header — one tile of stems, leaves, curling
+ * tendrils and berries, repeated as an SVG pattern across whatever width the
+ * window has. It hangs *below* the sticky bar (absolute, `top: 100%`) so the
+ * chrome stays legible and the greenery reads as growing off it rather than
+ * through it.
+ *
+ * Punch list 2026-08-15 item 4 rebuilt it. Three moves, none of them an
+ * asset: **two stems that cross** rather than one polite wave, so the vine
+ * reads as twisted growth; **an uneven underside** — tendrils of different
+ * lengths spiralling off the stem, leaf pairs at their tips — so the bottom
+ * edge is a plant's and not a wallpaper border's; and **berries with a gold
+ * glint**, the same #c9a227 every drawn mark in this app commits to. The
+ * whole canopy grows in on load (scaleY from the stem line, in CSS) and
+ * sways for good; both stop under `prefers-reduced-motion`.
+ *
+ * And it answers to touch: **click the header and the vine sheds leaves**
+ * from where you clicked. The canopy itself stays `pointer-events: none` —
+ * it listens on its parent, the header, so the nav keeps working and the
+ * leaves are a side effect of whatever you were doing anyway.
  */
 export function HeaderCanopy() {
   const id = useId().replace(/:/g, '')
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [shed, setShed] = useState<ShedLeaf[]>([])
+  const counter = useRef(0)
+
+  useEffect(() => {
+    const root = rootRef.current
+    const host = root?.parentElement
+    if (!root || !host) return
+    const onClick = (e: MouseEvent) => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+      const left = root.getBoundingClientRect().left
+      const burst = Array.from({ length: 3 }, (_, i) => {
+        const n = counter.current++
+        return {
+          id: n,
+          x: e.clientX - left + (i - 1) * 16 + ((n * 7) % 11) - 5,
+          drift: ((n * 13) % 49) - 24,
+          rot: 140 + ((n * 31) % 160),
+          size: 9 + ((n * 5) % 3) * 3,
+          delay: i * 110,
+        }
+      })
+      setShed((s) => [...s, ...burst])
+    }
+    host.addEventListener('click', onClick)
+    return () => host.removeEventListener('click', onClick)
+  }, [])
+
   return (
-    <div className="header-canopy" aria-hidden="true">
+    <div ref={rootRef} className="header-canopy" aria-hidden="true">
       <svg className="h-full w-full">
         <defs>
-          <pattern id={`vine-${id}`} width="220" height="26"
+          <pattern id={`vine-${id}`} width="260" height="44"
                    patternUnits="userSpaceOnUse">
-            <path d="M0 4 C 30 0, 52 12, 82 7 S 140 1, 168 9 S 206 12, 220 4"
-                  fill="none" stroke="currentColor" strokeWidth="1.4"
-                  opacity="0.75" />
-            {/* Leaves alternate sides of the stem, each its own size and
-                lean, because a vine that repeats too obviously is a wallpaper
-                border rather than a plant. */}
-            <path d="M26 6 q 6 1 8 9 q -8 -1 -8 -9" fill="currentColor"
+            {/* Two stems, crossing twice: the twist. The second is thinner
+                and dimmer, a stem seen behind a stem. */}
+            <path d="M0 6 C 34 -2, 62 16, 104 9 S 178 0, 216 10 S 248 12, 260 5"
+                  fill="none" stroke="currentColor" strokeWidth="1.6"
                   opacity="0.8" />
-            <path d="M58 9 q -2 -8 5 -12 q 3 8 -5 12" fill="currentColor"
-                  opacity="0.65" />
-            <path d="M104 6 q 7 2 8 11 q -9 -2 -8 -11" fill="currentColor"
+            <path d="M0 11 C 40 19, 70 1, 112 13 S 190 19, 226 6 S 250 3, 260 10"
+                  fill="none" stroke="currentColor" strokeWidth="1"
+                  opacity="0.45" />
+            {/* Leaves alternate sides of the stems, each its own size and
+                lean — a vine that repeats too obviously is a wallpaper
+                border rather than a plant. Every leaf carries its vein. */}
+            <path d="M22 7 q 7 1 9 11 q -9 -1 -9 -11" fill="currentColor"
                   opacity="0.85" />
-            <path d="M136 5 q -1 -7 6 -10 q 2 7 -6 10" fill="currentColor"
+            <path d="M23.5 8.5 q 4 3 6 8" stroke="currentColor"
+                  strokeWidth="0.6" fill="none" opacity="0.5" />
+            <path d="M52 10 q -2 -9 6 -13 q 3 9 -6 13" fill="currentColor"
+                  opacity="0.65" />
+            <path d="M53.5 8 q 2 -4 3.5 -8" stroke="currentColor"
+                  strokeWidth="0.6" fill="none" opacity="0.45" />
+            <path d="M98 8 q 8 2 9 13 q -10 -2 -9 -13" fill="currentColor"
+                  opacity="0.9" />
+            <path d="M99.5 10 q 4 4 6 9" stroke="currentColor"
+                  strokeWidth="0.6" fill="none" opacity="0.5" />
+            <path d="M132 7 q -1 -8 7 -11 q 2 8 -7 11" fill="currentColor"
                   opacity="0.6" />
-            <path d="M186 9 q 6 1 7 10 q -8 -1 -7 -10" fill="currentColor"
+            <path d="M168 12 q 6 1 8 11 q -9 -1 -8 -11" fill="currentColor"
                   opacity="0.75" />
-            <circle cx="76" cy="8" r="1.6" fill="currentColor" opacity="0.7" />
-            <circle cx="160" cy="7" r="1.3" fill="currentColor" opacity="0.6" />
-            <circle cx="212" cy="6" r="1.5" fill="currentColor" opacity="0.65" />
+            <path d="M169.5 13.5 q 3.5 3.5 5.5 8" stroke="currentColor"
+                  strokeWidth="0.6" fill="none" opacity="0.5" />
+            <path d="M206 8 q -2 -8 5 -12 q 3 8 -5 12" fill="currentColor"
+                  opacity="0.7" />
+            <path d="M238 9 q 7 2 8 12 q -9 -2 -8 -12" fill="currentColor"
+                  opacity="0.8" />
+            {/* Tendrils: spirals of unequal length hanging off the stem, a
+                leaf pair at each tip. The uneven underside is the point. */}
+            <path d="M64 10 c 1 8 -2 14 2 19 c 4 5 10 2 8 -3 c -1.5 -4 -7 -2 -5 2"
+                  fill="none" stroke="currentColor" strokeWidth="1"
+                  opacity="0.6" />
+            <path d="M70 27 q 5 0 7 6 q -7 0 -7 -6" fill="currentColor"
+                  opacity="0.55" />
+            <path d="M148 11 c 0 10 -3 18 2 25 c 4 6 11 2 9 -4 c -2 -5 -8 -2 -6 2"
+                  fill="none" stroke="currentColor" strokeWidth="1.1"
+                  opacity="0.7" />
+            <path d="M152 33 q -6 -1 -8 6 q 7 1 8 -6" fill="currentColor"
+                  opacity="0.6" />
+            <path d="M154 34 q 5 1 6 7 q -7 -1 -6 -7" fill="currentColor"
+                  opacity="0.5" />
+            <path d="M228 9 c 1 6 -1 11 2 15 c 3 4 8 1 6 -2 c -1.5 -3 -5 -1 -4 1.5"
+                  fill="none" stroke="currentColor" strokeWidth="0.9"
+                  opacity="0.55" />
+            {/* Berries in clusters, each with the gold glint the drawn marks
+                share. */}
+            <circle cx="84" cy="10" r="1.9" fill="currentColor" opacity="0.8" />
+            <circle cx="87.5" cy="12.5" r="1.5" fill="currentColor" opacity="0.65" />
+            <circle cx="85" cy="14" r="1.2" fill="currentColor" opacity="0.5" />
+            <circle cx="83.4" cy="9.4" r="0.6" fill="#c9a227" opacity="0.9" />
+            <circle cx="190" cy="9" r="1.7" fill="currentColor" opacity="0.75" />
+            <circle cx="193" cy="11" r="1.3" fill="currentColor" opacity="0.55" />
+            <circle cx="189.4" cy="8.4" r="0.55" fill="#c9a227" opacity="0.85" />
+            <circle cx="254" cy="8" r="1.5" fill="currentColor" opacity="0.65" />
+            <circle cx="253.5" cy="7.5" r="0.5" fill="#c9a227" opacity="0.8" />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill={`url(#vine-${id})`} />
       </svg>
+      {shed.map((leaf) => (
+        <span key={leaf.id} className="leaf-shed"
+              onAnimationEnd={() =>
+                setShed((s) => s.filter((l) => l.id !== leaf.id))}
+              style={{
+                left: `${leaf.x}px`,
+                animationDelay: `${leaf.delay}ms`,
+                '--drift': `${leaf.drift}px`,
+                '--rot': `${leaf.rot}deg`,
+              } as React.CSSProperties}>
+          <LeafShape size={leaf.size} />
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * The room behind a page (punch list 2026-08-15 item 10).
+ *
+ * Every masthead page already names one painting; this washes that same
+ * painting across the whole viewport — blurred, dim, and fading out toward
+ * the reading column — so the page stops being content floating on flat
+ * black and starts being a room with the light off. Over it, one shaft of
+ * sunlight from the upper corner, flickering slowly the way light does when
+ * it has come through leaves and old glass, with dust hanging in it. The
+ * art is the page's own masthead crop, so this adds no new source and no
+ * new credit; the beam and the dust are CSS.
+ *
+ * Decorative in the strict sense: `aria-hidden`, no pointer events, and
+ * behind everything with painted pixels. `prefers-reduced-motion` stills
+ * the flicker and the dust but keeps the room.
+ */
+export function SceneBackdrop({ art }: { art: string }) {
+  return (
+    <div className="scene-backdrop" aria-hidden="true">
+      <img src={art} alt="" className="scene-backdrop-art" />
+      <div className="scene-sunbeam" />
+      <div className="scene-sunbeam scene-sunbeam-b" />
+      {[
+        { left: '78%', top: '12%', dur: 19, delay: 0 },
+        { left: '84%', top: '24%', dur: 23, delay: 7 },
+        { left: '72%', top: '30%', dur: 29, delay: 13 },
+        { left: '88%', top: '9%', dur: 17, delay: 4 },
+      ].map((m, i) => (
+        <span key={i} className="scene-mote" style={{
+          left: m.left,
+          top: m.top,
+          '--dur': `${m.dur}s`,
+          '--delay': `${m.delay}s`,
+        } as React.CSSProperties} />
+      ))}
     </div>
   )
 }

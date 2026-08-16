@@ -1051,11 +1051,15 @@ button:hover .tarot-fan-card {
 .firefly {
   display: none;
   position: absolute;
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 9999px;
-  background: #ffe9a8;
-  box-shadow: 0 0 8px 2px rgba(255, 214, 110, 0.55);
+  background: #ffedb0;
+  /* Brighter than v1 (punch list item 4): a real glow, two shells deep, so
+     the fireflies read on a dark page instead of hinting at themselves. */
+  box-shadow:
+    0 0 10px 3px rgba(255, 220, 120, 0.75),
+    0 0 22px 8px rgba(255, 200, 90, 0.28);
   opacity: 0;
   animation:
     firefly-wander var(--dur) ease-in-out var(--delay) infinite alternate,
@@ -1090,15 +1094,20 @@ button:hover .tarot-fan-card {
 @keyframes firefly-glow {
   0%,
   100% {
-    opacity: 0.05;
+    opacity: 0.08;
   }
   50% {
-    opacity: 0.8;
+    opacity: 0.95;
   }
 }
 
+/* Leaves fall in both themes now (punch list item 4) — the old design hid
+   them at night entirely, which read as "the effect is invisible in dark
+   mode" because it was. By day they are the shade's green; by night they
+   catch the fireflies' light instead, brighter and warmer than the day
+   colour because a silhouette against a dark page is nothing at all. */
 .leaf-fall {
-  display: none;
+  display: block;
   position: absolute;
   top: -6%;
   color: var(--vine);
@@ -1106,13 +1115,37 @@ button:hover .tarot-fan-card {
   animation: leaf-fall var(--dur) linear var(--delay) infinite;
 }
 
-:root[data-theme='light'] .leaf-fall {
-  display: block;
+:root[data-theme='dark'] .leaf-fall {
+  color: #8ec49a;
+  filter: drop-shadow(0 0 3px rgba(140, 200, 150, 0.35));
 }
 
-@media (prefers-color-scheme: light) {
-  :root:where(:not([data-theme='dark'])) .leaf-fall {
-    display: block;
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .leaf-fall {
+    color: #8ec49a;
+    filter: drop-shadow(0 0 3px rgba(140, 200, 150, 0.35));
+  }
+}
+
+/* A page falls like paper, not like a leaf: the same descent, plus a
+   flutter on the third axis. Both themes — paper catches any light. */
+.page-fall {
+  display: block;
+  position: absolute;
+  top: -6%;
+  opacity: 0;
+  animation:
+    leaf-fall var(--dur) linear var(--delay) infinite,
+    page-flutter 3.7s ease-in-out var(--delay) infinite;
+}
+
+@keyframes page-flutter {
+  0%,
+  100% {
+    rotate: y 0deg;
+  }
+  50% {
+    rotate: y 52deg;
   }
 }
 
@@ -1136,23 +1169,40 @@ button:hover .tarot-fan-card {
   }
 }
 
-/* The vine along the header's underside. `color` is the whole palette —
-   the SVG draws in currentColor — and the sway is one transform on one
-   element, origin at the stem so the tips travel farthest. */
+/* The vine along the header's underside. `color` is most of the palette —
+   the SVG draws in currentColor, plus one fixed gold for the berry glints —
+   and the sway is one transform on one element, origin at the stem so the
+   tips travel farthest. Taller and more present than v1 (punch list item
+   4): the tendrils need the room, and 0.55 opacity read as a smudge. It
+   grows in on load — scaleY from the stem line — because a vine is a thing
+   that grew, and the sway takes over when the growing is done. */
 .header-canopy {
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
-  height: 24px;
+  height: 44px;
   pointer-events: none;
   color: var(--vine);
-  opacity: 0.55;
+  opacity: 0.75;
+  transform-origin: 50% 0;
+  animation: canopy-grow 1.1s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .header-canopy svg {
   transform-origin: 50% 0;
   animation: canopy-sway 13s ease-in-out infinite;
+}
+
+@keyframes canopy-grow {
+  0% {
+    transform: scaleY(0.1);
+    opacity: 0;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 0.75;
+  }
 }
 
 @keyframes canopy-sway {
@@ -1162,6 +1212,177 @@ button:hover .tarot-fan-card {
   }
   50% {
     transform: skewX(1.1deg) translateX(4px);
+  }
+}
+
+/* A leaf the vine shed because somebody touched the header (item 4). Falls
+   just past the canopy and is removed from the DOM by its own
+   `animationend`, so a click costs three spans for a second and a half. */
+.leaf-shed {
+  position: absolute;
+  top: 40%;
+  color: var(--vine);
+  opacity: 0;
+  animation: leaf-shed 1.5s ease-in forwards;
+}
+
+:root[data-theme='dark'] .leaf-shed {
+  color: #8ec49a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .leaf-shed {
+    color: #8ec49a;
+  }
+}
+
+@keyframes leaf-shed {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0.9;
+  }
+  55% {
+    transform: translate(calc(var(--drift) * 0.55), 70px)
+      rotate(calc(var(--rot) * 0.6));
+    opacity: 0.75;
+  }
+  100% {
+    transform: translate(var(--drift), 150px) rotate(var(--rot));
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------ the scene backdrop
+ *
+ * `SceneBackdrop` in `components/forest.tsx`: the page's own masthead
+ * painting washed across the viewport (punch list item 10). Fixed and
+ * z-indexed under everything with pixels; the art is blurred past
+ * recognising brush strokes, dimmed hard, and masked toward the bottom so
+ * the reading column sits on quiet. The sunbeam is two overlapping soft
+ * cones from the upper right, flickering on incommensurate periods — light
+ * through leaves and old glass — with dust hanging in it.
+ */
+.scene-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.scene-backdrop-art {
+  position: absolute;
+  inset: -24px;
+  width: calc(100% + 48px);
+  height: calc(100% + 48px);
+  object-fit: cover;
+  filter: blur(18px) saturate(0.85);
+  opacity: 0.13;
+  mask-image: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(0, 0, 0, 0.55) 45%,
+    rgba(0, 0, 0, 0.25) 100%
+  );
+}
+
+:root[data-theme='dark'] .scene-backdrop-art {
+  opacity: 0.16;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .scene-backdrop-art {
+    opacity: 0.16;
+  }
+}
+
+.scene-sunbeam {
+  position: absolute;
+  top: -12%;
+  right: -6%;
+  width: 55%;
+  height: 85%;
+  transform: rotate(24deg);
+  transform-origin: 100% 0;
+  background: linear-gradient(
+    203deg,
+    rgba(255, 226, 150, 0.14) 0%,
+    rgba(255, 226, 150, 0.05) 45%,
+    rgba(255, 226, 150, 0) 72%
+  );
+  animation: sunbeam-flicker 11s ease-in-out infinite;
+}
+
+.scene-sunbeam-b {
+  width: 34%;
+  transform: rotate(31deg);
+  animation-duration: 17s;
+  animation-delay: 4s;
+}
+
+/* Night light is the moon's: cooler, dimmer, same window. */
+:root[data-theme='dark'] .scene-sunbeam {
+  background: linear-gradient(
+    203deg,
+    rgba(190, 210, 255, 0.1) 0%,
+    rgba(190, 210, 255, 0.035) 45%,
+    rgba(190, 210, 255, 0) 72%
+  );
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .scene-sunbeam {
+    background: linear-gradient(
+      203deg,
+      rgba(190, 210, 255, 0.1) 0%,
+      rgba(190, 210, 255, 0.035) 45%,
+      rgba(190, 210, 255, 0) 72%
+    );
+  }
+}
+
+@keyframes sunbeam-flicker {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  23% {
+    opacity: 0.95;
+  }
+  41% {
+    opacity: 0.7;
+  }
+  67% {
+    opacity: 1;
+  }
+  84% {
+    opacity: 0.6;
+  }
+}
+
+.scene-mote {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: rgba(255, 240, 200, 0.5);
+  animation: mote-drift var(--dur) ease-in-out var(--delay) infinite alternate;
+}
+
+@keyframes mote-drift {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.7;
+  }
+  70% {
+    opacity: 0.35;
+  }
+  100% {
+    transform: translate(-46px, 60px);
+    opacity: 0;
   }
 }
 
@@ -1348,10 +1569,18 @@ button:hover .tarot-fan-card {
   .forest-ambience {
     display: none;
   }
+  .leaf-shed {
+    display: none;
+  }
+  .header-canopy,
   .header-canopy svg,
+  .scene-sunbeam,
   .whisper-sprout,
   .wordmark:hover .wordmark-tree {
     animation: none;
+  }
+  .scene-mote {
+    display: none;
   }
   .page-enter,
   .whisper-bubble {
