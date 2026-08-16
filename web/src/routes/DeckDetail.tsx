@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback, useEffect, useMemo, useRef, useState, type ReactNode,
+} from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   api,
@@ -7,6 +9,7 @@ import {
   type ClaudeStatus,
   type CommanderDossier,
   type DeckDetail as Deck,
+  type DeckLogEntry,
   type DeckRef,
   type DeckStats,
   type Suggestions,
@@ -30,7 +33,7 @@ import { SwapComposer } from '../components/swap'
 import { StanceReadout } from '../components/stance'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 
-type Tab = 'cards' | 'stats' | 'validation' | 'notes'
+type Tab = 'cards' | 'stats' | 'validation' | 'notes' | 'history'
 
 /** What the action bar can do to a card (punch list item 9). */
 type CardAction = 'ask' | 'argue' | 'why' | 'art' | 'entomb'
@@ -485,6 +488,10 @@ export default function DeckDetail() {
   const [tab, setTab] = useState<Tab>('cards')
   const [groupBy, setGroupBy] = useState('category')
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null)
+  // What has been done to this deck (ADR 28). `null` is "not asked yet", which
+  // the panel renders as loading; an empty array is the real answer for a deck
+  // whose every edit predates the log, and those two must not look the same.
+  const [history, setHistory] = useState<DeckLogEntry[] | null>(null)
   // Fetched alongside the deck rather than with it, and never awaited with
   // it: the panel it fills is decorative and runs several extra pool
   // queries, so a slow one must not hold up the 99. A failure is silent for
@@ -547,6 +554,10 @@ export default function DeckDetail() {
     setReport(v)
     requested.current = null
     setSuggestions(null)
+    // Only if it has been looked at: an edit adds an entry, and a panel the
+    // user is watching must not go stale behind them. Untouched, this stays
+    // the lazy fetch the tab does on first open.
+    if (historyFor.current) loadHistory()
   }
 
   async function saveRationale(name: string, why: string) {
@@ -701,6 +712,11 @@ export default function DeckDetail() {
     api.commander(deckRef).then(setDossier).catch(() => setDossier(null))
     setSuggestions(null)
     requested.current = null
+    // The history belongs to *this* deck. Cleared here as well as keyed by
+    // address below, so a slow fetch for the deck being left cannot land in
+    // the panel of the deck being opened.
+    setHistory(null)
+    historyFor.current = null
   }, [deckRef, owner, slug])
 
   // Its own effect, and keyed on the pin as well as the deck, because the
@@ -732,6 +748,26 @@ export default function DeckDetail() {
     requested.current = key
     api.suggestions(deckRef).then(setSuggestions).catch(() => setSuggestions(null))
   }, [tab, deckRef, owner, slug])
+
+  // The history (ADR 28), on the same terms as the shortlist above: lazily,
+  // for the tab that shows it, keyed on the whole address because two owners
+  // may both have a `goreclaw`.
+  //
+  // Its own ref rather than sharing `requested`, and that is not tidiness: one
+  // ref holding one key would make opening Validation and then History serve
+  // whichever was asked for second and cancel the other. `history` also has to
+  // be re-fetched after an edit, which is a thing the shortlist never does.
+  const historyFor = useRef<string | null>(null)
+  const loadHistory = useCallback(() => {
+    historyFor.current = `${owner}/${slug}`
+    api.deckLog(deckRef).then((l) => setHistory(l.entries))
+      .catch(() => setHistory([]))
+  }, [deckRef, owner, slug])
+
+  useEffect(() => {
+    if (tab !== 'history' || historyFor.current === `${owner}/${slug}`) return
+    loadHistory()
+  }, [tab, owner, slug, loadHistory])
 
   const groups = useMemo(() => {
     if (!deck) return []
@@ -775,6 +811,7 @@ export default function DeckDetail() {
     { id: 'stats', label: 'Stats' },
     { id: 'validation', label: 'Validation' },
     { id: 'notes', label: 'Notes' },
+    { id: 'history', label: 'History' },
   ]
 
   // The same three-part answer the dossier button uses: installed, configured,
@@ -1407,7 +1444,99 @@ export default function DeckDetail() {
           )}
         </div>
       )}
+
+      {tab === 'history' && <DeckHistory entries={history} />}
     </div>
   )
+}
+
+/**
+ * What has been done to this deck, and by whom (ADR 28).
+ *
+ * The sentences are the server's — `decks/log.py:describe` renders them and
+ * `mtglab decks log` prints the same strings. Nothing is composed here, which
+ * is what stops the panel and the CLI drifting into two accounts of the same
+ * edit. All this adds is the shape: a verb chip you can scan down, the actor,
+ * and the time.
+ *
+ * Three states, kept apart, because collapsing the first two is how a panel
+ * tells somebody their history is empty while it is still loading it:
+ * `null` is not asked yet, `[]` is a deck whose every edit predates this log,
+ * and anything else is the history.
+ *
+ * **No rationale appears here and none can**, because the server does not send
+ * one. A `why` change is recorded as a `why` change; the text itself lives in
+ * `deck.yaml`, which is the source of truth (rule 4).
+ */
+function DeckHistory({ entries }: { entries: DeckLogEntry[] | null }) {
+  if (entries === null) {
+    return <Spinner label="Reading the history…" />
+  }
+  if (entries.length === 0) {
+    return (
+      <div className="space-y-3">
+        <Caveat>
+          Every edit made through the app or the CLI is recorded here, with who
+          made it. Nothing is written on your behalf — this is a record of what
+          was done, not an opinion about it.
+        </Caveat>
+        <p className="card-surface rounded-xl px-4 py-6 text-sm"
+           style={{ color: 'var(--text-muted)' }}>
+          Nothing recorded yet. Edits made before this log existed are in git,
+          not here.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <Caveat>
+        Newest first. Card names, categories and which field changed — never
+        the words of a rationale, which stay in <code>deck.yaml</code>.
+      </Caveat>
+      <ol className="card-surface divide-y rounded-xl"
+          style={{ borderColor: 'var(--hairline)' }}>
+        {entries.map((e) => (
+          <li key={e.id}
+              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5"
+              style={{ borderColor: 'var(--hairline)' }}>
+            <Badge tone={e.action === 'exile' ? 'critical' : 'neutral'}>
+              {e.action}
+            </Badge>
+            <span className="min-w-0 flex-1 basis-64 text-sm">{e.summary}</span>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {/* `null` is whoever is at the machine: the CLI, and the app with
+                  auth off. An unnamed actor rather than an unknown one, so it
+                  is named rather than left blank. */}
+              {e.actor ?? 'you, locally'}
+            </span>
+            <time className="text-xs tabular-nums"
+                  style={{ color: 'var(--text-muted)' }}
+                  dateTime={e.created_at}>
+              {logWhen(e.created_at)}
+            </time>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
+/** An ISO-8601 UTC instant in the reader's own locale and zone.
+ *
+ * The server stores and sends UTC — string comparison is date comparison, and
+ * a shared instance has readers in more than one zone. Turning it local is the
+ * client's job precisely because the client is the only part that knows where
+ * it is. An unparseable stamp is shown as it arrived rather than as
+ * "Invalid Date": a row that cannot be dated still says what happened.
+ */
+function logWhen(stamp: string): string {
+  const at = new Date(stamp)
+  if (Number.isNaN(at.getTime())) return stamp
+  return at.toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
 }
 

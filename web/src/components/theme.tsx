@@ -373,6 +373,31 @@ export function ThemeInterview({
     void send(transcript, slots)
   }, [status, busy, transcript, slots, saved.job, send])
 
+  /** Ask the same question again, of the same conversation.
+   *
+   * A turn can come back with **no question** — the model answered with a
+   * declarative sentence and `theme.py` deletes it (a statement here is the
+   * mode telling somebody what they think instead of asking), or the JSON did
+   * not parse, or the model declined. Every one of those is reported as a
+   * `reason` with an empty `question`, and until now that was a dead end: the
+   * reason renders where the question goes, Answer is disabled because there
+   * is nothing to answer, and the auto-ask effect will not re-fire because
+   * `awaited` already holds this transcript length. The only way out was
+   * "Start over", which throws away the conversation to fix one bad turn.
+   *
+   * Nothing is lost by retrying and nothing is said twice: a failed turn
+   * appends **no** assistant turn, so the transcript this re-sends is byte for
+   * byte the one that was sent before. `awaited` is set rather than cleared,
+   * for the same reason it exists — the effect must not decide to ask as well.
+   */
+  function retry() {
+    if (busy) return
+    awaited.current = transcript.length
+    setReport(null)
+    setError(null)
+    void send(transcript, slots)
+  }
+
   function answerIt() {
     const said = answer.trim()
     if (!said || busy) return
@@ -526,6 +551,17 @@ export function ThemeInterview({
   const spent = report?.exchanges
     ?? transcript.filter((t) => t.role === 'user').length
   const ceiling = report?.max_exchanges ?? 10
+  // No question pending, and a reason why — the dead end `retry` exists for.
+  //
+  // `asked` is what separates a failed turn from a finished one. The stance
+  // being `off` and the exchange ceiling both report a reason with no question
+  // too, and neither is retryable: nothing was asked, and asking again would
+  // get the same answer. Both come back `asked: false`, so this is one field
+  // rather than a list of reasons to match on.
+  //
+  // A thrown error counts as stuck whatever the report says, because it leaves
+  // the identical screen: no question, and a disabled Answer under it.
+  const stuck = !busy && !question && (error !== null || report?.asked === true)
 
   return (
     <section className="space-y-5">
@@ -615,7 +651,11 @@ export function ThemeInterview({
                    ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                 {busy === 'asking'
                   ? 'Thinking…'
-                  : question || report?.reason || 'Starting…'}
+                  : question || report?.reason
+                    // A thrown turn sets no report, so there is no `reason` to
+                    // show — and "Starting…" under a red error line describes
+                    // the one thing that is definitely not happening.
+                    || (stuck ? 'That question did not arrive.' : 'Starting…')}
               </p>
               <textarea
                 ref={box}
@@ -642,15 +682,33 @@ export function ThemeInterview({
                         style={{ background: 'var(--series-1)', color: '#fff' }}>
                   Answer
                 </button>
+                {/* The way out of a turn that produced nothing. Sits next to
+                    Answer rather than replacing it, because the textarea is
+                    still perfectly usable — this is the control for the case
+                    where there is nothing to answer *yet*, which is the
+                    opening turn most of the time. */}
+                {stuck && (
+                  <button onClick={retry}
+                          className="rounded-md px-4 py-2 text-sm font-medium"
+                          style={{ border: '1px solid var(--hairline)',
+                                   color: 'var(--text-primary)' }}>
+                    Try that again
+                  </button>
+                )}
                 {/* Never "3 of 10" once the floor is met. The ceiling is a
                     guard rail, not a quota, and a counter that keeps counting
                     read as one — people sat through ten questions because the
-                    number said there were ten. */}
+                    number said there were ten.
+                    Nor while stuck: a count of questions asked, printed beside
+                    a question that never arrived, reads as blaming the person
+                    for not answering it. */}
                 <span className="text-xs" style={{
                   color: ready ? 'var(--series-2)' : 'var(--text-muted)' }}>
-                  {ready
-                    ? '✓ Enough answered — the rest is optional'
-                    : `${spent} of ${ceiling} questions at most`}
+                  {stuck
+                    ? ''
+                    : ready
+                      ? '✓ Enough answered — the rest is optional'
+                      : `${spent} of ${ceiling} questions at most`}
                 </span>
               </div>
             </div>

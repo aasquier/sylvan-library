@@ -50,6 +50,8 @@ src/mtglab/
   decks/companion.py      companion deckbuilding restrictions
   decks/partners.py       Partner / Background / Doctor pairings
   decks/analyze.py        macro category counts vs bracket targets
+  decks/log.py            what was done to a deck, and by whom (ADR 28);
+                          never what a rationale says
   sim/compile.py          deck.yaml + pool -> SimCards
   sim/cache.py            memoised Tier 1 results, keyed on compiled input
   sim/tier1/engine.py     Monte Carlo goldfish
@@ -175,6 +177,36 @@ carries `seed`, `cached` and `computed_at` — **quote a cached number as
 cached.** Runs are seeded by default (`simruns.DEFAULT_SEED`); an unseeded
 sample was what the app used to show and is not reproducible. Land sweeps cache
 per count, so an overlapping range reuses rows. `mtglab sim cache [--clear]`.
+
+**Every deck edit is recorded, from one call site** ([ADR 28](docs/adr/0028-the-activity-log-records-edits-and-never-rationales.md),
+schema v8). `service._commit` is where every deck write already goes and it
+had always assembled the per-operation description and thrown it away;
+`decks/log.py` keeps it. One call site is the whole design — the tenth edit
+operation is the one somebody adds in a year, and it inherits the log the same
+way it inherits the gate's verdict. Read it with `mtglab decks log <slug>` or
+the deck page's History tab.
+
+Four rules, each of which is a decision rather than a default. **No rationale
+text ever lands in it** — `describe` builds its sentence from card names,
+categories and field *names*, and drops the `why` where `swap_card` passes
+one; the log says a rationale changed and never what it says, because rule 4's
+text lives in `deck.yaml` and a second copy is both stale and a place it could
+be mined from. **A deck is `owner_id` + `slug`, and the file tier is
+`owner_id IS NULL`** — not the URL's owner segment, which is `local` on a
+laptop and a username deployed, so a history keyed on it would split in two
+the day `MTGLAB_ADMIN_EMAIL` was set. **Who may read one is decided by where
+the route is mounted**, through `Library` like every other per-deck route, so
+there is no second visibility rule to keep in step. And **`record` never
+raises**: the deck write has already happened, so a failure there is a logged
+warning, exactly as in `sim/cache.py` and `claude/ledger.py`.
+
+**It is not an undo, and must not become one.** ADR 27 rejected a server-side
+journal because an undo buffer only the database knows about is deck state the
+deck file does not show; that argument stands and the graveyard in `deck.yaml`
+is still the undo. This records that something happened, never enough to put
+it back. Creation, import and deletion are outside it because they are outside
+`_commit` — adding them means a second call site, which is a decision to take
+deliberately rather than by drift.
 
 **`colors.py` and `glossary.py` are reference prose, and that was argued
 rather than assumed.** They are the two modules that deliberately know things
@@ -311,6 +343,7 @@ mtglab decks note <slug> --key mulligan --value '...'
 mtglab decks set <slug> --art <set-code>   # which printing's art the deck shows
 mtglab decks promote <slug>       # draft -> curated, once every card is justified
 mtglab decks delete <slug>        # confirm by typing the slug; moves to decks/.trash/
+mtglab decks log <slug>           what has been done to it, and by whom
 mtglab decks build <slug> --against <(git show HEAD:decks/<slug>/deck.yaml)
 ```
 
@@ -347,9 +380,10 @@ fortune-teller tile deals the tarot spread.
 and `mtglab claude dossier <slug>` run the first three, and the deck page runs
 all three. `mtglab claude research "<question>"` and the `/research` page run
 the fourth — note it takes **no slug**, which is the feature and not an
-omission. **Deck conversation does not exist**, nor does the activity log —
-check what is actually there before assuming either way, and read ADR 26
-before adding a deck to any surface that does not already have one.
+omission. **Deck conversation does not exist** — check what is actually there
+before assuming either way, and read ADR 26 before adding a deck to any
+surface that does not already have one. The **activity log** it waits on does
+exist now (ADR 28, below); the other three prerequisites do not.
 
 **Research answers about Magic, never about your deck**
 ([ADR 26](docs/adr/0026-research-answers-about-magic-not-about-your-deck.md)).

@@ -171,6 +171,28 @@ class Library:
         return SqlDeckSource(self._user_id, writable=True)
 
     @property
+    def actor(self) -> str | None:
+        """Who to attribute an edit to in the activity log (ADR 28).
+
+        The caller's username, or `None` for whoever is at this machine — the
+        app with auth off, which is one person holding the file it reads.
+        `mtglab decks log` shows that as the local user, and it is the same
+        `None` the CLI writes, because the two really are the same person.
+
+        A **username**, never `user_id`: this is rendered in a panel and
+        printed by the CLI, and a number would need a join to `users` from two
+        places that otherwise never touch it. Never an email either — an
+        address may only be serialised into a response an admin authenticated
+        for (ADR 17), and a deck's history is read by everyone the deck is
+        shared with.
+
+        Separate from `my_owner`, which is a *segment* and falls back to
+        `local`. Conflating them would attribute a deployed maintainer's edits
+        to an account named `local` on any instance with no admin configured.
+        """
+        return self._username
+
+    @property
     def my_owner(self) -> str:
         """The owner segment the caller's own decks live under."""
         if not self._authenticated:

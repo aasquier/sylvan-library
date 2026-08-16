@@ -7,6 +7,7 @@
     mtglab decks validate <slug>        the gate -- run before anything else
     mtglab decks promote <slug>         a draft becomes curated, once justified
     mtglab decks delete <slug>          remove one; it moves to decks/.trash/
+    mtglab decks log <slug>             what has been done to it, and by whom
     mtglab decks build <slug>           generate the artifacts
     mtglab sim mana <slug>              Tier 1 goldfish
     mtglab sim lands <slug> 30..40      land-count sweep, flood-aware
@@ -502,6 +503,52 @@ def cmd_decks_note(args):
 
     print(f"  note {result['note']!r} set")
     _report_edit(result)
+
+
+def cmd_decks_log(args):
+    """What has been done to this deck, newest first (ADR 28).
+
+    Reads the file tier -- `owner_id IS NULL` -- because that is the only
+    library the CLI ever edits. On a deployed instance the maintainer's own
+    decks are that tier too, so `fly ssh console -C 'mtglab decks log gyome'`
+    shows the same history the deck page does.
+
+    `_load` first, so a slug that is not a deck says so rather than printing an
+    empty history, which is the same fact wearing a misleading face.
+    """
+    from mtglab.decks import log
+
+    deck = _load(args.slug)
+    rows = log.entries(args.slug, limit=args.limit)
+    if not rows:
+        print(f"\n  {deck.name}: nothing recorded yet.")
+        print("  Edits made before this log existed are in git, not here.\n")
+        return
+
+    capped = " (most recent; raise --limit for more)" \
+        if len(rows) == args.limit else ""
+    print(f"\n  {deck.name} -- {len(rows)} entries{capped}\n")
+    for row in rows:
+        # `None` is whoever is at this machine: the CLI itself, and the app
+        # with auth off. Not an unknown actor -- an unnamed one.
+        who = row["actor"] or "local"
+        print(f"  {_when(row['created_at']):<17} {who:<14} {row['summary']}")
+    print()
+
+
+def _when(stamp):
+    """An ISO-8601 UTC instant as something a terminal column can hold.
+
+    Falls back to the raw string rather than raising: a row that cannot be
+    parsed is still a row that says what happened, and a history that refuses
+    to print because one timestamp is odd is worse than one ugly line.
+    """
+    from datetime import datetime
+
+    try:
+        return datetime.fromisoformat(stamp).strftime("%Y-%m-%d %H:%M")
+    except (TypeError, ValueError):
+        return str(stamp)
 
 
 def cmd_decks_build(args):
@@ -1505,6 +1552,11 @@ def main(argv=None):
     nt.add_argument("--from-file", dest="from_file",
                     help="read the note's text from a file, for long prose")
     nt.set_defaults(func=cmd_decks_note)
+    lg = decks.add_parser("log", help="what has been done to this deck")
+    lg.add_argument("slug")
+    lg.add_argument("--limit", type=int, default=20,
+                    help="how many entries to show, newest first (default 20)")
+    lg.set_defaults(func=cmd_decks_log)
     b = decks.add_parser("build"); b.add_argument("slug")
     b.add_argument("--against", help="path to a previous deck.yaml, to emit swaps.md")
     b.add_argument("--force", action="store_true")

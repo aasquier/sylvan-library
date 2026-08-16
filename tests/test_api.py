@@ -318,6 +318,40 @@ def test_stats_are_json_serialisable(client):
     assert isinstance(body["categories"], list)
 
 
+def test_the_log_endpoint_shows_what_an_edit_did(swappable, monkeypatch):
+    """ADR 28's HTTP surface, and the one thing only it can check: that the
+    edit routes reach `_commit` with an actor and that the read route hands
+    the same rows back.
+
+    `_no_deck_log` comes off for this test alone. That stub keeps the rest of
+    the suite out of the developer's real history; a test of the log that ran
+    against it would pass with the recording deleted. The data directory is a
+    scratch one either way — `pool`, behind `swappable`, is what points it
+    there — so the rows land in a temporary `app.db`.
+    """
+    from mtglab.api import service
+    from mtglab.decks import log
+
+    monkeypatch.setattr(service, "log", log)
+    with swappable as client:
+        assert client.delete(
+            "/api/decks/local/mono-green/cards/Sol Ring").status_code == 200
+        body = client.get("/api/decks/local/mono-green/log").json()
+
+    assert body["slug"] == "mono-green"
+    assert [e["summary"] for e in body["entries"]] == ["entombed Sol Ring"]
+    assert body["entries"][0]["action"] == "entomb"
+    # Auth is off in this client, so there is no account to name and `local`
+    # is the owner segment rather than a username. See `Library.actor`.
+    assert body["entries"][0]["actor"] is None
+
+
+def test_the_log_endpoint_is_404_for_a_deck_that_is_not_there(client):
+    """The whole authorisation check, and it is the source's, not a second
+    rule written here (ADR 28)."""
+    assert client.get("/api/decks/local/nope/log").status_code == 404
+
+
 def test_suggestions_are_offered_for_a_banned_card(swappable):
     """The fixture deck runs Primeval Titan, which is banned. The endpoint
     should name the offender and shortlist legal cards that resemble it."""
