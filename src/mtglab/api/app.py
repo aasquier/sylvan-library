@@ -1138,6 +1138,17 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         if assets.is_dir():
             app.mount("/assets", Revalidated(directory=assets), name="assets")
 
+        # The bundle's own root files (index.html, and any favicon / manifest /
+        # robots.txt a build adds), mapped name -> path once from the trusted
+        # directory. The catch-all serves one only by looking the request up as
+        # a key here -- subdirectories are served by their own mounts above --
+        # so the path handed to FileResponse comes from this listing, never
+        # built out of the request. That is the containment (an exact key match
+        # cannot be walked out of the tree with `..`) and the reason the lookup
+        # no longer trips the path-injection scanner: the served path carries no
+        # user input at all, where the earlier `WEB_DIST / full_path` did.
+        root_files = {p.name: p for p in WEB_DIST.iterdir() if p.is_file()}
+
         @app.get("/{full_path:path}")
         def spa(full_path: str) -> FileResponse:
             """Serve the built app, letting the client router own real paths.
@@ -1157,9 +1168,15 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             if normalised == "/api" or normalised.startswith("/api/"):
                 raise HTTPException(status_code=404,
                                     detail=f"no such endpoint: {normalised}")
-            candidate = WEB_DIST / full_path
-            if full_path and candidate.is_file():
-                return FileResponse(candidate, headers=NO_CACHE)
+            # Serve a bundle root file only by exact key match. A raw traversal
+            # path (`../../../etc/hosts`) reaches this handler un-normalised --
+            # the same way `//api` does above -- and simply is not one of the
+            # known names, so the lookup misses and it falls through to the
+            # shell. The served path is the trusted listing's value, not the
+            # request.
+            target = root_files.get(full_path)
+            if target is not None:
+                return FileResponse(target, headers=NO_CACHE)
             # The shell above all: it is what names the asset files, so a
             # stale one pins every other stale thing in place.
             return FileResponse(WEB_DIST / "index.html", headers=NO_CACHE)
