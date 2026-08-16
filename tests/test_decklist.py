@@ -11,11 +11,14 @@ silently three cards short.
 """
 
 import sys
+import time
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from mtglab.decks.decklist import parse
+from mtglab.decks.decklist import MAX_LINE, parse
 
 MOXFIELD = """\
 1 Arahbo, Roar of the World (C17) 27 *CMDR*
@@ -171,3 +174,68 @@ def test_an_empty_list_parses_to_nothing():
     result = parse("")
     assert result.cards == [] and result.unreadable == []
     assert result.commander == [] and result.companion is None
+
+
+# ------------------------------------------------- bounded before the patterns
+
+def test_an_overlong_line_costs_only_itself():
+    """`parse` never raises, and a pasted list is somebody's whole deck -- one
+    absurd line must not cost them the other ninety-eight."""
+    result = parse(f"1 Sol Ring\n1 {'a' * (MAX_LINE * 4)}\n1 Arcane Signet\n")
+    assert [c.name for c in result.cards] == ["Sol Ring", "Arcane Signet"]
+    assert [n for n, _ in result.unreadable] == [2]
+
+
+def test_the_reported_text_is_sliced_to_the_bound():
+    """Reporting the line back whole would hand the input straight to an API
+    response and a log line, which is most of what the bound is for."""
+    (_, reported), = parse("1 " + "a" * (MAX_LINE * 4) + "\n").unreadable
+    assert len(reported) == MAX_LINE
+
+
+def test_a_line_at_the_bound_still_parses():
+    """The boundary itself. `>` and `>=` differ by exactly one real decklist,
+    and only this test can tell them apart."""
+    name = "a" * (MAX_LINE - len("1 "))
+    assert [c.name for c in parse(f"1 {name}\n").cards] == [name]
+
+
+def test_a_header_that_cannot_match_returns_in_no_time_at_all():
+    """The one that was not merely polynomial.
+
+    `_HEADER` used to let a lazy `[A-Za-z ]*?`, three `\\s*` runs and `\\s*$`
+    compete for the same spaces, so a line that could not match explored every
+    division of them -- about ten times worse per doubling, and **26 seconds
+    measured on one 512-character line**, which is inside any bound a real
+    decklist needs. Taken apart, it is linear.
+
+    The budget is a hundred-thousand-fold margin over the observed time, which
+    is what keeps a wall-clock assertion from being a flaky one; the failure
+    this guards against is measured in seconds, not milliseconds.
+    """
+    line = "a" + " " * (MAX_LINE - 3) + "!"
+    assert len(line) <= MAX_LINE
+    start = time.perf_counter()
+    parse(line + "\n")
+    assert time.perf_counter() - start < 1.0
+
+
+@pytest.mark.parametrize("pattern, line", [
+    # Each is the shape that makes that pattern's own backtracking bite: a long
+    # run the quantifier must give back one character at a time, and no way to
+    # match at the end. CodeQL flagged all five, at their use sites.
+    ("_MARKER", " " * (MAX_LINE * 2) + "*x"),
+    ("_BRACKET", " " * (MAX_LINE * 2) + "[x"),
+    ("_PRINTING", " " * (MAX_LINE * 2) + "(ab) x!"),
+    # Each ends on a non-space: `rstrip` runs before the guard, so a trailing
+    # whitespace run never reaches a pattern in the first place.
+    ("_QTY", "1" + " " * (MAX_LINE * 2) + "x"),
+    ("_HEADER", "a" + " " * (MAX_LINE * 2) + "!"),
+])
+def test_no_pattern_is_handed_more_than_the_bound(pattern, line):
+    """One guard covers all five, which is the point of putting it in the loop
+    rather than anchoring five patterns on a parser six decks depend on."""
+    assert len(line) > MAX_LINE, pattern
+    result = parse(line + "\n")
+    assert result.cards == [], pattern
+    assert [n for n, _ in result.unreadable] == [1], pattern

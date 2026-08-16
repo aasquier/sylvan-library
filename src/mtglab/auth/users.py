@@ -44,11 +44,41 @@ from mtglab.auth import passwords
 # the database (COLLATE NOCASE), so `Aaron` and `aaron` are one account.
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{1,31}$")
 
-# Not an RFC 5322 validator, and not trying to be. The only check that means
-# anything about deliverability is sending a message to the address, which is
-# what the invite flow does; everything short of that is a shape test whose
-# false negatives are somebody's perfectly real address.
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+#: RFC 5321 §4.5.3.1.3 caps a whole address at 254 octets, so this rejects
+#: nothing that was ever deliverable, and it is checked first because
+#: `normalise_email` sits on the unauthenticated claim path -- the one place a
+#: stranger chooses the input.
+MAX_EMAIL = 254
+
+
+def looks_like_email(candidate: str) -> bool:
+    """The shape test `^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$` used to make.
+
+    Not an RFC 5322 validator, and not trying to be. The only check that means
+    anything about deliverability is sending a message to the address, which is
+    what the invite flow does; everything short of that is a shape test whose
+    false negatives are somebody's perfectly real address.
+
+    Taken apart rather than left as a pattern, for the same reason
+    `decklist._header_section` was: **both `[^@\\s]+` runs also match dots**, so
+    every dot in the domain is a candidate separator and an address that cannot
+    match makes the engine try all of them. CodeQL called that out and a length
+    bound did not satisfy it -- correctly, in the sense that a bound is not the
+    absence of the quadratic, only a cap on it. There is nothing to cap here.
+
+    `tests/test_auth.py` keeps the original pattern and asserts this agrees with
+    it on generated input, so the regex remains the specification even though
+    nothing runs it.
+    """
+    local, at, domain = candidate.partition("@")
+    if not at or not local or "@" in domain:
+        return False
+    # A dot with something on either side of it, expressed as a slice because
+    # the first character and the last are exactly the two positions where a
+    # dot leaves one of the pattern's two runs with nothing to match.
+    if "." not in domain[1:-1]:
+        return False
+    return not any(char.isspace() for char in candidate)
 
 
 class UserExists(ValueError):
@@ -150,8 +180,13 @@ def normalise_email(email: str | None) -> str | None:
     if email is None or not email.strip():
         return None
     candidate = email.strip().lower()
-    if not EMAIL_RE.match(candidate):
-        raise InvalidEmail(f"{email!r} does not look like an email address")
+    if len(candidate) > MAX_EMAIL or not looks_like_email(candidate):
+        # The message quotes a bounded slice rather than the input: an
+        # oversized address is exactly the case that reaches here, and echoing
+        # it whole would put the caller's own megabyte back into an exception
+        # string, a log line and an API response.
+        raise InvalidEmail(
+            f"{email[:MAX_EMAIL]!r} does not look like an email address")
     return candidate
 
 
