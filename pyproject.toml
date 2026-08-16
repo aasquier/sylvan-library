@@ -3,6 +3,14 @@ name = "mtg-lab"
 version = "0.2.0"
 description = "Local Magic: the Gathering deckbuilding, simulation and shopping toolkit"
 requires-python = ">=3.11"
+# PEP 639's SPDX form, which is why `[build-system]` now floors setuptools at
+# 77: before that release this key had to be a table (`{text = "MIT"}`) and a
+# bare string is a hard build error, so the two changes are one change. Without
+# either, the wheel's metadata read `License: UNKNOWN` against a repository
+# whose LICENSE has said MIT all along -- and Commandment 9 makes being lawful
+# about the licence this project's own business, not only its dependencies'.
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = ["pyyaml>=6.0", "duckdb>=1.0", "numpy>=1.26"]
 
 [project.optional-dependencies]
@@ -96,7 +104,7 @@ dev = [
 mtglab = "mtglab.cli:main"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
