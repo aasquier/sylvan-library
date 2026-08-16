@@ -300,83 +300,195 @@ function CrystalBall({ vision }: {
     <div className="crystal-ball" aria-hidden="true">
       <svg viewBox="0 0 120 150" className="h-full w-full">
         <defs>
-          <radialGradient id={`${id}-depth`} cx="50%" cy="42%" r="68%">
-            <stop offset="0%" stopColor="#3b2d73" />
-            <stop offset="55%" stopColor="#241b52" />
-            <stop offset="100%" stopColor="#0e0926" />
+          {/* The depths: a nebula rather than a flat gradient. The base is
+              near-black indigo; two coloured pools drift through it below
+              (`.crystal-nebula-*`) so the interior reads as space with
+              weather in it, not as a tinted circle. */}
+          <radialGradient id={`${id}-depth`} cx="50%" cy="44%" r="70%">
+            <stop offset="0%" stopColor="#312566" />
+            <stop offset="45%" stopColor="#1d1548" />
+            <stop offset="100%" stopColor="#080520" />
           </radialGradient>
-          <radialGradient id={`${id}-sheen`} cx="36%" cy="28%" r="62%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.5)" />
-            <stop offset="38%" stopColor="rgba(255,255,255,0.12)" />
-            <stop offset="65%" stopColor="rgba(255,255,255,0)" />
+          <radialGradient id={`${id}-nebula-violet`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(147,98,255,0.55)" />
+            <stop offset="100%" stopColor="rgba(147,98,255,0)" />
+          </radialGradient>
+          <radialGradient id={`${id}-nebula-teal`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(64,201,198,0.4)" />
+            <stop offset="100%" stopColor="rgba(64,201,198,0)" />
+          </radialGradient>
+          <radialGradient id={`${id}-sheen`} cx="34%" cy="26%" r="60%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.55)" />
+            <stop offset="34%" stopColor="rgba(255,255,255,0.13)" />
+            <stop offset="62%" stopColor="rgba(255,255,255,0)" />
+          </radialGradient>
+          {/* Light gathering at the bottom of the sphere, the way it does in
+              real glass: a caustic pool, faintly violet. */}
+          <radialGradient id={`${id}-caustic`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(196,170,255,0.4)" />
+            <stop offset="70%" stopColor="rgba(196,170,255,0.08)" />
+            <stop offset="100%" stopColor="rgba(196,170,255,0)" />
           </radialGradient>
           <radialGradient id={`${id}-fog`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(216,201,255,0.85)" />
-            <stop offset="60%" stopColor="rgba(158,132,255,0.32)" />
-            <stop offset="100%" stopColor="rgba(158,132,255,0)" />
+            <stop offset="0%" stopColor="rgba(224,212,255,0.9)" />
+            <stop offset="55%" stopColor="rgba(168,142,255,0.35)" />
+            <stop offset="100%" stopColor="rgba(168,142,255,0)" />
           </radialGradient>
+          <linearGradient id={`${id}-rim`} x1="0" y1="0" x2="0.6" y2="1">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.75)" />
+            <stop offset="45%" stopColor="rgba(190,170,255,0.18)" />
+            <stop offset="100%" stopColor="rgba(120,90,220,0.45)" />
+          </linearGradient>
+          <linearGradient id={`${id}-brass`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#e8c76a" />
+            <stop offset="35%" stopColor="#a97e33" />
+            <stop offset="75%" stopColor="#6e4c1c" />
+            <stop offset="100%" stopColor="#4a3212" />
+          </linearGradient>
+          <linearGradient id={`${id}-brass-lip`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#7a5a24" />
+            <stop offset="30%" stopColor="#f3dc96" />
+            <stop offset="55%" stopColor="#c9a227" />
+            <stop offset="100%" stopColor="#6e4c1c" />
+          </linearGradient>
           <clipPath id={`${id}-glass`}>
             <circle cx="60" cy="62" r="44" />
           </clipPath>
+          {/* What turns flat ellipses into weather: static turbulence tears
+              the fog's edges into wisps as each layer drifts through it. The
+              noise itself never animates (no SMIL — reduced motion must be
+              able to arrest everything from CSS); the *layers* move, and the
+              displacement makes their edges boil as they go. */}
+          <filter id={`${id}-wisp`} x="-60%" y="-60%" width="220%" height="220%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.055 0.09"
+                          numOctaves="3" seed="7" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="26"
+                               xChannelSelector="R" yChannelSelector="G" />
+            <feGaussianBlur stdDeviation="2.6" />
+          </filter>
           <filter id={`${id}-soft`} x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="6" />
+            <feGaussianBlur stdDeviation="5" />
           </filter>
         </defs>
 
         {/* The light the ball throws on the felt. */}
-        <ellipse className="crystal-aura" cx="60" cy="130" rx="42" ry="9"
+        <ellipse className="crystal-aura" cx="60" cy="130" rx="46" ry="10"
                  fill="#8f79e8" />
 
-        {/* The stand: brass cradle, one worn band, three set stones. */}
-        <path d="M34 116 C 34 103 86 103 86 116 L 81 138 C 81 145 39 145 39 138 Z"
-              fill="#40301b" />
-        <path d="M34 116 C 34 103 86 103 86 116 C 86 125 34 125 34 116 Z"
-              fill="#8a6a2f" />
-        <path d="M39 111 C 46 105 74 105 81 111" stroke="#c9a227"
-              strokeWidth="2" fill="none" opacity="0.85" />
-        <circle cx="60" cy="134" r="3.2" fill="#c9a227" opacity="0.95" />
-        <circle cx="46" cy="131" r="2.1" fill="#7d4b8f" />
-        <circle cx="74" cy="131" r="2.1" fill="#2e6f6a" />
+        {/* The stand: a claw-footed brass cradle with a bright turned lip,
+            a beaded band, and three set stones that catch the light. */}
+        <path d="M32 114 C 32 100 88 100 88 114 L 83 139 C 83 147 37 147 37 139 Z"
+              fill={`url(#${id}-brass)`} />
+        <path d="M32 114 C 32 103 88 103 88 114 C 88 124 32 124 32 114 Z"
+              fill={`url(#${id}-brass-lip)`} />
+        <path d="M37 109 C 45 102 75 102 83 109" stroke="#f3dc96"
+              strokeWidth="1.6" fill="none" opacity="0.9" />
+        <path d="M39 128 C 48 132 72 132 81 128" stroke="#2c1d0a"
+              strokeWidth="1.2" fill="none" opacity="0.5" />
+        {/* The beaded band. */}
+        {[44, 52, 60, 68, 76].map((x) => (
+          <circle key={x} cx={x} cy="126.5" r="1.5" fill="#e8c76a"
+                  opacity="0.85" />
+        ))}
+        {/* Claw feet, splayed. */}
+        <path d="M37 139 C 33 142 31 146 33 148 C 36 149 39 146 40 143 Z"
+              fill={`url(#${id}-brass)`} />
+        <path d="M83 139 C 87 142 89 146 87 148 C 84 149 81 146 80 143 Z"
+              fill={`url(#${id}-brass)`} />
+        <path d="M57 141 L 63 141 L 62 148 L 58 148 Z" fill={`url(#${id}-brass)`} />
+        {/* Three stones: amethyst, opal, jade — each with its own glint. */}
+        <circle cx="60" cy="134" r="3.4" fill="#7d4b8f" />
+        <circle cx="59" cy="133" r="1" fill="#e6c8f2" opacity="0.9" />
+        <circle cx="45" cy="132" r="2.4" fill="#cfd8e8" />
+        <circle cx="44.4" cy="131.4" r="0.8" fill="#fff" opacity="0.95" />
+        <circle cx="75" cy="132" r="2.4" fill="#2e6f6a" />
+        <circle cx="74.4" cy="131.4" r="0.8" fill="#bff0e2" opacity="0.9" />
 
         {/* The glass, and everything it holds. */}
         <circle cx="60" cy="62" r="44" fill={`url(#${id}-depth)`} />
         <g clipPath={`url(#${id}-glass)`}>
+          {/* The nebula: two pools of colour turning slowly against each
+              other, far below the fog. */}
+          <g className="crystal-nebula crystal-nebula-a">
+            <ellipse cx="44" cy="50" rx="30" ry="20"
+                     fill={`url(#${id}-nebula-violet)`} />
+          </g>
+          <g className="crystal-nebula crystal-nebula-b">
+            <ellipse cx="76" cy="76" rx="26" ry="18"
+                     fill={`url(#${id}-nebula-teal)`} />
+          </g>
+          {/* A drift of stars, deeper than the smoke. */}
+          <g className="crystal-stars" fill="#fff">
+            {[[34, 44, 0.7], [50, 30, 0.5], [72, 38, 0.6], [86, 60, 0.45],
+              [78, 84, 0.55], [52, 92, 0.5], [30, 72, 0.45], [63, 58, 0.8],
+              [42, 62, 0.4], [70, 68, 0.5]].map(([x, y, r]) => (
+                <circle key={`${x}-${y}`} cx={x} cy={y} r={r} opacity="0.7" />
+            ))}
+          </g>
+
           {vision && (
-            // Keyed on the image so a new turn fades in as a new vision
-            // rather than swapping pixels inside the old one.
-            <g key={vision.image}
-               transform={vision.reversed ? 'rotate(180 60 62)' : undefined}>
-              <image className="crystal-vision" href={vision.image}
-                     x="16" y="8" width="88" height="108"
-                     preserveAspectRatio="xMidYMid slice" />
+            // Keyed on the image so a new turn arrives as a new vision. Two
+            // players in the arrival: the smoke billows up first
+            // (`.crystal-vision-smoke`), and the card surfaces through it,
+            // unblurring as the smoke thins — the fortune is simply *there*
+            // once the mist parts. A reversed card appears upside down; the
+            // ball does not editorialise.
+            <g key={vision.image}>
+              <g transform={vision.reversed ? 'rotate(180 60 62)' : undefined}>
+                <image className="crystal-vision" href={vision.image}
+                       x="16" y="8" width="88" height="108"
+                       preserveAspectRatio="xMidYMid slice" />
+              </g>
+              <g className="crystal-vision-smoke" filter={`url(#${id}-wisp)`}>
+                <ellipse cx="60" cy="70" rx="34" ry="22" fill={`url(#${id}-fog)`} />
+                <ellipse cx="48" cy="52" rx="22" ry="14" fill={`url(#${id}-fog)`} />
+                <ellipse cx="74" cy="58" rx="20" ry="13" fill={`url(#${id}-fog)`} />
+              </g>
             </g>
           )}
-          <g className="crystal-fog crystal-fog-a" filter={`url(#${id}-soft)`}>
-            <ellipse cx="42" cy="52" rx="27" ry="14" fill={`url(#${id}-fog)`} />
-            <ellipse cx="76" cy="76" rx="23" ry="12" fill={`url(#${id}-fog)`} />
+
+          {/* The standing weather: three layers of torn smoke drifting at
+              incommensurate speeds, so the glass never visibly loops. */}
+          <g className="crystal-fog crystal-fog-a" filter={`url(#${id}-wisp)`}>
+            <ellipse cx="42" cy="52" rx="27" ry="13" fill={`url(#${id}-fog)`} />
+            <ellipse cx="76" cy="76" rx="23" ry="11" fill={`url(#${id}-fog)`} />
           </g>
-          <g className="crystal-fog crystal-fog-b" filter={`url(#${id}-soft)`}>
-            <ellipse cx="68" cy="42" rx="21" ry="11" fill={`url(#${id}-fog)`} />
-            <ellipse cx="46" cy="84" rx="25" ry="12" fill={`url(#${id}-fog)`} />
+          <g className="crystal-fog crystal-fog-b" filter={`url(#${id}-wisp)`}>
+            <ellipse cx="68" cy="42" rx="21" ry="10" fill={`url(#${id}-fog)`} />
+            <ellipse cx="46" cy="84" rx="25" ry="11" fill={`url(#${id}-fog)`} />
           </g>
           <g className="crystal-fog crystal-fog-c" filter={`url(#${id}-soft)`}>
-            <ellipse cx="60" cy="64" rx="31" ry="17" fill={`url(#${id}-fog)`} />
+            <ellipse cx="60" cy="64" rx="31" ry="16" fill={`url(#${id}-fog)`} />
           </g>
+
           <g fill="#fff">
             <circle className="crystal-spark" cx="44" cy="46" r="1.4" />
             <circle className="crystal-spark crystal-spark-2" cx="77" cy="58" r="1" />
             <circle className="crystal-spark crystal-spark-3" cx="55" cy="86" r="1.2" />
             <circle className="crystal-spark crystal-spark-4" cx="69" cy="33" r="0.9" />
+            <circle className="crystal-spark crystal-spark-5" cx="36" cy="66" r="1.1" />
           </g>
+
+          {/* Glasswork, over everything inside: the caustic pool at the foot
+              of the sphere, then the sheen. */}
+          <ellipse cx="60" cy="94" rx="26" ry="10" fill={`url(#${id}-caustic)`} />
           <circle cx="60" cy="62" r="44" fill={`url(#${id}-sheen)`} />
         </g>
+
+        {/* The rim: a gradient stroke so the sphere's edge catches light at
+            the top and holds shadowed violet at the base — one flat stroke
+            was most of what read as clip art. */}
         <circle cx="60" cy="62" r="44" fill="none"
-                stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                stroke={`url(#${id}-rim)`} strokeWidth="1.6" />
+        <circle cx="60" cy="62" r="42.2" fill="none"
+                stroke="rgba(255,255,255,0.08)" strokeWidth="0.8" />
         {/* The gleam that breathes, and its small answer across the glass. */}
-        <path className="crystal-gleam" d="M30 47 A 34 34 0 0 1 51 24"
-              fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="3"
+        <path className="crystal-gleam" d="M29 46 A 35 35 0 0 1 50 23"
+              fill="none" stroke="rgba(255,255,255,0.92)" strokeWidth="3"
               strokeLinecap="round" />
-        <circle cx="80" cy="87" r="2.4" fill="rgba(255,255,255,0.35)" />
+        <path d="M83 90 A 34 34 0 0 1 74 98" fill="none"
+              stroke="rgba(255,255,255,0.28)" strokeWidth="2"
+              strokeLinecap="round" />
       </svg>
     </div>
   )
@@ -471,11 +583,15 @@ function ReaderPanel({ persona, onPick }: {
 }) {
   const art = PERSONA_ART[persona.key]
   return (
+    // No `art-fade` on the wrapper: that class belongs to the `<img>` inside
+    // `CardArt`, which is the element that gets `.loaded` back. On the wrapper
+    // it is an opacity-0 that nothing ever lifts, and every tile shipped as a
+    // black rectangle with a caption — the exact bug the punch list reported.
     <button onClick={onPick}
-            className="card-surface flex flex-col overflow-hidden rounded-xl text-center transition hover:opacity-90">
+            className="reader-tile card-surface flex flex-col overflow-hidden rounded-xl text-center">
       {art && (
-        <CardArt src={art.art} alt="" ratio="aspect-[626/457]"
-                 className="art-fade w-full rounded-none" />
+        <CardArt src={art.art} alt="" ratio="aspect-[626/457]" eager
+                 className="reader-tile-art w-full rounded-none" />
       )}
       <span className="flex flex-1 flex-col items-center gap-2 px-5 py-4">
         <span className="text-base font-medium">{persona.label}</span>
@@ -483,12 +599,19 @@ function ReaderPanel({ persona, onPick }: {
               style={{ color: 'var(--text-secondary)' }}>
           {persona.blurb}
         </span>
-        <span className="mt-auto text-[11px] uppercase tracking-wide"
-              style={{ color: 'var(--text-muted)' }}>
-          {persona.deals ? 'Three cards' : 'No cards — just the questions'}
-        </span>
+        {/* Only the reader who deals gets a footer. Six tiles all reciting
+            "No cards — just the questions" said nothing six times; the blurb
+            already says who each voice is, and the one fact worth a line of
+            its own is that the fortune-teller's table has cards on it. */}
+        {persona.deals && (
+          <span className="mt-auto text-[11px] uppercase tracking-wide"
+                style={{ color: 'var(--series-1)' }}>
+            ✦ Three cards, dealt for you
+          </span>
+        )}
         {art && (
-          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+          <span className={`text-[10px]${persona.deals ? '' : ' mt-auto'}`}
+                style={{ color: 'var(--text-muted)' }}>
             Art by {art.credit}
           </span>
         )}
@@ -695,6 +818,11 @@ export function TarotTable({ onPick, onLeave }: {
   const lastTurned = lastTurnedIndex === undefined
     ? null
     : cards[lastTurnedIndex] ?? null
+  // Every voice frames its own table. The dealing reader talks about the
+  // cards; everyone else introduces themselves with the same words their
+  // tile used — so the screen the conversation opens on belongs to the voice
+  // that was picked, rather than to one shared paragraph that read like the
+  // interview's script.
   const intro = chosen.deals
     ? {
         title: 'The cards are out',
@@ -702,7 +830,10 @@ export function TarotTable({ onPick, onLeave }: {
              + 'you — the pictures are only there to make them harder to '
              + 'answer politely.',
       }
-    : undefined
+    : {
+        title: chosen.label,
+        blurb: `${chosen.blurb} None of the questions are about Magic.`,
+      }
 
   return (
     <section className="space-y-6">

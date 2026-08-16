@@ -996,6 +996,9 @@ def _dossier_report(**over):
                              "mana_cost": "{3}{G}{W}",
                              "prose": "The other token general at the table.",
                              "source_ids": [2]}],
+            "allies": {"prose": "The Peregrin twins run his kitchen beside "
+                                "him.",
+                       "source_ids": [1]},
             "rivals": {"prose": "The lore gives him no nemesis; the kitchen "
                                 "is the story.",
                        "source_ids": [1]},
@@ -1030,7 +1033,9 @@ def test_claude_dossier_renders_passages_competitors_and_sources(
     assert "ARCHETYPE — Food value engine" in out
     assert "COMPETITORS" in out
     assert "Trostani Discordant {3}{G}{W}" in out
-    # The story rivals render as their own passage, and only when there is one.
+    # The story allies and rivals render as their own passages, and only when
+    # there is one.
+    assert "ALLIES" in out and "Peregrin twins" in out
     assert "RIVALS" in out and "no nemesis" in out
     assert "[1]" in out and "https://example.com/gyome" in out
     # The counters that climb when a prompt starts inventing.

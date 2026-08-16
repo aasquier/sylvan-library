@@ -377,9 +377,12 @@ function DossierBodyView({ body, report }: {
         </section>
       )}
 
-      {/* The story's rivals — prose, not cards, because a plot line is not a
-          pool row. Renders nothing for a character the lore gives no enemies,
-          which the prompt prefers to an invented feud. */}
+      {/* The story's allies and rivals — prose, not cards, because a plot
+          line is not a pool row. Friends first, the order a story introduces
+          them. Either renders nothing for a character the lore left alone,
+          which the prompt prefers to an invented fellowship or feud. */}
+      <Passage title="Allies in the story" section={body.allies}
+               sources={body.sources} />
       <Passage title="Rivals in the story" section={body.rivals}
                sources={body.sources} />
 

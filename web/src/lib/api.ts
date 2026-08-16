@@ -950,6 +950,9 @@ export interface DossierBody {
   archetype: DossierSection & { name: string }
   /** Commanders somebody would build instead — every one a pool row. */
   competitors: DossierCompetitor[]
+  /** The story's allies: cited prose, same argument as `rivals`. Known
+   *  associates from Magic's history, never cards that pair well. */
+  allies: DossierSection
   /** The story's rivals: cited prose, not a card list. A plot line is not a
    *  pool row, which is why this has `who`'s shape and not `competitors`'. */
   rivals: DossierSection

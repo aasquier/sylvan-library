@@ -239,6 +239,8 @@ const WRITTEN_DOSSIER = {
       art_crop: 'https://cards.scryfall.io/art_crop/ghalta.jpg',
       legal_commander: true, oracle_text: 'Trample',
     }],
+    allies: { prose: 'The beasts of the frozen peaks follow where it hunts.',
+              source_ids: ['s1'] },
     rivals: { prose: 'The lore pits the bear against the humans of Qal Sisma.',
               source_ids: ['s1'] },
     standing: { prose: 'A 2018 mythic that never left.', source_ids: ['s2'] },
@@ -1024,14 +1026,16 @@ describe('DeckDetail commander dossier', () => {
     expect(await screen.findByText('Ghalta, Primal Hunger')).toBeTruthy()
   })
 
-  it('renders the story rivals as their own cited passage', async () => {
-    // The story's rivals are prose, not cards (a plot line is not a pool
-    // row), labelled apart from the competitors so the two kinds of rival
-    // never blur again.
+  it('renders the story allies and rivals as their own cited passages', async () => {
+    // The story's allies and rivals are prose, not cards (a plot line is not
+    // a pool row), labelled apart from the competitors so the two kinds of
+    // rival never blur again — and the friends get a section too.
     renderDeck()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
-    expect(await screen.findByText(/rivals in the story/i)).toBeTruthy()
+    expect(await screen.findByText(/allies in the story/i)).toBeTruthy()
+    expect(screen.getByText(/beasts of the frozen peaks/i)).toBeTruthy()
+    expect(screen.getByText(/rivals in the story/i)).toBeTruthy()
     expect(screen.getByText(/pits the bear against the humans/i)).toBeTruthy()
   })
 

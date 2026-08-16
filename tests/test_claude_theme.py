@@ -700,13 +700,21 @@ def test_an_unparseable_answer_reports_the_stop_reason(monkeypatch, no_network):
 def test_the_closing_instruction_tracks_what_is_still_unknown():
     opening = theme._closing_for([], [])
     assert "Open the conversation" in opening
+    # The opening angle is drawn from the table in Python, so two openings
+    # are two different questions rather than one script twice.
+    assert any(angle in opening for angle in theme.OPENING_ANGLES)
 
     partway = theme._closing_for(GROUNDED[:1], TRANSCRIPT)
     assert "Still unknown" in partway
     assert "temperament" in partway and "posture" in partway
 
     done = theme._closing_for(GROUNDED, TRANSCRIPT)
-    assert "You have enough to go on" in done
+    # The short circuit: once the floor is met the instruction is to wind
+    # down and say so, never to keep the interview ambling toward the
+    # ten-exchange ceiling.
+    assert "You now know enough" in done
+    assert "whenever they like" in done
+    assert "never a new line of enquiry" in done
 
 
 def test_a_proposal_confirms_commanders_and_counts_what_it_dropped(

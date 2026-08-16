@@ -439,12 +439,15 @@ export function PageMasthead({ art, alt, title, credit, children }: {
 }
 
 export function CardArt({
-  src, alt, className = '', ratio = 'aspect-[626/457]', position,
+  src, alt, className = '', ratio = 'aspect-[626/457]', position, eager,
 }: {
   src?: string | null
   alt: string
   className?: string
   ratio?: string
+  /** Load immediately instead of lazily — for art that is above the fold on
+   *  the screen it opens on (the persona tiles), where lazy is all cost. */
+  eager?: boolean
   /**
    * `object-position` for the crop, when the default centre is wrong.
    *
@@ -483,7 +486,7 @@ export function CardArt({
         ref={imgRef}
         src={src}
         alt={alt}
-        loading="lazy"
+        loading={eager ? 'eager' : 'lazy'}
         onLoad={() => setLoaded(true)}
         // Never leave a broken URL as an invisible element -- show the frame.
         onError={() => setLoaded(true)}

@@ -486,6 +486,22 @@ describe('the theme conversation', () => {
       .hasAttribute('disabled')).toBe(false)
   })
 
+  it('says so in the conversation column, where the eye is', async () => {
+    // The short circuit (punch list 2026-08-15 item 5): once the floor is
+    // met the person should not have to notice a sidebar button changing
+    // colour — the conversation column says "enough", the counter stops
+    // counting toward ten, and a second button proposes right there.
+    vi.mocked(api.themeAsk).mockResolvedValue(asked(READY) as never)
+    await sitWith('plain')
+    await screen.findByText(READY.question)
+
+    expect(screen.getByText(/enough answered — the rest is optional/i))
+      .toBeTruthy()
+    expect(screen.queryByText(/of 10 questions/i)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /get my colours/i }))
+    expect(await screen.findByText(GOLGARI.reading)).toBeTruthy()
+  })
+
   it('sources the fun fact it volunteers', async () => {
     await enterTheme()
     const link = screen.getByRole('link', { name: 'Wizards' })
