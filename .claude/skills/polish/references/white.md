@@ -120,6 +120,15 @@ The 95% floor exists to make regressions loud, but Aaron's bar is the *right*
 tests, not coverage tests — and a suite that stays fast enough that adding
 tests never feels expensive.
 
+- **Check the environment before believing the run.** Compare the local test
+  count against CI's, and `pytest -ra` against CI's pinned skip count — a
+  passing suite that ran *fewer tests than CI* is the failure mode this facet
+  exists for, and it reads exactly like success. It happened: the `dev` extra
+  was missing fastapi, so `pip install -e ".[dev]"` (what CLAUDE.md documents)
+  ran 1444 tests where CI ran 1918, silently skipping the entire HTTP layer
+  including `test_isolation.py`. `tests/test_packaging.py` now pins it, but the
+  general rule stands — a green local suite is evidence only once you know it
+  is the same suite.
 - Measure first: `pytest -q --durations=25`. Record total wall time and the
   slow tail in the ledger. A test that got slower has a reason; find it.
 - Hunt duplicated setup: fixtures and helpers belong in `tests/tiny_pool.py`,
@@ -138,8 +147,14 @@ tests never feels expensive.
 - Verify new guard tests by mutation, not by greenness: a test written to
   hold a boundary gets the boundary broken locally once to prove it fires
   (the conftest-hides-the-deployed-branch lesson).
-- After the suite: `git status data/` — a dirtied `app.db` means some test
-  escaped its scratch directory.
+- After the suite, **`git status data/` proves nothing** — `app.db` is
+  gitignored, so a test that writes the developer's real database leaves the
+  status clean. That check was in this file for one run and was blind the whole
+  time; it missed a test that was creating `data/app.db` on every run. Use
+  `ls -la data/` instead, and trust `conftest.py`'s `_real_app_db_untouched`,
+  which now fails any test that creates or writes the real file. If that
+  fixture is ever the thing that turns red, the test named in the failure is
+  reaching past its scratch directory — do not "fix" it by relaxing the guard.
 - Coverage: read the report for *meaningless* coverage too — a module at 100%
   through tests that assert nothing is worse than an honest gap, because it
   reads as done.

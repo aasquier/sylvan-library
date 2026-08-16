@@ -64,10 +64,32 @@ animist = ["Pillow>=11"]
 # ivy and tarot assets against their recipes -- hold the ADR 29 boundary
 # (nothing committed without a checkable recipe), and an importorskip on PIL
 # would move CI's pinned skip count off 2 and quietly stop reading them.
+# `fastapi` and `uvicorn` are the same reason a fourth time, and they are the
+# two that were missing -- so CLAUDE.md's "dev (which includes all of it plus
+# the test tooling)" was not true. Everything else from the other three extras
+# was already vendored here for exactly this reason: python-dotenv and
+# argon2-cffi from `api`, anthropic from `claude`, Pillow from `animist`.
+#
+# fastapi was the expensive omission. tests/test_isolation.py -- the one ADR 5
+# calls the highest-value test in the whole auth story -- plus test_api.py,
+# test_admin.py, test_auth_api.py, test_auth_reset_api.py and
+# test_library_write_gate.py all open with an importorskip on it. A by-the-book
+# `pip install -e ".[dev]"` skipped all six, so the suite ran 1444 tests where
+# CI ran 1918: the HTTP layer, the 403/404 matrix and the route-classification
+# sweep, none of them read. The pinned skip count that would have said so is
+# only counted in CI, and CI installs `.[dev,api]` -- so for once the laptop
+# was the half testing less, and nothing on either side could see it.
+#
+# uvicorn is here for the type checker rather than the tests: no test starts a
+# server (the two `mtglab ui` tests fake it through `sys.modules`), but `mypy`
+# is strict over `cli.py`, which imports it, and a checkout that cannot run a
+# CI gate cannot reproduce the build. Same specifier as `api` so there is one
+# floor rather than two.
 dev = [
     "pytest>=8.0", "ruff>=0.16", "httpx>=0.27", "coverage>=7.0",
     "hypothesis>=6.100", "python-dotenv>=1.0", "anthropic>=0.69",
     "mypy>=1.11", "types-PyYAML>=6.0", "argon2-cffi>=23.1", "Pillow>=11",
+    "fastapi>=0.110", "uvicorn[standard]>=0.29",
 ]
 
 [project.scripts]
