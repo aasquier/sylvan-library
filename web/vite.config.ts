@@ -41,7 +41,14 @@ export default defineConfig({
         // is what makes stable filenames safe here rather than merely tidy.
         entryFileNames: 'assets/app.js',
         chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/app.[ext]',
+        // `[name]`, not a fixed `app`: the day the bundle carried more than
+        // one asset per extension (the ivy canopy and its sprigs, all webp),
+        // the fixed name collided and Rollup numbered the collisions in
+        // emission order — which differs between macOS and CI's Linux, so
+        // the committed bundle could never match the checked rebuild. Source
+        // basenames are stable on every platform and mean something in a
+        // diff.
+        assetFileNames: 'assets/[name].[ext]',
       },
     },
   },

@@ -1,11 +1,15 @@
 /**
- * The forest layer: the greenery the app is named after, drawn rather than
- * photographed.
+ * The forest layer: the greenery the app is named after.
  *
- * Everything here is inline SVG and CSS for the same reason `CardBack` and
- * `managlyphs.ts` are — no asset, no licence question, no bytes on the wire —
- * and all of it is decoration in the strict sense: `aria-hidden`, pointer
- * events off, and nothing a screen reader or a keyboard ever meets. The two
+ * Since the second 2026-08-15 punch list this file is split-material on
+ * purpose: the *canopy* is a photograph (CC0, matted — see
+ * `../assets/ambience/PROVENANCE.md`), because a wallpaper-border vine was
+ * the first thing every punch list named, while the small drifting things —
+ * fireflies, falling leaves, loose pages — stay inline SVG, because at nine
+ * pixels a drawn leaf and a photographed one are the same leaf and the SVG
+ * costs no bytes. Everything is decoration in the strict sense:
+ * `aria-hidden`, pointer events off, and nothing a screen reader or a
+ * keyboard ever meets. The two
  * themes get different weather on purpose: **fireflies at night, drifting
  * leaves by day.** That split lives in `index.css` (`.firefly` and
  * `.leaf-fall` display-gate on the theme), and `prefers-reduced-motion`
@@ -27,7 +31,7 @@
  * window that was never quite cleaned.
  */
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAmbience } from '../lib/prefs'
 
 /* ------------------------------------------------------------ the ambience */
@@ -182,28 +186,32 @@ interface ShedLeaf {
 }
 
 /**
- * The vine that drapes from the header — one tile of stems, leaves, curling
- * tendrils and berries, repeated as an SVG pattern across whatever width the
- * window has. It hangs *below* the sticky bar (absolute, `top: 100%`) so the
- * chrome stays legible and the greenery reads as growing off it rather than
- * through it.
+ * The vine that drapes from the header — and since the second 2026-08-15
+ * punch list (item 1), a real one. The drawn SVG pattern read as a wallpaper
+ * border no matter how many tendrils it grew, because the problem was never
+ * the geometry — it was that a flat fill is not a leaf. This is a
+ * photograph: cascading ivy (rawpixel, CC0 — see
+ * `../assets/ambience/PROVENANCE.md`), matted to alpha by green-dominance
+ * segmentation and mirror-tiled so it repeats seamlessly at any width. The
+ * lower edge is the actual silhouette of actual leaves.
  *
- * Punch list 2026-08-15 item 4 rebuilt it. Three moves, none of them an
- * asset: **two stems that cross** rather than one polite wave, so the vine
- * reads as twisted growth; **an uneven underside** — tendrils of different
- * lengths spiralling off the stem, leaf pairs at their tips — so the bottom
- * edge is a plant's and not a wallpaper border's; and **berries with a gold
- * glint**, the same #c9a227 every drawn mark in this app commits to. The
- * whole canopy grows in on load (scaleY from the stem line, in CSS) and
- * sways for good; both stop under `prefers-reduced-motion`.
- *
- * And it answers to touch: **click the header and the vine sheds leaves**
- * from where you clicked. The canopy itself stays `pointer-events: none` —
- * it listens on its parent, the header, so the nav keeps working and the
- * leaves are a side effect of whatever you were doing anyway.
+ * Everything the drawn canopy did survives: it hangs *below* the sticky bar
+ * (absolute, `top: 100%`), grows in on load, sways for good, stops under
+ * `prefers-reduced-motion`, and **sheds when the header is clicked** — the
+ * shed pieces are now sprigs cropped from the same photograph, so what
+ * falls is what hangs. The canopy stays `pointer-events: none` and listens
+ * on its parent, so the nav keeps working and the leaves are a side effect
+ * of whatever you were doing anyway.
  */
+
+import canopyUrl from '../assets/ambience/ivy-canopy.webp'
+import sprig1Url from '../assets/ambience/ivy-sprig-1.webp'
+import sprig2Url from '../assets/ambience/ivy-sprig-2.webp'
+import sprig3Url from '../assets/ambience/ivy-sprig-3.webp'
+
+const SPRIGS = [sprig1Url, sprig2Url, sprig3Url] as const
+
 export function HeaderCanopy() {
-  const id = useId().replace(/:/g, '')
   const rootRef = useRef<HTMLDivElement>(null)
   const [shed, setShed] = useState<ShedLeaf[]>([])
   const counter = useRef(0)
@@ -219,10 +227,10 @@ export function HeaderCanopy() {
         const n = counter.current++
         return {
           id: n,
-          x: e.clientX - left + (i - 1) * 16 + ((n * 7) % 11) - 5,
+          x: e.clientX - left + (i - 1) * 18 + ((n * 7) % 11) - 5,
           drift: ((n * 13) % 49) - 24,
           rot: 140 + ((n * 31) % 160),
-          size: 9 + ((n * 5) % 3) * 3,
+          size: 26 + ((n * 5) % 3) * 8,
           delay: i * 110,
         }
       })
@@ -234,75 +242,8 @@ export function HeaderCanopy() {
 
   return (
     <div ref={rootRef} className="header-canopy" aria-hidden="true">
-      <svg className="h-full w-full">
-        <defs>
-          <pattern id={`vine-${id}`} width="260" height="44"
-                   patternUnits="userSpaceOnUse">
-            {/* Two stems, crossing twice: the twist. The second is thinner
-                and dimmer, a stem seen behind a stem. */}
-            <path d="M0 6 C 34 -2, 62 16, 104 9 S 178 0, 216 10 S 248 12, 260 5"
-                  fill="none" stroke="currentColor" strokeWidth="1.6"
-                  opacity="0.8" />
-            <path d="M0 11 C 40 19, 70 1, 112 13 S 190 19, 226 6 S 250 3, 260 10"
-                  fill="none" stroke="currentColor" strokeWidth="1"
-                  opacity="0.45" />
-            {/* Leaves alternate sides of the stems, each its own size and
-                lean — a vine that repeats too obviously is a wallpaper
-                border rather than a plant. Every leaf carries its vein. */}
-            <path d="M22 7 q 7 1 9 11 q -9 -1 -9 -11" fill="currentColor"
-                  opacity="0.85" />
-            <path d="M23.5 8.5 q 4 3 6 8" stroke="currentColor"
-                  strokeWidth="0.6" fill="none" opacity="0.5" />
-            <path d="M52 10 q -2 -9 6 -13 q 3 9 -6 13" fill="currentColor"
-                  opacity="0.65" />
-            <path d="M53.5 8 q 2 -4 3.5 -8" stroke="currentColor"
-                  strokeWidth="0.6" fill="none" opacity="0.45" />
-            <path d="M98 8 q 8 2 9 13 q -10 -2 -9 -13" fill="currentColor"
-                  opacity="0.9" />
-            <path d="M99.5 10 q 4 4 6 9" stroke="currentColor"
-                  strokeWidth="0.6" fill="none" opacity="0.5" />
-            <path d="M132 7 q -1 -8 7 -11 q 2 8 -7 11" fill="currentColor"
-                  opacity="0.6" />
-            <path d="M168 12 q 6 1 8 11 q -9 -1 -8 -11" fill="currentColor"
-                  opacity="0.75" />
-            <path d="M169.5 13.5 q 3.5 3.5 5.5 8" stroke="currentColor"
-                  strokeWidth="0.6" fill="none" opacity="0.5" />
-            <path d="M206 8 q -2 -8 5 -12 q 3 8 -5 12" fill="currentColor"
-                  opacity="0.7" />
-            <path d="M238 9 q 7 2 8 12 q -9 -2 -8 -12" fill="currentColor"
-                  opacity="0.8" />
-            {/* Tendrils: spirals of unequal length hanging off the stem, a
-                leaf pair at each tip. The uneven underside is the point. */}
-            <path d="M64 10 c 1 8 -2 14 2 19 c 4 5 10 2 8 -3 c -1.5 -4 -7 -2 -5 2"
-                  fill="none" stroke="currentColor" strokeWidth="1"
-                  opacity="0.6" />
-            <path d="M70 27 q 5 0 7 6 q -7 0 -7 -6" fill="currentColor"
-                  opacity="0.55" />
-            <path d="M148 11 c 0 10 -3 18 2 25 c 4 6 11 2 9 -4 c -2 -5 -8 -2 -6 2"
-                  fill="none" stroke="currentColor" strokeWidth="1.1"
-                  opacity="0.7" />
-            <path d="M152 33 q -6 -1 -8 6 q 7 1 8 -6" fill="currentColor"
-                  opacity="0.6" />
-            <path d="M154 34 q 5 1 6 7 q -7 -1 -6 -7" fill="currentColor"
-                  opacity="0.5" />
-            <path d="M228 9 c 1 6 -1 11 2 15 c 3 4 8 1 6 -2 c -1.5 -3 -5 -1 -4 1.5"
-                  fill="none" stroke="currentColor" strokeWidth="0.9"
-                  opacity="0.55" />
-            {/* Berries in clusters, each with the gold glint the drawn marks
-                share. */}
-            <circle cx="84" cy="10" r="1.9" fill="currentColor" opacity="0.8" />
-            <circle cx="87.5" cy="12.5" r="1.5" fill="currentColor" opacity="0.65" />
-            <circle cx="85" cy="14" r="1.2" fill="currentColor" opacity="0.5" />
-            <circle cx="83.4" cy="9.4" r="0.6" fill="#c9a227" opacity="0.9" />
-            <circle cx="190" cy="9" r="1.7" fill="currentColor" opacity="0.75" />
-            <circle cx="193" cy="11" r="1.3" fill="currentColor" opacity="0.55" />
-            <circle cx="189.4" cy="8.4" r="0.55" fill="#c9a227" opacity="0.85" />
-            <circle cx="254" cy="8" r="1.5" fill="currentColor" opacity="0.65" />
-            <circle cx="253.5" cy="7.5" r="0.5" fill="#c9a227" opacity="0.8" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill={`url(#vine-${id})`} />
-      </svg>
+      <div className="canopy-photo"
+           style={{ backgroundImage: `url(${canopyUrl})` }} />
       {shed.map((leaf) => (
         <span key={leaf.id} className="leaf-shed"
               onAnimationEnd={() =>
@@ -313,7 +254,8 @@ export function HeaderCanopy() {
                 '--drift': `${leaf.drift}px`,
                 '--rot': `${leaf.rot}deg`,
               } as React.CSSProperties}>
-          <LeafShape size={leaf.size} />
+          <img src={SPRIGS[leaf.id % SPRIGS.length]} alt=""
+               width={leaf.size} />
         </span>
       ))}
     </div>
@@ -343,6 +285,15 @@ export function SceneBackdrop({ art }: { art: string }) {
   return (
     <div className="scene-backdrop" aria-hidden="true">
       <img src={art} alt="" className="scene-backdrop-art" />
+      {/* The lanes (second punch list, item 5): on a screen wide enough to
+          have margins, the margins are walls of this room, and the walls
+          carry the painting — near-sharp, drifting very slowly (the Ken
+          Burns a gallery projection would do), fading where the reading
+          column begins. The right lane is mirrored so the two walls frame
+          the page rather than repeat it. Below 1440px there are no margins
+          worth painting and the lanes are simply absent. */}
+      <img src={art} alt="" className="scene-lane scene-lane-left" />
+      <img src={art} alt="" className="scene-lane scene-lane-right" />
       <div className="scene-sunbeam" />
       <div className="scene-sunbeam scene-sunbeam-b" />
       {[
@@ -350,6 +301,8 @@ export function SceneBackdrop({ art }: { art: string }) {
         { left: '84%', top: '24%', dur: 23, delay: 7 },
         { left: '72%', top: '30%', dur: 29, delay: 13 },
         { left: '88%', top: '9%', dur: 17, delay: 4 },
+        { left: '6%', top: '18%', dur: 26, delay: 10 },
+        { left: '11%', top: '34%', dur: 21, delay: 3 },
       ].map((m, i) => (
         <span key={i} className="scene-mote" style={{
           left: m.left,

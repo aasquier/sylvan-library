@@ -1247,6 +1247,34 @@ arc; this is what the next few sessions actually do.
     returned*, in-band) and it is the crawler CLAUDE.md already bans, for
     savings measured in cents.
 
+12. **The photo-real pass** — started 2026-08-15, from the maintainer's second
+    punch list of that day, whose through-line was "no more clip art." The
+    tooling question ("do we need third-party software for animation and
+    photo-real imaging?") was asked three times in that list and is answered
+    once, here, so no session re-litigates it:
+
+    - **No third-party animation software.** Lottie and friends produce
+      vector output — the exact aesthetic being evicted. The material is
+      **real images**: Magic's own paintings (hotlinked from Scryfall with
+      credit, the posture the app has always had) and **CC0 photography
+      committed as assets** when a thing must be ours — found via Openverse
+      with a licence filter, checked per file, recorded in a `PROVENANCE.md`
+      per asset directory (the tarot deck's rule).
+    - **The pipeline is scripted Pillow** (a dev-only dependency): fetch,
+      matte, tile, measure, encode WebP. Measurements against a painting
+      (the wheel's circle, the Lab's glassware) are fitted numerically and
+      recorded in the component that uses them.
+    - **Motion is transforms and particles over real images** — CSS masks
+      and rotations of the artwork itself (the Wheel of Fortune spins the
+      painted wheel), Ken Burns drift on gallery lanes, and a canvas
+      particle layer (`components/vapor.tsx`) for volumetric steam/smoke.
+      Video loops stay on the table for later, but nothing so far has needed
+      one; if one ever does, it is a committed asset with a PROVENANCE
+      entry like any other.
+
+    Landed so far under this heading: the painted wheel spin (#116), and the
+    photo ivy canopy + Experimental Lab bench + gallery lanes (this branch).
+
 ---
 
 ## 1. Analyse or generate decks with simulation
