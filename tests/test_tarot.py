@@ -109,3 +109,60 @@ def test_describe_names_every_position_and_card():
 
 def test_image_paths_are_served_from_the_tarot_mount():
     assert tarot.BY_KEY["17-star"].image == "/tarot/17-star.webp"
+
+
+# ------------------------------------------------- the Magic crossovers
+
+def test_the_crossovers_join_the_shuffle_but_not_the_seventy_eight():
+    """Punch list 2026-08-15 item 13: three Magic cards that are tarot
+    cards. The 78 stay the 78 -- the picture sweeps above run over `DECK`
+    on purpose, because a crossover's picture is a hotlinked art crop and
+    not package data."""
+    assert len(tarot.DECK) == 78
+    assert len(tarot.FULL_DECK) == 81
+    assert len(tarot.CROSSOVERS) == 3
+    for card in tarot.CROSSOVERS:
+        assert card.after, f"{card.name} names no trump"
+        assert card.artist, f"{card.name} credits nobody"
+        assert card.art_url and card.art_url.startswith(
+            "https://cards.scryfall.io/art_crop/"), card.name
+        assert card.image == card.art_url
+
+
+def test_crossovers_sit_at_their_trumps_numbers():
+    by_name = {c.name: c for c in tarot.CROSSOVERS}
+    assert by_name["Flubs, the Fool"].number == 0
+    assert by_name["Massimo, the Magician"].number == 1
+    assert by_name["Homer, the Hermit"].number == 9
+
+
+def test_a_crossover_deal_replays_from_its_seed():
+    """The weighted sampler is as deterministic as the plain one was."""
+    seed = next(s for s in range(500)
+                if any(d.card.after for d in tarot.deal(s).cards))
+    assert tarot.deal(seed).as_dict() == tarot.deal(seed).as_dict()
+
+
+def test_crossovers_land_more_often_than_nature_would_allow():
+    """The weight is the feature: a wink nobody ever sees is worthless.
+
+    Fully deterministic -- the seeds are fixed, so this rate is a constant.
+    Unweighted, ~11% of three-card deals would hold one of three specials;
+    at weight 2 the arithmetic says ~14%, and the band below holds both
+    'clearly above nature' and 'still rare'.
+    """
+    deals = [tarot.deal(s) for s in range(1500)]
+    with_crossover = sum(
+        1 for r in deals if any(d.card.after for d in r.cards))
+    rate = with_crossover / len(deals)
+    assert 0.12 < rate < 0.25, rate
+
+
+def test_describe_tells_the_reader_what_a_crossover_is():
+    """The reader interprets; the deal only states the fact of the design.
+    The line must say which trump the card is printed after, or the voice
+    has nothing to read it as."""
+    seed = next(s for s in range(500)
+                if any(d.card.after for d in tarot.deal(s).cards))
+    text = tarot.deal(seed).describe()
+    assert "a Magic card printed after" in text
