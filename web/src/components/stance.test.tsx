@@ -38,7 +38,7 @@ function status(over: Partial<ClaudeStatus> = {}): ClaudeStatus {
       { name: 'consultant', blurb: 'Speaks when spoken to.', stance: view('consultant'), available: true },
       { name: 'collaborator', blurb: 'Batches edits.', stance: view('collaborator'), available: false },
     ],
-    never: 'No stance lets Claude write a card’s rationale.',
+    never: 'One rule holds at every setting: Claude never writes a card’s rationale. The why is always yours.',
     modes: [],
     ...over,
   }
@@ -78,7 +78,7 @@ describe('StanceReadout', () => {
       cleanup()
       render(<StanceReadout status={status()} pin={pin} />)
       fireEvent.click(screen.getByRole('button'))
-      expect(screen.getByText(/No stance lets Claude write a card’s rationale/))
+      expect(screen.getByText(/One rule holds at every setting/))
         .toBeTruthy()
     }
   })

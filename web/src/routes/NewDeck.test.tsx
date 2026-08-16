@@ -86,7 +86,7 @@ const STANCE = {
 const CLAUDE_STATUS = {
   installed: true, configured: true, model: 'claude-sonnet-5',
   stance: STANCE, ceiling: STANCE, default: STANCE, presets: [],
-  never: 'No stance lets Claude write a card’s rationale.', modes: [],
+  never: 'One rule holds at every setting: Claude never writes a card’s rationale. The why is always yours.', modes: [],
 }
 
 /** Two things known, so the floor is not met yet. */

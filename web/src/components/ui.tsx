@@ -554,3 +554,58 @@ export function CardHover({
     </span>
   )
 }
+
+/**
+ * A magnifying glass over a card that is already shown whole (second punch
+ * list, item 3). `CardHover` answers "what is this card?" for a thumbnail;
+ * on the deck hero the full card is the thing being hovered, so popping up a
+ * second, smaller copy of it answered a question nobody asked. This instead
+ * holds a lens over the printing itself: the same image, drawn at several
+ * times the size through a round glass that follows the cursor, rim and
+ * handle styled in the house gold. The detail is real — the source bitmap is
+ * far larger than the card is displayed — so the lens shows brush strokes
+ * and rules text, not bigger pixels.
+ *
+ * Hover-only by nature, and honestly so: on a touch screen it simply never
+ * appears, and the card underneath was already whole. jsdom has no layout,
+ * so every rect read guards against zero.
+ */
+export function CardLoupe({ src, alt, className = '', zoom = 2.6, imgStyle }: {
+  src: string
+  alt: string
+  className?: string
+  zoom?: number
+  imgStyle?: React.CSSProperties
+}) {
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
+  const ref = useRef<HTMLImageElement>(null)
+
+  function track(e: React.MouseEvent) {
+    const rect = ref.current?.getBoundingClientRect()
+    if (!rect || rect.width === 0 || rect.height === 0) return
+    setAt({
+      x: (e.clientX - rect.left) / rect.width,
+      y: (e.clientY - rect.top) / rect.height,
+    })
+  }
+
+  const rect = ref.current?.getBoundingClientRect()
+  return (
+    <span className={`card-loupe-host relative inline-block ${className}`}
+          onMouseEnter={track} onMouseMove={track}
+          onMouseLeave={() => setAt(null)}>
+      <img ref={ref} src={src} alt={alt} className="block w-full rounded-xl"
+           style={imgStyle} />
+      {at && rect && rect.width > 0 && (
+        <span aria-hidden className="card-loupe"
+              style={{
+                left: `${at.x * 100}%`,
+                top: `${at.y * 100}%`,
+                backgroundImage: `url(${src})`,
+                backgroundSize: `${rect.width * zoom}px ${rect.height * zoom}px`,
+                backgroundPosition: `${-(at.x * rect.width * zoom - 66)}px ${-(at.y * rect.height * zoom - 66)}px`,
+              }} />
+      )}
+    </span>
+  )
+}

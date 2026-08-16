@@ -1154,8 +1154,12 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
             == preset_stance,
         } for name, preset_stance in claude_stance.PRESETS.items()],
         # Stated here rather than only in an ADR, because it is the sentence a
-        # user should be able to read next to the dial.
-        "never": "No stance lets Claude write a card's rationale.",
+        # user should be able to read next to the dial. Reworded on the second
+        # 2026-08-15 punch list (item 6): the old "No stance lets Claude…"
+        # parsed as a fragment about some stance called "No", not as the
+        # guarantee it is.
+        "never": "One rule holds at every setting: Claude never writes a "
+                 "card's rationale. The why is always yours.",
         # The modes that exist, so a UI can offer what is built rather than
         # what ADR 15 planned. Six today, across five features.
         "modes": [{

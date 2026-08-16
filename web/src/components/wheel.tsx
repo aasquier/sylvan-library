@@ -1,120 +1,113 @@
 /**
- * The Wheel of Fortune (punch list 2026-08-15 item 9).
+ * The Wheel of Fortune (punch list 2026-08-15 item 9; rebuilt same day,
+ * item 12 of the second list).
  *
- * Daniel Gelon's Alpha painting, brought to life the only honest way: the
- * painting itself is the static scene — hotlinked from Scryfall and
- * credited, like every masthead — and over the painted wheel sits a *drawn*
- * wheel, planked and studded with the same four fates the painting carries
- * (cup, heart, sword, skull, clockwise from the top; a second skull watches
- * from the treetop, and it is the marker the spin lands under). The drawn
- * wheel is what turns. Nobody's scan of a 1993 card gets warped through a
- * rotation filter; the animation is geometry on top, in the painting's own
- * palette.
+ * Daniel Gelon's Alpha painting, and this time the painted wheel itself is
+ * what turns. The first build drew an SVG wheel over the art and spun that;
+ * it read as clip art sitting on a painting, because that is what it was.
+ * Now the scene renders the painting twice from the same hotlinked crop:
+ * once whole and still, and once clipped to the wheel's own circle — centre
+ * measured at (65.54%, 44.35%) of the crop, diameter 54% of its width, fitted
+ * numerically against the disc — with a feathered mask so the cut edge
+ * blends into the rim's shadow. Rotating the clipped copy rotates the wheel
+ * Gelon painted, planks, fates and all. No derivative is committed anywhere:
+ * both copies are the same Scryfall URL the credit line already covers, and
+ * the "edit" exists only as CSS at render time.
+ *
+ * The four fates sit where the painter put them, not on neat right angles —
+ * cup 340°, heart 63°, sword 155°, skull 254°, measured clockwise from the
+ * top of the crop — and the spin lands the chosen fate under the crowned
+ * skull watching from the treetop, which sits at 0° and is the marker.
  *
  * The spin itself is the server's (`decks/wheel.py`): seeded dice over the
  * pool, a fate and a card in the deck's colours that answers to it. The
  * client's whole job is theatre — ask first, then decelerate onto the
- * answer, then show the card once the wheel has stopped. `answered_by:
+ * answer, then show the card once the wheel has stopped. The theatre now
+ * has a soundtrack to match: `wheelTurn` in `lib/tablesounds.ts` ratchets a
+ * pawl over the studs on the same deceleration curve the CSS uses, and it
+ * obeys the same switch every other table sound does. `answered_by:
  * "python"` renders in the caveat, because a fortune wheel is exactly where
  * somebody would otherwise assume Claude.
  *
  * The reveal waits on `transitionend`, with a timer as the fallback — a
  * hidden tab never paints the transition, and a spin whose result never
  * arrives is a broken toy. Reduced motion skips the theatre entirely: the
- * wheel jumps, the card shows.
+ * wheel jumps, the card shows, nothing clicks.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { api, errorMessage, type DeckRef, type WheelSpin } from '../lib/api'
+import { wheelTurn } from '../lib/tablesounds'
 import { CardArt, CardHover, ManaCost } from './ui'
 
 const WHEEL_ART =
   'https://cards.scryfall.io/art_crop/front/6/7/67b369c4-faa8-45c8-a1b9-98f228b69682.jpg'
 
-/** Where each fate sits on the drawn wheel, in degrees clockwise from the
- *  top — the same order `wheel.SYMBOLS` serves, which is the contract. */
+/** The wheel's circle within the art crop: centre as fractions of the crop's
+ *  width and height, diameter as a fraction of width. Fitted against the
+ *  painted disc (a grid search maximising plank-tan inside the circle vs the
+ *  ring outside it), then checked by eye with an annotated render. */
+const WHEEL_CX = 0.6554
+const WHEEL_CY = 0.4435
+const WHEEL_DIAMETER = 0.54
+/** The crop is 563x451; the cutout's percentage offsets depend on it. */
+const ART_ASPECT = 563 / 451
+
+/** Where each fate sits in the painting, in degrees clockwise from the top.
+ *  Measured, not designed: Gelon spaced them like props, not like a clock
+ *  face, and landing them honestly means using his angles. The order is
+ *  still `wheel.SYMBOLS`'s — cup, heart, sword, skull, clockwise. */
 const ANGLES: Record<string, number> = {
-  cup: 0, heart: 90, sword: 180, skull: 270,
+  cup: 340, heart: 63, sword: 155, skull: 254,
 }
 
-/** The four fates, drawn small: a gold cup, a pink heart, a grey sword, an
- *  ivory skull — the painting's own props, simplified to read at 30px. */
-function FateGlyph({ symbol }: { symbol: string }) {
-  switch (symbol) {
-    case 'cup':
-      return (
-        <g>
-          <path d="M-7 -6 H 7 L 5 2 A 5 5 0 0 1 -5 2 Z" fill="#d9a72c" />
-          <path d="M-3 5 H 3 L 4 8 H -4 Z" fill="#b8891f" />
-          <ellipse cx="0" cy="-6" rx="7" ry="1.8" fill="#f0cf6e" />
-        </g>
-      )
-    case 'heart':
-      return (
-        <path d="M0 8 C -9 1 -8 -6 -4 -7 C -1.5 -7.5 0 -5 0 -4
-                 C 0 -5 1.5 -7.5 4 -7 C 8 -6 9 1 0 8 Z" fill="#d97a90" />
-      )
-    case 'sword':
-      return (
-        <g transform="rotate(35)">
-          <path d="M-1.4 -9 H 1.4 L 1 4 H -1 Z" fill="#9aa2ad" />
-          <path d="M-5 4 H 5 V 5.8 H -5 Z" fill="#6e5a2e" />
-          <path d="M-1.2 5.8 H 1.2 L 1 9 H -1 Z" fill="#57431f" />
-        </g>
-      )
-    default:
-      return (
-        <g>
-          <ellipse cx="0" cy="-1.5" rx="6.5" ry="6" fill="#e8e0c8" />
-          <path d="M-4 3.5 H 4 L 3 8 H -3 Z" fill="#e8e0c8" />
-          <ellipse cx="-2.6" cy="-2" rx="1.7" ry="2.1" fill="#4a3d2a" />
-          <ellipse cx="2.6" cy="-2" rx="1.7" ry="2.1" fill="#4a3d2a" />
-          <path d="M-0.9 1.6 L 0 3 L 0.9 1.6 Z" fill="#4a3d2a" />
-        </g>
-      )
-  }
-}
+/** How long the CSS deceleration runs (`.wheel-disc` in index.css). The
+ *  ratchet in `tablesounds` is scheduled against the same figure. */
+const SPIN_MS = 3800
 
-/** The drawn wheel: planks, iron rim, hub, and the four fates. Rendered
- *  once; the spin is one CSS transform on the group. */
-function DrawnWheel({ rotation, spinning }: {
+/**
+ * The painted wheel, cut loose: the full crop absolutely positioned inside a
+ * circle-masked box so the wheel's centre sits at the box's centre, rotated
+ * as one piece. The box is sized so the crop always covers the circle at any
+ * rotation — the nearest crop edge to the wheel's centre is farther away
+ * than the radius, which was checked with the same measurements the mask
+ * uses.
+ */
+function PaintedWheelCutout({ rotation, spinning, onDone }: {
   rotation: number
   spinning: boolean
+  onDone: () => void
 }) {
+  // The cutout box is WHEEL_DIAMETER of the scene's width, square. Inside
+  // it the crop renders at scene size again: width is 1/diameter of the
+  // box, and the offsets put the wheel's centre at the box's centre.
+  const imgW = 100 / WHEEL_DIAMETER
+  const left = 50 - WHEEL_CX * imgW
+  const top = 50 - (WHEEL_CY / ART_ASPECT) * imgW
   return (
-    <svg viewBox="-50 -50 100 100" className="h-full w-full">
-      <g className="wheel-disc"
+    <div className="wheel-cutout absolute"
          style={{
-           transform: `rotate(${rotation}deg)`,
-           transitionDuration: spinning ? undefined : '0ms',
+           left: `${WHEEL_CX * 100}%`,
+           top: `${WHEEL_CY * 100}%`,
+           width: `${WHEEL_DIAMETER * 100}%`,
+           aspectRatio: '1',
+           transform: 'translate(-50%, -50%)',
          }}>
-        <circle r="47" fill="#57431f" />
-        <circle r="44" fill="#c0a878" />
-        {/* Planks: chords across the face, the grain the painting shows. */}
-        {[-33, -22, -11, 0, 11, 22, 33].map((y) => (
-          <line key={y} x1={-Math.sqrt(44 * 44 - y * y)} y1={y}
-                x2={Math.sqrt(44 * 44 - y * y)} y2={y}
-                stroke="#8a6f45" strokeWidth="1.1" opacity="0.8" />
-        ))}
-        <circle r="44" fill="none" stroke="#6e5a2e" strokeWidth="2.5" />
-        {/* Iron studs on the rim. */}
-        {Array.from({ length: 12 }, (_, i) => {
-          const a = (i * Math.PI * 2) / 12
-          return <circle key={i} cx={Math.cos(a) * 40.5}
-                         cy={Math.sin(a) * 40.5} r="1.3" fill="#4a3a22" />
-        })}
-        {/* The hub — the dark mounting the painting shows at centre. */}
-        <circle r="4.5" fill="#3a2c16" />
-        <circle r="2" fill="#241a0c" />
-        {/* The four fates, upright relative to the wheel. */}
-        {Object.entries(ANGLES).map(([symbol, angle]) => (
-          <g key={symbol}
-             transform={`rotate(${angle}) translate(0 -27) rotate(${-angle})`}>
-            <FateGlyph symbol={symbol} />
-          </g>
-        ))}
-      </g>
-    </svg>
+      <div className="wheel-disc absolute inset-0"
+           onTransitionEnd={onDone}
+           style={{
+             transform: `rotate(${rotation}deg)`,
+             transitionDuration: spinning ? undefined : '0ms',
+           }}>
+        <img src={WHEEL_ART} alt="" aria-hidden
+             className="absolute max-w-none"
+             style={{
+               width: `${imgW}%`,
+               left: `${left}%`,
+               top: `${top}%`,
+             }} />
+      </div>
+    </div>
   )
 }
 
@@ -164,9 +157,12 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
       }
       setSpinning(true)
       setRotation(next)
+      // The pawl ratchets over the twelve studs on the same curve the CSS
+      // decelerates on; silent unless the table sound is switched on.
+      wheelTurn(next - rotation, SPIN_MS)
       // The transition is 3.8s; the fallback only exists for tabs that
       // never paint (a hidden pane fires no transitionend).
-      fallback.current = window.setTimeout(reveal, 4200)
+      fallback.current = window.setTimeout(reveal, SPIN_MS + 400)
     } catch (e) {
       setError(errorMessage(e))
     }
@@ -189,14 +185,8 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
                     Edition Alpha: a red-cloaked figure spins a plank wheel
                     mounted on a great tree."
                className="block w-full" />
-          {/* The drawn wheel sits exactly over the painted one: centre at
-              69% / 47% of the crop, diameter just over half its width. */}
-          <div className="absolute"
-               onTransitionEnd={reveal}
-               style={{ left: '69%', top: '47%', width: '53%',
-                        aspectRatio: '1', transform: 'translate(-50%, -50%)' }}>
-            <DrawnWheel rotation={rotation} spinning={spinning} />
-          </div>
+          <PaintedWheelCutout rotation={rotation} spinning={spinning}
+                              onDone={reveal} />
         </div>
 
         <div className="min-w-0 flex-1 space-y-2">
@@ -271,7 +261,8 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
 
       <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
         <em>Wheel of Fortune</em> by Daniel Gelon, Limited Edition Alpha —
-        the drawn wheel over it turns so the painting doesn&rsquo;t have to.
+        the wheel that turns is the painting&rsquo;s own, cut loose by a mask
+        and put back exactly where it was.
       </p>
     </section>
   )

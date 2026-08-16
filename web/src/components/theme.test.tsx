@@ -56,7 +56,7 @@ const STANCE = {
 const STATUS = {
   installed: true, configured: true, model: 'claude-sonnet-5',
   stance: STANCE, ceiling: STANCE, default: STANCE, presets: [],
-  never: 'No stance lets Claude write a card’s rationale.', modes: [],
+  never: 'One rule holds at every setting: Claude never writes a card’s rationale. The why is always yours.', modes: [],
 } as unknown as ClaudeStatus
 
 function report(over: Partial<ThemeReport> = {}): ThemeReport {
