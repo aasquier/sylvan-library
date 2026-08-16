@@ -11,13 +11,13 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from tests import tiny_pool
-from tests.tiny_pool import mono_green_deck
-
+import tiny_pool
 from mtglab import config
 from mtglab.cards import db
 from mtglab.decks import wheel
+from tiny_pool import mono_green_deck
 
 
 @pytest.fixture
