@@ -164,6 +164,10 @@ def _card_json(entry: CardEntry, rec: CardRecord | None, *,
         "category": entry.category,
         "why": entry.why,
         "qty": entry.qty,
+        # Which printing's art this deck picked for the slot, or "". Carried
+        # on every row so the art picker can mark the current choice without
+        # a second request; the image swap itself happens in `get_deck`.
+        "art": getattr(entry, "art", ""),
         "known": rec is not None,
     }
     if rec is not None:
@@ -511,9 +515,9 @@ def art_crop_from(image_normal: str | None) -> str | None:
     return image_normal.replace("/normal/", "/art_crop/", 1)
 
 
-def commander_printings(slug: str, *,
+def commander_printings(slug: str, *, card: str | None = None,
                         source: DeckSource | None = None) -> dict[str, Any]:
-    """Every printing of this deck's commander, newest first.
+    """Every printing of this deck's commander -- or of any card in it.
 
     **Non-digital only.** Arena and MTGO printings have their own art in the
     pool and are not things you can put in a sleeve, so offering one as a
@@ -524,14 +528,26 @@ def commander_printings(slug: str, *,
     `selected` marks the deck's current choice so a picker does not have to
     compare ids itself, and it is computed here rather than in the client so
     that the CLI and the app agree about which one is showing.
+
+    `card` widens the question from the commander to the 99 (and the swap
+    board, and the graveyard -- a choice made before entombment should survive
+    a return). Asking about a card the deck does not hold is refused, because
+    the answer would invite writing an `art` for a slot that does not exist.
     """
     deck = _source(source).get(slug)
-    empty: dict[str, Any] = {"slug": deck.slug, "commander": "",
-                             "selected": deck.commander_art, "printings": []}
-    if not deck.commander:
+    if card is not None:
+        entry = _find_card(deck, card)
+        if entry is None:
+            raise EditRejected(f"{card!r} is not in this deck")
+        name = entry.name
+        selected = getattr(entry, "art", "")
+    else:
+        name = deck.commander[0] if deck.commander else ""
+        selected = deck.commander_art
+    empty: dict[str, Any] = {"slug": deck.slug, "commander": name,
+                             "selected": selected, "printings": []}
+    if not name:
         return empty
-    name = deck.commander[0]
-    empty["commander"] = name
 
     con = _connect()
     if con is None:
@@ -569,7 +585,7 @@ def commander_printings(slug: str, *,
             "image": r[7],
             "art_crop": art_crop_from(r[7]),
             "price_usd": r[8],
-            "selected": r[0] == deck.commander_art,
+            "selected": r[0] == selected,
         } for r in rows],
     }
 
@@ -595,6 +611,44 @@ def _chosen_art(deck: Any, con: Any) -> dict[str, Any] | None:
             "set_name": row[1], "set_code": (row[2] or "").upper()}
 
 
+def _card_art_overrides(deck: Deck,
+                        con: DuckDBPyConnection | None) -> dict[str, dict[str, Any]]:
+    """The chosen printings for every card that picked one, keyed by name.
+
+    One query for the whole deck rather than one per card, for the same N+1
+    reason the shelf batches the gate. A stale id -- a printing that left the
+    pool -- simply does not come back, and the card renders its default, the
+    same forgiving answer `_chosen_art` gives the commander.
+    """
+    chosen = {c.name: c.art
+              for c in [*deck.cards, *deck.swap_board, *deck.graveyard]
+              if getattr(c, "art", "")}
+    if not chosen or con is None:
+        return {}
+    ids = list(chosen.values())
+    rows = con.execute(
+        f"SELECT id, image_normal FROM printings "
+        f"WHERE id IN ({','.join('?' * len(ids))}) "
+        f"AND image_normal IS NOT NULL",
+        ids).fetchall()
+    by_id = {r[0]: r[1] for r in rows}
+    return {name: {"image": by_id[art_id],
+                   "art_crop": art_crop_from(by_id[art_id])}
+            for name, art_id in chosen.items() if art_id in by_id}
+
+
+def _with_art(row: dict[str, Any],
+              overrides: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """One row, wearing its chosen printing. Images only -- oracle text, cost
+    and identity are the card's and do not vary by printing, exactly as the
+    commander's `_chosen_art` note argues."""
+    chosen = overrides.get(row["name"])
+    if chosen and row.get("known"):
+        row["image"] = chosen["image"]
+        row["art_crop"] = chosen["art_crop"] or row.get("art_crop")
+    return row
+
+
 def get_deck(slug: str, *, source: DeckSource | None = None,
              owner: str | None = None) -> dict[str, Any]:
     decks = _source(source)
@@ -617,6 +671,8 @@ def get_deck(slug: str, *, source: DeckSource | None = None,
             commander_card["art_crop"] = chosen["art_crop"] or commander_card.get("art_crop")
             commander_card["printing"] = {"set_name": chosen["set_name"],
                                           "set_code": chosen["set_code"]}
+        # The 99's own choices, one batch query (see `_card_art_overrides`).
+        chosen_art = _card_art_overrides(deck, con)
         return {
             "commander_art": deck.commander_art,
             "slug": deck.slug,
@@ -649,12 +705,15 @@ def get_deck(slug: str, *, source: DeckSource | None = None,
             "land_count": deck.land_count,
             "color_identity": sorted(commander_rec.color_identity) if commander_rec else [],
             "commander_card": commander_card,
-            "cards": [_card_json(e, cards.get(e.name)) for e in deck.cards],
-            "swap_board": [_card_json(e, cards.get(e.name)) for e in deck.swap_board],
+            "cards": [_with_art(_card_json(e, cards.get(e.name)), chosen_art)
+                      for e in deck.cards],
+            "swap_board": [_with_art(_card_json(e, cards.get(e.name)), chosen_art)
+                           for e in deck.swap_board],
             # Entombed cards (ADR 27): out of the 99, waiting on a return or
             # an exile. Rendered with the same pool facts as the living so the
             # graveyard panel can show real cards, not just names.
-            "graveyard": [_card_json(e, cards.get(e.name)) for e in deck.graveyard],
+            "graveyard": [_with_art(_card_json(e, cards.get(e.name)), chosen_art)
+                          for e in deck.graveyard],
             "pool_available": con is not None,
         }
     finally:
@@ -1717,6 +1776,14 @@ def set_card_field(slug: str, *, name: str, field: str, value: Any,
         raise EditRejected(f"{name!r} is not in this deck")
     if field == "category":
         value = _check_category(str(value))
+    # `art` is checked against the pool here for the same reason
+    # `commander_art` is in `set_deck_field`: the editor can tell a printing
+    # id from a typo by its shape, and only a query can tell whether that id
+    # is a printing *of this card*.
+    if field == "art" and str(value or "").strip():
+        _check_printing_of(
+            entry.name, str(value).strip(),
+            hint="the card's own printings list has the ones that are.")
     try:
         updated = edit.set_card_field(decks.read_text(slug), name=entry.name,
                                       field=field, value=value)
@@ -1725,15 +1792,13 @@ def set_card_field(slug: str, *, name: str, field: str, value: Any,
     return _commit(slug, decks, updated, card=entry.name, field=field)
 
 
-def _check_printing(deck: Any, printing_id: str) -> None:
-    """Refuse an art id that is not a printing of this deck's commander.
+def _check_printing_of(name: str, printing_id: str, *, hint: str) -> None:
+    """Refuse an art id that is not a printing of this card.
 
     Silence when there is no card pool: a fresh clone cannot check, and refusing
     every art change on a machine without a 500MB download would be a worse
     answer than accepting one that renders as the default.
     """
-    if not deck.commander:
-        raise EditRejected("this deck has no commander, so it has no art to set")
     con = _connect()
     if con is None:
         return
@@ -1741,13 +1806,21 @@ def _check_printing(deck: Any, printing_id: str) -> None:
         row = con.execute(
             "SELECT p.name FROM printings p WHERE p.id = ? AND p.oracle_id = "
             "(SELECT oracle_id FROM oracle_cards WHERE name = ? LIMIT 1)",
-            [printing_id, deck.commander[0]]).fetchone()
+            [printing_id, name]).fetchone()
     finally:
         con.close()
     if row is None:
         raise EditRejected(
-            f"{printing_id} is not a printing of {deck.commander[0]}. "
-            f"`GET /api/decks/{deck.slug}/printings` lists the ones that are.")
+            f"{printing_id} is not a printing of {name}. {hint}")
+
+
+def _check_printing(deck: Any, printing_id: str) -> None:
+    """The commander's version of the check above."""
+    if not deck.commander:
+        raise EditRejected("this deck has no commander, so it has no art to set")
+    _check_printing_of(
+        deck.commander[0], printing_id,
+        hint=f"`GET /api/decks/{deck.slug}/printings` lists the ones that are.")
 
 
 def set_deck_field(slug: str, *, field: str, value: Any,

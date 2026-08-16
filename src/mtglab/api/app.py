@@ -566,14 +566,24 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         return service.commander_dossier(slug, source=lib.source_for(owner))
 
     @app.get("/api/decks/{owner}/{slug}/printings")
-    def deck_printings(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
+    def deck_printings(owner: str, slug: str, lib: Lib,
+                       card: str | None = Query(None)) -> dict[str, Any]:
         """Every non-digital printing of this deck's commander, newest first.
 
         Its own route rather than fields on the deck: Goreclaw has twelve and
         most decks never open the picker, so this is a query the deck page
         should not pay for on every load.
+
+        `?card=` asks about any card the deck holds instead -- the 99, the
+        swap board or the graveyard -- so alternate art is not a privilege of
+        the command zone. A card the deck does not hold is a 422, not an
+        empty list, because the only caller is a picker about to write.
         """
-        return service.commander_printings(slug, source=lib.source_for(owner))
+        try:
+            return service.commander_printings(slug, card=card,
+                                               source=lib.source_for(owner))
+        except service.EditRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     # ------------------------------------------------------------ cards
 

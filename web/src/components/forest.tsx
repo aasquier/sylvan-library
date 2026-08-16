@@ -153,3 +153,40 @@ export function HeaderCanopy() {
     </div>
   )
 }
+
+/* ------------------------------------------------------------ the wordmark */
+
+/**
+ * The library's mark: a tree grown out of an open book.
+ *
+ * Drawn for the same reasons everything else in this file is — and because
+ * the header wore a 🌳 emoji, which renders as whatever the platform's emoji
+ * font thinks a tree is and reads as a placeholder on every one of them.
+ * This is the identity the tab, the header and the sign-in screen share.
+ *
+ * It commits to its own palette in both themes, like the tarot card back:
+ * a mark that changed colour with the theme would stop reading as a mark.
+ */
+export function LibraryMark({ size = 24 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 40 40" width={size} height={size} aria-hidden="true">
+      {/* The canopy: overlapping crowns, lit from the upper left. */}
+      <circle cx="20" cy="11.5" r="8" fill="#2f6b3f" />
+      <circle cx="12" cy="16" r="6.5" fill="#285c36" />
+      <circle cx="28" cy="16" r="6.5" fill="#285c36" />
+      <circle cx="20" cy="17" r="7.5" fill="#357347" />
+      <circle cx="16.5" cy="9.5" r="3.2" fill="#5c9c6c" opacity="0.9" />
+      {/* The trunk, flaring where it meets the pages. */}
+      <path d="M18.8 21 C18.8 24.5 17.8 27 16.2 28.8 L20 28.2 L23.8 28.8
+               C22.2 27 21.2 24.5 21.2 21 Z" fill="#6e4e28" />
+      {/* The open book: amber cover, parchment pages, a seam at the spine. */}
+      <path d="M5.5 28.5 C10.5 27 15.5 27.5 20 29.8 C24.5 27.5 29.5 27
+               34.5 28.5 L34.5 33.5 C29.5 32 24.5 32.5 20 34.8 C15.5 32.5
+               10.5 32 5.5 33.5 Z" fill="#c9a227" />
+      <path d="M7.5 29.3 C11.5 28.2 16 28.6 20 30.6 C24 28.6 28.5 28.2
+               32.5 29.3 L32.5 32 C28.5 31 24 31.4 20 33.2 C16 31.4 11.5 31
+               7.5 32 Z" fill="#f0e4c2" />
+      <path d="M20 30.6 L20 33.2" stroke="#b39b62" strokeWidth="0.9" />
+    </svg>
+  )
+}

@@ -79,6 +79,13 @@ class CardEntry:
     # Optional overrides, used when a card is too new for the local DB.
     mana_cost: str | None = None
     tags: list[str] = field(default_factory=list)
+    # Which printing's art this deck shows for the card: a Scryfall printing
+    # id, or empty for the pool's default. The card-level twin of the deck's
+    # `commander_art`, and a deck property for the same reason -- a foil
+    # Secret Lair Sol Ring is a fact about the deck in the box, not a
+    # preference of whoever is looking at it. Written only when set, so the
+    # six curated files do not grow 99 empty keys.
+    art: str = ""
 
     @classmethod
     def from_obj(cls, obj: Any) -> CardEntry:
@@ -92,6 +99,7 @@ class CardEntry:
             scryfall_id=obj.get("scryfall_id"),
             mana_cost=obj.get("mana_cost"),
             tags=list(obj.get("tags", [])),
+            art=str(obj.get("art") or ""),
         )
 
     def to_obj(self) -> dict[str, Any]:
@@ -106,6 +114,8 @@ class CardEntry:
             out["mana_cost"] = self.mana_cost
         if self.tags:
             out["tags"] = self.tags
+        if self.art:
+            out["art"] = self.art
         return out
 
 

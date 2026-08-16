@@ -5,7 +5,7 @@ import Library from './routes/Library'
 import Login from './routes/Login'
 import { Spinner } from './components/ui'
 import { StanceMenu } from './components/stancemenu'
-import { ForestAmbience, HeaderCanopy } from './components/forest'
+import { ForestAmbience, HeaderCanopy, LibraryMark } from './components/forest'
 import { LibraryWhisper } from './components/whisper'
 import { api, onSessionLost, type AuthState, type Health } from './lib/api'
 
@@ -120,8 +120,10 @@ function AuthScreen({ theme, onToggleTheme, children }: {
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-12">
       <div className="mb-5 flex items-center justify-between">
         <span className="flex items-center gap-2">
-          <span aria-hidden className="text-lg">🌳</span>
-          <span className="font-semibold tracking-tight">sylvan-library</span>
+          <LibraryMark size={26} />
+          <span className="wordmark-title font-semibold tracking-tight">
+            Sylvan Libraries
+          </span>
         </span>
         <ThemeButton theme={theme} onToggle={onToggleTheme} />
       </div>
@@ -267,9 +269,17 @@ export default function App() {
           {/* `shrink-0` and no wrapping: the signed-in name and Sign out add a
               second cluster to this row, and without it a narrow window breaks
               the wordmark across two lines before it touches anything else. */}
+          {/* The name the site answers to — sylvan-libraries.com — with the
+              drawn mark instead of an emoji whose rendering belonged to the
+              platform. The repo keeps its own name; that mismatch is stated
+              in CLAUDE.md and is not a bug to fix. */}
           <NavLink to="/" className="wordmark flex shrink-0 items-center gap-2 whitespace-nowrap">
-            <span aria-hidden className="wordmark-tree text-lg">🌳</span>
-            <span className="font-semibold tracking-tight">sylvan-library</span>
+            <span aria-hidden className="wordmark-tree inline-flex">
+              <LibraryMark size={26} />
+            </span>
+            <span className="wordmark-title text-[1.05rem] font-semibold tracking-tight">
+              Sylvan Libraries
+            </span>
           </NavLink>
 
           {/* The negative margin lets the scrolled row bleed to the viewport

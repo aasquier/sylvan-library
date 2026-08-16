@@ -286,3 +286,116 @@ def test_no_pool_means_the_choice_is_accepted_rather_than_blocked(tmp_path,
     deck = Deck.from_text(DECK_YAML)
     with config.use_paths(data_dir=tmp_path / "empty"):
         service._check_printing(deck, A_PRINTING)      # does not raise
+
+
+# ---------------------------------------------------------- the 99's own art
+#
+# The card-level twin of everything above (punch list 2026-08-15 item 8): any
+# card may pick its printing, the choice lives on the card's own entry in
+# `deck.yaml`, and the same two-layer check applies -- shape in `edit.py`,
+# ownership in `service.py`.
+
+CARDED_YAML = DECK_YAML + """\
+  - name: Sol Ring
+    category: ramp
+    why: Fast mana.
+"""
+
+
+def test_a_cards_art_choice_round_trips_and_stays_absent_when_unset():
+    deck = Deck.from_text(CARDED_YAML)
+    assert deck.cards[1].art == ""
+    # No `art: ''` creeping into the six curated files on a round trip.
+    assert "art:" not in deck.dump()
+    deck.cards[1].art = A_PRINTING
+    assert Deck.from_text(deck.dump()).cards[1].art == A_PRINTING
+
+
+def test_setting_a_cards_art_touches_that_entry_and_nothing_else():
+    updated = edit.set_card_field(CARDED_YAML, name="Sol Ring", field="art",
+                                  value=A_PRINTING)
+    deck = Deck.from_text(updated)
+    assert deck.cards[1].art == A_PRINTING
+    assert deck.cards[0].art == ""
+    assert deck.cards[1].why == "Fast mana."
+
+
+def test_clearing_a_cards_art_drops_the_key_rather_than_writing_a_blank():
+    picked = edit.set_card_field(CARDED_YAML, name="Sol Ring", field="art",
+                                 value=A_PRINTING)
+    cleared = edit.set_card_field(picked, name="Sol Ring", field="art",
+                                  value="")
+    assert "art:" not in cleared
+    assert Deck.from_text(cleared).cards[1].art == ""
+
+
+def test_a_cards_art_typo_is_refused_by_shape_before_any_query():
+    with pytest.raises(edit.EditFailed, match="Scryfall printing id"):
+        edit.set_card_field(CARDED_YAML, name="Sol Ring", field="art",
+                            value="tst")
+
+
+@pytest.fixture
+def carded(tmp_path):
+    path = tmp_path / "carded" / "deck.yaml"
+    path.parent.mkdir()
+    path.write_text(CARDED_YAML, encoding="utf-8")
+    return MemoryDeckSource([Deck.load(path)])
+
+
+def test_a_printing_of_another_card_is_refused_for_a_card(printed, carded):
+    """The ownership check, one card down: Gyome's painting on Sol Ring's
+    slot passes every shape check and only the pool can refuse it."""
+    with pytest.raises(service.EditRejected, match="not a printing of"):
+        service.set_card_field("mini", name="Sol Ring", field="art",
+                               value=GYOME_PRINTING, source=carded)
+
+
+def test_a_printing_of_the_card_itself_is_accepted(printed, carded):
+    result = service.set_card_field("mini", name="Sol Ring", field="art",
+                                    value=SOL_RING_PRINTING, source=carded)
+    assert result["card"] == "Sol Ring"
+
+
+def test_the_printings_list_answers_for_any_card_in_the_deck(printed, carded):
+    listing = service.commander_printings("mini", card="Sol Ring",
+                                          source=carded)
+    assert listing["commander"] == "Sol Ring"
+    assert [p["id"] for p in listing["printings"]] == [SOL_RING_PRINTING]
+
+
+def test_asking_about_a_card_the_deck_does_not_hold_is_refused(printed, carded):
+    with pytest.raises(service.EditRejected, match="not in this deck"):
+        service.commander_printings("mini", card="Lightning Bolt",
+                                    source=carded)
+
+
+def test_a_cards_chosen_printing_replaces_its_images_and_nothing_else(
+        printed, tmp_path):
+    yaml = CARDED_YAML.replace("why: Fast mana.",
+                               f"why: Fast mana.\n    art: {SOL_RING_PRINTING}")
+    path = tmp_path / "picked-card" / "deck.yaml"
+    path.parent.mkdir()
+    path.write_text(yaml, encoding="utf-8")
+    src = MemoryDeckSource([Deck.load(path)])
+
+    rows = {c["name"]: c for c in service.get_deck("mini", source=src)["cards"]}
+    assert rows["Sol Ring"]["image"].endswith("/a/b/x.jpg")
+    assert rows["Sol Ring"]["art"] == SOL_RING_PRINTING
+    # The pool's facts are untouched, and the unchosen card keeps its default.
+    assert rows["Sol Ring"]["oracle_text"]
+    assert not rows["Swamp"]["image"].endswith("/a/b/x.jpg")
+
+
+def test_a_stale_card_art_id_falls_back_to_the_default(printed, tmp_path):
+    gone = "44444444-4444-4444-8444-444444444444"
+    yaml = CARDED_YAML.replace("why: Fast mana.",
+                               f"why: Fast mana.\n    art: {gone}")
+    path = tmp_path / "stale-card" / "deck.yaml"
+    path.parent.mkdir()
+    path.write_text(yaml, encoding="utf-8")
+    src = MemoryDeckSource([Deck.load(path)])
+
+    rows = {c["name"]: c for c in service.get_deck("mini", source=src)["cards"]}
+    assert rows["Sol Ring"]["known"] and rows["Sol Ring"]["image"]
+    assert not rows["Sol Ring"]["image"].endswith("/a/b/x.jpg")
