@@ -107,7 +107,9 @@ def test_licence_prints_the_proof_without_downloading(scene, capsys):
     main(["animist", "licence", str(scene)])
     out = capsys.readouterr().out
     assert "ivy: cc0 -- confirmed" in out
-    assert "api.openverse.org" in out
+    # The proof line ends with the exact API URL the gate consulted.
+    proof = next(line for line in out.splitlines() if "confirmed" in line)
+    assert proof.endswith("via https://api.openverse.org/v1/images/abc-123/")
     # The gate alone moves no image bytes.
     data = scene.parent.parent / "data"
     assert not data.exists() or not list(data.rglob("*.jpg"))
