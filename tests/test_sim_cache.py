@@ -246,7 +246,7 @@ def test_the_cache_version_is_pinned_against_the_determinism_digest():
     """
     from test_determinism import REFERENCE_DIGEST
     assert (REFERENCE_DIGEST, cache.SIM_VERSION) == (
-        "3a19995ef9ae506dbf9bb05eecf11a7a2576c073f9b03e6876d5b30ab60b1239", 1)
+        "c3e278e3e09ae7766b145886bddf7e07314533c292b6c5aeb9340c73b3ee22d4", 2)
 
 
 # ------------------------------------------------------------- the store holds

@@ -86,6 +86,9 @@ SIMULATOR_KEYS = (
     "stat.never_cast_commander", "stat.color_screw_rate",
     "stat.spells_through_t8", "stat.wasted_through_t8",
     "stat.deployment_spread", "stat.argmax_lands",
+    # The texture stats (second 2026-08-15 punch list, item 11).
+    "stat.median_first_spell", "stat.stalled_turns",
+    "stat.missed_drop", "stat.card_timing",
 )
 
 

@@ -291,6 +291,19 @@ export interface TurnRow {
   unused: number
   spells: number
   commander_down: number
+  /** P(no land to play this turn) — the drop that could not be made. */
+  missed_drop: number
+}
+
+/** When one card comes online, over many games (second 2026-08-15 punch
+ *  list, item 11). Served sorted worst-first: never-cast, then latest
+ *  medians. */
+export interface CardTimingRow {
+  name: string
+  mv: number
+  cast_rate: number
+  median_turn: number | null
+  by_t8: number
 }
 
 /** What every Tier 1 result carries about its own provenance.
@@ -317,6 +330,9 @@ export interface ManaResult extends SimProvenance {
   never_cast_commander: number
   color_screw_rate: number
   by_turn: TurnRow[]
+  median_first_spell_turn: number | null
+  stalled_turns: number
+  card_timings: CardTimingRow[]
   caveat: string
 }
 

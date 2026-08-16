@@ -268,7 +268,7 @@ export default function Simulator() {
 
       {mana && (
         <div className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <StatTile label="Mulligan rate" value={percent(mana.mulligan_rate)}
                       hint={`avg ${mana.avg_mulligans.toFixed(2)} per game`}
                       help={help('stat.mulligan_rate')} />
@@ -282,6 +282,19 @@ export default function Simulator() {
             <StatTile label="Color-only blocks"
                       value={mana.color_screw_rate.toFixed(2)} hint="turns per game"
                       help={help('stat.color_screw_rate')} />
+            {/* The texture pair (second punch list, item 11): how the games
+                actually feel — when the deck starts moving, and how often
+                it just sits there. */}
+            <StatTile label="First spell"
+                      value={mana.median_first_spell_turn != null
+                        ? `T${mana.median_first_spell_turn}` : '—'}
+                      hint="median turn"
+                      help={help('stat.median_first_spell')} />
+            <StatTile label="Stalled turns"
+                      value={mana.stalled_turns.toFixed(2)}
+                      hint="castless with a spell in hand, per game"
+                      tone={mana.stalled_turns > 2 ? 'warning' : undefined}
+                      help={help('stat.stalled_turns')} />
           </div>
 
           <section className="card-surface space-y-2 rounded-xl p-5">
@@ -299,10 +312,36 @@ export default function Simulator() {
                 { key: 'mana', label: 'Mana' },
                 { key: 'spells', label: 'Spells' },
                 { key: 'unused', label: 'Wasted' },
+                { key: 'missed_drop', label: 'No land', format: (v) => percent(v, 0) },
                 { key: 'commander_down', label: 'Commander', format: (v) => percent(v, 0) },
               ]}
               rows={mana.by_turn}
             />
+          </section>
+
+          <section className="card-surface space-y-2 rounded-xl p-5">
+            <h3 className="flex items-center text-sm font-semibold">
+              When each card comes online{help('stat.card_timing')}
+            </h3>
+            <Caveat>
+              Worst first: never-cast cards lead, then the latest medians. Low
+              cast rates are normal — a specific card in a 99 is only drawn in
+              a minority of games — so read the gap between a card&rsquo;s
+              cost and its median turn, not the rate alone.
+            </Caveat>
+            <div className="max-h-96 overflow-y-auto">
+              <DataTable
+                columns={[
+                  { key: 'name', label: 'Card' },
+                  { key: 'mv', label: 'MV' },
+                  { key: 'median_turn', label: 'Median turn',
+                    format: (v) => (v == null ? 'never' : `T${v}`) },
+                  { key: 'cast_rate', label: 'Cast in', format: (v) => percent(v, 0) },
+                  { key: 'by_t8', label: 'Down by T8', format: (v) => percent(v, 0) },
+                ]}
+                rows={mana.card_timings}
+              />
+            </div>
           </section>
 
           <Provenance seed={mana.seed} cached={mana.cached}

@@ -109,7 +109,7 @@ _LOG = logging.getLogger("mtglab.sim.cache")
 #: fix that must invalidate cards compiled before it. Pinned against
 #: `tests/test_determinism.REFERENCE_DIGEST` as a pair, so a deliberate change
 #: to Tier 1's output forces a decision here rather than passing unnoticed.
-SIM_VERSION = 1
+SIM_VERSION = 2  # 2: GameResult/SimSummary grew the texture fields (2026-08-15 item 11)
 
 #: How many rows to keep. A mana result is ~1.5 kB and a land-sweep row a few
 #: hundred bytes, so this is a couple of megabytes at worst -- bounded because

@@ -183,8 +183,28 @@ def _mana_result(slug: str, deck: Deck, library: list[SimCard],
                 "unused": round(summary.avg_unused_by_turn[t], 2),
                 "spells": round(summary.avg_spells_by_turn[t], 2),
                 "commander_down": summary.commander_by_turn.get(t + 1, 0.0),
+                # P(no land to play this turn) -- the drop that could not be
+                # made, never the one held back (second punch list, item 11).
+                "missed_drop": round(summary.missed_drop_by_turn[t], 4),
             }
             for t in range(turns)
+        ],
+        # The texture (second punch list, item 11): when each card actually
+        # comes online, and the two whole-game scalars that summarise how a
+        # hand plays out. Timings ride sorted as the engine sorts them --
+        # never-cast first, then latest medians -- so a client that renders
+        # the top of the list is already showing the problem children.
+        "median_first_spell_turn": summary.median_first_spell_turn,
+        "stalled_turns": round(summary.avg_stalled_turns, 2),
+        "card_timings": [
+            {
+                "name": ct.name,
+                "mv": ct.mv,
+                "cast_rate": round(ct.cast_rate, 4),
+                "median_turn": ct.median_turn,
+                "by_t8": round(ct.by_t8, 4),
+            }
+            for ct in summary.card_timings
         ],
         "caveat": TIER1_CAVEAT,
     }

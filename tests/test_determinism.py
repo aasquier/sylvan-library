@@ -36,7 +36,7 @@ ORACLE = REPO_ROOT / "tests" / "mana_oracle.py"
 # what the simulator reports, which is a decision, not a detail. Regenerate
 # deliberately and say what moved and why:
 #     python tests/determinism_probe.py
-REFERENCE_DIGEST = "3a19995ef9ae506dbf9bb05eecf11a7a2576c073f9b03e6876d5b30ab60b1239"
+REFERENCE_DIGEST = "c3e278e3e09ae7766b145886bddf7e07314533c292b6c5aeb9340c73b3ee22d4"
 
 
 def _digest_from_subprocess(script: Path, *args: str, hash_seed: str) -> str:
