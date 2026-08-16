@@ -12,11 +12,22 @@ Commandment 2 makes this concrete: the newcomer someone shares the site with
 is opening it on *their* phone, in *their* browser. It has to just work.
 
 - The compatibility floor is real and personal: **Safari 15 on macOS 12 is
-  the dev machine's own browser.** No regex lookbehind under `web/src`
-  (grep `(?<` every run), and check newer JS/CSS features against that floor
-  before use — `:has()`, container queries, `structuredClone`, top-level
-  await in served code. When Vite's target and reality disagree, reality is
-  the phone that renders white.
+  the dev machine's own browser** — but check the ledger before repeating that
+  number, because the 2026-08-16 run found the shipped bundle needs 16.4 and
+  queued the question of which way to resolve it. Check newer JS/CSS features
+  against whatever the floor actually is — `:has()`, container queries,
+  `structuredClone`, top-level await in served code. When Vite's target and
+  reality disagree, reality is the phone that renders white.
+- **Audit `src/mtglab/web_dist/assets/`, not `web/src`, and run
+  `tests/test_browser_floor.py` rather than grepping.** This is the correction
+  that run earned the hard way: the floor moved from 15 to 16.4 the day
+  Tailwind v4 landed, and no source file changed — v4 emits `@property` and
+  `color-mix(in lab, …)` into the *bundle*. A grep of `web/src` cannot see
+  what a phone parses. Two further traps in the old instruction: below the
+  floor the failure is **quiet** (unsupported `@property` declarations are
+  dropped, so shadows, transforms, filters and rings vanish while the layout
+  stays correct), and `grep '(?<'` has a built-in false positive, since a
+  named capture group `(?<name>…)` is not a lookbehind.
 - Mobile Safari's quirks are the usual suspects; audit the surfaces changed
   since last run for them: viewport height (`100vh` vs dynamic toolbars —
   prefer `dvh`/`svh` with fallback), `env(safe-area-inset-*)` on notched

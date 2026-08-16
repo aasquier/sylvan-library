@@ -33,9 +33,9 @@ from mtglab.decks.source import (
 from mtglab.decks.validate import validate
 
 if TYPE_CHECKING:
-    # Type-only, so the lazy-import discipline holds at runtime: duckdb stays
-    # inside `_connect`, and the Claude package stays out of a base install's
-    # import graph entirely.
+    # Type-only, so the lazy-import discipline holds at runtime: duckdb is
+    # imported inside `cards.db.connect_readonly` and never here, and the
+    # Claude package stays out of a base install's import graph entirely.
     from duckdb import DuckDBPyConnection
 
     from mtglab.cards.db import CardRecord
@@ -75,8 +75,9 @@ def _connect() -> DuckDBPyConnection | None:
     if not Path(config.DB_PATH).exists():
         return None
     try:
-        import duckdb
-        return duckdb.connect(str(config.DB_PATH), read_only=True)
+        # `cards.db.Connection` is `Any` -- duckdb ships no stubs -- so the
+        # cast is what keeps this function's own return type meaningful.
+        return cast("DuckDBPyConnection", db.connect_readonly(config.DB_PATH))
     except Exception:                                               # noqa: BLE001
         # Most likely a `data refresh` holding the write lock. The app stays
         # usable in degraded form rather than failing every request.

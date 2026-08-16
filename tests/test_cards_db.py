@@ -599,6 +599,66 @@ def test_load_printings_skips_digital_and_snapshots_prices(tmp_path):
     con.close()
 
 
+def test_a_snapshot_date_is_bound_and_not_interpolated(tmp_path):
+    """`on_date` reaches DuckDB as a parameter, so a value cannot be syntax.
+
+    Unreachable from a request today -- the only production caller passes no
+    date -- but that is a property of the callers, and the next caller inherits
+    whatever this function does. Interpolated, the payload below would close the
+    date literal and drop the table; bound, it is a bad date and nothing more.
+    """
+    from mtglab.cards import db
+
+    con = db.connect(tmp_path / "pool.duckdb")
+    try:
+        con.execute("INSERT INTO printings (id, oracle_id, name, price_usd) "
+                    "VALUES ('p1', 'o1', 'Sol Ring', 1.5)")
+
+        # Note what this does *not* assert: that the payload is rejected.
+        # DuckDB's DATE cast reads the leading `2026-08-14` and ignores the rest,
+        # so the call succeeds. That is the point -- the string is a value being
+        # parsed, not syntax being executed. Interpolated, the same payload would
+        # have closed the date literal and dropped the table.
+        assert db.snapshot_prices(
+            con, on_date="2026-08-14'); DROP TABLE printings; --") == 1
+        assert con.execute("SELECT count(*) FROM printings").fetchone()[0] == 1
+        assert con.execute(
+            "SELECT count(*) FROM price_history WHERE snapshot_date = DATE "
+            "'2026-08-14'").fetchone()[0] == 1
+
+        # And the ordinary path still works, so the guard did not cost the
+        # feature: a real date still writes a row under that date.
+        assert db.snapshot_prices(con, on_date="2026-08-14") == 1
+    finally:
+        con.close()
+
+
+def test_connect_readonly_opens_without_creating_or_migrating(tmp_path):
+    """The API's handle: it must not create the file, and must not run DDL.
+
+    Both halves matter. Creating it would mean a missing pool looks present and
+    empty rather than absent, and `ALTER TABLE` on a read-only handle raises --
+    which is why `oracle_columns()` exists and why `connect()` cannot serve the
+    app. This is the function that let `api/service.py` stop importing `duckdb`
+    itself, closing the one live exception to "DuckDB stays behind `cards/db.py`".
+    """
+    from mtglab.cards import db
+
+    missing = tmp_path / "absent.duckdb"
+    with pytest.raises(Exception):  # noqa: B017 -- duckdb's own IO error
+        db.connect_readonly(missing)
+    assert not missing.exists(), "a read-only open must not create the pool"
+
+    db.connect(tmp_path / "pool.duckdb").close()
+    con = db.connect_readonly(tmp_path / "pool.duckdb")
+    try:
+        assert con.execute("SELECT count(*) FROM oracle_cards").fetchone()[0] == 0
+        with pytest.raises(Exception):  # noqa: B017 -- read-only refusal
+            con.execute("ALTER TABLE oracle_cards ADD COLUMN x INTEGER")
+    finally:
+        con.close()
+
+
 def test_download_bulk_writes_once_and_reuses_the_copy(tmp_path, monkeypatch):
     import urllib.request
 

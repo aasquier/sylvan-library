@@ -140,6 +140,30 @@ def connect(db_path: str | Path = "data/mtg.duckdb") -> Connection:
     return con
 
 
+def connect_readonly(db_path: str | Path = "data/mtg.duckdb") -> Connection:
+    """Open an existing pool without creating it and without migrating it.
+
+    `connect()` cannot serve the app: it creates the file, runs `SCHEMA` and
+    `ALTER`s columns, and a read-only handle may do none of those. The app
+    opens the pool read-only deliberately, so that a `data refresh` holding the
+    write lock degrades it rather than locking every reader out --
+    `oracle_columns()` exists for the same reason and says so.
+
+    That was the one live exception to CLAUDE.md's "DuckDB stays behind
+    `cards/db.py`": `api/service.py` reached for `duckdb` itself because this
+    function did not exist. Opening the pool is still the pool module's
+    business, so now it does.
+
+    Raises rather than returning `None`. Whether a missing or locked pool is
+    fatal is the caller's policy, not this module's -- the API answers in
+    degraded form, the CLI does not -- and a helper that swallowed the
+    difference would make both of them guess.
+    """
+    import duckdb  # lazy, exactly as in `connect`
+
+    return duckdb.connect(str(Path(db_path)), read_only=True)
+
+
 def oracle_columns(con: Connection) -> set[str]:
     """The columns `oracle_cards` actually has on this connection.
 
@@ -435,16 +459,26 @@ def load_printings(con: Connection, path: Path, *, batch: int = 5000) -> int:
 
 
 def snapshot_prices(con: Connection, *, on_date: str | None = None) -> int:
-    """Append today's prices to price_history. Run daily via cron/launchd."""
-    date_expr = f"DATE '{on_date}'" if on_date else "CURRENT_DATE"
+    """Append today's prices to price_history. Run daily via cron/launchd.
+
+    `on_date` is **bound, not interpolated**. Nothing reaches it from a request
+    today -- the only production caller passes no date at all -- but that is a
+    fact about the callers rather than about this function, and the next caller
+    inherits whatever is written here. The two expressions chosen below are
+    module constants either way, which is the line the rest of this file's
+    f-string SQL already stays on: shape may be interpolated, values may not.
+    """
+    date_sql = "CURRENT_DATE" if on_date is None else "CAST(? AS DATE)"
+    params: list[str] = [] if on_date is None else [on_date]
     con.execute(f"""
         INSERT OR REPLACE INTO price_history
-        SELECT {date_expr}, id, oracle_id, name, price_usd, price_usd_foil
+        SELECT {date_sql}, id, oracle_id, name, price_usd, price_usd_foil
         FROM printings
         WHERE price_usd IS NOT NULL OR price_usd_foil IS NOT NULL
-    """)
+    """, params)
     written: int = con.execute(
-        f"SELECT count(*) FROM price_history WHERE snapshot_date = {date_expr}"
+        f"SELECT count(*) FROM price_history WHERE snapshot_date = {date_sql}",
+        params,
     ).fetchone()[0]
     return written
 
