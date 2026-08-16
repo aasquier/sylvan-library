@@ -354,6 +354,33 @@ describe('the tarot door', () => {
     expect(screen.getByText('reversed')).toBeTruthy()
   })
 
+  it('a Magic crossover shows matted art with its provenance', async () => {
+    // Punch list 2026-08-15 item 13: three Magic cards are in the deck.
+    // The face carries `.is-crossover` (the stylesheet mats the landscape
+    // crop instead of cover-cropping it), and the caption states the two
+    // facts the deal is allowed to know — which trump it is printed after,
+    // and whose painting it is. What it *means* stays the reader's.
+    vi.mocked(api.tarotReading).mockResolvedValue({
+      ...READING,
+      cards: [
+        { key: 'mtg-massimo-the-magician', name: 'Massimo, the Magician',
+          arcana: 'major', suit: null, number: 1,
+          image: 'https://cards.scryfall.io/art_crop/front/b/e/massimo.jpg',
+          artist: 'Jodie Muir', after: 'The Magician',
+          reversed: false, slot: 'taste', position: 'The Root' },
+        ...READING.cards.slice(1),
+      ],
+    } as never)
+    await enterTarot()
+    fireEvent.click(await screen.findByRole(
+      'button', { name: 'Turn over The Root' }, PAST_THE_SHUFFLE))
+
+    const face = await screen.findByAltText('Massimo, the Magician')
+    expect(face.className).toContain('is-crossover')
+    expect(screen.getByText(/after The Magician/)).toBeTruthy()
+    expect(screen.getByText(/art by Jodie Muir/)).toBeTruthy()
+  })
+
   it('sends the reader and the seed with every turn', async () => {
     // Both are client-held, for the reason the transcript is: the server keeps
     // no conversation. The seed is what makes three pictures cost one integer

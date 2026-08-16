@@ -185,8 +185,12 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
         <CardBack />
       </div>
       <div className="tarot-face tarot-face-front">
+        {/* A Magic crossover shows its art matted in the frame rather than
+            cover-cropped: the crop is landscape, and a vertical slice of it
+            would hide exactly the character the wink depends on. */}
         <img src={card.image} alt={card.name}
-             className={card.reversed ? 'is-reversed' : ''} />
+             className={`${card.reversed ? 'is-reversed' : ''}${
+               card.after ? ' is-crossover' : ''}`} />
       </div>
     </div>
   )
@@ -229,6 +233,15 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
             <p className="text-center text-[11px] italic"
                style={{ color: 'var(--text-muted)' }}>
               reversed
+            </p>
+          )}
+          {/* The crossover's provenance (item 13): which trump it is
+              printed after, and whose painting this is — hotlinked art is
+              credited wherever it renders, the persona tiles' rule. */}
+          {card.after && (
+            <p className="text-center text-[10px]"
+               style={{ color: 'var(--text-muted)' }}>
+              after {card.after} · art by {card.artist}
             </p>
           )}
         </>

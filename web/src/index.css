@@ -443,6 +443,13 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   transform: rotate(180deg);
 }
 
+/* A Magic crossover's art is a landscape crop in a portrait frame (punch
+   list item 13): matted on the parchment rather than cover-cropped, since
+   a vertical slice would hide exactly the character the wink depends on. */
+.tarot-face-front img.is-crossover {
+  object-fit: contain;
+}
+
 /* The deck, while it is being shuffled. Three backs a couple of degrees
    apart, riffling in place. */
 .tarot-deck {

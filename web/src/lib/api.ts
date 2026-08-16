@@ -1319,8 +1319,15 @@ export interface TarotDrawn {
   arcana: string
   suit: string | null
   number: number
-  /** `/tarot/<key>.webp` — package data, served beside the API. */
+  /** `/tarot/<key>.webp` — package data, served beside the API — or, for a
+   *  Magic crossover, a hotlinked Scryfall art crop. */
   image: string
+  /** A Magic crossover's artist, owed a credit line wherever the art
+   *  renders. Null for the 78. */
+  artist: string | null
+  /** Which trump the crossover is printed after — "The Fool" under Flubs.
+   *  Null for the 78, and the render key for everything crossover-shaped. */
+  after: string | null
   reversed: boolean
   slot: string
   position: string
