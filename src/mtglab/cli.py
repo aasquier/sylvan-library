@@ -1479,6 +1479,77 @@ def cmd_claude_usage(args):
 
 # --------------------------------------------------------------------- main
 
+# ---------------------------------------------------------------- cardmotion
+
+def cmd_cardmotion_build(args):
+    """Derive a card's motion (ADR 32): pool facts, Scryfall art, cached
+    derivative. A dev-machine run -- the app only ever serves the cache."""
+    _animist_pixels()
+    from mtglab.cardmotion.build import BuildRefused, build_derivative
+
+    if not config.DB_PATH.exists():
+        sys.exit("no card pool -- run `mtglab data refresh` first; card "
+                 "facts come from the pool (rule 1)")
+    if bool(args.deck) == bool(args.card):
+        sys.exit("refused: name exactly one of --deck (its commander's art) "
+                 "or --card")
+    if args.deck:
+        deck = _load(args.deck)
+        if not deck.commander:
+            sys.exit(f"refused: {args.deck} has no commander to animate")
+        card = deck.commander[0]
+    else:
+        card = args.card
+
+    model = None
+    from mtglab.cardmotion.effects import EFFECTS
+    chosen = EFFECTS.get(args.effect)
+    if chosen is not None and chosen.needs_depth:
+        from mtglab.cardmotion.depth import DepthError, load_model
+        try:
+            print("loading the depth model (first run downloads weights)...")
+            model = load_model()
+        except DepthError as exc:
+            sys.exit(f"refused: {exc}")
+
+    from mtglab.cards import db
+    con = db.connect(config.DB_PATH)
+    try:
+        entry = build_derivative(con, card=card, effect_key=args.effect,
+                                 model=model)
+    except BuildRefused as exc:
+        sys.exit(f"refused: {exc}")
+    meta = entry.attribution()
+    print(f"  {meta['card_name']} -- {args.effect} "
+          f"(art by {meta['artist']})")
+    for path in sorted(entry.directory.iterdir()):
+        print(f"  wrote {path} ({path.stat().st_size / 1024:.0f} KB)")
+    print("  deployed instances receive this over sftp -- HOSTING has the "
+          "runbook line")
+
+
+def cmd_cardmotion_status(args):
+    """Every cached derivative: card, effect, artist, when."""
+    from mtglab.cardmotion import cache
+
+    base = cache.root()
+    entries = sorted(base.iterdir()) if base.is_dir() else []
+    shown = 0
+    for directory in entries:
+        derivative = cache.CachedDerivative(directory)
+        if not derivative.ready:
+            continue
+        meta = derivative.attribution()
+        size = sum(p.stat().st_size for p in directory.iterdir())
+        print(f"  {meta['card_name']:<30} {meta['effect']:<12} "
+              f"{size / 1024:6.0f} KB  (art by {meta['artist']}, "
+              f"{meta['generated_at'][:10]})")
+        shown += 1
+    if not shown:
+        print("  nothing derived yet -- `mtglab cardmotion build --deck "
+              "<slug> --effect depth-drift` is the first run")
+
+
 # ------------------------------------------------------------------- animist
 
 def _animist_recipe(path_str):
@@ -1944,6 +2015,21 @@ def main(argv=None):
     # Wake still images into the site's scenery -- fetched free-use,
     # licence-checked per file, every step written down (ADR 29). The gate
     # blocks: there is no flag past a refused licence, deliberately.
+    # Card-art motion (ADR 32): derived at runtime into the gitignored
+    # cache, never committed -- the runtime counterpart of the animist below.
+    cm = sub.add_parser("cardmotion").add_subparsers(dest="cmd",
+                                                     required=True)
+    cb = cm.add_parser("build", help="derive one card's motion into the "
+                                     "cache: pool facts, Scryfall art, "
+                                     "dual-format loop")
+    cb.add_argument("--deck", help="a deck slug; its commander's art")
+    cb.add_argument("--card", help="or a card by name")
+    cb.add_argument("--effect", default="depth-drift",
+                    help="depth-drift (needs the depth extra) or slow-pan")
+    cb.set_defaults(func=cmd_cardmotion_build)
+    cs = cm.add_parser("status", help="every cached derivative")
+    cs.set_defaults(func=cmd_cardmotion_status)
+
     an = sub.add_parser("animist").add_subparsers(dest="cmd", required=True)
     ab = an.add_parser("build", help="fetch, gate, transform, encode, and "
                                      "write the provenance entry")

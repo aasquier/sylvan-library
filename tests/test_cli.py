@@ -1636,3 +1636,93 @@ def test_a_bare_build_diffs_against_the_last_builds_snapshot(decks, capsys):
     assert run(["decks", "build", "mini"])[0] == 0
     swaps = (out / "swaps.md").read_text("utf-8")
     assert "Arcane Signet" not in swaps or "0 out" in swaps
+
+
+# ------------------------------------------------------ cardmotion (ADR 32)
+#
+# The build engine has its own suite (tests/test_cardmotion.py); what these
+# pin is the terminal wiring -- deck resolution, the refusals' sentences,
+# and that `status` reads an empty cache as a sentence rather than a crash.
+
+def _cardmotion_pool(tmp_path):
+    """A scratch data dir holding the tiny pool, entered for the test."""
+    import tiny_pool
+    ctx = config.use_paths(data_dir=tmp_path / "data")
+    ctx.__enter__()
+    tiny_pool.build(config.DB_PATH)
+    return ctx
+
+
+def test_cardmotion_status_reads_an_empty_cache(tmp_path, capsys):
+    with config.use_paths(data_dir=tmp_path / "data"):
+        assert run(["cardmotion", "status"])[0] == 0
+        assert "nothing derived yet" in capsys.readouterr().out
+
+
+def test_cardmotion_build_refuses_without_a_pool(tmp_path, capsys):
+    with config.use_paths(data_dir=tmp_path / "absent"):
+        code, msg = run(["cardmotion", "build", "--card", "Sol Ring"])
+    assert code != 0
+    assert "pool" in str(msg)
+
+
+def test_cardmotion_build_needs_exactly_one_subject(tmp_path, capsys):
+    ctx = _cardmotion_pool(tmp_path)
+    try:
+        _, msg = run(["cardmotion", "build"])
+        assert "exactly one" in str(msg)
+        _, msg = run(["cardmotion", "build", "--card", "X",
+                         "--deck", "y"])
+        assert "exactly one" in str(msg)
+    finally:
+        ctx.__exit__(None, None, None)
+
+
+def test_cardmotion_build_derives_a_decks_commander(tmp_path, capsys,
+                                                    monkeypatch):
+    """The whole terminal path: deck -> commander -> pool row -> cached
+    derivative, with the art fetch faked at the download seam."""
+    import io as _io
+
+    import numpy as _np
+    from PIL import Image as _Image
+
+    import tiny_pool
+    from mtglab.cardmotion import build as cardmotion_build
+    from mtglab.cardmotion import cache as cardmotion_cache
+
+    def fake_download(url, target):
+        rng = _np.random.default_rng(2)
+        image = _Image.fromarray(
+            rng.integers(0, 255, (48, 64, 3), dtype=_np.uint8), mode="RGB")
+        buffer = _io.BytesIO()
+        image.save(buffer, format="JPEG")
+        target.write_bytes(buffer.getvalue())
+
+    monkeypatch.setattr(cardmotion_build, "_download", fake_download)
+    decks_root = tmp_path / "decks"
+    (decks_root / "mono-green").mkdir(parents=True)
+    (decks_root / "mono-green" / "deck.yaml").write_text(
+        tiny_pool.mono_green_deck().dump(), encoding="utf-8")
+    with config.use_paths(data_dir=tmp_path / "data", decks_dir=decks_root):
+        tiny_pool.build(config.DB_PATH)
+        code, _ = run(["cardmotion", "build", "--deck", "mono-green",
+                       "--effect", "slow-pan"])
+        out = capsys.readouterr().out
+        assert code == 0, out
+        assert "Goreclaw" in out
+        assert "sftp" in out, "the runbook pointer is part of the answer"
+        capsys.readouterr()
+        assert run(["cardmotion", "status"])[0] == 0
+        status = capsys.readouterr().out
+        assert "Goreclaw" in status and "slow-pan" in status
+
+        from mtglab.cardmotion.effects import EFFECTS
+        directories = sorted(cardmotion_cache.root().iterdir())
+        built = [d for d in directories
+                 if cardmotion_cache.CachedDerivative(d).ready]
+        assert len(built) == 1
+        oracle_id = cardmotion_cache.CachedDerivative(
+            built[0]).attribution()["oracle_id"]
+        entry = cardmotion_cache.find_ready(oracle_id, EFFECTS["slow-pan"])
+        assert entry is not None and entry.ready

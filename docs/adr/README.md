@@ -45,6 +45,7 @@ they differ.
 | [29](0029-an-asset-is-committed-only-with-a-recipe.md) | An asset is committed only with a recipe, and the licence gate has no override | Accepted |
 | [30](0030-decks-are-live-app-data.md) | Decks are live app data, not repository content | Accepted |
 | [31](0031-motion-is-seeded-and-a-procedural-source-is-its-own-declaration.md) | Motion is seeded, and a procedural source is its own declaration | Accepted |
+| [32](0032-card-art-motion-is-derived-at-runtime-and-never-committed.md) | Card-art motion is derived at runtime, and never committed | Accepted |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the
@@ -175,6 +176,17 @@ function of an explicit seed, and a procedural source's declaration (its
 seed) *is* the source, gated and dated like any other. Read it next to 8 and
 29: the loader refusing an unseeded stochastic op is the gate's shape again,
 applied to reproducibility.
+
+32 is the second refinement in the directory's history (18 was the first):
+29's "runtime only" rule for Wizards' art stands, and what changed is what
+"runtime" is allowed to mean — not just CSS in a browser but the app's own
+gitignored data tree, where the pool and every cache already live. The
+licensing ground was re-read from the primary sources rather than inherited,
+and the ADR records where each line actually is: the Fan Content Policy
+forbids bulk reposting (git), not free fan presentation (the app);
+Scryfall's guidelines bound the effect vocabulary, which is why there are
+two effects and not ten. Read it next to 6 and 29 — the same line, drawn a
+third time — and next to 18, whose cache-key shape it borrows whole.
 
 30 supersedes half a sentence of 1, and it is the half everything since had
 been quietly contradicting: `deck.yaml` is still the source of truth, but it

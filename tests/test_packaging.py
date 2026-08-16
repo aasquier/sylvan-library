@@ -153,6 +153,7 @@ def test_the_dev_extra_alone_is_a_complete_test_environment(module):
     )
 
 
+# `depth` is absent from this list DELIBERATELY -- see the test after it.
 @pytest.mark.parametrize("extra", ["api", "claude", "animist"])
 def test_dev_includes_every_other_extra(extra):
     """CLAUDE.md's Setup section says `dev` "includes all of it plus the test
@@ -173,6 +174,27 @@ def test_dev_includes_every_other_extra(extra):
         f"the `{extra}` extra declares {sorted(missing)}, which `dev` does not. "
         "CLAUDE.md tells a checkout to install `.[dev]` and calls it complete, "
         "so either add these to `dev` or stop claiming it includes everything."
+    )
+
+
+def test_the_depth_extra_is_deliberately_not_in_dev():
+    """The one argued exception to the vendoring rule above (ADR 32).
+
+    `depth` is ~800MB of torch wheels backing a function no test may import:
+    the suite drives the whole pipeline through the `DepthModel` Protocol
+    and fakes, and the real model runs only on the maintainer's machine.
+    Pinned in *both* directions so the decision cannot drift either way
+    silently -- if torch ever lands in `dev`, somebody should be re-reading
+    ADR 32 first, and if `depth` stops declaring torch, the extra has
+    stopped meaning anything.
+    """
+    depth = extra_requirements("depth")
+    assert "torch" in depth, "the depth extra no longer declares torch"
+    overlap = depth & dev_requirements()
+    assert not overlap, (
+        f"`dev` now installs {sorted(overlap)} from the `depth` extra -- "
+        "that is 800MB per environment for a function no test imports; "
+        "re-read ADR 32 before doing this deliberately."
     )
 
 

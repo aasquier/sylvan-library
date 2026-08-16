@@ -56,6 +56,16 @@ claude = ["anthropic>=0.69"]
 # the binary is a GPL build, run as a subprocess and never linked or shipped —
 # are argued in NOTICE.md.
 animist = ["Pillow>=11", "imageio-ffmpeg>=0.6"]
+# The depth model (ADR 32): CPU torch + the Depth-Anything-V2-Small loader,
+# dev-machine tooling for `mtglab cardmotion build --effect depth-drift`.
+# Deliberately NOT vendored into `dev` -- the one exception to the rule the
+# comments below argue four times, and the argument is cost against caller:
+# these are ~800MB of wheels per environment to exercise a function no test
+# may import (the suite drives the pipeline through a FakeDepthModel; the
+# real model runs only on the maintainer's machine). torch is pinned exact
+# because the fingerprint story assumes same-weights-same-depth, and the
+# pin is the verified-installable version for macOS 12 Intel (ROADMAP 12).
+depth = ["torch==2.2.2", "transformers>=4.40"]
 # httpx backs fastapi's TestClient, so the API tests need it. ruff's floor is
 # 0.16 because the rule selection in [tool.ruff.lint] names rules added after
 # 0.4, and an older ruff would error on the config rather than lint the code.
@@ -247,6 +257,13 @@ check_untyped_defs = true
 # stub file for a module whose API is two generator functions.
 [[tool.mypy.overrides]]
 module = ["imageio_ffmpeg"]
+ignore_missing_imports = true
+
+# torch and transformers back the `depth` extra, which is deliberately not
+# installed in dev or CI (see the extra's comment); the modules that import
+# them do so inside functions behind the DepthModel Protocol seam.
+[[tool.mypy.overrides]]
+module = ["torch", "transformers"]
 ignore_missing_imports = true
 
 [tool.ruff]

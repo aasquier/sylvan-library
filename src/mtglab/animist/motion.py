@@ -179,24 +179,39 @@ def _spectral_noise(params: dict[str, Any]) -> FrameSequence:
 
 
 def _bilinear_wrap(channel: NDArray[np.float32], sample_y: NDArray[np.float32],
-                   sample_x: NDArray[np.float32]) -> NDArray[np.float32]:
-    """Sample `channel` at fractional coordinates, wrapping at the edges —
-    numpy only, so the advection below adds no scipy dependency."""
+                   sample_x: NDArray[np.float32], *,
+                   clamp: bool = False) -> NDArray[np.float32]:
+    """Sample `channel` at fractional coordinates — numpy only, so nothing
+    here adds a scipy dependency. Edges wrap by default (the periodic
+    textures); `clamp=True` pins them instead, for imagery like a painting
+    whose left edge must never bleed in from its right."""
     import numpy as np
 
     height, width = channel.shape
+    if clamp:
+        sample_y = np.clip(sample_y, 0.0, height - 1.0)
+        sample_x = np.clip(sample_x, 0.0, width - 1.0)
     y0 = np.floor(sample_y).astype(np.int64)
     x0 = np.floor(sample_x).astype(np.int64)
     fy = (sample_y - y0).astype(np.float32)
     fx = (sample_x - x0).astype(np.float32)
-    y0 %= height
-    x0 %= width
-    y1 = (y0 + 1) % height
-    x1 = (x0 + 1) % width
+    if clamp:
+        y0 = np.clip(y0, 0, height - 1)
+        x0 = np.clip(x0, 0, width - 1)
+        y1 = np.clip(y0 + 1, 0, height - 1)
+        x1 = np.clip(x0 + 1, 0, width - 1)
+    else:
+        y0 %= height
+        x0 %= width
+        y1 = (y0 + 1) % height
+        x1 = (x0 + 1) % width
+
+    import numpy as _np
 
     top = channel[y0, x0] * (1 - fx) + channel[y0, x1] * fx
     bottom = channel[y1, x0] * (1 - fx) + channel[y1, x1] * fx
-    out: NDArray[np.float32] = top * (1 - fy) + bottom * fy
+    out: NDArray[np.float32] = (top * (1 - fy) + bottom * fy) \
+        .astype(_np.float32)
     return out
 
 
@@ -346,6 +361,65 @@ def _ken_burns(sequence: FrameSequence,
                round(left + view_w), round(top + view_h))
         out_frames.append(
             image.resize((width, height), Resampling.LANCZOS, box=box))
+    return FrameSequence(frames=tuple(out_frames), fps=fps)
+
+
+def parallax_frames(art: Image, depth: Image, *, frames: int, fps: int,
+                    amplitude: float = 6.0, zoom: float = 1.06) -> FrameSequence:
+    """2.5D drift: a still painting plus its depth map become a loop.
+
+    The camera runs a closed elliptical path (cosine in x, sine in y), so
+    frame N-1 sits beside frame 0 and the clip loops. Each pixel is
+    displaced along the camera offset in proportion to its depth — near
+    things move more, which is the whole illusion — with a small constant
+    zoom so the parallax never reveals the void past the canvas edge.
+    Deterministic: a camera path has no randomness to seed.
+
+    A public function rather than a registry entry, deliberately: the
+    registry's ops are recipe vocabulary, and a recipe's story for *where a
+    depth map lives* is not decided here. ADR 32's runtime tier calls this
+    directly; the day a committed recipe wants it is the day it earns a
+    registry name and that story.
+    """
+    import numpy as np
+    from PIL import Image as PILImage
+
+    if frames < 2:
+        raise OpError("parallax needs at least two frames")
+    if fps < 1:
+        raise OpError("parallax needs fps >= 1")
+    if amplitude <= 0:
+        raise OpError("parallax needs a positive `amplitude`")
+
+    art_rgb = art.convert("RGB")
+    width, height = art_rgb.size
+    depth_arr = np.asarray(
+        depth.convert("L").resize((width, height)), dtype=np.float32) / 255.0
+    # Centre the displacement so the mid-depth plane holds still and the
+    # scene pivots around it rather than sliding wholesale.
+    depth_arr -= float(depth_arr.mean())
+
+    array = np.asarray(art_rgb, dtype=np.float32)
+    ys, xs = np.meshgrid(np.arange(height, dtype=np.float32),
+                         np.arange(width, dtype=np.float32), indexing="ij")
+    # The zoom margin: sample from a slightly larger window than shown.
+    cy, cx = (height - 1) / 2.0, (width - 1) / 2.0
+    base_y = cy + (ys - cy) / zoom
+    base_x = cx + (xs - cx) / zoom
+
+    out_frames = []
+    for k in range(frames):
+        angle = 2.0 * np.pi * k / frames
+        dx = amplitude * np.cos(angle)
+        dy = amplitude * 0.6 * np.sin(angle)
+        sample_y = base_y + depth_arr * dy
+        sample_x = base_x + depth_arr * dx
+        moved = np.dstack([
+            _bilinear_wrap(np.ascontiguousarray(array[:, :, c]),
+                           sample_y, sample_x, clamp=True)
+            for c in range(3)])
+        out_frames.append(PILImage.fromarray(
+            np.clip(moved, 0.0, 255.0).astype(np.uint8), mode="RGB"))
     return FrameSequence(frames=tuple(out_frames), fps=fps)
 
 

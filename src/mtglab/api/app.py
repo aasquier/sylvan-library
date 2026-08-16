@@ -1054,6 +1054,68 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         with the cards absent and counted for."""
         return service.lore_shelves()
 
+    # ------------------------------------------------- card-art motion
+    #
+    # ADR 32's serving half, and deliberately the *only* half the app has:
+    # a derivative either sits in `data/cache/cardmotion/` (put there by a
+    # dev-machine `mtglab cardmotion build`, pushed over sftp deployed) or
+    # it does not exist. No request triggers generation, so these routes
+    # need no job pool, no dedup key, and no model anywhere near them.
+
+    @app.get("/api/art/motion/{oracle_id}/{effect}")
+    def art_motion_status(oracle_id: str, effect: str) -> dict[str, Any]:
+        """Is there a motion derivative for this painting? `ready: false` is
+        a complete, correct answer -- the client shows the still it already
+        has, which is the current page, not an error."""
+        from mtglab.cardmotion import cache as cardmotion_cache
+        from mtglab.cardmotion.effects import EFFECTS
+
+        chosen = EFFECTS.get(effect)
+        if chosen is None:
+            raise HTTPException(status_code=404,
+                                detail=f"no effect {effect!r}")
+        hit = cardmotion_cache.find_ready(oracle_id, chosen)
+        if hit is None:
+            return {"ready": False, "effect": effect}
+        meta = hit.attribution()
+        stamp = meta.get("fingerprint", "")
+        base = f"/api/art/motion/{oracle_id}/{effect}"
+        keys = {"loop.webm": "webm", "loop.mp4": "mp4",
+                "poster.webp": "poster", "depth.png": "depth"}
+        urls = {keys[name]: f"{base}/{name}?v={stamp}"
+                for name in sorted(cardmotion_cache.SERVABLE)
+                if hit.file(name).exists()}
+        return {"ready": True, "effect": effect, "fingerprint": stamp,
+                "urls": urls, "attribution": meta}
+
+    _ART_MOTION_TYPES = {"loop.webm": "video/webm", "loop.mp4": "video/mp4",
+                         "poster.webp": "image/webp",
+                         "depth.png": "image/png"}
+
+    @app.get("/api/art/motion/{oracle_id}/{effect}/{filename}")
+    def art_motion_file(oracle_id: str, effect: str,
+                        filename: str) -> FileResponse:
+        """One derivative file. Long-lived caching is safe because the
+        status payload's URLs carry the fingerprint as a version stamp -- a
+        regenerated derivative is a different URL, never a stale hit. The
+        media type is explicit because the container has no /etc/mime.types
+        (the tarot lesson)."""
+        from mtglab.cardmotion import cache as cardmotion_cache
+        from mtglab.cardmotion.effects import EFFECTS
+
+        chosen = EFFECTS.get(effect)
+        media_type = _ART_MOTION_TYPES.get(filename)
+        # The allowlist is the path-traversal guard: `filename` never
+        # reaches the filesystem unless it is one of four fixed names.
+        if chosen is None or media_type is None:
+            raise HTTPException(status_code=404, detail="no such derivative")
+        hit = cardmotion_cache.find_ready(oracle_id, chosen)
+        if hit is None or not hit.file(filename).exists():
+            raise HTTPException(status_code=404, detail="no such derivative")
+        return FileResponse(
+            hit.file(filename), media_type=media_type,
+            headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
     # -------------------------------------------------------------- sim
 
     # The job closures capture `decks` and run after the response has been
