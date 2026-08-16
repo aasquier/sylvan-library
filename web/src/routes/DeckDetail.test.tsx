@@ -99,7 +99,30 @@ const DECK = {
 const STATS = {
   slug: 'goreclaw-stompy', name: DECK.name, bracket: 4, total_cards: 99,
   land_count: 34, curve: { average_mv: 3.5, nonland_cards: 65, buckets: [] },
-  categories: [], colors: [], types: {},
+  categories: [], colors: [], types: { Creature: 30, Land: 34 },
+  game_changers: { cards: [], count: 0, allowed: 3, bracket: 4, verdict: 'ok' },
+  opening: {
+    deck_size: 99, hand_size: 7,
+    lands: {
+      count: 34,
+      distribution: [
+        { lands: 0, chance: 0.04 }, { lands: 1, chance: 0.16 },
+        { lands: 2, chance: 0.29 }, { lands: 3, chance: 0.28 },
+        { lands: 4, chance: 0.16 }, { lands: 5, chance: 0.05 },
+        { lands: 6, chance: 0.01 }, { lands: 7, chance: 0.001 },
+      ],
+      keepable: 0.73,
+    },
+    categories: [
+      { category: 'ramp', count: 10, in_opening_hand: 0.55, by_turn_four: 0.72 },
+    ],
+    singleton: [
+      { turn: 1, cards_seen: 8, chance: 8 / 99 },
+      { turn: 4, cards_seen: 11, chance: 11 / 99 },
+      { turn: 7, cards_seen: 14, chance: 14 / 99 },
+      { turn: 10, cards_seen: 17, chance: 17 / 99 },
+    ],
+  },
 } as DeckStats
 
 const REPORT: ValidationReport = {
@@ -540,6 +563,51 @@ describe('DeckDetail validation tab', () => {
  * way to break that is a placeholder that is really a first draft. This test
  * fails if anyone ever pre-fills the field.
  */
+/**
+ * The stats tab's punch-list additions (2026-08-15 item 6): opening-hand
+ * hypergeometrics, the type breakdown, and the Game Changers count — which
+ * had been in the payload since the printed-stats branch with no screen.
+ */
+describe('DeckDetail stats tab', () => {
+  async function openStats() {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    fireEvent.click(screen.getByRole('button', { name: 'Stats' }))
+  }
+
+  it('shows the opening-hand odds with their which-system caveat', async () => {
+    await openStats()
+    expect(screen.getByText('Opening hand odds')).toBeTruthy()
+    expect(screen.getByText('73.0%')).toBeTruthy()
+    // The caveat is the ADR 14 line: these are draw odds, castability is
+    // the simulator's question.
+    expect(screen.getByText(/no simulation, no opponent/i)).toBeTruthy()
+  })
+
+  it('renders the Game Changers verdict instead of hiding the count', async () => {
+    await openStats()
+    expect(screen.getByText('Game Changers')).toBeTruthy()
+    expect(screen.getByText(/0 of 3 allowed/)).toBeTruthy()
+  })
+
+  it('says unknown when nobody could look, never zero', async () => {
+    vi.mocked(api.stats).mockResolvedValue({
+      ...STATS,
+      game_changers: { cards: [], count: 0, allowed: null, bracket: null,
+                       verdict: 'unknown' },
+    } as DeckStats)
+    await openStats()
+    expect(screen.getByText('not checked')).toBeTruthy()
+    expect(screen.getByText(/absent count is not a count of zero/i)).toBeTruthy()
+  })
+
+  it('shows the type breakdown', async () => {
+    await openStats()
+    expect(screen.getByText('Card types')).toBeTruthy()
+    expect(screen.getByText('Creature')).toBeTruthy()
+  })
+})
+
 describe('DeckDetail rationale editor', () => {
   /** The row for one card, anchored on its name text. The per-row buttons
    *  became the action bar (punch list item 9), so the old anchor — the
