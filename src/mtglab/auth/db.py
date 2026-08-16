@@ -318,8 +318,12 @@ _MIGRATIONS: tuple[str, ...] = (
         requests          INTEGER NOT NULL,
         input_tokens      INTEGER NOT NULL,
         output_tokens     INTEGER NOT NULL,
-        -- The slice of input served from the prompt cache at ~a tenth of the
-        -- price. The number that says whether the cache is working at all.
+        -- Prompt tokens served from the cache at ~a tenth of the input price.
+        -- Counted *beside* input_tokens, never inside it: the API reports
+        -- input_tokens as the uncached remainder, so a conversation's whole
+        -- prompt is the two added together. The number that says whether the
+        -- cache is working at all -- and note what is missing next to it,
+        -- cache *writes*, which bill at 1.25x input and are recorded nowhere.
         cache_read_tokens INTEGER NOT NULL
     );
 

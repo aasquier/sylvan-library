@@ -278,10 +278,136 @@ state, never checklists.
 
 *Claude API spend · static assets · performance*
 
-- **Last run:** never
-- **Queued for Aaron:** —
-- **Deferred:** —
-- **Measurements:** —
+- **Last run:** 2026-08-16 (rainbow)
+- **Fixed and landed:**
+  1. **The challenge board asked the pool once per deck.**
+     `service.challenge_progress` (`/api/colors/progress`) ran `get_cards`
+     inside its loop over `decks.slugs()` — one query per deck, for one name
+     each. Now: read every deck, then one batched call. **6 queries → 1;
+     p50 306ms → 94ms** on the real six-deck library (quiet machine, full
+     pool). Linear in a library aimed at 32 slots, so the win grows.
+     Mutation-verified test (`test_challenge_progress_asks_the_pool_once`)
+     counts the calls rather than the milliseconds — wall clock is noise on a
+     shared machine, the query count is what moved.
+  2. **The spend ledger described cached tokens in a way its own data
+     disproves.** `mtglab claude usage`, the `claude_usage` schema comment and
+     `modes.Turn.cache_read_tokens` all called cache reads "the slice of
+     'tokens in'". They are counted *beside* `input_tokens`, not inside it —
+     the API reports `input_tokens` as the uncached remainder only. Locally
+     that reads as 2,354 in vs **496,654 cached**, which is impossible as a
+     slice and correct as a sibling: the prompt cache is doing almost all the
+     work. Copy corrected in all three places, and it now says out loud that
+     cache *writes* are recorded nowhere.
+- **Queued for Aaron:**
+  1. **Cache-write tokens are invisible, and they are the priciest class.**
+     `modes.converse` records `input_tokens`, `output_tokens` and
+     `cache_read_input_tokens`, and drops `cache_creation_input_tokens`
+     entirely. Writes bill at **1.25× input** — the most expensive token this
+     project buys — so the usage table is a *floor* on the bill, not the bill.
+     It matters most exactly where the cache works best: a ~4k-token system
+     prefix rewritten once per conversation past the 5-minute TTL costs more
+     than everything currently counted. Fix is one column plus one assignment,
+     but it is a **schema migration** (v9) on a forward-only ladder that
+     applies on boot unwatched — so per CLAUDE.md it wants its own branch
+     merged while somebody is watching, not a ride-along.
+  2. **The theme conversation's second cache breakpoint cannot be read back on
+     the next turn.** `theme._messages` puts the marker on the *closing
+     instruction*, which is stripped and re-appended at the end of every turn,
+     so turn N's cached region is not a byte-prefix of turn N+1's request —
+     verified deterministically, no API calls, by rendering two consecutive
+     turns and comparing. Its docstring claims the opposite ("a conversation's
+     history is the part that grows"). It does pay inside one `converse` call
+     (a `pause_turn` resume), just not across conversation turns. **Verified
+     fix:** move the marker to the last settled *transcript* block, before the
+     closing — that region *is* a prefix of the next turn's request. Queued
+     rather than fixed because it changes what a paid path caches and the
+     payoff can only be confirmed by spending; pairs naturally with (1), which
+     is the instrument that would show it working.
+- **Deferred:**
+  - **Interview and single-card argue have neither a cache nor an in-flight
+    dedupe key** — the only two paid modes with neither, and no written
+    argument for it. In practice both are guarded client-side
+    (`disabled={busy}` in `components/deckedit.tsx`), and the deck-sweep argue
+    button that *isn't* guarded is the one covered server-side by
+    `jobs.submit(key=…)` — so the coverage is coherent, just not uniform.
+    Trigger: either endpoint becoming a background job, or gaining a second
+    caller that is not the deck page.
+  - **Long max-age for the immutable media** (219KB `ivy-canopy.webp`, three
+    sprigs, 78 tarot PNGs). Tempting, and it collapses into the same trap as
+    the JS: `assetFileNames: 'assets/[name].[ext]'` means an animist rebuild
+    reuses the filename, so a long max-age would serve a stale asset. Trigger:
+    media bytes growing enough that per-navigation revalidation matters — the
+    fix would be content-hashing *media* names only, which do not need to stay
+    diff-legible the way JS chunk names do.
+- **Checklist corrected this run:** `references/black.md` said committed assets
+  "should be aggressively cacheable (hashed filenames from Vite get long
+  max-age)". This repo deliberately does the opposite and is right to: Vite is
+  configured for stable filenames because the bundle is committed, and
+  `Cache-Control: no-cache` is the half that makes stable names safe — added
+  2026-08-13 after Safari served a stale `DeckDetail.js` against a redeployed
+  server until the page crashed. Reference updated so the next Black run does
+  not propose the change that already broke production.
+- **Measurements (2026-08-16, quiet machine — serial rainbow, no siblings):**
+  - **Claude spend to date** (local ledger, all of it 2026-08-16): 13
+    conversations / 14 requests / 2,354 input / 25,000 output / 496,654 cache
+    reads. Per mode: `theme-conversation:fortune-teller` 11 conv (1,520 in /
+    15,592 out / 266,205 cached), `commander-dossier` 1 conv, 2 req (832 /
+    9,241 / 230,449), `theme-conversation:chef` 1 conv (2 / 167 / 0). At Sonnet
+    5 introductory rates ($2/$10 per MTok, through 2026-08-31; $3/$15 after)
+    that is **≈$0.35 total, ≈$0.027 per conversation** — *excluding* unrecorded
+    cache writes. Four of six modes have never run locally.
+  - **Prompt cache is working**: cache reads outnumber fresh input **211:1**.
+  - **Per-mode cached prefix** (system + tools, est. chars/4): interview 1,577
+    tok · slot-argument 2,210 · dossier 1,580 · research 1,367 ·
+    theme-conversation 3,495 · theme-proposal 4,427. All above Sonnet 5's
+    1,024-token minimum cacheable prefix, interview and research with the
+    least margin. Per-persona theme system prompts: plain 3,466 tok → chef
+    3,875 → fortune-teller 3,962.
+  - **Spend knobs**: model `claude-sonnet-5` everywhere (`MTGLAB_CLAUDE_MODEL`
+    overrides, for A/B only). `max_tokens` 8,192 (interview, argue, theme
+    conversation) / 16,384 (dossier, research, theme proposal). `effort: high`
+    on all six, argued — lower levels reach for tools less, and a mode
+    answering from recall instead of `get_cards` is rule 1 failing quietly.
+    Web search `max_uses`: dossier 4, research 4 (shares the dossier's), theme
+    proposal 3, theme conversation 1. `MAX_TOOL_TURNS` 6; theme conversation
+    caps at 4, dossier/research/proposal at 8.
+  - **Refusable-before-the-call** holds on every paid surface: no key (503),
+    bad card/stance/transcript (422), floor not reached (409) — all refused in
+    the request, so no mode errors *after* spending.
+  - **Bundle** (committed `web_dist`, post-#130, gzip -9): total 1,196,126 raw
+    / **511,611 gzip**. `charts.js` 398,447 / **111,212** (recharts, the known
+    heavyweight — already its own chunk, loaded only where a chart renders);
+    `app.js` 294,315 / 91,749; `DeckDetail.js` 75,090 / 17,756; `NewDeck.js`
+    59,667 / 15,234; `index.css` 56,259 / 12,187; `ivy-canopy.webp` 219,330
+    (WebP, gzip makes it larger). Route-level code splitting is already in
+    place — nine `lazy()` routes in `App.tsx`, one chunk each.
+  - **Live instance** (5 samples each, p50 time-to-first-byte from this Mac):
+    `/` 240ms · `/assets/app.js` 192ms · `/assets/charts.js` 177ms ·
+    `/assets/ivy-canopy.webp` 167ms · `/api/health` 211ms. API routes answer
+    401 unauthenticated (auth is on), 164–169ms. Most of that is RTT to `sjc`;
+    server work on `/api/health` is ~45ms.
+  - **Compression and caching headers, read live**: `content-encoding: gzip` on
+    HTML, JS and CSS; `vary: Accept-Encoding` present. No brotli. Every asset
+    is `cache-control: no-cache` with a strong `etag`; a conditional request
+    returns **304** correctly, so the cost is one revalidation RTT per
+    navigation (HTTP/2-multiplexed), not a re-download.
+  - **Static assets over hotlinks**: the served app references exactly one
+    external host at runtime — `cards.scryfall.io`, for Wizards art, which
+    White's licensing verdict keeps as a hotlink. It already carries a
+    `<link rel="preconnect">`, which is the right mitigation for a mandatory
+    hotlink. **No CDN for code, fonts, CSS or scripts**; no `@import url(http…)`,
+    no `fonts.googleapis`/`gstatic`, no `unpkg`/`jsdelivr`. Remaining external
+    strings in the bundle are the SVG namespace (`w3.org`) and doc URLs inside
+    vendored library error messages — inert, nothing fetched. Nothing in
+    category (c): no dead or replaceable external URL found.
+  - **DuckDB query patterns**: swept `cards/db.py` callers for n+1 by walking
+    the syntax tree for pool calls inside loops. One real hit — the
+    `challenge_progress` fix above. Every other `get_cards` caller already
+    batches. `get_cards` itself is a CTE + three hash semi-joins with a
+    measured 108ms → 62ms note already in place.
+  - **Tier 1 / `SIM_VERSION`**: not touched this run, deliberately. No engine
+    change, so the ADR 18 cache is intact and the determinism digest did not
+    move.
 
 ## Red — Speed & Alarum
 

@@ -54,8 +54,17 @@ once, deploy it, and be fast forever.
   `mtglab animist measure` to pick the size knee rather than guessing.
 - No CDN dependencies for code or fonts, ever — a CDN is a hotlink with
   better marketing, plus a privacy leak of every visitor's IP.
-- Check caching headers on what we already serve: committed assets should be
-  aggressively cacheable (hashed filenames from Vite get long max-age).
+- Check caching headers on what we already serve — but **do not propose a long
+  max-age here without reading `web/vite.config.ts` first.** This repo
+  deliberately builds with *stable* filenames rather than content hashes,
+  because the bundle is committed and hashing would add two files to git on
+  every rebuild. `Cache-Control: no-cache` (`NO_CACHE` in `api/app.py`) is the
+  half that makes stable names safe, and it was added 2026-08-13 after Safari
+  assigned its own heuristic lifetime and served a stale `DeckDetail.js`
+  against a redeployed server until the page crashed. Verified 2026-08-16:
+  conditional requests return 304, so the cost is one revalidation RTT per
+  navigation, not a re-download. A long max-age is only back on the table
+  paired with content hashing, and that is a queued decision, not a fix.
 
 ## Facet: performance & efficiency
 

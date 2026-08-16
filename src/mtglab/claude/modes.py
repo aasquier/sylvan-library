@@ -200,11 +200,17 @@ class Turn:
     #: they want different answers.
     search_errors: list[str] = field(default_factory=list)
     refused: bool = False
-    #: How many of `input_tokens`' worth of prompt were served from the prompt
-    #: cache (at ~a tenth of the price). Zero on a cold call; if it stays zero
-    #: across repeated calls of the same mode, the prefix is drifting and the
-    #: breakpoint in `converse` is buying nothing -- that is the number to
-    #: check, per the caching guidance, before believing the cache works.
+    #: Prompt tokens served from the cache, at ~a tenth of the input price.
+    #: **Counted beside `input_tokens`, not inside it** -- the API reports
+    #: `input_tokens` as the uncached remainder only, so this conversation's
+    #: whole prompt is `input_tokens + cache_read_tokens` (plus cache writes,
+    #: which nothing here records). Reading it as a slice understates the
+    #: prompt by however well the cache worked, which is backwards.
+    #:
+    #: Zero on a cold call; if it stays zero across repeated calls of the same
+    #: mode, the prefix is drifting and the breakpoint in `converse` is buying
+    #: nothing -- that is the number to check, per the caching guidance,
+    #: before believing the cache works.
     cache_read_tokens: int = 0
 
     def parsed(self) -> Any:
