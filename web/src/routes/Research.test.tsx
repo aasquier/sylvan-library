@@ -32,7 +32,8 @@ vi.mock('../lib/api', async () => {
   const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api')
   return {
     ...actual,
-    api: { claudeStatus: vi.fn(), research: vi.fn(), job: vi.fn() },
+    api: { claudeStatus: vi.fn(), research: vi.fn(), job: vi.fn(),
+           searchCards: vi.fn() },
   }
 })
 
@@ -246,6 +247,35 @@ describe('a refusal', () => {
     await askSomething()
     expect(await screen.findByText(/No source survived checking/)).toBeTruthy()
     expect(screen.queryByText('Answer')).toBeNull()
+  })
+})
+
+describe('the keeper’s dossier', () => {
+  it('opens on the About button, exhibits the pool’s Ludevic cards, closes on Escape', async () => {
+    // The bio is checked-in prose; the exhibit case is a live pool search,
+    // fetched only when the dossier opens. A card whose name lacks
+    // "Ludevic" — the search matches rules text too — stays out of the case.
+    vi.mocked(api.searchCards).mockResolvedValue({
+      total: 2,
+      cards: [
+        { name: 'Ludevic, Necro-Alchemist', category: '', why: '', qty: 1,
+          known: true, mana_cost: '{1}{U}{R}',
+          type_line: 'Legendary Creature — Human Wizard' },
+        { name: 'Curse of Some Text Mention', category: '', why: '', qty: 1,
+          known: true, mana_cost: '{2}{B}',
+          type_line: 'Enchantment — Aura Curse' },
+      ],
+    })
+    draw()
+    expect(vi.mocked(api.searchCards)).not.toHaveBeenCalled()
+    fireEvent.click(await screen.findByRole('button', { name: 'About the keeper' }))
+    expect(await screen.findByRole('dialog', { name: 'About the keeper' })).toBeTruthy()
+    expect(screen.getByText(/necro-alchemist — his own preferred billing/i)).toBeTruthy()
+    expect(await screen.findByText('Ludevic, Necro-Alchemist',
+      { selector: 'span' })).toBeTruthy()
+    expect(screen.queryByText('Curse of Some Text Mention')).toBeNull()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
 
