@@ -286,8 +286,17 @@ function ShufflingDeck() {
  *
  * `vision` is the trick the ball was bought for: the card most recently
  * turned over surfaces inside the glass, under the fog, the way a fortune
- * arrives — already there once the mist thins. A reversed card appears
- * upside down in the glass too; the ball does not editorialise.
+ * arrives — already there once the mist thins. Whole, since the punch list
+ * (2026-08-15 item 11) — the old crop filled the glass with a detail nobody
+ * could name. A reversed card appears upside down in the glass too; the
+ * ball does not editorialise.
+ *
+ * The same punch list called the ball clip art, and the answer is optics
+ * rather than assets: a fresnel ring (glass darkens at its own silhouette),
+ * one hard specular hotspot, a contact shadow under a properly turned
+ * cradle — lathework is a stack of profiles, each catching its own light —
+ * and behind the whole thing, slow smoke with a light flickering in it
+ * (`.crystal-haze`), so the ball sits in a séance and not on a sticker.
  *
  * Decorative and marked so. The spread announces every card by name; the
  * ball repeating it to a screen reader would be saying everything twice.
@@ -298,6 +307,14 @@ function CrystalBall({ vision }: {
   const id = useId().replace(/:/g, '')
   return (
     <div className="crystal-ball" aria-hidden="true">
+      {/* The room behind the glass: drifting smoke, and a light somewhere
+          in it that will not hold steady. Behind the svg in paint order. */}
+      <div className="crystal-haze">
+        <span className="crystal-backlight" />
+        <span className="crystal-haze-puff crystal-haze-a" />
+        <span className="crystal-haze-puff crystal-haze-b" />
+        <span className="crystal-haze-puff crystal-haze-c" />
+      </div>
       <svg viewBox="0 0 120 150" className="h-full w-full">
         <defs>
           {/* The depths: a nebula rather than a flat gradient. The base is
@@ -339,18 +356,54 @@ function CrystalBall({ vision }: {
             <stop offset="45%" stopColor="rgba(190,170,255,0.18)" />
             <stop offset="100%" stopColor="rgba(120,90,220,0.45)" />
           </linearGradient>
+          {/* Brass, with the stops a photograph of brass actually has: a
+              bright turned band, a fast fall to shadow, a bounce of warm
+              reflected light off the felt near the foot. The lip runs the
+              gradient horizontally, because a lathe leaves its light across
+              the turning, not down it. */}
           <linearGradient id={`${id}-brass`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#e8c76a" />
-            <stop offset="35%" stopColor="#a97e33" />
-            <stop offset="75%" stopColor="#6e4c1c" />
-            <stop offset="100%" stopColor="#4a3212" />
+            <stop offset="0%" stopColor="#f6e3a0" />
+            <stop offset="18%" stopColor="#d4a94e" />
+            <stop offset="38%" stopColor="#8f6526" />
+            <stop offset="62%" stopColor="#5c3f16" />
+            <stop offset="84%" stopColor="#3e2a0e" />
+            <stop offset="100%" stopColor="#6b4d1e" />
           </linearGradient>
           <linearGradient id={`${id}-brass-lip`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#7a5a24" />
-            <stop offset="30%" stopColor="#f3dc96" />
-            <stop offset="55%" stopColor="#c9a227" />
-            <stop offset="100%" stopColor="#6e4c1c" />
+            <stop offset="0%" stopColor="#6b4d1e" />
+            <stop offset="22%" stopColor="#f8e6a8" />
+            <stop offset="40%" stopColor="#c9a227" />
+            <stop offset="58%" stopColor="#8f6526" />
+            <stop offset="78%" stopColor="#e8c76a" />
+            <stop offset="100%" stopColor="#5c3f16" />
           </linearGradient>
+          {/* The vertical streak a window leaves on polished metal. */}
+          <linearGradient id={`${id}-brass-streak`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="rgba(255,244,200,0)" />
+            <stop offset="45%" stopColor="rgba(255,244,200,0.55)" />
+            <stop offset="55%" stopColor="rgba(255,244,200,0.55)" />
+            <stop offset="100%" stopColor="rgba(255,244,200,0)" />
+          </linearGradient>
+          {/* Fresnel: real glass goes dark and reflective at its silhouette.
+              Transparent through the body, a deep violet ring at the edge —
+              this one gradient is most of the difference between "sphere"
+              and "circle with a border". */}
+          <radialGradient id={`${id}-fresnel`} cx="50%" cy="46%" r="54%">
+            <stop offset="0%" stopColor="rgba(8,5,32,0)" />
+            <stop offset="78%" stopColor="rgba(8,5,32,0)" />
+            <stop offset="93%" stopColor="rgba(24,14,64,0.42)" />
+            <stop offset="100%" stopColor="rgba(5,3,24,0.75)" />
+          </radialGradient>
+          <radialGradient id={`${id}-hotspot`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
+            <stop offset="40%" stopColor="rgba(255,255,255,0.35)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </radialGradient>
+          <radialGradient id={`${id}-shadow`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(4,2,18,0.6)" />
+            <stop offset="70%" stopColor="rgba(4,2,18,0.25)" />
+            <stop offset="100%" stopColor="rgba(4,2,18,0)" />
+          </radialGradient>
           <clipPath id={`${id}-glass`}>
             <circle cx="60" cy="62" r="44" />
           </clipPath>
@@ -371,38 +424,62 @@ function CrystalBall({ vision }: {
           </filter>
         </defs>
 
-        {/* The light the ball throws on the felt. */}
+        {/* What the ball does to the table: its violet light, and under the
+            stand the shadow the light cannot argue away. Shadow first, so
+            everything sits *on* something — the missing contact shadow was
+            half of what read as clip art. */}
+        <ellipse cx="60" cy="144" rx="34" ry="6" fill={`url(#${id}-shadow)`} />
         <ellipse className="crystal-aura" cx="60" cy="130" rx="46" ry="10"
                  fill="#8f79e8" />
 
-        {/* The stand: a claw-footed brass cradle with a bright turned lip,
-            a beaded band, and three set stones that catch the light. */}
-        <path d="M32 114 C 32 100 88 100 88 114 L 83 139 C 83 147 37 147 37 139 Z"
+        {/* The stand: a turned brass cradle. Real lathework is a stack of
+            profiles — a cushion ring the sphere sits in, a waisted ogee
+            body, a beaded band, a flared foot — and each course carries the
+            lip gradient across it so every turning catches its own light. */}
+        {/* The body, waisted then flared. */}
+        <path d="M36 116 C 36 108 84 108 84 116 C 84 124 76 126 74 130
+                 L 78 140 C 78 148 42 148 42 140 L 46 130
+                 C 44 126 36 124 36 116 Z"
               fill={`url(#${id}-brass)`} />
-        <path d="M32 114 C 32 103 88 103 88 114 C 88 124 32 124 32 114 Z"
-              fill={`url(#${id}-brass-lip)`} />
-        <path d="M37 109 C 45 102 75 102 83 109" stroke="#f3dc96"
-              strokeWidth="1.6" fill="none" opacity="0.9" />
-        <path d="M39 128 C 48 132 72 132 81 128" stroke="#2c1d0a"
-              strokeWidth="1.2" fill="none" opacity="0.5" />
-        {/* The beaded band. */}
-        {[44, 52, 60, 68, 76].map((x) => (
-          <circle key={x} cx={x} cy="126.5" r="1.5" fill="#e8c76a"
-                  opacity="0.85" />
+        {/* The cushion ring the sphere rests in, seen edge-on. */}
+        <ellipse cx="60" cy="112" rx="26" ry="7" fill={`url(#${id}-brass-lip)`} />
+        <ellipse cx="60" cy="111" rx="21" ry="5" fill="#1a1030" />
+        <ellipse cx="60" cy="110.4" rx="21" ry="5" fill="none"
+                 stroke="#f8e6a8" strokeWidth="0.7" opacity="0.7" />
+        {/* Engraved turnings on the body. */}
+        <path d="M42 122 C 50 126 70 126 78 122" stroke="#2c1d0a"
+              strokeWidth="1" fill="none" opacity="0.55" />
+        <path d="M43 120.6 C 51 124.6 69 124.6 77 120.6" stroke="#f3dc96"
+              strokeWidth="0.7" fill="none" opacity="0.6" />
+        <path d="M45 132 C 52 135 68 135 75 132" stroke="#2c1d0a"
+              strokeWidth="0.9" fill="none" opacity="0.5" />
+        {/* The window's streak down the polished body. */}
+        <path d="M50 112 L 48 146 L 56 146 L 56 112 Z"
+              fill={`url(#${id}-brass-streak)`} opacity="0.5" />
+        {/* The beaded band above the foot. */}
+        {[46, 52.5, 59, 65.5, 72].map((x) => (
+          <g key={x}>
+            <circle cx={x + 1} cy="137.5" r="1.6" fill="#e8c76a"
+                    opacity="0.9" />
+            <circle cx={x + 0.5} cy="137" r="0.55" fill="#fff7dd"
+                    opacity="0.9" />
+          </g>
         ))}
-        {/* Claw feet, splayed. */}
-        <path d="M37 139 C 33 142 31 146 33 148 C 36 149 39 146 40 143 Z"
+        {/* The flared foot, its own turning and its own light. */}
+        <path d="M42 140 C 42 138 78 138 78 140 L 82 144
+                 C 84 147 76 149 60 149 C 44 149 36 147 38 144 Z"
               fill={`url(#${id}-brass)`} />
-        <path d="M83 139 C 87 142 89 146 87 148 C 84 149 81 146 80 143 Z"
-              fill={`url(#${id}-brass)`} />
-        <path d="M57 141 L 63 141 L 62 148 L 58 148 Z" fill={`url(#${id}-brass)`} />
+        <path d="M38.5 144.5 C 44 147.5 76 147.5 81.5 144.5" stroke="#f3dc96"
+              strokeWidth="0.8" fill="none" opacity="0.55" />
         {/* Three stones: amethyst, opal, jade — each with its own glint. */}
-        <circle cx="60" cy="134" r="3.4" fill="#7d4b8f" />
-        <circle cx="59" cy="133" r="1" fill="#e6c8f2" opacity="0.9" />
-        <circle cx="45" cy="132" r="2.4" fill="#cfd8e8" />
-        <circle cx="44.4" cy="131.4" r="0.8" fill="#fff" opacity="0.95" />
-        <circle cx="75" cy="132" r="2.4" fill="#2e6f6a" />
-        <circle cx="74.4" cy="131.4" r="0.8" fill="#bff0e2" opacity="0.9" />
+        <circle cx="60" cy="128" r="3.4" fill="#7d4b8f" />
+        <circle cx="60" cy="128" r="3.4" fill="none" stroke="#2c1d0a"
+                strokeWidth="0.5" opacity="0.6" />
+        <circle cx="59" cy="127" r="1" fill="#e6c8f2" opacity="0.9" />
+        <circle cx="46" cy="126" r="2.4" fill="#cfd8e8" />
+        <circle cx="45.4" cy="125.4" r="0.8" fill="#fff" opacity="0.95" />
+        <circle cx="74" cy="126" r="2.4" fill="#2e6f6a" />
+        <circle cx="73.4" cy="125.4" r="0.8" fill="#bff0e2" opacity="0.9" />
 
         {/* The glass, and everything it holds. */}
         <circle cx="60" cy="62" r="44" fill={`url(#${id}-depth)`} />
@@ -435,9 +512,15 @@ function CrystalBall({ vision }: {
             // ball does not editorialise.
             <g key={vision.image}>
               <g transform={vision.reversed ? 'rotate(180 60 62)' : undefined}>
+                {/* `meet`, not `slice`, and a modest footprint (punch list
+                    2026-08-15 item 11): the old crop filled the glass and
+                    showed a fist-sized detail of a card nobody could name.
+                    The whole picture floats in the sphere now, its corners
+                    just kissing the glass — a vision of the card, not a
+                    zoom into it. */}
                 <image className="crystal-vision" href={vision.image}
-                       x="16" y="8" width="88" height="108"
-                       preserveAspectRatio="xMidYMid slice" />
+                       x="35.5" y="20" width="49" height="84"
+                       preserveAspectRatio="xMidYMid meet" />
               </g>
               <g className="crystal-vision-smoke" filter={`url(#${id}-wisp)`}>
                 <ellipse cx="60" cy="70" rx="34" ry="22" fill={`url(#${id}-fog)`} />
@@ -470,9 +553,17 @@ function CrystalBall({ vision }: {
           </g>
 
           {/* Glasswork, over everything inside: the caustic pool at the foot
-              of the sphere, then the sheen. */}
+              of the sphere, the sheen, then the fresnel — the darkening a
+              sphere of glass does at its own silhouette, which is most of
+              what separates a ball from a circle. Last, the hotspot: one
+              small hard reflection of the room's light, blurred just enough
+              to sit *on* the glass rather than in it. */}
           <ellipse cx="60" cy="94" rx="26" ry="10" fill={`url(#${id}-caustic)`} />
           <circle cx="60" cy="62" r="44" fill={`url(#${id}-sheen)`} />
+          <circle cx="60" cy="62" r="44" fill={`url(#${id}-fresnel)`} />
+          <ellipse cx="44" cy="35" rx="7" ry="4.5" fill={`url(#${id}-hotspot)`}
+                   transform="rotate(-28 44 35)" />
+          <circle cx="47.5" cy="32.5" r="1.3" fill="#fff" opacity="0.95" />
         </g>
 
         {/* The rim: a gradient stroke so the sphere's edge catches light at
