@@ -1,6 +1,6 @@
 /**
  * The stance readout, and the properties that survived the dial's move to the
- * header (`stancemenu.test.tsx` covers the control itself):
+ * header (`settings.test.tsx` covers the control itself):
  *
  * - **The axes are the server's resolved answer.** `status.stance` is what
  *   `/api/claude` said after clamping; nothing here recomputes it, and the
