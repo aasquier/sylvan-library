@@ -8,6 +8,7 @@ never drift into disagreeing about a deck.
 from __future__ import annotations
 
 import mimetypes
+import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -1161,12 +1162,15 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             # not collapse a `..` in the string, so a raw traversal path --
             # which reaches this handler un-normalised, the same way `//api`
             # does above -- would resolve outside the tree and serve, e.g.,
-            # `/etc/hosts`. Resolve first, then require the result stay under
-            # the (resolved) web root; a legitimate asset always does.
+            # `/etc/hosts`. Resolve first, then require the resolved path to
+            # sit under the resolved web root before serving. The check is a
+            # `startswith` on the resolved strings rather than the terser
+            # `Path.is_relative_to`, because that is the containment form the
+            # code-scanning path-injection model recognises as a barrier.
             web_root = WEB_DIST.resolve()
             candidate = (web_root / full_path).resolve()
             if (full_path and candidate.is_file()
-                    and candidate.is_relative_to(web_root)):
+                    and str(candidate).startswith(str(web_root) + os.sep)):
                 return FileResponse(candidate, headers=NO_CACHE)
             # The shell above all: it is what names the asset files, so a
             # stale one pins every other stale thing in place.
