@@ -83,6 +83,111 @@ def test_every_required_extra_is_declared_in_pyproject():
     assert not missing, f"the Dockerfile would install undeclared extras: {missing}"
 
 
+# ------------------------------------- what a documented checkout can test
+
+# The modules CI asserts are importable before it runs the suite, and the
+# distribution that provides each. Explicit, so a module added to that guard
+# without an entry here fails this test rather than passing through it.
+GUARD_DISTRIBUTIONS = {
+    "fastapi": "fastapi",
+    "httpx": "httpx",
+    "hypothesis": "hypothesis",
+    "argon2": "argon2-cffi",
+}
+
+
+def ci_import_guard() -> set[str]:
+    """The modules ci.yml's "Test dependencies must be present" step imports."""
+    found = re.search(r"python -c \"import ([^\"]+)\"",
+                      CI_YML.read_text(encoding="utf-8"))
+    assert found, "no `python -c \"import ...\"` dependency guard in ci.yml"
+    return {name.strip() for name in found.group(1).split(",")}
+
+
+def extra_requirements(extra: str) -> set[str]:
+    """The distribution names in one pyproject extra, lowercased.
+
+    Bracketed extras are stripped -- `uvicorn[standard]>=0.29` is a requirement
+    on `uvicorn`, and which extras of it are wanted is not this file's business.
+    """
+    block = re.search(rf"^{extra} = \[(.*?)\]", (ROOT / "pyproject.toml")
+                      .read_text(encoding="utf-8"),
+                      flags=re.MULTILINE | re.DOTALL)
+    assert block, f"no `{extra}` extra in pyproject.toml"
+    return {name.lower()
+            for name in re.findall(r"\"([A-Za-z0-9_.-]+)", block.group(1))}
+
+
+def dev_requirements() -> set[str]:
+    return extra_requirements("dev")
+
+
+@pytest.mark.parametrize("module", sorted(GUARD_DISTRIBUTIONS))
+def test_the_dev_extra_alone_is_a_complete_test_environment(module):
+    """`.[dev]` is what CLAUDE.md's Setup section tells a checkout to install,
+    so it has to run the whole suite on its own.
+
+    It did not. Six modules open with `pytest.importorskip("fastapi")` and
+    fastapi lived in the `api` extra only, so the documented install ran 1444
+    tests where CI ran 1918 -- the HTTP layer, the 403/404 matrix and
+    `test_isolation.py`, the route-classification sweep ADR 5 calls the
+    highest-value test in the auth story. It was invisible from CI, which
+    installs `.[dev,api]` and asserts these very imports, and invisible from
+    the pinned skip count, which is only counted there. Commandment 11 asks for
+    the full suite locally before a PR; this is what makes that sentence true.
+
+    Asserted against ci.yml's own guard rather than a list repeated here, so
+    the two cannot drift: whatever CI decides it needs, `dev` must provide.
+    """
+    assert module in ci_import_guard(), (
+        f"`{module}` is in GUARD_DISTRIBUTIONS but ci.yml no longer asserts it "
+        "is importable. Drop it here too, or put the guard back."
+    )
+    distribution = GUARD_DISTRIBUTIONS[module]
+    assert distribution.lower() in dev_requirements(), (
+        f"ci.yml requires `{module}` before it will run the suite, but the "
+        f"`dev` extra does not install `{distribution}`. A "
+        f"`pip install -e \".[dev]\"` -- what CLAUDE.md documents -- would skip "
+        "every test that needs it, and CI cannot notice: it installs "
+        "`.[dev,api]`."
+    )
+
+
+@pytest.mark.parametrize("extra", ["api", "claude", "animist"])
+def test_dev_includes_every_other_extra(extra):
+    """CLAUDE.md's Setup section says `dev` "includes all of it plus the test
+    tooling". That is a contract a checkout relies on, and it was false.
+
+    Everything from `claude` and `animist` was vendored into `dev` deliberately,
+    each with its own comment saying which boundary test would otherwise not
+    run. From `api`, python-dotenv and argon2-cffi made it across and fastapi
+    and uvicorn did not -- so `.[dev]` could neither run the HTTP tests nor
+    satisfy `mypy`, which is strict over `cli.py`'s uvicorn import. Two of
+    Commandment 11's four gates, unreproducible from the documented install.
+
+    Checked as a subset rather than by listing names, so a package added to any
+    extra later inherits the rule instead of quietly escaping it.
+    """
+    missing = extra_requirements(extra) - dev_requirements()
+    assert not missing, (
+        f"the `{extra}` extra declares {sorted(missing)}, which `dev` does not. "
+        "CLAUDE.md tells a checkout to install `.[dev]` and calls it complete, "
+        "so either add these to `dev` or stop claiming it includes everything."
+    )
+
+
+def test_every_module_in_cis_guard_is_accounted_for():
+    """The other direction. A module added to ci.yml's guard with no entry in
+    `GUARD_DISTRIBUTIONS` would simply not be checked above -- the parametrize
+    reads this table, not the workflow."""
+    unmapped = ci_import_guard() - set(GUARD_DISTRIBUTIONS)
+    assert not unmapped, (
+        f"ci.yml asserts these imports and this file does not know which "
+        f"distribution ships them: {sorted(unmapped)}. Add them to "
+        "GUARD_DISTRIBUTIONS so `dev` is checked for them."
+    )
+
+
 # --------------------------------------- what makes the deployment private
 
 # Settings the deployed instance is only safe with, and what each one stops.

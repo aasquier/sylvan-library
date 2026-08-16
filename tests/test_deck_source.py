@@ -501,21 +501,31 @@ def test_shared_only_hides_an_unshared_file_deck(decks_root):
         view.delete("mini")
 
 
-def test_library_resolution_edges():
+def test_library_resolution_edges(tmp_path):
     """The `None` branches: no username is nobody, no maintainer is no match,
-    and the maintainer's own `mine()` is the file tier, writable."""
+    and the maintainer's own `mine()` is the file tier, writable.
+
+    Under `use_paths` like everything else in this section, and not merely for
+    tidiness: `source_for` on an unknown owner is authenticated here, so it
+    falls past the auth-off early return to `Library._owner_id`, which opens
+    `app.db` -- and `library.py` says in a comment at that very branch that on
+    a laptop opening it means *creating* it. Without this the test reached the
+    developer's real database and ran the forward-only migration ladder over
+    it. `conftest.py`'s `_real_app_db_untouched` is the guard that now says so.
+    """
     from mtglab.decks.library import Library
 
-    nobody = Library(username=None, user_id=None, maintainer="gyome",
-                     authenticated=True)
-    with pytest.raises(DeckNotFound):
-        nobody.source_for("someone-else")
+    with config.use_paths(data_dir=tmp_path / "data"):
+        nobody = Library(username=None, user_id=None, maintainer="gyome",
+                         authenticated=True)
+        with pytest.raises(DeckNotFound):
+            nobody.source_for("someone-else")
 
-    no_maintainer = Library(username="ada", user_id=7, maintainer=None,
-                            authenticated=True)
-    assert no_maintainer.file_owner == "local"
+        no_maintainer = Library(username="ada", user_id=7, maintainer=None,
+                                authenticated=True)
+        assert no_maintainer.file_owner == "local"
 
-    keeper = Library(username="gyome", user_id=1, maintainer="gyome",
-                     authenticated=True)
-    assert keeper.my_owner == "gyome"
-    assert keeper.mine().writable is True
+        keeper = Library(username="gyome", user_id=1, maintainer="gyome",
+                         authenticated=True)
+        assert keeper.my_owner == "gyome"
+        assert keeper.mine().writable is True
