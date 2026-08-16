@@ -219,13 +219,13 @@ def test_a_mistyped_api_path_is_a_json_404_not_the_shell(client):
 
 
 def test_the_spa_catch_all_refuses_a_path_traversal():
-    """The shell handler resolves `WEB_DIST / full_path` to look a file up, and
-    a raw traversal path reaches it un-normalised the same way `//api` does --
-    `WEB_DIST / "../../../etc/hosts"` does not collapse the `..` in the string,
-    so without a containment check the handler would serve a file outside the
-    built frontend (a real `/etc/hosts` read was confirmed). The client
-    normalises `..` away before sending, so the sink is exercised directly:
-    the handler must fall back to the shell rather than serve out-of-tree."""
+    """The catch-all serves a bundle file only on an exact allowlist match, so a
+    raw traversal path -- which reaches the handler un-normalised the same way
+    `//api` does, since `WEB_DIST / "../../../etc/hosts"` would not collapse the
+    `..` in the string -- is not a known name and falls through to the shell.
+    The client normalises `..` away before sending, so the handler is exercised
+    directly. The payload resolves to a real out-of-tree file, which the earlier
+    `WEB_DIST / full_path` + `is_file()` form would have served."""
     from mtglab.api.app import WEB_DIST, create_app
 
     app = create_app()

@@ -8,7 +8,6 @@ never drift into disagreeing about a deck.
 from __future__ import annotations
 
 import mimetypes
-import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -1139,6 +1138,17 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         if assets.is_dir():
             app.mount("/assets", Revalidated(directory=assets), name="assets")
 
+        # The bundle's own root files (index.html, and any favicon / manifest /
+        # robots.txt a build adds), captured once from the trusted directory.
+        # The catch-all serves a file only if the request names one of these
+        # exactly -- subdirectories are served by their own mounts above -- so
+        # a request never builds a path out of user input. That is both the
+        # containment (an exact-match allowlist cannot be walked out of the
+        # tree with `..`) and the reason the file lookup no longer trips the
+        # path-injection scanner: a membership test against a fixed set is a
+        # barrier it recognises, where `Path.is_relative_to` was not.
+        root_files = frozenset(p.name for p in WEB_DIST.iterdir() if p.is_file())
+
         @app.get("/{full_path:path}")
         def spa(full_path: str) -> FileResponse:
             """Serve the built app, letting the client router own real paths.
@@ -1158,20 +1168,13 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             if normalised == "/api" or normalised.startswith("/api/"):
                 raise HTTPException(status_code=404,
                                     detail=f"no such endpoint: {normalised}")
-            # Contain the file lookup to WEB_DIST. `WEB_DIST / full_path` does
-            # not collapse a `..` in the string, so a raw traversal path --
-            # which reaches this handler un-normalised, the same way `//api`
-            # does above -- would resolve outside the tree and serve, e.g.,
-            # `/etc/hosts`. Resolve first, then require the resolved path to
-            # sit under the resolved web root before serving. The check is a
-            # `startswith` on the resolved strings rather than the terser
-            # `Path.is_relative_to`, because that is the containment form the
-            # code-scanning path-injection model recognises as a barrier.
-            web_root = WEB_DIST.resolve()
-            candidate = (web_root / full_path).resolve()
-            if (full_path and candidate.is_file()
-                    and str(candidate).startswith(str(web_root) + os.sep)):
-                return FileResponse(candidate, headers=NO_CACHE)
+            # Serve a bundle root file only on an exact allowlist match. A raw
+            # traversal path (`../../../etc/hosts`) reaches this handler
+            # un-normalised -- the same way `//api` does above, since
+            # `WEB_DIST / full_path` would not collapse the `..` -- and simply
+            # is not one of the known names, so it falls through to the shell.
+            if full_path in root_files:
+                return FileResponse(WEB_DIST / full_path, headers=NO_CACHE)
             # The shell above all: it is what names the asset files, so a
             # stale one pins every other stale thing in place.
             return FileResponse(WEB_DIST / "index.html", headers=NO_CACHE)
