@@ -129,6 +129,18 @@ tests never feels expensive.
   including `test_isolation.py`. `tests/test_packaging.py` now pins it, but the
   general rule stands — a green local suite is evidence only once you know it
   is the same suite.
+- **Once per cycle, install the documented setup from a clean checkout.** The
+  gap above was found by accident: a run happened to execute in a fresh
+  worktree, and a fresh worktree is a fresh checkout. Nothing reproduces that
+  signal on purpose any more — the serial rainbow runs colors in the main tree,
+  where `.venv` already holds everything ever installed into it, so the
+  documented instructions and the working environment can drift apart
+  indefinitely without anyone standing where a new contributor stands. So stand
+  there deliberately: `git worktree add` to a scratch path, follow CLAUDE.md's
+  Setup block *verbatim* — no extras nobody wrote down — and check the test
+  count, the skip count and `mypy` against CI's. `tests/test_packaging.py` pins
+  the one gap already found; this is what finds the next one, which by
+  definition is not that gap.
 - Measure first: `pytest -q --durations=25`. Record total wall time and the
   slow tail in the ledger. A test that got slower has a reason; find it.
 - Hunt duplicated setup: fixtures and helpers belong in `tests/tiny_pool.py`,
