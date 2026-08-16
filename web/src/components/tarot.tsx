@@ -546,9 +546,13 @@ function SoundToggle() {
  * - storyteller — *Birgi, God of Storytelling*, Eric Deschamps, Kaldheim.
  * - barkeep — *Edgewall Innkeeper*, Matt Stewart, Throne of Eldraine.
  *
- * `plain` is deliberately absent: "just talk to me" is the tile with no
- * costume, and a stand-in painting would make it one of seven characters
- * rather than the exit from character.
+ * `plain` is deliberately absent from this table: it is the tile with no
+ * costume, and a borrowed painting would make it one of seven characters
+ * rather than the exit from character. It is not artless any more, though
+ * (punch list 2026-08-15 item 1) — it wears `ClaudeMark` below, drawn rather
+ * than painted, for the same reason the card back and the library's tree are
+ * drawn: the one voice that is nobody in particular still deserves a face,
+ * and the honest face for it is a mark rather than somebody else's portrait.
  */
 const PERSONA_ART: Record<string, { art: string; credit: string }> = {
   'fortune-teller': {
@@ -577,6 +581,76 @@ const PERSONA_ART: Record<string, { art: string; credit: string }> = {
   },
 }
 
+/**
+ * Claude's own tile art: a spark of warm light on the same night the card
+ * backs are printed on.
+ *
+ * Chosen by Claude, since the tile is Claude (item 1 asked). Not a figure —
+ * every costumed tile is a painting of somebody, and the point of this one
+ * is that there is nobody between you and the conversation. A light source
+ * works where a portrait would lie: warm against the indigo, radiating, with
+ * the concentric rings a voice makes. The palette deliberately shares the
+ * card back's night so the grid reads as one table, and the spark is the
+ * warm terracotta none of the paintings use, so the one drawn tile still
+ * reads as its own kind of thing.
+ */
+function ClaudeMark() {
+  const id = useId().replace(/:/g, '')
+  return (
+    <svg viewBox="0 0 626 457" className="h-full w-full" aria-hidden="true"
+         preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id={`${id}-night`} cx="50%" cy="42%" r="75%">
+          <stop offset="0%" stopColor="#2c3f6b" />
+          <stop offset="60%" stopColor="#1b2647" />
+          <stop offset="100%" stopColor="#101830" />
+        </radialGradient>
+        <radialGradient id={`${id}-halo`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="rgba(255,236,210,0.95)" />
+          <stop offset="30%" stopColor="rgba(240,166,122,0.55)" />
+          <stop offset="70%" stopColor="rgba(218,119,86,0.18)" />
+          <stop offset="100%" stopColor="rgba(218,119,86,0)" />
+        </radialGradient>
+      </defs>
+      <rect width="626" height="457" fill={`url(#${id}-night)`} />
+      {/* A scatter of far stars, the card back's sky continued. */}
+      <g fill="#f0e4c2">
+        {[[62, 70, 1.6], [140, 330, 1.2], [210, 96, 1.1], [318, 40, 1.4],
+          [430, 88, 1.2], [538, 150, 1.6], [566, 330, 1.1], [468, 396, 1.3],
+          [96, 210, 1.0], [246, 402, 1.2], [388, 372, 1.0], [520, 244, 1.0],
+        ].map(([x, y, r]) => (
+          <circle key={`${x}-${y}`} cx={x} cy={y} r={r} opacity="0.55" />
+        ))}
+      </g>
+      {/* The rings a voice makes: concentric, fading as they travel. */}
+      {[74, 118, 166, 220].map((r, i) => (
+        <circle key={r} cx="313" cy="222" r={r} fill="none"
+                stroke="#f0a67a" strokeWidth={1.6 - i * 0.3}
+                opacity={0.34 - i * 0.07} />
+      ))}
+      <circle cx="313" cy="222" r="150" fill={`url(#${id}-halo)`} />
+      {/* The spark: rays alternating long and short, warm on the night. */}
+      <g transform="translate(313 222)">
+        {Array.from({ length: 12 }, (_, i) => {
+          const a = (i * Math.PI * 2) / 12 - Math.PI / 2
+          const inner = 26
+          const outer = i % 2 === 0 ? 74 : 50
+          return (
+            <line key={i}
+                  x1={Math.cos(a) * inner} y1={Math.sin(a) * inner}
+                  x2={Math.cos(a) * outer} y2={Math.sin(a) * outer}
+                  stroke={i % 2 === 0 ? '#f7d9b8' : '#e8956d'}
+                  strokeWidth={i % 2 === 0 ? 7 : 4.5}
+                  strokeLinecap="round" opacity="0.92" />
+          )
+        })}
+        <circle r="19" fill="#fbe8d0" />
+        <circle r="9" fill="#fff6ea" />
+      </g>
+    </svg>
+  )
+}
+
 function ReaderPanel({ persona, onPick }: {
   persona: Persona
   onPick: () => void
@@ -592,6 +666,14 @@ function ReaderPanel({ persona, onPick }: {
       {art && (
         <CardArt src={art.art} alt="" ratio="aspect-[626/457]" eager
                  className="reader-tile-art w-full rounded-none" />
+      )}
+      {/* The tile with no costume wears Claude's own mark — drawn, so it
+          needs no credit line and owes nobody a licence (item 1). */}
+      {!art && persona.key === 'plain' && (
+        <span className="reader-tile-art block w-full aspect-[626/457]"
+              aria-hidden="true">
+          <ClaudeMark />
+        </span>
       )}
       <span className="flex flex-1 flex-col items-center gap-2 px-5 py-4">
         <span className="text-base font-medium">{persona.label}</span>

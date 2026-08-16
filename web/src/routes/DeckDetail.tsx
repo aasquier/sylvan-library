@@ -586,31 +586,54 @@ export default function DeckDetail() {
     return () => clearTimeout(timer)
   }, [pendingEntomb])
 
-  /** The armed action lands on a card. Everything but entomb disarms the bar
-   *  on the first pick; entomb keeps ADR 27's second click. */
+  /** The armed action lands on a card — and stays armed (punch list
+   *  2026-08-15 item 3). One arm, many picks: writing five rationales is five
+   *  clicks, not five trips back to the bar. Escape, the pressed button, or a
+   *  double-click on a card (see `actOnAndDisarm`) puts the bar away; entomb
+   *  keeps ADR 27's second click per card. */
   function actOn(name: string) {
     if (!action) return
     if (action === 'ask') {
       setAskNow(true)
       setEditing(name)
-      setAction(null)
     } else if (action === 'why') {
       setAskNow(false)
       setEditing(editing === name ? null : name)
-      setAction(null)
     } else if (action === 'argue') {
       setArguing(arguing === name ? null : name)
-      setAction(null)
     } else if (action === 'art') {
       setArtFor(artFor === name ? null : name)
-      setAction(null)
     } else if (pendingEntomb === name) {
       setPendingEntomb(null)
-      setAction(null)
       void entombCard(name)
     } else {
       setPendingEntomb(name)
     }
+  }
+
+  /** A double-click: do it and put the bar away, one gesture.
+   *
+   * The two single clicks a double-click is made of have already fired
+   * `actOn`, so for the toggling actions this sets the *open* state
+   * explicitly rather than toggling a third time — a double-click must never
+   * land on "closed". Entomb's two clicks were exactly ADR 27's arm-and-
+   * commit, so the card is already on its way down; all that is left to do
+   * is disarm. */
+  function actOnAndDisarm(name: string) {
+    if (!action) return
+    if (action === 'ask') {
+      setAskNow(true)
+      setEditing(name)
+    } else if (action === 'why') {
+      setAskNow(false)
+      setEditing(name)
+    } else if (action === 'argue') {
+      setArguing(name)
+    } else if (action === 'art') {
+      setArtFor(name)
+    }
+    setPendingEntomb(null)
+    setAction(null)
   }
 
   /** Rows currently sinking into the graveyard — they get the send-off class
@@ -1008,8 +1031,9 @@ export default function DeckDetail() {
           {/* The action bar (punch list item 9): the four per-row buttons,
               rolled up and inverted. Press an action, then pick the card it
               applies to — one bar instead of four buttons times 99 rows, and
-              every row gets its width back. Escape or the pressed button
-              itself cancels. */}
+              every row gets its width back. An armed action is a mode, not a
+              single shot (item 3): it stays armed across picks, and Escape,
+              the pressed button, Done, or a double-click on a card ends it. */}
           {deck.writable && !selecting && (
             <div className="action-bar flex flex-wrap items-center gap-2 rounded-lg px-3 py-2">
               <span className="text-[10px] uppercase tracking-wide"
@@ -1037,11 +1061,13 @@ export default function DeckDetail() {
                 <span className="action-hint text-xs"
                       style={{ color: 'var(--text-secondary)' }}>
                   {CARD_ACTIONS.find((a) => a.key === action)?.hint}{' '}
+                  Stays on for more picks — double-click a card to act and
+                  put the bar away.{' '}
                   <button type="button"
                           onClick={() => { setAction(null); setPendingEntomb(null) }}
                           className="underline"
                           style={{ color: 'var(--text-muted)' }}>
-                    Cancel
+                    Done
                   </button>
                 </span>
               )}
@@ -1082,6 +1108,7 @@ export default function DeckDetail() {
                               tabIndex: 0,
                               'aria-label': `${CARD_ACTIONS.find((a) => a.key === action)?.label}: ${card.name}`,
                               onClick: () => actOn(card.name),
+                              onDoubleClick: () => actOnAndDisarm(card.name),
                               onKeyDown: (e: React.KeyboardEvent) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
                                   e.preventDefault()

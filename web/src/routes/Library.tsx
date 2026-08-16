@@ -198,8 +198,7 @@ function LibraryMasthead({ decks, health }: {
            below for scale."
       title="Deck library"
       credit={<>
-        <em>Sylvan Library</em> by Yeong-Hao Han, Commander&rsquo;s Arsenal —
-        the card this project is named after.
+        <em>Sylvan Library</em> by Yeong-Hao Han, Commander&rsquo;s Arsenal.
       </>}>
       <p>
         {decks} deck{decks === 1 ? '' : 's'} ·{' '}

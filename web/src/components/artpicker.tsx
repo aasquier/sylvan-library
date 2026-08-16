@@ -1,6 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, errorMessage, type DeckRef, type Printing } from '../lib/api'
 import { Spinner } from './ui'
+
+/**
+ * Click-versus-double-click, disambiguated (punch list 2026-08-15 item 3).
+ *
+ * A double-click is two clicks, and a naive handler pair would fire the
+ * single-click path twice first — which here means "apply" then "toggle back
+ * to the default", the worst possible reading of an eager gesture. So the
+ * single click waits one beat before applying; the double-click cancels the
+ * pending beat and does its own thing. 250ms is under anybody's double-click
+ * threshold and invisible next to the save's round trip.
+ */
+function useClickOrDouble(single: (id: string) => void,
+                          double: (id: string) => void) {
+  const timer = useRef<number | null>(null)
+  useEffect(() => () => {
+    if (timer.current) window.clearTimeout(timer.current)
+  }, [])
+  return {
+    click(id: string) {
+      if (timer.current) window.clearTimeout(timer.current)
+      timer.current = window.setTimeout(() => {
+        timer.current = null
+        single(id)
+      }, 250)
+    },
+    doubleClick(id: string) {
+      if (timer.current) {
+        window.clearTimeout(timer.current)
+        timer.current = null
+      }
+      double(id)
+    },
+  }
+}
 
 /**
  * The same choice for any card in the 99 (punch list 2026-08-15 item 8).
@@ -34,7 +68,7 @@ export function CardArtPicker({ deck, card, onPicked, onClose }: {
     return () => { live = false }
   }, [deck, card])
 
-  async function pick(id: string) {
+  async function pick(id: string, thenClose = false) {
     const next = id === selected ? '' : id
     setSaving(id)
     setError(null)
@@ -42,12 +76,20 @@ export function CardArtPicker({ deck, card, onPicked, onClose }: {
       await api.setCardField(deck, card, 'art', next)
       setSelected(next)
       onPicked()
+      // Close only on a successful save: a double-click that failed must
+      // leave the error where the person who made it is looking.
+      if (thenClose) onClose()
     } catch (err) {
       setError(errorMessage(err))
     } finally {
       setSaving('')
     }
   }
+
+  const gesture = useClickOrDouble(
+    (id) => void pick(id),
+    (id) => void pick(id, true),
+  )
 
   return (
     <div className="mt-2 rounded-lg px-3 py-3"
@@ -77,7 +119,8 @@ export function CardArtPicker({ deck, card, onPicked, onClose }: {
         <>
           <p className="mb-2 mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
             {printings.length} printings, newest first. The choice is saved to{' '}
-            <code>deck.yaml</code>; picking the one showing resets to the default.
+            <code>deck.yaml</code>; picking the one showing resets to the
+            default. Double-click a painting to pick it and close this.
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
             {printings.map((printing) => {
@@ -86,7 +129,8 @@ export function CardArtPicker({ deck, card, onPicked, onClose }: {
                 <button
                   key={printing.id}
                   type="button"
-                  onClick={() => void pick(printing.id)}
+                  onClick={() => gesture.click(printing.id)}
+                  onDoubleClick={() => gesture.doubleClick(printing.id)}
                   disabled={!!saving}
                   title={`${printing.set_name ?? printing.set_code} · #${printing.collector_number ?? '?'}`}
                   className="overflow-hidden rounded-lg text-left"
@@ -164,7 +208,7 @@ export function ArtPicker({ deck, onPicked }: {
     return () => { live = false }
   }, [open, printings, deck])
 
-  async function pick(id: string) {
+  async function pick(id: string, thenClose = false) {
     // Picking the one already showing clears the choice instead of rewriting
     // it — that is how somebody gets back to the default printing without
     // having to know which one it was.
@@ -175,12 +219,21 @@ export function ArtPicker({ deck, onPicked }: {
       await api.setDeckField(deck, 'commander_art', next)
       setSelected(next)
       onPicked()
+      // The one-gesture swap (item 3): double-click applies and folds the
+      // picker away — but only on success, so an error is seen where it
+      // happened.
+      if (thenClose) setOpen(false)
     } catch (err) {
       setError(errorMessage(err))
     } finally {
       setSaving('')
     }
   }
+
+  const gesture = useClickOrDouble(
+    (id) => void pick(id),
+    (id) => void pick(id, true),
+  )
 
   return (
     <div>
@@ -216,7 +269,8 @@ export function ArtPicker({ deck, onPicked }: {
               <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
                 {printings.length} printings, newest first. Digital-only ones
                 are left out. The choice is saved to <code>deck.yaml</code>, so
-                it travels with the deck.
+                it travels with the deck. Double-click a painting to swap and
+                close the picker in one go.
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {printings.map((printing) => {
@@ -225,7 +279,8 @@ export function ArtPicker({ deck, onPicked }: {
                     <button
                       key={printing.id}
                       type="button"
-                      onClick={() => void pick(printing.id)}
+                      onClick={() => gesture.click(printing.id)}
+                      onDoubleClick={() => gesture.doubleClick(printing.id)}
                       disabled={!!saving}
                       title={`${printing.set_name ?? printing.set_code} · #${printing.collector_number ?? '?'}`}
                       className="overflow-hidden rounded-lg text-left"

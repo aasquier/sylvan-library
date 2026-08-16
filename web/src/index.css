@@ -961,6 +961,9 @@ button:hover .tarot-fan-card {
 
 .action-pick {
   cursor: pointer;
+  /* Double-click acts-and-disarms (punch list item 3); without this it also
+     selects the card's name, and the highlight reads as a third state. */
+  user-select: none;
   transition: transform 120ms ease, border-color 120ms ease,
     box-shadow 120ms ease;
 }

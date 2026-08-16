@@ -257,8 +257,11 @@ class Persona:
 
 PLAIN = Persona(
     key="plain",
-    label="Just talk to me",
-    blurb="A few questions about you, and a suggestion at the end.",
+    # Named for who it actually is (punch list 2026-08-15 item 1): the voice
+    # with no costume is Claude's own, so the door says so instead of talking
+    # around it.
+    label="Chat with Claude",
+    blurb="No costume. A few questions about you, and a suggestion at the end.",
     voice=PLAIN_VOICE,
 )
 
