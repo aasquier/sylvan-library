@@ -308,6 +308,9 @@ def _tiles(decks: list[Deck], con: Any, *, writable: bool,
             # display, and never a claim about somebody *else's* deck being
             # private: a private deck of another owner is not in this list.
             "shared": deck.shared,
+            # Who sleeves this one up (second 2026-08-15 punch list, item 10):
+            # a household tag, not an account. Empty means untagged.
+            "pilot": deck.pilot,
             "status": deck.status,
             "stage": deck.stage,
             # The draft's to-do list, as a number. Carried on the library
@@ -693,6 +696,7 @@ def get_deck(slug: str, *, source: DeckSource | None = None,
             # than being remembered from the list that linked here.
             "owner": owner,
             "shared": deck.shared,
+            "pilot": deck.pilot,
             "status": deck.status,
             "stage": deck.stage,
             "needs_rationale": len(deck.unjustified),

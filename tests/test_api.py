@@ -906,6 +906,27 @@ def test_deck_status_and_bracket_are_patchable(swappable):
         assert (body["status"], body["bracket"]) == ("built", 5)
 
 
+def test_a_pilot_is_patchable_and_travels_to_the_shelf(swappable):
+    """The household tag (second 2026-08-15 punch list, item 10): set through
+    the same field PATCH as stage and status, case kept, visible on both the
+    deck and the shelf listing, and clearable."""
+    with swappable as client:
+        resp = client.patch("/api/decks/local/mono-green",
+                            json={"field": "pilot", "value": "Mark's Wife"})
+        assert resp.status_code == 200, resp.json()
+        assert client.get(
+            "/api/decks/local/mono-green").json()["pilot"] == "Mark's Wife"
+        tile = next(d for d in client.get("/api/decks").json()
+                    if d["slug"] == "mono-green")
+        assert tile["pilot"] == "Mark's Wife"
+
+        # Untagging is a real operation, not an error.
+        assert client.patch("/api/decks/local/mono-green",
+                            json={"field": "pilot",
+                                  "value": ""}).status_code == 200
+        assert client.get("/api/decks/local/mono-green").json()["pilot"] == ""
+
+
 def test_a_field_that_is_not_the_decks_own_is_refused(swappable):
     with swappable as client:
         for field in ("name", "commander", "cards"):

@@ -338,6 +338,10 @@ function DeckCard({ deck, onDelete, heading: Heading = 'h2', index = 0 }: {
                 </Badge>
               )}
               {deck.bracket && <Badge>B{deck.bracket}</Badge>}
+              {/* Whose hands it belongs in, when the household tagged it.
+                  Plain text, no emoji — a glyph here would render as
+                  whatever the platform thinks a pilot is. */}
+              {deck.pilot && <Badge>pilot · {deck.pilot}</Badge>}
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs"
@@ -388,6 +392,7 @@ export default function Library() {
   const [sort, setSort] = useState('name')
   const [status, setStatus] = useState('all')
   const [stage, setStage] = useState('all')
+  const [pilot, setPilot] = useState('all')
   const [shelf, setShelf] = useState<Shelf>('mine')
   const [deleting, setDeleting] = useState<DeckTile | null>(null)
   // Kept after the dialog closes: "it is in .trash/" is the sentence that
@@ -429,6 +434,10 @@ export default function Library() {
     if (color !== 'all') list = list.filter((d) => d.color_identity.includes(color))
     if (status !== 'all') list = list.filter((d) => d.status === status)
     if (stage !== 'all') list = list.filter((d) => d.stage === stage)
+    // 'none' is a real answer — the untagged decks — not the filter off.
+    if (pilot !== 'all') {
+      list = list.filter((d) => (pilot === 'none' ? !d.pilot : d.pilot === pilot))
+    }
     return [...list].sort((a, b) =>
       sort === 'bracket'
         ? (b.bracket ?? 0) - (a.bracket ?? 0)
@@ -436,7 +445,7 @@ export default function Library() {
           ? b.total_cards - a.total_cards
           : a.name.localeCompare(b.name),
     )
-  }, [mine, players, shelf, bracket, color, status, stage, sort])
+  }, [mine, players, shelf, bracket, color, status, stage, pilot, sort])
 
   /** The browse shelf, grouped under the username it belongs to.
    *
@@ -456,6 +465,10 @@ export default function Library() {
   if (!decks) return <Spinner label="Loading decks…" />
 
   const brackets = [...new Set(decks.map((d) => d.bracket).filter(Boolean))].sort()
+  // The household's names, straight off the decks (second punch list,
+  // item 10): the filter exists only once somebody has tagged a pilot, so a
+  // single-player library never grows a control about nobody.
+  const pilots = [...new Set(decks.map((d) => d.pilot).filter(Boolean))].sort()
 
   return (
     <div className="space-y-6">
@@ -526,6 +539,12 @@ export default function Library() {
                   options={[{ value: 'all', label: 'Draft and curated' },
                     { value: 'curated', label: 'Curated' },
                     { value: 'draft', label: 'Draft' }]} />
+          {pilots.length > 0 && (
+            <Select label="Pilot" value={pilot} onChange={setPilot}
+                    options={[{ value: 'all', label: 'Everyone' },
+                      ...pilots.map((p) => ({ value: p, label: p })),
+                      { value: 'none', label: 'Untagged' }]} />
+          )}
           <Select label="Sort" value={sort} onChange={setSort}
                   options={[
                     { value: 'name', label: 'Name' },

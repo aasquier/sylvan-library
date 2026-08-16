@@ -155,6 +155,82 @@ function ShareToggle({ deck, deckRef, onChanged }: {
  * the place it would have been easiest to ignore: "one of eight legendary
  * Trolls" is exactly the sentence a model writes fluently and wrongly.
  */
+/**
+ * The pilot tag, shown and edited in place (second punch list, item 10).
+ *
+ * One line: "Piloted by Mark's wife", with a change/tag control on decks the
+ * viewer may write. The input saves on Enter or the button, clears to untag,
+ * and the deck refreshes so the shelf's filter sees the same fact this page
+ * does. Absent entirely on an untagged deck the viewer cannot write —
+ * "nobody claims this" is not a fact worth a line on somebody else's deck.
+ */
+function PilotLine({ deck, deckRef, onRefresh }: {
+  deck: Deck
+  deckRef: DeckRef
+  onRefresh: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(deck.pilot)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!deck.pilot && !deck.writable) return null
+
+  async function save() {
+    try {
+      setError(null)
+      await api.setDeckField(deckRef, 'pilot', value.trim())
+      setEditing(false)
+      onRefresh()
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm"
+         style={{ color: 'var(--text-muted)' }}>
+      {!editing && deck.pilot && (
+        <span>
+          Piloted by{' '}
+          <span style={{ color: 'var(--text-secondary)' }}>{deck.pilot}</span>
+        </span>
+      )}
+      {!editing && deck.writable && (
+        <button type="button"
+                onClick={() => { setValue(deck.pilot); setEditing(true) }}
+                className="text-xs underline decoration-dotted"
+                style={{ color: 'var(--text-muted)' }}>
+          {deck.pilot ? 'change' : 'Tag a pilot — who plays this one?'}
+        </button>
+      )}
+      {editing && (
+        <span className="flex flex-wrap items-center gap-2">
+          <input value={value} onChange={(e) => setValue(e.target.value)}
+                 onKeyDown={(e) => { if (e.key === 'Enter') void save() }}
+                 maxLength={40} autoFocus
+                 placeholder="Mark’s wife, the kids…"
+                 aria-label="Pilot"
+                 className="h-7 rounded-md px-2 text-xs"
+                 style={{ background: 'var(--surface-1)',
+                          border: '1px solid var(--hairline)',
+                          color: 'var(--text-primary)' }} />
+          <button type="button" onClick={() => void save()}
+                  className="text-xs font-medium underline"
+                  style={{ color: 'var(--series-1)' }}>
+            Save
+          </button>
+          <button type="button" onClick={() => setEditing(false)}
+                  className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Cancel
+          </button>
+        </span>
+      )}
+      {error && <span className="text-xs"
+                      style={{ color: 'var(--status-critical)' }}>{error}</span>}
+    </div>
+  )
+}
+
 function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
   deck: Deck
   /** The deck's address. Taken from the URL rather than rebuilt from `deck`,
@@ -235,6 +311,11 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
               {' '}— you can read this deck, not change it.
             </p>
           )}
+
+          {/* Which human sleeves this one up (second punch list, item 10):
+              a household tag, not an account. Editable inline on your own
+              decks; on somebody else's it is a fact, or absent. */}
+          <PilotLine deck={deck} deckRef={deckRef} onRefresh={onRefresh} />
 
           {/* The identity, loud — it constrains all 99 other cards and it used
               to be a row of 12px dots. The mana cost deliberately sits on the

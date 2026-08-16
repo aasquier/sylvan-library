@@ -68,15 +68,18 @@ SETTABLE_FIELDS = ("category", "qty", "why", "art")
 # What `set_deck_field` will write: the deck's own scalars. `strategy` and
 # `notes` are prose and belong to `set_note`; `commander` and `companion` change
 # what the whole deck is legal to contain and are a rebuild, not a field edit.
-SETTABLE_DECK_FIELDS = ("stage", "status", "bracket", "commander_art")
+SETTABLE_DECK_FIELDS = ("stage", "status", "bracket", "commander_art", "pilot")
+
+# The most anybody's name needs. A pilot is a person at a table, not a bio.
+PILOT_MAX = 40
 
 # The order `Deck.dump` writes top-level keys in. Used to place a key the file
 # does not have yet -- `stage` is absent from every deck written before ADR 13,
 # and appending it to the bottom of the file would be legal YAML and unlike
 # every deck in the repository.
-_DECK_KEY_ORDER = ("slug", "name", "status", "stage", "commander",
-                   "commander_art", "companion", "bracket", "strategy",
-                   "notes", "cards", "swap_board", "graveyard")
+_DECK_KEY_ORDER = ("slug", "name", "status", "stage", "commander", "shared",
+                   "pilot", "commander_art", "companion", "bracket",
+                   "strategy", "notes", "cards", "swap_board", "graveyard")
 
 # A Scryfall printing id: a plain UUID. Checked by shape rather than against
 # the pool, because `edit.py` is pure text surgery over YAML and reaching for
@@ -889,6 +892,16 @@ def set_deck_field(text: str, *, field: str, value: Any) -> str:
             raise EditFailed(f"bracket must be a number, not {value!r}") from exc
         if not 1 <= value <= 5:
             raise EditFailed("bracket runs from 1 to 5")
+    elif field == "pilot":
+        # A person's name: free text, case kept, and emptying it is a real
+        # operation -- it means "nobody claims this one". The cap is about
+        # the file and the shelf, not about people; nobody signs a deck with
+        # a paragraph.
+        value = str(value or "").strip()
+        if len(value) > PILOT_MAX:
+            raise EditFailed(
+                f"a pilot name runs at most {PILOT_MAX} characters; "
+                f"{value[:20]!r}… is {len(value)}")
     elif field == "commander_art":
         # A Scryfall printing id, so free text with no enum to check it
         # against. Case is preserved rather than lowered: the value is an
