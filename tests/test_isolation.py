@@ -117,6 +117,15 @@ SHARED = {
     # two accounts asking the same question get two jobs.
     "/api/claude/research": "submits a job; the question is the caller's and "
                             "no deck is reachable, and the job is scoped",
+    # ADR 32. A derivative is keyed on a public painting's oracle_id and a
+    # fixed effect name -- the same class of thing as `/api/colors/{key}`:
+    # nothing here belongs to an account, and every session sees the same
+    # cache. Behind auth (not PUBLIC_PATHS) because deck pages are, and a
+    # backdrop should not outlive the door it decorates.
+    "/api/art/motion/{oracle_id}/{effect}": "a shared cache over public "
+                                            "card art; nothing per-account",
+    "/api/art/motion/{oracle_id}/{effect}/{filename}": "one file of the "
+                                                       "same shared cache",
 }
 
 # Belongs to one person. Each entry says how to make one as user A and where to
@@ -240,7 +249,10 @@ def concrete(path: str) -> str:
                 .replace("{name}", "Forest")
                 .replace("{key}", "mulligan")
                 .replace("{job_id}", "deadbeef")
-                .replace("{username}", "alice"))
+                .replace("{username}", "alice")
+                .replace("{oracle_id}", "0aae2e33-0000-4000-8000-000000000000")
+                .replace("{effect}", "depth-drift")
+                .replace("{filename}", "loop.webm"))
 
 
 # ------------------------------------------------------- the generated sweep

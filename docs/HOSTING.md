@@ -1178,6 +1178,23 @@ fly ssh sftp get /data/decks/<slug>/deck.yaml ./decks/<slug>/deck.yaml
 `sftp put` silently overwrites whatever was written on the instance, so do it
 only when you know nothing was — the History tab (ADR 28) is how you know.
 
+### Card-art motion derivatives (ADR 32)
+
+Generated on the dev machine (`mtglab cardmotion build --deck <slug>
+--effect depth-drift`), never in git and never in the image; the instance
+only serves what sits in its cache. Push a finished derivative up the same
+way everything else reaches the volume:
+
+```bash
+fly ssh sftp put -r data/cache/cardmotion /data/cache/cardmotion
+```
+
+Files arrive root-owned; the entrypoint re-chowns `/data` at the next boot,
+or run the chown line from §4 step 6 to fix it immediately. Nothing here is
+irreplaceable — a lost cache regenerates from the same seeds and pool — so
+`backups/` need not carry it; the deck pages simply show stills until the
+push is redone, which is the app as it was before the tier existed.
+
 ### Backups
 
 The pool needs no backup — `data refresh` rebuilds it in one command. That is

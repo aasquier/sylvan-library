@@ -132,6 +132,16 @@ src/mtglab/
                           refuses one left unseeded. Wizards' art never
                           enters COMMITTED assets -- ADR 32's runtime tier
                           is where card-art derivation will live
+  cardmotion/             card-art motion, derived at runtime (ADR 32):
+                          effects (depth-drift, slow-pan -- the vocabulary
+                          is bounded by Scryfall's guidelines), a DepthModel
+                          Protocol whose real loader lives behind the
+                          `depth` extra (torch, dev-Mac only, NEVER the
+                          container), and a cache under data/cache keyed
+                          like the sim cache. Built by `mtglab cardmotion
+                          build`, pushed to the volume over sftp, served by
+                          two shared routes; nothing generates at request
+                          time and git never holds a byte of it
   mana.py                 cost parsing + castability solver
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema
