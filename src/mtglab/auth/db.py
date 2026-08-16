@@ -39,7 +39,7 @@ from mtglab import config
 
 # Bumped when `_MIGRATIONS` grows. Stored in SQLite's own `user_version`, which
 # costs no table and cannot be forgotten in a schema dump.
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 # One entry per version, applied in order to whatever the file is at. A fresh
 # database runs all of them; an existing one runs the tail. The invite and
@@ -324,6 +324,76 @@ _MIGRATIONS: tuple[str, ...] = (
     );
 
     CREATE INDEX claude_usage_by_time ON claude_usage(created_at);
+    """,
+    # -- 8 ------------------------------------------------------------------
+    # The deck activity log (ADR 28). One row per edit, written by
+    # `decks/log.py` from `service._commit` -- the single place every deck
+    # write already passes through, which is what makes "an edit that is not
+    # logged" a thing no route can produce by forgetting.
+    #
+    # This is the table ADR 15 lists as a prerequisite for deck conversation's
+    # write autonomy: "what did it change while I was not looking" is a
+    # question a log answers and nothing else here can. Nothing autonomous
+    # writes yet, and the column that will carry the answer -- `actor` -- is
+    # here from the start rather than added later, because a log that cannot
+    # say *who* only postpones the question.
+    #
+    # Three column decisions, each argued rather than defaulted:
+    #
+    # - **`owner_id`, not an owner name.** `/api/decks/{owner}/{slug}` names
+    #   its owner as a *segment*, and that segment is not stable across
+    #   configurations: the file tier is `local` on a laptop and the
+    #   maintainer's username on a deployment (`decks/library.py:_file_owner`).
+    #   Keying on the segment would split one deck's history in two the day
+    #   `MTGLAB_ADMIN_EMAIL` was set. So the file tier is **NULL** -- there is
+    #   exactly one of it per instance, which is the whole of what it means --
+    #   and everybody else's decks carry `user_decks.owner_id`. NULL also
+    #   keeps `mtglab decks log` honest: the CLI only ever edits the file tier,
+    #   so it reads and writes exactly the rows the app files under it.
+    # - **CASCADE, matching `user_decks`.** Deleting an account takes its decks
+    #   (migration 6); a history of edits to decks that no longer exist,
+    #   attributed to somebody who no longer has an account, is not something
+    #   to keep. NULL is exempt from the constraint, which is what lets the
+    #   same column mean "the file tier" without a second table.
+    # - **`summary` is rendered here, not at read time.** `_commit` already
+    #   assembles the per-operation description and throws it away; this
+    #   stores the sentence it made. One renderer, server-side, rather than
+    #   one in Python for the CLI and a second in TypeScript for the panel
+    #   that would drift. `action` rides alongside so the row stays queryable
+    #   ("how many cards did I entomb in July") without parsing prose.
+    #
+    # **No rationale text ever lands here**, which is a property rather than an
+    # accident: `describe` builds the sentence from card names, categories and
+    # field *names*, and drops `why` where `swap_card` passes it. The log says
+    # a rationale changed and never what it says -- rule 4's text lives in
+    # `deck.yaml`, which is the source of truth, and a second copy in a table
+    # nobody edits is a copy that goes stale and a place a rationale could be
+    # mined from. `tests/test_deck_log.py` pins it.
+    """
+    CREATE TABLE deck_log (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT NOT NULL,
+        -- NULL is the file-backed curated library, of which there is one per
+        -- instance. See the note above for why this is not an owner segment.
+        owner_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        slug       TEXT NOT NULL,
+        -- The account that made the edit, or NULL for whoever is at this
+        -- machine -- the CLI, and the app with auth off. A username, never an
+        -- email: this is read by anyone who may read the deck, and an address
+        -- must never reach a log line.
+        actor      TEXT,
+        -- A stable verb: 'add', 'entomb', 'return', 'exile', 'remove',
+        -- 'swap', 'set-card', 'set-deck', 'note', 'edit'.
+        action     TEXT    NOT NULL,
+        -- The sentence both the CLI and the deck panel show.
+        summary    TEXT    NOT NULL
+    );
+
+    -- The one query there is: this deck's history, newest first. `id` is in
+    -- the index so the ordering comes off it too -- `created_at` would order
+    -- identically but two edits inside the same second would tie, and an
+    -- autoincrementing id cannot.
+    CREATE INDEX deck_log_by_deck ON deck_log(owner_id, slug, id);
     """,
 )
 

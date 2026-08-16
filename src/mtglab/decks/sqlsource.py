@@ -57,6 +57,19 @@ class SqlDeckSource:
         # arrives. ADR 22's 404 is this line.
         self._shared_only = shared_only
 
+    @property
+    def owner_id(self) -> int:
+        """Whose decks these are, as a `users.id`.
+
+        Exposed for the activity log (ADR 28), which keys an entry on the
+        library rather than on the owner segment out of the URL -- that segment
+        is `local` on a laptop and a username on a deployment, and a history
+        keyed on it would split in two the day `MTGLAB_ADMIN_EMAIL` was set.
+        The file tier has no id and answers `None` by not having this at all,
+        which is exactly what it means: there is one of it per instance.
+        """
+        return self._owner_id
+
     # ---- reading ---------------------------------------------------------
 
     def _where(self) -> tuple[str, list[object]]:

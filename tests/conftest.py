@@ -77,6 +77,43 @@ def _no_usage_ledger(monkeypatch):
     monkeypatch.setattr(modes, "ledger",
                         SimpleNamespace(record=lambda **kwargs: None))
 
+@pytest.fixture(autouse=True)
+def _no_deck_log(monkeypatch):
+    """No test writes activity-log rows into the developer's real app.db.
+
+    The same hazard as `_no_usage_ledger` above, arriving through a different
+    door and found the same way — by running the suite and then looking at the
+    file. `service._commit` records every deck edit through `decks/log.py`,
+    which resolves its database from `config`; and the edit tests deliberately
+    run against a `MemoryDeckSource` **without** overriding the data directory,
+    because until now nothing about an edit touched a database at all. So the
+    decks were safe and one row landed in the laptop's real history anyway,
+    attributing a promotion of `gyome-food` to a test.
+
+    Only `record` is replaced, and the module stays real behind it: `entries`
+    and `describe` are pure reads a test may want, and `tests/test_deck_log.py`
+    exercises the writer directly against a scratch path. One test there also
+    puts the real module back in front of `service`, because a stub nothing
+    ever removes is how a broken seam stays green.
+    """
+    from mtglab.api import service
+    from mtglab.decks import log
+
+    class _Silent:
+        """`decks.log`, with a `record` that does not write."""
+
+        def __getattr__(self, name):
+            # Everything else — `entries`, `describe`, `DEFAULT_LIMIT` — comes
+            # off the real module, so this cannot go stale when one is added.
+            return getattr(log, name)
+
+        @staticmethod
+        def record(**_kwargs):
+            pass
+
+    monkeypatch.setattr(service, "log", _Silent())
+
+
 settings.register_profile("dev", max_examples=200, deadline=None)
 settings.register_profile(
     "ci",

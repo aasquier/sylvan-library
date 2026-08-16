@@ -315,6 +315,32 @@ export interface Suggestions {
   targets: SuggestionTarget[]
 }
 
+/** One thing that was done to a deck (ADR 28).
+ *
+ * `summary` is rendered on the server and shown verbatim: the CLI prints the
+ * same string, and a second renderer here would be a second thing to keep in
+ * step. `action` is the stable verb beside it, which is what a client may
+ * safely switch on.
+ *
+ * There is deliberately no rationale field. The log records that a `why`
+ * changed and never what it says — rule 4's text lives in `deck.yaml`.
+ */
+export interface DeckLogEntry {
+  id: number
+  /** ISO-8601 UTC. */
+  created_at: string
+  /** A username, or `null` for whoever is at the machine — the CLI, and the
+   *  app with auth off. An unnamed actor, not an unknown one. */
+  actor: string | null
+  action: string
+  summary: string
+}
+
+export interface DeckLog {
+  slug: string
+  entries: DeckLogEntry[]
+}
+
 export interface ImportResult {
   slug: string
   /** Whose library it landed in — always the caller's. Sent back rather than
@@ -1263,6 +1289,12 @@ export const api = {
   stats: (ref: DeckRef) => get<DeckStats>(deckPath(ref, '/stats')),
   suggestions: (ref: DeckRef) =>
     get<Suggestions>(deckPath(ref, '/suggestions')),
+  // What has been done to this deck, newest first (ADR 28). As reachable as
+  // the deck and no more — the server resolves it through the same source, so
+  // a deck you cannot read has a history you cannot read either, answered by
+  // the same 404.
+  deckLog: (ref: DeckRef, limit?: number) =>
+    get<DeckLog>(deckPath(ref, `/log${limit ? `?limit=${limit}` : ''}`)),
   upcomingSets: () => get<{ sets: UpcomingSet[]; as_of: string }>('/api/sets/upcoming'),
   searchCards: (params: Record<string, string | number>) => {
     const qs = new URLSearchParams()

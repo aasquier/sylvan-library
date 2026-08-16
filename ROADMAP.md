@@ -1040,9 +1040,13 @@ arc; this is what the next few sessions actually do.
    non-empty `may_write`, `test_claude_boundary.py` forbidding the *mention*
    of a write function anywhere under `src/mtglab/claude/` — including
    `remove_card` and `set_card_field`, the two ADR 15 says are
-   autonomous-safe — and the activity log ADR 15 lists as required. Plus a
-   sim-results tool that `service.py` does not have. **Deck conversation is
-   the largest of the three, not the unblocked one.**
+   autonomous-safe. Plus a sim-results tool that `service.py` does not have.
+   **Deck conversation is the largest of the three, not the unblocked one.**
+
+   The fifth item on that list — the activity log — landed 2026-08-16 as
+   ADR 28, which leaves the four locks and the missing tool. Each lock names
+   the ADR that would have to supersede it, so none of them is work; they are
+   arguments somebody has to make.
 
    So argue a slot went first, and not only because it was cheapest. It is
    the mode nearest the boundary while the stakes are lowest: its whole output
@@ -1739,11 +1743,20 @@ proposal, plus the tarot door of ADR 21), the **stance dial UI** (2026-08-14,
 #88), the **slot argument** (2026-08-14, ADR 25, #89), and **research**
 (2026-08-14, ADR 26) — six modes across five features.
 
+Then the **activity log** (2026-08-16, ADR 28) — not a mode, but the
+prerequisite ADR 15 lists for the top of the write axis, and the last one that
+was cheap. Every deck edit is now recorded from `service._commit`, with who
+made it, and **never with what a rationale says**; `mtglab decks log <slug>`
+and the deck page's History tab read it. It answers "what did it change while
+I was not looking" for the two cases git cannot: ADR 22's SQL tier, which has
+no git history at all, and the deployed instance, where `/data/decks` is the
+live source of truth and nothing commits it.
+
 What is *not* built: the one mode ADR 15 names that remains — **deck
-conversation** — the activity log the top of the write axis needs, and the
-Forge half. Note that ADR 26 made deck conversation *harder* rather than
-nearer: research is deck-blind by construction precisely so that "a Claude
-surface that can see your list" stays a decision somebody has to argue for.
+conversation** — and the Forge half. Note that ADR 26 made deck conversation
+*harder* rather than nearer: research is deck-blind by construction precisely
+so that "a Claude surface that can see your list" stays a decision somebody
+has to argue for.
 
 The plumbing was already in place: an API key reaches the app from a gitignored
 `.env` or `fly secrets`, named in `.env.example` and in the CI reviewer workflow
@@ -1900,7 +1913,9 @@ exactly where a human judgement enters.
 
 Two things this adds to the build: an **activity log**, since "what did it
 change while I was not looking" cannot be answered with "read the git diff" by
-someone on a hosted instance, and a default that comes from the deck —
+someone on a hosted instance — **built 2026-08-16 as ADR 28**, with an `actor`
+column that says NULL today and is there so nothing has to be migrated the day
+something autonomous writes — and a default that comes from the deck —
 `status: built | theoretical` already separates lists under consideration from
 sleeved cardboard. The stance itself starts as per-conversation state, not
 persisted, so what people actually reach for is known before a default is

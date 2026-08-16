@@ -884,7 +884,16 @@ export function TarotTable({ onPick, onLeave }: {
       {cards.length > 0 && (
         <div className={dealing ? 'tarot-table-felt relative px-4 py-8' : ''}>
           {dealing && (
-            <div className="absolute right-5 top-1/2 hidden -translate-y-1/2 sm:block">
+            /* `lg`, not `sm`. The ball is positioned against the felt's right
+               edge while the spread is centred in the whole felt, so the two
+               close on each other as the page narrows — at `sm` it sat on top
+               of the third card for every width from 640px to about a
+               thousand, which is most laptops in a half-width window. The
+               arithmetic is in `index.css` beside `.crystal-ball`, which
+               shrinks it with the viewport for the widths where it does fit.
+               Below that it is absent rather than squeezed: no ball is a
+               plainer table, and a ball across the cards is a broken one. */
+            <div className="absolute right-5 top-1/2 hidden -translate-y-1/2 lg:block">
               <CrystalBall vision={lastTurned && lastTurned.image
                 ? { image: lastTurned.image, reversed: lastTurned.reversed }
                 : null} />

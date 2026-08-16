@@ -636,7 +636,26 @@ button:hover .tarot-fan-card {
  * ball on the first frame.
  */
 .crystal-ball {
-  width: 168px;
+  /* Sized against the viewport rather than fixed, because on the dealing
+     table the clearance between the ball and the cards is a function of the
+     page width and nothing else. The ball is absolutely positioned at the
+     felt's right edge while the spread is centred in the *whole* felt, so the
+     two close on each other as the felt narrows: at a fixed 168px they
+     collided at every width below about 1000px, and the third card — "the
+     table" — spent that whole range underneath the glass.
+
+     Measured, not guessed. The spread is three 168px slots and two 1.5rem
+     gaps, plus a little for the settle rotation, so its right edge sits about
+     280px past centre; the ball's left edge sits at `feltW - 20 - width`.
+     They clear when `feltW / 2 > 300 + width`, which at 168px wants a felt
+     938px wide and a window near a thousand.
+
+     The clamp buys back most of that: at the `lg` breakpoint the ball is
+     ~133px and clears the cards by about 55px, and it reaches full size on a
+     desktop where there was never a problem. `tarot.tsx` holds the other half
+     — the ball is not rendered at all below `lg`, because a ball squeezed to
+     its 120px floor to fit a tablet is a worse table than one with no ball. */
+  width: clamp(120px, 13vw, 168px);
   filter: drop-shadow(0 12px 22px rgba(8, 4, 34, 0.55));
 }
 

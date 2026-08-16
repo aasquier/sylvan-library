@@ -25,6 +25,7 @@ from mtglab.api import admin, auth, jobs, service
 from mtglab.api.deps import Scope, UserScope, deck_source, library
 from mtglab.auth import bootstrap
 from mtglab.auth.mail import EmailSender
+from mtglab.decks import log
 from mtglab.decks.library import Library
 from mtglab.decks.source import DeckNotFound, DeckSource, ReadOnlySource
 
@@ -397,6 +398,21 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     def deck_stats(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
         return service.stats_for(slug, source=lib.source_for(owner))
 
+    @app.get("/api/decks/{owner}/{slug}/log")
+    def deck_log(owner: str, slug: str, lib: Lib,
+                 limit: int = Query(log.DEFAULT_LIMIT, ge=1, le=500),
+                 ) -> dict[str, Any]:
+        """What has been done to this deck, newest first (ADR 28).
+
+        A GET beside `validate` and `stats`, and user-scoped by exactly the
+        same mechanism: `lib.source_for(owner)` is what decides whether this
+        deck exists for this caller, so a history is unreachable in precisely
+        the cases the deck is. There is no separate rule about who may read
+        one, which is the point — a second rule is a second thing to get wrong.
+        """
+        return service.history_for(slug, source=lib.source_for(owner),
+                                   limit=limit)
+
     @app.post("/api/decks/{owner}/{slug}/swap")
     def swap_card(owner: str, slug: str, payload: dict[str, Any], lib: Lib) -> dict[str, Any]:
         """Carry out a swap the caller has already decided on.
@@ -412,7 +428,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 out=str(payload.get("out", "")),
                 into=str(payload.get("into", "")),
                 why=str(payload.get("why", "")),
-                source=lib.source_for(owner),
+                source=lib.source_for(owner), actor=lib.actor,
             )
         except service.SwapRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -433,7 +449,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 why=str(payload.get("why") or ""),
                 qty=int(payload.get("qty") or 1),
                 to=str(payload.get("to") or "cards"),
-                source=lib.source_for(owner),
+                source=lib.source_for(owner), actor=lib.actor,
             )
         except (TypeError, ValueError) as exc:
             raise HTTPException(status_code=422,
@@ -445,7 +461,9 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     def remove_card(owner: str, slug: str, name: str, lib: Lib) -> dict[str, Any]:
         """Entomb a 99-card (ADR 27); a swap-board card is removed outright."""
         try:
-            return service.remove_card(slug, name=name, source=lib.source_for(owner))
+            return service.remove_card(slug, name=name,
+                                       source=lib.source_for(owner),
+                                       actor=lib.actor)
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -462,7 +480,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=422, detail="names must be a list")
         try:
             return service.entomb_cards(slug, names=[str(n) for n in names],
-                                        source=lib.source_for(owner))
+                                        source=lib.source_for(owner),
+                                        actor=lib.actor)
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -470,7 +489,9 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     def return_card(owner: str, slug: str, name: str, lib: Lib) -> dict[str, Any]:
         """Bring an entombed card back to the 99, its rationale intact."""
         try:
-            return service.return_card(slug, name=name, source=lib.source_for(owner))
+            return service.return_card(slug, name=name,
+                                       source=lib.source_for(owner),
+                                       actor=lib.actor)
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -478,7 +499,9 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     def exile_card(owner: str, slug: str, name: str, lib: Lib) -> dict[str, Any]:
         """Remove an entombed card permanently -- the only hard delete left."""
         try:
-            return service.exile_card(slug, name=name, source=lib.source_for(owner))
+            return service.exile_card(slug, name=name,
+                                      source=lib.source_for(owner),
+                                      actor=lib.actor)
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -496,7 +519,9 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=422, detail="value is required")
         try:
             return service.set_card_field(slug, name=name, field=field,
-                                          value=payload["value"], source=lib.source_for(owner))
+                                          value=payload["value"],
+                                          source=lib.source_for(owner),
+                                          actor=lib.actor)
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -513,7 +538,9 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=422, detail="value is required")
         try:
             return service.set_deck_field(slug, field=str(payload.get("field", "")),
-                                          value=payload["value"], source=lib.source_for(owner))
+                                          value=payload["value"],
+                                          source=lib.source_for(owner),
+                                          actor=lib.actor)
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -523,7 +550,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         try:
             return service.set_note(slug, key=key,
                                     value=str(payload.get("value", "")),
-                                    source=lib.source_for(owner))
+                                    source=lib.source_for(owner),
+                                    actor=lib.actor)
         except service.EditRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

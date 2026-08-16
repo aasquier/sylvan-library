@@ -366,6 +366,50 @@ def test_note_can_read_long_prose_from_a_file(decks, tmp_path):
     assert written["notes"]["gameplan"] == text
 
 
+# ------------------------------------------------------------- decks log
+
+def test_log_shows_what_the_cli_itself_did(decks, capsys, monkeypatch):
+    """The CLI writes the file tier, which is `owner_id IS NULL`, and reads it
+    back from the same place -- so an edit made here shows up here.
+
+    `conftest.py`'s `_no_deck_log` is taken off for this one: it exists to keep
+    the rest of the suite out of the developer's real history, and a test of
+    the log that ran against a stub would pass with the recording removed.
+    """
+    from mtglab.api import service
+    from mtglab.decks import log
+
+    monkeypatch.setattr(service, "log", log)
+    assert run(["decks", "note", "mini", "--key", "mulligan",
+                "--value", "Keep any two-lander."])[0] == 0
+    capsys.readouterr()
+
+    assert run(["decks", "log", "mini"])[0] == 0
+    out = capsys.readouterr().out
+    assert "changed the mulligan note" in out
+    # Nobody is signed in on a command line. Named as the local user rather
+    # than left blank, because an unnamed actor is not an unknown one.
+    assert "local" in out
+
+
+def test_log_says_so_when_there_is_nothing_yet(decks, capsys, monkeypatch):
+    """A deck edited only before this log existed, which is every deck in the
+    repository. Its history is in git, and saying that is more use than an
+    empty table."""
+    from mtglab.api import service
+    from mtglab.decks import log
+
+    monkeypatch.setattr(service, "log", log)
+    assert run(["decks", "log", "mini"])[0] == 0
+    assert "nothing recorded yet" in capsys.readouterr().out
+
+
+def test_log_refuses_a_slug_that_is_not_a_deck(decks):
+    """Rather than printing an empty history, which is the same fact wearing a
+    misleading face."""
+    assert run(["decks", "log", "not-a-deck"])[0] == 1
+
+
 def test_add_without_a_pool_refuses_rather_than_guessing(decks):
     """Rule 1 applied to a write: a card nobody looked up is a card whose
     legality and colour identity are a guess."""

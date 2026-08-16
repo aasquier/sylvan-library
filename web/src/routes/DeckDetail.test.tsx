@@ -34,6 +34,7 @@ vi.mock('../lib/api', async () => ({
   followJob: vi.fn(),
   api: {
     deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
+    deckLog: vi.fn(),
     swapCard: vi.fn(), addCard: vi.fn(), entombCard: vi.fn(),
     entombCards: vi.fn(), returnCard: vi.fn(), exileCard: vi.fn(),
     setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),
@@ -137,6 +138,22 @@ const DOSSIER: CommanderDossier = {
     art_crop: 'https://example.test/surrak.jpg',
   }],
   printings: { count: 12, first_released: '2018-07-13', first_set: 'Core Set 2019' },
+}
+
+/** A deck's history as the server sends it (ADR 28).
+ *
+ * Note what is *not* in it: no rationale text. `set-card` records that a
+ * `why` changed and the words stay in `deck.yaml`, so there is no field here
+ * for the panel to render one out of even if it wanted to.
+ */
+const DECK_LOG = {
+  slug: 'goreclaw-stompy',
+  entries: [
+    { id: 3, created_at: '2026-08-15T09:30:00+00:00', actor: 'aasquier',
+      action: 'entomb', summary: 'entombed Primeval Titan' },
+    { id: 2, created_at: '2026-08-14T18:00:00+00:00', actor: null,
+      action: 'set-card', summary: 'changed the rationale for Sol Ring' },
+  ],
 }
 
 const EDIT_RESULT = {
@@ -353,6 +370,7 @@ beforeEach(() => {
     cancel: () => {},
   })
   vi.mocked(api.printings).mockReset().mockResolvedValue(PRINTINGS)
+  vi.mocked(api.deckLog).mockReset().mockResolvedValue(DECK_LOG)
   // A run's id is parked here so a reload can reattach; without this a test
   // that leaves one behind makes the next one reattach to a job it never made.
   localStorage.clear()
@@ -1684,5 +1702,93 @@ describe('DeckDetail deck review', () => {
     renderDeck()
     await screen.findByText(DECK.name)
     expect(screen.queryByRole('button', { name: 'Review with Claude' })).toBeNull()
+  })
+})
+
+/** The history tab (ADR 28).
+ *
+ * Three things are behaviour rather than markup. It is fetched **lazily**, on
+ * the same terms as the shortlist beside it — most visits never open it. It is
+ * **re-fetched after an edit**, because an entry appearing is the whole point
+ * and a panel the user is watching must not go stale behind them. And an
+ * unasked history and an empty one are **not the same screen**: collapsing
+ * them tells somebody their deck has no history while it is still loading.
+ */
+describe('deck history', () => {
+  function openHistory() {
+    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+  }
+
+  it('is not fetched until the tab is opened', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(api.deckLog).not.toHaveBeenCalled()
+
+    openHistory()
+    await waitFor(() => expect(api.deckLog).toHaveBeenCalledWith(REF))
+  })
+
+  it('shows the server’s sentence, the actor and the verb', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    openHistory()
+
+    await screen.findByText('entombed Primeval Titan')
+    expect(screen.getByText('changed the rationale for Sol Ring')).toBeTruthy()
+    expect(screen.getByText('entomb')).toBeTruthy()
+    expect(screen.getByText('aasquier')).toBeTruthy()
+    // A null actor is whoever is at the machine, and is named rather than
+    // left blank — an unnamed actor is not an unknown one.
+    expect(screen.getByText('you, locally')).toBeTruthy()
+  })
+
+  it('never shows a rationale, because it is never sent one', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    openHistory()
+
+    await screen.findByText('changed the rationale for Sol Ring')
+    // The card's `why` is on the deck, and the entry about it says only that
+    // it changed. Rule 4's text lives in deck.yaml.
+    expect(screen.queryByText(/Ramp and threat in one card/)).toBeNull()
+  })
+
+  it('distinguishes “nothing recorded” from “not asked yet”', async () => {
+    vi.mocked(api.deckLog).mockResolvedValue({
+      slug: 'goreclaw-stompy', entries: [],
+    })
+    renderDeck()
+    await screen.findByText(DECK.name)
+    openHistory()
+
+    await screen.findByText(/Nothing recorded yet/)
+    // The sentence that stops an empty panel reading as a lost history: these
+    // decks were edited for months before the log existed.
+    expect(screen.getByText(/in git, not here/)).toBeTruthy()
+  })
+
+  it('re-reads itself after an edit', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    openHistory()
+    await waitFor(() => expect(api.deckLog).toHaveBeenCalledTimes(1))
+
+    // Any edit will do; `refresh` is what every one of them calls.
+    fireEvent.click(screen.getByRole('button', { name: 'The 99' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Entomb' }))
+    fireEvent.click(screen.getByRole('button', { name: /Primeval Titan/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Primeval Titan/ }))
+    await waitFor(() => expect(api.entombCard).toHaveBeenCalled())
+    await waitFor(() => expect(api.deckLog).toHaveBeenCalledTimes(2))
+  })
+
+  it('is shown on a deck you cannot edit', async () => {
+    // Reading a shared deck's history is reading the deck (ADR 28) — the
+    // server gates it by the same source, so the client must not hide it.
+    vi.mocked(api.deck).mockResolvedValue({ ...DECK, writable: false } as Deck)
+    renderDeck()
+    await screen.findByText(DECK.name)
+    openHistory()
+    await screen.findByText('entombed Primeval Titan')
   })
 })

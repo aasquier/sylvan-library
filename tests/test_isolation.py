@@ -135,6 +135,10 @@ USER_SCOPED = {
     "/api/decks/{owner}/{slug}": "item",
     "/api/decks/{owner}/{slug}/validate": "item",
     "/api/decks/{owner}/{slug}/stats": "item",
+    # ADR 28. A deck's history is as reachable as the deck and no more: the
+    # route resolves its source through `Library`, so a private deck's log is
+    # a 404 for the same reason and by the same code path the deck itself is.
+    "/api/decks/{owner}/{slug}/log": "item",
     "/api/decks/{owner}/{slug}/swap": "item",
     "/api/decks/{owner}/{slug}/cards": "item",
     "/api/decks/{owner}/{slug}/cards/{name}": "item",

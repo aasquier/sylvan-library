@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 from mtglab import colors, config
 from mtglab import glossary as gloss
 from mtglab.cards import db
-from mtglab.decks import decklist, edit, importer, partners, suggest
+from mtglab.decks import decklist, edit, importer, log, partners, suggest
 from mtglab.decks.analyze import deck_stats
 from mtglab.decks.edit import EditFailed
 from mtglab.decks.importer import ImportRefused
@@ -737,6 +737,31 @@ def validate_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, A
     finally:
         if con is not None:
             con.close()
+
+
+def history_for(slug: str, *, source: DeckSource | None = None,
+                limit: int = log.DEFAULT_LIMIT) -> dict[str, Any]:
+    """What has been done to this deck, newest first (ADR 28).
+
+    `source.get(slug)` runs first and is not decoration: it is the whole
+    authorisation check. A deck this caller may not see is absent from their
+    source, so it raises `DeckNotFound` -> 404 before a row is read -- the same
+    answer, arrived at the same way, as every other route about one deck. There
+    is deliberately no second rule here about who may read a history: it is the
+    people who may read the deck, and that set is decided in
+    `decks/library.py` once.
+
+    A shared deck's history is therefore visible to whoever it is shared with,
+    and every actor in it is the deck's owner, because writes are owner-only
+    (ADR 22). So it discloses a username that the URL already carried.
+    """
+    decks = _source(source)
+    decks.get(slug)                     # 404 before anything is read
+    return {
+        "slug": slug,
+        "entries": log.entries(slug, owner_id=_owner_id_of(decks),
+                               limit=limit),
+    }
 
 
 class ImportRejected(Exception):
@@ -1560,6 +1585,26 @@ def _identity_of(deck: Deck, con: DuckDBPyConnection) -> frozenset[str]:
     return identity
 
 
+def _owner_id_of(decks: DeckSource) -> int | None:
+    """Which library these decks are in, as the activity log keys it.
+
+    `None` is the file-backed curated library, which is one per instance and
+    has no row in `users` to point at; a `SqlDeckSource` answers with the
+    account whose decks it holds. Asked of the *source* rather than passed in
+    from the route, because the source is already the thing that decided which
+    library the caller is in (`decks/library.py`) -- a second answer arriving
+    beside it could disagree with it.
+
+    `getattr` rather than a method on the protocol, for the same reason
+    `_for_writing` asks about `hides_decks` that way: this is a fact one
+    implementation has and the others do not, and putting it on `DeckSource`
+    would oblige every future source to have an opinion about a table it does
+    not use.
+    """
+    owner = getattr(decks, "owner_id", None)
+    return owner if isinstance(owner, int) else None
+
+
 def _find_card(deck: Deck, name: str) -> CardEntry | None:
     wanted = name.strip().lower()
     return next((c for c in deck.cards + deck.swap_board
@@ -1567,15 +1612,29 @@ def _find_card(deck: Deck, name: str) -> CardEntry | None:
 
 
 def _commit(slug: str, decks: DeckSource, updated: str,
-            **extra: Any) -> dict[str, Any]:
+            *, actor: str | None = None, **extra: Any) -> dict[str, Any]:
     """Write an edited deck, and hand back the gate's verdict on the result.
 
     Every write goes out through here, so no caller can change a deck without
     being told what the change did to the gate. `stage` and `needs_rationale`
     ride along because an edit is the most likely moment for either to move --
     filling in the last blank `why` is what makes a draft promotable.
+
+    **And so no caller can change a deck without the change being recorded**
+    (ADR 28). `extra` has always been the per-operation description and has
+    always been thrown away with the response; `decks/log.py` keeps it. That it
+    is written here rather than in the nine functions above is the same
+    argument the gate makes one paragraph up: the tenth edit operation is the
+    one somebody adds in a year, and it inherits both.
+
+    The entry is written **after** the deck and before the gate runs, which is
+    the honest order: the edit has happened by then, and a validation that
+    blows up afterwards must not be able to erase the record of it.
     """
     decks.write_text(slug, updated)
+    action, summary = log.describe(extra)
+    log.record(slug=slug, action=action, summary=summary,
+               owner_id=_owner_id_of(decks), actor=actor)
     after = decks.get(slug)
     con = _connect()
     try:
@@ -1612,7 +1671,8 @@ def _check_category(category: str) -> str:
 
 def add_card(slug: str, *, name: str, category: str, why: str = "",
              qty: int = 1, to: str = "cards",
-             source: DeckSource | None = None) -> dict[str, Any]:
+             source: DeckSource | None = None,
+             actor: str | None = None) -> dict[str, Any]:
     """Put a card into the 99 or onto the swap board.
 
     Checked against the pool before anything is written -- the card has to
@@ -1655,14 +1715,15 @@ def add_card(slug: str, *, name: str, category: str, why: str = "",
                                     list_key=to)
         except EditFailed as exc:
             raise EditRejected(str(exc)) from exc
-        return _commit(slug, decks, updated, added=rec.name, category=category,
-                       into=to)
+        return _commit(slug, decks, updated, actor=actor, added=rec.name,
+                       category=category, into=to)
     finally:
         con.close()
 
 
 def remove_card(slug: str, *, name: str,
-                source: DeckSource | None = None) -> dict[str, Any]:
+                source: DeckSource | None = None,
+                actor: str | None = None) -> dict[str, Any]:
     """Take a card out of the deck -- to the graveyard, if it was in the 99.
 
     Since ADR 27 a removal from the 99 is an **entombment**: the entry moves to
@@ -1688,12 +1749,13 @@ def remove_card(slug: str, *, name: str,
     except EditFailed as exc:
         raise EditRejected(str(exc)) from exc
     if in_99:
-        return _commit(slug, decks, updated, entombed=entry.name)
-    return _commit(slug, decks, updated, removed=entry.name)
+        return _commit(slug, decks, updated, actor=actor, entombed=entry.name)
+    return _commit(slug, decks, updated, actor=actor, removed=entry.name)
 
 
 def entomb_cards(slug: str, *, names: list[str],
-                 source: DeckSource | None = None) -> dict[str, Any]:
+                 source: DeckSource | None = None,
+                 actor: str | None = None) -> dict[str, Any]:
     """Entomb several cards from the 99 in one write.
 
     All or nothing: a name that is not in the 99 refuses the whole batch
@@ -1723,11 +1785,12 @@ def entomb_cards(slug: str, *, names: list[str],
             text = edit.entomb_card(text, name=name)
     except EditFailed as exc:
         raise EditRejected(str(exc)) from exc
-    return _commit(slug, decks, text, entombed=resolved)
+    return _commit(slug, decks, text, actor=actor, entombed=resolved)
 
 
 def return_card(slug: str, *, name: str,
-                source: DeckSource | None = None) -> dict[str, Any]:
+                source: DeckSource | None = None,
+                actor: str | None = None) -> dict[str, Any]:
     """Bring an entombed card back into the 99, exactly as it left.
 
     The `why` that returns is the user's own words, preserved through the
@@ -1739,11 +1802,12 @@ def return_card(slug: str, *, name: str,
         updated = edit.return_card(decks.read_text(slug), name=name)
     except EditFailed as exc:
         raise EditRejected(str(exc)) from exc
-    return _commit(slug, decks, updated, returned=name)
+    return _commit(slug, decks, updated, actor=actor, returned=name)
 
 
 def exile_card(slug: str, *, name: str,
-               source: DeckSource | None = None) -> dict[str, Any]:
+               source: DeckSource | None = None,
+               actor: str | None = None) -> dict[str, Any]:
     """Remove an entombed card from the graveyard permanently.
 
     The only genuinely destructive delete left, and it can only ever act on a
@@ -1754,11 +1818,12 @@ def exile_card(slug: str, *, name: str,
         updated = edit.exile_card(decks.read_text(slug), name=name)
     except EditFailed as exc:
         raise EditRejected(str(exc)) from exc
-    return _commit(slug, decks, updated, exiled=name)
+    return _commit(slug, decks, updated, actor=actor, exiled=name)
 
 
 def set_card_field(slug: str, *, name: str, field: str, value: Any,
-                   source: DeckSource | None = None) -> dict[str, Any]:
+                   source: DeckSource | None = None,
+                   actor: str | None = None) -> dict[str, Any]:
     """Change one card's category, quantity, or rationale.
 
     This is the write path behind the rationale editor, and the answer to the
@@ -1789,7 +1854,8 @@ def set_card_field(slug: str, *, name: str, field: str, value: Any,
                                       field=field, value=value)
     except EditFailed as exc:
         raise EditRejected(str(exc)) from exc
-    return _commit(slug, decks, updated, card=entry.name, field=field)
+    return _commit(slug, decks, updated, actor=actor, card=entry.name,
+                   field=field)
 
 
 def _check_printing_of(name: str, printing_id: str, *, hint: str) -> None:
@@ -1824,7 +1890,8 @@ def _check_printing(deck: Any, printing_id: str) -> None:
 
 
 def set_deck_field(slug: str, *, field: str, value: Any,
-                   source: DeckSource | None = None) -> dict[str, Any]:
+                   source: DeckSource | None = None,
+                   actor: str | None = None) -> dict[str, Any]:
     """Change one of the deck's own scalars: stage, status, bracket or art.
 
     Promotion -- `stage` to `curated` -- is the one that closes the import
@@ -1846,11 +1913,12 @@ def set_deck_field(slug: str, *, field: str, value: Any,
                                       value=value)
     except EditFailed as exc:
         raise EditRejected(str(exc)) from exc
-    return _commit(slug, decks, updated, field=field, value=value)
+    return _commit(slug, decks, updated, actor=actor, field=field, value=value)
 
 
 def set_note(slug: str, *, key: str, value: str,
-             source: DeckSource | None = None) -> dict[str, Any]:
+             source: DeckSource | None = None,
+             actor: str | None = None) -> dict[str, Any]:
     """Set one deck-level note -- the prose the advanced primer reads directly.
 
     Notes are the deck's thinking, and they live in the source of truth rather
@@ -1863,11 +1931,12 @@ def set_note(slug: str, *, key: str, value: str,
         updated = edit.set_note(decks.read_text(slug), key=key, value=value)
     except EditFailed as exc:
         raise EditRejected(str(exc)) from exc
-    return _commit(slug, decks, updated, note=key.strip())
+    return _commit(slug, decks, updated, actor=actor, note=key.strip())
 
 
 def swap_card(slug: str, *, out: str, into: str, why: str,
-              source: DeckSource | None = None) -> dict[str, Any]:
+              source: DeckSource | None = None,
+              actor: str | None = None) -> dict[str, Any]:
     """Replace one card in a deck with another, and re-run the gate.
 
     This is not the auto-substitution ADR 8 rejected. The judgement stays with
@@ -1925,7 +1994,7 @@ def swap_card(slug: str, *, out: str, into: str, why: str,
     finally:
         con.close()
 
-    return _commit(slug, decks, updated, swapped_out=entry.name,
+    return _commit(slug, decks, updated, actor=actor, swapped_out=entry.name,
                    swapped_in=rec.name, why=why.strip())
 
 

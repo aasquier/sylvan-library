@@ -41,6 +41,7 @@ they differ.
 | [25](0025-argue-a-slot-argues-one-direction.md) | Argue a slot argues one direction, and that asymmetry is the guard | Accepted |
 | [26](0026-research-answers-about-magic-not-about-your-deck.md) | Research answers about Magic, never about your deck | Accepted |
 | [27](0027-entomb-is-the-delete-and-the-graveyard-is-the-undo.md) | Entomb is the delete, and the graveyard is the undo | Accepted |
+| [28](0028-the-activity-log-records-edits-and-never-rationales.md) | The activity log records edits, and never rationales | Accepted |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the
@@ -143,10 +144,11 @@ boundary for a model integration before the first client call rather than after
 it. Both are Accepted, and most of what they describe now exists: the client,
 the tools, the stance and its dial, Forge, five modes across four features, and
 the rule that no code path writes a `why` — which is enforced over the
-package's syntax tree rather than by prompt. Two of the modes 15 tabulates are
-still unbuilt — research and deck conversation — as is the activity log. The
-notes at the top of each say which half is which, because a status of Accepted
-on its own would overstate it.
+package's syntax tree rather than by prompt. Research landed as 26; the
+activity log 15 lists as a prerequisite landed as 28. **Deck conversation is
+the one mode 15 tabulates that is still unbuilt**, and 28's last consequence
+lists what it is still waiting on. The notes at the top of each say which half
+is which, because a status of Accepted on its own would overstate it.
 
 ## Where the longer arguments live
 
