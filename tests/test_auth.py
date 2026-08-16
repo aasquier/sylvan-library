@@ -8,12 +8,15 @@ every session, a token is never stored, a disabled account is refused the same
 way a wrong password is.
 """
 
+import re
 import sqlite3
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -201,6 +204,31 @@ def test_bad_usernames_are_refused(con, bad):
 def test_bad_emails_are_refused(con, bad):
     with pytest.raises(users.InvalidEmail):
         users.create(con, "ada", password=GOOD, email=bad)
+
+
+#: The pattern `looks_like_email` replaced. It stays here as the
+#: specification: nothing runs it in `src/` any more, because both its
+#: `[^@\s]+` runs also match dots, so every dot in a domain is a candidate
+#: separator and an address that cannot match makes the engine try them all.
+_EMAIL_SPEC = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+@given(st.text(alphabet="ab.@ \t\n", max_size=12))
+@settings(max_examples=1000)
+def test_the_shape_test_agrees_with_the_pattern_it_replaced(candidate):
+    """Taking a pattern apart is only safe if it still answers the same.
+
+    The alphabet is the four things the pattern distinguishes -- an ordinary
+    character, a dot, the at sign, whitespace -- because every interesting case
+    is an arrangement of those and nothing else.
+
+    Stripped first, which is the only shape the predicate is ever handed:
+    `normalise_email` strips before it asks. That is load-bearing rather than
+    cosmetic, because Python's `$` also matches *before* a trailing newline, so
+    the pattern by itself would accept `a@a.a\\n` and the predicate would not.
+    """
+    candidate = candidate.strip()
+    assert users.looks_like_email(candidate) is bool(_EMAIL_SPEC.match(candidate))
 
 
 def test_an_address_at_the_rfc_limit_is_still_accepted(con):
