@@ -1,5 +1,5 @@
 import {
-  useCallback, useEffect, useMemo, useRef, useState, type ReactNode,
+  useCallback, useEffect, useMemo, useRef, useState,
 } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
@@ -19,6 +19,7 @@ import { categoryLabel, identityName } from '../lib/mtg'
 import { SceneBackdrop } from '../components/forest'
 import { WheelOfFortune } from '../components/wheel'
 import {
+  ArmedButton,
   Badge, CardArt, CardHover, CardLoupe, Caveat, ColorRing, ErrorNote, ManaCost,
   ManaText,
   Select, Spinner, StatTile,
@@ -158,11 +159,17 @@ function ShareToggle({ deck, deckRef, onChanged }: {
 /**
  * The pilot tag, shown and edited in place (second punch list, item 10).
  *
- * One line: "Piloted by Mark's wife", with a change/tag control on decks the
+ * One line: "Piloted by the kids", with a change/tag control on decks the
  * viewer may write. The input saves on Enter or the button, clears to untag,
  * and the deck refreshes so the shelf's filter sees the same fact this page
  * does. Absent entirely on an untagged deck the viewer cannot write —
  * "nobody claims this" is not a fact worth a line on somebody else's deck.
+ *
+ * **The examples here stay generic on purpose.** A placeholder is UI copy
+ * that every viewer of every deck reads, so a real person's name in it names
+ * somebody who never agreed to appear in the app — and a household tag is
+ * precisely the field where a real name is the tempting thing to write.
+ * The wording follows commandment 2 instead: a partner, a friend, the kids.
  */
 function PilotLine({ deck, deckRef, onRefresh }: {
   deck: Deck
@@ -195,20 +202,32 @@ function PilotLine({ deck, deckRef, onRefresh }: {
           <span style={{ color: 'var(--text-secondary)' }}>{deck.pilot}</span>
         </span>
       )}
-      {!editing && deck.writable && (
+      {/* Untagged, this is the only thing on the line, and as a muted dotted
+          underline among muted text it was reported as hard to find. So the
+          invitation wears a border and the accent; once a pilot is named the
+          line has its own content and "change" goes back to being quiet. */}
+      {!editing && deck.writable && (deck.pilot ? (
         <button type="button"
                 onClick={() => { setValue(deck.pilot); setEditing(true) }}
                 className="text-xs underline decoration-dotted"
                 style={{ color: 'var(--text-muted)' }}>
-          {deck.pilot ? 'change' : 'Tag a pilot — who plays this one?'}
+          change
         </button>
-      )}
+      ) : (
+        <button type="button"
+                onClick={() => { setValue(deck.pilot); setEditing(true) }}
+                className="card-action rounded-md px-2.5 py-1 text-xs font-medium"
+                style={{ border: '1px solid var(--hairline)',
+                         color: 'var(--series-1)' }}>
+          Tag a pilot — who plays this one?
+        </button>
+      ))}
       {editing && (
         <span className="flex flex-wrap items-center gap-2">
           <input value={value} onChange={(e) => setValue(e.target.value)}
                  onKeyDown={(e) => { if (e.key === 'Enter') void save() }}
                  maxLength={40} autoFocus
-                 placeholder="Mark’s wife, the kids…"
+                 placeholder="A partner, a friend, the kids…"
                  aria-label="Pilot"
                  className="h-7 rounded-md px-2 text-xs"
                  style={{ background: 'var(--surface-1)',
@@ -518,50 +537,6 @@ function CommanderFacts({ dossier }: { dossier: CommanderDossier }) {
         </div>
       )}
     </div>
-  )
-}
-
-/**
- * A destructive control that arms on the first click and acts on the second.
- *
- * The confirmation structure ADR 27 chose over a dialog: one accidental click
- * does nothing except turn the button solid red for a few seconds, and a
- * deliberate deletion is still two quick clicks in place — no modal to dismiss
- * ten times while tuning a deck. The arm times out rather than staying
- * cocked, because a button left armed yesterday firing today is the mis-click
- * this exists to prevent.
- */
-function ArmedButton({ children, armedLabel, title, onConfirm }: {
-  children: ReactNode
-  /** What the armed state says — name the consequence, not "are you sure". */
-  armedLabel: string
-  title?: string
-  onConfirm: () => void
-}) {
-  const [armed, setArmed] = useState(false)
-  useEffect(() => {
-    if (!armed) return
-    const timer = setTimeout(() => setArmed(false), 4000)
-    return () => clearTimeout(timer)
-  }, [armed])
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-pressed={armed}
-      className={'card-action card-action-danger rounded-md px-2 py-1 '
-                 + `text-[11px] font-medium${armed ? ' armed' : ''}`}
-      onClick={() => {
-        if (armed) {
-          setArmed(false)
-          onConfirm()
-        } else {
-          setArmed(true)
-        }
-      }}
-    >
-      {armed ? armedLabel : children}
-    </button>
   )
 }
 

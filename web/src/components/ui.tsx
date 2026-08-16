@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { COLOR_NAMES, COLOR_VAR, manaSymbols, splitManaText } from '../lib/mtg'
 import { ManaGlyph } from './manasymbol'
 import { hasGlyph } from '../lib/managlyphs'
@@ -607,5 +607,54 @@ export function CardLoupe({ src, alt, className = '', zoom = 2.6, imgStyle }: {
               }} />
       )}
     </span>
+  )
+}
+
+/**
+ * A destructive control that arms on the first click and acts on the second.
+ *
+ * The confirmation structure ADR 27 chose over a dialog: one accidental click
+ * does nothing except turn the button solid red for a few seconds, and a
+ * deliberate deletion is still two quick clicks in place — no modal to dismiss
+ * ten times while tuning a deck. The arm times out rather than staying
+ * cocked, because a button left armed yesterday firing today is the mis-click
+ * this exists to prevent.
+ *
+ * It lives here rather than beside the deck page because it has a second
+ * caller now: the reading room's "Start over", which is destructive in the
+ * way this pattern was built for *and* spends money — it discards the
+ * transcript and the next turn is a paid one.
+ */
+export function ArmedButton({ children, armedLabel, title, onConfirm }: {
+  children: ReactNode
+  /** What the armed state says — name the consequence, not "are you sure". */
+  armedLabel: string
+  title?: string
+  onConfirm: () => void
+}) {
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (!armed) return
+    const timer = setTimeout(() => setArmed(false), 4000)
+    return () => clearTimeout(timer)
+  }, [armed])
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-pressed={armed}
+      className={'card-action card-action-danger rounded-md px-2 py-1 '
+                 + `text-[11px] font-medium${armed ? ' armed' : ''}`}
+      onClick={() => {
+        if (armed) {
+          setArmed(false)
+          onConfirm()
+        } else {
+          setArmed(true)
+        }
+      }}
+    >
+      {armed ? armedLabel : children}
+    </button>
   )
 }

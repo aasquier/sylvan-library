@@ -48,6 +48,7 @@ output is a proposal; the existing create flow is what makes a deck.
 from __future__ import annotations
 
 import json
+import logging
 import random
 import re
 from collections.abc import Callable
@@ -556,6 +557,8 @@ THEME_PROPOSAL = Mode(
 #: against a real thing that happened.
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 
+_LOG = logging.getLogger("mtglab.claude.theme")
+
 
 def prose(text: Any) -> str:
     """Model-written text, fit to put in front of somebody.
@@ -571,8 +574,27 @@ def prose(text: Any) -> str:
     never the problem; the escape was valid JSON. So the check belongs one step
     later, on the way out, with the other things this module refuses to pass
     along untouched.
+
+    **It counts what it removed, and that is the point of the log line.** A
+    turn was once reported as having lost its dashes -- not a word eaten this
+    time, the punctuation simply gone -- and the report could not be acted on
+    because this function is silent by construction: it repairs the text and
+    the evidence in the same pass. `_CONTROL` cannot match a dash, so that
+    report is still unexplained, and the only way to tell "the escape bug
+    again, wearing different clothes" from "the model wrote it that way" is to
+    know whether anything was substituted at all. A quiet log at the moment of
+    repair is that instrument; it names the codepoints, because U+000C and
+    U+0008 fail very differently in a sentence.
     """
-    return re.sub(r"\s+", " ", _CONTROL.sub(" ", str(text or ""))).strip()
+    raw = str(text or "")
+    cleaned, removed = _CONTROL.subn(" ", raw)
+    if removed:
+        seen = sorted({f"U+{ord(c):04X}" for c in raw if _CONTROL.match(c)})
+        _LOG.warning(
+            "prose() removed %d control character(s) from model text: %s",
+            removed, ", ".join(seen),
+        )
+    return re.sub(r"\s+", " ", cleaned).strip()
 
 
 def _normalise(text: str) -> str:

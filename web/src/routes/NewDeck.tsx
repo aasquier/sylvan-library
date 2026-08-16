@@ -53,7 +53,13 @@ import {
   type ThemeCommander,
 } from '../lib/api'
 import { COLOR_VAR } from '../lib/mtg'
-import { CardHover, ColorRing, ManaText } from '../components/ui'
+import { CardHover, ColorRing, ManaText, PageMasthead } from '../components/ui'
+
+/** The doors page wears the card about choosing which way to go. Shadows over
+ *  Innistrad's printing; artist and URL read off the pool together, so the
+ *  credit belongs to the art actually shown. */
+const FORK_IN_THE_ROAD_ART =
+  'https://cards.scryfall.io/art_crop/front/0/a/0a7ad701-65c3-494a-8986-b4ea1bab46bc.jpg'
 import { ColorPentagram, TierGlyph } from '../components/pentagram'
 import { TarotTable } from '../components/tarot'
 
@@ -363,12 +369,18 @@ export default function NewDeck() {
   return (
     <div className="space-y-8">
       <header className="space-y-3">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Start a deck</h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {DOOR_BLURBS[mode]}
-          </p>
-        </div>
+        <PageMasthead
+          art={FORK_IN_THE_ROAD_ART}
+          alt="Fork in the Road, painted by Jung Park: a traveller halted where
+               a woodland track splits in two, one way falling into shadow and
+               the other climbing toward open light."
+          title="Start a deck"
+          credit={<>
+            <em>Fork in the Road</em> by Jung Park, Shadows over Innistrad —
+            four ways in, and none of them wrong.
+          </>}>
+          <p>{DOOR_BLURBS[mode]}</p>
+        </PageMasthead>
         {/* Four ways in, and the order is deliberate: the one that assumes
             least goes first. The last two open onto "which of the 32 do you
             want", which is a question somebody who has never played cannot

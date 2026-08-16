@@ -49,7 +49,12 @@ const WHEEL_ART =
  *  ring outside it), then checked by eye with an annotated render. */
 const WHEEL_CX = 0.6554
 const WHEEL_CY = 0.4435
-const WHEEL_DIAMETER = 0.54
+/** Nudged out from the fitted 0.54 because the turning disc read as slightly
+ *  undersized against the painting. The extra is a thin annulus of *not the
+ *  disc* — planks and background, which do rotate along with it — so this can
+ *  only go as far as the rim band below covers, and 0.556 is that limit at
+ *  the scene's widths. Bigger than this wants a re-fit, not a bigger number. */
+const WHEEL_DIAMETER = 0.556
 /** The crop is 563x451; the cutout's percentage offsets depend on it. */
 const ART_ASPECT = 563 / 451
 
@@ -84,30 +89,37 @@ function PaintedWheelCutout({ rotation, spinning, onDone }: {
   const imgW = 100 / WHEEL_DIAMETER
   const left = 50 - WHEEL_CX * imgW
   const top = 50 - (WHEEL_CY / ART_ASPECT) * imgW
+  // The cutout and the rim are the same circle, so they take the same box.
+  const geometry = {
+    left: `${WHEEL_CX * 100}%`,
+    top: `${WHEEL_CY * 100}%`,
+    width: `${WHEEL_DIAMETER * 100}%`,
+    aspectRatio: '1',
+    transform: 'translate(-50%, -50%)',
+  }
   return (
-    <div className="wheel-cutout absolute"
-         style={{
-           left: `${WHEEL_CX * 100}%`,
-           top: `${WHEEL_CY * 100}%`,
-           width: `${WHEEL_DIAMETER * 100}%`,
-           aspectRatio: '1',
-           transform: 'translate(-50%, -50%)',
-         }}>
-      <div className="wheel-disc absolute inset-0"
-           onTransitionEnd={onDone}
-           style={{
-             transform: `rotate(${rotation}deg)`,
-             transitionDuration: spinning ? undefined : '0ms',
-           }}>
-        <img src={WHEEL_ART} alt="" aria-hidden
-             className="absolute max-w-none"
+    <>
+      <div className="wheel-cutout absolute" style={geometry}>
+        <div className="wheel-disc absolute inset-0"
+             onTransitionEnd={onDone}
              style={{
-               width: `${imgW}%`,
-               left: `${left}%`,
-               top: `${top}%`,
-             }} />
+               transform: `rotate(${rotation}deg)`,
+               transitionDuration: spinning ? undefined : '0ms',
+             }}>
+          <img src={WHEEL_ART} alt="" aria-hidden
+               className="absolute max-w-none"
+               style={{
+                 width: `${imgW}%`,
+                 left: `${left}%`,
+                 top: `${top}%`,
+               }} />
+        </div>
       </div>
-    </div>
+      {/* The rim goes over the seam, and outside the cutout so the cutout's
+          own mask cannot clip it. It does not rotate: a rim belongs to the
+          frame the wheel is mounted in, not to the wheel. */}
+      <div className="wheel-rim absolute" aria-hidden style={geometry} />
+    </>
   )
 }
 

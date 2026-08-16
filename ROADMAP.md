@@ -1275,6 +1275,35 @@ arc; this is what the next few sessions actually do.
     Landed so far under this heading: the painted wheel spin (#116), and the
     photo ivy canopy + Experimental Lab bench + gallery lanes (this branch).
 
+    **The room was invisible from #118 until 2026-08-16, and the reason is
+    worth keeping.** Driving the deployed instance, the maintainer reported
+    every backdrop as "just a bland background… not present in the least."
+    Three faults, stacked, none of which any test could see:
+
+    - **The gallery lanes never rendered at any width.** `.scene-lane` is an
+      `<img>` — a *replaced* element — given `top: 0; bottom: 0` and no
+      explicit height. `height: auto` resolves from the intrinsic aspect
+      ratio, the box is over-constrained, and `bottom` is the declaration
+      dropped. Measured at 250x145 where 250x1000 was intended: painted,
+      present, and far too small to read as anything.
+    - **Every fixed backdrop was trapped for the first 300ms of each page
+      view.** The routed page is wrapped in `.page-enter`, which animates a
+      `transform`, and a transformed ancestor becomes the containing block
+      for `position: fixed` descendants. `SceneBackdrop` portals to
+      `document.body` now; anything fixed added under that wrapper needs the
+      same treatment.
+    - **The wash was tuned below visibility** — 0.13 opacity behind an 18px
+      blur behind a mask fully transparent for its top 26%, an effective peak
+      near 0.09. The sunbeam was worse and for a different reason: pale
+      yellow on a near-white page is light-on-light, so more alpha could
+      never have fixed it. It is amber now; the warmth is the signal.
+
+    Two pages had no room at all (`/learn`, `/new`) and now wear mastheads
+    like their four siblings. The lesson generalises past this feature: **a
+    test that asserts an element renders has not asserted that it has a
+    size**, and jsdom cannot close that gap — only a browser measuring a real
+    box can.
+
     **The pipeline is real now — `mtglab animist`, 2026-08-16
     ([ADR 29](docs/adr/0029-an-asset-is-committed-only-with-a-recipe.md)).**
     "Scripted Pillow" had been a description of scripts that were never

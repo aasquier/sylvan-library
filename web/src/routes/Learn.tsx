@@ -35,7 +35,16 @@ import {
   type Term as TermData,
 } from '../lib/api'
 import { COLOR_VAR } from '../lib/mtg'
-import { CardHover, ColorRing, ErrorNote, ManaCost, ManaText } from '../components/ui'
+import {
+  CardHover, ColorRing, ErrorNote, ManaCost, ManaText, PageMasthead,
+} from '../components/ui'
+
+/** The card the whole project is named after, so the reference page wears it.
+ *  Dominaria Remastered's printing — the artist credited below is that
+ *  printing's, which is why the URL and the name are read off the pool
+ *  together rather than picked separately. */
+const SYLVAN_LIBRARY_ART =
+  'https://cards.scryfall.io/art_crop/front/6/a/6ada256f-2e55-4c1f-b4d3-d7b10b498956.jpg'
 import { ColorPentagram, TierGlyph } from '../components/pentagram'
 import { useGlossary } from '../lib/glossary'
 
@@ -489,15 +498,23 @@ export default function Learn() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Learn</h1>
-        <p className="mt-1 max-w-3xl text-sm" style={{ color: 'var(--text-secondary)' }}>
+      <PageMasthead
+        art={SYLVAN_LIBRARY_ART}
+        alt="Sylvan Library, painted by Yeong-Hao Han: shelves of books grown
+             into the trunks of living trees, with green light falling between
+             the leaves onto an open volume."
+        title="Learn"
+        credit={<>
+          <em>Sylvan Library</em> by Yeong-Hao Han, Dominaria Remastered — the
+          card this place is named for.
+        </>}>
+        <p>
           Magic has thirty years of vocabulary and this app assumes most of it.
           Here is the part you need: what the colours mean and who fought over
           them, and every word the other screens use without stopping to
           explain.
         </p>
-      </header>
+      </PageMasthead>
 
       <div className="flex flex-wrap gap-1">
         {TABS.map((t) => (
