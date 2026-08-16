@@ -41,6 +41,7 @@ import { StanceReadout } from '../components/stance'
 import {
   Badge, CardHover, ErrorNote, ManaCost, PageMasthead, Spinner,
 } from '../components/ui'
+import { VaporLayer, type VaporSource } from '../components/vapor'
 
 /**
  * Novijen, Heart of Progress, Martina Pilcerova (the Commander 2021
@@ -69,176 +70,46 @@ const LUDEVIC_ART =
   'https://cards.scryfall.io/art_crop/front/f/3/f3e7a886-2593-4e6e-b9da-d7cb417cba08.jpg'
 
 /**
- * The bench (punch list item 7): racks of glassware, a burner, a condenser
- * mid-drip, jars on a shelf, notes the keeper never files. Inline SVG and
- * CSS like every other drawn thing in this app — no asset, no licence — and
- * all of it `aria-hidden`: it is the room the question box sits in, not
- * information.
+ * The bench, rebuilt photo-real (second punch list of 2026-08-15, item 4).
  *
- * `busy` is the fun part: while a question is out being researched the
- * bench *cooks* — `--lab-speed` drops and every bubble, drip and flame
- * animation runs faster, so minutes of waiting read as the lab working
- * rather than as a stuck page. The speed lives in one custom property so
- * the busy state is one class, not eleven animation overrides.
+ * The first bench was a drawn SVG diorama — racks of glassware, a burner, a
+ * condenser — and it read as exactly that. This one is a painting: Arthur
+ * Yuan's *Experimental Lab* (Duskmourn Commander), a laboratory interior
+ * whose art crop is natively wide, hotlinked and credited like every
+ * masthead. Over it, `VaporLayer` breathes real-looking steam from the
+ * points where the painting keeps its glassware — the glowing tank at
+ * (0.25, 0.56), the flask at (0.32, 0.73), the right-hand bench at
+ * (0.69, 0.64), and two candle-wisps in warm smoke — measured against the
+ * crop the way the wheel's circle was, not guessed.
+ *
+ * `busy` is still the fun part: while a question is out being researched
+ * the vapour thickens and climbs faster, so minutes of waiting read as the
+ * lab working rather than as a stuck page.
  */
-function LabBench({ busy }: { busy: boolean }) {
+const LAB_SCENE_ART =
+  'https://cards.scryfall.io/art_crop/front/0/e/0ee64079-76f2-49da-bd62-3d22dc1ec0c0.jpg'
+
+const LAB_VAPOR: VaporSource[] = [
+  { x: 0.25, y: 0.56, hue: 'cool', size: 1.6 },
+  { x: 0.325, y: 0.73, hue: 'cool', size: 1 },
+  { x: 0.69, y: 0.64, hue: 'cool', size: 1.1 },
+  { x: 0.565, y: 0.88, hue: 'warm', size: 0.55 },
+  { x: 0.685, y: 0.9, hue: 'warm', size: 0.5 },
+]
+
+function LabScene({ busy }: { busy: boolean }) {
   return (
-    <div className={`lab-bench${busy ? ' is-cooking' : ''}`} aria-hidden="true">
-      <svg viewBox="0 0 900 190" className="h-auto w-full" fill="none">
-        {/* The back shelf, and what lives on it. */}
-        <rect x="500" y="52" width="380" height="5" rx="1" fill="#6e4e28" />
-        <rect x="497" y="57" width="8" height="14" fill="#5c3f1e" />
-        <rect x="875" y="57" width="8" height="14" fill="#5c3f1e" />
-        {/* Specimen jars: something teal, something that floats, something
-            best not asked about. */}
-        <g opacity="0.9">
-          <rect x="520" y="24" width="26" height="28" rx="3" fill="#1d3a3a" />
-          <rect x="522" y="30" width="22" height="20" rx="2" fill="#2e8f7f"
-                opacity="0.55" />
-          <ellipse cx="533" cy="40" rx="6" ry="4" fill="#0f2424" opacity="0.8" />
-          <rect x="518" y="20" width="30" height="5" rx="2" fill="#8a6a33" />
-        </g>
-        <g opacity="0.9">
-          <rect x="560" y="30" width="20" height="22" rx="3" fill="#241d3a" />
-          <rect x="562" y="34" width="16" height="16" rx="2" fill="#8f79e8"
-                opacity="0.45" />
-          <circle className="lab-float" cx="570" cy="42" r="3" fill="#3a2f5c" />
-          <rect x="558" y="26" width="24" height="5" rx="2" fill="#8a6a33" />
-        </g>
-        <g opacity="0.9">
-          <rect x="596" y="26" width="24" height="26" rx="3" fill="#3a2e1d" />
-          <rect x="598" y="32" width="20" height="18" rx="2" fill="#c9a227"
-                opacity="0.4" />
-          <path d="M602 44 q 4 -6 8 0 q 4 6 8 0" stroke="#8a6a33"
-                strokeWidth="1.2" opacity="0.8" />
-          <rect x="594" y="22" width="28" height="5" rx="2" fill="#8a6a33" />
-        </g>
-        {/* Books leaning at the shelf's end — it is still a library. */}
-        <rect x="800" y="22" width="9" height="30" rx="1" fill="#7a3b2e" />
-        <rect x="811" y="25" width="8" height="27" rx="1" fill="#2e5c46"
-              transform="rotate(6 815 52)" />
-        <rect x="823" y="24" width="9" height="28" rx="1" fill="#3a4d7a"
-              transform="rotate(11 827 52)" />
-
-        {/* The bench itself. */}
-        <rect x="0" y="168" width="900" height="7" rx="1" fill="#6e4e28" />
-        <rect x="0" y="175" width="900" height="12" fill="#4a3212" />
-
-        {/* The burner, its flame, and the beaker it worries. */}
-        <g>
-          <rect x="96" y="158" width="30" height="10" rx="2" fill="#55606e" />
-          <rect x="108" y="146" width="6" height="14" fill="#55606e" />
-          <path className="lab-flame"
-                d="M111 146 C 106 138 108 130 111 124 C 114 130 116 138 111 146 Z"
-                fill="#f0a05a" />
-          <path className="lab-flame lab-flame-2"
-                d="M111 144 C 108.5 139 109.5 133 111 129 C 112.5 133 113.5 139 111 144 Z"
-                fill="#5aa0f0" opacity="0.85" />
-          {/* Tripod and beaker. */}
-          <path d="M92 168 L 104 120 M 130 168 L 118 120 M 96 132 H 126"
-                stroke="#55606e" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M92 92 H 130 L 127 120 H 95 Z" fill="#cfe4ea" opacity="0.3" />
-          <rect x="95" y="103" width="32" height="16" fill="#2e8f7f"
-                opacity="0.75" />
-          <ellipse cx="111" cy="103" rx="16" ry="3" fill="#3aa08c" />
-          <circle className="lab-bubble" cx="104" cy="114" r="2" fill="#bfeadf" />
-          <circle className="lab-bubble lab-bubble-2" cx="114" cy="116" r="1.5"
-                  fill="#bfeadf" />
-          <circle className="lab-bubble lab-bubble-3" cx="109" cy="112" r="1.2"
-                  fill="#bfeadf" />
-          {/* Steam, once the bubbles have done their work. */}
-          <circle className="lab-steam" cx="106" cy="88" r="4" fill="#cfe4ea" />
-          <circle className="lab-steam lab-steam-2" cx="116" cy="84" r="3"
-                  fill="#cfe4ea" />
-        </g>
-
-        {/* The erlenmeyer, mid-thought. */}
-        <g>
-          <path d="M232 96 H 248 L 249 112 L 266 160 A 6 6 0 0 1 260 168
-                   H 220 A 6 6 0 0 1 214 160 L 231 112 Z"
-                fill="#cfe4ea" opacity="0.28" />
-          <path d="M224 138 L 256 138 L 264 160 A 5 5 0 0 1 259 166
-                   H 221 A 5 5 0 0 1 216 160 Z" fill="#8f79e8" opacity="0.7" />
-          <ellipse cx="240" cy="138" rx="16" ry="3" fill="#a99af0" />
-          <circle className="lab-bubble lab-bubble-2" cx="234" cy="152" r="2"
-                  fill="#d5ccf7" />
-          <circle className="lab-bubble lab-bubble-4" cx="246" cy="156" r="1.4"
-                  fill="#d5ccf7" />
-          <rect x="230" y="90" width="20" height="6" rx="2" fill="#8a6a33" />
-        </g>
-
-        {/* The retort and condenser: a round flask over a stand, a tube
-            sloping down through a water jacket, and a drip that will not
-            stop. The drip is the whole joke of a condenser. */}
-        <g>
-          <circle cx="360" cy="132" r="26" fill="#cfe4ea" opacity="0.28" />
-          <path d="M338 143 A 26 26 0 0 0 382 143 Z" fill="#3aa08c"
-                opacity="0.8" />
-          <ellipse cx="360" cy="143" rx="21" ry="3.5" fill="#4db8a2" />
-          <rect x="354" y="94" width="12" height="16" rx="2" fill="#cfe4ea"
-                opacity="0.5" />
-          <path d="M344 168 L 352 154 M 376 168 L 368 154 M 346 160 H 374"
-                stroke="#55606e" strokeWidth="2.2" strokeLinecap="round" />
-          <circle className="lab-bubble lab-bubble-3" cx="354" cy="150" r="2"
-                  fill="#bfeadf" />
-          <circle className="lab-bubble" cx="366" cy="152" r="1.5" fill="#bfeadf" />
-          {/* The tube out of the neck, through the jacket, to the beaker. */}
-          <path d="M366 96 C 390 84 410 92 424 110 C 434 122 440 132 444 142"
-                stroke="#cfe4ea" strokeWidth="3.5" opacity="0.7" />
-          <rect x="398" y="88" width="34" height="14" rx="7" fill="#5aa0f0"
-                opacity="0.35" transform="rotate(32 415 95)" />
-          {/* The receiving beaker, and the drip. */}
-          <path d="M432 144 H 460 L 458 168 H 434 Z" fill="#cfe4ea"
-                opacity="0.3" />
-          <rect x="434" y="156" width="23" height="10" fill="#6fae7f"
-                opacity="0.7" />
-          <circle className="lab-drip" cx="444" cy="144" r="1.8" fill="#bfeadf" />
-        </g>
-
-        {/* The test tube rack: four verdicts pending. */}
-        <g>
-          <rect x="656" y="140" width="92" height="6" rx="2" fill="#6e4e28" />
-          <rect x="656" y="162" width="92" height="6" rx="2" fill="#6e4e28" />
-          <rect x="660" y="146" width="4" height="16" fill="#5c3f1e" />
-          <rect x="740" y="146" width="4" height="16" fill="#5c3f1e" />
-          {[
-            [672, '#3aa08c', 26],
-            [692, '#8f79e8', 34],
-            [712, '#c9a227', 20],
-            [732, '#c75e5e', 30],
-          ].map(([x, color, depth]) => (
-            <g key={String(x)}>
-              <rect x={Number(x) - 5} y={112} width="10" height="54" rx="5"
-                    fill="#cfe4ea" opacity="0.28" />
-              <rect x={Number(x) - 5} y={166 - Number(depth)} width="10"
-                    height={Number(depth)} rx="4" fill={String(color)}
-                    opacity="0.8" />
-            </g>
-          ))}
-          <circle className="lab-bubble lab-bubble-4" cx="692" cy="150" r="1.6"
-                  fill="#d5ccf7" />
-          <circle className="lab-bubble lab-bubble-2" cx="732" cy="152" r="1.4"
-                  fill="#f0c0c0" />
-        </g>
-
-        {/* Notes strewn where notes get strewn. The writing is five strokes
-            nobody can read, which is faithful to the keeper's hand. */}
-        <g transform="rotate(-7 790 158)">
-          <rect x="768" y="146" width="44" height="30" rx="2" fill="#f0e4c2" />
-          {[153, 158, 163, 168].map((y, i) => (
-            <path key={y} d={`M774 ${y} H ${i === 3 ? 794 : 806}`}
-                  stroke="#8a7a55" strokeWidth="1" opacity="0.6" />
-          ))}
-        </g>
-        <g transform="rotate(5 842 162)">
-          <rect x="820" y="150" width="44" height="28" rx="2" fill="#e8dcb8" />
-          {[157, 162, 167, 172].map((y, i) => (
-            <path key={y} d={`M826 ${y} H ${i === 2 ? 844 : 858}`}
-                  stroke="#8a7a55" strokeWidth="1" opacity="0.6" />
-          ))}
-          <circle cx="852" cy="171" r="3" fill="#3aa08c" opacity="0.4" />
-        </g>
-      </svg>
+    <div aria-hidden="true">
+      <div className="relative overflow-hidden">
+        <img src={LAB_SCENE_ART} alt=""
+             className="block w-full" loading="lazy" />
+        <VaporLayer sources={LAB_VAPOR} busy={busy}
+                    className="absolute inset-0 h-full w-full" />
+      </div>
+      <p className="px-4 py-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+        <em>Experimental Lab</em> by Arthur Yuan — the bench
+        {busy ? ' is cooking.' : ' simmers between questions.'}
+      </p>
     </div>
   )
 }
@@ -366,7 +237,7 @@ export default function Research() {
           it. The bench cooks while a question is out. */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
         <div className="card-surface min-w-0 flex-1 overflow-hidden rounded-xl">
-          <LabBench busy={busy} />
+          <LabScene busy={busy} />
         </div>
         <aside className="card-surface flex w-full shrink-0 flex-col overflow-hidden rounded-xl lg:w-60">
           <img src={LUDEVIC_ART}

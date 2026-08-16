@@ -1620,22 +1620,31 @@ button:hover .tarot-fan-card {
    4): the tendrils need the room, and 0.55 opacity read as a smudge. It
    grows in on load — scaleY from the stem line — because a vine is a thing
    that grew, and the sway takes over when the growing is done. */
+/* Photographic since the second punch list (item 1): real cascading ivy,
+ * matted to alpha, mirror-tiled. Taller than the drawn vine was — a
+ * photograph earns the space — with the densest growth in its upper half so
+ * the hang over content stays translucent leaf-tips, not a hedge. */
 .header-canopy {
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
-  height: 44px;
+  height: 84px;
   pointer-events: none;
-  color: var(--vine);
-  opacity: 0.75;
+  opacity: 0.9;
   transform-origin: 50% 0;
   animation: canopy-grow 1.1s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.header-canopy svg {
+.canopy-photo {
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat-x;
+  background-size: auto 100%;
   transform-origin: 50% 0;
   animation: canopy-sway 13s ease-in-out infinite;
+  /* A breath of shadow under the leaves so they sit *on* the page. */
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
 }
 
 @keyframes canopy-grow {
@@ -1645,7 +1654,7 @@ button:hover .tarot-fan-card {
   }
   100% {
     transform: scaleY(1);
-    opacity: 0.75;
+    opacity: 0.9;
   }
 }
 
@@ -1739,12 +1748,81 @@ button:hover .tarot-fan-card {
 }
 
 :root[data-theme='dark'] .scene-backdrop-art {
-  opacity: 0.16;
+  opacity: 0.2;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme='light'])) .scene-backdrop-art {
-    opacity: 0.16;
+    opacity: 0.2;
+  }
+}
+
+/* The lanes (second punch list, item 5). The reading column is `max-w-7xl`
+ * (80rem); anything a viewport has beyond that is wall, and the wall shows
+ * the page's painting nearly sharp — 2px of blur to sit it behind the glass,
+ * not 18px to erase it. Masked to nothing where the column starts, and
+ * drifting on an 80/95-second Ken Burns so the room breathes without ever
+ * being caught moving. The right lane bakes its mirror into the keyframes,
+ * because `animation` owns `transform` once it starts. */
+.scene-lane {
+  display: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc((100% - 80rem) / 2 + 5rem);
+  object-fit: cover;
+  filter: blur(2px) saturate(1.05);
+  opacity: 0.3;
+  mask-image: linear-gradient(90deg, #000 0%, #000 45%, transparent 96%);
+}
+
+.scene-lane-left {
+  left: 0;
+  object-position: 22% center;
+  animation: lane-drift 80s ease-in-out infinite alternate;
+}
+
+/* Mirrored: the mask paints before the transform, so the same left-opaque
+ * gradient lands right-opaque once flipped. */
+.scene-lane-right {
+  right: 0;
+  object-position: 78% center;
+  animation: lane-drift-mirror 95s ease-in-out infinite alternate;
+}
+
+@media (min-width: 1440px) {
+  .scene-lane {
+    display: block;
+  }
+}
+
+:root[data-theme='dark'] .scene-lane {
+  opacity: 0.44;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .scene-lane {
+    opacity: 0.44;
+  }
+}
+
+@keyframes lane-drift {
+  from {
+    transform: scale(1.04) translateY(-0.5%);
+  }
+
+  to {
+    transform: scale(1.11) translateY(0.7%);
+  }
+}
+
+@keyframes lane-drift-mirror {
+  from {
+    transform: scaleX(-1) scale(1.04) translateY(0.6%);
+  }
+
+  to {
+    transform: scaleX(-1) scale(1.11) translateY(-0.5%);
   }
 }
 
@@ -1756,10 +1834,12 @@ button:hover .tarot-fan-card {
   height: 85%;
   transform: rotate(24deg);
   transform-origin: 100% 0;
+  /* Turned up on the second punch list (item 5): at 0.14 the light was a
+     rumour. This is a beam somebody can point at. */
   background: linear-gradient(
     203deg,
-    rgba(255, 226, 150, 0.14) 0%,
-    rgba(255, 226, 150, 0.05) 45%,
+    rgba(255, 226, 150, 0.26) 0%,
+    rgba(255, 226, 150, 0.09) 45%,
     rgba(255, 226, 150, 0) 72%
   );
   animation: sunbeam-flicker 11s ease-in-out infinite;
@@ -1776,8 +1856,8 @@ button:hover .tarot-fan-card {
 :root[data-theme='dark'] .scene-sunbeam {
   background: linear-gradient(
     203deg,
-    rgba(190, 210, 255, 0.1) 0%,
-    rgba(190, 210, 255, 0.035) 45%,
+    rgba(190, 210, 255, 0.18) 0%,
+    rgba(190, 210, 255, 0.06) 45%,
     rgba(190, 210, 255, 0) 72%
   );
 }
@@ -1786,8 +1866,8 @@ button:hover .tarot-fan-card {
   :root:where(:not([data-theme='light'])) .scene-sunbeam {
     background: linear-gradient(
       203deg,
-      rgba(190, 210, 255, 0.1) 0%,
-      rgba(190, 210, 255, 0.035) 45%,
+      rgba(190, 210, 255, 0.18) 0%,
+      rgba(190, 210, 255, 0.06) 45%,
       rgba(190, 210, 255, 0) 72%
     );
   }
@@ -1814,10 +1894,11 @@ button:hover .tarot-fan-card {
 
 .scene-mote {
   position: absolute;
-  width: 3px;
-  height: 3px;
+  width: 4px;
+  height: 4px;
   border-radius: 9999px;
-  background: rgba(255, 240, 200, 0.5);
+  background: rgba(255, 240, 200, 0.7);
+  box-shadow: 0 0 6px rgba(255, 240, 200, 0.5);
   animation: mote-drift var(--dur) ease-in-out var(--delay) infinite alternate;
 }
 
@@ -2025,8 +2106,9 @@ button:hover .tarot-fan-card {
     display: none;
   }
   .header-canopy,
-  .header-canopy svg,
+  .canopy-photo,
   .scene-sunbeam,
+  .scene-lane,
   .whisper-sprout,
   .wordmark:hover .wordmark-tree {
     animation: none;
