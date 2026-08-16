@@ -19,10 +19,11 @@ vi.mock('../lib/api', async () => ({
   // path while every assertion below still passed.
   deckUrl: (await vi.importActual<typeof import('../lib/api')>('../lib/api')).deckUrl,
   api: { decks: vi.fn(), health: vi.fn(), deleteDeck: vi.fn(),
-         colors: vi.fn() },
+         colors: vi.fn(), lore: vi.fn() },
 }))
 
 const { api } = await import('../lib/api')
+const { resetLoreCache } = await import('../lib/lore')
 
 function deck(overrides: Partial<DeckTile> & { slug: string }): DeckTile {
   return {
@@ -86,9 +87,11 @@ beforeEach(() => {
     total_cards: 99, stage: 'curated', status: 'built',
   })
   // The shelf-fact strip is decorative and must never block the shelf, so
-  // the default here is the taxonomy failing to load. The one test about the
+  // the default here is the shelves failing to load. The one test about the
   // strip supplies its own.
   vi.mocked(api.colors).mockReset().mockRejectedValue(new Error('no taxonomy'))
+  resetLoreCache()
+  vi.mocked(api.lore).mockReset().mockRejectedValue(new Error('no shelves'))
 })
 
 // Explicit, because Testing Library only registers auto-cleanup when the test
@@ -286,27 +289,36 @@ describe('Library', () => {
     expect(link.getAttribute('href')).toBe('/import')
   })
 
-  it('tells one story from the shelves, linking into Learn', async () => {
-    // The fun-fact strip: one combination from the checked-in colour
-    // reference, offered as a door into the Learn page. Decorative — the
-    // default mock rejects, and every other test proves the shelf renders
-    // without it.
-    vi.mocked(api.colors).mockResolvedValue({
-      combinations: [{
-        key: 'bg', name: 'Golgari', colors: ['B', 'G'], tier: 'guild',
-        tagline: 'Death feeds growth', aliases: [], champions: [],
-        history: 'The swarm turns the dead into mulch. Then more.',
-        verified_by: 'x', lore: '',
+  it('offers one fact from the shelves, with the paragraph behind a door', async () => {
+    // The shelf strip (second punch list, item 7): one lore fact at a time,
+    // `more` behind "Tell me more", cards resolved by the server. Decorative —
+    // the default mock rejects, and every other test proves the shelf
+    // renders without it.
+    resetLoreCache()
+    vi.mocked(api.lore).mockResolvedValue({
+      volumes: [{ key: 'history', label: 'History', blurb: 'Where it began.' }],
+      facts: [{
+        key: 'alpha-93', volume: 'history',
+        fact: 'Magic reached shops in the summer of 1993.',
+        more: 'And sold out almost immediately.',
+        cards: [{ name: 'Black Lotus', mana_cost: '{0}', type_line: 'Artifact',
+                  oracle_text: '', color_identity: [] }],
+        learn: { tab: 'words', key: 'commander' },
       }],
-    } as never)
+      pool: true, dropped: 0,
+    })
     renderLibrary()
     await screen.findByText(/from the shelves/i)
-    expect(screen.getByText('Golgari')).toBeTruthy()
-    // Only the opener, not the whole paragraph — it is a hook, not the page.
-    expect(screen.getByText(/turns the dead into mulch/)).toBeTruthy()
-    expect(screen.queryByText(/Then more/)).toBeNull()
-    expect(screen.getByText(/the full story/i).closest('a')!
-      .getAttribute('href')).toBe('/learn?c=bg')
+    expect(screen.getByText('History')).toBeTruthy()
+    expect(screen.getByText(/summer of 1993/)).toBeTruthy()
+    // The paragraph and the cards wait behind the door — a hook, not a page.
+    expect(screen.queryByText(/sold out almost immediately/)).toBeNull()
+    expect(screen.queryByText('Black Lotus')).toBeNull()
+    fireEvent.click(screen.getByText('Tell me more'))
+    expect(screen.getByText(/sold out almost immediately/)).toBeTruthy()
+    expect(screen.getByText('Black Lotus')).toBeTruthy()
+    expect(screen.getByText(/in the learn room/i).closest('a')!
+      .getAttribute('href')).toBe('/learn?tab=words')
   })
 
   // ------------------------------------------------------------- first run

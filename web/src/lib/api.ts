@@ -763,6 +763,24 @@ export interface Glossary {
   terms: Term[]
 }
 
+/** One fact from the shelves. Mirrors `mtglab.lore.Fact`, with the named
+ *  cards already resolved through the pool (or dropped and counted). */
+export interface LoreFact {
+  key: string
+  volume: string
+  fact: string
+  more: string
+  cards: ReferenceCard[]
+  learn: { tab: string; key: string } | null
+}
+
+export interface LoreShelves {
+  volumes: { key: string; label: string; blurb: string }[]
+  facts: LoreFact[]
+  pool: boolean
+  dropped: number
+}
+
 export interface ColorTaxonomy {
   colors: { code: string; name: string; wants: string; fears: string }[]
   // `blurb` is what the tier *is* and every tier has one; `eras` below is the
@@ -1444,6 +1462,7 @@ export const api = {
   // The vocabulary. Memoised below rather than here, because a tooltip may ask
   // for it from anywhere and asking twice on one screen is the normal case.
   glossary: () => get<Glossary>('/api/glossary'),
+  lore: () => get<LoreShelves>('/api/lore'),
   // The only call here that can lose work. `confirm` must be a word somebody
   // typed — `bury`, or the slug itself — which a mis-aimed click cannot
   // satisfy. The deck moves to `.trash/` rather than being unlinked, and the

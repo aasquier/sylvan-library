@@ -1518,6 +1518,27 @@ def test_glossary_needs_no_pool_and_no_decks(client):
         assert all(ref in keys for ref in term["see_also"])
 
 
+def test_lore_serves_the_shelves_with_pool_cards(client):
+    """Reference prose plus pool cards, `/api/colors/{key}`-style: the facts
+    always answer, and a fact naming a card `tiny_pool` holds ships that
+    card's own text beside the prose."""
+    body = client.get("/api/lore").json()
+    assert [v["key"] for v in body["volumes"]] == [
+        "history", "mechanics", "artists", "table", "curiosities"]
+    assert body["facts"], "the shelves are empty"
+    for fact in body["facts"]:
+        assert fact["fact"] and fact["more"]
+    # tiny_pool holds none of the historical cards, so with this fixture the
+    # named cards drop and are counted rather than invented -- which is the
+    # instrument working, not a gap.
+    assert body["pool"] is True
+    named = sum(len(f["cards"]) for f in body["facts"])
+    dropped = body["dropped"]
+    from mtglab import lore as lore_mod
+    total = sum(len(f.cards) for f in lore_mod.FACTS)
+    assert named + dropped == total
+
+
 def test_challenge_progress_counts_filled_slots(in_memory_client):
     with in_memory_client([Deck.load(Path("decks/gyome-food/deck.yaml"))]) as c:
         body = c.get("/api/colors/progress").json()

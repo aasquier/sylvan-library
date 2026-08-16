@@ -156,8 +156,18 @@ def test_every_named_card_matches_the_real_pool():
     exact = {c.key: [c.verified_by, *c.signature] for c in colors.COMBINATIONS}
     within = {c.key: [ch.card for ch in c.champions]
               for c in colors.COMBINATIONS}
+    # The lore shelves ride in the same test rather than adding a second
+    # `needs_full_pool` marker (see the docstring above): their claim is
+    # weaker -- the named card must simply exist, since the facts assert
+    # history rather than identity -- but the argument for running against
+    # the real pool is the same, and a misspelled name would otherwise
+    # silently drop on every page load.
+    from mtglab import lore
+    lore_names = sorted({n for f in lore.FACTS for n in f.cards})
+
     names = sorted({n for v in exact.values() for n in v}
-                   | {n for v in within.values() for n in v})
+                   | {n for v in within.values() for n in v}
+                   | set(lore_names))
 
     con = db.connect(config.DB_PATH)
     try:
@@ -166,6 +176,9 @@ def test_every_named_card_matches_the_real_pool():
         con.close()
 
     wrong = []
+    for name in lore_names:
+        if name not in found:
+            wrong.append(f"lore: no card named {name!r}")
     for c in colors.COMBINATIONS:
         for name in exact[c.key]:
             rec = found.get(name)
