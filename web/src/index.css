@@ -1332,6 +1332,25 @@ button:hover .tarot-fan-card {
   transition: transform 3.8s cubic-bezier(0.12, 0.55, 0.08, 1);
 }
 
+/* The seam, made into an object. A feathered mask alone left the join between
+ * the turning copy and the still painting reading as a blur — the eye finds a
+ * soft edge and calls it a rendering fault. A band gives the join a reason to
+ * exist: the wheel is mounted in something. It also does the practical work,
+ * hiding both the sub-pixel mask mismatch that made the edge shimmer at some
+ * rotations and the thin annulus of non-disc painting that `WHEEL_DIAMETER`'s
+ * nudge brought inside the circle. Dark iron with a brass highlight, lit from
+ * the upper left like Gelon's own light. */
+.wheel-rim {
+  border-radius: 9999px;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 3px rgba(44, 29, 12, 0.66),
+    inset 0 0 0 4.5px rgba(198, 156, 78, 0.36),
+    inset 6px 6px 18px rgba(0, 0, 0, 0.34),
+    inset -3px -3px 12px rgba(255, 226, 168, 0.12),
+    0 1px 7px rgba(0, 0, 0, 0.34);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wheel-disc {
     transition: none;
@@ -1624,12 +1643,25 @@ button:hover .tarot-fan-card {
  * matted to alpha, mirror-tiled. Taller than the drawn vine was — a
  * photograph earns the space — with the densest growth in its upper half so
  * the hang over content stays translucent leaf-tips, not a hedge. */
+/* How far the ivy hangs below the header. `.page-main` pads by this plus a
+ * breath, so the leaves always hang over page rather than over words — the
+ * canopy is 84px and main's old `py-8` was 32, which put the top 52px of
+ * every page under the growth and read as content being clipped. One
+ * variable because the two numbers are one decision. */
+:root {
+  --canopy-drop: 84px;
+}
+
+.page-main {
+  padding-top: calc(var(--canopy-drop) + 0.75rem);
+}
+
 .header-canopy {
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
-  height: 84px;
+  height: var(--canopy-drop);
   pointer-events: none;
   opacity: 0.9;
   transform-origin: 50% 0;
@@ -1715,10 +1747,16 @@ button:hover .tarot-fan-card {
  * cones from the upper right, flickering on incommensurate periods — light
  * through leaves and old glass — with dust hanging in it.
  */
+/* Portalled onto `document.body` (see `SceneBackdrop`), so `inset: 0` really
+ * is the viewport rather than whichever masthead section happened to be
+ * mid-`.page-enter`. `-1` puts it above the canvas background — `body`'s
+ * background propagates to the canvas, so there is nothing of body's own to
+ * paint over it — and below every in-flow element in `#root`, which is
+ * static and transparent. */
 .scene-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   overflow: hidden;
   pointer-events: none;
 }
@@ -1736,24 +1774,24 @@ button:hover .tarot-fan-card {
   width: calc(100% + 48px);
   height: calc(100% + 48px);
   object-fit: cover;
-  filter: blur(18px) saturate(0.85);
-  opacity: 0.13;
+  filter: blur(11px) saturate(1.02);
+  opacity: 0.3;
   mask-image: linear-gradient(
     180deg,
     transparent 0%,
-    transparent 26%,
-    rgba(0, 0, 0, 0.7) 55%,
-    rgba(0, 0, 0, 0.55) 100%
+    transparent 15%,
+    rgba(0, 0, 0, 0.88) 48%,
+    rgba(0, 0, 0, 0.8) 100%
   );
 }
 
 :root[data-theme='dark'] .scene-backdrop-art {
-  opacity: 0.2;
+  opacity: 0.42;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme='light'])) .scene-backdrop-art {
-    opacity: 0.2;
+    opacity: 0.42;
   }
 }
 
@@ -1764,11 +1802,20 @@ button:hover .tarot-fan-card {
  * drifting on an 80/95-second Ken Burns so the room breathes without ever
  * being caught moving. The right lane bakes its mirror into the keyframes,
  * because `animation` owns `transform` once it starts. */
+/* `height: 100%` is not redundant beside `top: 0; bottom: 0`, and leaving it
+ * out is why these never rendered between #118 and here. An `<img>` is a
+ * *replaced* element: with `height: auto` the used height comes from the
+ * intrinsic aspect ratio, the box becomes over-constrained, and `bottom` is
+ * the declaration dropped. The lanes were 250x145 postage stamps in the top
+ * corner at every viewport width — present, painted, and far too small to
+ * read as anything. `object-fit: cover` needs a box before it can crop to
+ * one. Any future full-height decorative image wants this line too. */
 .scene-lane {
   display: none;
   position: absolute;
   top: 0;
   bottom: 0;
+  height: 100%;
   width: calc((100% - 80rem) / 2 + 5rem);
   object-fit: cover;
   filter: blur(2px) saturate(1.05);
@@ -1834,13 +1881,17 @@ button:hover .tarot-fan-card {
   height: 85%;
   transform: rotate(24deg);
   transform-origin: 100% 0;
-  /* Turned up on the second punch list (item 5): at 0.14 the light was a
-     rumour. This is a beam somebody can point at. */
+  /* Raised twice and still unseen the second time, because more alpha was
+     the wrong lever: #fce296 on a #f9f9f7 page is light-on-light, and a
+     near-white ground has no headroom left to brighten into. What reads on
+     pale paper is *colour*, so the beam is amber now rather than a paler
+     white — the warmth is the signal, and the alpha only sets how much of
+     it lands. */
   background: linear-gradient(
     203deg,
-    rgba(255, 226, 150, 0.26) 0%,
-    rgba(255, 226, 150, 0.09) 45%,
-    rgba(255, 226, 150, 0) 72%
+    rgba(255, 196, 92, 0.34) 0%,
+    rgba(255, 196, 92, 0.13) 45%,
+    rgba(255, 196, 92, 0) 72%
   );
   animation: sunbeam-flicker 11s ease-in-out infinite;
 }
@@ -1856,9 +1907,9 @@ button:hover .tarot-fan-card {
 :root[data-theme='dark'] .scene-sunbeam {
   background: linear-gradient(
     203deg,
-    rgba(190, 210, 255, 0.18) 0%,
-    rgba(190, 210, 255, 0.06) 45%,
-    rgba(190, 210, 255, 0) 72%
+    rgba(190, 212, 255, 0.28) 0%,
+    rgba(190, 212, 255, 0.1) 45%,
+    rgba(190, 212, 255, 0) 72%
   );
 }
 
@@ -1866,9 +1917,9 @@ button:hover .tarot-fan-card {
   :root:where(:not([data-theme='light'])) .scene-sunbeam {
     background: linear-gradient(
       203deg,
-      rgba(190, 210, 255, 0.18) 0%,
-      rgba(190, 210, 255, 0.06) 45%,
-      rgba(190, 210, 255, 0) 72%
+      rgba(190, 212, 255, 0.28) 0%,
+      rgba(190, 212, 255, 0.1) 45%,
+      rgba(190, 212, 255, 0) 72%
     );
   }
 }

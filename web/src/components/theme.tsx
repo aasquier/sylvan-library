@@ -44,7 +44,7 @@ import { COLOR_VAR } from '../lib/mtg'
 import { PERSONA_ACCENT, PERSONA_ART } from '../lib/personart'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 import { SceneBackdrop } from './forest'
-import { CardHover, ColorRing } from './ui'
+import { ArmedButton, CardHover, ColorRing } from './ui'
 import { StanceReadout } from './stance'
 
 /** Held here so a closed tab does not cost ten minutes of somebody's thinking.
@@ -735,12 +735,18 @@ export function ThemeInterview({
             </p>
             )}
         <div className="ml-auto flex items-center gap-2">
+          {/* Armed, on ADR 27's pattern, because this is destructive twice
+              over: it throws the conversation away *and* the empty transcript
+              immediately draws a fresh opening question, which is a paid turn.
+              It was reported as reading like an undo — a control that looks
+              free, costs money, and gave no sign it had done anything. The
+              armed label names both halves. */}
           {transcript.length > 0 && (
-            <button onClick={startOver} className="rounded-md px-3 py-1.5 text-sm"
-                    style={{ border: '1px solid var(--hairline)',
-                             color: 'var(--text-muted)' }}>
+            <ArmedButton armedLabel="Discard and ask again"
+                         title="Clears these answers and starts a new opening question"
+                         onConfirm={startOver}>
               Start over
-            </button>
+            </ArmedButton>
           )}
           <button onClick={onLeave} className="rounded-md px-3 py-1.5 text-sm"
                   style={{ border: '1px solid var(--hairline)',

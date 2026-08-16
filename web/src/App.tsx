@@ -340,10 +340,18 @@ export default function App() {
         <HeaderCanopy />
       </header>
 
-      <main className="relative z-10 mx-auto max-w-7xl px-6 py-8">
+      {/* `page-main` carries the top padding, keyed to how far the ivy hangs
+          (`--canopy-drop`); `pb-8` is the ordinary bottom. */}
+      <main className="page-main relative z-10 mx-auto max-w-7xl px-6 pb-8">
         {/* Keyed on the path: navigating re-mounts this wrapper, so every
             page enters the same way — a short rise out of the undergrowth
-            (`.page-enter`), gone entirely under reduced motion. */}
+            (`.page-enter`), gone entirely under reduced motion.
+
+            NOTE: this wrapper animates a `transform`, which makes it the
+            containing block for any `position: fixed` descendant. That is why
+            `SceneBackdrop` portals to `document.body` instead of rendering in
+            place — see its docstring. Anything fixed added under here needs
+            the same treatment. */}
         <div key={location.pathname} className="page-enter">
         <Suspense fallback={<Spinner label="Loading…" />}>
         <Routes>

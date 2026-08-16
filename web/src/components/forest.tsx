@@ -32,6 +32,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAmbience } from '../lib/prefs'
 
 /* ------------------------------------------------------------ the ambience */
@@ -277,12 +278,25 @@ export function HeaderCanopy() {
  * Decorative in the strict sense: `aria-hidden`, no pointer events, and
  * behind everything with painted pixels. `prefers-reduced-motion` stills
  * the flicker and the dust but keeps the room.
+ *
+ * **It is portalled onto `document.body`, and that is load-bearing.** The
+ * routed page is wrapped in `.page-enter` (`App.tsx`), which animates a
+ * `transform` — and a transformed ancestor becomes the containing block for
+ * every `position: fixed` descendant. Rendered in place, this element
+ * resolved `inset: 0` against the *masthead section* for the first 300ms of
+ * every page view: measured at 1232x376 instead of 1600x1000, with the lanes
+ * inheriting the error and coming out 58px wide. A portal keeps the
+ * component where it belongs in the React tree — `PageMasthead` still owns
+ * it, and there is no new prop to thread — while putting the DOM node
+ * outside the animation. `z-index: -1` then lands it above the canvas
+ * background and below all in-flow content, which is why nothing in `#root`
+ * needs a stacking context of its own.
  */
 export function SceneBackdrop({ art }: { art: string }) {
   // Same switch as the weather: a room is ambience too.
   const [ambience] = useAmbience()
   if (!ambience) return null
-  return (
+  return createPortal(
     <div className="scene-backdrop" aria-hidden="true">
       <img src={art} alt="" className="scene-backdrop-art" />
       {/* The lanes (second punch list, item 5): on a screen wide enough to
@@ -311,7 +325,8 @@ export function SceneBackdrop({ art }: { art: string }) {
           '--delay': `${m.delay}s`,
         } as React.CSSProperties} />
       ))}
-    </div>
+    </div>,
+    document.body,
   )
 }
 
