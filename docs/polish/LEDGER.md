@@ -413,10 +413,212 @@ state, never checklists.
 
 *CI/CD · alerting & self-healing*
 
-- **Last run:** never
-- **Queued for Aaron:** —
-- **Deferred:** —
-- **Measurements:** —
+- **Last run:** 2026-08-16 (rainbow). First Red run; everything below is a
+  first baseline, so read the numbers as a starting point and not as a trend.
+- **Fixed and landed:** `concurrency` groups on `codeql.yml` and
+  `dependency-review.yml`, which `ci.yml` has had since it was written and
+  these two never did. **The waste was observed rather than theorised**, on
+  this same afternoon: Blue pushed a fixup at 20:08:10Z and again at
+  20:09:06Z, `ci.yml` run `31969659465` was **cancelled** as designed, and
+  CodeQL run `31969659483` for the very same superseded commit ran happily to
+  completion. Cancelled on `pull_request` only for CodeQL, because a cancelled
+  `main` run leaves the Security tab without a baseline for that commit and
+  the next PR's "new alerts only" comparison has nothing to compare against;
+  unconditionally for dependency-review, which has no `main` run at all.
+  `timeout-minutes: 10` on the dependency-review job, the one job in the repo
+  that was still on the six-hour default.
+- **Fixed and landed — the card-data scan is no longer anchored to `data/`**
+  (White queued this one for Red deliberately, `ci.yml` being Red's file).
+  `no-secrets-or-card-data` asked `^data/.*\.duckdb$`, so a pool built into
+  `tests/fixtures/` or dropped at the repository root passed a scan named
+  after it — the rule only ever asked *where* a file was, when what makes it a
+  rule 5 violation is what it *is*. Widened with `\.duckdb$`, `\.jsonl\.gz$`
+  and `\.json\.gz$`, the last two being Scryfall's bulk downloads, which the
+  `image` job already refuses to find inside the container and nothing refused
+  in the tree. Mutation-verified against a synthetic list: the old pattern
+  passes five real leaks the new one catches, and both pass every legitimate
+  file — including all 418 tracked ones, where the new pattern matches exactly
+  what the old one did, which is nothing. **The asymmetry is the interesting
+  part and is written into the comment:** `.duckdb`/`.jsonl.gz`/`.json.gz` may
+  match anywhere because nothing legitimate here is named that; bare `.json`
+  emphatically may not (`package.json`, `package-lock.json`, `tsconfig`), so
+  it stays pinned to `data/`.
+- **Also corrected, two notes that had drifted from the truth:** `ci.yml`'s
+  Trivy note claimed the action was "unpinned, like every other action in this
+  file" when all eleven are SHA-pinned — and the worry it recorded (pinning a
+  scanner pins its database) turns out not to apply, which the *run log* shows
+  rather than the docs: the vulnerability data restores from a separate
+  date-keyed cache and moves daily. And `docs/HOSTING.md` §5's Backups runbook
+  described the manual `app.db` procedure in detail and was silent about the
+  volume snapshots Fly takes daily on its own.
+- **Checklist conflict, now fixed in `references/red.md`:** the reference said
+  the six required checks were "four `ci.yml` jobs, `dependency-review`,
+  CodeQL". Read from the protection setting, they are `test (3.11)`,
+  `test (3.12)`, `frontend`, `image`, `no-secrets-or-card-data`,
+  `dependency-review` — `ci.yml` supplies **five** contexts because `test` is
+  a matrix, and **CodeQL is not required at all**. `codeql.yml`'s own header
+  says so and CLAUDE.md's count was right; only the reference had drifted.
+- **Queued for Aaron:**
+  1. **Nothing tells Aaron the site is down, and one specific failure is
+     invisible to everything now watching.** Fly's HTTP check is configured
+     and passing, but on Fly a failing service check makes the proxy *stop
+     routing* — it does not restart the machine. The machine's restart policy
+     is `on-failure`/`max_retries: 10`, which fires only if the process
+     *exits*. So an app that hangs while still holding port 8080 is a total
+     outage that nothing detects and nothing recovers. Recommendation, in
+     this order: **UptimeRobot free tier** (50 monitors, 5-minute interval, no
+     card) hitting `/api/health`, wired to **Pushover** (one-time $5, one
+     platform) for the phone. Pushover over the alternatives on reliability
+     rather than price: carrier email-to-SMS gateways are being retired and
+     fail by silently dropping, which is the worst possible failure for an
+     alert channel; ntfy.sh's free tier has no delivery guarantee and
+     self-hosting it puts the alarm on infrastructure that can fail with the
+     thing it watches; Twilio is genuinely reliable but is a metered bill and
+     a phone number to maintain. Pushover is a push, not a text — it lands on
+     the lock screen the same way without a carrier in the path. **Total cost
+     $5, once.**
+  2. **Whatever monitor is chosen must be configured for GET, not HEAD.**
+     Measured today: `HEAD /` and `HEAD /api/health` both answer **405**,
+     while GET answers 200. `fly.toml` already sets `method = "GET"`, which is
+     why Fly's own check works. A monitor left on a HEAD default would alert
+     continuously against a perfectly healthy site, and an alert channel that
+     cries wolf in week one is an alert channel that gets muted.
+  3. **A health endpoint that detects sickness, not just liveness — and the
+     non-obvious half is that it must keep answering 200.** `/api/health`
+     today opens DuckDB, counts oracle cards and printings, globs the bulk
+     directory and counts decks. It never opens `app.db` and never looks at
+     free space, so a corrupt auth database leaves the check green while every
+     login fails, and a full volume leaves it green while every write fails.
+     The trap in fixing it: Fly stops routing on a *failing* check, and with
+     one machine that converts "logins are broken" into "the site is
+     entirely down". So the recommendation is to **report the extra facts in
+     the body and keep the status 200**, and let the external monitor decide
+     what is worth waking somebody for. Roughly: `app_db` (does it open),
+     `disk_free_mb`, `schema_version`.
+  4. **`sha_pinning_required` is available and off.** GitHub now offers
+     enforced SHA pinning for Actions free on public repos; the repo already
+     pins all eleven references by hand and Dependabot keeps them current, so
+     turning it on makes an existing convention structural instead of
+     voluntary. `allowed_actions` is also `"all"`, which is the widest
+     setting. Both are repository settings, so they are Aaron's to flip and
+     were deliberately not touched by this run. Free, and pure win.
+  5. **A merge queue, the next time more than two PRs are open at once.**
+     Protection has `strict: true` (branch must be up to date), so with N open
+     PRs every merge invalidates the other N−1 and forces a rebase plus a full
+     re-run. Rainbow going serial (#128) dissolved the immediate case — one
+     branch at a time never collides — so this is worth having only if
+     concurrent PRs come back. Free for public repos; it changes contributor
+     workflow, so queued rather than adopted.
+  6. **A deploy does not take a snapshot, and that is the wrong way round.**
+     Four deploys landed this afternoon (machine v61 → v65) and the newest
+     volume snapshot still predates all four: Fly snapshots on its own daily
+     schedule, which has no relationship to when the volume is at risk. The
+     moment the volume is *most* at risk is the boot after a merge, because
+     `auth/db.py`'s ladder is forward-only and applies unwatched (ADR 23) — so
+     the one deploy that needs a rollback point is the one guaranteed not to
+     have a fresh one. HOSTING §5 already says to take a manual `app.db`
+     backup before a migration; the gap is that nothing *enforces* it and the
+     schedule will not cover for a forgotten one. Cheapest honest fix is a
+     step in the `deploy` job that snapshots before `flyctl deploy` — but that
+     needs a `FLY_API_TOKEN` scope check and a decision about failing the
+     deploy when the snapshot fails, so it is Aaron's call, not a safe fix.
+- **Deferred:**
+  - **Speeding up the `image` job — deferred because it would not help.**
+    Its 292s median is 214s of arm64-under-QEMU, and that 214s is 142s of
+    `pip install` plus 46s of `python -m venv`, neither of which caches:
+    `RUN python -m venv` sits *below* `COPY src ./src` in the Dockerfile so
+    every commit invalidates it, and the two buildx `type=gha` caches share
+    one scope, so each run's amd64-only build overwrites the arm64 layers the
+    previous run wrote. Both are fixable (move the venv above the COPYs; give
+    each build its own `scope=`), and neither is provable on this Mac, which
+    has no container runtime at all — so it would have to land alone and be
+    watched. **The reason not to bother yet is stronger than "small win":**
+    across ten runs the critical path was `image` six times and `test (3.12)`
+    four, at medians of 292s and 284s. They are close enough that which one is
+    the bottleneck *flips run to run*, so fixing either alone buys almost
+    nothing. Trigger to revive: the test job gets materially faster (White's
+    deferred `pytest-xdist` would do it), which would make `image` the
+    bottleneck properly and worth the branch.
+  - **A Fly volume-snapshot restore has never been performed.** Snapshots are
+    current and daily, but the restore path is a *new* volume plus a machine
+    re-attach, which is downtime and steps nobody has walked. Documented as
+    unverified in HOSTING §5 rather than written up as a procedure, because
+    writing down an untried runbook is worse than admitting there isn't one.
+    Trigger: any change to the volume's shape or size, or the first time a
+    real restore is needed — do it once deliberately before then.
+  - **`www.sylvan-libraries.com` does not resolve or answer** (connection
+    fails; the Fly cert covers the apex only). Harmless until a friend types
+    it. Trigger: anyone reports the site not loading and turns out to have
+    typed `www.`.
+- **Measurements (2026-08-16):**
+  - **CI per-job medians**, n=10 runs — the ten most recent, which are #128
+    through #132 and their pushes, all taken after rainbow went serial, so
+    **nothing here is contended**:
+    `test (3.11)` **158s** (149–172) · `test (3.12)` **284s** (241–386) ·
+    `frontend` **36s** (29–42) · `no-secrets-or-card-data` **5s** (4–7) ·
+    `image` **292s** (49–336) · `deploy` **78s** (72–79, n=5).
+    Separate workflows: `codeql` **~60s** on a PR, ~90s on a push;
+    `dependency-review` **~12s**. One-day window, so this is a baseline and
+    not yet a trend — but a clean one.
+  - Full run wall clock **241–386s, median ~307s**, plus ~78s of deploy on a
+    push. **The critical path flips**: `image` was the longest job in 6 of 10
+    runs and `test (3.12)` in the other 4. That is the number to re-check
+    before anyone optimises one job — at 292s vs 284s there is no bottleneck
+    to attack, only a tie.
+  - The 386s `test (3.12)` (run `31970110603`) is the observed tail and did
+    not reproduce; the other nine sit in 241–288s. Worth remembering only so
+    that a single slow run is not read as a regression.
+  - Where the two long jobs go: `test (3.12)` is ~233s of `Tests`, roughly
+    100s of it coverage instrumentation (`test (3.11)` runs the same suite
+    bare at ~130s) — a deliberate trade, not a regression. `image` is 214s of
+    arm64 QEMU: `pip install` 142s, `python -m venv` 46s, export 19s.
+  - **Cache health: all green, read from run `31965727360`'s log rather than
+    assumed.** pip hit (~107 MB, keyed on `pyproject.toml`), npm hit (~47 MB),
+    QEMU binfmt hit, Trivy binary hit, Trivy vulnerability DB hit on a
+    *date*-keyed key (so the SHA pin holds the action still while the data
+    still moves daily), buildx amd64 layers all `CACHED`. The one miss is
+    arm64, above.
+  - No queueing observed — jobs started 2–5s after run creation across all
+    ten, and serial rainbow means one run in flight at a time. Public repos
+    get 20 concurrent jobs and one run is five, so there is ~4× headroom;
+    concurrent PRs are what would eat it.
+  - Actions hygiene: all **11** action references pinned to 40-char SHAs with
+    version comments; no `pull_request_target`; workflow-level
+    `permissions: contents: read` on all three files, with
+    `security-events: write` scoped to the CodeQL job alone; default workflow
+    permissions `read`; `can_approve_pull_request_reviews` false. Pinned
+    invariants verified, not assumed: skip gate `expected=2` (and the local
+    suite really does skip exactly 2), `image` the only container build,
+    `deploy` `needs` all four `ci.yml` jobs and is gated to `refs/heads/main`
+    outside the event check.
+  - **Alerting posture inventory** — Fly HTTP check GET `/api/health`, 30s/5s/
+    10s grace, passing, **does not restart on failure** · machine restart
+    policy `on-failure` max 10, fires only on process exit · Dockerfile
+    `HEALTHCHECK` present but inert on Fly Machines (`fly.toml`'s check is the
+    live one, and the file says so) · GitHub deploy-job failure email to the
+    actor · Fly account status emails, unverified whether they reach Aaron ·
+    **external uptime monitoring: none · phone alerting: none.**
+  - **External probe** (2026-08-16 ~20:55Z, quiet machine). Liveness and the
+    gate, which is Red's half: `GET /api/health` **200**, `GET /` **200**,
+    `GET /api/decks` **401**; `HEAD /` and `HEAD /api/health` both **405**.
+    HTTP/2, TLSv1.3. Security headers on 200s: HSTS 31536000,
+    `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`,
+    `Permissions-Policy`. **Response times are Black's**, measured the same
+    afternoon and not re-taken here: `/` 240ms, `/api/health` 211ms p50 TTFB
+    with ~45ms of server work.
+  - **TLS expiry 2026-11-11** (Let's Encrypt, `CN=sylvan-libraries.com`,
+    issued 2026-08-13, ~87 days remaining, Fly-managed and auto-renewing,
+    **apex-only SAN**).
+  - Instance: machine `84e19ef25041e8`, **version 65** (v61 at the start of
+    this run — four merges landed during it, each replacing the machine, and
+    the check stayed passing through all four), `iad`, `shared-cpu-1x`/1 GB,
+    started, 1/1 checks passing. Health body: pool true, 35,390 oracle cards,
+    107,338 printings, 7 decks, `pool_stale` false.
+  - Volume `mtglab_data` 3 GB, encrypted. **4 snapshots, one per day, newest
+    6h old, 5-day retention, 286 MiB stored — and unchanged across four
+    deploys**, which is the finding rather than the number. Five days is Fly's
+    default and is the number that matters: a corruption nobody notices inside
+    five days has no snapshot behind it.
 
 ## Green — Growth & Resilience
 

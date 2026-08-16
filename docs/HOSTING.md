@@ -1253,6 +1253,50 @@ git above:
 fly ssh sftp get /data/decks ./backups/decks-$(date +%F)
 ```
 
+#### The snapshots Fly takes on its own, and what is not yet known about them
+
+Everything above is a backup *you* run. Fly is separately snapshotting the
+volume daily without being asked, and this runbook said nothing about them
+until 2026-08-16, which is the kind of silence that reads as "there are none"
+at exactly the wrong moment. Observed that day:
+
+```bash
+fly volumes list --app sylvan-library
+fly volumes snapshots list vol_vwnqxewn1y00oy9v
+```
+
+Four snapshots, one a day, the newest six hours old, **five-day retention**,
+286 MiB stored against a 3 GB volume. Five days is Fly's default and it is the
+number to know: a corruption nobody notices within five days is a corruption
+with no snapshot behind it, and `app.db` is the file where that matters,
+because a bad row can sit unnoticed far longer than a missing one.
+
+**A deploy does not take one, and the timing is exactly backwards.** Four
+deploys landed on 2026-08-16 — machine v61 through v65 — and the newest
+snapshot still predated all four, because Fly snapshots on a daily clock that
+knows nothing about when the volume is at risk. The moment it is *most* at
+risk is the boot after a merge: ADR 23 means merging deploys, and `auth/db.py`
+migrates forward-only on the first connection afterwards with nobody watching.
+So the deploy that would most want a rollback point is the one guaranteed not
+to have a fresh one. That is what the manual `app.db` backup above is for, and
+why "take one before a deploy that carries a schema migration" is written as an
+instruction rather than left to the schedule.
+
+**The restore path has never been exercised, and this file will not pretend
+otherwise.** Fly restores a snapshot by creating a *new* volume from it
+(`fly volume fork` / `fly volumes create --snapshot-id`) rather than by
+rewinding the one in place, so a real restore also means detaching the running
+machine from the current volume and attaching the new one — which is downtime,
+a machine edit, and a step nobody has walked here. Contrast the `app.db`
+procedure above, which was executed end to end on 2026-08-13 and is written
+down because it was. Until somebody does the same for a snapshot, treat these
+as a safety net of unmeasured strength and keep taking the manual `app.db`
+backup, which is the one with a proven restore.
+
+The two are not redundant, either: the snapshot holds the whole volume
+including the pool, and the manual backup holds the two irreplaceable things at
+a moment you chose — which is the one you want before a schema migration.
+
 ### Watching it
 
 ```bash

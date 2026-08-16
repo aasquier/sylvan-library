@@ -27,6 +27,19 @@ on:
 permissions:
   contents: read
 
+# One analysis per ref, matching `ci.yml`'s group and for the same reason:
+# pushing three fixups to a branch used to queue three full analyses -- two
+# languages each, so six jobs -- and the first two answer a question nobody is
+# asking any more.
+#
+# Cancelled on pull requests only, and here that split is load-bearing rather
+# than merely tidy. A `main` run is what populates the Security tab's baseline
+# for that commit; cancel one and the branch has no recorded analysis, so the
+# next PR's "new alerts only" comparison has nothing to compare against.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   analyze:
     runs-on: ubuntu-latest

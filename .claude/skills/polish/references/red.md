@@ -6,9 +6,17 @@ before Aaron's friends notice the site is down.
 
 ## Facet: CI/CD
 
-The suite is six checks (four `ci.yml` jobs, `dependency-review`, CodeQL),
-and a green main deploys itself (ADR 23). The audit is runtime trend,
-robustness, and whether the free tier has grown new capabilities worth
+Six checks are **required** on `main`, and they are not the six this file
+used to name. Read from the protection setting rather than from memory
+(2026-08-16): `test (3.11)`, `test (3.12)`, `frontend`, `image`,
+`no-secrets-or-card-data`, `dependency-review`. So `ci.yml` supplies five
+contexts and not four — `test` is a matrix and each leg gates separately —
+and **CodeQL is not among them**. It runs on every pull request and on a
+schedule, and `codeql.yml`'s own header says why it is deliberately advisory:
+a scanner that blocks merges on a query-pack update is a gate that gets
+disabled in anger. Treat "green" as those six plus a CodeQL run somebody
+actually read. A green main deploys itself (ADR 23). The audit is runtime
+trend, robustness, and whether the free tier has grown new capabilities worth
 adopting.
 
 - **Measure runtimes first**: `bash -lc 'gh run list --workflow ci.yml
@@ -34,8 +42,15 @@ adopting.
   required workflows. Adoptions that change contributor workflow are queued;
   pure-win config (a better cache key) is a safe fix.
 - Local/CI parity: everything CI checks must be runnable locally except
-  `image` and `dependency-review` (documented exceptions). A new CI check
-  that cannot run locally violates "CI is never a surprise" — flag it.
+  **three** — `image` (no container runtime on this Mac), `dependency-review`
+  (it diffs a base against a head, and a laptop has no base), and **CodeQL**,
+  which wants the CodeQL CLI and its query packs and is in neither the
+  `[dev]` extra nor the runbook. The third is the one that bites: White's
+  first run spent four commits teaching a correct guard to satisfy
+  `py/path-injection`, which is "CI is a surprise" happening. It is tolerable
+  only because CodeQL does not gate merging — budget for it on a security fix
+  and never let it become required without the local story first. A *fourth*
+  such check violates the rule outright — flag it.
 
 ## Facet: alerting & self-healing
 
