@@ -179,7 +179,7 @@ def test_swap_list_diffs_two_versions():
     assert "massentry" in out
 
 
-def test_write_all_produces_five_files():
+def test_write_all_produces_five_files_and_the_snapshot():
     deck = make_deck(99)
     prev = make_deck(99)
     prev.cards[0] = CardEntry(name="Old Card", category="threat", why="was here")
@@ -187,15 +187,30 @@ def test_write_all_produces_five_files():
         written = write_all(deck, tmp, cards=pool_for(deck), previous=prev,
                             prices={"Card 0": 1.0})
         names = sorted(p.name for p in written)
-    assert names == ["decklist-annotated.md", "moxfield.txt", "primer-advanced.md",
-                     "primer-quick.md", "swaps.md"]
+    # The sixth file is the build's own baseline for the next swaps.md
+    # (ADR 30), not a deliverable.
+    assert names == ["deck.last-built.yaml", "decklist-annotated.md",
+                     "moxfield.txt", "primer-advanced.md", "primer-quick.md",
+                     "swaps.md"]
 
 
 def test_write_all_omits_swaps_when_nothing_changed():
     deck = make_deck(99)
     with tempfile.TemporaryDirectory() as tmp:
         written = write_all(deck, tmp, cards=pool_for(deck))
-    assert len(written) == 4
+    assert "swaps.md" not in {p.name for p in written}
+    assert len(written) == 5
+
+
+def test_the_snapshot_round_trips_as_the_next_baseline():
+    """What `deck.last-built.yaml` is for: `Deck.load` of it must equal the
+    deck that was built, or the next bare build's swaps.md lies."""
+    deck = make_deck(9)
+    with tempfile.TemporaryDirectory() as tmp:
+        write_all(deck, tmp, cards=pool_for(deck))
+        again = Deck.load(Path(tmp) / "deck.last-built.yaml")
+    assert [c.name for c in again.cards] == [c.name for c in deck.cards]
+    assert [c.why for c in again.cards] == [c.why for c in deck.cards]
 
 
 def test_quick_primer_surfaces_category_table():
@@ -229,28 +244,10 @@ def test_an_unrecognised_status_fails_the_gate():
     assert "deck-status" in codes
 
 
-#: The maintainer's six hand-written decks. Asserted **by name** rather than by
-#: enumerating `decks/`, because `decks/` stopped being a fixed set the moment
-#: the app could create a deck: a user who makes one should not fail the test
-#: suite. These six are the fixtures; anything else in the directory is theirs.
-CURATED_SIX = {
-    "arahbo-cats": "built",
-    "atla-palani-dinos": "built",
-    "goreclaw-stompy": "theoretical",
-    "gyome-food": "built",
-    "tivit-cedh": "theoretical",
-    "trostani-tokens": "built",
-}
-
-
-def test_the_curated_decks_declare_a_status():
-    """Recorded 2026-08-11: Goreclaw and Tivit are lists Aaron is thinking
-    about; the other four are sleeved up."""
-    root = Path(__file__).resolve().parents[1] / "decks"
-    for slug, expected in CURATED_SIX.items():
-        path = root / slug / "deck.yaml"
-        assert path.exists(), f"{slug} is missing from decks/"
-        assert Deck.load(path).status == expected, slug
+# The two tests that used to live here reading the maintainer's real decks —
+# their statuses and stages — left with ADR 30: decks are live app data, so a
+# checkout has none to read. The facts they pinned are prose in CLAUDE.md's
+# "The decks" section, where a wrong claim is an edit rather than a red suite.
 
 
 # ---------------------------------------------------------------- deck stage
@@ -342,7 +339,7 @@ def test_write_all_refuses_a_draft_and_names_what_is_owed():
 def test_write_all_accepts_the_same_deck_once_promoted():
     deck = make_deck(99, stage="curated")
     with tempfile.TemporaryDirectory() as tmp:
-        assert len(write_all(deck, tmp)) == 4
+        assert len(write_all(deck, tmp)) == 5  # four deliverables + snapshot
 
 
 def test_a_dumped_draft_carries_a_blank_why_for_every_card():
@@ -354,19 +351,6 @@ def test_a_dumped_draft_carries_a_blank_why_for_every_card():
     # A curated deck must not get one pre-typed: there it is a blocking error.
     curated = Deck(slug="x", name="X", cards=[CardEntry("Sol Ring", "ramp")])
     assert "why" not in curated.dump()
-
-
-def test_the_curated_decks_are_all_curated():
-    """None of the six is a draft, which is what makes the default safe.
-
-    Scoped to the six by name for the reason `CURATED_SIX` gives: a deck the
-    user created through the app is a draft on purpose (ADR 13), and it would
-    otherwise fail this.
-    """
-    root = Path(__file__).resolve().parents[1] / "decks"
-    stages = {slug: Deck.load(root / slug / "deck.yaml").stage
-              for slug in CURATED_SIX}
-    assert set(stages.values()) == {"curated"}, stages
 
 
 if __name__ == "__main__":

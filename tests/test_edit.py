@@ -603,44 +603,75 @@ def test_an_empty_note_is_refused():
         set_note(DECK, key="  ", value="Something.")
 
 
-# ------------------------------------------------------- the real deck files
+# --------------------------------------------------- the hand-written shape
+#
+# These two tests used to sweep the repository's real deck files. ADR 30 made
+# decks live app data — a checkout has none — and an empty sweep would have
+# gone on passing with nothing under it, which is the worst shape a test can
+# have. What the sweep was actually for was never the six decks; it was their
+# *formatting*: hand-written YAML with folded scalars wrapped at several
+# widths, inline comments, and prose fields between the cards — everything a
+# load-and-dump would normalise away and a naive edit would reflow. So the
+# fixture below is that formatting, kept deliberately gnarly. If a future
+# hand-written style breaks the surgical editor, add its shape here.
 
-def real_decks() -> list[Path]:
-    root = Path(__file__).resolve().parents[1] / "decks"
-    # Decks with no cards are skipped, not an oversight. `decks/` stopped being
-    # a fixed set of hand-written files when the app could create a deck, and a
-    # brand-new deck is legitimately empty (ADR 13) -- there is no "first card"
-    # to replace and no "last card" to remove, so these operations have nothing
-    # to be small about. The point of this module is the *hand-written* files
-    # with their folded scalars, and an empty deck has none.
-    return [p for p in sorted(root.glob("*/deck.yaml"))
-            if not p.parent.name.startswith("_")
-            and (yaml.safe_load(p.read_text(encoding="utf-8")) or {}).get("cards")]
+HAND_WRITTEN = """\
+slug: gnarly
+name: Gnarly, Hand-Written — Fixture
+status: theoretical  # an inline comment the editor must not eat
+commander:
+  - Gnarly, Hand-Written
+bracket: 4
+
+strategy: >
+  A folded scalar wrapped at one width, whose lines must survive an edit to
+  any card below it byte for byte. The point of this file is its formatting,
+  not its Magic.
+
+notes:
+  mulligan: >
+    Keep 2-5 lands. That is the whole rule, wrapped
+    at a narrower width than the strategy above,
+    because the real files are not consistent either.
+
+cards:
+  - name: Swamp
+    category: land
+    qty: 40
+    why: Black mana.
+  - name: Sol Ring
+    category: ramp
+    why: >
+      Two mana on turn one, and a folded rationale long enough to wrap onto a
+      second line so removal has a multi-line block to be exact about.
+  - name: Primeval Titan
+    category: threat
+    why: The last card, which the operations below pick on.
+"""
 
 
-def test_every_curated_deck_can_be_edited_without_collateral_damage():
-    """The synthetic fixture above is tidy. The real files are hand-written,
-    with folded scalars wrapped at several widths -- which is the reason this
-    module exists instead of a load-and-dump."""
-    for path in real_decks():
-        text = path.read_text(encoding="utf-8")
+def hand_written_files() -> list[tuple[str, str]]:
+    return [("gnarly", HAND_WRITTEN)]
+
+
+def test_the_hand_written_shape_can_be_edited_without_collateral_damage():
+    """The synthetic fixture above is tidy. This one is hand-written on
+    purpose, with folded scalars wrapped at several widths -- which is the
+    reason this module exists instead of a load-and-dump."""
+    for slug, text in hand_written_files():
         first = yaml.safe_load(text)["cards"][0]["name"]
         out = replace_card(text, old_name=first, new_name="Island",
                            why="A replacement, for test purposes only.")
-        assert changed_lines(text, out) <= 12, path.parent.name
+        assert changed_lines(text, out) <= 12, slug
         assert yaml.safe_load(out)["cards"][0]["name"] == "Island"
-        # And the file on disk is untouched, because this returns text.
-        assert path.read_text(encoding="utf-8") == text
 
 
-def test_every_operation_is_small_on_every_real_deck():
-    """Each operation, on each hand-written file, against the diff budget that
+def test_every_operation_is_small_on_the_hand_written_shape():
+    """Each operation, on the hand-written shape, against the diff budget that
     makes `swaps.md` readable. Adding a card is a pure insertion; removing one
     is a pure deletion; setting a field touches that field's lines and no
     others."""
-    for path in real_decks():
-        text = path.read_text(encoding="utf-8")
-        slug = path.parent.name
+    for slug, text in hand_written_files():
         parsed = yaml.safe_load(text)
         victim = parsed["cards"][-1]["name"]
 
@@ -661,8 +692,6 @@ def test_every_operation_is_small_on_every_real_deck():
         note = set_note(text, key="test_note", value="A test note.")
         lines = changed(text, note)
         assert all(line.startswith("+") for line in lines), slug
-
-        assert path.read_text(encoding="utf-8") == text
 
 
 def test_operations_compose_in_memory():

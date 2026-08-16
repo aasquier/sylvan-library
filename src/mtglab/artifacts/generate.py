@@ -256,6 +256,16 @@ class DraftDeck(Exception):
     """Artifacts were requested for a deck nobody has finished reasoning about."""
 
 
+#: The build's own baseline for the next `swaps.md` (ADR 30). Decks are live
+#: app data rather than repository content, so "diff against the previous git
+#: revision" stopped being a thing a build could ask for; instead every build
+#: stashes the deck as it was built, and the next bare build diffs against it.
+#: A normalised dump rather than the hand-written file on purpose: `swap_list`
+#: compares decks, not text, and a snapshot that round-trips through
+#: `Deck.load` is all the baseline it needs.
+SNAPSHOT = "deck.last-built.yaml"
+
+
 def write_all(deck: Deck, outdir: str | Path, *, cards: dict[str, CardRecord] | None = None,
               previous: Deck | None = None, prices: dict[str, float] | None = None,
               stats: dict[str, Any] | None = None) -> list[Path]:
@@ -302,4 +312,10 @@ def write_all(deck: Deck, outdir: str | Path, *, cards: dict[str, CardRecord] | 
         path = out / name
         path.write_text(content, encoding="utf-8")
         written.append(path)
+
+    # Last, so a refusal above leaves the old baseline in place: a build that
+    # wrote nothing has no business moving what the next swaps.md diffs against.
+    snapshot = out / SNAPSHOT
+    snapshot.write_text(deck.dump(), encoding="utf-8")
+    written.append(snapshot)
     return written

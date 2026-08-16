@@ -34,13 +34,14 @@ forge-*.jar
 jdk-*/
 *.dck
 
-# --- Deleted decks -----------------------------------------------------------
-# `mtglab decks delete` moves a deck's whole directory here rather than
-# unlinking it, so the mistake is survivable for the deck that most needs it:
-# a draft imported minutes ago and never committed, which has no other copy.
-# Ignored because a deletion should leave the working tree without also
-# staging a pile of files nobody asked to add.
-decks/.trash/
+# --- Never commit: decks -----------------------------------------------------
+# Decks are live app data, not repository content (ADR 30). `decks/` is the
+# local app's data directory — every editing route writes it, `decks delete`
+# moves a deck into `decks/.trash/` inside it — and the deployed copy lives on
+# the volume at /data/decks. Tracking it meant two diverging copies and a
+# working tree the app dirtied by being used. `deck.yaml` is still the source
+# of truth; git is just not where it lives.
+decks/
 
 # --- Never commit: anything that identifies what you physically own ---------
 # A public inventory of expensive cards tied to a real identity is a

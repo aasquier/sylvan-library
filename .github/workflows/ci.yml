@@ -283,14 +283,19 @@ jobs:
           fi
           echo "no card pool in the image"
 
-      # The decks ship as a seed, not as the live directory -- MTGLAB_DECKS_DIR
-      # points at the volume. If this path moves, HOSTING §4 step 6's copy
-      # command is wrong and a fresh instance silently comes up with no decks.
-      - name: The decks seed must be where the runbook says
+      # Decks are live app data (ADR 30) and must not ship in the image at
+      # all: the volume is the only copy an instance should have, and a deck
+      # baked into a layer would shadow it with stale state. `.dockerignore`
+      # excludes `decks/`; this is the check that it keeps doing so even
+      # though a CI checkout has no decks to leak in the first place.
+      - name: The image must contain no decks
         run: |
-          docker run --rm --entrypoint sh sylvan-library:ci -c \
-            'test -f /app/decks-seed/arahbo-cats/deck.yaml'
-          echo "decks seed present"
+          found=$(docker run --rm --entrypoint sh sylvan-library:ci -c \
+            'find / -xdev -name "deck.yaml" 2>/dev/null' )
+          if [ -n "$found" ]; then
+            echo "::error::deck data found in the image:"; echo "$found"; exit 1
+          fi
+          echo "no decks in the image"
 
       # The tarot art ships as `package-data`, not as part of the built bundle,
       # so nothing else in this pipeline would notice it going missing: the

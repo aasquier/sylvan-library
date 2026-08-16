@@ -1603,7 +1603,7 @@ def test_set_art_takes_a_printing_id_verbatim(decks, monkeypatch, capsys):
 
 
 def test_build_against_a_previous_revision_diffs_the_swaps(decks, capsys):
-    """`--against` is why `swaps.md` exists: commit first, then diff."""
+    """An explicit `--against` still wins over the build's own snapshot."""
     previous = decks.parent / "previous.yaml"
     previous.write_text(GOOD_DECK.replace("Sol Ring", "Arcane Signet"),
                         encoding="utf-8")
@@ -1611,3 +1611,28 @@ def test_build_against_a_previous_revision_diffs_the_swaps(decks, capsys):
     assert code == 0
     swaps = (decks / "mini" / "artifacts" / "swaps.md").read_text("utf-8")
     assert "Sol Ring" in swaps and "Arcane Signet" in swaps
+
+
+def test_a_bare_build_diffs_against_the_last_builds_snapshot(decks, capsys):
+    """ADR 30's swaps.md story: build, edit, build — no git, no flag.
+
+    The first build has no baseline and emits no swaps.md; it stashes one.
+    The second build diffs against it and shows the edit."""
+    assert run(["decks", "build", "mini"])[0] == 0
+    out = decks / "mini" / "artifacts"
+    assert not (out / "swaps.md").exists(), "a first build has nothing to diff"
+    assert (out / "deck.last-built.yaml").exists()
+
+    (decks / "mini" / "deck.yaml").write_text(
+        GOOD_DECK.replace("Sol Ring", "Arcane Signet"), encoding="utf-8")
+    capsys.readouterr()
+    assert run(["decks", "build", "mini"])[0] == 0
+    swaps = (out / "swaps.md").read_text("utf-8")
+    assert "Sol Ring" in swaps and "Arcane Signet" in swaps
+
+    # And the baseline moved: building again with no edit emits a swaps.md
+    # from the *same* content, which `swap_list` renders as nothing to say.
+    capsys.readouterr()
+    assert run(["decks", "build", "mini"])[0] == 0
+    swaps = (out / "swaps.md").read_text("utf-8")
+    assert "Arcane Signet" not in swaps or "0 out" in swaps

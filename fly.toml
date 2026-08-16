@@ -19,14 +19,11 @@ primary_region = "iad"          # change to the region nearest you
 [env]
   MTGLAB_DATA_DIR = "/data"
 
-  # The volume, not `/app/decks`. `deck.yaml` is the source of truth and the
-  # app's editing routes write it, so a decks directory inside the image would
-  # mean every rationale written in the UI disappeared at the next deploy. The
-  # image carries `/app/decks-seed`; §4 step 6 copies it here once.
-  #
-  # The consequence to know: this instance's decks and the repository's can now
-  # diverge, and neither is automatically authoritative. §5 says how to keep
-  # them in step.
+  # The volume, which is the only copy there is (ADR 30). `deck.yaml` is the
+  # source of truth and the app's editing routes write it, so a decks directory
+  # inside the image would mean every rationale written in the UI disappeared
+  # at the next deploy. Decks are not in the repository or the image at all;
+  # HOSTING §5's backups are the recovery story.
   MTGLAB_DECKS_DIR = "/data/decks"
 
   # Auth on. The local default is off and stays off — one person on a laptop

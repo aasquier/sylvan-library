@@ -62,11 +62,14 @@ LABEL org.opencontainers.image.title="sylvan-library" \
       org.opencontainers.image.source="https://github.com/aasquier/sylvan-library" \
       org.opencontainers.image.licenses="MIT"
 
-# MTGLAB_DECKS_DIR points at the **volume**, not at the copy baked in below.
-# `deck.yaml` is the source of truth and every editing route in the app writes
-# it — swap, add, remove, set, note, import, delete — so decks living on the
-# image's read-only-in-spirit layer would mean every edit made in the hosted
-# app vanished at the next deploy, silently and with no error to notice.
+# MTGLAB_DECKS_DIR points at the **volume**, which is the only copy there is
+# (ADR 30). `deck.yaml` is the source of truth and every editing route in the
+# app writes it — swap, add, remove, set, note, import, delete — so decks in
+# an image layer would mean every edit made in the hosted app vanished at the
+# next deploy. The image used to carry a seed copy at /app/decks-seed; decks
+# left the repository entirely, so a fresh instance now starts with zero decks
+# and is populated the way the pool is — a documented run (HOSTING §4 step 6):
+# restore a backup over sftp, or import through the app.
 #
 # PYTHONDONTWRITEBYTECODE because the venv is root-owned and the app is not:
 # every import would otherwise attempt a `.pyc` write it is not allowed to make.
@@ -84,12 +87,6 @@ RUN useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin mtglab
 COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /app
-
-# The repository's decks, as a **seed** and not as the live directory. Copying
-# them into place is one line of the volume-seeding run in HOSTING §4 step 6,
-# deliberately manual: which of these two copies is authoritative is a question
-# with a real answer per instance, and a boot-time sync would pick one silently.
-COPY decks /app/decks-seed
 
 COPY docker-entrypoint.sh /usr/local/bin/
 # `setpriv` is how the entrypoint drops privileges; it ships in util-linux,

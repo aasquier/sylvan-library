@@ -1415,9 +1415,10 @@ purchase. Carts are staged for a human to confirm.
 `moxfield.txt`, and `swaps.md` when something changed.
 
 Run for the four decks that pass the gate; Goreclaw and Atla Palani are
-blocked on their banned card. `swaps.md` is the exception — it is a git diff,
-so it only appears once a deck changes against a committed baseline, which has
-not happened yet.
+blocked on their banned card. `swaps.md` is the exception — it is a diff, so
+it only appears once a deck changes against a baseline. Since ADR 30 the
+baseline is the last build's own snapshot (`artifacts/deck.last-built.yaml`)
+rather than a git revision, because decks are live app data and not in git.
 
 ## 6. Scan upcoming sets against curated decks
 
@@ -2410,8 +2411,9 @@ Forge.
 
 **Done 2026-08-12:** the `Dockerfile`, `fly.toml`, `.dockerignore` and
 `docker-entrypoint.sh` are in the repository, CI builds and exercises the image
-on every PR, and the pool-and-decks seeding run is documented in HOSTING §4
-step 6. A refresh cron deliberately does not exist — the refresh is monthly and
+on every PR, and the pool seeding run is documented in HOSTING §4 step 6
+(which since ADR 30 also says where a fresh instance's decks come from — a
+backup, the laptop, or an import; the image carries none). A refresh cron deliberately does not exist — the refresh is monthly and
 by hand, for the volume-attachment reasons in ADR 6; the runbook is the one
 item §7 still lists as prose to write.
 

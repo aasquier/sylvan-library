@@ -195,7 +195,15 @@ def instance(tmp_path):
     that are already here.
     """
     jobs.clear()
-    with config.use_paths(data_dir=tmp_path / "data"):
+    # A scratch deck directory with one deck, so the shared-routes test below
+    # has something shared to compare. Decks are live app data (ADR 30) -- a
+    # checkout has none, and reading the default `decks/` here would mean the
+    # suite passed on the maintainer's machine and failed everywhere else.
+    decks_root = tmp_path / "decks"
+    (decks_root / "mono-green").mkdir(parents=True)
+    (decks_root / "mono-green" / "deck.yaml").write_text(
+        tiny_pool.mono_green_deck().dump(), encoding="utf-8")
+    with config.use_paths(data_dir=tmp_path / "data", decks_dir=decks_root):
         con = db.connect()
         try:
             alice = users.create(con, "alice", password=PASSWORD_A,
