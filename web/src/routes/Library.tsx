@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, deckUrl, type DeckTile, type Health } from '../lib/api'
+import {
+  api, deckUrl, type Combination, type DeckTile, type Health,
+} from '../lib/api'
 import { identityName } from '../lib/mtg'
 import {
-  Badge, CardArt, ColorPips, ErrorNote, ManaText, PageMasthead, Select,
-  Spinner,
+  Badge, CardArt, ColorPips, ColorRing, ErrorNote, ManaText, PageMasthead,
+  Select, Spinner,
 } from '../components/ui'
 
 /**
@@ -210,6 +212,60 @@ function LibraryMasthead({ decks, health }: {
 }
 
 /**
+ * One thing from the shelves, at random, under the masthead.
+ *
+ * The landing page knew how many decks and cards it held and said nothing
+ * about the game they belong to. This borrows one combination from the
+ * colour reference — checked-in prose, no pool and no network beyond the
+ * one free fetch (`colors.py`'s whole argument) — and offers its story as
+ * a door into Learn. Random per visit, so the shelf has something new to
+ * say each time you walk past it.
+ *
+ * Decorative in the strict sense: any failure to load renders nothing.
+ */
+function ShelfFact() {
+  const [fact, setFact] = useState<Combination | null>(null)
+  useEffect(() => {
+    let live = true
+    try {
+      api.colors()
+        .then((t) => {
+          if (!live) return
+          const storied = t.combinations.filter((c) => c.history)
+          setFact(storied[Math.floor(Math.random() * storied.length)] ?? null)
+        })
+        .catch(() => {})
+    } catch {
+      // Trivia is never worth an error state; a shelf without it is a shelf.
+    }
+    return () => { live = false }
+  }, [])
+
+  if (!fact) return null
+  // No lookbehind: Safari 15 — the oldest browser this app genuinely serves —
+  // rejects the regex at parse time, which takes the whole bundle with it.
+  const opener = /^[^.]*\./.exec(fact.history)?.[0] ?? fact.history
+  return (
+    <aside className="shelf-fact card-surface flex items-start gap-3 rounded-xl px-4 py-3">
+      <span className="mt-0.5 shrink-0"><ColorRing colors={fact.colors} size={22} /></span>
+      <p className="min-w-0 text-xs leading-relaxed"
+         style={{ color: 'var(--text-secondary)' }}>
+        <span className="mr-2 text-[10px] uppercase tracking-wide"
+              style={{ color: 'var(--text-muted)' }}>
+          From the shelves
+        </span>
+        <strong>{fact.name}</strong> — {fact.tagline.replace(/\.+$/, '')}.{' '}
+        {opener}{' '}
+        <Link to={`/learn?c=${fact.key}`} className="whitespace-nowrap underline"
+              style={{ color: 'var(--series-1)' }}>
+          The full story →
+        </Link>
+      </p>
+    </aside>
+  )
+}
+
+/**
  * What someone sees before they own anything.
  *
  * Distinct from "no decks match those filters", which is a dead end you get
@@ -260,19 +316,23 @@ function FirstRun() {
  * only shown in the case that carries information — a tile on a laptop, where
  * one person owns everything and shares it with nobody, is unchanged.
  */
-function DeckCard({ deck, onDelete, heading: Heading = 'h2' }: {
+function DeckCard({ deck, onDelete, heading: Heading = 'h2', index = 0 }: {
   deck: DeckTile
   onDelete: (deck: DeckTile) => void
   /** `h3` inside the browse tab, where the owner's username is the `h2` these
    *  decks sit under. A flat shelf keeps `h2`, which is what it is: a list of
    *  decks under the page's own `h1`. */
   heading?: 'h2' | 'h3'
+  /** Position in the grid, for the entrance stagger — the shelf fills the
+   *  way a hand lays cards out, not all at once. */
+  index?: number
 }) {
   return (
     // `group/card` is on this wrapper rather than on the Link, because the
     // delete button has to sit outside the Link — inside it, a click would
     // navigate — and still react to hovering the card.
-    <div className="group/card relative">
+    <div className="group/card tile-enter relative"
+         style={{ '--tile-index': Math.min(index, 11) } as React.CSSProperties}>
       {/* Muted until the card is hovered or the button is focused: deleting a
           deck should be reachable without being the thing your eye lands on. */}
       {deck.writable && (
@@ -362,8 +422,8 @@ function DeckGrid({ decks, onDelete, heading }: {
 }) {
   return (
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-      {decks.map((deck) => (
-        <DeckCard key={`${deck.owner}/${deck.slug}`} deck={deck}
+      {decks.map((deck, i) => (
+        <DeckCard key={`${deck.owner}/${deck.slug}`} deck={deck} index={i}
                   onDelete={onDelete} heading={heading} />
       ))}
     </div>
@@ -474,6 +534,8 @@ export default function Library() {
           </p>
         </div>
       )}
+
+      {mine.length > 0 && <ShelfFact />}
 
       {/* Offered only when there is somebody to browse. On a laptop, and on an
           instance where nobody else has shared anything, this is one tab

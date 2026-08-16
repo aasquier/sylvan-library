@@ -918,6 +918,53 @@ button:hover .tarot-fan-card {
   background: var(--gridline);
 }
 
+/* The action bar (deck page, punch list item 9): press an action, pick a
+ * card. The pressed button inverts so the armed state survives a glance
+ * away, and rows in pick mode lift on hover so "the cards are the targets
+ * now" is visible rather than explained. */
+.action-bar {
+  border: 1px solid var(--hairline);
+  background: var(--surface-1);
+}
+
+.card-action[aria-pressed='true'],
+.card-action[aria-pressed='true']:hover {
+  background: var(--series-1);
+  border-color: var(--series-1);
+  color: #fff;
+}
+
+.card-action-danger[aria-pressed='true'],
+.card-action-danger[aria-pressed='true']:hover {
+  background: var(--status-critical);
+  border-color: var(--status-critical);
+}
+
+.action-pick {
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.action-pick:hover {
+  transform: translateX(3px);
+  border-color: var(--series-1);
+  box-shadow: -3px 0 0 0 var(--series-1);
+}
+
+.action-pick.is-pending-entomb,
+.action-pick.is-pending-entomb:hover {
+  border-color: var(--status-critical);
+  box-shadow: -3px 0 0 0 var(--status-critical);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-pick,
+  .action-pick:hover {
+    transform: none;
+  }
+}
+
 /* The destructive family (ADR 27). Red before it is touched, because the
  * label alone ("Entomb") should not be the only thing saying what this does
  * — and solid red once armed, so the second click knows it is the second
@@ -1123,6 +1170,50 @@ button:hover .tarot-fan-card {
 
 .nav-link.is-active::after {
   transform: scaleX(1);
+}
+
+/* The shelf fills the way a hand lays cards out — each tile rises in on a
+   short stagger, capped at a dozen steps so a hundred-deck shelf does not
+   spend five seconds appearing. `backwards` holds the hidden frame through
+   the delay; without it late tiles flash visible first. */
+.tile-enter {
+  animation: tile-rise 360ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--tile-index, 0) * 45ms);
+}
+
+@keyframes tile-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.shelf-fact {
+  animation: tile-rise 360ms cubic-bezier(0.22, 1, 0.36, 1) backwards 120ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-enter,
+  .shelf-fact {
+    animation: none;
+  }
+}
+
+/* The wordmark's name: mostly the page's own ink, falling into forest green
+   at the tail — enough to belong to the mark beside it without becoming a
+   rainbow. The gradient needs background-clip, so the colour lives here and
+   degrades to plain text-primary anywhere that is unsupported. */
+.wordmark-title {
+  color: var(--text-primary);
+  background: linear-gradient(
+    105deg,
+    var(--text-primary) 45%,
+    #3f7d4e 85%,
+    #c9a227 118%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* The wordmark's tree answers the pointer with a small shiver of leaves. */

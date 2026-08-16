@@ -337,7 +337,7 @@ def cmd_decks_exile(args):
     _report_edit(result)
 
 
-def _art_id(args):
+def _art_id(args, card=None):
     """Turn `--art <set-code>` into the printing id the deck file stores.
 
     A set code is what a person has to hand -- nobody knows a Scryfall UUID --
@@ -346,6 +346,10 @@ def _art_id(args):
     different paintings. So a code matching several printings prints them and
     refuses, rather than picking one and being wrong about which art the user
     meant. `--art ''` clears the choice back to the default printing.
+
+    With `card`, the same resolution runs against that card's printings
+    instead of the commander's -- `--card X --art <set-code>` is how any of
+    the 99 picks its painting.
     """
     from mtglab.api import service
 
@@ -353,7 +357,10 @@ def _art_id(args):
     if not ref:
         return ""
 
-    listing = service.commander_printings(args.slug)
+    try:
+        listing = service.commander_printings(args.slug, card=card)
+    except service.EditRejected as exc:
+        sys.exit(f"refused: {exc}")
     printings = listing["printings"]
     if not printings:
         sys.exit(f"no printings found for {listing['commander'] or args.slug} "
@@ -388,16 +395,21 @@ def cmd_decks_set(args):
     """
     from mtglab.api import service
 
+    # `--art` reads the flags around it: with `--card` it dresses that card,
+    # without one it dresses the commander -- the same word for the same act,
+    # aimed by context rather than by a second flag.
     card_fields = (("why", args.why), ("category", args.category),
-                   ("qty", args.qty))
+                   ("qty", args.qty),
+                   ("art", _art_id(args, card=args.card)
+                    if args.art is not None and args.card else None))
     deck_fields = (("stage", args.stage), ("status", args.status),
                    ("bracket", args.bracket),
-                   ("commander_art", _art_id(args) if args.art is not None
-                    else None))
+                   ("commander_art", _art_id(args)
+                    if args.art is not None and not args.card else None))
     chosen = [(f, v) for f, v in card_fields + deck_fields if v is not None]
     if len(chosen) != 1:
-        sys.exit("choose exactly one of --why, --category, --qty (with --card) "
-                 "or --stage, --status, --bracket, --art (without)")
+        sys.exit("choose exactly one of --why, --category, --qty, --art (with "
+                 "--card) or --stage, --status, --bracket, --art (without)")
     field, value = chosen[0]
     on_a_card = field in dict(card_fields)
 

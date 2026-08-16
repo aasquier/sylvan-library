@@ -61,7 +61,9 @@ GRAVEYARD = "graveyard"
 # `replace_card`, which also drops the overrides identifying the outgoing card;
 # `scryfall_id` and `mana_cost` are overrides for cards the pool does not yet
 # know, and hand-editing them through this path would mask a stale pool.
-SETTABLE_FIELDS = ("category", "qty", "why")
+# `art` is the card's own `commander_art`: which printing's picture this deck
+# shows for the slot, blank for the pool's default.
+SETTABLE_FIELDS = ("category", "qty", "why", "art")
 
 # What `set_deck_field` will write: the deck's own scalars. `strategy` and
 # `notes` are prose and belong to `set_note`; `commander` and `companion` change
@@ -801,7 +803,7 @@ def _drop_block_header(lines: list[str], key: str) -> list[str]:
 
 
 def set_card_field(text: str, *, name: str, field: str, value: Any) -> str:
-    """Change one field of one card: its category, its quantity, or its `why`.
+    """Change one field of one card: category, quantity, `why`, or art.
 
     This is the write path behind the rationale editor, and the one place a
     `why` can be filled in without replacing the card. The value comes from the
@@ -822,6 +824,17 @@ def set_card_field(text: str, *, name: str, field: str, value: Any) -> str:
             raise EditFailed(f"quantity must be a whole number, not {value!r}") from exc
         if value < 1:
             raise EditFailed("quantity must be at least 1; remove the card instead")
+    elif field == "art":
+        # The card's own `commander_art`, with the same contract: a printing
+        # id checked by shape here and against the pool one layer up
+        # (`service.set_card_field`), case preserved, and a blank meaning
+        # "back to the default printing" -- which drops the key rather than
+        # writing `art: ''` into a file where absence already says that.
+        value = str(value or "").strip()
+        if value and not _PRINTING_ID.match(value):
+            raise EditFailed(
+                f"{value!r} is not a Scryfall printing id. It should look "
+                f"like a UUID; the deck page's art picker sets this for you.")
     else:
         value = str(value)
         if field == "category" and not value.strip():
@@ -832,12 +845,16 @@ def set_card_field(text: str, *, name: str, field: str, value: Any) -> str:
                 raise EditFailed(
                     "a card in a curated deck needs a `why`; refusing to blank it")
 
-    rebuilt = _rewrite_entry(lines, entry, {field: value})
+    change: Any = _DROP if field == "art" and not value else value
+    rebuilt = _rewrite_entry(lines, entry, {field: change})
     updated = "\n".join(lines[:entry.start] + rebuilt + lines[entry.end:])
 
     expected = copy.deepcopy(doc)
     item = dict(expected[list_key][position])
-    item[field] = value
+    if change is _DROP:
+        item.pop(field, None)
+    else:
+        item[field] = value
     expected[list_key][position] = item
     return _verified(updated, expected)
 

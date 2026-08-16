@@ -1311,8 +1311,8 @@ def test_set_art_resolves_a_set_code_to_its_one_printing(
         decks, monkeypatch, capsys):
     from mtglab.api import service
     monkeypatch.setattr(service, "commander_printings",
-                        lambda slug: _printings(("abc-123", "C21", "1",
-                                                 "Commander 2021")))
+                        lambda slug, card=None: _printings(
+                            ("abc-123", "C21", "1", "Commander 2021")))
     seen = {}
 
     def set_field(slug, *, field, value):
@@ -1331,7 +1331,7 @@ def test_set_art_with_several_printings_lists_them_and_refuses(
     which painting the user meant, which is the whole reason ids exist."""
     from mtglab.api import service
     monkeypatch.setattr(service, "commander_printings",
-                        lambda slug: _printings(
+                        lambda slug, card=None: _printings(
                             ("id-1", "MUL", "42", "Multiverse Legends"),
                             ("id-2", "MUL", "107", "Multiverse Legends")))
     code, msg = run(["decks", "set", "mini", "--art", "MUL"])
@@ -1345,7 +1345,7 @@ def test_set_art_with_several_printings_lists_them_and_refuses(
 def test_set_art_names_the_sets_it_is_actually_in(decks, monkeypatch, capsys):
     from mtglab.api import service
     monkeypatch.setattr(service, "commander_printings",
-                        lambda slug: _printings(("id-1", "C21", "1",
+                        lambda slug, card=None: _printings(("id-1", "C21", "1",
                                                  "Commander 2021")))
     code, msg = run(["decks", "set", "mini", "--art", "ZNR"])
     assert code == 1
@@ -1353,10 +1353,37 @@ def test_set_art_names_the_sets_it_is_actually_in(decks, monkeypatch, capsys):
     assert "It is in: C21" in msg
 
 
+def test_set_art_with_a_card_dresses_that_card(decks, monkeypatch, capsys):
+    """`--card X --art <code>` is the commander's picker one card down: the
+    same set-code resolution, written to the card's own `art` field."""
+    from mtglab.api import service
+
+    asked = {}
+
+    def printings(slug, card=None):
+        asked["card"] = card
+        return {"commander": card or "Gyome, Master Chef",
+                "printings": [{"id": "sr-1", "set_code": "C21",
+                               "collector_number": "1", "rarity": "rare",
+                               "set_name": "Commander 2021"}]}
+    monkeypatch.setattr(service, "commander_printings", printings)
+    seen = {}
+
+    def set_field(slug, *, name, field, value):
+        seen.update(name=name, field=field, value=value)
+        return {**_gate_clean(), "card": name}
+    monkeypatch.setattr(service, "set_card_field", set_field)
+
+    code, _ = run(["decks", "set", "mini", "--card", "Sol Ring", "--art", "c21"])
+    assert code == 0
+    assert asked == {"card": "Sol Ring"}
+    assert seen == {"name": "Sol Ring", "field": "art", "value": "sr-1"}
+
+
 def test_set_art_without_a_pool_says_to_load_one(decks, monkeypatch):
     from mtglab.api import service
     monkeypatch.setattr(service, "commander_printings",
-                        lambda slug: {"commander": "", "printings": []})
+                        lambda slug, card=None: {"commander": "", "printings": []})
     code, msg = run(["decks", "set", "mini", "--art", "C21"])
     assert code == 1
     assert "is the pool loaded?" in msg
@@ -1522,8 +1549,8 @@ def test_suggest_ranks_candidates_with_their_reasons(
 def test_set_art_takes_a_printing_id_verbatim(decks, monkeypatch, capsys):
     from mtglab.api import service
     monkeypatch.setattr(service, "commander_printings",
-                        lambda slug: _printings(("abc-123", "C21", "1",
-                                                 "Commander 2021")))
+                        lambda slug, card=None: _printings(
+                            ("abc-123", "C21", "1", "Commander 2021")))
     monkeypatch.setattr(service, "set_deck_field",
                         lambda slug, *, field, value: _gate_clean())
     code, _ = run(["decks", "set", "mini", "--art", "abc-123"])

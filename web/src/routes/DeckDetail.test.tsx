@@ -523,22 +523,21 @@ describe('DeckDetail validation tab', () => {
  * fails if anyone ever pre-fills the field.
  */
 describe('DeckDetail rationale editor', () => {
-  /** The row for one card.
-   *
-   * Anchored on the remove button's title rather than the card name, which
-   * appears twice in a row -- once on the art's hover target and once on the
-   * name itself. */
+  /** The row for one card, anchored on its name text. The per-row buttons
+   *  became the action bar (punch list item 9), so the old anchor — the
+   *  remove button's title — no longer exists on a row. */
   function rowFor(card: string) {
-    return screen.getByTitle(new RegExp(`Send ${card} to the graveyard`))
-      .closest('li')!
+    const el = screen.getAllByText(card).find((n) => n.closest('li'))
+    return el!.closest('li')!
   }
 
+  /** The new interaction: arm the action on the bar, then pick the card. */
   async function openEditorFor(card: string) {
     renderDeck()
     await screen.findByText(DECK.name)
-    const row = rowFor(card)
-    fireEvent.click(within(row).getByRole('button', { name: /why/i }))
-    return row
+    fireEvent.click(screen.getByRole('button', { name: 'Write why' }))
+    fireEvent.click(screen.getByRole('button', { name: `Write why: ${card}` }))
+    return rowFor(card)
   }
 
   it('opens an empty box for a card that has no rationale', async () => {
@@ -707,27 +706,27 @@ describe('DeckDetail rationale editor', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /show the 2 that need one/i }))
     await waitFor(() => expect(
-      screen.queryByTitle(/Send Primeval Titan to the graveyard/)).toBeNull())
+      screen.queryAllByText('Primeval Titan').filter((el) => el.closest('li')))
+      .toHaveLength(0))
     expect(rowFor('Sol Ring')).toBeTruthy()
     expect(rowFor('Forest')).toBeTruthy()
   })
 
   it('entombs on the second click, never the first', async () => {
-    // ADR 27's confirmation structure: the first click only arms the button
-    // — solid red, naming the consequence — and one stray click mutates
-    // nothing. This is the test for the bug that killed a handful of
-    // Gyome's cards in one afternoon.
+    // ADR 27's confirmation structure, through the action bar now: arming
+    // Entomb and picking a card only marks the row — naming the consequence
+    // — and one stray click mutates nothing. This is the test for the bug
+    // that killed a handful of Gyome's cards in one afternoon.
     renderDeck()
     await screen.findByText(DECK.name)
-    const row = rowFor('Primeval Titan')
-    const button = within(row).getByRole('button', { name: 'Entomb' })
-    fireEvent.click(button)
+    fireEvent.click(screen.getByRole('button', { name: 'Entomb' }))
+    const target = screen.getByRole('button', { name: 'Entomb: Primeval Titan' })
+    fireEvent.click(target)
 
     expect(api.entombCard).not.toHaveBeenCalled()
-    expect(button.textContent).toMatch(/graveyard\?/i)
-    expect(button.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText(/click again to entomb/i)).toBeTruthy()
 
-    fireEvent.click(button)
+    fireEvent.click(target)
     await waitFor(() => expect(api.entombCard)
       .toHaveBeenCalledWith(REF, 'Primeval Titan'))
     await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2))
@@ -737,10 +736,10 @@ describe('DeckDetail rationale editor', () => {
     vi.mocked(api.entombCard).mockRejectedValue(new Error('this deck is read-only'))
     renderDeck()
     await screen.findByText(DECK.name)
-    const row = rowFor('Primeval Titan')
-    const button = within(row).getByRole('button', { name: 'Entomb' })
-    fireEvent.click(button)
-    fireEvent.click(button)
+    fireEvent.click(screen.getByRole('button', { name: 'Entomb' }))
+    const target = screen.getByRole('button', { name: 'Entomb: Primeval Titan' })
+    fireEvent.click(target)
+    fireEvent.click(target)
 
     await screen.findByText(/read-only/)
   })
@@ -1213,6 +1212,38 @@ describe('DeckDetail art picker', () => {
 })
 
 /**
+ * Alternate art for the 99 (punch list 2026-08-15 item 8): the commander's
+ * picker, one card down. Reached through the action bar, written through the
+ * ordinary card-field edit, pool-checked server-side.
+ */
+describe('DeckDetail card art', () => {
+  it('opens a picker for any card and writes through the card field', async () => {
+    vi.mocked(api.printings).mockResolvedValue(PRINTINGS as never)
+    renderDeck()
+    await screen.findByText(DECK.name)
+    fireEvent.click(screen.getByRole('button', { name: 'Card art' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Card art: Primeval Titan' }))
+
+    await screen.findByText(/art for primeval titan/i)
+    expect(api.printings).toHaveBeenCalledWith(REF, 'Primeval Titan')
+
+    fireEvent.click(await screen.findByTitle(/Bloomburrow Commander/))
+    await waitFor(() => expect(api.setCardField).toHaveBeenCalledWith(
+      REF, 'Primeval Titan', 'art', 'p-blc'))
+  })
+
+  it('marks a card wearing a chosen printing', async () => {
+    vi.mocked(api.deck).mockResolvedValue({
+      ...DECK,
+      cards: [{ ...DECK.cards[0]!, art: 'p-m19' }],
+    } as unknown as Deck)
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(screen.getByText(/chosen art/i)).toBeTruthy()
+  })
+})
+
+/**
  * The complaint that moved this whole branch to the front of the queue.
  *
  * The rationale interview has worked since ADR 15 and the deck page never
@@ -1222,11 +1253,6 @@ describe('DeckDetail art picker', () => {
  * does the thing.
  */
 describe('DeckDetail rationale interview discoverability', () => {
-  function rowFor(card: string) {
-    return screen.getByTitle(new RegExp(`Send ${card} to the graveyard`))
-      .closest('li')!
-  }
-
   it('says the interview exists', async () => {
     renderDeck()
     expect(await screen.findByText(/stuck on a/i)).toBeTruthy()
@@ -1240,18 +1266,19 @@ describe('DeckDetail rationale interview discoverability', () => {
       .toBeTruthy()
   })
 
-  it('offers the interview on each card', async () => {
+  it('offers the interview from the action bar', async () => {
     renderDeck()
     await screen.findByText(DECK.name)
-    expect(within(rowFor('Primeval Titan'))
-      .getByRole('button', { name: /ask claude/i })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude' }))
+    expect(screen.getByRole('button', { name: 'Ask Claude: Primeval Titan' }))
+      .toBeTruthy()
   })
 
   it('asks straight away rather than revealing a second button', async () => {
     renderDeck()
     await screen.findByText(DECK.name)
-    fireEvent.click(within(rowFor('Primeval Titan'))
-      .getByRole('button', { name: /ask claude/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude: Primeval Titan' }))
 
     await waitFor(() => expect(api.interview).toHaveBeenCalledWith(
       REF, { card: 'Primeval Titan' }))
@@ -1262,8 +1289,8 @@ describe('DeckDetail rationale interview discoverability', () => {
     // is a page nobody opens a text box on.
     renderDeck()
     await screen.findByText(DECK.name)
-    fireEvent.click(within(rowFor('Primeval Titan'))
-      .getByRole('button', { name: /edit why/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Write why' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Write why: Primeval Titan' }))
 
     await screen.findByRole('button', { name: /save rationale/i })
     expect(api.interview).not.toHaveBeenCalled()
@@ -1322,9 +1349,11 @@ describe('DeckDetail for a reader', () => {
   it('offers no way to edit or remove a card', async () => {
     renderDeck()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
-    expect(screen.queryByTitle(/Send Sol Ring to the graveyard/)).toBeNull()
-    expect(screen.queryByText('Edit why')).toBeNull()
-    expect(screen.queryByText('Write why')).toBeNull()
+    // The action bar is the write surface now, so its absence is the whole
+    // assertion: no bar, no Write why, no Entomb, nothing to arm.
+    expect(screen.queryByText('Card actions')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Write why' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Entomb' })).toBeNull()
   })
 
   it('does not offer the rationale interview', async () => {
@@ -1440,8 +1469,8 @@ describe('DeckDetail sharing', () => {
  */
 describe('DeckDetail slot argument', () => {
   function rowFor(card: string) {
-    return screen.getByTitle(new RegExp(`Send ${card} to the graveyard`))
-      .closest('li')!
+    const el = screen.getAllByText(card).find((n) => n.closest('li'))
+    return el!.closest('li')!
   }
 
   async function argueAbout(card: string) {
@@ -1451,9 +1480,9 @@ describe('DeckDetail slot argument', () => {
     vi.mocked(api.deck).mockResolvedValue(DRAFT)
     renderDeck()
     await screen.findByText(DECK.name)
-    const row = rowFor(card)
-    fireEvent.click(within(row).getByRole('button', { name: /argue slot/i }))
-    return row
+    fireEvent.click(screen.getByRole('button', { name: 'Argue slot' }))
+    fireEvent.click(screen.getByRole('button', { name: `Argue slot: ${card}` }))
+    return rowFor(card)
   }
 
   it('asks once when the panel is opened, not on page load', async () => {
@@ -1461,11 +1490,11 @@ describe('DeckDetail slot argument', () => {
     renderDeck()
     await screen.findByText(DECK.name)
     // Rendering the deck must not spend money. The control says "argue"; the
-    // click is the consent.
+    // pick is the consent.
     expect(api.argue).not.toHaveBeenCalled()
 
-    fireEvent.click(within(rowFor('Sol Ring')).getByRole(
-      'button', { name: /argue slot/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Argue slot' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Argue slot: Sol Ring' }))
     await waitFor(() => expect(api.argue).toHaveBeenCalledWith(
       REF, { card: 'Sol Ring' }))
     expect(api.argue).toHaveBeenCalledTimes(1)

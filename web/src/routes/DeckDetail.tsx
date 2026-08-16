@@ -23,7 +23,7 @@ import {
 import {
   AddCardForm, AddNoteForm, NoteEditor, RationaleEditor, SlotArgumentPanel,
 } from '../components/deckedit'
-import { ArtPicker } from '../components/artpicker'
+import { ArtPicker, CardArtPicker } from '../components/artpicker'
 import { CommanderDossierPanel } from '../components/dossier'
 import { DeckReviewPanel } from '../components/review'
 import { SwapComposer } from '../components/swap'
@@ -31,6 +31,33 @@ import { StanceReadout } from '../components/stance'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 
 type Tab = 'cards' | 'stats' | 'validation' | 'notes'
+
+/** What the action bar can do to a card (punch list item 9). */
+type CardAction = 'ask' | 'argue' | 'why' | 'art' | 'entomb'
+
+/** The bar's vocabulary: label, hint while armed, and whether it needs
+ *  Claude. Entomb is the one destructive act and is styled apart. */
+const CARD_ACTIONS: {
+  key: CardAction
+  label: string
+  hint: string
+  claude?: boolean
+  danger?: boolean
+}[] = [
+  { key: 'why', label: 'Write why',
+    hint: 'Pick a card to write or edit its rationale.' },
+  // "Card art", not "Change art": the commander's own picker in the hero
+  // already answers to that name, and two controls sharing it would make
+  // either one unfindable — by a person or a test.
+  { key: 'art', label: 'Card art',
+    hint: 'Pick a card to choose which printing it shows.' },
+  { key: 'ask', label: 'Ask Claude', claude: true,
+    hint: 'Pick a card and Claude interviews you about its slot.' },
+  { key: 'argue', label: 'Argue slot', claude: true,
+    hint: 'Pick a card to hear the case against its slot.' },
+  { key: 'entomb', label: 'Entomb', danger: true,
+    hint: 'Pick a card to send to the graveyard — it will ask twice.' },
+]
 
 /**
  * Put this deck on display to the other accounts on this instance, or take it
@@ -487,6 +514,17 @@ export default function DeckDetail() {
   // editor is where you say why you did.
   const [arguing, setArguing] = useState<string | null>(null)
   const [onlyUnjustified, setOnlyUnjustified] = useState(false)
+  // The armed action, if any (punch list 2026-08-15 item 9). The four
+  // per-row buttons became one bar above the 99: press an action, then pick
+  // the card it applies to — which is the same interaction inverted, and it
+  // gives every row back the width four buttons were eating. Escape or the
+  // bar's own button cancels.
+  const [action, setAction] = useState<CardAction | null>(null)
+  // The card whose art picker is open (item 8) — set through the action bar.
+  const [artFor, setArtFor] = useState<string | null>(null)
+  // Entomb through the bar keeps ADR 27's two-step: the first pick arms the
+  // row, the second within four seconds commits it.
+  const [pendingEntomb, setPendingEntomb] = useState<string | null>(null)
   // Two error slots, not one: a refused removal belongs next to the cards and a
   // refused promotion belongs next to the button that asked for it. Sharing one
   // renders the same sentence in both places.
@@ -515,6 +553,53 @@ export default function DeckDetail() {
     await api.setCardField(deckRef, name, 'why', why)
     await refresh()
     setEditing(null)
+  }
+
+  // Escape leaves the action mode from anywhere; the arm on a pending entomb
+  // times out on its own, exactly as ArmedButton's does.
+  useEffect(() => {
+    if (!action) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setAction(null)
+        setPendingEntomb(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [action])
+
+  useEffect(() => {
+    if (!pendingEntomb) return
+    const timer = setTimeout(() => setPendingEntomb(null), 4000)
+    return () => clearTimeout(timer)
+  }, [pendingEntomb])
+
+  /** The armed action lands on a card. Everything but entomb disarms the bar
+   *  on the first pick; entomb keeps ADR 27's second click. */
+  function actOn(name: string) {
+    if (!action) return
+    if (action === 'ask') {
+      setAskNow(true)
+      setEditing(name)
+      setAction(null)
+    } else if (action === 'why') {
+      setAskNow(false)
+      setEditing(editing === name ? null : name)
+      setAction(null)
+    } else if (action === 'argue') {
+      setArguing(arguing === name ? null : name)
+      setAction(null)
+    } else if (action === 'art') {
+      setArtFor(artFor === name ? null : name)
+      setAction(null)
+    } else if (pendingEntomb === name) {
+      setPendingEntomb(null)
+      setAction(null)
+      void entombCard(name)
+    } else {
+      setPendingEntomb(name)
+    }
   }
 
   /** Rows currently sinking into the graveyard — they get the send-off class
@@ -861,6 +946,8 @@ export default function DeckDetail() {
                 onClick={() => {
                   setSelecting(!selecting)
                   setChosen(new Set())
+                  setAction(null)
+                  setPendingEntomb(null)
                 }}
                 className="card-action rounded-md px-2 py-1 text-[11px] font-medium"
               >
@@ -877,6 +964,49 @@ export default function DeckDetail() {
                   : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                       Tick the cards to entomb.
                     </span>
+              )}
+            </div>
+          )}
+
+          {/* The action bar (punch list item 9): the four per-row buttons,
+              rolled up and inverted. Press an action, then pick the card it
+              applies to — one bar instead of four buttons times 99 rows, and
+              every row gets its width back. Escape or the pressed button
+              itself cancels. */}
+          {deck.writable && !selecting && (
+            <div className="action-bar flex flex-wrap items-center gap-2 rounded-lg px-3 py-2">
+              <span className="text-[10px] uppercase tracking-wide"
+                    style={{ color: 'var(--text-muted)' }}>
+                Card actions
+              </span>
+              {CARD_ACTIONS
+                .filter((a) => !a.claude || claudeReady)
+                .map((a) => (
+                  <button
+                    key={a.key}
+                    type="button"
+                    aria-pressed={action === a.key}
+                    onClick={() => {
+                      setAction(action === a.key ? null : a.key)
+                      setPendingEntomb(null)
+                    }}
+                    className={`card-action${a.danger ? ' card-action-danger' : ''}`
+                               + ' rounded-md px-2.5 py-1 text-[11px] font-medium'}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              {action && (
+                <span className="action-hint text-xs"
+                      style={{ color: 'var(--text-secondary)' }}>
+                  {CARD_ACTIONS.find((a) => a.key === action)?.hint}{' '}
+                  <button type="button"
+                          onClick={() => { setAction(null); setPendingEntomb(null) }}
+                          className="underline"
+                          style={{ color: 'var(--text-muted)' }}>
+                    Cancel
+                  </button>
+                </span>
               )}
             </div>
           )}
@@ -902,14 +1032,27 @@ export default function DeckDetail() {
                 {cards.map((card) => (
                   <li key={card.name}
                       className={'card-surface rounded-lg p-2'
-                                 + (leaving.has(card.name) ? ' entombing' : '')}>
-                   {/* `flex-wrap` plus the text column's `basis-52`: on a
-                       phone the four action buttons cannot share a line with
-                       the rationale, and without the wrap they crushed it to
-                       a word per line and pushed Remove off-screen. The
-                       basis is what makes the wrap deterministic — the text
-                       claims 13rem before the buttons may have the rest. */}
-                   <div className="flex flex-wrap items-center gap-3">
+                                 + (leaving.has(card.name) ? ' entombing' : '')
+                                 + (action && deck.writable ? ' action-pick' : '')
+                                 + (pendingEntomb === card.name ? ' is-pending-entomb' : '')}>
+                   {/* In action mode the whole row is the pick target — the
+                       four buttons that used to sit here live in the action
+                       bar above the list now (punch list item 9). */}
+                   <div className="flex flex-wrap items-center gap-3"
+                        {...(action && deck.writable
+                          ? {
+                              role: 'button' as const,
+                              tabIndex: 0,
+                              'aria-label': `${CARD_ACTIONS.find((a) => a.key === action)?.label}: ${card.name}`,
+                              onClick: () => actOn(card.name),
+                              onKeyDown: (e: React.KeyboardEvent) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  actOn(card.name)
+                                }
+                              },
+                            }
+                          : {})}>
                     {selecting && deck.writable && (
                       <input
                         type="checkbox"
@@ -957,81 +1100,31 @@ export default function DeckDetail() {
                         </p>
                       )}
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {/* The discoverability fix, and the smallest honest
-                          version of it. The rationale interview has worked
-                          since ADR 15 and was reachable only by opening the
-                          editor and finding a second button inside it, so
-                          nothing on this page said it existed. This says it,
-                          per card, where the work actually is — and it opens
-                          the editor already asking, because clicking a control
-                          that says "ask" and then being shown another one that
-                          says "ask" is the same problem one layer down. */}
-                      {/* The interview is gated with the writes even though it
-                          only asks questions: its entire purpose is to help
-                          somebody write a `why`, and offering that to a
-                          reader who cannot save one would spend a Claude call
-                          on a dead end. */}
-                      {/* `card-action`, not inline muted-on-hairline: these
-                          are live controls, and muted text with no hover
-                          state is the universal disabled idiom — driving the
-                          deployed app found people not clicking them. */}
-                      {deck.writable && claudeReady && (
-                        <button
-                          onClick={() => {
-                            setAskNow(true)
-                            setEditing(card.name)
-                          }}
-                          title={`Claude interviews you about ${card.name}'s slot`
-                                 + ' to help you write its why — it asks, you write'}
-                          className="card-action rounded-md px-2 py-1 text-[11px]">
-                          Ask Claude
-                        </button>
-                      )}
-                      {/* Gated with the writes for the same reason the
-                          interview is, and it is a spend argument rather than
-                          a privacy one: arguing a slot on a deck you cannot
-                          edit spends a call to reach a conclusion you cannot
-                          act on. */}
-                      {deck.writable && claudeReady && (
-                        <button
-                          onClick={() => setArguing(
-                            arguing === card.name ? null : card.name)}
-                          title={`The case against ${card.name}'s slot`}
-                          className="card-action rounded-md px-2 py-1 text-[11px]">
-                          Argue slot
-                        </button>
-                      )}
-                      {deck.writable && (
-                        <>
-                          <button
-                            onClick={() => {
-                              setAskNow(false)
-                              setEditing(editing === card.name ? null : card.name)
-                            }}
-                            className="rounded-md px-2 py-1 text-[11px] font-medium"
-                            style={{ background: 'var(--gridline)',
-                                     color: 'var(--text-primary)' }}>
-                            {card.why ? 'Edit why' : 'Write why'}
-                          </button>
-                          {/* Two clicks, red, and reversible: the arm is the
-                              confirmation and the graveyard is the undo.
-                              This used to be "Remove" in muted text, firing
-                              on one click with nothing to walk it back —
-                              which is how a whole handful of Gyome's cards
-                              died in one afternoon. */}
-                          <ArmedButton
-                            title={`Send ${card.name} to the graveyard — its `
-                                   + 'rationale goes with it, and Return brings '
-                                   + 'it back'}
-                            armedLabel="To the graveyard?"
-                            onConfirm={() => void entombCard(card.name)}>
-                            Entomb
-                          </ArmedButton>
-                        </>
-                      )}
-                    </div>
+                    {/* The four buttons that lived here are the action bar
+                        now. What remains per row is state, not controls: the
+                        armed entomb naming its second click, and a chip when
+                        the card wears a chosen printing. */}
+                    {pendingEntomb === card.name && (
+                      <span className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium"
+                            style={{ background: 'var(--status-critical)', color: '#fff' }}>
+                        Click again to entomb
+                      </span>
+                    )}
+                    {!!card.art && (
+                      <span className="shrink-0 text-[10px] uppercase tracking-wide"
+                            title="This deck shows a chosen printing for this card"
+                            style={{ color: 'var(--text-muted)' }}>
+                        ✦ chosen art
+                      </span>
+                    )}
                    </div>
+                   {artFor === card.name && (
+                     <CardArtPicker
+                       deck={deckRef}
+                       card={card.name}
+                       onPicked={() => void refresh()}
+                       onClose={() => setArtFor(null)} />
+                   )}
                    {arguing === card.name && (
                      <SlotArgumentPanel
                        deck={deckRef}

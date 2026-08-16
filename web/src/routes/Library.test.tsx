@@ -18,7 +18,8 @@ vi.mock('../lib/api', async () => ({
   // where a deck lives, and a stub would let them all point at the pre-ADR-22
   // path while every assertion below still passed.
   deckUrl: (await vi.importActual<typeof import('../lib/api')>('../lib/api')).deckUrl,
-  api: { decks: vi.fn(), health: vi.fn(), deleteDeck: vi.fn() },
+  api: { decks: vi.fn(), health: vi.fn(), deleteDeck: vi.fn(),
+         colors: vi.fn() },
 }))
 
 const { api } = await import('../lib/api')
@@ -84,6 +85,10 @@ beforeEach(() => {
     moved_to: 'decks/.trash/goreclaw-20260811T220000Z',
     total_cards: 99, stage: 'curated', status: 'built',
   })
+  // The shelf-fact strip is decorative and must never block the shelf, so
+  // the default here is the taxonomy failing to load. The one test about the
+  // strip supplies its own.
+  vi.mocked(api.colors).mockReset().mockRejectedValue(new Error('no taxonomy'))
 })
 
 // Explicit, because Testing Library only registers auto-cleanup when the test
@@ -279,6 +284,29 @@ describe('Library', () => {
     await waitFor(() => expect(shownNames()).toHaveLength(3))
     const link = screen.getByText('Import a decklist').closest('a')!
     expect(link.getAttribute('href')).toBe('/import')
+  })
+
+  it('tells one story from the shelves, linking into Learn', async () => {
+    // The fun-fact strip: one combination from the checked-in colour
+    // reference, offered as a door into the Learn page. Decorative — the
+    // default mock rejects, and every other test proves the shelf renders
+    // without it.
+    vi.mocked(api.colors).mockResolvedValue({
+      combinations: [{
+        key: 'bg', name: 'Golgari', colors: ['B', 'G'], tier: 'guild',
+        tagline: 'Death feeds growth', aliases: [], champions: [],
+        history: 'The swarm turns the dead into mulch. Then more.',
+        verified_by: 'x', lore: '',
+      }],
+    } as never)
+    renderLibrary()
+    await screen.findByText(/from the shelves/i)
+    expect(screen.getByText('Golgari')).toBeTruthy()
+    // Only the opener, not the whole paragraph — it is a hook, not the page.
+    expect(screen.getByText(/turns the dead into mulch/)).toBeTruthy()
+    expect(screen.queryByText(/Then more/)).toBeNull()
+    expect(screen.getByText(/the full story/i).closest('a')!
+      .getAttribute('href')).toBe('/learn?c=bg')
   })
 
   // ------------------------------------------------------------- first run

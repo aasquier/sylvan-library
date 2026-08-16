@@ -106,6 +106,9 @@ export interface Card {
   why: string
   qty: number
   known: boolean
+  /** Which printing's art this deck picked for the slot, or "" for the
+   *  pool's default. The card-level `commander_art`. */
+  art?: string
   mana_cost?: string | null
   cmc?: number
   type_line?: string
@@ -1408,7 +1411,9 @@ export const api = {
     post<Job>(deckPath(ref, '/dossier'), body),
   // Every non-digital printing of the commander, newest first. Its own call
   // because most visits never open the picker and Goreclaw has twelve.
-  printings: (ref: DeckRef) => get<PrintingList>(deckPath(ref, '/printings')),
+  printings: (ref: DeckRef, card?: string) =>
+    get<PrintingList>(deckPath(ref, '/printings')
+      + (card ? `?card=${encodeURIComponent(card)}` : '')),
   // Research (ADR 26). **Note there is no deck in the path, in the body, or
   // anywhere in this signature** — that absence is the feature, not an
   // omission. The mode cannot reach a library, so it cannot critique a deck,

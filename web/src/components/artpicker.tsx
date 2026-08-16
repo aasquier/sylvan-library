@@ -3,6 +3,129 @@ import { api, errorMessage, type DeckRef, type Printing } from '../lib/api'
 import { Spinner } from './ui'
 
 /**
+ * The same choice for any card in the 99 (punch list 2026-08-15 item 8).
+ *
+ * Rendered under the card's row by the deck page's action bar rather than as
+ * a per-row toggle — 99 "change art" buttons would be 98 too many. Writes
+ * through `set_card_field(field='art')`, which pool-checks the id the same
+ * way the commander's picker does, and picking the printing already showing
+ * clears the choice back to the default, same contract as below.
+ */
+export function CardArtPicker({ deck, card, onPicked, onClose }: {
+  deck: DeckRef
+  card: string
+  onPicked: () => void
+  onClose: () => void
+}) {
+  const [printings, setPrintings] = useState<Printing[] | null>(null)
+  const [selected, setSelected] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState('')
+
+  useEffect(() => {
+    let live = true
+    api.printings(deck, card)
+      .then((list) => {
+        if (!live) return
+        setPrintings(list.printings)
+        setSelected(list.selected)
+      })
+      .catch((err) => { if (live) setError(errorMessage(err)) })
+    return () => { live = false }
+  }, [deck, card])
+
+  async function pick(id: string) {
+    const next = id === selected ? '' : id
+    setSaving(id)
+    setError(null)
+    try {
+      await api.setCardField(deck, card, 'art', next)
+      setSelected(next)
+      onPicked()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setSaving('')
+    }
+  }
+
+  return (
+    <div className="mt-2 rounded-lg px-3 py-3"
+         style={{ border: '1px solid var(--hairline)', background: 'var(--page)' }}>
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-medium">Art for {card}</p>
+        <button type="button" onClick={onClose}
+                className="ml-auto rounded-md px-2 py-1 text-[11px]"
+                style={{ border: '1px solid var(--hairline)',
+                         color: 'var(--text-muted)' }}>
+          Close
+        </button>
+      </div>
+      {error && (
+        <p className="mt-2 text-xs" style={{ color: 'var(--status-critical)' }}>
+          {error}
+        </p>
+      )}
+      {!printings && !error && <Spinner label="finding printings…" />}
+      {printings && printings.length === 0 && (
+        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          No printings found. Without a card pool this list is empty — run
+          <code className="mx-1">mtglab data refresh</code>.
+        </p>
+      )}
+      {printings && printings.length > 0 && (
+        <>
+          <p className="mb-2 mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            {printings.length} printings, newest first. The choice is saved to{' '}
+            <code>deck.yaml</code>; picking the one showing resets to the default.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+            {printings.map((printing) => {
+              const on = printing.id === selected
+              return (
+                <button
+                  key={printing.id}
+                  type="button"
+                  onClick={() => void pick(printing.id)}
+                  disabled={!!saving}
+                  title={`${printing.set_name ?? printing.set_code} · #${printing.collector_number ?? '?'}`}
+                  className="overflow-hidden rounded-lg text-left"
+                  style={{
+                    outline: on ? '2px solid var(--series-1)' : '1px solid var(--hairline)',
+                    outlineOffset: on ? '1px' : '0',
+                    opacity: saving && saving !== printing.id ? 0.5 : 1,
+                    background: 'var(--page)',
+                  }}
+                >
+                  {printing.art_crop
+                    ? <img src={printing.art_crop} alt="" loading="lazy"
+                           className="aspect-[626/457] w-full object-cover" />
+                    : <span className="block aspect-[626/457] w-full" />}
+                  <span className="flex items-baseline justify-between gap-1 px-1.5 py-1">
+                    <span className="text-[10px] font-medium">
+                      {printing.set_code}
+                    </span>
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      {printing.released_at?.slice(0, 4)}
+                    </span>
+                  </span>
+                  {on && (
+                    <span className="block px-1.5 pb-1 text-[10px]"
+                          style={{ color: 'var(--series-1)' }}>
+                      showing · click to reset
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
  * Choose which printing's art a deck shows for its commander.
  *
  * The choice is a **deck** property, not a viewer preference — it lives in
