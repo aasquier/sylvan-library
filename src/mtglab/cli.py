@@ -1518,6 +1518,23 @@ def _animist_widths(spec: str) -> list[int]:
     return widths
 
 
+def _animist_crfs(spec: str) -> list[int]:
+    """`24:48:4` (start:stop:step) or `24,32,40` -- the video sweep's axis."""
+    try:
+        if ":" in spec:
+            start, stop, step = (int(part) for part in spec.split(":"))
+            crfs = list(range(start, stop + 1, step))
+        else:
+            crfs = [int(part) for part in spec.split(",") if part]
+    except ValueError:
+        sys.exit(f"refused: could not read --crfs {spec!r} -- give "
+                 "start:stop:step or a comma-separated list")
+    if len(crfs) < 3:
+        sys.exit("refused: a crf curve needs at least three points, or "
+                 "there is no knee to find")
+    return crfs
+
+
 def cmd_animist_build(args):
     """The whole pipeline for one recipe. The gate runs first and blocks."""
     _animist_pixels()
@@ -1626,14 +1643,17 @@ def cmd_animist_verify(args):
 def cmd_animist_measure(args):
     """The size curve for one output, and where its knee sits.
 
-    Runs the output's ops *except* any `resize`, then encodes at each width
-    in the sweep -- the question is what the final resize should be, so the
-    recipe's own answer is held out.
+    For a still, runs the output's ops *except* any `resize`, then encodes
+    at each width in the sweep -- the question is what the final resize
+    should be, so the recipe's own answer is held out. For a video output
+    the axis is `crf` instead of width (ADR 31): the derivation runs as
+    written and the sweep asks what the rate control should be.
     """
     _animist_pixels()
     from mtglab.animist.fetch import fetch_source
-    from mtglab.animist.measure import knee, size_curve
+    from mtglab.animist.measure import crf_curve, knee, size_curve
     from mtglab.animist.ops import apply
+    from mtglab.animist.recipe import VIDEO_FORMATS
     from mtglab.animist.sources import LicenceRefused, SourceError
 
     recipe = _animist_recipe(args.recipe)
@@ -1642,6 +1662,26 @@ def cmd_animist_measure(args):
         sys.exit(f"refused: {recipe.path.name} has no `file:` output named "
                  f"{args.output!r} -- `measure` sweeps one file at a time")
     (output,) = named
+
+    if output.encode.format in VIDEO_FORMATS:
+        from mtglab.animist.run import _derive
+
+        crfs = _animist_crfs(args.crfs)
+        source = recipe.sources[output.source]
+        try:
+            _, local = fetch_source(recipe, source)
+        except (LicenceRefused, SourceError) as exc:
+            sys.exit(f"refused: {exc}")
+        original = next(iter(local.values())) if local else None
+        sequence = _derive(original, output, source)
+        curve = crf_curve(sequence, output.encode, crfs)
+        for crf, size in curve:
+            print(f"  crf {crf:3d}  {size / 1024:8.1f} KB")
+        elbow = knee(curve)
+        print(f"  the knee is at crf {elbow} -- the numbers' half of the "
+              "answer; look at the result before trusting it")
+        return
+
     widths = _animist_widths(args.widths)
     from PIL import Image
 
@@ -1929,6 +1969,9 @@ def main(argv=None):
     am.add_argument("--output", required=True, help="the `file:` output to sweep")
     am.add_argument("--widths", default="300:600:20",
                     help="start:stop:step, or a comma-separated list")
+    am.add_argument("--crfs", default="24:48:4",
+                    help="the sweep for a video output, where the axis is "
+                         "crf rather than width")
     am.set_defaults(func=cmd_animist_measure)
 
     args = p.parse_args(argv)

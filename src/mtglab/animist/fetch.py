@@ -65,6 +65,9 @@ def fetch_source(recipe: Recipe, source: Source, *,
     month is a licence this run has not confirmed.
     """
     confirmed = confirm(source, transport=transport)
+    if source.provider == "procedural":
+        # Nothing upstream, nothing cached: the build generates instead.
+        return confirmed, {}
     fetch_one = download if download is not None else _download
     directory = cache_dir(recipe, source)
     directory.mkdir(parents=True, exist_ok=True)

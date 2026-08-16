@@ -84,8 +84,8 @@ mtglab claude check          # optional: is the API key live?
 ```
 
 Extras: `api` (FastAPI + the app), `claude` (the Anthropic SDK), `animist`
-(Pillow, for the asset pipeline), `dev` (which includes all of it plus the
-test tooling). A base install has the gate, the mana
+(Pillow + imageio-ffmpeg, for the asset pipeline and its video encoders),
+`dev` (which includes all of it plus the test tooling). A base install has the gate, the mana
 solver and Tier 1, and needs neither a network nor an account. `claude check`
 needs `ANTHROPIC_API_KEY`; see `.env.example`.
 
@@ -116,10 +116,22 @@ src/mtglab/
   assets/tarot/           the 78 pictures, package-data; PROVENANCE.md argues
                           the licence and is not optional reading
   animist/                the asset pipeline (ADR 29): recipe -> fetch ->
-                          licence gate (no override) -> Pillow ops -> clean
-                          WebP -> PROVENANCE entry; `verify` holds every
+                          licence gate (no override) -> ops -> clean
+                          output -> PROVENANCE entry; `verify` holds every
                           committed asset to its recipe, in the suite.
-                          Wizards' art never enters it -- runtime-only, always
+                          Since ADR 31 it also does motion: motion.py owns
+                          FrameSequence, one seeded generator
+                          (spectral_noise, loop-perfect by construction)
+                          and three motion ops (advect, color_ramp,
+                          ken_burns); a `procedural` source is its own
+                          declaration (a seed, licence ours-generated); the
+                          encode table writes webp/awebp/apng (Pillow) and
+                          webm/mp4 (imageio-ffmpeg, crf-controlled, dev and
+                          CI only -- never the image). Every stochastic op
+                          is a pure function of an explicit seed; the loader
+                          refuses one left unseeded. Wizards' art never
+                          enters COMMITTED assets -- ADR 32's runtime tier
+                          is where card-art derivation will live
   mana.py                 cost parsing + castability solver
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema

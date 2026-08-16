@@ -44,6 +44,7 @@ they differ.
 | [28](0028-the-activity-log-records-edits-and-never-rationales.md) | The activity log records edits, and never rationales | Accepted |
 | [29](0029-an-asset-is-committed-only-with-a-recipe.md) | An asset is committed only with a recipe, and the licence gate has no override | Accepted |
 | [30](0030-decks-are-live-app-data.md) | Decks are live app data, not repository content | Accepted |
+| [31](0031-motion-is-seeded-and-a-procedural-source-is-its-own-declaration.md) | Motion is seeded, and a procedural source is its own declaration | Accepted |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the
@@ -164,6 +165,16 @@ is the deck gate's shape — a refusal with no override flag — and
 clothes. The recipes it introduced also closed an old debt: both PROVENANCE
 files described scripts that were never committed, and the claim they made is
 now `tests/test_animist_recipes_repo.py`.
+
+31 is 29's own "later phases" sentence coming due, and it holds the line 29
+predicted: the animated formats really are format-table rows, and the two
+places the schema genuinely strained — randomness against `ops.py`'s purity
+promise, and a generated asset against "every output draws from a source" —
+each got an argument rather than an exception. A stochastic op is a pure
+function of an explicit seed, and a procedural source's declaration (its
+seed) *is* the source, gated and dated like any other. Read it next to 8 and
+29: the loader refusing an unseeded stochastic op is the gate's shape again,
+applied to reproducibility.
 
 30 supersedes half a sentence of 1, and it is the half everything since had
 been quietly contradicting: `deck.yaml` is still the source of truth, but it

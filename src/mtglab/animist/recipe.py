@@ -32,17 +32,40 @@ import yaml
 #: today would mean something different tomorrow — additive fields do not.
 VERSION = 1
 
-#: The transform vocabulary. Implementations live in `ops.py`.
+#: The still transform vocabulary. Implementations live in `ops.py`.
 KNOWN_OPS = frozenset({"crop", "matte_green", "feather", "mirror_tile",
                        "resize"})
 
-#: Where a source may come from. Each is a dispatch key in `sources.py`.
-PROVIDERS = frozenset({"openverse", "wikimedia", "wikimedia-category"})
+#: The motion vocabulary (ADR 31). Implementations live in `motion.py`;
+#: these are the schema's copies, pinned equal in
+#: `tests/test_animist_motion.py` — the same seam as `KNOWN_OPS`, because
+#: this module is deliberately stdlib+yaml and may not import the registries.
+#: A generator makes frames from parameters alone; a motion op transforms
+#: frames; a seeded op is one whose derivation includes randomness and must
+#: therefore be handed an explicit integer seed to stay a pure function.
+KNOWN_GENERATOR_OPS = frozenset({"spectral_noise"})
+KNOWN_MOTION_OPS = frozenset({"advect", "color_ramp", "ken_burns"})
+KNOWN_SEEDED_OPS = frozenset({"spectral_noise", "advect"})
 
-#: Encoding targets. WebP is the only one built; the field is a dispatch key
-#: so animated formats (ADR 29's later phases) are one entry, not a schema
-#: change.
-FORMATS = frozenset({"webp"})
+#: Where a source may come from. Each is a dispatch key in `sources.py`.
+#: `procedural` is ADR 31's addition: a source with no upstream at all —
+#: the declaration (its seed) *is* the source, the licence is necessarily
+#: `ours-generated`, and the gate has nothing to ask anybody about.
+PROVIDERS = frozenset({"openverse", "wikimedia", "wikimedia-category",
+                       "procedural"})
+
+#: Encoding targets, each a dispatch key in `encode.py`. `webp` is a still;
+#: `awebp` and `apng` are the animated stills (Pillow, no new dependency);
+#: `webm` (VP9) and `mp4` (H.264) are the video loops, encoded through
+#: imageio-ffmpeg and always dual-shipped — one for each half of the
+#: browser world, per the phase's Safari-16.4-floor decision.
+FORMATS = frozenset({"webp", "awebp", "apng", "webm", "mp4"})
+
+#: The formats whose output is a timeline rather than a picture.
+ANIMATED_FORMATS = frozenset({"awebp", "apng", "webm", "mp4"})
+
+#: The formats encoded by ffmpeg, whose rate control is `crf`, not `quality`.
+VIDEO_FORMATS = frozenset({"webm", "mp4"})
 
 
 class RecipeError(ValueError):
@@ -74,6 +97,7 @@ class Source:
     require_filename_prefix: str = ""   # the RWS1909 guard; empty = no guard
     found_via: str = ""
     landing: str = ""
+    seed: int | None = None       # procedural: the declaration IS the source
 
 
 @dataclass(frozen=True)
@@ -86,10 +110,20 @@ class Op:
 
 @dataclass(frozen=True)
 class Encode:
-    """How the output is written. `format` dispatches in `encode.py`."""
+    """How the output is written. `format` dispatches in `encode.py`.
+
+    `quality` is the Pillow-family knob (webp/awebp; apng ignores it, being
+    lossless); `crf` is the ffmpeg-family knob (webm/mp4). The loader
+    requires exactly the knob the format reads and refuses the other, so a
+    recipe cannot say something the encoder would silently ignore. There is
+    deliberately no fps here — the rate belongs to the derivation (the
+    generator or `ken_burns` op that created the timeline), and the encoder
+    reads it off the `FrameSequence`.
+    """
 
     format: str = "webp"
     quality: int = 82
+    crf: int | None = None
 
 
 @dataclass(frozen=True)
@@ -108,6 +142,8 @@ class Expect:
     budget_kb: int | None = None
     total_budget_kb: int | None = None
     metadata_none: bool = True
+    frames: int | None = None     # animated formats: exact frame count
+    fps: int | None = None        # animated formats: exact rate
 
 
 @dataclass(frozen=True)
@@ -168,6 +204,20 @@ def _load_source(path: Path, sid: str, raw: Any) -> Source:
         _require_str(path, raw, "title", f"wikimedia source `{sid}`")
     if provider == "wikimedia-category":
         _require_str(path, raw, "category", f"wikimedia-category source `{sid}`")
+    seed: int | None = None
+    if provider == "procedural":
+        # The declaration is the source (ADR 31): a seed instead of an
+        # upstream, and the one licence a thing with no upstream can have.
+        raw_seed = raw.get("seed")
+        if not isinstance(raw_seed, int) or raw_seed < 0:
+            raise _fail(path, f"procedural source `{sid}` needs `seed`, a "
+                              "non-negative integer -- it is the whole of "
+                              "what this source is")
+        seed = raw_seed
+        if licence != "ours-generated":
+            raise _fail(path, f"procedural source `{sid}` must declare "
+                              "`licence: ours-generated` -- generated pixels "
+                              "have no upstream licence to confirm")
     return Source(
         id=sid, provider=provider, licence=licence,
         identifier=str(raw.get("identifier", "") or ""),
@@ -176,6 +226,7 @@ def _load_source(path: Path, sid: str, raw: Any) -> Source:
         require_filename_prefix=str(raw.get("require_filename_prefix", "") or ""),
         found_via=str(raw.get("found_via", "") or ""),
         landing=str(raw.get("landing", "") or ""),
+        seed=seed,
     )
 
 
@@ -186,9 +237,10 @@ def _load_op(path: Path, index: int, raw: Any) -> Op:
         raise _fail(path, f"op #{index + 1} must be a single-key mapping "
                           "like `- resize: {width: 400}`")
     name, params = next(iter(raw.items()))
-    if name not in KNOWN_OPS:
+    vocabulary = KNOWN_OPS | KNOWN_MOTION_OPS | KNOWN_GENERATOR_OPS
+    if name not in vocabulary:
         raise _fail(path, f"op #{index + 1} names unknown op `{name}` "
-                          f"(one of: {', '.join(sorted(KNOWN_OPS))})")
+                          f"(one of: {', '.join(sorted(vocabulary))})")
     if params is None:
         params = {}
     if not isinstance(params, dict):
@@ -205,6 +257,22 @@ def _load_encode(path: Path, raw: Any) -> Encode:
     if fmt not in FORMATS:
         raise _fail(path, f"unknown encode format `{fmt}` "
                           f"(one of: {', '.join(sorted(FORMATS))})")
+    if fmt in VIDEO_FORMATS:
+        # ffmpeg's knob, and only ffmpeg's knob: a `quality` here would be
+        # silently ignored, which is worse than refused.
+        if raw.get("quality") is not None:
+            raise _fail(path, f"`{fmt}` is rate-controlled by `crf`, not "
+                              "`quality` -- one knob per format, the one the "
+                              "encoder actually reads")
+        crf = raw.get("crf")
+        ceiling = 63 if fmt == "webm" else 51
+        if not isinstance(crf, int) or not 0 <= crf <= ceiling:
+            raise _fail(path, f"`{fmt}` needs `encode.crf`, an integer from "
+                              f"0 to {ceiling} (lower is larger and finer)")
+        return Encode(format=fmt, quality=82, crf=crf)
+    if raw.get("crf") is not None:
+        raise _fail(path, f"`{fmt}` is quality-controlled, not crf -- `crf` "
+                          "belongs to the video formats")
     quality = raw.get("quality", 82)
     if not isinstance(quality, int) or not 1 <= quality <= 100:
         raise _fail(path, "`encode.quality` must be an integer from 1 to 100")
@@ -237,6 +305,8 @@ def _load_expect(path: Path, raw: Any) -> Expect:
         budget_kb=_optional_int(path, raw, "budget_kb"),
         total_budget_kb=_optional_int(path, raw, "total_budget_kb"),
         metadata_none=True,
+        frames=_optional_int(path, raw, "frames"),
+        fps=_optional_int(path, raw, "fps"),
     )
 
 
@@ -263,9 +333,53 @@ def _load_output(path: Path, index: int, raw: Any,
     if expect.count is not None and file_name:
         raise _fail(path, f"{where}: `expect.count` only makes sense on an "
                           "`each` output")
+    source = sources[source_id]
+    _check_motion_rules(path, where, source, ops, each=bool(each_source))
     return Output(source=source_id, ops=ops,
                   encode=_load_encode(path, raw.get("encode")),
                   expect=expect, file=file_name, each=bool(each_source))
+
+
+def _check_motion_rules(path: Path, where: str, source: Source,
+                        ops: tuple[Op, ...], *, each: bool) -> None:
+    """ADR 31's derivation rules, refused at load rather than at build.
+
+    A generator makes frames from nothing, so it only makes sense as the
+    first op of a procedural output; a fetched image already *is* the frames,
+    so a generator anywhere in its derivation would discard the source the
+    licence gate just confirmed. And a seeded op with no seed to inherit is a
+    derivation the recipe has not actually written down.
+    """
+    procedural = source.provider == "procedural"
+    if procedural:
+        if each:
+            raise _fail(path, f"{where}: a procedural source yields one "
+                              "derivation, so it needs `file:`, not `each:`")
+        if not ops or ops[0].name not in KNOWN_GENERATOR_OPS:
+            raise _fail(path, f"{where}: a procedural output must start with "
+                              "a generator op (one of: "
+                              f"{', '.join(sorted(KNOWN_GENERATOR_OPS))}) -- "
+                              "there is no upstream image to start from")
+    for index, op in enumerate(ops):
+        if op.name in KNOWN_GENERATOR_OPS:
+            if not procedural:
+                raise _fail(path, f"{where}: `{op.name}` generates frames "
+                                  "from parameters alone and belongs to a "
+                                  "`procedural` source, not a fetched one")
+            if index > 0:
+                raise _fail(path, f"{where}: `{op.name}` must be the first "
+                                  "op -- a generator replaces everything "
+                                  "before it")
+        if op.name in KNOWN_SEEDED_OPS:
+            own = op.params.get("seed")
+            if own is None and source.seed is None:
+                raise _fail(path, f"{where}: `{op.name}` is stochastic and "
+                                  "has no seed to inherit -- give it "
+                                  "`seed:` in its params, or draw from a "
+                                  "procedural source, whose seed it inherits")
+            if own is not None and (not isinstance(own, int) or own < 0):
+                raise _fail(path, f"{where}: `{op.name}` `seed` must be a "
+                                  "non-negative integer")
 
 
 def load_recipe(path: Path | str) -> Recipe:

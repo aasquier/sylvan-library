@@ -17,13 +17,16 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from mtglab.animist.encode import encode
 from mtglab.animist.fetch import Downloader, fetch_source
-from mtglab.animist.ops import apply
 from mtglab.animist.provenance import render, update
-from mtglab.animist.recipe import Output, Recipe
+from mtglab.animist.recipe import Output, Recipe, Source
 from mtglab.animist.sources import Confirmed, Transport
+
+if TYPE_CHECKING:
+    from mtglab.animist.motion import FrameSequence
 
 
 class BuildError(RuntimeError):
@@ -58,15 +61,53 @@ def _budget_check(name: str, size: int, output: Output) -> None:
             "drift past its own recipe")
 
 
-def _derive(original: Path, output: Output) -> bytes:
+def _effective_params(op_name: str, params: dict[str, object],
+                      source: Source) -> dict[str, object]:
+    """A seeded op inherits the procedural source's seed unless it carries
+    its own — the loader already refused the case where neither exists."""
+    from mtglab.animist.recipe import KNOWN_SEEDED_OPS
+
+    if op_name in KNOWN_SEEDED_OPS and "seed" not in params \
+            and source.seed is not None:
+        return {**params, "seed": source.seed}
+    return params
+
+
+def _derive(original: Path | None, output: Output,
+            source: Source) -> FrameSequence:
+    """One output's ops, start to frames. `original` is None exactly when
+    the source is procedural — the first op generates instead of opening."""
     from PIL import Image
 
-    with Image.open(original) as image:
-        image.load()
-        current: Image.Image = image
-        for op in output.ops:
-            current = apply(current, op.name, op.params)
-        return encode(current, output.encode)
+    from mtglab.animist.motion import (
+        FrameSequence,
+        apply_motion,
+        generate,
+        lift_still,
+    )
+    from mtglab.animist.recipe import KNOWN_GENERATOR_OPS, KNOWN_MOTION_OPS
+
+    ops = list(output.ops)
+    if original is None:
+        first = ops.pop(0)  # the loader guarantees a generator comes first
+        sequence = generate(first.name,
+                            dict(_effective_params(first.name,
+                                                   first.params, source)))
+    else:
+        with Image.open(original) as image:
+            image.load()
+            sequence = FrameSequence.still(image)
+
+    for op in ops:
+        params = dict(_effective_params(op.name, op.params, source))
+        if op.name in KNOWN_MOTION_OPS:
+            sequence = apply_motion(sequence, op.name, params)
+        elif op.name in KNOWN_GENERATOR_OPS:
+            raise BuildError(f"generator op `{op.name}` after the first "
+                             "position -- the loader should have refused this")
+        else:
+            sequence = lift_still(sequence, op.name, params)
+    return sequence
 
 
 def build(recipe: Recipe, *, only: str | None = None, dry_run: bool = False,
@@ -92,17 +133,30 @@ def build(recipe: Recipe, *, only: str | None = None, dry_run: bool = False,
 
     result = Built(dry_run=dry_run)
     produced: dict[str, list[str]] = {}
+    # Dual-format is two outputs with the same source and ops and different
+    # encode blocks (a webm and its mp4 twin, a loop and its poster), so the
+    # derivation is memoised on exactly that pair and generation runs once.
+    # `Op.params` is a dict, so the key is the ops' repr — stable within one
+    # build, which is the only scope the memo lives for.
+    derived: dict[tuple[str, str, str], FrameSequence] = {}
     for out in outputs:
+        source = recipe.sources[out.source]
         local = originals[out.source]
         if out.file:
-            # A `file:` output derives from its source's first original --
-            # single-file providers only ever have one.
-            targets = {out.file: next(iter(local.values()))}
+            if source.provider == "procedural":
+                targets: dict[str, Path | None] = {out.file: None}
+            else:
+                # A `file:` output derives from its source's first original --
+                # single-file providers only ever have one.
+                targets = {out.file: next(iter(local.values()))}
         else:
             targets = {_slug_name(name, out.encode.format): path
                        for name, path in sorted(local.items())}
         for name, original in targets.items():
-            data = _derive(original, out)
+            key = (out.source, str(original), repr(out.ops))
+            if key not in derived:
+                derived[key] = _derive(original, out, source)
+            data = encode(derived[key], out.encode)
             _budget_check(name, len(data), out)
             result.sizes[name] = len(data)
             produced.setdefault(out.source, []).append(name)

@@ -38,3 +38,24 @@ def test_size_curve_grows_with_width() -> None:
     assert widths == [30, 45, 60]
     assert sizes == sorted(sizes)                  # more pixels, more bytes
     assert all(size > 0 for size in sizes)
+
+
+def test_crf_curve_sweeps_the_video_axis() -> None:
+    """The knee finder is shared; only the axis changed (ADR 31)."""
+    import numpy as np
+    from PIL import Image
+
+    from mtglab.animist.measure import crf_curve, knee
+    from mtglab.animist.motion import FrameSequence
+    from mtglab.animist.recipe import Encode
+
+    rng = np.random.default_rng(5)
+    frames = tuple(
+        Image.fromarray(rng.integers(0, 255, (16, 32, 3), dtype=np.uint8),
+                        mode="RGB") for _ in range(3))
+    sequence = FrameSequence(frames=frames, fps=8)
+    curve = crf_curve(sequence, Encode(format="webm", crf=40), [20, 40, 60])
+    assert [crf for crf, _ in curve] == [20, 40, 60]
+    sizes = [size for _, size in curve]
+    assert sizes[0] > sizes[-1], "lower crf must cost more bytes"
+    assert knee(curve) in {20, 40, 60}

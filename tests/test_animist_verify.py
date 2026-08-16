@@ -129,3 +129,99 @@ def test_verify_never_writes(tmp_path: Path) -> None:
     stamps = {p: p.stat().st_mtime_ns for p in tmp_path.iterdir()}
     verify_recipe(recipe)
     assert {p: p.stat().st_mtime_ns for p in tmp_path.iterdir()} == stamps
+
+
+# --------------------------------------------------------- motion (ADR 31)
+
+VIDEO_RECIPE = """
+animist: 1
+why_committed: generated here
+sources:
+  mist:
+    provider: procedural
+    seed: 7
+    licence: ours-generated
+outputs:
+  - file: loop.webm
+    from: mist
+    ops:
+      - spectral_noise: {width: 32, height: 16, frames: 4, fps: 8}
+    encode: {format: webm, crf: 45}
+    expect: {width: 32, height: 16, frames: 4, fps: 8, budget_kb: 100}
+"""
+
+
+def webm_bytes(width: int = 32, height: int = 16, frames: int = 4,
+               fps: int = 8) -> bytes:
+    from mtglab.animist.encode import encode
+    from mtglab.animist.motion import FrameSequence
+    from mtglab.animist.recipe import Encode
+
+    rng = np.random.default_rng(1)
+    images = tuple(
+        Image.fromarray(rng.integers(0, 255, (height, width, 3),
+                                     dtype=np.uint8), mode="RGB")
+        for _ in range(frames))
+    return encode(FrameSequence(frames=images, fps=fps),
+                  Encode(format="webm", crf=45))
+
+
+def video_recipe(tmp_path: Path) -> Path:
+    path = tmp_path / "mist.recipe.yaml"
+    path.write_text(VIDEO_RECIPE, encoding="utf-8")
+    return path
+
+
+def test_a_committed_loop_that_matches_holds(tmp_path: Path) -> None:
+    (tmp_path / "loop.webm").write_bytes(webm_bytes())
+    assert verify_recipe(load_recipe(video_recipe(tmp_path))) == []
+
+
+def test_a_loop_with_the_wrong_frame_count_is_named(tmp_path: Path) -> None:
+    (tmp_path / "loop.webm").write_bytes(webm_bytes(frames=6))
+    failures = verify_recipe(load_recipe(video_recipe(tmp_path)))
+    assert any("6 frame(s)" in f and "expects 4" in f for f in failures)
+
+
+def test_a_loop_at_the_wrong_rate_is_named(tmp_path: Path) -> None:
+    (tmp_path / "loop.webm").write_bytes(webm_bytes(fps=24))
+    failures = verify_recipe(load_recipe(video_recipe(tmp_path)))
+    assert any("24" in f and "fps" in f for f in failures)
+
+
+def test_a_loop_at_the_wrong_size_is_named(tmp_path: Path) -> None:
+    (tmp_path / "loop.webm").write_bytes(webm_bytes(width=64, height=32))
+    failures = verify_recipe(load_recipe(video_recipe(tmp_path)))
+    assert any("width 64" in f for f in failures)
+
+
+def test_a_file_that_is_not_video_at_all_is_named(tmp_path: Path) -> None:
+    (tmp_path / "loop.webm").write_bytes(b"not a video")
+    failures = verify_recipe(load_recipe(video_recipe(tmp_path)))
+    assert any("cannot be decoded as webm" in f for f in failures)
+
+
+def test_an_fps_expectation_nothing_can_read_fails_loudly(
+        tmp_path: Path) -> None:
+    """ADR 8 wearing a codec: Pillow reads no rate out of animated WebP, and
+    an expectation the decoder cannot evaluate must not silently pass."""
+    from mtglab.animist.encode import encode
+    from mtglab.animist.motion import FrameSequence
+    from mtglab.animist.recipe import Encode
+
+    recipe_text = VIDEO_RECIPE.replace(
+        "file: loop.webm", "file: loop.webp").replace(
+        "encode: {format: webm, crf: 45}",
+        "encode: {format: awebp, quality: 80}")
+    path = tmp_path / "mist.recipe.yaml"
+    path.write_text(recipe_text, encoding="utf-8")
+
+    rng = np.random.default_rng(2)
+    images = tuple(
+        Image.fromarray(rng.integers(0, 255, (16, 32, 3), dtype=np.uint8),
+                        mode="RGB") for _ in range(4))
+    data = encode(FrameSequence(frames=images, fps=8),
+                  Encode(format="awebp", quality=80))
+    (tmp_path / "loop.webp").write_bytes(data)
+    failures = verify_recipe(load_recipe(path))
+    assert any("no rate can be read" in f for f in failures)
