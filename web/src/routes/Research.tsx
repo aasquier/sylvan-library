@@ -41,6 +41,7 @@ import { StanceReadout } from '../components/stance'
 import {
   Badge, CardHover, ErrorNote, ManaCost, PageMasthead, Spinner,
 } from '../components/ui'
+import { KeeperDossier } from '../components/keeper'
 import { VaporLayer, type VaporSource } from '../components/vapor'
 
 /**
@@ -149,6 +150,7 @@ export default function Research() {
   const [report, setReport] = useState<ResearchReport | null>(null)
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
   const [busy, setBusy] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [pin, setPin] = useStance()
@@ -257,6 +259,13 @@ export default function Research() {
               which, given what he does with donated material, is probably
               for the best.
             </p>
+            {/* The door to the dossier (second punch list, item 8). */}
+            <button type="button" onClick={() => setAboutOpen(true)}
+                    className="mt-2 self-start rounded-md px-2.5 py-1 text-xs font-medium"
+                    style={{ border: '1px solid var(--hairline)',
+                             color: 'var(--text-secondary)' }}>
+              About the keeper
+            </button>
             <p className="mt-auto pt-1 text-[10px]"
                style={{ color: 'var(--text-muted)' }}>
               Art by Aaron Miller
@@ -264,6 +273,8 @@ export default function Research() {
           </div>
         </aside>
       </div>
+
+      <KeeperDossier open={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       <form className="card-surface flex flex-col gap-3 rounded-xl px-5 py-4"
             onSubmit={(e) => { e.preventDefault(); void ask(question) }}>
