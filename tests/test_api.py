@@ -218,6 +218,31 @@ def test_a_mistyped_api_path_is_a_json_404_not_the_shell(client):
     assert "no such endpoint" in resp.json()["detail"]
 
 
+def test_the_spa_catch_all_refuses_a_path_traversal():
+    """The shell handler resolves `WEB_DIST / full_path` to look a file up, and
+    a raw traversal path reaches it un-normalised the same way `//api` does --
+    `WEB_DIST / "../../../etc/hosts"` does not collapse the `..` in the string,
+    so without a containment check the handler would serve a file outside the
+    built frontend (a real `/etc/hosts` read was confirmed). The client
+    normalises `..` away before sending, so the sink is exercised directly:
+    the handler must fall back to the shell rather than serve out-of-tree."""
+    from mtglab.api.app import WEB_DIST, create_app
+
+    app = create_app()
+    spa = next(r.endpoint for r in app.routes  # type: ignore[attr-defined]
+               if getattr(r, "name", None) == "spa")
+
+    web_root = WEB_DIST.resolve()
+    depth = len(web_root.parts)
+    payload = "../" * depth + "etc/hosts"
+    assert (web_root / payload).resolve().is_file(), \
+        "test payload must resolve to a real out-of-tree file to be meaningful"
+
+    resp = spa(payload)
+    assert resp.path == WEB_DIST / "index.html", \
+        "a traversal path must fall back to the shell, never serve out-of-tree"
+
+
 def test_frontend_routes_still_get_the_shell(client):
     """The refusal above must not overreach: an SPA route is the shell's to
     serve, and so is the root."""

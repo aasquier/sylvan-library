@@ -1157,8 +1157,16 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             if normalised == "/api" or normalised.startswith("/api/"):
                 raise HTTPException(status_code=404,
                                     detail=f"no such endpoint: {normalised}")
-            candidate = WEB_DIST / full_path
-            if full_path and candidate.is_file():
+            # Contain the file lookup to WEB_DIST. `WEB_DIST / full_path` does
+            # not collapse a `..` in the string, so a raw traversal path --
+            # which reaches this handler un-normalised, the same way `//api`
+            # does above -- would resolve outside the tree and serve, e.g.,
+            # `/etc/hosts`. Resolve first, then require the result stay under
+            # the (resolved) web root; a legitimate asset always does.
+            web_root = WEB_DIST.resolve()
+            candidate = (web_root / full_path).resolve()
+            if (full_path and candidate.is_file()
+                    and candidate.is_relative_to(web_root)):
                 return FileResponse(candidate, headers=NO_CACHE)
             # The shell above all: it is what names the asset files, so a
             # stale one pins every other stale thing in place.
