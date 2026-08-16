@@ -1458,8 +1458,13 @@ def cmd_claude_usage(args):
     print(f"  {'total':<22} {sum(r['conversations'] for r in rows):>5} "
           f"{sum(r['requests'] for r in rows):>5} {total_in:>11} "
           f"{total_out:>11} {total_cached:>11}")
-    print("\n  'cached' tokens are the slice of 'tokens in' served from the "
-          "prompt cache\n  at ~a tenth of the input price.")
+    print("\n  'cached' counts prompt cache reads, at ~a tenth of the input "
+          "price. They sit\n  *beside* 'tokens in' rather than inside it -- "
+          "the API reports 'tokens in' as\n  the uncached remainder only, so "
+          "a conversation's whole prompt is the two\n  added together.")
+    print("  Prompt cache *writes* bill at 1.25x input and are not recorded "
+          "at all, so\n  this table is a floor on the bill rather than the "
+          "bill.")
     first = min(r["first_at"] for r in rows)
     last = max(r["last_at"] for r in rows)
     print(f"  counting {first[:10]} to {last[:10]}.\n")

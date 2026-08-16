@@ -34,6 +34,7 @@ from mtglab import config  # noqa: E402
 from mtglab.api import jobs, service  # noqa: E402
 from mtglab.api.app import create_app  # noqa: E402
 from mtglab.api.deps import deck_source, library  # noqa: E402
+from mtglab.cards import db  # noqa: E402
 from mtglab.decks.library import LOCAL_OWNER, Library  # noqa: E402
 from mtglab.decks.model import Deck  # noqa: E402
 from mtglab.decks.source import DeckNotFound, MemoryDeckSource  # noqa: E402
@@ -3288,6 +3289,41 @@ def test_suggestions_without_a_pool_say_so_instead_of_guessing(tmp_path):
                                        source=MemoryDeckSource([deck]))
     assert body["pool_available"] is False
     assert body["targets"] == []
+
+
+def test_challenge_progress_asks_the_pool_once(pool, monkeypatch):
+    """Three decks, one `get_cards`.
+
+    The obvious loop asks per deck, which is one query per deck for one name
+    each -- fine at six and linear in a library aimed at thirty-two slots.
+    Counting the calls is what pins it: a wall-clock assertion would be noise
+    on a shared machine, and the query count is the thing that actually moved.
+    """
+    calls: list[list[str]] = []
+    real = db.get_cards
+
+    def counting(con, names):
+        wanted = list(names)
+        calls.append(wanted)
+        return real(con, wanted)
+
+    monkeypatch.setattr(db, "get_cards", counting)
+
+    decks = [
+        Deck.from_text(f"slug: d{i}\nname: D{i}\ncommander:\n"
+                       f"  - {name}\ncards: []", slug=f"d{i}")
+        for i, name in enumerate(("Gyome, Master Chef",
+                                  "Goreclaw, Terror of Qal Sisma",
+                                  "No Such Legend"))
+    ]
+    body = service.challenge_progress(source=MemoryDeckSource(decks))
+
+    assert len(calls) == 1, f"one query for three decks, got {len(calls)}"
+    assert sorted(calls[0]) == ["Goreclaw, Terror of Qal Sisma",
+                                "Gyome, Master Chef", "No Such Legend"]
+    # Still the right answer: two resolvable commanders in two slots, and the
+    # one the pool has never heard of contributes nothing.
+    assert body["filled"] == 2
 
 
 def test_challenge_progress_skips_what_it_cannot_resolve(pool):

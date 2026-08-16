@@ -1539,16 +1539,33 @@ def challenge_progress(*, source: DeckSource | None = None) -> dict[str, Any]:
     A deck's slot is `colors.of(its colour identity)`, and that identity comes
     from the commander via the pool -- so without one this reports the slots
     as unknown rather than inventing them from the deck file.
+
+    **The pool is asked once, not once per deck.** Read every deck first,
+    collect the commanders, then make a single `get_cards` call -- which is
+    what that function is for, and what every other batch caller here already
+    does. The per-deck form cost one query per deck for one name each: six
+    today, and linear in a library that is meant to reach thirty-two. Deck
+    order is preserved by walking the same list twice rather than sorting it.
     """
     decks = _source(source)
     con = _connect()
     filled: dict[str, list[dict[str, str]]] = {}
     try:
-        for slug in decks.slugs():
-            deck = Deck.from_text(decks.read_text(slug), slug=slug)
-            if con is None or not deck.commander:
-                continue
-            found = db.get_cards(con, deck.commander)
+        # Distinct *spellings*, not distinct cards: `get_cards` keys its result
+        # by the name it was handed, so two decks naming the same commander
+        # with different casing each need their own key back.
+        ordered: list[tuple[str, Deck]] = []
+        wanted: set[str] = set()
+        if con is not None:
+            for slug in decks.slugs():
+                deck = Deck.from_text(decks.read_text(slug), slug=slug)
+                if not deck.commander:
+                    continue
+                ordered.append((slug, deck))
+                wanted.update(deck.commander)
+
+        found = db.get_cards(con, sorted(wanted)) if wanted else {}
+        for slug, deck in ordered:
             recs = [found[c] for c in deck.commander if c in found]
             if not recs:
                 continue
