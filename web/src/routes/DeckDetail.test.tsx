@@ -243,7 +243,7 @@ const STANCE = {
 const CLAUDE_STATUS = {
   installed: true, configured: true, model: 'claude-sonnet-5',
   stance: STANCE, ceiling: STANCE, default: STANCE, presets: [],
-  never: 'No stance lets Claude write a card’s rationale.',
+  never: 'One rule holds at every setting: Claude never writes a card’s rationale. The why is always yours.',
   modes: [{ name: 'rationale-interview', purpose: 'Asks about a slot.',
             tools: ['get_cards'], writes: [] }],
 }
@@ -589,7 +589,7 @@ describe('DeckDetail wheel of fortune', () => {
     // Before the wheel stops, no card; the suspense is the feature.
     expect(screen.queryByText('Harmonize')).toBeNull()
     fireEvent.transitionEnd(
-      document.querySelector('.wheel-scene .absolute') as Element)
+      document.querySelector('.wheel-scene .wheel-disc') as Element)
 
     expect(await screen.findByText('Harmonize')).toBeTruthy()
     expect(screen.getByText('The Cup')).toBeTruthy()
@@ -610,7 +610,7 @@ describe('DeckDetail wheel of fortune', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Spin the wheel' }))
     await waitFor(() => expect(vi.mocked(api.wheelSpin)).toHaveBeenCalled())
     fireEvent.transitionEnd(
-      document.querySelector('.wheel-scene .absolute') as Element)
+      document.querySelector('.wheel-scene .wheel-disc') as Element)
     expect(await screen.findByText(/no legal card in these colours/)).toBeTruthy()
   })
 

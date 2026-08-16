@@ -43,7 +43,7 @@ function status(over: Partial<ClaudeStatus> = {}): ClaudeStatus {
       { name: 'second-opinion', blurb: 'A second pair of eyes.', stance: view('second-opinion'), available: true },
       { name: 'collaborator', blurb: 'Batches edits.', stance: view('collaborator'), available: false },
     ],
-    never: 'No stance lets Claude write a card’s rationale.',
+    never: 'One rule holds at every setting: Claude never writes a card’s rationale. The why is always yours.',
     modes: [],
     ...over,
   }
@@ -128,7 +128,7 @@ describe('StanceMenu', () => {
   it('shows the never-line under every position', async () => {
     claudeStatus.mockResolvedValue(status())
     await open()
-    expect(screen.getByText(/No stance lets Claude write a card’s rationale/))
+    expect(screen.getByText(/One rule holds at every setting/))
       .toBeTruthy()
   })
 })

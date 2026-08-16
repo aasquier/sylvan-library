@@ -96,8 +96,24 @@ describe('tablesounds', () => {
     snd.deal()
     snd.flip()
     snd.shimmer()
+    snd.wheelTurn(1620, 3800)
     snd.wake()
     expect(constructed).toBe(0)
+    expect(started).toBe(0)
+  })
+
+  it('wheelTurn clicks once per notch and settles, or stays quiet under one', async () => {
+    const snd = await fresh()
+    snd.setSound(true)
+    // 4.5 turns = 54 notches; each click is two bursts, the settle is one
+    // oscillator. Placement in time is the bezier's business; the count is
+    // this test's.
+    snd.wheelTurn(1620, 3800)
+    expect(started).toBe(54 * 2 + 1)
+    started = 0
+    // Under one notch there is nothing to ratchet over — silence, not a
+    // lone floating click.
+    snd.wheelTurn(15, 3800)
     expect(started).toBe(0)
   })
 

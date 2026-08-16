@@ -200,6 +200,56 @@ export function shimmer(): void {
 }
 
 /**
+ * The Wheel of Fortune's own curve, evaluated rather than approximated: the
+ * CSS spins on `cubic-bezier(0.12, 0.55, 0.08, 1)` (`.wheel-disc` in
+ * index.css), and a ratchet clicking on any other curve would drift audibly
+ * out of step with the planks by the second turn. Given a fraction of the
+ * rotation completed, this answers the fraction of the duration elapsed —
+ * the inverse of what a timing function usually does, because the clicks
+ * are placed in angle and scheduled in time.
+ */
+function wheelEase(rotationFrac: number): number {
+  const y = (s: number) =>
+    3 * (1 - s) * (1 - s) * s * 0.55 + 3 * (1 - s) * s * s * 1 + s ** 3
+  const x = (s: number) =>
+    3 * (1 - s) * (1 - s) * s * 0.12 + 3 * (1 - s) * s * s * 0.08 + s ** 3
+  let lo = 0
+  let hi = 1
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2
+    if (y(mid) < rotationFrac) lo = mid
+    else hi = mid
+  }
+  return x((lo + hi) / 2)
+}
+
+/**
+ * The wheel turning: a pawl ratcheting over the studs, one click per 30° of
+ * rotation, spaced on the same deceleration the CSS runs — a blur of clicks
+ * at the start, then slower, softer knocks as the last fate crawls under
+ * the marker, and the pawl's final settle once the wheel has answered.
+ * The pitch wanders arithmetically, not randomly, in the house style.
+ */
+export function wheelTurn(degrees: number, durMs: number): void {
+  const total = Math.abs(degrees)
+  if (total < 30) return
+  play((c) => {
+    const t0 = c.currentTime
+    const dur = durMs / 1000
+    const clicks = Math.floor(total / 30)
+    for (let k = 1; k <= clicks; k++) {
+      const at = t0 + wheelEase((k * 30) / total) * dur
+      // Wood on wood, easing off as the wheel does.
+      const level = 0.42 - 0.2 * (k / clicks)
+      burst(c, at, 0.022, 1900 + ((k * 37) % 5) * 110, level, 1.6)
+      burst(c, at + 0.004, 0.045, 380 + ((k * 13) % 3) * 40, level * 0.55)
+    }
+    // The pawl drops into the last notch: the wheel has answered.
+    thump(c, t0 + dur + 0.04, 170, 72, 0.12, 0.55)
+  })
+}
+
+/**
  * Called from the toggle's own click when sound turns on. Constructs and
  * resumes the context inside a guaranteed user gesture — after this, a deal
  * scheduled from a timer finds a context already running — and answers with

@@ -1240,14 +1240,94 @@ button:hover .tarot-fan-card {
 
 /* ------------------------------------------------------------- the wheel
  *
- * `DrawnWheel` in components/wheel.tsx (punch list item 9). One transform,
- * one long deceleration: the easing front-loads the speed so the wheel
- * blurs past, then crawls the last fate into place. `transform-box:
- * view-box` for the same reason the crystal fog needs it — an SVG group
- * otherwise rotates about the viewBox corner and exits the painting.
+ * `PaintedWheelCutout` in components/wheel.tsx (punch list item 9, rebuilt
+ * by the second list's item 12). The cutout box is the painted wheel's own
+ * circle: clipped round, and masked with a feather over the last few
+ * percent so the cut edge dissolves into the rim's painted shadow instead
+ * of reading as a sticker. `closest-side` because the box is square and the
+ * circle's edge is the side, not the corner. `.wheel-disc` is the rotating
+ * copy of the crop inside it — one transform, one long deceleration: the
+ * easing front-loads the speed so the planks blur past, then crawl the
+ * last fate into place. The ratchet in `lib/tablesounds.ts` schedules its
+ * clicks against this same curve; change one and change both.
  */
+/* ------------------------------------------------------------- the loupe
+ *
+ * `CardLoupe` in components/ui.tsx (second punch list, item 3). The glass
+ * is 132px across — the 66px half-size is hard-coded in the component's
+ * background arithmetic, so the two figures move together. The rim is the
+ * house gold over a dark undercoat, the sheen is one diagonal streak of
+ * white at low alpha (glass, not chrome), and the handle grows out of the
+ * lower-right of the rim. `cursor: none` on the host while the lens is the
+ * cursor: two pointers reading the same spot is one too many.
+ */
+.card-loupe-host {
+  cursor: zoom-in;
+}
+
+.card-loupe-host:hover {
+  cursor: none;
+}
+
+.card-loupe {
+  position: absolute;
+  z-index: 40;
+  width: 132px;
+  height: 132px;
+  margin-left: -66px;
+  margin-top: -66px;
+  border-radius: 9999px;
+  border: 4px solid #c9a227;
+  box-shadow:
+    0 0 0 1px rgba(40, 28, 6, 0.9),
+    inset 0 0 0 1px rgba(40, 28, 6, 0.7),
+    0 10px 28px rgba(0, 0, 0, 0.55);
+  /* No overflow clip: the border-radius already clips the magnified image,
+     and the handle (::after) has to live outside the rim. */
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* The sheen: light lying on the glass, above the magnified image. */
+.card-loupe::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.06) 28%,
+    transparent 46%
+  );
+}
+
+/* The handle, angled off the lower-right of the rim. */
+.card-loupe::after {
+  content: '';
+  position: absolute;
+  right: -26px;
+  bottom: -26px;
+  width: 44px;
+  height: 13px;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #8a6f2a 0%, #5c4a1c 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  transform: rotate(45deg);
+}
+
+.wheel-cutout {
+  border-radius: 9999px;
+  overflow: hidden;
+  mask-image: radial-gradient(circle closest-side, #000 91%, transparent 100%);
+  -webkit-mask-image: radial-gradient(
+    circle closest-side,
+    #000 91%,
+    transparent 100%
+  );
+}
+
 .wheel-disc {
-  transform-box: view-box;
   transform-origin: 50% 50%;
   transition: transform 3.8s cubic-bezier(0.12, 0.55, 0.08, 1);
 }
@@ -1634,6 +1714,13 @@ button:hover .tarot-fan-card {
   pointer-events: none;
 }
 
+/* Quiet at the top on purpose (second punch list, item 2): the top of every
+ * page that owns a backdrop is where the *sharp* copy of the same painting
+ * already sits — the deck hero's band, a masthead's crop — and a blurred
+ * clone bleeding out from behind it read as a rendering mistake. The wash
+ * now starts below that band and blooms toward the foot of the viewport,
+ * so the room is at its most visible exactly where the page is at its most
+ * text. */
 .scene-backdrop-art {
   position: absolute;
   inset: -24px;
@@ -1644,9 +1731,10 @@ button:hover .tarot-fan-card {
   opacity: 0.13;
   mask-image: linear-gradient(
     180deg,
-    rgba(0, 0, 0, 0.9) 0%,
-    rgba(0, 0, 0, 0.55) 45%,
-    rgba(0, 0, 0, 0.25) 100%
+    transparent 0%,
+    transparent 26%,
+    rgba(0, 0, 0, 0.7) 55%,
+    rgba(0, 0, 0, 0.55) 100%
   );
 }
 

@@ -19,7 +19,8 @@ import { categoryLabel, identityName } from '../lib/mtg'
 import { SceneBackdrop } from '../components/forest'
 import { WheelOfFortune } from '../components/wheel'
 import {
-  Badge, CardArt, CardHover, Caveat, ColorRing, ErrorNote, ManaCost, ManaText,
+  Badge, CardArt, CardHover, CardLoupe, Caveat, ColorRing, ErrorNote, ManaCost,
+  ManaText,
   Select, Spinner, StatTile,
 } from '../components/ui'
 import {
@@ -203,14 +204,16 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
 
       <div className="relative flex flex-col gap-6 p-5 sm:flex-row sm:p-6">
         {card?.image && (
-          <CardHover card={card}>
-            {/* Beside the text, not lifted into the band. Overlapping the art
-                was what "the card preview is clipped by the hero art" meant,
-                and there is no negative margin here for that reason. */}
-            <img src={card.image} alt={card.name}
-                 className="w-40 shrink-0 cursor-help self-start rounded-xl sm:w-44"
-                 style={{ boxShadow: '0 14px 40px rgba(0,0,0,0.45)' }} />
-          </CardHover>
+          /* The loupe, not CardHover (second punch list, item 3): this card
+             is already shown whole, so the hover popup was a smaller copy of
+             the thing being hovered. The lens shows detail instead — the
+             painting's brushwork, the rules text — through a styled glass.
+             Beside the text, not lifted into the band. Overlapping the art
+             was what "the card preview is clipped by the hero art" meant,
+             and there is no negative margin here for that reason. */
+          <CardLoupe src={card.image} alt={card.name}
+                     className="w-40 shrink-0 self-start sm:w-44"
+                     imgStyle={{ boxShadow: '0 14px 40px rgba(0,0,0,0.45)' }} />
         )}
 
         <div className="min-w-0 flex-1">

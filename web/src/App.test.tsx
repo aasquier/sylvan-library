@@ -133,7 +133,7 @@ describe('the Claude menu in the header', () => {
       { name: 'off', blurb: 'No calls.', available: true,
         stance: { preset: 'off', allows_calls: false, may_write: false, axes: [] } },
     ],
-    never: 'No stance lets Claude write a card’s rationale.',
+    never: 'One rule holds at every setting: Claude never writes a card’s rationale. The why is always yours.',
     modes: [],
   }
 
