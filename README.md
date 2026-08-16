@@ -13,7 +13,7 @@ Python 3.11+ · DuckDB · numpy · FastAPI · React. The package and CLI are nam
 
 Most deckbuilding tools are lists. This one is an argument.
 
-A deck is one YAML file in git. Each of the 99 cards carries a `category` and a
+A deck is one YAML file. Each of the 99 cards carries a `category` and a
 `why` — the reason it is in the deck rather than something else. Nothing
 generates that sentence for you, and no write path accepts an empty one: a card
 you cannot justify is a card to cut. The five documents a deck ships with —
@@ -48,8 +48,9 @@ written.
 
 **Deck files.** Import a pasted decklist, validate it against the gate, get
 ranked replacement suggestions for whatever it flagged, and apply surgical
-edits that re-run the gate on the result and produce minimal diffs. Deck
-history is git history; the swap list is a real `git diff`.
+edits that re-run the gate on the result and produce minimal diffs. Every
+edit lands in the deck's activity log, and the swap list is a real diff
+against the last build's snapshot.
 
 **Simulation.** Tier 1 is a Monte Carlo goldfish in pure Python — shuffles,
 draws, and pays costs, answering mulligan policy, land count, commander speed

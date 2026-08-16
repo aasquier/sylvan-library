@@ -336,3 +336,29 @@ def test_the_deploy_job_deploys_main_and_nothing_else(event, ref, expected, why)
         f"ci.yml's deploy job would {'not ' if expected else ''}run for "
         f"{event} on {ref}, and it should{'' if expected else ' not'}: {why}. "
         f"Condition is: {deploy_condition()}")
+
+
+def test_no_deck_is_tracked_by_git():
+    """ADR 30: decks are live app data, not repository content.
+
+    `.gitignore` covers the whole `decks/` tree, but an ignore rule does not
+    evict a file that is already tracked, and a `git add -f` would sail past
+    it silently. This is the check that the removal stays removed. Runs
+    against `git ls-files` rather than the ignore file because the ignore
+    file is the intent and the index is the fact -- the config-tests lesson,
+    applied to the repository itself.
+
+    When the suite runs outside a git checkout (an unpacked sdist), there is
+    no index to consult and nothing to enforce; CI always runs from a
+    checkout, and CI is where this gate matters.
+    """
+    import subprocess
+
+    proc = subprocess.run(["git", "-C", str(ROOT), "ls-files", "--", "decks/"],
+                          capture_output=True, text=True)
+    if proc.returncode != 0:
+        return  # not a checkout; CI is the enforcement point
+    tracked = [line for line in proc.stdout.splitlines() if line.strip()]
+    assert tracked == [], (
+        "decks are live app data (ADR 30) and must not be tracked: "
+        f"{tracked[:5]}")

@@ -2,9 +2,11 @@
 
 Two kinds of test live here, and the difference is deliberate.
 
-The endpoints that read a deck file run against the **real** decks in `decks/`
-and need no card pool, because a fresh clone has none until `data refresh` runs
-and the app has to stay usable in that state rather than 500ing.
+The endpoints that read a deck file run against a scratch deck directory the
+`client` fixture writes (decks are live app data, ADR 30 -- a checkout has
+none) and need no card pool, because a fresh clone has none until
+`data refresh` runs and the app has to stay usable in that state rather than
+500ing.
 
 The endpoints that look a card up -- swap, add, suggestions, search, the Tier 1
 jobs -- take the `pool` fixture and the synthetic deck from `tiny_pool`.
@@ -45,9 +47,33 @@ JOB_TIMEOUT_S = 60
 
 
 @pytest.fixture
-def client():
+def client(tmp_path):
+    """The app over a scratch deck directory holding the fixture deck.
+
+    These tests used to run against the repository's real decks. ADR 30 made
+    decks live app data — a checkout has none — so the fixture writes its own:
+    `mono-green` as a real file, exercising the file-backed tier end to end,
+    plus an underscore-prefixed directory to pin that scaffolding is skipped.
+    The card pool is deliberately not arranged here: the deck-file endpoints
+    must stay usable with no pool at all rather than 500ing.
+    """
     jobs.clear()
-    with TestClient(create_app()) as c:
+    root = tmp_path / "decks"
+    (root / "mono-green").mkdir(parents=True)
+    (root / "mono-green" / "deck.yaml").write_text(
+        tiny_pool.mono_green_deck().dump(), encoding="utf-8")
+    # A built sibling, because two things key off `status`: the stance default
+    # follows it (ADR 15), and nothing else in the fixture exercises "built".
+    built = tiny_pool.mono_green_deck()
+    built.slug, built.status, built.name = ("mono-green-built", "built",
+                                            "Mono-Green Fixture, Built")
+    (root / "mono-green-built").mkdir(parents=True)
+    (root / "mono-green-built" / "deck.yaml").write_text(
+        built.dump(), encoding="utf-8")
+    (root / "_template").mkdir()
+    (root / "_template" / "deck.yaml").write_text(
+        "slug: _template\nname: Scaffolding\ncards: []\n", encoding="utf-8")
+    with config.use_paths(decks_dir=root), TestClient(create_app()) as c:
         yield c
 
 
@@ -152,7 +178,7 @@ def test_decks_lists_the_library(client):
     body = client.get("/api/decks").json()
     assert isinstance(body, list)
     slugs = {d["slug"] for d in body}
-    assert "gyome-food" in slugs
+    assert "mono-green" in slugs
     assert "_template" not in slugs
 
 
@@ -190,9 +216,9 @@ def test_deck_list_gate_counts_agree_with_the_validate_endpoint(pool, client):
 
 
 def test_deck_detail_has_every_card_with_its_why(client):
-    body = client.get("/api/decks/local/gyome-food").json()
+    body = client.get("/api/decks/local/mono-green").json()
     assert body["total_cards"] == 99
-    assert body["land_count"] == 34
+    assert body["land_count"] == 95, "the fixture's 95 Forests"
     assert all(c["why"] for c in body["cards"]), "a card lost its rationale"
 
 
@@ -330,14 +356,14 @@ def test_missing_deck_stats_is_also_404(client):
 
 
 def test_validate_returns_structured_issues(client):
-    body = client.get("/api/decks/local/gyome-food/validate").json()
+    body = client.get("/api/decks/local/mono-green/validate").json()
     assert set(body) == {"ok", "errors", "warnings"}
     assert isinstance(body["errors"], list)
 
 
 def test_stats_are_json_serialisable(client):
     """The curve buckets are dataclasses; they must be flattened for the wire."""
-    body = client.get("/api/decks/local/gyome-food/stats").json()
+    body = client.get("/api/decks/local/mono-green/stats").json()
     assert body["total_cards"] == 99
     assert body["curve"]["buckets"], "no curve buckets"
     assert isinstance(body["curve"]["buckets"][0]["mv"], int)
@@ -431,7 +457,7 @@ def test_suggestions_for_a_missing_deck_are_a_404(client):
 
 
 def test_suggestion_limit_is_bounded(client):
-    assert client.get("/api/decks/local/goreclaw-stompy/suggestions",
+    assert client.get("/api/decks/local/mono-green/suggestions",
                       params={"limit": 999}).status_code == 422
 
 
@@ -489,11 +515,11 @@ def in_memory_client():
 
 
 def test_endpoints_read_the_request_scope_not_the_filesystem(in_memory_client):
-    only = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    only = tiny_pool.mono_green_deck()
     with in_memory_client([only]) as client:
-        assert [d["slug"] for d in client.get("/api/decks").json()] == ["gyome-food"]
-        assert client.get("/api/decks/local/gyome-food").status_code == 200
-        # On disk, and deliberately not in this request's scope.
+        assert [d["slug"] for d in client.get("/api/decks").json()] == ["mono-green"]
+        assert client.get("/api/decks/local/mono-green").status_code == 200
+        # A slug this scope was not handed, however plausible, is absent.
         assert client.get("/api/decks/local/arahbo-cats").status_code == 404
 
 
@@ -899,14 +925,13 @@ def test_an_empty_note_is_refused(swappable):
 def test_a_draft_is_promoted_once_every_card_is_justified(in_memory_client):
     """The last step of an import, and until now the last thing in the whole
     lifecycle that could only be done in a text editor."""
-    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
-    deck.stage = "draft"
+    deck = tiny_pool.mono_green_deck(stage="draft")
     with in_memory_client([deck]) as client:
-        resp = client.patch("/api/decks/local/gyome-food",
+        resp = client.patch("/api/decks/local/mono-green",
                             json={"field": "stage", "value": "curated"})
         assert resp.status_code == 200, resp.json()
         assert resp.json()["stage"] == "curated"
-        assert client.get("/api/decks/local/gyome-food").json()["stage"] == "curated"
+        assert client.get("/api/decks/local/mono-green").json()["stage"] == "curated"
 
 
 def test_promotion_is_refused_while_a_card_is_blank(draft_client):
@@ -1088,16 +1113,16 @@ def test_import_refusals(importable, payload, expected):
 
 
 def test_import_will_not_overwrite_an_existing_deck(in_memory_client, tmp_path):
-    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
+    deck = tiny_pool.mono_green_deck()
     with config.use_paths(data_dir=tmp_path / "data"):
         tiny_pool.build(config.DB_PATH)
         with in_memory_client([deck]) as client:
             resp = client.post("/api/decks/import", json={
-                "slug": "goreclaw-stompy", "text": tiny_pool.DECKLIST})
+                "slug": "mono-green", "text": tiny_pool.DECKLIST})
             assert resp.status_code == 422
             assert "already exists" in resp.json()["detail"]
             # The deck it refused to touch is untouched.
-            assert client.get("/api/decks/local/goreclaw-stompy").json()["stage"] == "curated"
+            assert client.get("/api/decks/local/mono-green").json()["stage"] == "curated"
 
 
 def test_import_without_a_pool_refuses_rather_than_guessing(in_memory_client,
@@ -1113,7 +1138,7 @@ def test_import_without_a_pool_refuses_rather_than_guessing(in_memory_client,
 
 
 def test_a_read_only_library_refuses_import():
-    deck = Deck.load(Path("decks/goreclaw-stompy/deck.yaml"))
+    deck = tiny_pool.mono_green_deck()
     app = create_app()
     _ro = MemoryDeckSource([deck], writable=False)
     app.dependency_overrides[deck_source] = lambda: _ro
@@ -1605,16 +1630,16 @@ def test_lore_answers_whole_with_no_pool_at_all(client, tmp_path):
 
 
 def test_challenge_progress_counts_filled_slots(in_memory_client):
-    with in_memory_client([Deck.load(Path("decks/gyome-food/deck.yaml"))]) as c:
+    with in_memory_client([tiny_pool.mono_green_deck()]) as c:
         body = c.get("/api/colors/progress").json()
     assert body["total"] == 32
     assert len(body["slots"]) == 32
-    # Gyome is Golgari. Without a card pool the identity cannot be derived at all,
-    # so the assertion is conditional -- the same tolerance the rest of this
-    # file has for a fresh clone.
-    golgari = next(s for s in body["slots"] if s["key"] == "BG")
+    # Goreclaw is mono-green. Without a card pool the identity cannot be
+    # derived at all, so the assertion is conditional -- the same tolerance
+    # the rest of this file has for a missing pool.
+    green = next(s for s in body["slots"] if s["key"] == "G")
     if body["filled"]:
-        assert [d["slug"] for d in golgari["decks"]] == ["gyome-food"]
+        assert [d["slug"] for d in green["decks"]] == ["mono-green"]
 
 
 # ----------------------------------------------------------------- create
@@ -1646,7 +1671,8 @@ def test_create_refuses_a_deck_with_no_commander(in_memory_client):
 
 
 def test_create_refuses_a_duplicate_slug(pool, in_memory_client):
-    existing = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    existing = Deck(slug="gyome-food", name="Gyome Food",
+                    commander=["Gyome, Master Chef"], cards=[])
     with in_memory_client([existing]) as c:
         r = c.post("/api/decks", json={
             "slug": "gyome-food", "commander": ["Gyome, Master Chef"]})
@@ -1655,7 +1681,7 @@ def test_create_refuses_a_duplicate_slug(pool, in_memory_client):
 
 
 def test_create_is_refused_on_a_read_only_library():
-    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    deck = tiny_pool.mono_green_deck()
     app = create_app()
     _ro = MemoryDeckSource([deck], writable=False)
     app.dependency_overrides[deck_source] = lambda: _ro
@@ -1838,8 +1864,8 @@ def test_the_stance_default_comes_from_the_decks_status(client):
     """ADR 15: a theoretical deck is a list under consideration, a built one is
     sleeved cardboard. The default follows a field that already exists."""
     theoretical = client.get("/api/claude",
-                             params={"slug": "goreclaw-stompy"}).json()
-    built = client.get("/api/claude", params={"slug": "arahbo-cats"}).json()
+                             params={"slug": "mono-green"}).json()
+    built = client.get("/api/claude", params={"slug": "mono-green-built"}).json()
     assert theoretical["default"]["preset"] == "second-opinion"
     assert built["default"]["preset"] == "consultant"
     # Neither default may write.
@@ -1945,16 +1971,16 @@ def test_the_status_lists_the_modes_that_actually_exist(client):
 # (`mtglab claude interview`) for the same reason `claude check` is.
 
 def test_the_interview_needs_a_card(client):
-    r = client.post("/api/decks/local/gyome-food/interview", json={})
+    r = client.post("/api/decks/local/mono-green/interview", json={})
     assert r.status_code == 422
 
 
 def test_the_interview_refuses_a_card_the_deck_does_not_run(client):
     """A 422 rather than a 404: the deck is fine, the question is not."""
-    r = client.post("/api/decks/local/gyome-food/interview",
+    r = client.post("/api/decks/local/mono-green/interview",
                     json={"card": "Black Lotus", "stance": "consultant"})
     assert r.status_code == 422
-    assert "not in gyome-food" in r.json()["detail"]
+    assert "not in mono-green" in r.json()["detail"]
 
 
 def test_the_interview_on_an_unknown_deck_is_a_404(client):
@@ -1969,8 +1995,8 @@ def test_the_interview_at_a_stance_of_off_makes_no_call(client):
     original = cc.connect
     cc.connect = lambda: pytest.fail("a stance of off must make no call")
     try:
-        r = client.post("/api/decks/local/gyome-food/interview",
-                        json={"card": "Bag End Banquet", "stance": "off"})
+        r = client.post("/api/decks/local/mono-green/interview",
+                        json={"card": "Sol Ring", "stance": "off"})
     finally:
         cc.connect = original
     assert r.status_code == 200
@@ -1989,16 +2015,16 @@ def test_the_interview_at_a_stance_of_off_makes_no_call(client):
 # broke deployed in a way no green suite could have seen.
 
 def test_the_argument_needs_a_card(client):
-    r = client.post("/api/decks/local/gyome-food/argue", json={})
+    r = client.post("/api/decks/local/mono-green/argue", json={})
     assert r.status_code == 422
 
 
 def test_the_argument_refuses_a_card_the_deck_does_not_run(client):
     """A 422 rather than a 404: the deck is fine, the question is not."""
-    r = client.post("/api/decks/local/gyome-food/argue",
+    r = client.post("/api/decks/local/mono-green/argue",
                     json={"card": "Black Lotus", "stance": "consultant"})
     assert r.status_code == 422
-    assert "not in gyome-food" in r.json()["detail"]
+    assert "not in mono-green" in r.json()["detail"]
 
 
 def test_the_argument_on_an_unknown_deck_is_a_404(client):
@@ -2012,8 +2038,8 @@ def test_the_argument_at_a_stance_of_off_makes_no_call(client):
     original = cc.connect
     cc.connect = lambda: pytest.fail("a stance of off must make no call")
     try:
-        r = client.post("/api/decks/local/gyome-food/argue",
-                        json={"card": "Bag End Banquet", "stance": "off"})
+        r = client.post("/api/decks/local/mono-green/argue",
+                        json={"card": "Sol Ring", "stance": "off"})
     finally:
         cc.connect = original
     assert r.status_code == 200
@@ -2031,8 +2057,8 @@ def test_the_argument_carries_no_field_for_the_case_in_favour(client):
     field would make the one-direction rule a UI convention rather than a
     property of the endpoint.
     """
-    r = client.post("/api/decks/local/gyome-food/argue",
-                    json={"card": "Bag End Banquet", "stance": "off"})
+    r = client.post("/api/decks/local/mono-green/argue",
+                    json={"card": "Sol Ring", "stance": "off"})
     body = r.json()
     for field in ("defence", "in_favour", "verdict", "rationale", "why",
                   "recommendation", "summary"):
@@ -2046,8 +2072,8 @@ def test_the_argument_is_a_different_mode_from_the_interview(client):
     them is the one a client renders from -- and rendering a one-sided
     argument under the interview's framing is the misread worth preventing.
     """
-    r = client.post("/api/decks/local/gyome-food/argue",
-                    json={"card": "Bag End Banquet", "stance": "off"})
+    r = client.post("/api/decks/local/mono-green/argue",
+                    json={"card": "Sol Ring", "stance": "off"})
     assert r.json()["mode"] == "slot-argument"
 
 
@@ -3228,9 +3254,9 @@ cards: []
 
 
 def test_add_refuses_a_card_the_pool_does_not_know(pool, in_memory_client):
-    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    deck = tiny_pool.mono_green_deck()
     with in_memory_client([deck]) as c:
-        r = c.post(f"/api/decks/{LOCAL_OWNER}/gyome-food/cards", json={
+        r = c.post(f"/api/decks/{LOCAL_OWNER}/mono-green/cards", json={
             "name": "No Such Card", "category": "ramp", "why": "x"})
     assert r.status_code == 422
     assert "not a card the pool knows" in r.json()["detail"]
@@ -3239,9 +3265,9 @@ def test_add_refuses_a_card_the_pool_does_not_know(pool, in_memory_client):
 def test_add_refuses_a_banned_card(pool, in_memory_client):
     """Rule 1's cheapest dividend: the pool knows Emrakul is banned, so the
     add is refused before a rationale is ever asked for."""
-    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    deck = tiny_pool.mono_green_deck()
     with in_memory_client([deck]) as c:
-        r = c.post(f"/api/decks/{LOCAL_OWNER}/gyome-food/cards", json={
+        r = c.post(f"/api/decks/{LOCAL_OWNER}/mono-green/cards", json={
             "name": "Emrakul, the Aeons Torn", "category": "threat",
             "why": "big"})
     assert r.status_code == 422
@@ -3249,9 +3275,9 @@ def test_add_refuses_a_banned_card(pool, in_memory_client):
 
 
 def test_set_category_refuses_a_word_off_the_taxonomy(pool, in_memory_client):
-    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    deck = tiny_pool.mono_green_deck()
     with in_memory_client([deck]) as c:
-        r = c.patch(f"/api/decks/{LOCAL_OWNER}/gyome-food/cards/Command Tower",
+        r = c.patch(f"/api/decks/{LOCAL_OWNER}/mono-green/cards/Sol Ring",
                     json={"field": "category", "value": "nonsense"})
     # The category list is fixed so counts stay comparable across decks.
     assert r.status_code == 422
@@ -3273,7 +3299,8 @@ def test_set_art_refuses_a_printing_of_somebody_else(pool):
     and only a query can know whose painting an id names. A well-formed id
     that is not this commander's is refused with the route that lists the
     ones that are."""
-    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    deck = Deck(slug="gyome-food", name="Gyome Food",
+                commander=["Gyome, Master Chef"], cards=[])
     src = MemoryDeckSource([deck])
     with pytest.raises(service.EditRejected,
                        match="not a printing of Gyome, Master Chef"):
@@ -3375,7 +3402,8 @@ def test_commander_dossier_of_a_headless_deck_is_a_shell(pool):
 
 def test_commander_dossier_reports_the_first_printing(pool):
     """The `first_set` lookup: min(released_at) resolved back to a set name."""
-    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    deck = Deck(slug="gyome-food", name="Gyome Food",
+                commander=["Gyome, Master Chef"], cards=[])
     body = service.commander_dossier("gyome-food",
                                      source=MemoryDeckSource([deck]))
     assert body["card"]["name"] == "Gyome, Master Chef"
@@ -3409,10 +3437,10 @@ def test_pool_stale_never_raises(pool):
 
 
 def test_import_refuses_a_slug_that_already_exists(pool, in_memory_client):
-    deck = Deck.load(Path("decks/gyome-food/deck.yaml"))
+    deck = tiny_pool.mono_green_deck()
     with in_memory_client([deck]) as c:
         r = c.post("/api/decks/import", json={
-            "text": "1 Forest\n", "slug": "gyome-food",
+            "text": "1 Forest\n", "slug": "mono-green",
             "commander": "Gyome, Master Chef"})
     assert r.status_code == 422
     assert "already exists" in r.json()["detail"]
@@ -3630,7 +3658,7 @@ def test_the_same_selection_twice_in_flight_is_one_sweep(in_memory_client,
 
 def test_wheel_route_spins_and_a_seed_replays(pool, client):
     """Punch list item 9: the spin is the server's, seeded like Tier 1."""
-    first = client.post("/api/decks/local/gyome-food/wheel",
+    first = client.post("/api/decks/local/mono-green/wheel",
                         json={"seed": 5})
     assert first.status_code == 200, first.text
     body = first.json()
@@ -3638,13 +3666,13 @@ def test_wheel_route_spins_and_a_seed_replays(pool, client):
     assert body["symbol"] in ("cup", "heart", "sword", "skull")
     assert body["seed"] == 5
     assert body["answered_by"] == "python"
-    again = client.post("/api/decks/local/gyome-food/wheel",
+    again = client.post("/api/decks/local/mono-green/wheel",
                         json={"seed": 5}).json()
     assert again == body
 
 
 def test_wheel_route_rolls_its_own_seed_when_unseeded(pool, client):
-    body = client.post("/api/decks/local/gyome-food/wheel", json={}).json()
+    body = client.post("/api/decks/local/mono-green/wheel", json={}).json()
     assert isinstance(body["seed"], int)
 
 

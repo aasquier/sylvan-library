@@ -263,9 +263,9 @@ def _report_edit(result):
         print(f"    {issue['code']}: {card}{issue['message']}")
     if result.get("stage") == "draft" and result.get("needs_rationale"):
         print(f"\n  draft: {result['needs_rationale']} card(s) still owe a `why`.")
-    print("\n  deck.yaml is the source of truth and its history is git history:\n"
-          "  commit this, then `mtglab decks build` --against the previous "
-          "revision for swaps.md.")
+    print("\n  deck.yaml is the source of truth; `mtglab decks build` records\n"
+          "  it as the baseline, so the next build's swaps.md shows what this\n"
+          "  edit changed.")
 
 
 def cmd_decks_swap(args):
@@ -558,7 +558,7 @@ def _when(stamp):
 
 
 def cmd_decks_build(args):
-    from mtglab.artifacts.generate import DraftDeck, write_all
+    from mtglab.artifacts.generate import SNAPSHOT, DraftDeck, write_all
     from mtglab.decks.validate import validate
 
     deck = _load(args.slug)
@@ -571,11 +571,18 @@ def cmd_decks_build(args):
     if rep.warnings:
         print(rep.render(), "\n")
 
+    outdir = config.DECKS_DIR / args.slug / "artifacts"
+
+    # The baseline for swaps.md, resolved before `write_all` moves it: an
+    # explicit --against wins, and otherwise the previous build's snapshot is
+    # the diff base (ADR 30 — build before editing, where it used to be
+    # commit before editing). A first build has neither, and emits no swaps.md.
     previous = None
     if args.against:
         previous = Deck.load(Path(args.against))
+    elif (outdir / SNAPSHOT).exists():
+        previous = Deck.load(outdir / SNAPSHOT)
 
-    outdir = config.DECKS_DIR / args.slug / "artifacts"
     try:
         written = write_all(deck, outdir, cards=cards, previous=previous)
     except DraftDeck as exc:
@@ -1756,7 +1763,9 @@ def main(argv=None):
                     help="how many entries to show, newest first (default 20)")
     lg.set_defaults(func=cmd_decks_log)
     b = decks.add_parser("build"); b.add_argument("slug")
-    b.add_argument("--against", help="path to a previous deck.yaml, to emit swaps.md")
+    b.add_argument("--against",
+                   help="path to a previous deck.yaml for swaps.md; defaults "
+                        "to the last build's own snapshot when one exists")
     b.add_argument("--force", action="store_true")
     b.set_defaults(func=cmd_decks_build)
 

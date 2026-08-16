@@ -72,12 +72,11 @@ npm --prefix web run build   # rebuild the committed bundle -- required if you
 
 ## Adding your own decks
 
-Decks live at `decks/<slug>/deck.yaml`. Start from `decks/_template/deck.yaml`.
-
-If several people keep decks here, namespace them — `decks/<yourname>/<slug>/`
-— so nobody's refactor collides with anybody else's. If you would rather keep
-your lists to yourself, fork instead; the tool does not care where the deck
-files live.
+Decks live at `decks/<slug>/deck.yaml` — your app data, not repository
+content ([ADR 30](docs/adr/0030-decks-are-live-app-data.md)): the directory
+is gitignored, so your lists stay yours and never ride into a pull request.
+Start from [`docs/deck-template.yaml`](docs/deck-template.yaml), or skip the
+template entirely with `mtglab decks import`.
 
 Every card needs a `category` and a `why`. Validation fails without them, on
 purpose: a card you cannot justify is a card to cut. **Nothing writes that
@@ -100,12 +99,14 @@ mtglab decks validate <slug>          # the gate. fix errors first
 mtglab decks suggest <slug>           # replacements for what the gate flagged
 mtglab sim mana <slug>                # baseline consistency
 mtglab sim lands <slug> 30 40         # is the land count right?
-git commit -am "before refactor"      # so the swap list has something to diff
+mtglab decks build <slug>             # stashes the baseline for the swap list
 # ...edit deck.yaml...
-mtglab decks build <slug> --against <(git show HEAD:decks/<slug>/deck.yaml)
+mtglab decks build <slug>             # swaps.md now shows what you changed
 ```
 
-`swaps.md` is a **git diff**. Commit before you edit or you will not get one.
+`swaps.md` diffs against the last build's snapshot
+(`artifacts/deck.last-built.yaml`). **Build before you edit** or the next
+build has no baseline; `--against <path>` accepts an explicit one.
 
 ## Command reference
 

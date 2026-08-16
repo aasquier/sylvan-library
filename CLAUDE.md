@@ -1,6 +1,6 @@
 # sylvan-library
 
-Local-first Commander toolkit: deck files in git, Monte Carlo simulation,
+Local-first Commander toolkit: deck files on disk, Monte Carlo simulation,
 Scryfall-validated decklists, generated primers.
 
 Python 3.11+ · DuckDB · numpy. The package and CLI are named `mtglab`; the repo
@@ -166,18 +166,22 @@ src/mtglab/
   cli.py
 web/                      frontend source (React + Vite); `npm test` is Vitest,
                           and web/README.md is the conventions map
-decks/<slug>/deck.yaml    SOURCE OF TRUTH
+decks/<slug>/deck.yaml    SOURCE OF TRUTH — live app data, NOT in git (ADR 30)
 decks/<slug>/artifacts/   GENERATED — never edit by hand
 Dockerfile                two stages, no Node; app runs non-root
 docker-entrypoint.sh      fixes the volume's ownership, then drops privileges
 fly.toml                  the only Fly-specific file; no secrets, ever
 ```
 
-Deployed, **decks live on the volume at `/data/decks`, not in the image** — the
+**Decks do not live in git** (ADR 30). `decks/` is the local app's data
+directory — gitignored, like the pool and `app.db` — and deployed, decks live
+on the volume at `/data/decks`, which is the only copy that instance has: the
 app's editing routes write `deck.yaml`, so decks baked into a layer would lose
-every edit at the next deploy. The image carries them at `/app/decks-seed` and
-`docs/HOSTING.md` §4 step 6 copies them across once. The pool is never in the
-image at all.
+every edit at the next deploy. The image carries no decks and no pool at all;
+`docs/HOSTING.md` §4 step 6 says how a fresh instance's library fills (a
+backup, your laptop, or an import). Deck history is the activity log (ADR 28),
+and `swaps.md` diffs against the last build's own snapshot
+(`artifacts/deck.last-built.yaml`), not against a git revision.
 
 Layering: `api/` must not import from `cli.py`. Anything both need lives in
 `config.py` or the relevant package — that rule is why `deck_paths` and the
@@ -414,7 +418,7 @@ mtglab sim mana <slug>            # baseline consistency
 mtglab sim lands <slug> 30 40     # is the land count right?
 mtglab sim cache                  # what Tier 1 results are memoised; --clear
 mtglab sim forge <a> <b> [c] [d]  # Tier 3 — Forge plays real games
-git commit -am "before refactor"  # so swaps.md has something to diff
+mtglab decks build <slug>         # before a refactor, so swaps.md can diff it
 ```
 
 Site imagery goes through the animist (ADR 29) — never hand-place a binary:
@@ -442,10 +446,13 @@ mtglab decks set <slug> --art <set-code>   # which printing's art the deck shows
 mtglab decks promote <slug>       # draft -> curated, once every card is justified
 mtglab decks delete <slug>        # confirm by typing the slug; moves to decks/.trash/
 mtglab decks log <slug>           what has been done to it, and by whom
-mtglab decks build <slug> --against <(git show HEAD:decks/<slug>/deck.yaml)
+mtglab decks build <slug>         # diffs against the last build's snapshot
 ```
 
-`swaps.md` is a **git diff**. Commit before editing or you won't get one.
+`swaps.md` diffs the deck against `artifacts/deck.last-built.yaml`, which
+every build stashes (ADR 30 — decks are not in git, so there is no revision
+to diff). **Build before editing** or the next build has no baseline;
+`--against <path>` still accepts an explicit one.
 
 ## Python decides, Claude advises
 
@@ -842,10 +849,13 @@ only), Atla Palani dinosaurs (Naya), Goreclaw mono-green stompy (bracket 4),
 Tivit (Esper cEDH, bracket 5), Gyome food (Golgari, bracket 4), and Trostani
 tokens (Selesnya — an older token deck retooled into this list).
 
-All six are migrated into `decks/<slug>/deck.yaml`, which is now the only
-source of truth — the original markdown in `~/Downloads` is historical and
-should not be edited or re-imported. `ROADMAP.md` records what the migration
-turned up.
+All six live as `decks/<slug>/deck.yaml` — Aaron's app data on this machine
+and on the instance's volume, **not in git** (ADR 30), so a fresh checkout has
+none of them and nothing in the suite may assume otherwise. The original
+markdown in `~/Downloads` is historical and should not be edited or
+re-imported. `ROADMAP.md` records what the migration turned up. The facts
+below (statuses, stages, the two banned cards) are recorded here as prose
+precisely because no test can read the files to check them.
 
 Each deck declares `status: built | theoretical`. **Goreclaw and Tivit are
 theoretical** — lists under consideration, not boxes of cards; the other four

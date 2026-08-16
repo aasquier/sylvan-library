@@ -42,16 +42,16 @@ dist/
 # Tests, docs and planning documents. The image runs the app; CI runs the
 # suite, from a checkout rather than from a layer.
 #
-# `*.md` is root-level only — a single `*` does not cross a `/` — which is the
-# intent: CLAUDE.md and ROADMAP.md go, and the generated artifacts inside
-# `decks/<slug>/artifacts/` stay, since those belong to the decks being seeded.
+# `*.md` is root-level only — a single `*` does not cross a `/` — which keeps
+# CLAUDE.md and ROADMAP.md out without reaching into subdirectories.
 tests/
 docs/
 *.md
 
-# Deleted decks. `mtglab decks delete` moves a deck here rather than unlinking
-# it, and a trashed deck is not something to ship.
-decks/.trash/
+# Decks. Live app data (ADR 30) — gitignored, so a checkout has none, but a
+# local working copy does and it must never reach a layer: the volume is the
+# only copy an instance should ever have.
+decks/
 
 # Forge's distribution, if it was ever unpacked in-tree. Several hundred MB,
 # and `res/cardsfolder` is card pool data by another name.

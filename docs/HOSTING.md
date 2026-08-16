@@ -15,30 +15,23 @@ stale copy of the code. One instance means one upgrade path.
 Everything else depends on this, so it goes first.
 
 **sylvan-library is local-first by design.** `decks/<slug>/deck.yaml` is the
-source of truth, it lives in git, and *deck history is git history* —
-`git log -p decks/gyome-food/deck.yaml` is the swap record, and `swaps.md` is
-literally a git diff. That is a real feature, and it is the thing that breaks
-the moment other people have decks.
-
-Friends' decks cannot live in your git repo. So you need a second storage path,
-and the question is how much of the local-first model to keep.
+source of truth. It lived in git when this section was first written; ADR 30
+has since made decks **live app data** — `decks/` locally, `/data/decks` on
+the volume, gitignored everywhere — with the activity log (ADR 28) as the
+edit record and the build snapshot as `swaps.md`'s baseline. What follows kept
+its shape through that change: there are still two tiers, because friends'
+decks still need per-user storage.
 
 ### Recommended: two tiers, not one
 
 | Tier | Storage | Who writes it | Keeps |
 | --- | --- | --- | --- |
-| **Curated decks** (your six) | `decks/*.yaml` in git, as today | You, locally, via CLI | Full local-first model, git-diff `swaps.md`, artifacts in the repo |
-| **User decks** | SQLite on the volume, one row per deck | Logged-in users, via UI | Per-user isolation, no git |
+| **Curated decks** (your six) | `deck.yaml` files under `MTGLAB_DECKS_DIR` | You, via CLI or UI | The file-based model: the gate, the five artifacts, `swaps.md` |
+| **User decks** | SQLite on the volume, one row per deck | Logged-in users, via UI | Per-user isolation |
 
-Your six ship read-only inside the image and everyone can view them — that is
-the showcase, and it is what makes the site worth logging into. Nothing about
-your workflow changes: you still edit YAML locally, still run
-`mtglab decks build`, still commit. Users get a UI-backed deck store that never
-touches git.
-
-**Why not put everything in the database?** You would lose the git swap record,
-which is one of the few genuinely novel things this project does. Don't trade
-it away to save one code path.
+Your six live on the volume and everyone can view them — that is the
+showcase, and it is what makes the site worth logging into. Users get a
+UI-backed deck store.
 
 **Why not give each user a git repo on the volume?** Tempting — it would
 preserve `swaps.md` for everyone. But it means running git operations per
@@ -790,17 +783,22 @@ documented run, not a build step and not a boot step** — the pool half needs
 several minutes and a ~500 MB download, and with scale-to-zero putting boot on
 the request path, doing it at startup would turn a visit into an outage.
 
-**The decks**, first, because it is instant. The image carries the repository's
-decks at `/app/decks-seed`; `MTGLAB_DECKS_DIR` points at the volume, so nothing
-is live until they are copied:
+**The decks**, first, because it is instant. The image carries none (ADR 30:
+decks are live app data, not repository content), so a fresh instance's
+library fills the way the pool does — from outside. Either restore a backup
+pulled off a previous instance:
 
 ```bash
-fly ssh console -C "cp -rn /app/decks-seed/. /data/decks/"
+fly ssh sftp put ./backups/decks-<date>/<slug>/deck.yaml /data/decks/<slug>/deck.yaml
 ```
 
-`-n` so re-running it never overwrites an edit made on the instance. The copy
-runs as root, so hand the files back afterwards — the entrypoint does this at
-every boot, and a restart would fix it, but not before the first write fails:
+or push your local working decks up, one `deck.yaml` per deck, or simply
+import through the app once you can sign in. A brand-new instance with zero
+decks is a legitimate state, not a broken one.
+
+Files put over sftp arrive owned by root, so hand them back afterwards — the
+entrypoint does this at every boot, and a restart would fix it, but not
+before the first write fails:
 
 ```bash
 fly ssh console -C "chown -R mtglab:mtglab /data"
@@ -818,14 +816,16 @@ part-way, re-run it: `download_bulk` writes to a `.part` file and renames only
 on completion, so an interrupted download is never mistaken for a finished one.
 
 Verify, and note this checks both halves at once — `validate` needs the pool
-to check card facts and the decks to have something to check:
+to check card facts and a deck to have something to check (use whichever slug
+you restored or imported):
 
 ```bash
 fly ssh console -C "mtglab decks validate gyome-food"
 ```
 
-Expect **Goreclaw and Atla Palani to fail the gate on one banned card each**.
-That is a known, deliberate state recorded in CLAUDE.md, not a bad deploy.
+On the maintainer's own library, expect **Goreclaw and Atla Palani to fail
+the gate on one banned card each**. That is a known, deliberate state
+recorded in CLAUDE.md, not a bad deploy.
 
 #### Reading the mail DNS, and the mistake worth not repeating
 
@@ -1160,30 +1160,23 @@ does not work. Your options, in order of how much I would recommend them:
 
 Start with (1). Only build (2) if you find yourself forgetting.
 
-### Decks on the volume, and the repository
+### Decks on the volume, and the laptop
 
-Decks live at `/data/decks` on the instance and at `decks/` in git, and **from
-the first edit made in the hosted app those two diverge.** Neither is
-automatically authoritative; the deployment did not decide that question, it
-created it. Say which one you mean before you copy in either direction.
-
-The honest framing is that the repository is the source of truth for the six
-curated decks and the instance is the source of truth for anything written on
-it. Pull instance-side work back into git rather than pushing over it:
+This section used to be about keeping `/data/decks` in step with a copy
+tracked in git, and it opened with the admission that neither was
+automatically authoritative. ADR 30 resolved that by removal: decks are live
+app data, git holds none, and **each instance's `MTGLAB_DECKS_DIR` is the
+only copy that instance has.** The laptop's `decks/` and the volume's
+`/data/decks` are two different libraries that happen to share some slugs,
+the same way two laptops would be. Copy between them deliberately, in
+whichever direction you mean:
 
 ```bash
 fly ssh sftp get /data/decks/<slug>/deck.yaml ./decks/<slug>/deck.yaml
 ```
 
-Then `mtglab decks build <slug>` locally and commit — the artifacts are
-generated, so regenerating them beside the deck they describe is the point.
-Going the other way (`sftp put`) silently overwrites whatever was written on the
-instance, so do it only when you know nothing was.
-
-This is worth revisiting rather than living with. A `DeckSource` backed by git,
-or a second tier as §0 sketches, would make the question have one answer; the
-architecture is already shaped for it, since deck-facing endpoints take a
-`DeckSource` from the request scope rather than reading the filesystem.
+`sftp put` silently overwrites whatever was written on the instance, so do it
+only when you know nothing was — the History tab (ADR 28) is how you know.
 
 ### Backups
 
@@ -1191,9 +1184,10 @@ The pool needs no backup — `data refresh` rebuilds it in one command. That is
 the whole reason it is gitignored.
 
 Two things on the volume *are* irreplaceable. **`app.db`** holds users,
-sessions and password hashes. **`/data/decks`** holds every deck edit made on
-the instance and not yet pulled back into git — the rationales your friends
-wrote, which by rule 4 nobody may regenerate on their behalf.
+sessions and password hashes. **`/data/decks`** holds the instance's whole
+library — since ADR 30 there is no git copy behind it — including the
+rationales your friends wrote, which by rule 4 nobody may regenerate on
+their behalf.
 
 Back `app.db` up with SQLite's online backup, which is safe to run against a
 live database. **There is no `sqlite3` binary in the image** — the same class of
@@ -1246,8 +1240,8 @@ fly ssh console -C "python3 -c \"import sqlite3; print(sqlite3.connect('/data/ap
 ```
 
 The decks need no such ceremony — they are plain YAML — but they do need
-copying, which is the same operation as pulling instance-side work back into
-git above:
+copying, and since ADR 30 this pull is the instance's whole recovery story
+alongside Fly's own snapshots:
 
 ```bash
 fly ssh sftp get /data/decks ./backups/decks-$(date +%F)
@@ -1487,7 +1481,9 @@ unticked box below is an open question, not a blocker that was ignored.
       deploy. See the deck-drift note in §5, which is the question that choice
       creates rather than answers.
 - [x] **A documented pool-seeding run** against the volume — §4 step 6, which
-      now seeds decks as well. Not a build step and not a boot step: it needs
+      also says where decks come from (a backup, your laptop, or an import —
+      the image carries none since ADR 30). Not a build step and not a boot
+      step: it needs
       several minutes and a ~500 MB download, and with scale-to-zero putting
       boot on the request path it would turn a wake into an outage.
       **This one needed a code fix to be true rather than only written down.**
@@ -1505,8 +1501,8 @@ unticked box below is an open question, not a blocker that was ignored.
       (the dev machine is Intel; anything deployed to is arm64), runs the
       amd64 image with auth on, and requires: `/api/health` answers 200 with
       `"pool": false`, `/api/decks` answers 401, PID 1 runs as `mtglab`,
-      `/data` is writable by it, no card pool file exists anywhere in the image,
-      and the decks seed is at the path §4 step 6's copy command names. Trivy
+      `/data` is writable by it, and no card pool file and no `deck.yaml`
+      exists anywhere in the image (ADR 30). Trivy
       fails the build on HIGH/CRITICAL. **`image` is a required check on `main`
       as of 2026-08-12**, which it was not on the day it shipped — a check that
       is not required does not gate, and it sat passing-but-decorative for a

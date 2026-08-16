@@ -14,7 +14,7 @@ they differ.
 
 | # | Decision | Status |
 | --- | --- | --- |
-| [1](0001-deck-yaml-in-git-is-the-source-of-truth.md) | `deck.yaml` in git is the source of truth, and deck history is git history | Accepted |
+| [1](0001-deck-yaml-in-git-is-the-source-of-truth.md) | `deck.yaml` in git is the source of truth, and deck history is git history | Accepted — the *location* half superseded by [30](0030-decks-are-live-app-data.md) |
 | [2](0002-duckdb-for-the-card-corpus.md) | DuckDB for the card corpus — not SQLite, not Postgres, not the API | Accepted |
 | [3](0003-tier-1-stays-python.md) | Tier 1 stays Python; a compiled port is deferred with a written trigger | Accepted |
 | [4](0004-two-embedded-databases.md) | Two embedded databases when hosting, and two tiers of deck | Proposed |
@@ -43,6 +43,7 @@ they differ.
 | [27](0027-entomb-is-the-delete-and-the-graveyard-is-the-undo.md) | Entomb is the delete, and the graveyard is the undo | Accepted |
 | [28](0028-the-activity-log-records-edits-and-never-rationales.md) | The activity log records edits, and never rationales | Accepted |
 | [29](0029-an-asset-is-committed-only-with-a-recipe.md) | An asset is committed only with a recipe, and the licence gate has no override | Accepted |
+| [30](0030-decks-are-live-app-data.md) | Decks are live app data, not repository content | Accepted |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the
@@ -163,6 +164,15 @@ is the deck gate's shape — a refusal with no override flag — and
 clothes. The recipes it introduced also closed an old debt: both PROVENANCE
 files described scripts that were never committed, and the claim they made is
 now `tests/test_animist_recipes_repo.py`.
+
+30 supersedes half a sentence of 1, and it is the half everything since had
+been quietly contradicting: `deck.yaml` is still the source of truth, but it
+lives where the app's other data lives — `MTGLAB_DECKS_DIR`, the volume when
+deployed — and not in this repository. Read it next to 22 and 28: once decks
+had owners and a purpose-built history, git was the third-best record of both,
+and the two-copies question HOSTING had to document is resolved by there being
+one copy per instance. The removal does not rewrite history; the curated six
+as of 2026-08-16 stay readable in old revisions, deliberately.
 
 ## Where the longer arguments live
 
