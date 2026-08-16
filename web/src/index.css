@@ -654,9 +654,126 @@ button:hover .tarot-fan-card {
      ~133px and clears the cards by about 55px, and it reaches full size on a
      desktop where there was never a problem. `tarot.tsx` holds the other half
      — the ball is not rendered at all below `lg`, because a ball squeezed to
-     its 120px floor to fit a tablet is a worse table than one with no ball. */
-  width: clamp(120px, 13vw, 168px);
+     its 120px floor to fit a tablet is a worse table than one with no ball.
+
+     The ceiling rose 168 → 190 with the punch-list rework (item 11): the
+     vision shows the whole card now, so on a desktop the glass earns the
+     extra inch. 190px only applies above ~1460px wide, where the clearance
+     arithmetic has hundreds of pixels to spare. */
+  position: relative;
+  width: clamp(120px, 13vw, 190px);
   filter: drop-shadow(0 12px 22px rgba(8, 4, 34, 0.55));
+}
+
+/* The svg joins the positioned stacking order, or the (positioned) haze
+   behind it would paint on top regardless of DOM order. */
+.crystal-ball svg {
+  position: relative;
+}
+
+/* The room behind the glass (item 11): smoke that drifts, and a light in it
+   that will not hold steady — a candle somewhere off the table's edge. All
+   blurred radial washes on three spans, all behind the sphere. */
+.crystal-haze {
+  position: absolute;
+  inset: -34% -55%;
+  pointer-events: none;
+}
+
+.crystal-haze-puff {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(13px);
+  background: radial-gradient(
+    closest-side,
+    rgba(158, 128, 226, 0.3),
+    rgba(158, 128, 226, 0)
+  );
+}
+
+.crystal-haze-a {
+  left: 2%;
+  top: 26%;
+  width: 62%;
+  height: 42%;
+  animation: haze-drift 23s ease-in-out infinite alternate;
+}
+
+.crystal-haze-b {
+  right: 0%;
+  top: 44%;
+  width: 55%;
+  height: 38%;
+  animation: haze-drift-back 31s ease-in-out infinite alternate;
+}
+
+.crystal-haze-c {
+  left: 22%;
+  bottom: 4%;
+  width: 58%;
+  height: 34%;
+  opacity: 0.8;
+  animation: haze-drift 41s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes haze-drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(26px, -14px) scale(1.18);
+  }
+}
+
+@keyframes haze-drift-back {
+  from {
+    transform: translate(0, 0) scale(1.1);
+  }
+  to {
+    transform: translate(-30px, 10px) scale(0.94);
+  }
+}
+
+.crystal-backlight {
+  position: absolute;
+  inset: 12% 18% 24% 18%;
+  background: radial-gradient(
+    closest-side,
+    rgba(255, 196, 128, 0.26),
+    rgba(255, 196, 128, 0)
+  );
+  filter: blur(9px);
+  animation: backlight-flicker 7.3s ease-in-out infinite;
+}
+
+/* Candle arithmetic: mostly steady, two fast dips, one surge — flicker is
+   irregularity, and a sine wave is the opposite of that. */
+@keyframes backlight-flicker {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  11% {
+    opacity: 0.95;
+  }
+  14% {
+    opacity: 0.55;
+  }
+  17% {
+    opacity: 0.9;
+  }
+  43% {
+    opacity: 0.7;
+  }
+  61% {
+    opacity: 1;
+  }
+  64% {
+    opacity: 0.6;
+  }
+  67% {
+    opacity: 0.85;
+  }
 }
 
 .crystal-fog,
@@ -894,7 +1011,9 @@ button:hover .tarot-fan-card {
   .crystal-aura,
   .crystal-nebula-a,
   .crystal-nebula-b,
-  .crystal-stars {
+  .crystal-stars,
+  .crystal-haze-puff,
+  .crystal-backlight {
     animation: none;
   }
   .crystal-spark {
