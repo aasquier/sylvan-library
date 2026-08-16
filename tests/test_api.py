@@ -215,6 +215,14 @@ def test_deck_list_gate_counts_agree_with_the_validate_endpoint(pool, client):
         assert rep["ok"] == (deck["errors"] == 0)
 
 
+def test_the_commander_card_carries_its_oracle_id(swappable):
+    """The motion tier (ADR 32) is keyed on oracle_id, and the deck page
+    learns it from this payload rather than from a second request."""
+    with swappable as client:
+        card = client.get("/api/decks/local/mono-green").json()["commander_card"]
+    assert card["oracle_id"], "the commander resolved against a real pool"
+
+
 def test_deck_detail_has_every_card_with_its_why(client):
     body = client.get("/api/decks/local/mono-green").json()
     assert body["total_cards"] == 99

@@ -17,6 +17,7 @@ import {
 } from '../lib/api'
 import { categoryLabel, identityName } from '../lib/mtg'
 import { SceneBackdrop } from '../components/forest'
+import { CommanderMotion } from '../components/cardmotion'
 import { WheelOfFortune } from '../components/wheel'
 import {
   ArmedButton,
@@ -287,8 +288,16 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
               all — it gives up the bottom instead, which on card art is
               ground, robes and negative space far more often than it is the
               subject. */}
-          <CardArt src={card.art_crop} alt="" ratio="aspect-[1200/300]"
-                   className="rounded-none" position="center top" />
+          {/* The painting breathes when its derivative exists (ADR 32) and
+              is exactly this still when it does not — the motion tier can
+              only ever add, never break the band. */}
+          <CommanderMotion
+            oracleId={card.oracle_id}
+            className="deck-hero-motion"
+            still={
+              <CardArt src={card.art_crop} alt="" ratio="aspect-[1200/300]"
+                       className="rounded-none" position="center top" />
+            } />
           <div className="deck-hero-scrim" />
           {/* The deck page's room is its commander's painting (punch list
               item 10) — the same wash every masthead page gets, from the

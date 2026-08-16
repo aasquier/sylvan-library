@@ -135,6 +135,9 @@ export interface Card {
   // cards legitimately have none.
   flavor_text?: string | null
   artist?: string | null
+  /** Also commander-only: the key the motion tier (ADR 32) is cached on.
+   *  Null when the pool is absent or the name did not resolve. */
+  oracle_id?: string | null
   /** Set only when the deck picked a specific printing for its commander, so
    *  the header can name which painting it is showing. Its absence means the
    *  pool's default printing. */

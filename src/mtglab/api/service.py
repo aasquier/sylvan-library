@@ -665,6 +665,15 @@ def get_deck(slug: str, *, source: DeckSource | None = None,
             type("E", (), {"name": deck.commander[0], "category": "commander",
                            "why": deck.notes.get("commander_why", ""), "qty": 1})(),
             commander_rec, full=True) if commander_rec else None
+        # The motion tier (ADR 32) is keyed on oracle_id, and this payload is
+        # the one place the deck page learns who its commander *is* rather
+        # than what the card says -- so the id rides here, not in a second
+        # request.
+        if commander_card is not None and con is not None:
+            row = con.execute(
+                "SELECT oracle_id FROM oracle_cards WHERE name = ? LIMIT 1",
+                [deck.commander[0]]).fetchone()
+            commander_card["oracle_id"] = row[0] if row else None
         # The chosen printing replaces the images and nothing else. Oracle text,
         # cost, type line and colour identity are the *card's*, and they do not
         # vary by printing -- swapping them here would make a cosmetic choice
