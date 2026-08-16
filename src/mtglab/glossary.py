@@ -388,6 +388,52 @@ TERMS: tuple[Term, ...] = (
         "reported on its own rather than folded into the rest.",
         "simulator", ("mana-base", "color-identity", "pip")),
     Term(
+        "stat.median_first_spell", "First spell",
+        "The median turn this deck casts its first nonland spell.",
+        "The tempo number the curve chart implies but never states. A deck "
+        "whose first spell lands on turn one is applying pressure or fixing "
+        "before opponents untap twice; one that waits until turn three has "
+        "conceded the opening to the table. Only games that cast a spell at "
+        "all inside the horizon are counted, so a catastrophic draw does not "
+        "drag the median — it shows up in stalled turns instead.",
+        "simulator", ("stat.stalled_turns", "curve")),
+    Term(
+        "stat.stalled_turns", "Stalled turns",
+        "Turns per game that end with no spell cast while at least one sat "
+        "in hand.",
+        "The whole-game cost of every kind of mana failure at once: too few "
+        "lands, wrong colours, or a hand whose curve outran the board. The "
+        "colour-only subset is reported separately as colour-only blocks; "
+        "this is the union, and it is the number that answers \"how often "
+        "does this deck just sit there\". Zero is not the goal — a turn "
+        "spent deploying nothing because everything already deployed is not "
+        "counted — but a rising trend against a similar deck is a mana base "
+        "asking for help.",
+        "simulator", ("stat.color_screw_rate", "stat.missed_drop")),
+    Term(
+        "stat.missed_drop", "Missed land drops",
+        "The chance of having no land to play on a given turn.",
+        "Counted only when the hand held none — choosing to hold a land "
+        "back is not a miss, and the simulator never chooses that anyway. "
+        "Early misses are the expensive ones: a missed third turn costs a "
+        "whole turn of development, where a missed eleventh usually costs "
+        "nothing. Read it alongside the lands-by-turn average: the average "
+        "says where the deck usually is, this says how often it trips.",
+        "simulator", ("stat.stalled_turns", "mana-base")),
+    Term(
+        "stat.card_timing", "When cards come online",
+        "Per card: how often it was cast at all, and the median turn of its "
+        "first cast when it was.",
+        "The gap between a card's mana value and its median first cast is "
+        "the telling number — a four-drop with a median of seven is waiting "
+        "on something, usually colours or competition for the same turn. "
+        "The cast rates look low and should: a specific card in a "
+        "ninety-nine is drawn at all in only a minority of eight-turn "
+        "games, which is exactly why the deck needs a plan and not a "
+        "favourite card. Rows sort worst-first, so the top of the table is "
+        "the to-do list.",
+        "simulator", ("stat.median_commander_turn", "curve")),
+    Term(
         "stat.spells_through_t8", "Spells deployed through T8",
         "The total number of spells cast in the first eight turns. This is "
         "the number a land count is chosen on.",

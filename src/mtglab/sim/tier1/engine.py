@@ -90,6 +90,20 @@ class GameResult:
     unused_by_turn: list[int]
     mulligans: int
     color_screwed_turns: int
+    # --- the per-game texture (second 2026-08-15 punch list, item 11) ----
+    # The turn each named nonland spell was first cast, when it was. Keyed by
+    # name: the 99 is singleton apart from basics, and basics are lands.
+    first_cast: dict[str, int]
+    # True for each turn where no land was played while none was in hand --
+    # a missed drop, as opposed to a chosen discard of tempo.
+    missed_drop_by_turn: list[bool]
+    # The first turn any nonland spell resolved, or None for a game that
+    # never got moving inside the horizon.
+    first_spell_turn: int | None
+    # Turns that ended with zero spells cast while at least one nonland
+    # spell sat in hand -- the "couldn't act" count, blocked on quantity or
+    # colour alike (color_screwed_turns is the colour-only subset).
+    stalled_turns: int
 
 
 def _consume(cost: ManaCost, sources: list[ManaSource]) -> list[ManaSource] | None:
@@ -209,6 +223,10 @@ def simulate_game(
     spells_by_turn: list[int] = []
     unused_by_turn: list[int] = []
     color_screwed = 0
+    first_cast: dict[str, int] = {}
+    missed_drop_by_turn: list[bool] = []
+    first_spell_turn: int | None = None
+    stalled_turns = 0
 
     for turn in range(1, turns + 1):
         if not (turn == 1 and on_the_play):
@@ -228,6 +246,10 @@ def simulate_game(
             battlefield.append((land, turn))
             if not land.enters_tapped:
                 pool.extend(land.produces)
+        # A missed drop is having none to play, not choosing not to --
+        # `_pick_land` always plays one when the hand holds one.
+        missed_drop_by_turn.append(
+            land is None and not any(c.is_land for c in hand))
 
         # --- casting ------------------------------------------------------
         cast_count = 0
@@ -258,6 +280,9 @@ def simulate_game(
             assert remaining is not None
             pool = remaining
 
+            if first_spell_turn is None:
+                first_spell_turn = turn
+            first_cast.setdefault(chosen.name, turn)
             if chosen is commander:
                 commander_turn = turn
                 battlefield.append((chosen, turn))
@@ -283,6 +308,8 @@ def simulate_game(
         )
         spells_by_turn.append(cast_count)
         unused_by_turn.append(len(expand_units(pool)))
+        if cast_count == 0 and any(not c.is_land for c in hand):
+            stalled_turns += 1
 
     return GameResult(
         commander_turn=commander_turn,
@@ -292,7 +319,31 @@ def simulate_game(
         unused_by_turn=unused_by_turn,
         mulligans=mulligans,
         color_screwed_turns=color_screwed,
+        first_cast=first_cast,
+        missed_drop_by_turn=missed_drop_by_turn,
+        first_spell_turn=first_spell_turn,
+        stalled_turns=stalled_turns,
     )
+
+
+@dataclass(frozen=True)
+class CardTiming:
+    """When one card actually comes online, over many games.
+
+    The gap between `mv` and `median_turn` is the fun number: a four-drop
+    with a median first cast of seven is telling you something about the
+    mana base (or about how much else competes for the same turn) that no
+    curve histogram shows.
+    """
+
+    name: str
+    mv: int
+    #: Fraction of games in which it was cast at all inside the horizon.
+    cast_rate: float
+    #: Median turn of the first cast, over the games that cast it.
+    median_turn: float | None
+    #: Fraction of games in which it was down by end of turn 8.
+    by_t8: float
 
 
 @dataclass
@@ -310,6 +361,17 @@ class SimSummary:
     avg_unused_by_turn: list[float]
     avg_spells_by_turn: list[float]
     color_screw_rate: float
+    # --- the texture (second 2026-08-15 punch list, item 11) -------------
+    #: Per nonland spell, when it comes online. Sorted latest median first,
+    #: because the interesting rows are the ones running late.
+    card_timings: list[CardTiming]
+    #: P(no land to play on turn t), cumulative misses being the reader's own
+    #: sum -- the per-turn number is the honest unit.
+    missed_drop_by_turn: list[float]
+    #: Median turn of the first nonland spell, over games that cast one.
+    median_first_spell_turn: float | None
+    #: Turns per game that ended castless with a spell in hand.
+    avg_stalled_turns: float
 
     def spells_through(self, turn: int) -> float:
         """Total spells deployed by end of `turn` -- the flood-aware measure
@@ -327,6 +389,9 @@ class SimSummary:
             f"median commander turn: {self.median_commander_turn}",
             f"commander never cast by T{self.turns}: {self.never_cast_commander:.1%}",
             f"turns with a color-only block: {self.color_screw_rate:.2f} per game",
+            f"median first spell: T{self.median_first_spell_turn}",
+            (f"stalled turns (castless with a spell in hand): "
+             f"{self.avg_stalled_turns:.2f} per game"),
             "",
             "  turn   lands   mana   unused   spells   P(commander down)",
         ]
@@ -372,6 +437,10 @@ def run(
     unused_acc = [0.0] * turns
     spells_acc = [0.0] * turns
     screw_acc = 0
+    cast_turns: dict[str, list[int]] = {}
+    missed_acc = [0] * turns
+    first_spells: list[int] = []
+    stalled_total = 0
 
     for game_index in range(games):
         if progress is not None and game_index % report_every == 0:
@@ -385,11 +454,18 @@ def run(
         mull_total += res.mulligans
         mull_any += 1 if res.mulligans else 0
         screw_acc += res.color_screwed_turns
+        stalled_total += res.stalled_turns
+        if res.first_spell_turn is not None:
+            first_spells.append(res.first_spell_turn)
+        for name, cast_on in res.first_cast.items():
+            cast_turns.setdefault(name, []).append(cast_on)
         for i in range(turns):
             lands_acc[i] += res.lands_by_turn[i]
             mana_acc[i] += res.mana_by_turn[i]
             unused_acc[i] += res.unused_by_turn[i]
             spells_acc[i] += res.spells_by_turn[i]
+            if res.missed_drop_by_turn[i]:
+                missed_acc[i] += 1
 
     if progress is not None:
         progress(games, games)
@@ -400,6 +476,31 @@ def run(
     for t in range(1, turns + 1):
         running += cum.get(t, 0)
         by_turn[t] = running / games
+
+    # Every distinct nonland spell in the deck, whether or not any game cast
+    # it -- a card the simulation *never* reached is the most interesting row
+    # of all, and dropping it would hide exactly that. Duplicates collapse by
+    # name, which in a singleton format is only the handful of spells a deck
+    # runs twice by special dispensation.
+    mv_by_name: dict[str, int] = {}
+    for c in library:
+        if not c.is_land:
+            mv_by_name.setdefault(c.name, c.mv)
+    if commander is not None:
+        mv_by_name.setdefault(commander.name, commander.mv)
+    timings = []
+    for name, mv in mv_by_name.items():
+        casts = cast_turns.get(name, [])
+        timings.append(CardTiming(
+            name=name,
+            mv=mv,
+            cast_rate=len(casts) / games,
+            median_turn=float(median(casts)) if casts else None,
+            by_t8=sum(1 for t in casts if t <= 8) / games,
+        ))
+    # Latest median first; the never-cast rows (median None) lead outright.
+    timings.sort(key=lambda t: (t.median_turn is not None,
+                                -(t.median_turn or 0), t.name))
 
     return SimSummary(
         games=games,
@@ -415,6 +516,10 @@ def run(
         avg_unused_by_turn=[x / games for x in unused_acc],
         avg_spells_by_turn=[x / games for x in spells_acc],
         color_screw_rate=screw_acc / games,
+        card_timings=timings,
+        missed_drop_by_turn=[x / games for x in missed_acc],
+        median_first_spell_turn=float(median(first_spells)) if first_spells else None,
+        avg_stalled_turns=stalled_total / games,
     )
 
 

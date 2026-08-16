@@ -152,6 +152,65 @@ def test_offcolor_base_produces_color_screw():
     assert bad.never_cast_commander > 5 * good.never_cast_commander
 
 
+def test_card_timings_cover_every_spell_including_the_never_cast():
+    """The texture stats (second 2026-08-15 punch list, item 11): every
+    nonland spell gets a timing row whether or not any game reached it, and
+    the never-cast row leads the sort -- it is the most interesting one."""
+    lib, cmd = build_golgari(36)
+    lib.append(spell("White Elephant", "{18}", "threat"))
+    summary = run(lib, cmd, games=300, turns=8, seed=11)
+
+    names = {t.name for t in summary.card_timings}
+    assert "White Elephant" in names
+    assert cmd.name in names
+    assert not any(c.is_land and c.name in names for c in lib)
+
+    elephant = next(t for t in summary.card_timings if t.name == "White Elephant")
+    assert elephant.cast_rate == 0.0
+    assert elephant.median_turn is None
+    assert elephant.by_t8 == 0.0
+    # Never-cast rows sort to the front, then latest medians.
+    assert summary.card_timings[0].median_turn is None
+
+    # A one-mana dork comes online before the commander does, medians in
+    # hand: the ordering is the claim, not any absolute turn. Its *rate* is
+    # modest and must be — a specific card in a 99 is only drawn at all in a
+    # sixth of eight-turn games, which is exactly the honesty this table
+    # brings to "why haven't I seen my bomb".
+    dork = next(t for t in summary.card_timings if t.name.startswith("Dork"))
+    commander_row = next(t for t in summary.card_timings if t.name == cmd.name)
+    assert dork.median_turn is not None and commander_row.median_turn is not None
+    assert dork.median_turn < commander_row.median_turn
+    assert 0.05 < dork.cast_rate < 0.5
+    # The commander is the one card always available, so its cast rate is the
+    # complement of never_cast — the two numbers must agree exactly.
+    assert abs(commander_row.cast_rate - (1 - summary.never_cast_commander)) < 1e-9
+
+
+def test_missed_drops_track_land_starvation():
+    """A land-light deck misses drops where a land-heavy one does not, and a
+    turn-one miss is impossible for any keep that requires two lands."""
+    lib, cmd = build_golgari(36)
+    starved, _ = build_golgari(24)
+    fed = run(lib, cmd, games=400, turns=8, seed=5)
+    hungry = run(starved, cmd, games=400, turns=8, seed=5)
+    assert len(fed.missed_drop_by_turn) == 8
+    assert fed.missed_drop_by_turn[0] == 0.0
+    assert sum(hungry.missed_drop_by_turn) > sum(fed.missed_drop_by_turn)
+
+
+def test_first_spell_and_stalled_turns_are_sane():
+    lib, cmd = build_golgari(36)
+    summary = run(lib, cmd, games=400, turns=8, seed=9)
+    assert summary.median_first_spell_turn is not None
+    assert 1 <= summary.median_first_spell_turn <= 4
+    assert 0 <= summary.avg_stalled_turns <= 8
+    # And the starved deck stalls more, which is what the number is *for*.
+    starved, _ = build_golgari(24)
+    hungry = run(starved, cmd, games=400, turns=8, seed=9)
+    assert hungry.avg_stalled_turns > summary.avg_stalled_turns
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):
