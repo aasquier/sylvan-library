@@ -921,6 +921,9 @@ export interface SlotArgumentReport {
     not_in_pool: string[]
     banned: string[]
     off_colour: string[]
+    /** Suggestions the deck already runs — a swap to one would be a no-op,
+     *  so Python drops them before they are shown (punch list 2026-08-15). */
+    already_in_deck: string[]
     no_pool: string[]
   }
   tool_calls: { tool: string; arguments: Record<string, unknown> }[]

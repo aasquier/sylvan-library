@@ -318,7 +318,7 @@ const ARGUMENT = {
   alternatives_dropped: {
     not_in_pool: [], banned: ['Primeval Titan'],
     off_colour: ['Ajani, Nacatl Pariah // Ajani, Nacatl Avenger'],
-    no_pool: [],
+    already_in_deck: [], no_pool: [],
   },
   tool_calls: [], usage: { input_tokens: 10, output_tokens: 5 },
   never: 'This is the case against the card, and only that. A card that '
@@ -557,6 +557,32 @@ describe('DeckDetail rationale editor', () => {
     fireEvent.click(screen.getByRole('button', { name: `Write why: ${card}` }))
     return rowFor(card)
   }
+
+  it('stays armed after a pick, for the next card', async () => {
+    // Punch list 2026-08-15 item 3: an armed action is a mode, not a single
+    // shot. Writing five rationales is five clicks, not five trips to the bar.
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    await openEditorFor('Sol Ring')
+    const next = screen.getByRole('button', { name: 'Write why: Forest' })
+    fireEvent.click(next)
+    expect(within(rowFor('Forest')).getByRole('textbox')).toBeTruthy()
+  })
+
+  it('a double-click acts and puts the bar away', async () => {
+    // The two real clicks inside a double-click fire first and toggle the
+    // editor open then closed; the dblclick must land it *open* and disarm.
+    vi.mocked(api.deck).mockResolvedValue(DRAFT)
+    renderDeck()
+    await screen.findByText(DECK.name)
+    fireEvent.click(screen.getByRole('button', { name: 'Write why' }))
+    const row = screen.getByRole('button', { name: 'Write why: Sol Ring' })
+    fireEvent.click(row)
+    fireEvent.click(row)
+    fireEvent.doubleClick(row)
+    expect(within(rowFor('Sol Ring')).getByRole('textbox')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Write why: /
+    })).toBeNull()
+  })
 
   it('opens an empty box for a card that has no rationale', async () => {
     vi.mocked(api.deck).mockResolvedValue(DRAFT)
@@ -1198,6 +1224,26 @@ describe('DeckDetail art picker', () => {
     await waitFor(() => {
       expect(vi.mocked(api.setDeckField)).toHaveBeenCalledWith(
         REF, 'commander_art', 'p-blc')
+    })
+  })
+
+  it('a double-click swaps and closes the picker in one gesture', async () => {
+    // Punch list 2026-08-15 item 3. The two real clicks inside it schedule
+    // and reschedule the single-click save; the dblclick cancels the pending
+    // beat, applies once, and folds the picker away.
+    renderDeck()
+    fireEvent.click(await screen.findByText(/change art/i))
+    const tile = await screen.findByTitle(/Bloomburrow Commander/)
+    fireEvent.click(tile)
+    fireEvent.click(tile)
+    fireEvent.doubleClick(tile)
+    await waitFor(() => {
+      expect(vi.mocked(api.setDeckField)).toHaveBeenCalledWith(
+        REF, 'commander_art', 'p-blc')
+    })
+    expect(vi.mocked(api.setDeckField)).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(screen.queryByText(/travels with the deck/i)).toBeNull()
     })
   })
 

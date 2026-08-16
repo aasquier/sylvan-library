@@ -36,8 +36,11 @@ was confident about.
 **Alternatives are names, and deterministic Python judges them.** The model may
 name cards that do the job instead; it may not say why they are better. Each
 name is resolved through the pool and **dropped if it does not resolve, is not
-Commander-legal, or falls outside the deck's colour identity** -- counted in all
-three cases. That is ADR 19's rival instrument pointed at rule 1 and
+Commander-legal, falls outside the deck's colour identity, or is already in the
+deck** -- counted in all four cases. A replacement the deck already runs is not
+a replacement; it is the punch list's "pointless swap", reported under its own
+key because "you invented that card" and "you already have that card" are
+different failures. That is ADR 19's rival instrument pointed at rule 1 and
 non-negotiable 2, and it is the specific failure `CLAUDE.md` records: *Ajani,
 Nacatl Pariah* was proposed for a G/W deck and its back face is R/W. A model
 cannot make that mistake here, because it is not the thing deciding.
@@ -152,8 +155,10 @@ RESPONSE_SCHEMA: dict[str, Any] = {
             "description": (
                 "Up to six cards that could do this slot's job instead. "
                 "**Names only.** Every one is checked against the pool, the "
-                "Commander ban list and the deck's colour identity before it "
-                "is shown, and one that fails any of those is dropped -- so a "
+                "Commander ban list, the deck's colour identity and the deck's "
+                "own list before it is shown, and one that fails any of those "
+                "is dropped -- a card the deck already runs is never an "
+                "alternative, so do not spend a slot on one. Likewise a "
                 "name you are unsure of costs nothing but is also not worth "
                 "guessing at. Leave the list empty when the charge is that "
                 "the slot itself should go."),
@@ -297,10 +302,11 @@ def only_charges(items: list[Any]) -> tuple[list[dict[str, Any]], int]:
 
 
 def resolve_alternatives(names: list[Any], *, identity: list[str],
+                         in_deck: set[str] | frozenset[str] = frozenset(),
                          ) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
     """Resolve suggested names against the pool, and drop what does not survive.
 
-    Three filters, and Python owns all three because all three have right
+    Four filters, and Python owns all four because all four have right
     answers (ADR 14). A name that does not resolve is a card the model made up
     or misspelled. A card that is banned cannot go in. **A card outside the
     commander's colour identity cannot go in either, and that check is the
@@ -308,6 +314,14 @@ def resolve_alternatives(names: list[Any], *, identity: list[str],
     *Ajani, Nacatl Pariah* proposed for a G/W deck, whose back face is R/W and
     whose identity therefore is not. Rule 2: the pool's `color_identity` field
     already accounts for back faces, so it is read and never derived.
+
+    `in_deck` is the fourth: the pool spellings, casefolded, of every card the
+    deck already runs -- the 99, the command zone, the companion. A card that
+    is already in the deck is not an alternative to anything in it, and the
+    check sits on the *resolved* name so a DFC suggested by its front face is
+    still caught. Checked first of the four verdicts because it is the most
+    specific true thing to say: Goreclaw's Primeval Titan is both banned and
+    in that deck, and "you already run it" is the answer that helps.
 
     Returns the survivors and a breakdown of what went, by reason. Dropped and
     *counted*, never dropped quietly -- the same instrument ADR 19 built for
@@ -327,7 +341,8 @@ def resolve_alternatives(names: list[Any], *, identity: list[str],
             wanted.append(name)
 
     dropped: dict[str, list[str]] = {"not_in_pool": [], "banned": [],
-                                     "off_colour": [], "no_pool": []}
+                                     "off_colour": [], "already_in_deck": [],
+                                     "no_pool": []}
     if not wanted:
         return [], dropped
 
@@ -369,6 +384,9 @@ def resolve_alternatives(names: list[Any], *, identity: list[str],
         if record["name"] in already:
             continue
         already.add(record["name"])
+        if record["name"].casefold() in in_deck:
+            dropped["already_in_deck"].append(record["name"])
+            continue
         if not record["legal_commander"]:
             dropped["banned"].append(record["name"])
             continue
@@ -487,9 +505,17 @@ def ask(slug: str, card: str, *, requested: Any = None, focus: str = "",
                               f"{turn.stop_reason}). Nothing was written.")
 
     charges, dropped = only_charges(payload.get("charges") or [])
+    # The deck's own names, fetched fresh rather than carried in the brief:
+    # the brief is what the model reads, and 99 names in the prompt would be
+    # tokens spent teaching it a rule Python enforces anyway.
+    deck = service.get_deck(slug, source=source)
+    in_deck = {c["name"].casefold() for c in deck["cards"]}
+    in_deck.update(str(n).casefold() for n in deck["commander"])
+    if deck.get("companion"):
+        in_deck.add(str(deck["companion"]).casefold())
     alternatives, alt_dropped = resolve_alternatives(
         payload.get("alternatives") or [],
-        identity=facts["deck"]["color_identity"])
+        identity=facts["deck"]["color_identity"], in_deck=in_deck)
     return _report(turn, slug=slug, card=facts["card"]["name"],
                    effective=effective, charges=charges[:MAX_CHARGES],
                    dropped=dropped, alternatives=alternatives,

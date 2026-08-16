@@ -360,6 +360,7 @@ export function SlotArgumentBody({ deck, report, writable = false, onSwapped }: 
     ['not in the card pool', dropped.not_in_pool],
     ['banned in Commander', dropped.banned],
     ["outside the deck's colour identity", dropped.off_colour],
+    ['already in this deck', dropped.already_in_deck ?? []],
   ] : []
 
   return (

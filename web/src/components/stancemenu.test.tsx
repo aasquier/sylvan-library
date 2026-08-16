@@ -83,42 +83,46 @@ describe('StanceMenu', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('offers "follow the deck" first and selects it when nothing is pinned', async () => {
+  it('starts the slider at "follow the deck" when nothing is pinned', async () => {
     claudeStatus.mockResolvedValue(status())
     await open()
-    const radios = screen.getAllByRole('radio')
-    expect(radios).toHaveLength(4)
-    expect((radios[0] as HTMLInputElement).checked).toBe(true)
-    expect(screen.getByRole('radio', { name: /Follow the deck/ })).toBeTruthy()
+    const slider = screen.getByRole('slider') as HTMLInputElement
+    // One track: the auto position, then the server's three presets.
+    expect(slider.min).toBe('0')
+    expect(slider.max).toBe('3')
+    expect(slider.value).toBe('0')
+    expect(slider.getAttribute('aria-valuetext')).toMatch(/Follow the deck/)
   })
 
-  it('labels presets in friendly words, never the wire token', async () => {
+  it('labels detents in friendly words, never the wire token', async () => {
     claudeStatus.mockResolvedValue(status())
     await open()
-    expect(screen.getByRole('radio', { name: /Second opinion/ })).toBeTruthy()
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '2' } })
+    expect(screen.getByText('Second opinion')).toBeTruthy()
     expect(screen.queryByText('second-opinion')).toBeNull()
     expect(screen.getByText('A second pair of eyes.')).toBeTruthy()
   })
 
-  it('pins a preset, and can clear it back to the deck default', async () => {
+  it('pins a preset, and can slide back to the deck default', async () => {
     claudeStatus.mockResolvedValue(status())
-    const trigger = await open()
-    fireEvent.click(screen.getByRole('radio', { name: /Second opinion/ }))
+    await open()
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '2' } })
     expect(localStorage.getItem('mtglab-stance')).toBe('second-opinion')
 
-    fireEvent.click(trigger)
-    fireEvent.click(screen.getByRole('radio', { name: /Follow the deck/ }))
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '0' } })
     expect(localStorage.getItem('mtglab-stance')).toBeNull()
   })
 
-  it('disables a preset the deployment caps, and says which it is', async () => {
+  it('a capped detent peeks but never pins', async () => {
+    // "Shown, disabled, and labelled", slider-shaped: the busy end of the
+    // track is still there to look at, the readout says the operator limited
+    // it, and nothing lands in the pin store.
     claudeStatus.mockResolvedValue(status())
     await open()
-    const capped = screen.getByRole('radio', { name: /Collaborator/ }) as HTMLInputElement
-    expect(capped.disabled).toBe(true)
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '3' } })
+    expect(screen.getByText('Collaborator')).toBeTruthy()
     expect(screen.getByText(/limited on this server/)).toBeTruthy()
-    const okay = screen.getByRole('radio', { name: /Second opinion/ }) as HTMLInputElement
-    expect(okay.disabled).toBe(false)
+    expect(localStorage.getItem('mtglab-stance')).toBeNull()
   })
 
   it('shows the never-line under every position', async () => {

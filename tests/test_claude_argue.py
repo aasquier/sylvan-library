@@ -260,6 +260,42 @@ def test_an_invented_card_is_dropped_and_named(pool):
     assert dropped["not_in_pool"] == ["Blossoming Nonesuch"]
 
 
+def test_a_card_already_in_the_deck_is_dropped(pool):
+    """The punch list's "pointless swap" (2026-08-15 item 5), executable.
+
+    A replacement the deck already runs is not a replacement. It is dropped
+    under its own key rather than folded into another, because "you already
+    have that card" and "you invented that card" are different failures.
+    """
+    kept, dropped = argue.resolve_alternatives(
+        ["Regal Behemoth", "Craterhoof Behemoth"], identity=["G"],
+        in_deck={"regal behemoth"})
+    assert [c["name"] for c in kept] == ["Craterhoof Behemoth"]
+    assert dropped["already_in_deck"] == ["Regal Behemoth"]
+
+
+def test_an_in_deck_dfc_is_caught_by_its_front_face(pool):
+    """The check sits on the *resolved* name. A model suggests a DFC by the
+    face it knows; the deck stores the pool's full `A // B` spelling; the two
+    must still collide."""
+    kept, dropped = argue.resolve_alternatives(
+        ["Ajani, Nacatl Pariah"], identity=["R", "W"],
+        in_deck={"ajani, nacatl pariah // ajani, nacatl avenger"})
+    assert kept == []
+    assert dropped["already_in_deck"] == [
+        "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"]
+
+
+def test_an_in_deck_banned_card_reports_as_in_deck(pool):
+    """Goreclaw's deck really runs Primeval Titan. Both verdicts are true;
+    "you already run it" is the one that helps, so it is checked first."""
+    kept, dropped = argue.resolve_alternatives(
+        ["Primeval Titan"], identity=["G"], in_deck={"primeval titan"})
+    assert kept == []
+    assert dropped["already_in_deck"] == ["Primeval Titan"]
+    assert dropped["banned"] == []
+
+
 def test_alternatives_are_deduplicated_case_insensitively(pool):
     kept, _ = argue.resolve_alternatives(
         ["Terastodon", "terastodon", "  TERASTODON  "], identity=["G"])
@@ -329,7 +365,7 @@ def test_a_whole_answer_is_read_filtered_and_labelled(pool, source, monkeypatch)
        {"claim": "It is simply not very good.",
         "ground": "ceiling", "fact": "", "strength": "decisive"}],
      "alternatives": ["Craterhoof Behemoth", "Ajani, Nacatl Pariah",
-                      "Primeval Titan"]}
+                      "Black Lotus"]}
     """))
     report = argue.ask("mono-green", "Vorinclex, Voice of Hunger",
                        requested="consultant", source=source)
@@ -339,8 +375,27 @@ def test_a_whole_answer_is_read_filtered_and_labelled(pool, source, monkeypatch)
     assert [c["name"] for c in report["alternatives"]] == ["Craterhoof Behemoth"]
     assert report["alternatives_dropped"]["off_colour"] == [
         "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"]
-    assert report["alternatives_dropped"]["banned"] == ["Primeval Titan"]
+    # Black Lotus, not the fixture's Primeval Titan: the Titan is *in* this
+    # deck, so it now drops as `already_in_deck` before the ban is consulted.
+    assert report["alternatives_dropped"]["banned"] == ["Black Lotus"]
     assert "yours to write" in report["never"]
+
+
+def test_ask_drops_alternatives_the_deck_already_runs(pool, source, monkeypatch):
+    """End to end: the model names a card from the 99 and the commander
+    herself; both are dropped as `already_in_deck`, and the one genuinely
+    new card survives. `ask()` builds the exclusion set from the deck it
+    fetched, so nothing here depends on what the model was told."""
+    monkeypatch.setattr(argue, "converse", lambda *a, **k: turn_returning("""
+    {"charges": [],
+     "alternatives": ["Regal Behemoth", "Craterhoof Behemoth",
+                      "Goreclaw, Terror of Qal Sisma"]}
+    """))
+    report = argue.ask("mono-green", "Vorinclex, Voice of Hunger",
+                       requested="consultant", source=source)
+    assert [c["name"] for c in report["alternatives"]] == ["Craterhoof Behemoth"]
+    assert set(report["alternatives_dropped"]["already_in_deck"]) == {
+        "Regal Behemoth", "Goreclaw, Terror of Qal Sisma"}
 
 
 def test_a_banned_card_in_the_deck_can_still_be_argued_about(pool, source,
