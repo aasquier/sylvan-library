@@ -126,7 +126,7 @@ def test_the_schema_forbids_an_unattributed_section():
     would let it say something else."""
     props = dossier.RESPONSE_SCHEMA["properties"]
     assert dossier.RESPONSE_SCHEMA["additionalProperties"] is False
-    for name in ("who", "standing"):
+    for name in ("who", "allies", "rivals", "standing"):
         assert set(props[name]["required"]) == {"prose", "source_ids"}
         assert props[name]["additionalProperties"] is False
 
@@ -282,6 +282,8 @@ def test_the_dropped_counts_are_reported(pool, source, monkeypatch):
         "archetype": {"name": "Food", "prose": "Food.", "source_ids": ["s1"]},
         "competitors": [{"card": "Not A Real Card", "prose": "x",
                          "source_ids": ["s1"]}],
+        "allies": {"prose": "The kitchen crew stood by them.",
+                   "source_ids": ["s1", "s2"]},
         "rivals": {"prose": "The story pits them against nobody.",
                    "source_ids": ["s1"]},
         "standing": {"prose": "Niche.", "source_ids": []},
@@ -298,7 +300,11 @@ def test_the_dropped_counts_are_reported(pool, source, monkeypatch):
     body = dossier.ask("mini", requested="consultant", source=source)["dossier"]
     assert body["sources_dropped"] == 1
     assert body["competitors_dropped"] == 1
-    # The story rivals survive as a cited passage, the same shape as `who`.
+    # The story allies and rivals survive as cited passages, the same shape
+    # as `who` — and an ally citation that points at the dropped source is
+    # narrowed away exactly as any other passage's would be.
+    assert body["allies"]["prose"] == "The kitchen crew stood by them."
+    assert body["allies"]["source_ids"] == ["s1"]
     assert body["rivals"]["prose"] == "The story pits them against nobody."
     assert body["rivals"]["source_ids"] == ["s1"]
     assert [s["id"] for s in body["sources"]] == ["s1"]

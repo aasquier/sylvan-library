@@ -89,7 +89,12 @@ WEB_SEARCH: dict[str, Any] = {
 #: build *instead* are a shopping question, and the characters this one fought
 #: in the story are a lore question. The old single "rivals" list answered the
 #: first while wearing the second's name.
-SECTIONS = ("who", "archetype", "competitors", "rivals", "standing")
+#:
+#: `allies` joined the same day, on the same argument run forward: a character
+#: who fought somebody usually fought *beside* somebody, and a dossier that
+#: only remembers the feuds tells half the story. Friends before foes in the
+#: rendered order, because that is the order a story introduces them.
+SECTIONS = ("who", "archetype", "competitors", "allies", "rivals", "standing")
 
 _PROSE: dict[str, Any] = {
     "type": "string",
@@ -167,6 +172,16 @@ RESPONSE_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
             },
         },
+        "allies": {
+            **_SOURCED,
+            "description": (
+                "The story's allies: who this character fought beside, "
+                "served, loved or led in the lore -- a guild, a crew, a "
+                "found family, a mentor. Known associates from Magic's "
+                "history, not cards that pair well in a deck. A minor "
+                "character may honestly have none; then say so in a "
+                "sentence rather than inventing a fellowship."),
+        },
         "rivals": {
             **_SOURCED,
             "description": (
@@ -195,8 +210,8 @@ RESPONSE_SCHEMA: dict[str, Any] = {
             },
         },
     },
-    "required": ["who", "archetype", "competitors", "rivals", "standing",
-                 "sources"],
+    "required": ["who", "archetype", "competitors", "allies", "rivals",
+                 "standing", "sources"],
     "additionalProperties": False,
 }
 
@@ -255,6 +270,12 @@ How to write it:
   is easiest to break, because comparing two commanders is exactly the sentence
   that wants a half-remembered ability in it -- and a competitor described with
   somebody else's card text is worse than one you left out.
+- Allies are the story's companions: who this character fought beside, served,
+  loved or led -- a guild, a crew, a mentor, a found family. Known associates
+  from Magic's history, never cards that merely pair well in a deck; that is a
+  deckbuilding thought and it has no section here. Rest every claim on a cited
+  page. A loner may honestly have no allies worth the name; one plain sentence
+  saying so beats an invented fellowship.
 - Rivals are the story's, not the shop's: who this character fought, feared or
   betrayed, and the plot lines they figure in -- Bolas and Ugin is the shape.
   Rest every claim on a cited page, the same as the rest of the lore. A minor
@@ -629,10 +650,12 @@ def run_dossier(request: DossierRequest, *,
             **_section(archetype_raw, allowed),
         },
         "competitors": competitors,
-        # The story's rivals are prose like `who` and `standing`, not a card
-        # list: a plot line is not a pool row, and Bolas has a dozen printings
-        # none of which is the point. A named character who *is* a card still
-        # gets checked the way any lore claim does -- against a cited page.
+        # The story's allies and rivals are prose like `who` and `standing`,
+        # not card lists: a plot line is not a pool row, and Bolas has a dozen
+        # printings none of which is the point. A named character who *is* a
+        # card still gets checked the way any lore claim does -- against a
+        # cited page.
+        "allies": _section(payload.get("allies"), allowed),
         "rivals": _section(payload.get("rivals"), allowed),
         "standing": _section(payload.get("standing"), allowed),
         "sources": sources,
@@ -676,7 +699,12 @@ def ask(slug: str, *, requested: Any = None, refresh: bool = False,
 #: 2: the single "rivals" card list split into "competitors" (pool-resolved
 #: cards) and "rivals" (the story's, as cited prose), and the who section was
 #: given its brief back -- character first, mechanics elsewhere.
-DOSSIER_VERSION = 2
+#:
+#: 3: "allies" -- the story's companions, as cited prose beside the rivals.
+#: (The fingerprint already misses old rows on any schema change; the version
+#: is bumped anyway so the miss is legible in this table rather than implicit
+#: in a hash.)
+DOSSIER_VERSION = 3
 
 
 def _fingerprint() -> str:

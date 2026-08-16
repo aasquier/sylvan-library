@@ -556,6 +556,72 @@ button:hover .tarot-fan-card {
   --felt-edge: #3d5d49;
 }
 
+/* The interview's "you can stop now" banner: quietly lit in the proposal
+   button's colour, and it rises in once rather than pulsing for attention —
+   it is an invitation, not an alarm. */
+.ready-banner {
+  border: 1px solid color-mix(in srgb, var(--series-2) 45%, transparent);
+  background: color-mix(in srgb, var(--series-2) 9%, var(--surface-1));
+  animation: bubble-in 300ms ease;
+}
+
+/* Conversation bubbles (theme interview): each new turn rises in rather
+   than appearing, which is most of what makes the exchange read as live. */
+.chat-bubble {
+  animation: bubble-in 240ms ease;
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* The interviewer thinking: the ellipsis breathes so a multi-second Claude
+   call reads as somebody considering, not as a hung page. */
+.thinking-pulse {
+  animation: thinking-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes thinking-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-bubble,
+  .thinking-pulse {
+    animation: none;
+  }
+}
+
+/* The reader tiles (`ReaderPanel` in components/tarot.tsx): a lift and an
+   art zoom on hover, because "pick who you talk to" is the most theatrical
+   door in the app and its tiles were the flattest thing on the page. The
+   zoom lives on the img so the crop stays clipped by the tile. */
+.reader-tile {
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.reader-tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.26);
+}
+
+.reader-tile .reader-tile-art img {
+  transition: transform 450ms ease;
+}
+
+.reader-tile:hover .reader-tile-art img {
+  transform: scale(1.06);
+}
+
 /* The reader's crystal ball (`CrystalBall` in components/tarot.tsx).
  *
  * Three fogs turn against each other at incommensurate speeds — 26s, 41s and
@@ -570,14 +636,33 @@ button:hover .tarot-fan-card {
  * ball on the first frame.
  */
 .crystal-ball {
-  width: 118px;
-  filter: drop-shadow(0 10px 18px rgba(8, 4, 34, 0.5));
+  width: 168px;
+  filter: drop-shadow(0 12px 22px rgba(8, 4, 34, 0.55));
 }
 
 .crystal-fog,
-.crystal-vision {
+.crystal-vision,
+.crystal-vision-smoke,
+.crystal-nebula,
+.crystal-stars {
   transform-box: view-box;
   transform-origin: 60px 62px;
+}
+
+/* The depths: two pools of colour turning against each other far below the
+   smoke, and a field of stars drifting slower than either. Nothing in here
+   ever holds still while motion is allowed — a crystal ball with static
+   weather is a paperweight. */
+.crystal-nebula-a {
+  animation: crystal-swirl 67s linear infinite;
+}
+
+.crystal-nebula-b {
+  animation: crystal-swirl-back 49s linear infinite;
+}
+
+.crystal-stars {
+  animation: crystal-swirl 140s linear infinite;
 }
 
 .crystal-fog-a {
@@ -633,6 +718,11 @@ button:hover .tarot-fan-card {
   animation-delay: 3.1s;
 }
 
+.crystal-spark-5 {
+  animation-delay: 1.9s;
+  animation-duration: 5.6s;
+}
+
 @keyframes crystal-twinkle {
   0%,
   100% {
@@ -646,15 +736,18 @@ button:hover .tarot-fan-card {
   }
 }
 
-/* The fortune arriving: already there once the mist thins. The appear and
-   the sway share the transform, so the sway takes over exactly when the
-   appear ends (its delay is the appear's duration). */
+/* The fortune arriving, in two acts. First the smoke billows up out of
+   nothing (`.crystal-vision-smoke`, one-shot); the card surfaces underneath
+   it, so by the time the billow thins the picture is simply *there* — a
+   fortune is discovered, never delivered. The appear and the sway share the
+   transform, so the sway takes over exactly when the appear ends (its delay
+   is the appear's duration). */
 .crystal-vision {
   opacity: 0;
   filter: saturate(0.82) brightness(1.04);
   animation:
-    crystal-vision-appear 1.8s ease-out forwards,
-    crystal-vision-sway 9s ease-in-out 1.8s infinite;
+    crystal-vision-appear 2.4s ease-out 0.5s forwards,
+    crystal-vision-sway 9s ease-in-out 2.9s infinite;
 }
 
 @keyframes crystal-vision-appear {
@@ -665,6 +758,29 @@ button:hover .tarot-fan-card {
   to {
     opacity: 0.92;
     transform: scale(1);
+  }
+}
+
+.crystal-vision-smoke {
+  opacity: 0;
+  animation: crystal-billow 3.2s ease-out forwards;
+}
+
+@keyframes crystal-billow {
+  0% {
+    opacity: 0;
+    transform: scale(0.55) translateY(14px);
+  }
+  22% {
+    opacity: 0.95;
+  }
+  60% {
+    opacity: 0.55;
+    transform: scale(1.18) translateY(-4px) rotate(14deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.42) translateY(-10px) rotate(26deg);
   }
 }
 
@@ -756,7 +872,10 @@ button:hover .tarot-fan-card {
     opacity: 0.7;
   }
   .crystal-fog,
-  .crystal-aura {
+  .crystal-aura,
+  .crystal-nebula-a,
+  .crystal-nebula-b,
+  .crystal-stars {
     animation: none;
   }
   .crystal-spark {
@@ -766,6 +885,16 @@ button:hover .tarot-fan-card {
   .crystal-vision {
     animation: none;
     opacity: 0.92;
+  }
+  .crystal-vision-smoke {
+    /* Arrested weather, not vanished: the billow's job under reduced motion
+       is simply to not obscure the vision. */
+    animation: none;
+    opacity: 0;
+  }
+  .reader-tile,
+  .reader-tile:hover {
+    transform: none;
   }
   .flask-bubble {
     animation: none;

@@ -1244,6 +1244,8 @@ def cmd_claude_dossier(args):
             print(f"    {competitor['name']}{cost}{'  ' + cites if cites else ''}")
             print(_wrapped(competitor["prose"], indent="      "))
         print()
+    if body["allies"]["prose"]:
+        passage("ALLIES", body["allies"])
     if body["rivals"]["prose"]:
         passage("RIVALS", body["rivals"])
     passage("STANDING", body["standing"])

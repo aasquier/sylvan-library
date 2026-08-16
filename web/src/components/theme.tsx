@@ -530,16 +530,30 @@ export function ThemeInterview({
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">
-            {intro?.title ?? 'Let’s work out what you want'}
-          </h2>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {intro?.blurb ?? 'No Magic knowledge needed — the questions are '
-              + 'about you. Magic’s five colours started life as five '
-              + 'philosophies, so this is less of a detour than it sounds.'}
-          </p>
-        </div>
+        {/* The framing paragraph only frames an *empty* table. Once the
+            conversation exists it speaks for itself, and a fixed paragraph
+            sitting above every exchange read as a script the interview was
+            following — "a hard-coded prompt", reported twice, about the one
+            surface where every sentence is actually generated. */}
+        {transcript.length === 0
+          ? (
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight">
+                {intro?.title ?? 'Let’s work out what you want'}
+              </h2>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                {intro?.blurb ?? 'No Magic knowledge needed — the questions are '
+                  + 'about you. Magic’s five colours started life as five '
+                  + 'philosophies, so this is less of a detour than it sounds.'}
+              </p>
+            </div>
+            )
+          : (
+            <p className="text-[10px] uppercase tracking-wide"
+               style={{ color: 'var(--text-muted)' }}>
+              {intro?.title ?? 'Working you out'}
+            </p>
+            )}
         <div className="ml-auto flex items-center gap-2">
           {transcript.length > 0 && (
             <button onClick={startOver} className="rounded-md px-3 py-1.5 text-sm"
@@ -563,29 +577,42 @@ export function ThemeInterview({
       {!proposal && (
         <div className="grid gap-5 lg:grid-cols-[1fr_18rem]">
           <div className="space-y-4">
-            {/* What has been said, so the conversation reads as one. */}
-            {transcript.length > 1 && (
-              <ol className="space-y-3">
-                {transcript.slice(0, -1).map((t, i) => (
-                  <li key={`${i}-${t.text.slice(0, 12)}`}
-                      className={t.role === 'user' ? 'text-right' : ''}>
-                    <span className="inline-block max-w-[85%] rounded-xl px-3 py-2 text-sm"
-                          style={t.role === 'user'
-                            ? { background: 'var(--series-1)', color: '#fff' }
-                            : { border: '1px solid var(--hairline)',
-                                color: 'var(--text-secondary)' }}>
-                      {t.text}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            )}
+            {/* What has been said, so the conversation reads as one. Only a
+                *trailing assistant turn* is held back — that is the pending
+                question, and the card below renders it. A trailing *user*
+                turn is the answer somebody just sent, and it must appear as
+                their bubble immediately: the old `slice(0, -1)` swallowed it
+                until the next question landed, so for the length of a Claude
+                call your own words looked like they had gone nowhere. */}
+            {(() => {
+              const shown = transcript[transcript.length - 1]?.role === 'assistant'
+                ? transcript.slice(0, -1)
+                : transcript
+              return shown.length > 0 && (
+                <ol className="space-y-3">
+                  {shown.map((t, i) => (
+                    <li key={`${i}-${t.text.slice(0, 12)}`}
+                        className={t.role === 'user' ? 'text-right' : ''}>
+                      <span className="chat-bubble inline-block max-w-[85%] rounded-xl px-3 py-2 text-sm"
+                            style={t.role === 'user'
+                              ? { background: 'var(--series-1)', color: '#fff' }
+                              : { border: '1px solid var(--hairline)',
+                                  color: 'var(--text-secondary)' }}>
+                        {t.text}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )
+            })()}
 
             {report?.fact && <FactNote fact={report.fact} />}
 
             <div className="card-surface rounded-xl px-5 py-4">
-              <p className="text-base leading-relaxed"
-                 style={{ color: 'var(--text-primary)' }}>
+              <p className={`text-base leading-relaxed${
+                   busy === 'asking' ? ' thinking-pulse' : ''}`}
+                 style={{ color: busy === 'asking'
+                   ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                 {busy === 'asking'
                   ? 'Thinking…'
                   : question || report?.reason || 'Starting…'}
@@ -615,11 +642,44 @@ export function ThemeInterview({
                         style={{ background: 'var(--series-1)', color: '#fff' }}>
                   Answer
                 </button>
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {spent} of {ceiling} questions
+                {/* Never "3 of 10" once the floor is met. The ceiling is a
+                    guard rail, not a quota, and a counter that keeps counting
+                    read as one — people sat through ten questions because the
+                    number said there were ten. */}
+                <span className="text-xs" style={{
+                  color: ready ? 'var(--series-2)' : 'var(--text-muted)' }}>
+                  {ready
+                    ? '✓ Enough answered — the rest is optional'
+                    : `${spent} of ${ceiling} questions at most`}
                 </span>
               </div>
             </div>
+
+            {/* The short circuit, where the eye already is. The sidebar
+                button lights up when the floor is met, but the person is
+                reading the conversation column — so the conversation column
+                is where "you can stop now" has to be said. */}
+            {ready && busy !== 'proposing' && (
+              <div className="ready-banner rounded-xl px-5 py-4">
+                <p className="text-sm font-medium"
+                   style={{ color: 'var(--text-primary)' }}>
+                  {seed !== null
+                    ? 'Three cards, three answers — the reading is ready.'
+                    : 'That’s enough to go on.'}
+                </p>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Keep talking if you’re enjoying it, or get your colours now.
+                </p>
+                {/* Worded apart from the sidebar's "Suggest my colours" —
+                    two controls, one act, and a reader (or a test) should be
+                    able to tell which one they pressed. */}
+                <button onClick={proposeIt} disabled={!!busy}
+                        className="mt-3 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
+                        style={{ background: 'var(--series-2)', color: '#fff' }}>
+                  {seed !== null ? 'Read my cards' : 'Get my colours'}
+                </button>
+              </div>
+            )}
           </div>
 
           <aside className="space-y-3">

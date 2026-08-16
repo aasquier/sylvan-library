@@ -48,6 +48,7 @@ output is a proposal; the existing create flow is what makes a deck.
 from __future__ import annotations
 
 import json
+import random
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -1069,6 +1070,21 @@ def _exchanges(transcript: list[dict[str, str]]) -> int:
     return sum(1 for t in transcript if t["role"] == "user")
 
 
+#: Ways into the opening question, one drawn per conversation. All of them
+#: are still about the person and none is about Magic (ADR 20); what varies
+#: is only where the first question lands, so the interview never opens on
+#: the same beat twice in a row.
+OPENING_ANGLES = (
+    "something they keep returning to -- a film, an album, a book, a game",
+    "the last thing that completely absorbed them, whatever it was",
+    "how they are when a plan falls apart in the middle of the evening",
+    "the part they end up playing when their friends are all in one room",
+    "a place, real or fictional, or a period of history that pulls at them",
+    "what they would do with a free evening and nobody to answer to",
+    "the kind of villain -- or hero -- they catch themselves rooting for",
+)
+
+
 def _closing_for(grounded: list[dict[str, str]],
                  transcript: list[dict[str, str]]) -> str:
     """What to ask the model for, given how far along the conversation is.
@@ -1079,9 +1095,18 @@ def _closing_for(grounded: list[dict[str, str]],
     check disagreed with would ask the wrong next question.
     """
     if not transcript:
+        # The angle is drawn here, in Python, rather than left to the model.
+        # One fixed opening instruction produced one recognisable opening
+        # question, and somebody who started the interview twice read the
+        # second as a script -- "seemingly hard-coded" was the exact report,
+        # about the one part of this feature that never was. A model asked to
+        # vary itself converges on its favourite opener; a die does not.
+        angle = random.choice(OPENING_ANGLES)
         return ("Open the conversation. One warm, specific question about them "
                 "-- not about Magic, and not a list. Introduce yourself in a "
-                "sentence first so they know what this is.")
+                "sentence first so they know what this is. Tonight, open from "
+                f"this angle rather than whatever you usually reach for: "
+                f"{angle}.")
     have = {s["kind"] for s in grounded}
     missing = [k for k in SLOT_KINDS if k not in have and k != "anchor"]
     if missing:
@@ -1090,10 +1115,20 @@ def _closing_for(grounded: list[dict[str, str]],
                 f"they are actually interested in rather than working through "
                 f"that list in order, and re-state every slot you are confident "
                 f"of, including ones from earlier turns.")
-    return ("You have enough to go on, and they can ask for a suggestion "
-            "whenever they like. Keep going while they are enjoying it: ask "
-            "something that sharpens what you already know, or that might turn "
-            "up an anchor. Re-state every slot you are confident of.")
+    # Ready is the short circuit, not a licence to keep dealing. An earlier
+    # version of this said "keep going while they are enjoying it", and what
+    # that produced -- most visibly at the fortune-teller's table, where three
+    # answered cards *are* the three slots -- was an interview that ambled on
+    # toward the ten-exchange ceiling as if the ceiling were the goal. The
+    # reading is ready the moment the floor is met, and the person should hear
+    # that from the reader, not deduce it from a button changing colour.
+    return ("You now know enough to read them, and they should hear that from "
+            "you: say plainly, in your own voice, that you have what you need "
+            "and they can ask for their colours whenever they like. You may "
+            "close with one light, clearly optional question -- something that "
+            "sharpens what you already know or might turn up an anchor, never "
+            "a new line of enquiry -- and it must still end in a question "
+            "mark. Re-state every slot you are confident of.")
 
 
 @dataclass(frozen=True)
