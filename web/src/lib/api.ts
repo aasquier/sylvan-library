@@ -229,6 +229,35 @@ export interface DeckStats {
   categories: CategoryRow[]
   colors: ColorNeed[]
   types: Record<string, number>
+  /** Which Game Changers the deck runs against its bracket's allowance.
+   *  `allowed: null` is an unlimited bracket; `verdict: "unknown"` means
+   *  nobody could look (no pool, or no declared bracket) — not zero. */
+  game_changers: {
+    cards: string[]
+    count: number
+    allowed: number | null
+    bracket: number | null
+    verdict: 'ok' | 'over' | 'unknown'
+  }
+  /** Hypergeometric draw odds (punch list 2026-08-15 item 6) — arithmetic on
+   *  the deck file's own counts, no pool and no simulation. Castability
+   *  stays Tier 1's job; the caveat rendered beside these says so. */
+  opening: {
+    deck_size: number
+    hand_size: number
+    lands: {
+      count: number
+      distribution: { lands: number; chance: number }[]
+      keepable: number
+    }
+    categories: {
+      category: string
+      count: number
+      in_opening_hand: number
+      by_turn_four: number
+    }[]
+    singleton: { turn: number; cards_seen: number; chance: number }[]
+  }
 }
 
 export interface TurnRow {

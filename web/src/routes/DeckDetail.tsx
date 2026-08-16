@@ -1342,6 +1342,148 @@ export default function DeckDetail() {
             </Caveat>
             <CategoryCoverage rows={stats.categories} />
           </section>
+
+          {/* Opening-hand odds (punch list item 6): hypergeometrics computed
+              from the deck file's own counts — the gate's kind of number,
+              not Claude's, and the caveat says which system answered. */}
+          <section className="card-surface space-y-3 rounded-xl p-5">
+            <h3 className="text-sm font-semibold">Opening hand odds</h3>
+            <Caveat>
+              Pure draw arithmetic on {stats.opening.deck_size} cards —
+              hypergeometric, no simulation, no opponent. Whether a hand can
+              actually <em>cast</em> anything is the simulator&rsquo;s
+              question; these are the odds that precede it. By-turn numbers
+              assume the draw: seven cards plus one per turn.
+            </Caveat>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <StatTile label="Keepable land band"
+                        value={`${(stats.opening.lands.keepable * 100).toFixed(1)}%`}
+                        hint="2–4 lands in the opening seven" />
+              <StatTile label="Any single card"
+                        value={`${((stats.opening.singleton.find((s) => s.turn === 10)?.chance ?? 0) * 100).toFixed(1)}%`}
+                        hint="seen by turn 10, on the draw" />
+              <StatTile label="Lands" value={String(stats.opening.lands.count)}
+                        hint={`of ${stats.opening.deck_size} cards`} />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                Lands in the opening seven
+              </p>
+              {stats.opening.lands.distribution.map((row) => (
+                <div key={row.lands} className="flex items-center gap-2 text-xs">
+                  <span className="w-4 text-right tabular"
+                        style={{ color: 'var(--text-muted)' }}>
+                    {row.lands}
+                  </span>
+                  <div className="h-3 flex-1 overflow-hidden rounded-sm"
+                       style={{ background: 'var(--surface-1)' }}>
+                    <div className="h-full rounded-sm"
+                         style={{
+                           width: `${Math.max(row.chance * 100, row.chance > 0 ? 0.75 : 0)}%`,
+                           background: row.lands >= 2 && row.lands <= 4
+                             ? 'var(--series-1)'
+                             : 'color-mix(in srgb, var(--series-1) 35%, transparent)',
+                         }} />
+                  </div>
+                  <span className="w-14 text-right tabular"
+                        style={{ color: 'var(--text-secondary)' }}>
+                    {(row.chance * 100).toFixed(1)}%
+                  </span>
+                </div>
+              ))}
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                The solid band is the conventional keep — two to four lands.
+              </p>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium"
+                 style={{ color: 'var(--text-secondary)' }}>
+                Odds of holding at least one, by category
+              </p>
+              <DataTable
+                columns={[
+                  { key: 'category', label: 'Category' },
+                  { key: 'count', label: 'Cards' },
+                  { key: 'opening', label: 'In the opening 7' },
+                  { key: 'turn4', label: 'By turn 4' },
+                ]}
+                rows={stats.opening.categories.map((row) => ({
+                  category: categoryLabel(row.category),
+                  count: row.count,
+                  opening: `${(row.in_opening_hand * 100).toFixed(1)}%`,
+                  turn4: `${(row.by_turn_four * 100).toFixed(1)}%`,
+                }))}
+              />
+            </div>
+          </section>
+
+          <section className="card-surface space-y-2 rounded-xl p-5">
+            <h3 className="text-sm font-semibold">Card types</h3>
+            <Caveat>
+              Primary type, front face of a double-faced card. Counted from
+              the pool&rsquo;s own type lines.
+            </Caveat>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(stats.types).map(([type, count]) => (
+                <span key={type}
+                      className="rounded-lg px-3 py-1.5 text-sm"
+                      style={{ border: '1px solid var(--hairline)' }}>
+                  {type}
+                  <span className="ml-2 tabular text-xs"
+                        style={{ color: 'var(--text-muted)' }}>
+                    {count}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </section>
+
+          {/* The Game Changers count finally gets a screen (it has been in
+              the payload since the printed-stats branch). "unknown" renders
+              as unknown: an absent count is not a count of zero. */}
+          <section className="card-surface space-y-2 rounded-xl p-5">
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              Game Changers
+              {stats.game_changers.verdict === 'ok' && (
+                <Badge tone="good">
+                  {stats.game_changers.count}
+                  {stats.game_changers.allowed !== null
+                    ? ` of ${stats.game_changers.allowed} allowed`
+                    : ' — no bracket limit'}
+                </Badge>
+              )}
+              {stats.game_changers.verdict === 'over' && (
+                <Badge tone="critical">
+                  {stats.game_changers.count} — over bracket{' '}
+                  {stats.game_changers.bracket}&rsquo;s allowance of{' '}
+                  {stats.game_changers.allowed}
+                </Badge>
+              )}
+              {stats.game_changers.verdict === 'unknown' && (
+                <Badge tone="warning">not checked</Badge>
+              )}
+            </h3>
+            {stats.game_changers.verdict === 'unknown' ? (
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Needs a card pool and a declared bracket — an absent count is
+                not a count of zero.
+              </p>
+            ) : stats.game_changers.cards.length === 0 ? (
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                None. The bracket system&rsquo;s heavy hitters are all absent
+                from this list.
+              </p>
+            ) : (
+              <ul className="flex flex-wrap gap-2">
+                {stats.game_changers.cards.map((name) => (
+                  <li key={name} className="rounded-lg px-3 py-1.5 text-sm"
+                      style={{ border: '1px solid var(--hairline)' }}>
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
       )}
 

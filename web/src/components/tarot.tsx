@@ -46,6 +46,7 @@ import {
 } from '../lib/api'
 import { deal as dealSound, flip as flipSound, riffle, setSound, shimmer,
   soundOn, wake } from '../lib/tablesounds'
+import { PERSONA_ART } from '../lib/personart'
 import { ThemeInterview } from './theme'
 import { CardArt } from './ui'
 
@@ -619,25 +620,12 @@ function SoundToggle() {
 
 /* -------------------------------------------------------------- the reader */
 
-/**
- * Each costumed voice gets a painting, and the paintings are Scryfall art
- * crops — hotlinked with the artist credited on the tile, never committed
- * (rule 5, ADR 6), exactly as the page mastheads do it. Looked up on
- * Scryfall rather than recalled (rule 1 covers art too); artist and set are
- * what Scryfall reports for the default printing:
+/*
+ * The paintings themselves moved to `lib/personart.ts` (punch list item 8):
+ * the interview's rooms need them too, and this file already imports
+ * `theme.tsx`, so a table in either component would be an import cycle.
  *
- * - fortune-teller — *The Deck of Many Things*, Volkan Baǵa, Adventures in
- *   the Forgotten Realms: a spread of cards nobody should trust.
- * - therapist — *Alandra, Sky Dreamer*, Caroline Gariba, Murders at Karlov
- *   Manor Commander: somebody paid to sit with what you dream.
- * - scientist — *Rukarumel, Biologist*, Fariba Khamseh, Commander Masters:
- *   a field scientist delighted by her specimen.
- * - chef — *Gyome, Master Chef*, Steve Prescott: the house chef, and a nod
- *   to the deck he leads in this library.
- * - storyteller — *Birgi, God of Storytelling*, Eric Deschamps, Kaldheim.
- * - barkeep — *Edgewall Innkeeper*, Matt Stewart, Throne of Eldraine.
- *
- * `plain` is deliberately absent from this table: it is the tile with no
+ * `plain` is deliberately absent from that table: it is the tile with no
  * costume, and a borrowed painting would make it one of seven characters
  * rather than the exit from character. It is not artless any more, though
  * (punch list 2026-08-15 item 1) — it wears `ClaudeMark` below, drawn rather
@@ -645,32 +633,6 @@ function SoundToggle() {
  * drawn: the one voice that is nobody in particular still deserves a face,
  * and the honest face for it is a mark rather than somebody else's portrait.
  */
-const PERSONA_ART: Record<string, { art: string; credit: string }> = {
-  'fortune-teller': {
-    art: 'https://cards.scryfall.io/art_crop/front/f/e/feddbdc6-0757-43cb-bb41-dc83c6cf42ea.jpg',
-    credit: 'Volkan Baǵa',
-  },
-  therapist: {
-    art: 'https://cards.scryfall.io/art_crop/front/5/4/54bf48d4-e350-4ca7-87da-ce04fefd4610.jpg',
-    credit: 'Caroline Gariba',
-  },
-  scientist: {
-    art: 'https://cards.scryfall.io/art_crop/front/0/b/0b2f7397-9d75-4667-8872-e58a39512583.jpg',
-    credit: 'Fariba Khamseh',
-  },
-  chef: {
-    art: 'https://cards.scryfall.io/art_crop/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg',
-    credit: 'Steve Prescott',
-  },
-  storyteller: {
-    art: 'https://cards.scryfall.io/art_crop/front/4/4/44657ab1-0a6a-4a5f-9688-86f239083821.jpg',
-    credit: 'Eric Deschamps',
-  },
-  barkeep: {
-    art: 'https://cards.scryfall.io/art_crop/front/7/c/7c5d0560-f9e6-4c70-8cce-cae61e4e74bc.jpg',
-    credit: 'Matt Stewart',
-  },
-}
 
 /**
  * Claude's own tile art: a spark of warm light on the same night the card

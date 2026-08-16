@@ -1038,6 +1038,224 @@ button:hover .tarot-fan-card {
     animation: none;
     opacity: 0.8;
   }
+  .lab-bubble,
+  .lab-steam,
+  .lab-drip,
+  .lab-flame,
+  .lab-float {
+    animation: none;
+  }
+  .lab-note,
+  .lab-note:hover {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ------------------------------------------------------------ the lab bench
+ *
+ * `LabBench` in routes/Research.tsx (punch list item 7). One custom
+ * property is the whole "the lab is working" mechanic: every animation
+ * duration multiplies by `--lab-speed`, so `.is-cooking` makes the room
+ * boil by changing one number instead of eleven rules.
+ */
+.lab-bench {
+  --lab-speed: 1;
+  padding: 0.75rem 1rem 0;
+}
+
+.lab-bench.is-cooking {
+  --lab-speed: 0.38;
+}
+
+.lab-bubble {
+  opacity: 0;
+  animation: lab-bubble-rise calc(var(--lab-speed) * 2.8s) ease-in infinite;
+}
+
+.lab-bubble-2 {
+  animation-delay: calc(var(--lab-speed) * 0.9s);
+  animation-duration: calc(var(--lab-speed) * 3.4s);
+}
+
+.lab-bubble-3 {
+  animation-delay: calc(var(--lab-speed) * 1.7s);
+  animation-duration: calc(var(--lab-speed) * 2.3s);
+}
+
+.lab-bubble-4 {
+  animation-delay: calc(var(--lab-speed) * 2.2s);
+  animation-duration: calc(var(--lab-speed) * 3.1s);
+}
+
+@keyframes lab-bubble-rise {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-30px);
+    opacity: 0;
+  }
+}
+
+.lab-steam {
+  opacity: 0;
+  filter: blur(2px);
+  animation: lab-steam-rise calc(var(--lab-speed) * 4.6s) ease-out infinite;
+}
+
+.lab-steam-2 {
+  animation-delay: calc(var(--lab-speed) * 2.1s);
+  animation-duration: calc(var(--lab-speed) * 5.4s);
+}
+
+@keyframes lab-steam-rise {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(-34px) scale(1.7);
+    opacity: 0;
+  }
+}
+
+.lab-drip {
+  opacity: 0;
+  animation: lab-drip-fall calc(var(--lab-speed) * 2.2s) ease-in infinite;
+}
+
+@keyframes lab-drip-fall {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  85% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+}
+
+/* Flicker is irregularity — same argument as the crystal backlight. The
+   transform box matters: a flame scales from its base or it detaches. */
+.lab-flame {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: lab-flame-dance calc(var(--lab-speed) * 1.7s) ease-in-out infinite;
+}
+
+.lab-flame-2 {
+  animation-duration: calc(var(--lab-speed) * 1.3s);
+  animation-delay: calc(var(--lab-speed) * 0.4s);
+}
+
+@keyframes lab-flame-dance {
+  0%,
+  100% {
+    transform: scaleY(1) skewX(0deg);
+    opacity: 0.95;
+  }
+  27% {
+    transform: scaleY(1.18) skewX(-2.5deg);
+    opacity: 1;
+  }
+  46% {
+    transform: scaleY(0.86) skewX(1.8deg);
+    opacity: 0.8;
+  }
+  71% {
+    transform: scaleY(1.1) skewX(2.2deg);
+    opacity: 1;
+  }
+}
+
+.lab-float {
+  transform-box: fill-box;
+  animation: lab-float-bob calc(var(--lab-speed) * 6.5s) ease-in-out infinite
+    alternate;
+}
+
+@keyframes lab-float-bob {
+  from {
+    transform: translateY(0) rotate(0deg);
+  }
+  to {
+    transform: translateY(-3px) rotate(8deg);
+  }
+}
+
+/* A note from the keeper's bench: parchment, dropped at its own angle, and
+   it straightens when you reach for it. The rotation lives on the slot's
+   nth-child so the note itself keeps one clean hover transform. */
+.lab-note {
+  background: #f0e4c2;
+  color: #4a3d22;
+  border: 1px solid #d9c89a;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(20, 14, 4, 0.25);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.lab-note-slot:nth-child(4n + 1) .lab-note {
+  transform: rotate(-1.6deg);
+}
+
+.lab-note-slot:nth-child(4n + 2) .lab-note {
+  transform: rotate(1.1deg) translateY(2px);
+}
+
+.lab-note-slot:nth-child(4n + 3) .lab-note {
+  transform: rotate(1.8deg);
+}
+
+.lab-note-slot:nth-child(4n) .lab-note {
+  transform: rotate(-0.9deg) translateY(-1px);
+}
+
+.lab-note-slot .lab-note:hover,
+.lab-note-slot .lab-note:focus-visible {
+  transform: rotate(0deg) translateY(-2px);
+  box-shadow: 0 6px 16px rgba(20, 14, 4, 0.35);
+}
+
+/* ---------------------------------------------------------- persona rooms
+ *
+ * `RoomSign` and the `.persona-room` wrapper in components/theme.tsx (punch
+ * list item 8). The sign borrows the laboratory's animation classes — its
+ * own rule here is only the accent and the stir: hovering a sign drops the
+ * shared `--lab-speed`, so the flame leaps and the steam hurries. The room
+ * notices you; that is the whole trick.
+ */
+.room-sign {
+  --lab-speed: 1;
+  color: var(--room-accent, var(--series-1));
+}
+
+.room-sign:hover {
+  --lab-speed: 0.35;
+}
+
+/* The readiness banner picks up the room's accent too, so "the proposal
+   button lit up" happens in the voice's own colour. */
+.persona-room .ready-banner {
+  border-color: color-mix(
+    in srgb,
+    var(--room-accent, var(--series-1)) 55%,
+    transparent
+  );
 }
 
 /* Card-row actions (deck page). These live here and not inline for one

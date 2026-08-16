@@ -15,6 +15,7 @@ The pool is passed in as a `{name: CardRecord}` dict, matching
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import comb
 from typing import TYPE_CHECKING, Any
 
 from mtglab.decks.model import CATEGORIES, Deck
@@ -258,6 +259,78 @@ def type_breakdown(deck: Deck, cards: dict[str, CardRecord]) -> dict[str, int]:
     return dict(sorted(out.items(), key=lambda kv: -kv[1]))
 
 
+def _at_least_one(deck_size: int, copies: int, seen: int) -> float:
+    """P(at least one of `copies` cards among `seen` draws from `deck_size`).
+
+    Hypergeometric complement: 1 - C(deck-copies, seen) / C(deck, seen).
+    `comb` returns 0 for k > n, which quietly makes "you will have drawn the
+    whole rest of the deck" come out as probability 1 -- the right answer.
+    """
+    if copies <= 0 or deck_size <= 0:
+        return 0.0
+    seen = min(seen, deck_size)
+    total = comb(deck_size, seen)
+    if total == 0:
+        return 0.0
+    return 1.0 - comb(deck_size - copies, seen) / total
+
+
+def opening_hand(deck: Deck) -> dict[str, Any]:
+    """Draw odds for the opening seven, and the seen-it-by-turn table.
+
+    Pure arithmetic on counts the deck file already holds (punch list
+    2026-08-15 item 6) -- no pool, no simulation, no model, which is ADR 14's
+    line drawn through statistics: a hypergeometric has a right answer.
+    Tier 1 stays the authority on *castability*, because paying a cost needs
+    the solver; these are the draw odds that precede it, and the caveat the
+    UI renders says so.
+
+    The by-turn convention is **on the draw**: by the end of turn `t` you
+    have seen `7 + t` cards. On the play it is one fewer, which at these
+    deck sizes moves nothing anybody would decide differently on.
+    """
+    n = deck.total_cards
+    hand = min(7, n)
+    lands = deck.land_count
+
+    distribution = [
+        {"lands": k,
+         "chance": (comb(lands, k) * comb(n - lands, hand - k) / comb(n, hand))
+         if comb(n, hand) else 0.0}
+        for k in range(hand + 1)
+    ]
+    keepable = sum(row["chance"] for row in distribution
+                   if 2 <= row["lands"] <= 4)
+
+    counts: dict[str, int] = {}
+    for entry in deck.cards:
+        counts[entry.category] = counts.get(entry.category, 0) + entry.qty
+    categories = [
+        {"category": cat,
+         "count": m,
+         "in_opening_hand": _at_least_one(n, m, hand),
+         # Turn four is where a Commander game's shape is usually decided,
+         # and 7 + 4 seen cards is enough for the number to mean something.
+         "by_turn_four": _at_least_one(n, m, hand + 4)}
+        for cat, m in sorted(counts.items(), key=lambda kv: -kv[1])
+    ]
+
+    singleton = [
+        {"turn": t, "cards_seen": min(hand + t, n),
+         "chance": min(hand + t, n) / n if n else 0.0}
+        for t in (1, 4, 7, 10)
+    ]
+
+    return {
+        "deck_size": n,
+        "hand_size": hand,
+        "lands": {"count": lands, "distribution": distribution,
+                  "keepable": keepable},
+        "categories": categories,
+        "singleton": singleton,
+    }
+
+
 def deck_stats(deck: Deck, cards: dict[str, CardRecord] | None = None) -> dict[str, Any]:
     """The whole deterministic report, as plain data ready to serialise."""
     cards = cards or {}
@@ -271,6 +344,7 @@ def deck_stats(deck: Deck, cards: dict[str, CardRecord] | None = None) -> dict[s
         "curve": curve(deck, cards),
         "categories": category_report(deck),
         "game_changers": game_changers(deck, cards),
+        "opening": opening_hand(deck),
         "colors": [
             {
                 "color": n.color,

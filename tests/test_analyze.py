@@ -332,3 +332,73 @@ def test_deck_stats_carries_the_report():
                        {"Smothering Tithe": _Rec(True),
                         "Gyome, Master Chef": _Rec(False)})
     assert stats["game_changers"]["count"] == 1
+
+
+# ---------------------------------------------------------- opening hands
+
+def _big_deck(lands=34, threats=20):
+    """A 99 with a known composition: `lands` Forests, `threats` Bears,
+    and ramp filling the rest."""
+    rest = 99 - lands - threats
+    return deck_of(
+        CardEntry(name="Forest", category="land", qty=lands, why="x"),
+        CardEntry(name="Bear", category="threat", qty=threats, why="x"),
+        CardEntry(name="Rock", category="ramp", qty=rest, why="x"),
+    )
+
+
+def test_opening_hand_land_distribution_sums_to_one():
+    from mtglab.decks.analyze import opening_hand
+    out = opening_hand(_big_deck())
+    total = sum(row["chance"] for row in out["lands"]["distribution"])
+    assert abs(total - 1.0) < 1e-9
+    assert out["deck_size"] == 99
+    assert out["hand_size"] == 7
+
+
+def test_opening_hand_keepable_is_the_two_to_four_band():
+    from mtglab.decks.analyze import opening_hand
+    out = opening_hand(_big_deck())
+    band = sum(row["chance"] for row in out["lands"]["distribution"]
+               if 2 <= row["lands"] <= 4)
+    assert out["lands"]["keepable"] == band
+    assert 0.0 < band < 1.0
+
+
+def test_opening_hand_zero_lands_matches_the_hand_computation():
+    """One value pinned against arithmetic done by hand, not by the same
+    formula: P(0 lands in 7 of 99, 34 lands) = C(65,7)/C(99,7), and the
+    first factor form of that is 65/99 * 64/98 * ... * 59/93."""
+    from mtglab.decks.analyze import opening_hand
+    out = opening_hand(_big_deck(lands=34))
+    expected = 1.0
+    for i in range(7):
+        expected *= (65 - i) / (99 - i)
+    zero = out["lands"]["distribution"][0]
+    assert zero["lands"] == 0
+    assert abs(zero["chance"] - expected) < 1e-12
+
+
+def test_opening_hand_certain_category_is_certain():
+    """A category that is the whole deck is in every hand."""
+    from mtglab.decks.analyze import opening_hand
+    deck = deck_of(CardEntry(name="Forest", category="land", qty=99, why="x"))
+    out = opening_hand(deck)
+    row = next(r for r in out["categories"] if r["category"] == "land")
+    assert row["in_opening_hand"] == 1.0
+
+
+def test_opening_hand_singleton_is_seen_over_deck_size():
+    """On the draw, by end of turn t you have seen 7 + t cards, and a
+    singleton's odds are exactly that over the deck size."""
+    from mtglab.decks.analyze import opening_hand
+    out = opening_hand(_big_deck())
+    by_turn = {row["turn"]: row for row in out["singleton"]}
+    assert by_turn[4]["cards_seen"] == 11
+    assert abs(by_turn[4]["chance"] - 11 / 99) < 1e-12
+
+
+def test_deck_stats_carries_opening_hand():
+    from mtglab.decks.analyze import deck_stats
+    stats = deck_stats(_big_deck())
+    assert stats["opening"]["lands"]["count"] == 34

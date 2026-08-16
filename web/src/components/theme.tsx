@@ -41,7 +41,9 @@ import {
   type ThemeTurn,
 } from '../lib/api'
 import { COLOR_VAR } from '../lib/mtg'
+import { PERSONA_ACCENT, PERSONA_ART } from '../lib/personart'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
+import { SceneBackdrop } from './forest'
 import { CardHover, ColorRing } from './ui'
 import { StanceReadout } from './stance'
 
@@ -109,6 +111,133 @@ function load(persona: string, seed: number | null): Saved {
 }
 
 /* ------------------------------------------------------------- the pieces */
+
+/**
+ * The voice's sign, hung by the door (punch list 2026-08-15 item 8): one
+ * small drawn emblem per persona, animated with the laboratory's own
+ * classes — a flame is a flame whether it is under a beaker or a story.
+ * Hovering it stirs it (`--lab-speed` drops on `.room-sign:hover`), which
+ * is the cheapest kind of interactive: the room notices you.
+ *
+ * Drawn in `currentColor` so each sign wears its room's accent, except
+ * where a thing has an unarguable colour — foam is foam.
+ */
+function RoomSign({ persona }: { persona: string }) {
+  const sign = (() => {
+    switch (persona) {
+      case 'therapist':
+        // A crescent, and three dreams getting away.
+        return (
+          <svg viewBox="0 0 64 48" className="h-12 w-16">
+            <path d="M40 38 A 15 15 0 1 1 40 10 A 12 12 0 1 0 40 38 Z"
+                  fill="currentColor" opacity="0.8" />
+            <circle className="lab-steam" cx="22" cy="34" r="3.4"
+                    fill="currentColor" />
+            <circle className="lab-steam lab-steam-2" cx="14" cy="30" r="2.6"
+                    fill="currentColor" />
+            <circle className="lab-steam" cx="29" cy="28" r="2"
+                    fill="currentColor" style={{ animationDelay: '3.2s' }} />
+          </svg>
+        )
+      case 'scientist':
+        // The specimen, mid-observation.
+        return (
+          <svg viewBox="0 0 64 48" className="h-12 w-16">
+            <rect x="27" y="4" width="10" height="40" rx="5"
+                  fill="currentColor" opacity="0.25" />
+            <rect x="27" y="22" width="10" height="22" rx="5"
+                  fill="currentColor" opacity="0.75" />
+            <circle className="lab-bubble" cx="30" cy="38" r="1.8" fill="#fff"
+                    opacity="0.9" />
+            <circle className="lab-bubble lab-bubble-3" cx="34" cy="40" r="1.3"
+                    fill="#fff" opacity="0.9" />
+            <path d="M24 8 H 40" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" />
+          </svg>
+        )
+      case 'chef':
+        // The pot, and what escapes it.
+        return (
+          <svg viewBox="0 0 64 48" className="h-12 w-16">
+            <path d="M14 26 H 50 V 34 A 10 10 0 0 1 40 44 H 24 A 10 10 0 0 1 14 34 Z"
+                  fill="currentColor" opacity="0.85" />
+            <path d="M12 26 H 52" stroke="currentColor" strokeWidth="3"
+                  strokeLinecap="round" />
+            <path d="M28 22 C 28 18 36 18 36 22" stroke="currentColor"
+                  strokeWidth="2.5" fill="none" strokeLinecap="round" />
+            <circle className="lab-steam" cx="24" cy="18" r="3" fill="#cfe4ea" />
+            <circle className="lab-steam lab-steam-2" cx="34" cy="14" r="2.4"
+                    fill="#cfe4ea" />
+            <circle className="lab-steam" cx="42" cy="17" r="2"
+                    fill="#cfe4ea" style={{ animationDelay: '2.4s' }} />
+          </svg>
+        )
+      case 'storyteller':
+        // The fire the tales are told across.
+        return (
+          <svg viewBox="0 0 64 48" className="h-12 w-16">
+            <path d="M18 42 L 46 42 M 20 45 L 44 39" stroke="#8a6a33"
+                  strokeWidth="3" strokeLinecap="round" />
+            <path className="lab-flame"
+                  d="M32 40 C 24 32 26 22 32 12 C 38 22 40 32 32 40 Z"
+                  fill="currentColor" />
+            <path className="lab-flame lab-flame-2"
+                  d="M32 38 C 28 33 29 27 32 21 C 35 27 36 33 32 38 Z"
+                  fill="#f6d98a" opacity="0.9" />
+          </svg>
+        )
+      case 'barkeep':
+        // The pour that settles while you decide what to admit.
+        return (
+          <svg viewBox="0 0 64 48" className="h-12 w-16">
+            <path d="M22 10 H 42 L 40 44 H 24 Z" fill="currentColor"
+                  opacity="0.8" />
+            <path d="M42 16 C 50 16 50 30 42 30" stroke="currentColor"
+                  strokeWidth="3" fill="none" />
+            <rect x="23" y="10" width="18" height="6" rx="3" fill="#f0e4c2" />
+            <circle className="lab-bubble" cx="28" cy="36" r="1.6" fill="#f0e4c2"
+                    opacity="0.9" />
+            <circle className="lab-bubble lab-bubble-2" cx="34" cy="38" r="1.2"
+                    fill="#f0e4c2" opacity="0.9" />
+          </svg>
+        )
+      case 'fortune-teller':
+        // Three cards, already fanned. The table below deals the real ones.
+        return (
+          <svg viewBox="0 0 64 48" className="h-12 w-16">
+            {[-14, 0, 14].map((angle) => (
+              <rect key={angle} x="26" y="10" width="14" height="24" rx="2"
+                    fill="currentColor" opacity="0.75"
+                    transform={`rotate(${angle} 33 36)`} />
+            ))}
+            <circle className="lab-float" cx="33" cy="7" r="2"
+                    fill="currentColor" />
+          </svg>
+        )
+      default:
+        // Claude's spark, small — the mark from the tile, breathing.
+        return (
+          <svg viewBox="0 0 64 48" className="h-12 w-16">
+            <g className="lab-float">
+              {Array.from({ length: 8 }, (_, i) => {
+                const a = (i * Math.PI * 2) / 8
+                return (
+                  <line key={i}
+                        x1={32 + Math.cos(a) * 8} y1={24 + Math.sin(a) * 8}
+                        x2={32 + Math.cos(a) * (i % 2 === 0 ? 17 : 12)}
+                        y2={24 + Math.sin(a) * (i % 2 === 0 ? 17 : 12)}
+                        stroke="currentColor" strokeWidth={i % 2 === 0 ? 3 : 2}
+                        strokeLinecap="round" />
+                )
+              })}
+              <circle cx="32" cy="24" r="5.5" fill="currentColor" />
+            </g>
+          </svg>
+        )
+    }
+  })()
+  return <span className="room-sign shrink-0" aria-hidden="true">{sign}</span>
+}
 
 function Chip({ slot }: { slot: ThemeSlot }) {
   return (
@@ -563,9 +692,18 @@ export function ThemeInterview({
   // the identical screen: no question, and a disabled Answer under it.
   const stuck = !busy && !question && (error !== null || report?.asked === true)
 
+  // The room (punch list item 8): each voice's own painting washed across
+  // the viewport, its accent on the chrome, its sign by the door. `plain`
+  // keeps a bare room on purpose — no costume includes the walls.
+  const roomArt = PERSONA_ART[persona]
+  const accent = PERSONA_ACCENT[persona] ?? 'var(--series-1)'
+
   return (
-    <section className="space-y-5">
+    <section className="persona-room space-y-5"
+             style={{ '--room-accent': accent } as React.CSSProperties}>
+      {roomArt && <SceneBackdrop art={roomArt.art} />}
       <div className="flex flex-wrap items-center gap-3">
+        <RoomSign persona={persona} />
         {/* The framing paragraph only frames an *empty* table. Once the
             conversation exists it speaks for itself, and a fixed paragraph
             sitting above every exchange read as a script the interview was
@@ -582,6 +720,12 @@ export function ThemeInterview({
                   + 'about you. Magic’s five colours started life as five '
                   + 'philosophies, so this is less of a detour than it sounds.'}
               </p>
+              {roomArt && (
+                <p className="mt-1 text-[10px]"
+                   style={{ color: 'var(--text-muted)' }}>
+                  The room wears {roomArt.credit}&rsquo;s painting.
+                </p>
+              )}
             </div>
             )
           : (
@@ -631,7 +775,11 @@ export function ThemeInterview({
                         className={t.role === 'user' ? 'text-right' : ''}>
                       <span className="chat-bubble inline-block max-w-[85%] rounded-xl px-3 py-2 text-sm"
                             style={t.role === 'user'
-                              ? { background: 'var(--series-1)', color: '#fff' }
+                              // The room's accent, not the app's: your own
+                              // words wear the colour of whoever you are
+                              // talking to (item 8).
+                              ? { background: 'var(--room-accent, var(--series-1))',
+                                  color: '#fff' }
                               : { border: '1px solid var(--hairline)',
                                   color: 'var(--text-secondary)' }}>
                         {t.text}
