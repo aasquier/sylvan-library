@@ -50,6 +50,13 @@ USERNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{1,31}$")
 # false negatives are somebody's perfectly real address.
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+#: RFC 5321 §4.5.3.1.3 caps a whole address at 254 octets, so this rejects
+#: nothing that was ever deliverable. It is a length bound rather than a
+#: taste, and it is checked *before* `EMAIL_RE` because that pattern is
+#: polynomial in what it is handed and sits on the unauthenticated claim
+#: path -- the one place a stranger chooses the input.
+MAX_EMAIL = 254
+
 
 class UserExists(ValueError):
     """Raised rather than silently taking over an existing account."""
@@ -150,8 +157,13 @@ def normalise_email(email: str | None) -> str | None:
     if email is None or not email.strip():
         return None
     candidate = email.strip().lower()
-    if not EMAIL_RE.match(candidate):
-        raise InvalidEmail(f"{email!r} does not look like an email address")
+    if len(candidate) > MAX_EMAIL or not EMAIL_RE.match(candidate):
+        # The message quotes a bounded slice rather than the input: an
+        # oversized address is exactly the case that reaches here, and echoing
+        # it whole would put the caller's own megabyte back into an exception
+        # string, a log line and an API response.
+        raise InvalidEmail(
+            f"{email[:MAX_EMAIL]!r} does not look like an email address")
     return candidate
 
 

@@ -203,6 +203,30 @@ def test_bad_emails_are_refused(con, bad):
         users.create(con, "ada", password=GOOD, email=bad)
 
 
+def test_an_address_at_the_rfc_limit_is_still_accepted(con):
+    """The bound is RFC 5321's 254 octets, so it refuses nothing that was ever
+    deliverable -- which is only true if the limit itself gets in."""
+    local = "a" * (users.MAX_EMAIL - len("@example.com"))
+    assert users.normalise_email(f"{local}@example.com") is not None
+
+
+def test_an_oversized_address_is_refused_before_the_pattern(con):
+    """`EMAIL_RE` is polynomial in what it is handed and `normalise_email` sits
+    on the unauthenticated claim path -- the one place a stranger picks the
+    input. The length check runs first for that reason."""
+    with pytest.raises(users.InvalidEmail):
+        users.normalise_email("a" * users.MAX_EMAIL + "@example.com")
+
+
+def test_the_refusal_does_not_echo_the_whole_address(con):
+    """An oversized address is exactly what reaches here, so quoting it whole
+    would put the caller's own megabyte into an exception, a log and a
+    response."""
+    with pytest.raises(users.InvalidEmail) as raised:
+        users.normalise_email("a" * 100_000 + "@example.com")
+    assert len(str(raised.value)) < users.MAX_EMAIL * 2
+
+
 def test_an_account_can_exist_without_a_password(con):
     """The state an invite leaves behind (ADR 16): it exists, it cannot log in."""
     ada = users.create(con, "ada")
