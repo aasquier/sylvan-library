@@ -157,6 +157,13 @@ class Deck:
     # Sharing governs *reading*. Writing is the owner's alone either way, which
     # is `Library`'s rule and not this flag's.
     shared: bool = True
+    # Who actually plays this deck (second 2026-08-15 punch list, item 10):
+    # free text, because the pilots at a kitchen table are "Mark's wife" and
+    # "the kids", not accounts. A *tag* deliberately, not an owner -- ADR 22's
+    # `owner_id` says whose library a deck lives in; this says which human
+    # sleeves it up, and one account routinely holds decks for a household.
+    # Empty means untagged, which is every deck that predates the field.
+    pilot: str = ""
     commander: list[str] = field(default_factory=list)
     # Which printing's art the deck shows for its commander: a Scryfall
     # printing id, or empty for "whatever the pool considers the default".
@@ -254,6 +261,7 @@ class Deck:
             # `is None` rather than `or True`: `shared: false` is falsey, and
             # the whole point of the field is that it can say no.
             shared=True if raw.get("shared") is None else bool(raw["shared"]),
+            pilot=str(raw.get("pilot") or "").strip(),
             commander=list(commander),
             commander_art=str(raw.get("commander_art") or "").strip(),
             companion=raw.get("companion"),
@@ -280,6 +288,11 @@ class Deck:
         # default they already had.
         if not self.shared:
             payload["shared"] = False
+        # Written only when set, like everything below: untagged is the
+        # default and the six curated decks should not grow a `pilot:` line
+        # asserting it.
+        if self.pilot:
+            payload["pilot"] = self.pilot
         # Omitted when unset, so the six decks that predate it are unchanged by
         # a round trip and a `commander_art:` line in a diff always means
         # somebody picked one.

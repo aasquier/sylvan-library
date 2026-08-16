@@ -404,13 +404,14 @@ def cmd_decks_set(args):
                    ("art", _art_id(args, card=args.card)
                     if args.art is not None and args.card else None))
     deck_fields = (("stage", args.stage), ("status", args.status),
-                   ("bracket", args.bracket),
+                   ("bracket", args.bracket), ("pilot", args.pilot),
                    ("commander_art", _art_id(args)
                     if args.art is not None and not args.card else None))
     chosen = [(f, v) for f, v in card_fields + deck_fields if v is not None]
     if len(chosen) != 1:
         sys.exit("choose exactly one of --why, --category, --qty, --art (with "
-                 "--card) or --stage, --status, --bracket, --art (without)")
+                 "--card) or --stage, --status, --bracket, --pilot, "
+                 "--art (without)")
     field, value = chosen[0]
     on_a_card = field in dict(card_fields)
 
@@ -1531,6 +1532,9 @@ def main(argv=None):
                     help="curated needs every card justified; see `decks promote`")
     st.add_argument("--status", choices=list(DECK_STATUSES))
     st.add_argument("--bracket", type=int)
+    st.add_argument("--pilot",
+                    help="who sleeves this deck up — a name, or '' to untag "
+                         "(second 2026-08-15 punch list, item 10)")
     st.add_argument("--art", metavar="SET",
                     help="which printing's art the deck shows for its "
                          "commander: a set code, or a printing id when a set "

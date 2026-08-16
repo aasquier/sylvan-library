@@ -32,6 +32,7 @@ function deck(overrides: Partial<DeckTile> & { slug: string }): DeckTile {
     // A reader's view of somebody else's is `writable: false`, and the browse
     // tab's subject is `writable: false, showcase: false`.
     owner: 'aasquier',
+    pilot: '',
     shared: true,
     showcase: true,
     status: 'built',
@@ -151,6 +152,33 @@ describe('Library', () => {
     fireEvent.change(screen.getByLabelText('Color'), { target: { value: 'R' } })
     expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0)
     expect(screen.getByText('No decks match those filters.')).toBeTruthy()
+  })
+
+  it('filters by pilot, with untagged as a real answer', async () => {
+    // The household tag (second punch list, item 10). The control exists only
+    // once somebody has tagged a pilot — a single-player library never grows
+    // a filter about nobody — and 'Untagged' is a position, not the filter
+    // off.
+    vi.mocked(api.decks).mockResolvedValue([
+      deck({ slug: 'tivit', name: 'Tivit', pilot: "Mark's Wife" }),
+      deck({ slug: 'arahbo', name: 'Arahbo', pilot: 'The Kids' }),
+      deck({ slug: 'goreclaw', name: 'Goreclaw' }),
+    ])
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    fireEvent.change(screen.getByLabelText('Pilot'), { target: { value: "Mark's Wife" } })
+    expect(shownNames()).toEqual(['Tivit'])
+    fireEvent.change(screen.getByLabelText('Pilot'), { target: { value: 'none' } })
+    expect(shownNames()).toEqual(['Goreclaw'])
+    // And the tag shows on the tile.
+    fireEvent.change(screen.getByLabelText('Pilot'), { target: { value: 'all' } })
+    expect(screen.getByText("pilot · Mark's Wife")).toBeTruthy()
+  })
+
+  it('grows no pilot filter while nobody is tagged', async () => {
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    expect(screen.queryByLabelText('Pilot')).toBeNull()
   })
 
   it('offers only the brackets that decks actually use', async () => {

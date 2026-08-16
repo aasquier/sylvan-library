@@ -522,6 +522,28 @@ def test_a_bracket_is_a_number_in_range():
         set_deck_field(DECK, field="bracket", value="four")
 
 
+def test_a_pilot_is_a_name_with_its_case_kept(tmp_path):
+    """The household tag (second 2026-08-15 punch list, item 10): free text,
+    case preserved -- it is somebody's name -- clearable, and capped at
+    something a shelf can wear."""
+    out = set_deck_field(DECK, field="pilot", value="Mark's Wife")
+    assert yaml.safe_load(out)["pilot"] == "Mark's Wife"
+
+    # Round-trips through the model unchanged, and dumps only when set.
+    from mtglab.decks.model import Deck as DeckModel
+    deck = DeckModel.from_text(out, slug="mini")
+    assert deck.pilot == "Mark's Wife"
+    assert "pilot: Mark's Wife" in deck.dump()
+    assert "pilot" not in DeckModel.from_text(DECK, slug="mini").dump()
+
+    # Clearing is a real operation: the tag comes off.
+    cleared = set_deck_field(out, field="pilot", value="")
+    assert not yaml.safe_load(cleared).get("pilot")
+
+    with pytest.raises(EditFailed, match="at most 40 characters"):
+        set_deck_field(DECK, field="pilot", value="x" * 41)
+
+
 def test_promotion_leaves_every_card_and_note_alone():
     draft = DECK.replace("bracket: 4", "bracket: 4\nstage: draft")
     out = set_deck_field(draft, field="stage", value="curated")

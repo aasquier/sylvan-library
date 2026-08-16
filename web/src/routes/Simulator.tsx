@@ -207,7 +207,11 @@ export default function Simulator() {
                 }}
                 options={decks.map((d) => ({
                   value: `${d.owner}/${d.slug}`,
-                  label: d.writable ? d.name : `${d.name} — ${d.owner}`,
+                  // The pilot tag rides along (second punch list, item 10),
+                  // so a household comparing decks can tell whose is whose
+                  // without leaving the page.
+                  label: (d.writable ? d.name : `${d.name} — ${d.owner}`)
+                    + (d.pilot ? ` (${d.pilot})` : ''),
                 }))} />
         <Select label="Simulation" value={mode}
                 onChange={(v) => setMode(v as Mode)}

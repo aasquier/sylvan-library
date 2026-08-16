@@ -54,6 +54,11 @@ export interface DeckSummary {
    *  is only ever interesting on your own decks, where it is the answer to
    *  "is this one on display". */
   shared: boolean
+  /** Who sleeves this deck up (second 2026-08-15 punch list, item 10): a
+   *  household tag — "Mark's wife", "the kids" — not an account. The owner
+   *  says whose library it lives in; this says which human plays it. Empty
+   *  means untagged. */
+  pilot: string
   name: string
   /** "built" = the cards are sleeved up; "theoretical" = a list under consideration. */
   status: string
