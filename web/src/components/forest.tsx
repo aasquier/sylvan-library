@@ -28,6 +28,7 @@
  */
 
 import { useEffect, useId, useRef, useState } from 'react'
+import { useAmbience } from '../lib/prefs'
 
 /* ------------------------------------------------------------ the ambience */
 
@@ -115,6 +116,11 @@ function PageShape({ size }: { size: number }) {
  * what makes the room read as having depth rather than an overlay).
  */
 export function ForestAmbience() {
+  // The settings gear's ambience switch (second punch list, item 9). Off
+  // removes the layer, not just its motion — that is what distinguishes a
+  // person's "no thank you" from `prefers-reduced-motion`'s stillness.
+  const [ambience] = useAmbience()
+  if (!ambience) return null
   return (
     <div className="forest-ambience" aria-hidden="true">
       {FIREFLIES.map((f, i) => (
@@ -331,6 +337,9 @@ export function HeaderCanopy() {
  * the flicker and the dust but keeps the room.
  */
 export function SceneBackdrop({ art }: { art: string }) {
+  // Same switch as the weather: a room is ambience too.
+  const [ambience] = useAmbience()
+  if (!ambience) return null
   return (
     <div className="scene-backdrop" aria-hidden="true">
       <img src={art} alt="" className="scene-backdrop-art" />

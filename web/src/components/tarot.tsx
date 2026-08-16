@@ -44,8 +44,9 @@ import {
   type TarotReading,
   type ThemeCommander,
 } from '../lib/api'
-import { deal as dealSound, flip as flipSound, riffle, setSound, shimmer,
-  soundOn, wake } from '../lib/tablesounds'
+import { deal as dealSound, flip as flipSound, riffle, shimmer }
+  from '../lib/tablesounds'
+import { useTableSound } from '../lib/prefs'
 import { PERSONA_ART } from '../lib/personart'
 import { ThemeInterview } from './theme'
 import { CardArt } from './ui'
@@ -610,15 +611,13 @@ function CrystalBall({ vision }: {
  * which is exactly what the first version shipped as.
  */
 function SoundToggle() {
-  const [on, setOn] = useState(soundOn)
+  // Through `lib/prefs.ts` rather than a local `useState`: the settings gear
+  // flips the same preference, and two controls over one key must watch one
+  // store or the one not clicked lies until remounted.
+  const [on, setOn] = useTableSound()
   return (
     <button type="button"
-            onClick={() => {
-              const next = !on
-              setSound(next)
-              setOn(next)
-              if (next) wake()
-            }}
+            onClick={() => setOn(!on)}
             aria-pressed={on}
             title={on
               ? 'Table sounds are on'

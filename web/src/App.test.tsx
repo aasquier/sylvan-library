@@ -123,6 +123,23 @@ describe('the nav', () => {
   })
 })
 
+describe('the ambience switch', () => {
+  it('removes the weather layer entirely when opted out', async () => {
+    localStorage.setItem('mtglab-ambience', '0')
+    renderApp()
+    await screen.findByText('Card search')
+    expect(document.querySelector('.forest-ambience')).toBeNull()
+    localStorage.removeItem('mtglab-ambience')
+  })
+
+  it('the weather is on by default — the character is not opt-in', async () => {
+    renderApp()
+    await screen.findByText('Card search')
+    expect(document.querySelector('.forest-ambience')).toBeTruthy()
+    expect(document.querySelectorAll('.firefly').length).toBeGreaterThan(0)
+  })
+})
+
 describe('the Claude menu in the header', () => {
   const claude = {
     installed: true, configured: true, model: 'claude-sonnet-5',
@@ -137,18 +154,22 @@ describe('the Claude menu in the header', () => {
     modes: [],
   }
 
-  it('appears when this instance has Claude configured', async () => {
+  it('shows on the settings gear when this instance has Claude configured', async () => {
     routes['/api/claude'] = { body: claude }
     renderApp()
-    expect(await screen.findByRole('button', { name: /Claude/ })).toBeTruthy()
+    // The gear itself is unconditional; the Claude readout on it is not.
+    expect(await screen.findByRole('button', { name: 'Settings' })).toBeTruthy()
+    expect(await screen.findByText(/Claude ·/)).toBeTruthy()
   })
 
-  it('stays out of the header when it is not', async () => {
+  it('stays out of the gear when it is not', async () => {
     // The default mock 404s `/api/claude`, which is what an instance without
-    // the extra effectively is to this menu: nothing to control.
+    // the extra effectively is to this panel: nothing to control. The gear
+    // still renders — theme, ambience and sound are about the person.
     renderApp()
     await screen.findByText('Card search')
-    expect(screen.queryByRole('button', { name: /Claude/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy()
+    expect(screen.queryByText(/Claude ·/)).toBeNull()
   })
 })
 

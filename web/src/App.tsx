@@ -4,7 +4,7 @@ import Claim from './routes/Claim'
 import Library from './routes/Library'
 import Login from './routes/Login'
 import { Spinner } from './components/ui'
-import { StanceMenu } from './components/stancemenu'
+import { SettingsMenu } from './components/settings'
 import { ForestAmbience, HeaderCanopy, LibraryMark } from './components/forest'
 import { LibraryWhisper } from './components/whisper'
 import { api, onSessionLost, type AuthState, type Health } from './lib/api'
@@ -328,11 +328,11 @@ export default function App() {
                 </button>
               </span>
             )}
-            {/* Self-gating: renders nothing unless this instance has Claude
-                installed and configured, so a laptop without the extra never
-                shows a menu over a feature it does not have. */}
-            <StanceMenu />
-            <ThemeButton theme={theme} onToggle={toggleTheme} />
+            {/* Every preference behind one gear (second punch list, item 9):
+                theme, ambience, table sound, and — only where the instance
+                has it — the Claude stance slider. The logged-out screens
+                keep the bare ThemeButton; they have no ambience to switch. */}
+            <SettingsMenu theme={theme} onToggleTheme={toggleTheme} />
           </div>
         </div>
         {/* The vine draped along the header's underside. Inside the sticky
