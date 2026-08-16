@@ -17,6 +17,7 @@ import {
 } from '../lib/api'
 import { categoryLabel, identityName } from '../lib/mtg'
 import { SceneBackdrop } from '../components/forest'
+import { WheelOfFortune } from '../components/wheel'
 import {
   Badge, CardArt, CardHover, Caveat, ColorRing, ErrorNote, ManaCost, ManaText,
   Select, Spinner, StatTile,
@@ -1295,6 +1296,12 @@ export default function DeckDetail() {
               </ul>
             </section>
           )}
+
+          {/* The Wheel of Fortune (punch list item 9): a random suggestion
+              in this deck's colours, spun rather than searched for. At the
+              foot of the list because it is dessert, not dinner — and for
+              readers too, since a spin writes nothing. */}
+          <WheelOfFortune deckRef={deckRef} />
         </div>
       )}
 

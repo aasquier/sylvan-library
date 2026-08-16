@@ -260,6 +260,30 @@ export interface DeckStats {
   }
 }
 
+/** One turn of the Wheel of Fortune — a fate, and (usually) a card in the
+ *  deck's colours that answers to it. `answered_by: "python"` because the
+ *  wheel is seeded dice over the pool, never a model. */
+export interface WheelSpin {
+  pool_available: boolean
+  symbol: 'cup' | 'heart' | 'sword' | 'skull' | null
+  label?: string
+  meaning?: string
+  seed?: number
+  answered_by?: string
+  caveat?: string
+  message?: string
+  reason?: string
+  card: {
+    name: string
+    mana_cost: string | null
+    type_line: string
+    oracle_text: string
+    color_identity: string[]
+    image: string | null
+    art_crop: string | null
+  } | null
+}
+
 export interface TurnRow {
   turn: number
   lands: number
@@ -1319,6 +1343,11 @@ export const api = {
   deck: (ref: DeckRef) => get<DeckDetail>(deckPath(ref)),
   validate: (ref: DeckRef) => get<ValidationReport>(deckPath(ref, '/validate')),
   stats: (ref: DeckRef) => get<DeckStats>(deckPath(ref, '/stats')),
+  /** One turn of the Wheel of Fortune (punch list item 9). A POST because
+   *  each spin is a fresh draw, but read-only with respect to the deck. */
+  wheelSpin: (ref: DeckRef, seed?: number) =>
+    post<WheelSpin>(deckPath(ref, '/wheel'),
+                    seed === undefined ? {} : { seed }),
   suggestions: (ref: DeckRef) =>
     get<Suggestions>(deckPath(ref, '/suggestions')),
   // What has been done to this deck, newest first (ADR 28). As reachable as

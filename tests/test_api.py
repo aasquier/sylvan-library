@@ -3503,3 +3503,30 @@ def test_the_same_selection_twice_in_flight_is_one_sweep(in_memory_client,
         await_job(client, other["id"])
         assert started.count("Regal Behemoth") == 1, \
             "the sweep must not have been paid for twice"
+
+
+# ------------------------------------------------------------------ the wheel
+
+def test_wheel_route_spins_and_a_seed_replays(pool, client):
+    """Punch list item 9: the spin is the server's, seeded like Tier 1."""
+    first = client.post("/api/decks/local/gyome-food/wheel",
+                        json={"seed": 5})
+    assert first.status_code == 200, first.text
+    body = first.json()
+    assert body["pool_available"] is True
+    assert body["symbol"] in ("cup", "heart", "sword", "skull")
+    assert body["seed"] == 5
+    assert body["answered_by"] == "python"
+    again = client.post("/api/decks/local/gyome-food/wheel",
+                        json={"seed": 5}).json()
+    assert again == body
+
+
+def test_wheel_route_rolls_its_own_seed_when_unseeded(pool, client):
+    body = client.post("/api/decks/local/gyome-food/wheel", json={}).json()
+    assert isinstance(body["seed"], int)
+
+
+def test_wheel_on_a_missing_deck_is_404(pool, client):
+    assert client.post("/api/decks/local/nope/wheel",
+                       json={}).status_code == 404

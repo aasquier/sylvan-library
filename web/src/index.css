@@ -1231,6 +1231,26 @@ button:hover .tarot-fan-card {
   box-shadow: 0 6px 16px rgba(20, 14, 4, 0.35);
 }
 
+/* ------------------------------------------------------------- the wheel
+ *
+ * `DrawnWheel` in components/wheel.tsx (punch list item 9). One transform,
+ * one long deceleration: the easing front-loads the speed so the wheel
+ * blurs past, then crawls the last fate into place. `transform-box:
+ * view-box` for the same reason the crystal fog needs it — an SVG group
+ * otherwise rotates about the viewBox corner and exits the painting.
+ */
+.wheel-disc {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transition: transform 3.8s cubic-bezier(0.12, 0.55, 0.08, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-disc {
+    transition: none;
+  }
+}
+
 /* ---------------------------------------------------------- persona rooms
  *
  * `RoomSign` and the `.persona-room` wrapper in components/theme.tsx (punch

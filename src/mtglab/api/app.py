@@ -575,6 +575,21 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         source.set_shared(slug, bool(payload["shared"]))
         return service.get_deck(slug, source=source, owner=owner)
 
+    @app.post("/api/decks/{owner}/{slug}/wheel")
+    def deck_wheel(owner: str, slug: str, lib: Lib,
+                   body: dict[str, Any] | None = None) -> dict[str, Any]:
+        """One turn of the Wheel of Fortune (punch list item 9).
+
+        A POST because each spin is a fresh draw, but read-only with respect
+        to the deck -- readers may spin a shared deck's wheel, exactly as
+        they may read its stats. `seed` replays a spin; absent, the server
+        rolls one and reports it.
+        """
+        seed = (body or {}).get("seed")
+        return service.wheel_spin(
+            slug, source=lib.source_for(owner),
+            seed=int(seed) if seed is not None else None)
+
     @app.get("/api/decks/{owner}/{slug}/suggestions")
     def deck_suggestions(owner: str, slug: str, lib: Lib,
                          limit: int = Query(5, ge=1, le=20)) -> dict[str, Any]:

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 from mtglab import colors, config
 from mtglab import glossary as gloss
 from mtglab.cards import db
-from mtglab.decks import decklist, edit, importer, log, partners, suggest
+from mtglab.decks import decklist, edit, importer, log, partners, suggest, wheel
 from mtglab.decks.analyze import deck_stats
 from mtglab.decks.edit import EditFailed
 from mtglab.decks.importer import ImportRefused
@@ -1996,6 +1996,30 @@ def swap_card(slug: str, *, out: str, into: str, why: str,
 
     return _commit(slug, decks, updated, actor=actor, swapped_out=entry.name,
                    swapped_in=rec.name, why=why.strip())
+
+
+def wheel_spin(slug: str, *, source: DeckSource | None = None,
+               seed: int | None = None) -> dict[str, Any]:
+    """One turn of the Wheel of Fortune for this deck (punch list item 9).
+
+    Deterministic and seeded like Tier 1: `decks/wheel.py` picks a fate and a
+    random pool card in the commander's identity that answers to it, and the
+    seed comes back so the same spin can be spun again. Read-only -- the wheel
+    suggests, it never edits, and no rationale is prefilled (rule 4).
+    """
+    deck = _source(source).get(slug)
+    con = _connect()
+    if con is None:
+        return {"pool_available": False, "card": None, "symbol": None,
+                "message": "no card pool yet -- run `mtglab data refresh`"}
+    try:
+        cards = _pool_for(deck, con)
+        commander = cards.get(deck.commander[0]) if deck.commander else None
+        identity = commander.color_identity if commander else frozenset()
+        return {"pool_available": True,
+                **wheel.spin(deck, identity, con, seed=seed)}
+    finally:
+        con.close()
 
 
 def suggestions_for(slug: str, *, source: DeckSource | None = None,
