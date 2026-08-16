@@ -165,3 +165,95 @@ def test_built_default_shape() -> None:
     result = Built()
     assert result.written == [] and result.sizes == {}
     assert not result.dry_run and result.provenance is None
+
+
+# --------------------------------------------------------- motion (ADR 31)
+
+PROCEDURAL_RECIPE = """
+animist: 1
+why_committed: generated here; committing it is the only way it exists
+sources:
+  mist:
+    provider: procedural
+    seed: 42
+    licence: ours-generated
+outputs:
+  - file: mist-loop.webm
+    from: mist
+    ops:
+      - spectral_noise: {width: 32, height: 16, frames: 4, fps: 8}
+      - color_ramp: {low: "#0b1c14", high: "#9fe8c0"}
+    encode: {format: webm, crf: 45}
+    expect: {width: 32, height: 16, frames: 4, fps: 8, budget_kb: 100}
+  - file: mist-loop.mp4
+    from: mist
+    ops:
+      - spectral_noise: {width: 32, height: 16, frames: 4, fps: 8}
+      - color_ramp: {low: "#0b1c14", high: "#9fe8c0"}
+    encode: {format: mp4, crf: 40}
+    expect: {width: 32, height: 16, frames: 4, budget_kb: 100}
+  - file: mist-poster.webp
+    from: mist
+    ops:
+      - spectral_noise: {width: 32, height: 16, frames: 4, fps: 8}
+      - color_ramp: {low: "#0b1c14", high: "#9fe8c0"}
+    encode: {format: webp, quality: 80}
+    expect: {width: 32, height: 16, budget_kb: 50}
+"""
+
+
+def no_network(url, params):
+    raise AssertionError(f"a procedural build reached the network: {url}")
+
+
+def never_download(url, target):
+    raise AssertionError(f"a procedural build tried to download: {url}")
+
+
+def test_a_procedural_build_touches_no_network(tmp_path, monkeypatch):
+    """The whole point of the provider: seed in, committed loop out, and the
+    transport is a tripwire rather than a fake."""
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path / "data")
+    path = tmp_path / "mist.recipe.yaml"
+    path.write_text(PROCEDURAL_RECIPE, encoding="utf-8")
+    result = build(load_recipe(path), transport=no_network,
+                   download=never_download)
+    names = sorted(p.name for p in result.written)
+    assert names == ["mist-loop.mp4", "mist-loop.webm", "mist-poster.webp"]
+    assert (tmp_path / "PROVENANCE.md").exists()
+    text = (tmp_path / "PROVENANCE.md").read_text(encoding="utf-8")
+    assert "seed 42" in text
+    assert "ours-generated" in text
+    assert "crf 45" in text
+
+
+def test_dual_format_derives_once(tmp_path, monkeypatch):
+    """Three outputs, one derivation: the memo key is (source, ops), so the
+    webm, its mp4 twin and the poster share one generation pass."""
+    from mtglab.animist import motion
+
+    calls = {"n": 0}
+    real = motion.GENERATOR_OPS["spectral_noise"]
+
+    def counting(params):
+        calls["n"] += 1
+        return real(params)
+
+    monkeypatch.setitem(motion.GENERATOR_OPS, "spectral_noise", counting)
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path / "data")
+    path = tmp_path / "mist.recipe.yaml"
+    path.write_text(PROCEDURAL_RECIPE, encoding="utf-8")
+    build(load_recipe(path), transport=no_network, download=never_download)
+    assert calls["n"] == 1
+
+
+def test_the_source_seed_reaches_the_generator(tmp_path, monkeypatch):
+    """Two builds from the same recipe produce identical stills -- the
+    procedural source's seed is inherited, not the clock's."""
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path / "data")
+    path = tmp_path / "mist.recipe.yaml"
+    path.write_text(PROCEDURAL_RECIPE, encoding="utf-8")
+    build(load_recipe(path), transport=no_network, download=never_download)
+    first = (tmp_path / "mist-poster.webp").read_bytes()
+    build(load_recipe(path), transport=no_network, download=never_download)
+    assert (tmp_path / "mist-poster.webp").read_bytes() == first

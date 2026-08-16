@@ -64,6 +64,33 @@ for the card pool: keep it on the volume, not in the image.
 
 Nothing here is legal advice.
 
+## imageio-ffmpeg and its bundled ffmpeg
+
+The animist's video encoders (ADR 31) run through
+[imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg), which is
+**BSD-2-Clause** and whose wheel bundles a static **ffmpeg** binary. That
+binary is a **GPL build** (it links x264, among others), and the argument for
+why that binds nothing here is Forge's argument verbatim, one section up:
+
+1. It is a **build-time subprocess on the dev machine and CI** — `mtglab
+   animist build` starts it as a separate process and feeds it frames over a
+   pipe, the boundary the FSF names as the one between two separate programs.
+   Nothing links it, and this project stays MIT.
+2. It is **never in the container image and never served to users**. The
+   `animist` extra is not installed by the image's `.[api,claude]`, so the
+   only thing distributed to anybody is the encoded WebM/MP4 output — and an
+   encoder's licence does not attach to the files it encodes.
+3. If a future change ever did put ffmpeg in a distributed image, the Forge
+   section's rule applies: that is distribution, and it would need the same
+   deliberate handling. Do not do it casually.
+
+## Depth-Anything V2 (planned)
+
+The depth-parallax phase (ADR 32) uses Depth-Anything-V2-Small, released under
+**Apache-2.0**, via CPU torch on the dev machine only. Model weights are
+downloaded to the gitignored cache at build time and are never committed,
+never in the image, and never served.
+
 ## Prices
 
 Price data comes from the Scryfall printings feed. TCGplayer's developer API is

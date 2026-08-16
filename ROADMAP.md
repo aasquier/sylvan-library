@@ -1317,16 +1317,24 @@ arc; this is what the next few sessions actually do.
     as committed recipes. Wizards' art stays runtime-animated only — the
     pipeline deliberately has no provider that takes a Scryfall URL.
 
-    Later phases, in likely order, each a registry entry or format-table row
-    rather than a schema change: **procedural motion textures and sprite
-    sheets** (noise/displacement maps, particle sprites, a runtime
-    sprite-sheet player), **animated formats** (animated WebP/APNG natively;
-    MP4/WebM via `imageio-ffmpeg`, whose static-ffmpeg pip wheel is verified
-    to work on the dev Mac — the door the video-loops sentence above left
-    open), and **2.5D depth parallax** for public-domain paintings
-    (torch 2.2.2 CPU + Depth-Anything-V2-Small, Apache-2.0, both verified
-    installable on macOS 12 Intel; card art is excluded — a depth map of a
-    Wizards painting is a committed derivative).
+    The first two later phases landed 2026-08-16 as **ADR 31**: procedural
+    motion (a seeded, loop-perfect `spectral_noise` generator plus `advect`,
+    `color_ramp` and `ken_burns`, with a `procedural` source whose
+    declaration — its seed — is the source) and the animated formats
+    (`awebp`/`apng` through Pillow, `webm`/`mp4` through `imageio-ffmpeg`,
+    crf-controlled, dual-shipped for the Safari floor, never in the image).
+    `verify` reads video through the same bundled ffmpeg that wrote it, and
+    `measure` sweeps crf where a video output is the subject.
+
+    Still ahead: **2.5D depth parallax** (torch 2.2.2 CPU +
+    Depth-Anything-V2-Small, Apache-2.0, both verified installable on
+    macOS 12 Intel) for public-domain paintings as committed assets — and
+    for **card art through ADR 32's runtime tier**, which supersedes the
+    exclusion this paragraph used to state: a depth map of a Wizards
+    painting is still never *committed*, but a derivative generated
+    server-side into the gitignored cache and served by the free fan-content
+    app is the runtime-only rule kept, not bent. Sprite sheets and the
+    runtime sprite-sheet player remain open.
 
 ---
 

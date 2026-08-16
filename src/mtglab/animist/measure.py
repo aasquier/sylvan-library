@@ -23,17 +23,36 @@ from mtglab.animist.recipe import Encode
 if TYPE_CHECKING:
     from PIL.Image import Image
 
+    from mtglab.animist.motion import FrameSequence
+
 
 def size_curve(image: Image, settings: Encode,
                widths: list[int]) -> list[tuple[int, int]]:
     """Encode `image` resized to each width (aspect kept): (width, bytes)."""
     from PIL.Image import Resampling
 
+    from mtglab.animist.motion import FrameSequence
+
     curve: list[tuple[int, int]] = []
     for width in sorted(set(widths)):
         height = max(1, round(image.height * width / image.width))
         resized = image.resize((width, height), Resampling.LANCZOS)
-        curve.append((width, len(encode(resized, settings))))
+        curve.append((width,
+                      len(encode(FrameSequence.still(resized), settings))))
+    return curve
+
+
+def crf_curve(sequence: FrameSequence, settings: Encode,
+              crfs: list[int]) -> list[tuple[int, int]]:
+    """The video formats' half of the same question: encode the sequence at
+    each crf, report (crf, bytes). The knee finder is shared — its arithmetic
+    never asked what the x-axis meant."""
+    from dataclasses import replace
+
+    curve: list[tuple[int, int]] = []
+    for crf in sorted(set(crfs)):
+        cost = len(encode(sequence, replace(settings, crf=crf)))
+        curve.append((crf, cost))
     return curve
 
 
