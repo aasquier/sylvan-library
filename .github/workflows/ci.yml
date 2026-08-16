@@ -185,10 +185,28 @@ jobs:
       # email addresses -- the first personal data the project stores (ADR 16)
       # -- and unlike the pool it is irreplaceable, so a committed one is
       # both a leak and a thing somebody might try to "restore" from git.
+      #
+      # The pool rules stopped being anchored to `data/` on 2026-08-16, found
+      # by White's run and closed by Red's. `^data/.*\.duckdb$` only ever asked
+      # where a file was, and the thing that makes a committed pool a rule 5
+      # violation is what it *is* -- so a pool built into `tests/fixtures/` or
+      # dropped at the repository root passed a scan named after it. The
+      # `.jsonl.gz`/`.json.gz` pair is the same hole one step upstream: those
+      # are Scryfall's bulk downloads, which the `image` job already refuses to
+      # find *inside the container* and which nothing refused in the tree.
+      #
+      # Note which extensions may go global and which may not, because it is
+      # the whole reason the first alternative stays: nothing legitimate in
+      # this repository is named `.duckdb`, `.jsonl.gz` or `.json.gz`, so those
+      # can match anywhere and cannot false-positive. Bare `.json` emphatically
+      # cannot -- `package.json`, `package-lock.json` and `tsconfig` are all
+      # tracked -- so it stays pinned to `data/`, where a JSON file is Scryfall's
+      # and nothing else. Checked against all 418 tracked files: the widened
+      # pattern matches exactly what the old one did, which is nothing.
       - name: Reject committed card data, collections, or credentials
         run: |
           bad=$(git ls-files | grep -Ei \
-            '(^data/.*\.(json|duckdb)$|app\.db|collection|wishlist|inventory|purchases|orders|\.env$|cookies\.json)' \
+            '(^data/.*\.(json|duckdb)$|\.duckdb$|\.jsonl\.gz$|\.json\.gz$|app\.db|collection|wishlist|inventory|purchases|orders|\.env$|cookies\.json)' \
             || true)
           if [ -n "$bad" ]; then
             echo "These files must not be committed:"; echo "$bad"; exit 1
@@ -407,10 +425,19 @@ jobs:
       # because a CVE with no available patch is not something this build can
       # act on -- it would turn the gate into noise that gets disabled.
       #
-      # Unpinned, like every other action in this file. ENGINEERING §5's
-      # supply-chain list owns moving all of them to commit SHAs; pinning a
-      # scanner to an old tag also pins its database schema, which is its own
-      # way to end up with a green check that checks nothing.
+      # This note used to read "unpinned, like every other action in this
+      # file", and both halves of that are now false: ENGINEERING §5's
+      # supply-chain item landed and all eleven action references here are
+      # commit SHAs with the version in a trailing comment.
+      #
+      # The worry it recorded was real and turned out not to apply -- pinning a
+      # scanner to an old tag can pin its vulnerability database too, which is
+      # its own way to end up with a green check that checks nothing. It does
+      # not happen here, and the run log says why rather than the docs: this
+      # step restores `trivy-binary-v0.70.0` from cache and then a *separate*
+      # `cache-trivy-<today>` key. The database is fetched at run time and
+      # keyed on the date, so the pin holds the action still and the data still
+      # moves every day.
       - name: Scan for vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
