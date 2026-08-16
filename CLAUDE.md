@@ -89,6 +89,13 @@ test tooling). A base install has the gate, the mana
 solver and Tier 1, and needs neither a network nor an account. `claude check`
 needs `ANTHROPIC_API_KEY`; see `.env.example`.
 
+That parenthesis was **false until 2026-08-16** — `dev` carried every other
+extra's packages except `fastapi` and `uvicorn` — and the omission cost 474
+tests, silently. `pyproject.toml` now vendors them with the reason written
+out; the rule the episode argues for is the general one: **a sentence in this
+file asserting completeness is a claim to re-check against the code, not a
+fact to inherit.**
+
 `data refresh` needs network access to `api.scryfall.com` and
 `data.scryfall.io`. In a cloud session with default Trusted network access
 those are not reachable — widen the environment's access level first, or run
@@ -102,6 +109,8 @@ src/mtglab/
   config.py               where decks and the pool live; env-overridable
   colors.py               the 32 combinations, and the teaching depth
   glossary.py             the vocabulary, Magic's and this tool's own
+  lore.py                 the shelves: history, rules that changed, the
+                          painters; reference prose, the third of its kind
   tarot.py                the 78-card deck, the shuffle, and the three-card
                           spread; stdlib, and no card's meaning
   assets/tarot/           the 78 pictures, package-data; PROVENANCE.md argues
@@ -125,6 +134,8 @@ src/mtglab/
   decks/analyze.py        macro category counts vs bracket targets
   decks/log.py            what was done to a deck, and by whom (ADR 28);
                           never what a rationale says
+  decks/wheel.py          the Wheel of Fortune: a seeded spin picks one of
+                          four fates and a card that answers it; no model
   sim/compile.py          deck.yaml + pool -> SimCards
   sim/cache.py            memoised Tier 1 results, keyed on compiled input
   sim/tier1/engine.py     Monte Carlo goldfish
@@ -147,6 +158,8 @@ src/mtglab/
   api/dossierruns.py      the commander dossier, same shape (236s, ADR 19)
   api/researchruns.py     research, same shape (265s, ADR 26) — and the first
                           one that was a job before it was a failure
+  api/argueruns.py        the slot argument swept across a selection, same
+                          shape; one job for the sweep, one card at a time
   api/auth.py             the deny-by-default middleware and login routes
   api/deps.py             the request scope: who is asking, what they see
   web_dist/               built frontend, committed so `mtglab ui` needs no Node
@@ -281,12 +294,14 @@ it back. Creation, import and deletion are outside it because they are outside
 `_commit` — adding them means a second call site, which is a decision to take
 deliberately rather than by drift.
 
-**`colors.py` and `glossary.py` are reference prose, and that was argued
-rather than assumed.** They are the two modules that deliberately know things
-Scryfall did not say — what a guild is, what happened to it, what a mulligan
-is — and the alternative was a Claude surface. It lost on four counts, written
-out in `colors.py`'s docstring and ROADMAP item 3 branch 4: `/api/colors` and
-`/api/glossary` work with **no card pool and no network**, the set is finite and
+**`colors.py`, `glossary.py` and `lore.py` are reference prose, and that was
+argued rather than assumed.** They are the three modules that deliberately know
+things Scryfall did not say — what a guild is, what happened to it, what a
+mulligan is, whose brush painted the card — and the alternative was a Claude
+surface. It lost on four counts, written
+out in `colors.py`'s docstring and ROADMAP item 3 branch 4: `/api/colors`,
+`/api/glossary` and `/api/lore` work with **no card pool and no network**, the
+set is finite and
 written once, ADR 20 already classed `colors.py` as a fourth source that is
 free, and *bland prose is fixed by editing, which only checked-in text
 allows*. Claude answers the unbounded per-deck question about a **commander**
@@ -515,9 +530,12 @@ is reported as weak** via `strength`, because removing the counter-case must
 not create pressure to invent a case.
 
 **The stance dial is built** (2026-08-14), and since 2026-08-15 it is a
-**header menu plus per-surface readouts** rather than a fieldset repeated on
-three screens: `components/stancemenu.tsx` is the one control (the pin was
-always one global value in `lib/stance.ts`), `components/stance.tsx` is the
+**one header control plus per-surface readouts** rather than a fieldset
+repeated on three screens. That control is now the **stance slider inside the
+settings gear** (`components/settings.tsx`, which also holds theme, ambience
+and table sound); it began as a `stancemenu.tsx` of its own and was folded in
+when the gear landed, so the file no longer exists and the pin was always one
+global value in `lib/stance.ts`. `components/stance.tsx` is the
 line each Claude panel keeps saying what that setting resolved to *here*, and
 `lib/claudecopy.ts` is the only place a wire token (`second-opinion`,
 `on-request`) becomes a user-facing label — no raw enum or model id renders
@@ -740,7 +758,8 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
 - Every bug fix gets a test. `mana.py` is subtle; `tests/test_mana.py` pins the
   cases where naive source-counting gives the wrong answer.
 - `ruff check src tests` and `mypy` before pushing. mypy is strict by default
-  with two named exceptions in `pyproject.toml`; that list is meant to shrink,
+  with one named exception in `pyproject.toml` (`cli.py`, since `cards/db.py`
+  graduated 2026-08-16); that list is meant to shrink,
   so a new module is strict from the day it is written.
 - Frontend: `npm --prefix web run check` runs the typecheck, oxlint and Vitest
   in one; then rebuild the committed bundle with `npm --prefix web run build`

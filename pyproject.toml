@@ -182,22 +182,30 @@ strict = true
 # Show the rule name so a failure says which knob it came from.
 show_error_codes = true
 
-# The modules that do not pass `--strict` yet, with the count at the time the
-# checker landed. They are here to be worked down, not to be permanent -- and
-# until then the *rest* of the package cannot regress, which is the point.
-# `check_untyped_defs` still applies to both (that was clean across the whole
-# package on day one), so this is a weaker check rather than no check.
+# The one module that does not pass `--strict` yet. It is here to be worked
+# down, not to be permanent -- and until then the *rest* of the package cannot
+# regress, which is the point. `check_untyped_defs` still applies to it (that
+# was clean across the whole package on day one), so this is a weaker check
+# rather than no check.
 #
-#   cli.py   79     cards/db.py   24
+#   cli.py   109   (79 when the checker landed; measured again 2026-08-16)
+#
+# That number went **up**, which is the argument for keeping the list short:
+# a module on it absorbs every new untyped function without a word. The 109
+# are 59 `no-untyped-def` and 48 `no-untyped-call` -- the argparse handlers
+# calling each other -- so it is annotations rather than a rewrite, just a
+# lot of them, and it wants its own branch.
 #
 # api/service.py and api/simruns.py graduated 2026-08-12. The other six of the
 # original eight -- api/app.py, artifacts/generate.py, and decks/{analyze,
 # companion, importer, validate}.py -- graduated 2026-08-14; nearly all of it
 # was bare `dict` where the value type was `CardRecord` all along.
+# cards/db.py graduated 2026-08-16 (24 errors, all annotations: the `con`
+# parameters take the `Connection` alias the module already defined, the JSON
+# helpers take `dict[str, Any]`, and two `Any` returns became named locals).
 [[tool.mypy.overrides]]
 module = [
     "mtglab.cli",
-    "mtglab.cards.db",
 ]
 # `strict` is not a per-module setting -- it is shorthand that expands at the
 # top level only, so `strict = false` here would be silently ignored and these

@@ -11,13 +11,17 @@ The backend's standards are already codified; the audit is whether the tree
 still meets them and whether the standards themselves have fallen behind.
 
 - Strict mypy's exception list (`pyproject.toml`) is meant to shrink:
-  `cli.py` and `cards/db.py` remain. Chipping a module off that list is a
-  classic safe fix — measure the error count first and queue it if it is a
-  rewrite rather than annotations.
-- Ruff's excluded groups were excluded on *measured* cost (ARG 310, PT 65,
-  SLF 63, N 38 at the time). Re-measure occasionally — a group whose count
-  has collapsed is now nearly free to adopt. A group still expensive stays
-  out; update the recorded numbers so the next run knows.
+  **`cli.py` is all that remains** (`cards/db.py` graduated 2026-08-16).
+  Chipping a module off that list is a classic safe fix — measure the error
+  count first and queue it if it is a rewrite rather than annotations. Measure
+  by *removing the override block and re-running*, not by estimating: the
+  recorded count can be years stale, and `cli.py`'s had grown 79 → 109.
+- Ruff's excluded groups were excluded on *measured* cost. Re-measure
+  occasionally — a group whose count has collapsed is now nearly free to
+  adopt. **Measure `src` and `tests` separately**: as of 2026-08-16 ARG, PT and
+  SLF are ~100% test-side (16/604, 0/112, 0/67), so the headline number badly
+  overstates what adopting them would cost `src`. Current totals are in the
+  ledger; update them there so the next run knows.
 - ADR 24 decided **no autoformatter** — do not propose black/ruff-format
   again; the revisit trigger is a second human contributor.
 - The layering rules are checkable: `api/` never imports `cli.py`; DuckDB
@@ -39,8 +43,14 @@ still meets them and whether the standards themselves have fallen behind.
   `--deny-warnings`, Vitest). The audit is what the gauntlet *cannot* see:
   - **No regex lookbehind anywhere under `web/src`** — Safari 15 is a real
     user (this very dev machine). Grep for `(?<`.
-  - `noUncheckedIndexedAccess` is on and no non-test `!` assertions under
-    `web/src`; remember a tuple type does not satisfy the flag.
+  - `noUncheckedIndexedAccess` is on, and since 2026-08-16 the no-`!` rule is
+    **enforced by oxlint** (`typescript/no-non-null-assertion`, off for
+    `*.test.ts(x)`) rather than by prose — so the gauntlet now catches it and
+    this is no longer a grep worth repeating. Remember a tuple type does not
+    satisfy the flag. The general lesson is the one to carry forward: **a
+    convention this repo states absolutely but enforces with nothing will
+    drift** — that rule sat in `web/README.md` for months and four assertions
+    reappeared. Hunt the other prose-only invariants instead.
   - jsdom has no layout: a test asserting an element renders has not
     asserted it has a size. Anything layout-critical needs a real-browser
     check, not a stronger jsdom test.

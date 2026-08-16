@@ -19,10 +19,10 @@ from __future__ import annotations
 import gzip
 import json
 import urllib.request
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, TextIO, TypeAlias
 
 from mtglab import config
 
@@ -140,7 +140,7 @@ def connect(db_path: str | Path = "data/mtg.duckdb") -> Connection:
     return con
 
 
-def oracle_columns(con) -> set[str]:
+def oracle_columns(con: Connection) -> set[str]:
     """The columns `oracle_cards` actually has on this connection.
 
     Needed because the migration in `connect()` cannot always run: the API
@@ -155,7 +155,7 @@ def oracle_columns(con) -> set[str]:
     return {r[0] for r in rows}
 
 
-def pool_is_stale(con) -> bool:
+def pool_is_stale(con: Connection) -> bool:
     """Does this pool predate the power/toughness columns?
 
     Worth a named question rather than a silent NULL. A database loaded before
@@ -185,7 +185,7 @@ def _fetch_json(url: str) -> Any:
         return json.load(resp)
 
 
-def bulk_download_url(entry: dict) -> str:
+def bulk_download_url(entry: dict[str, Any]) -> str:
     """The download URL for a bulk-data index entry.
 
     Scryfall retired the plain-JSON `download_uri` in favour of gzipped JSONL
@@ -193,7 +193,9 @@ def bulk_download_url(entry: dict) -> str:
     one so an archived index still loads, and fail loudly rather than with a
     bare KeyError if both ever disappear.
     """
-    url = entry.get("jsonl_download_uri") or entry.get("download_uri")
+    # Annotated because the entry came from JSON: the checker sees `Any` here,
+    # and naming the type is what makes the return honest rather than opaque.
+    url: str | None = entry.get("jsonl_download_uri") or entry.get("download_uri")
     if not url:
         raise ValueError(
             f"bulk entry {entry.get('type')!r} has no download URL; Scryfall's "
@@ -254,7 +256,7 @@ _FRONT_FACE_FIELDS = ("mana_cost", "power", "toughness", "loyalty", "defense",
                       "flavor_text", "artist")
 
 
-def _front(c: dict, field: str):
+def _front(c: dict[str, Any], field: str) -> Any:
     """A field from the card, falling back to its front face.
 
     **This is a correctness fix, not tidiness.** `mana_cost` is absent at the
@@ -277,7 +279,7 @@ def _front(c: dict, field: str):
     return faces[0].get(field) if faces else None
 
 
-def _oracle_row(c: dict) -> tuple:
+def _oracle_row(c: dict[str, Any]) -> tuple[Any, ...]:
     img = c.get("image_uris") or {}
     if not img and c.get("card_faces"):
         img = (c["card_faces"][0].get("image_uris") or {})
@@ -311,13 +313,13 @@ _ORACLE_COLUMNS = (
 )
 
 
-def _printing_row(c: dict) -> tuple:
+def _printing_row(c: dict[str, Any]) -> tuple[Any, ...]:
     prices = c.get("prices") or {}
     img = c.get("image_uris") or {}
     if not img and c.get("card_faces"):
         img = (c["card_faces"][0].get("image_uris") or {})
 
-    def f(key):
+    def f(key: str) -> float | None:
         v = prices.get(key)
         return float(v) if v else None
 
@@ -331,7 +333,7 @@ def _printing_row(c: dict) -> tuple:
     )
 
 
-def _iter_json_array(fh):
+def _iter_json_array(fh: TextIO) -> Iterator[dict[str, Any]]:
     """Yield objects from a JSON array whose opening '[' is already consumed.
 
     Kept for the legacy `download_uri` files, which were single arrays up to
@@ -363,7 +365,7 @@ def _iter_json_array(fh):
                     buf = ""
 
 
-def _iter_cards(path: Path):
+def _iter_cards(path: Path) -> Iterator[dict[str, Any]]:
     """Stream a bulk file, one card object at a time.
 
     Handles both formats Scryfall has served: newline-delimited JSONL (current)
@@ -391,7 +393,7 @@ def _iter_cards(path: Path):
                 yield json.loads(line)
 
 
-def load_oracle(con, path: Path, *, batch: int = 5000) -> int:
+def load_oracle(con: Connection, path: Path, *, batch: int = 5000) -> int:
     insert = (f"INSERT OR REPLACE INTO oracle_cards "
               f"({', '.join(_ORACLE_COLUMNS)}) VALUES "
               f"({','.join('?' * len(_ORACLE_COLUMNS))})")
@@ -411,7 +413,7 @@ def load_oracle(con, path: Path, *, batch: int = 5000) -> int:
     return total
 
 
-def load_printings(con, path: Path, *, batch: int = 5000) -> int:
+def load_printings(con: Connection, path: Path, *, batch: int = 5000) -> int:
     con.execute("DELETE FROM printings")
     rows, total = [], 0
     for card in _iter_cards(path):
@@ -432,7 +434,7 @@ def load_printings(con, path: Path, *, batch: int = 5000) -> int:
     return total
 
 
-def snapshot_prices(con, *, on_date: str | None = None) -> int:
+def snapshot_prices(con: Connection, *, on_date: str | None = None) -> int:
     """Append today's prices to price_history. Run daily via cron/launchd."""
     date_expr = f"DATE '{on_date}'" if on_date else "CURRENT_DATE"
     con.execute(f"""
@@ -441,9 +443,10 @@ def snapshot_prices(con, *, on_date: str | None = None) -> int:
         FROM printings
         WHERE price_usd IS NOT NULL OR price_usd_foil IS NOT NULL
     """)
-    return con.execute(
+    written: int = con.execute(
         f"SELECT count(*) FROM price_history WHERE snapshot_date = {date_expr}"
     ).fetchone()[0]
+    return written
 
 
 # ------------------------------------------------------------------ queries
@@ -522,7 +525,7 @@ class CardRecord:
 def _to_record(row: Sequence[Any]) -> CardRecord:
     legalities = json.loads(row[8]) if row[8] else {}
 
-    def at(i: int, default=None):
+    def at(i: int, default: Any = None) -> Any:
         """Positional read that tolerates a shorter row.
 
         The existing style here, kept: `search()` and `get_cards()` share
@@ -556,7 +559,7 @@ _READ_COLUMNS = (
 )
 
 
-def _select(con) -> str:
+def _select(con: Connection) -> str:
     """The SELECT clause, with any column this database lacks filled as NULL.
 
     The alternative — a fixed column list — turns a schema change into an
@@ -570,7 +573,7 @@ def _select(con) -> str:
     return f"SELECT {cols} FROM oracle_cards"
 
 
-def get_cards(con, names: Iterable[str]) -> dict[str, CardRecord]:
+def get_cards(con: Connection, names: Iterable[str]) -> dict[str, CardRecord]:
     """Look up many cards at once, case-insensitively. Missing names are simply
     absent from the result -- callers must handle that, loudly.
 
@@ -626,7 +629,7 @@ def get_cards(con, names: Iterable[str]) -> dict[str, CardRecord]:
     return out
 
 
-def search(con, where: str, params: Sequence[Any] = (), limit: int = 100,
+def search(con: Connection, where: str, params: Sequence[Any] = (), limit: int = 100,
            order_by: str | None = None, offset: int = 0) -> list[CardRecord]:
     """Escape hatch for ad-hoc pool queries, e.g.
 

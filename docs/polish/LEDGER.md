@@ -179,10 +179,87 @@ state, never checklists.
 
 *Python craft · TypeScript/React craft · Claude-first docs & memory*
 
-- **Last run:** never
-- **Queued for Aaron:** —
-- **Deferred:** —
-- **Measurements:** —
+- **Last run:** 2026-08-16 (rainbow). First Blue run — everything here is baseline.
+- **Fixed and landed:**
+  1. **`cards/db.py` graduated off the strict-mypy exception list**, which is
+     now one module (`cli.py`) rather than two. All 24 errors were annotations,
+     not a rewrite: `con` parameters took the `Connection` alias the module had
+     already defined for exactly this, the JSON helpers took `dict[str, Any]`,
+     and two `Any` returns became named locals. No behaviour changed.
+  2. **`typescript/no-non-null-assertion` is now an oxlint error**, off for
+     `*.test.ts(x)` only. `web/README.md` has stated "no non-null assertions
+     outside test files" as load-bearing for months with **nothing enforcing
+     it**, and four had drifted in: three `map.get(k)!.push(…)` group-bys
+     (`components/review.tsx`, `routes/Library.tsx`, `routes/DeckDetail.tsx`)
+     and `getElementById('root')!` in `main.tsx`. Fixed with get-or-create and
+     an explicit throw. Rule verified by mutation — with the old code in place
+     it reported exactly those four and nothing else.
+  3. **Doc corrections** (the facet's own work): `components/stancemenu.tsx`
+     was named as "the one control" in *both* CLAUDE.md and `web/README.md`
+     and **does not exist** — it folded into the settings gear
+     (`components/settings.tsx`) when that landed. `lore.py`, `decks/wheel.py`
+     and `api/argueruns.py` were missing from CLAUDE.md's architecture block
+     entirely. The "`colors.py` and `glossary.py` are the two modules" passage
+     is now three (`lore.py` is reference prose of the same kind and says so in
+     its own docstring). `user_decks.yaml` in HOSTING.md read as a filename and
+     is a column.
+- **Queued for Aaron:**
+  1. **`cli.py` is the last strict-mypy exception and it has grown: 79 → 109.**
+     59 `no-untyped-def` and 48 `no-untyped-call` (the argparse handlers calling
+     each other), so it is annotations rather than a rewrite — just a lot of
+     them, touching one 1900-line file. Too big to ride along with a polish
+     fix set; it wants its own branch. The decision is whether that branch is
+     worth an afternoon, given the module is exercised end-to-end by the suite
+     and the list has been "meant to shrink" since it was written. **The number
+     going up is the argument for doing it**: a module on the list absorbs
+     every new untyped function without a word.
+  2. **`api/service.py` reaches past `cards/db.py` to `duckdb` directly**
+     (`import duckdb; duckdb.connect(..., read_only=True)`), which is the one
+     live exception to CLAUDE.md's "DuckDB stays behind `cards/db.py`". It is
+     justified — `db.connect` creates the file, runs DDL and `ALTER`s, none of
+     which a read-only app handle may do — but the rule now has an undocumented
+     hole. Two ways out: add `db.connect_readonly()` and move the call, or write
+     the exception into CLAUDE.md. Not done here because the read-only path is a
+     deployed degradation path and getting it wrong is an outage, not a lint.
+- **Deferred:**
+  - **Adopting ruff's `N` group (39 in `src`, 1 in `tests`).** The only excluded
+    group whose cost is now plausibly payable, but naming rules rename things,
+    which is a wide diff for no behaviour change. Trigger: a session already
+    renaming in the same modules.
+  - **`ARG`, `PT`, `SLF` stay out** and the re-measure says why (below) — all
+    three are overwhelmingly *test* findings, and the fixture/override idiom
+    they fire on is correct here.
+- **Measurements (2026-08-16, uncontended unless noted):**
+  - **mypy:** clean over 82 source files. Strict-exception list: `cards/db.py`
+    24 → **graduated**; `cli.py` **109** (was 79 when the checker landed —
+    re-measured by removing the override block, not estimated).
+  - **ruff:** clean. Excluded groups re-measured, split src/tests for the first
+    time — the split is the finding: `ARG` **620** (16 src / 604 tests, was 310
+    total), `PT` **112** (0 / 112, was 65), `SLF` **67** (0 / 67, was 63), `N`
+    **40** (39 / 1, was 38). Everything except `N` lives almost entirely in
+    `tests/`, so the recorded "cost" was never really a cost to `src`.
+  - **pytest:** 1926 passed, 2 skipped (the pinned skip count) in **159s** on
+    this Mac, uncontended and post-#129. Incidental cross-check of White's
+    conftest fix: a full run left `data/app.db`'s mtime untouched, where the
+    pre-#129 run in this same worktree had written it.
+  - **frontend:** `npm --prefix web run check` green — typecheck, oxlint with
+    the new rule, 432 Vitest tests across 23 files in ~27s.
+  - **Layering, grepped not trusted:** `api/` imports `cli.py` **nowhere**;
+    `mana.py` and `sim/` are stdlib+numpy only; `anthropic`, `PIL` and `dotenv`
+    have **no** module-level import anywhere in `src/` (`argon2` does, and
+    pyproject argues for it deliberately); no PEP 695 / 3.12-only syntax in
+    `src/`, so the `>=3.11` floor holds. One exception, queued above.
+  - **Frontend compatibility:** **zero regex lookbehind** under `web/src`
+    (Safari 15 is the dev machine); no `.at()`, `structuredClone`, `findLast`,
+    `toSorted` or `Object.hasOwn`; no `forwardRef`, `React.memo`, `defaultProps`
+    or `propTypes` — React 19 idiom throughout. Index keys appear only on
+    static decorative lists.
+  - **Doc/tree consistency:** every source path named in CLAUDE.md, ROADMAP.md,
+    `web/README.md`, ENGINEERING.md, HOSTING.md and the two skills now resolves
+    against `git ls-files`. Branch protection re-read from the API: **six**
+    required checks (`test (3.11)`, `test (3.12)`, `frontend`,
+    `no-secrets-or-card-data`, `image`, `dependency-review`) — CLAUDE.md's "all
+    six" is correct; CodeQL runs but is **not** a required context.
 
 ## Black — Ruthless Efficiency
 
