@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  api, deckUrl, type Combination, type DeckTile, type Health,
+  api, deckUrl, type DeckTile, type Health,
 } from '../lib/api'
 import { identityName } from '../lib/mtg'
+import { TheShelves } from '../components/shelf'
 import {
-  Badge, CardArt, ColorPips, ColorRing, ErrorNote, ManaText, PageMasthead,
+  Badge, CardArt, ColorPips, ErrorNote, ManaText, PageMasthead,
   Select, Spinner,
 } from '../components/ui'
 
@@ -207,60 +208,6 @@ function LibraryMasthead({ decks, health }: {
           : 'no card pool yet — run `mtglab data refresh`'}
       </p>
     </PageMasthead>
-  )
-}
-
-/**
- * One thing from the shelves, at random, under the masthead.
- *
- * The landing page knew how many decks and cards it held and said nothing
- * about the game they belong to. This borrows one combination from the
- * colour reference — checked-in prose, no pool and no network beyond the
- * one free fetch (`colors.py`'s whole argument) — and offers its story as
- * a door into Learn. Random per visit, so the shelf has something new to
- * say each time you walk past it.
- *
- * Decorative in the strict sense: any failure to load renders nothing.
- */
-function ShelfFact() {
-  const [fact, setFact] = useState<Combination | null>(null)
-  useEffect(() => {
-    let live = true
-    try {
-      api.colors()
-        .then((t) => {
-          if (!live) return
-          const storied = t.combinations.filter((c) => c.history)
-          setFact(storied[Math.floor(Math.random() * storied.length)] ?? null)
-        })
-        .catch(() => {})
-    } catch {
-      // Trivia is never worth an error state; a shelf without it is a shelf.
-    }
-    return () => { live = false }
-  }, [])
-
-  if (!fact) return null
-  // No lookbehind: Safari 15 — the oldest browser this app genuinely serves —
-  // rejects the regex at parse time, which takes the whole bundle with it.
-  const opener = /^[^.]*\./.exec(fact.history)?.[0] ?? fact.history
-  return (
-    <aside className="shelf-fact card-surface flex items-start gap-3 rounded-xl px-4 py-3">
-      <span className="mt-0.5 shrink-0"><ColorRing colors={fact.colors} size={22} /></span>
-      <p className="min-w-0 text-xs leading-relaxed"
-         style={{ color: 'var(--text-secondary)' }}>
-        <span className="mr-2 text-[10px] uppercase tracking-wide"
-              style={{ color: 'var(--text-muted)' }}>
-          From the shelves
-        </span>
-        <strong>{fact.name}</strong> — {fact.tagline.replace(/\.+$/, '')}.{' '}
-        {opener}{' '}
-        <Link to={`/learn?c=${fact.key}`} className="whitespace-nowrap underline"
-              style={{ color: 'var(--series-1)' }}>
-          The full story →
-        </Link>
-      </p>
-    </aside>
   )
 }
 
@@ -534,7 +481,7 @@ export default function Library() {
         </div>
       )}
 
-      {mine.length > 0 && <ShelfFact />}
+      {mine.length > 0 && <TheShelves />}
 
       {/* Offered only when there is somebody to browse. On a laptop, and on an
           instance where nobody else has shared anything, this is one tab

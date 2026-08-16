@@ -14,7 +14,7 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from mtglab import colors, config
+from mtglab import colors, config, lore
 from mtglab import glossary as gloss
 from mtglab.cards import db
 from mtglab.decks import decklist, edit, importer, log, partners, suggest, wheel
@@ -1402,6 +1402,59 @@ def glossary() -> dict[str, Any]:
         "terms": [{"key": t.key, "term": t.term, "short": t.short,
                    "long": t.long, "section": t.section,
                    "see_also": list(t.see_also)} for t in gloss.TERMS],
+    }
+
+
+def lore_shelves() -> dict[str, Any]:
+    """The fact volumes, with every named card resolved through the pool.
+
+    Reference prose like `glossary()` -- checked-in, no key, no network --
+    except that a fact may *name* cards, and those go through `get_cards`
+    exactly as `combination_detail`'s champions do: resolved into the card's
+    own cost, type and text, and **dropped and counted** when a name does not
+    resolve, because a misspelled name rendering as a confident empty card is
+    the failure this instrument exists to prevent. With no pool at all the
+    prose still answers whole -- every fact reads complete without its cards,
+    which is a writing rule in `lore.py`, not a hope.
+    """
+    con = _connect()
+    found: dict[str, db.CardRecord] = {}
+    wanted = sorted({name for f in lore.FACTS for name in f.cards})
+    if con is not None:
+        try:
+            found = db.get_cards(con, wanted)
+        finally:
+            con.close()
+
+    dropped = 0
+    facts = []
+    for f in lore.FACTS:
+        cards = []
+        for name in f.cards:
+            rec = found.get(name)
+            if rec is None:
+                if con is not None:
+                    dropped += 1
+                continue
+            cards.append({
+                "name": rec.name, "mana_cost": rec.mana_cost,
+                "type_line": rec.type_line, "oracle_text": rec.oracle_text,
+                "color_identity": sorted(rec.color_identity),
+                "image": rec.image_normal,
+                "art_crop": getattr(rec, "image_art_crop", None),
+            })
+        facts.append({
+            "key": f.key, "volume": f.volume, "fact": f.fact, "more": f.more,
+            "cards": cards,
+            "learn": {"tab": f.learn[0], "key": f.learn[1]} if f.learn else None,
+        })
+
+    return {
+        "volumes": [{"key": v, "label": lore.VOLUME_LABELS[v],
+                     "blurb": lore.VOLUME_BLURBS[v]} for v in lore.VOLUMES],
+        "facts": facts,
+        "pool": con is not None,
+        "dropped": dropped,
     }
 
 

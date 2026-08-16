@@ -1046,6 +1046,14 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         deck source, no network."""
         return service.glossary()
 
+    @app.get("/api/lore")
+    def lore_shelves() -> dict[str, Any]:
+        """The fact volumes (second 2026-08-15 punch list, item 7). Reference
+        prose like the glossary, plus pool-resolved cards like
+        `/api/colors/{key}` -- and like that route it answers without a pool,
+        with the cards absent and counted for."""
+        return service.lore_shelves()
+
     # -------------------------------------------------------------- sim
 
     # The job closures capture `decks` and run after the response has been
