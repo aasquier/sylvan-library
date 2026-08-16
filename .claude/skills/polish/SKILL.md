@@ -1,6 +1,6 @@
 ---
 name: polish
-description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Python or TypeScript best practices, testing, performance, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, browser/mobile compatibility, scalability, or the repo's Claude-facing docs. Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' or 'polish all' (all five in one merged report), on 'polish rainbow' (all five as separate parallel agents), on 'run the polish pass', and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears."
+description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Python or TypeScript best practices, testing, performance, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, browser/mobile compatibility, scalability, or the repo's Claude-facing docs. Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' or 'polish all' (all five in one merged report), on 'polish rainbow' (all five as separate runs, one color at a time), on 'run the polish pass', and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears."
 ---
 
 # The Polish Pass
@@ -79,30 +79,68 @@ matters because a colorless run resets staleness only softly: a color whose
 last touch was a survey is staler than its date suggests, and the next bare
 `/polish` should weigh that.
 
-## Rainbow — all five, five separate agents
+## Rainbow — all five, one color at a time
 
-`/polish rainbow` runs the full cycle at **full solo depth**, one subagent per
-color, in parallel. Rainbow is the opposite of colorless: every color shines
-separately and completely, no survey shortcut. It is the most thorough option
-and the most expensive — five real audits' worth of tokens — so it is Aaron's
-explicit call and his tokens; do not reach for it when colorless or a solo run
-would do.
+`/polish rainbow` runs the full cycle at **full solo depth** — one subagent per
+color, **serially, in WUBRG order**: White, Blue, Black, Red, Green. Rainbow is
+the opposite of colorless: every color shines separately and completely, no
+survey shortcut. It is the most thorough option and the most expensive — five
+real audits' worth of tokens — so it is Aaron's explicit call and his tokens;
+do not reach for it when colorless or a solo run would do.
+
+The shape to hold in your head: **rainbow is five solo runs, chained.** Each
+color is an ordinary run of the protocol below — main working tree, own branch,
+own PR — and the next color does not start until the previous one's PR has
+merged.
+
+Why serial, and why that order:
+
+- **Serial, because parallel churns.** Five branches each expanding an
+  adjacent section of `docs/polish/LEDGER.md` conflict with one another by
+  construction, and five PRs open at once means five `image` builds queueing
+  for no gain. Merging each color before starting the next cuts every branch
+  from a main that already holds its predecessors' entries, so the conflicts
+  never exist rather than getting resolved. (Parallel was tried once, on
+  2026-08-16; that churn is why this paragraph exists.)
+- **One subagent per color, for context rather than collision.** Five audits'
+  depth does not fit one context window — that is the whole difference between
+  rainbow and colorless — so each color still gets its own fresh agent.
+- **WUBRG, because Magic says so and the dependencies happen to agree.**
+  Commandment 3 settles the order on its own, but it is also topologically
+  correct: White's licensing law binds Black's static-assets facet, Black's
+  spend numbers feed Green's quota proposal, and Red's external probe is
+  Green's baseline. Every cross-color dependency points forward. One wrinkle
+  worth knowing rather than fixing: Blue's docs-and-memory audit runs second
+  but would sometimes rather run last, since the colors after it generate the
+  drift it hunts. Let the ledger carry that across to the next cycle — it is
+  what the ledger is for.
 
 Orchestration:
 
+- Run each color **in the main working tree**, not a worktree. Only one color
+  is live at a time so there is nothing to isolate from, and the main tree
+  already has `.venv`, `web/node_modules` and the card pool — a fresh worktree
+  has none of the three and must rebuild all of them before it can run the
+  gauntlet, which was the parallel version's hidden tax.
 - Give each agent exactly one color and its reference file, the ledger, and
-  the same run protocol and non-negotiables below. Spawn them in worktrees so
-  their fixes never collide.
+  the same run protocol and non-negotiables below.
 - **Each color lands its own branch and PR**, kept independently reviewable —
-  do not merge five colors' diffs into one branch, which would be a
-  mass-restructure by the back door and unreviewable. A color with only
-  queued findings and no safe fix opens no PR; it just reports.
-- You are the collector: gather the five reports, resolve any cross-color
-  overlap (two agents proposing the same fix — keep one), update all five
-  ledger sections, and hand Aaron one consolidated summary plus the list of
-  open PRs. Tag each ledger section `2026-08-16 (rainbow)`.
-- Watch each PR's checks; remember CI is a shared resource, so five PRs at
-  once means five image builds — stagger or expect the queue.
+  never five colors' diffs on one branch, which would be a mass-restructure by
+  the back door. Each agent updates **only its own ledger section**.
+- **Merge before advancing.** Watch the six checks, merge when green, and only
+  then start the next color. Remember what merging means here: a green merge
+  deploys itself (ADR 23), so a rainbow is five deploys and five brief
+  downtimes — one more reason schema migrations stay a queued item.
+- A color with only queued findings and no safe fix opens **no PR**. Carry its
+  ledger text onto the next color's branch and move straight on; there is
+  nothing to merge and so nothing to wait for.
+- You are the collector: relay each color's report as it lands — the agent's
+  own report never reaches Aaron — resolve cross-color overlap when a later
+  color re-proposes an earlier one's fix, and close with one consolidated
+  summary. Tag each ledger section `YYYY-MM-DD (rainbow)`.
+- A rainbow may outlive a session, and that is fine. The merged PRs and the
+  ledger are the resume point: read the ledger, see which colors already carry
+  this rainbow's tag, and pick up at the next one in WUBRG order.
 
 ## The ledger
 
