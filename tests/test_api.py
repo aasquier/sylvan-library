@@ -1518,25 +1518,43 @@ def test_glossary_needs_no_pool_and_no_decks(client):
         assert all(ref in keys for ref in term["see_also"])
 
 
-def test_lore_serves_the_shelves_with_pool_cards(client):
-    """Reference prose plus pool cards, `/api/colors/{key}`-style: the facts
-    always answer, and a fact naming a card `tiny_pool` holds ships that
-    card's own text beside the prose."""
+def test_lore_serves_the_shelves_with_pool_cards(client, pool):
+    """Reference prose plus pool cards, `/api/colors/{key}`-style.
+
+    The `pool` fixture is deliberate and is the lesson of this test's first
+    version, which took the bare `client` and asserted `pool is True`: that
+    passed on the laptop, where `data/mtg.duckdb` exists at the default path,
+    and failed in CI, where nothing does -- the exact environment-dependent
+    shape `tiny_pool` was built to kill. With the fixture the world is
+    pinned: a pool exists, it holds none of the shelves' historical cards,
+    so every named card drops and is counted rather than invented -- the
+    instrument working, not a gap.
+    """
     body = client.get("/api/lore").json()
     assert [v["key"] for v in body["volumes"]] == [
         "history", "mechanics", "artists", "table", "curiosities"]
     assert body["facts"], "the shelves are empty"
     for fact in body["facts"]:
         assert fact["fact"] and fact["more"]
-    # tiny_pool holds none of the historical cards, so with this fixture the
-    # named cards drop and are counted rather than invented -- which is the
-    # instrument working, not a gap.
     assert body["pool"] is True
     named = sum(len(f["cards"]) for f in body["facts"])
-    dropped = body["dropped"]
     from mtglab import lore as lore_mod
     total = sum(len(f.cards) for f in lore_mod.FACTS)
-    assert named + dropped == total
+    assert named + body["dropped"] == total
+
+
+def test_lore_answers_whole_with_no_pool_at_all(client, tmp_path):
+    """The fresh-clone property: no pool, and the shelves still stock every
+    fact -- prose complete, cards absent, and `dropped` at zero, because an
+    unresolvable name is only a *fault* when there was a pool to ask."""
+    with config.use_paths(data_dir=tmp_path / "absent"):
+        body = client.get("/api/lore").json()
+    assert body["pool"] is False
+    assert body["dropped"] == 0
+    assert body["facts"]
+    for fact in body["facts"]:
+        assert fact["fact"] and fact["more"]
+        assert fact["cards"] == []
 
 
 def test_challenge_progress_counts_filled_slots(in_memory_client):
