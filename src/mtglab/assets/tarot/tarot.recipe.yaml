@@ -1,0 +1,41 @@
+# The tarot deck's recipe (ADR 29) -- the reconstruction of the 2026-08-13
+# fetch, whose script PROVENANCE.md describes ("the fetch script skips
+# anything without that prefix") but which was never committed. The committed
+# cards are the record; `mtglab animist verify` holds them to `expect` and
+# never re-fetches. If they ever ARE re-fetched, PROVENANCE.md's trap section
+# applies: check the RWS1909 prefix AND the visual tells, because the 1971
+# US Games recolouring is still in copyright.
+#
+# The committed filenames (00-fool.webp .. wands-14.webp) were assigned by
+# hand to match `tarot.py`'s keys; a rebuild would slug the upstream names
+# instead. Verification is by count, width, budget and cleanliness, so the
+# naming difference does not loosen the contract.
+animist: 1
+
+why_committed: >
+  Public domain in both the US and the UK -- the 1909 Rider printing, not
+  the 1971 US Games recolouring; PROVENANCE.md argues the licence per
+  jurisdiction and documents the trap. Hotlinking 78 images from Commons
+  would put every page load in a third party's hands for art that is
+  free to carry.
+
+sources:
+  rws:
+    provider: wikimedia-category
+    category: "Rider-Waite tarot deck (Roses & Lilies)"
+    require_filename_prefix: RWS1909
+    found_via: "the Commons category, licence checked per file via the API"
+    licence: Public domain
+
+outputs:
+  - each: rws
+    ops:
+      - resize: {width: 400}
+    encode: {format: webp, quality: 75}
+    # 78 exactly -- the image CI job's rule, stated there first: a glob that
+    # half-matches is worse than one that fails. 400px sits at the measured
+    # knee of the size curve (PROVENANCE.md: 560px cost 11.0 MB, 340px saved
+    # only 1.5 MB more while softening linework); re-derive it with
+    # `mtglab animist measure`. Heights vary per scan, so only width is
+    # contractual.
+    expect: {count: 78, width: 400, total_budget_kb: 4700, metadata: none}

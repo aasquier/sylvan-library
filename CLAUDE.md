@@ -83,8 +83,9 @@ pytest -q
 mtglab claude check          # optional: is the API key live?
 ```
 
-Extras: `api` (FastAPI + the app), `claude` (the Anthropic SDK), `dev` (which
-includes both plus the test tooling). A base install has the gate, the mana
+Extras: `api` (FastAPI + the app), `claude` (the Anthropic SDK), `animist`
+(Pillow, for the asset pipeline), `dev` (which includes all of it plus the
+test tooling). A base install has the gate, the mana
 solver and Tier 1, and needs neither a network nor an account. `claude check`
 needs `ANTHROPIC_API_KEY`; see `.env.example`.
 
@@ -105,6 +106,11 @@ src/mtglab/
                           spread; stdlib, and no card's meaning
   assets/tarot/           the 78 pictures, package-data; PROVENANCE.md argues
                           the licence and is not optional reading
+  animist/                the asset pipeline (ADR 29): recipe -> fetch ->
+                          licence gate (no override) -> Pillow ops -> clean
+                          WebP -> PROVENANCE entry; `verify` holds every
+                          committed asset to its recipe, in the suite.
+                          Wizards' art never enters it -- runtime-only, always
   mana.py                 cost parsing + castability solver
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema
@@ -394,6 +400,16 @@ mtglab sim lands <slug> 30 40     # is the land count right?
 mtglab sim cache                  # what Tier 1 results are memoised; --clear
 mtglab sim forge <a> <b> [c] [d]  # Tier 3 — Forge plays real games
 git commit -am "before refactor"  # so swaps.md has something to diff
+```
+
+Site imagery goes through the animist (ADR 29) — never hand-place a binary:
+
+```bash
+mtglab animist build <recipe>     # fetch, licence-gate, transform, encode,
+                                  # and write the PROVENANCE entry itself
+mtglab animist verify             # every committed asset vs its recipe
+mtglab animist licence <recipe>   # the gate alone; per file, dated, no --force
+mtglab animist measure <recipe> --output X   # the size curve and its knee
 ```
 
 Editing, all surgical and self-verifying ([ADR 12](docs/adr/0012-decks-are-edited-by-surgical-operations.md)),

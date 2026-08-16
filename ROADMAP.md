@@ -1275,6 +1275,30 @@ arc; this is what the next few sessions actually do.
     Landed so far under this heading: the painted wheel spin (#116), and the
     photo ivy canopy + Experimental Lab bench + gallery lanes (this branch).
 
+    **The pipeline is real now — `mtglab animist`, 2026-08-16
+    ([ADR 29](docs/adr/0029-an-asset-is-committed-only-with-a-recipe.md)).**
+    "Scripted Pillow" had been a description of scripts that were never
+    committed; it is now a package (`src/mtglab/animist/`, Pillow behind the
+    `animist` extra) driven by a `*.recipe.yaml` beside each asset directory:
+    fetch from Openverse/Commons, **licence gate per file through the
+    provider's API with no override**, transform (matte, feather, tile,
+    resize), encode WebP with metadata stripped, write the PROVENANCE entry,
+    and `verify` holds every committed asset to its recipe's `expect` block
+    in the test suite. Both founding pipelines (ivy, tarot) are reconstructed
+    as committed recipes. Wizards' art stays runtime-animated only — the
+    pipeline deliberately has no provider that takes a Scryfall URL.
+
+    Later phases, in likely order, each a registry entry or format-table row
+    rather than a schema change: **procedural motion textures and sprite
+    sheets** (noise/displacement maps, particle sprites, a runtime
+    sprite-sheet player), **animated formats** (animated WebP/APNG natively;
+    MP4/WebM via `imageio-ffmpeg`, whose static-ffmpeg pip wheel is verified
+    to work on the dev Mac — the door the video-loops sentence above left
+    open), and **2.5D depth parallax** for public-domain paintings
+    (torch 2.2.2 CPU + Depth-Anything-V2-Small, Apache-2.0, both verified
+    installable on macOS 12 Intel; card art is excluded — a depth map of a
+    Wizards painting is a committed derivative).
+
 ---
 
 ## 1. Analyse or generate decks with simulation

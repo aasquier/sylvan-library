@@ -55,6 +55,15 @@ them as separate steps on purpose, so a type error reports as a type error.
   under the title; the non-library pages draw on the Strixhaven Mystical
   Archive cycle (the argument is in `CardSearch.tsx`). Never commit an image
   (rule 5, ADR 6).
+- **A committed asset comes from a recipe.** The exception to the rule above
+  is CC0/public-domain imagery that must be ours (the ivy under
+  `src/assets/ambience/`), and it arrives only through `mtglab animist`
+  (ADR 29): a `*.recipe.yaml` beside the assets records source, per-file
+  API-confirmed licence, and every transform; the tool writes the
+  PROVENANCE.md entry, and the suite verifies the committed files against
+  the recipe. Never hand-place a `.webp` — and mind Vite's
+  `assets/[name].[ext]` rule: asset basenames must be unique across the app
+  or the committed bundle diverges between macOS and CI Linux.
 - **Both themes, every time.** Light/dark live in `index.css` on
   `data-theme` with a `prefers-color-scheme` fallback; decorative art needs
   *opposite* treatment per theme (dark mode brightens, light mode dims — the

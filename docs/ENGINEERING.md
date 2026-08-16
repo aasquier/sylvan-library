@@ -408,6 +408,11 @@ checklist that shaped the files.
       `no-secrets-or-card-data` job checks what is *tracked*, and the `image` job
       greps the *built image*, which is a different question the moment a
       `.dockerignore` line is deleted.
+- [x] **Committed assets match their recipes** (ADR 29) — not a new CI job:
+      `tests/test_animist_recipes_repo.py` runs `mtglab animist verify`'s
+      check inside the ordinary suite, holding every committed asset to its
+      recipe's dimensions, budgets, count and metadata-absence. Contract, not
+      bytes, because image encoders are not byte-stable the way Vite is.
 
 **The reason CI carries so much of this.** The maintainer's machine is macOS 12
 on Intel: Docker Desktop supports the three most recent macOS releases and will

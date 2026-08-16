@@ -1,0 +1,62 @@
+# The ivy set's recipe (ADR 29) -- the reconstruction of 2026-08-15's
+# scripted-Pillow pipeline, whose script was described in PROVENANCE.md but
+# never committed. The committed assets are the record; `mtglab animist
+# verify` holds them to the `expect` blocks below and never regenerates them.
+#
+# Two parameters did not survive from that session and are honestly absent
+# rather than plausibly invented: the initial crop box ("the cascading
+# foliage band at the top") and the three sprig crops (chosen by
+# alpha-density scoring, then by eye). A rebuild from source would re-make
+# those judgements; everything checkable about the committed files is
+# pinned in `expect`.
+animist: 1
+
+why_committed: >
+  Scryfall art is hotlinked because the Fan Content Policy covers display
+  and the credit line is part of the deal; this photograph is CC0, so
+  committing the derived asset is clean, and a decoration that breaks when
+  a third-party CDN moves is a decoration the app does not own.
+
+sources:
+  ivy:
+    provider: openverse
+    identifier: 2519cbb2-2290-47b4-a2e8-8f7b16fa6575
+    title: "Free ivy leaves cascading gray"
+    landing: https://www.rawpixel.com/image/5909908/image-texture-public-domain-leaves
+    found_via: "Openverse with a license=cc0 filter"
+    licence: CC0-1.0
+
+outputs:
+  - file: ivy-canopy.webp
+    from: ivy
+    ops:
+      # The band crop preceded these; its box was not recorded (see above).
+      - matte_green: {fade_below_frac: 0.42}
+      - feather: {radius: 1.2, resteepen: true}
+      - mirror_tile: {axis: x}
+      - resize: {width: 2048}
+    encode: {format: webp, quality: 82}
+    expect: {width: 2048, height: 250, budget_kb: 240, metadata: none}
+
+  # The sprigs share the matte and feather; each crop was exploratory.
+  - file: ivy-sprig-1.webp
+    from: ivy
+    ops:
+      - matte_green: {fade_below_frac: 0.42}
+      - feather: {radius: 1.2, resteepen: true}
+    encode: {format: webp, quality: 82}
+    expect: {width: 90, height: 110, budget_kb: 8, metadata: none}
+  - file: ivy-sprig-2.webp
+    from: ivy
+    ops:
+      - matte_green: {fade_below_frac: 0.42}
+      - feather: {radius: 1.2, resteepen: true}
+    encode: {format: webp, quality: 82}
+    expect: {width: 90, height: 110, budget_kb: 8, metadata: none}
+  - file: ivy-sprig-3.webp
+    from: ivy
+    ops:
+      - matte_green: {fade_below_frac: 0.42}
+      - feather: {radius: 1.2, resteepen: true}
+    encode: {format: webp, quality: 82}
+    expect: {width: 90, height: 110, budget_kb: 8, metadata: none}
