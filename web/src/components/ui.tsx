@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { COLOR_NAMES, COLOR_VAR, manaSymbols, splitManaText } from '../lib/mtg'
 import { ManaGlyph } from './manasymbol'
 import { hasGlyph } from '../lib/managlyphs'
+import { SceneBackdrop } from './forest'
 
 /* ------------------------------------------------------------------ pips */
 
@@ -434,6 +435,14 @@ export function PageMasthead({ art, alt, title, credit, children }: {
           </p>
         </div>
       </div>
+      {/* The page's painting, again, as the room (punch list 2026-08-15 item
+          10): every masthead page gets its art washed dim across the whole
+          viewport — one component, no second source, no second credit. It is
+          fixed-position, so rendering it from inside the section costs
+          nothing layout-wise; it renders *after* the real image so the
+          masthead art stays the section's first `img` — the one a screen
+          reader should meet, and the one the accessibility test checks. */}
+      <SceneBackdrop art={art} />
     </section>
   )
 }
