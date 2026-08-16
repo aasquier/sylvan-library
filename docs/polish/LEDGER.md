@@ -624,7 +624,166 @@ state, never checklists.
 
 *Browser & mobile compatibility · cloud resource watch · scalability*
 
-- **Last run:** never
-- **Queued for Aaron:** —
-- **Deferred:** —
-- **Measurements:** —
+- **Last run:** 2026-08-16 (rainbow). First Green run; every number below is a
+  first baseline, so read them as a starting point and not as a trend.
+- **Fixed and landed — `prefers-reduced-motion` now covers every animation.**
+  `.ready-banner` (the theme interview's "you can stop now" invitation) ran
+  `bubble-in` unguarded. It was the *only* gap: all 43 animation declarations
+  were resolved against the nine guard blocks, and the other apparent misses
+  are covered by a base class the element also carries — `.crystal-haze-a/b/c`
+  by `.crystal-haze-puff`, `.crystal-fog-*` by `.crystal-fog`,
+  `.scene-lane-*` by `.scene-lane`, `.leaf-fall`/`.page-fall` by
+  `.forest-ambience { display: none }`. **Source order is what makes those
+  work**, not specificity: the guards are equal-specificity single classes and
+  win only because they sit later in the file, which was verified against the
+  *served* stylesheet's rule indices in a real browser (haze declared at rules
+  63–65, guarded at 91), not against the source.
+- **Fixed and landed — `tests/test_browser_floor.py`, which makes the
+  compatibility floor a declared value instead of a remembered one.** See the
+  queued item below for what it found. Three tests, all mutation-verified:
+  lowering `FLOOR` to 15.0 lists all nine offending features with attribution,
+  and swapping the lookbehind patterns for a string that *is* in the bundle
+  fails as designed.
+- **Checklist conflict, and it is the reason the drift was invisible:**
+  `references/green.md` says to grep `(?<` under `web/src` every run and to
+  check new features "before they are used". Both halves are wrong in the same
+  way. **`web/src` is not what a phone parses** — every feature that actually
+  raised the floor arrived through a dependency, so Blue's source grep this
+  same afternoon was clean and correct while the shipped bundle carried nine
+  above-floor features. And **`(?<` also matches a named capture group**
+  (`(?<name>...)`, Safari 11.3), so the prescribed grep has a false positive
+  built in; the hazards are `(?<=` and `(?<!` only. The new test does both
+  correctly against `web_dist/assets`. The reference should be updated to say
+  "run the test" rather than "run the grep".
+- **Queued for Aaron:**
+  1. **The stated compatibility floor is Safari 15; the shipped bundle needs
+     Safari 16.4.** This is the run's headline and it is a decision, not a bug
+     to fix quietly. Tailwind v4 emits **56 `@property` rules** and **10
+     `color-mix(in lab, …)`** values (both Safari 16.4); React adds
+     `Object.hasOwn` ×7, `structuredClone` ×1 and `reportError` ×4 (Safari
+     15.4). Nine features over the line in total, none of them in a file we
+     wrote. **What it costs below the floor is quiet rather than fatal**, which
+     is why nobody noticed: `@property` registers the `--tw-*` variables that
+     Tailwind composes shadows, transforms, filters and rings out of, so where
+     the at-rule is ignored those `var()`s are invalid and the whole
+     declaration drops — the page lays out correctly with its depth gone.
+     **The sharp point: Safari 15 on macOS 12 is this dev machine's own
+     browser**, so Aaron can settle the severity question in ten seconds on a
+     browser he already has, and no one has looked. The decision is whether the
+     floor *is* 16.4 now (in which case `references/green.md`, CLAUDE.md and
+     the memory note that all still say 15 are wrong and should be corrected),
+     or whether getting back to 15 is worth what it costs — realistically
+     pinning Tailwind v3, which is a large change. `FLOOR` in
+     `tests/test_browser_floor.py` records 16.4 as *observed*, deliberately not
+     as chosen; changing it is one line.
+  2. **Five of eight nav destinations are unreachable on a phone, and one of
+     them is Learn.** Measured at 375px: the nav strip is 736px of content in a
+     343px window (**47% visible**), `overflow-x: auto` with the scrollbar
+     explicitly suppressed (`[scrollbar-width:none]`,
+     `[&::-webkit-scrollbar]:hidden`) and **no mask, fade or any other
+     affordance**. Visible: Library, Start a deck, Import. Off-screen: Card
+     search, Simulator, Laboratory, **Learn**, Accounts — with "Card search"
+     cut mid-word, which reads as broken rather than as "swipe me". The strip
+     is scroll-only below Tailwind's `lg` (1024px), so this is every phone and
+     every tablet; at 1024 it goes `overflow-visible` and all eight fit.
+     **Commandment 2 is what makes this the priority it is** — Learn is the
+     page built to teach a newcomer the vocabulary, and a newcomer on a phone
+     cannot find it. Not fixed here because the primary navigation is a design
+     decision (Commandment 1). Three options, cheapest first: an edge fade
+     mask on the scroll container; letting the strip wrap to two lines below
+     `lg`; a proper disclosure menu.
+  3. **Touch targets: 82% of the deck page's controls are under 44px.** 27 of
+     33 interactive elements at 375px. The dense action cluster the checklist
+     names — Write why, Card art, Ask Claude, Argue slot, Entomb, + Add a card,
+     Bulk entomb…, Review with Claude — is uniformly **27–28px tall**. The two
+     worst are disclosure buttons at **16px and 17px** ("Who is Arahbo?", "What
+     is Claude allowed to do here?"). Raising these is a visual pass across the
+     app rather than a polish trim, hence queued. The cheap version that moves
+     no pixels is a pseudo-element hit area; the honest version is a spacing
+     scale decision.
+  4. **`env(safe-area-inset-*)` appears nowhere, and adding it alone would be a
+     no-op.** `.library-whisper` (the sprout, fixed `bottom: 1.25rem`) sits in
+     the home-indicator band on a notched iPhone. The fix is *two* coupled
+     changes — `viewport-fit=cover` on the viewport meta **and** `env()` insets
+     on the fixed layers — because iOS reports all insets as 0 without the
+     former. `viewport-fit=cover` changes what the page does under the notch,
+     so it wants Aaron's physical phone to verify; that is why this is queued
+     rather than fixed.
+  5. **The admin resource panel — which numbers, and the boundary with Red.**
+     Red owns the alerting thresholds and made the sharp point that
+     `/api/health` must keep answering 200 (a failing Fly check stops routing,
+     turning "logins are broken" into "the site is down" on a single machine).
+     Green's half is the *surfacing*: a `GET /api/admin/resources`, admin-
+     mounted so the prefix middleware refuses it before routing and a
+     logged-in non-admin gets 403 (ADR 17), classified `admin` in
+     `tests/test_isolation.py`. It should report volume used/free/percent,
+     `app.db` and `mtg.duckdb` sizes, the decks tree, `SCHEMA_VERSION`, newest
+     snapshot age, and job-registry occupancy against `MAX_JOBS`. Deliberately
+     a *separate* endpoint from `/api/health` so Red's constraint is not
+     compromised: health stays a liveness 200, this is the dashboard.
+- **Deferred:**
+  - **The shelf's serialization** (`/api/decks`, evidence under Measurements).
+    Real, and the first bottleneck by a wide margin, but the design point is
+    10 concurrent and the last user waits ~1.8s — annoying, not broken. Fixing
+    it means caching the shelf with invalidation on deck write, which is a new
+    cache and a design decision. **Trigger:** the design point moves past ~25
+    concurrent, or the deck count grows past ~20 (the cost is linear in decks).
+  - **Widening the `NET` job pool past 2.** Not a bottleneck to fix — it is a
+    deliberate spend guard (`jobs.py`: "a queue is a cheaper way to say 'not
+    four at once' than a rate limiter nobody has written yet"). **Trigger:** a
+    real per-user quota on the Claude surfaces exists, at which point the
+    queue stops being the cost control and can widen.
+- **Measurements (2026-08-16):**
+  - **Volume — 99M used of 2.9G, 4%, 2.7G available.** Breakdown:
+    `mtg.duckdb` 76M, `/data/scryfall` 24M, `app.db` 212K, `/data/decks` 304K,
+    plus `lost+found`. Nothing unexpected growing. At this rate the 3GB volume
+    is not a concern; the pool is the only large object and it is replaced
+    rather than appended.
+  - **Machine:** `shared-cpu-1x`, 1 vCPU, 1024MB, region `iad`, one machine on
+    volume `vol_vwnqxewn1y00oy9v`. `free` is not in the image so in-container
+    memory was not readable; no OOM events and no restarts in the event log
+    beyond the deploy itself. (Red has the machine version and check config.)
+  - **Snapshots vs migrations — the check passes.** Newest snapshot ~4h old at
+    time of reading; newest schema migration is `SCHEMA_VERSION = 8`, landed
+    2026-08-15 in #109. Snapshot is newer than the migration. Retention is
+    **5 days**, which — given ADR 23 applies migrations on boot, unwatched and
+    forward-only — is the real recovery window for a bad one.
+  - **Concurrency probe, local, machine quiet** (load 3.0/8 cores; the earlier
+    contended run is discarded). Serial: `/api/health` 73ms, **`/api/decks`
+    224ms**, `/api/decks/local/arahbo-cats` 117ms, `/api/colors` 3ms,
+    `/api/glossary` 3ms, `/` 4ms. **At the design point (10 concurrent):
+    `/api/decks` wall 1821ms, median 1513ms — 6.8× serial, i.e. essentially
+    perfect serialization.** Deck detail is 2.6× (DuckDB releases the GIL);
+    everything else is noise. At 30 concurrent the shelf is 5458ms, still
+    linear. **Zero errors at every level** — no 500s, no timeouts, no SQLite
+    lock failures. The first bottleneck is the shelf's pure-Python YAML and
+    aggregation under the GIL, not SQLite, not memory, and not the job pools.
+  - **SQLite posture is correct for the design point:** `journal_mode=WAL`,
+    `foreign_keys=ON`, `busy_timeout=5000` in `auth/db.py::connect`, deferred
+    isolation so `with con:` is a real transaction. ADR 4 stands; no change
+    proposed.
+  - **Where the design point lives in code** (100 accounts / 10 concurrent):
+    `jobs.py` `CPU=1` (GIL-bound, deliberate), `NET=2` (spend guard, not
+    throughput), `MAX_JOBS=200`; `auth/ratelimit.py` `PER_ACCOUNT` 10/15min,
+    `PER_ADDRESS` 30/15min, `RESET_PER_MAILBOX` 3/hr, `RESET_PER_ADDRESS`
+    10/hr, `CLAIM_PER_ADDRESS` 20/15min; `fly.toml` `soft_limit=20` /
+    `hard_limit=40`; one uvicorn worker, bound by the in-process job registry
+    (the Dockerfile's CMD comment is the argument and it is still correct).
+    **Adaptability verdict: 500/50 is a config edit and a re-measure for
+    everything except the shelf and the single worker.** Both are documented
+    levers with triggers above rather than hidden assumptions, so the design
+    point is a setting.
+  - **Responsive sweep, screenshots taken at each** — 375 light, 375 dark
+    (deck page), 768 light, 1024, 1280 light, 1280 dark. No horizontal overflow
+    on any route at any width; the 3px seen at 375 is the emulator's classic
+    scrollbar (`innerWidth` 378 vs `clientWidth` 375) and scrolls 0.5px, not a
+    real overflow — a real iPhone uses overlay scrollbars. Theme resolution is
+    correct: with no stored preference the app follows `prefers-color-scheme`
+    and persists the resolved value.
+  - **Live instance response times:** see Black's baseline (p50 TTFB `/` 240ms,
+    `app.js` 192ms, `/api/health` 211ms with ~45ms server work; gzip on, no
+    brotli, strong etag with 304 confirmed). Green watches these for
+    *degradation* rather than re-measuring them.
+  - **Local suite note:** this worktree symlinks the real pool, so pytest
+    reported **1932 passed / 0 skipped**. CI has no pool and will still show
+    its pinned 2 skips — the 0 is a property of the worktree, not a change.

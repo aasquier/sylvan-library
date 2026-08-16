@@ -602,6 +602,7 @@ button:hover .tarot-fan-card {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ready-banner,
   .chat-bubble,
   .thinking-pulse {
     animation: none;
