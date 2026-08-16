@@ -1,0 +1,82 @@
+# Red — Speed & Alarum
+
+Two facets: the CI/CD pipeline, and alerting & self-healing. Red is speed and
+the fire alarm — the pipeline that answers fast, and the bell that rings
+before Aaron's friends notice the site is down.
+
+## Facet: CI/CD
+
+The suite is six checks (four `ci.yml` jobs, `dependency-review`, CodeQL),
+and a green main deploys itself (ADR 23). The audit is runtime trend,
+robustness, and whether the free tier has grown new capabilities worth
+adopting.
+
+- **Measure runtimes first**: `bash -lc 'gh run list --workflow ci.yml
+  --limit 20 --json databaseId,conclusion,createdAt,updatedAt'` and per-job
+  timings from `gh api` on recent runs. Record medians per job in the
+  ledger; the question is the trend, not today's number. A job that grew 40%
+  since last run has a cause — new tests, cold caches, runner changes — name
+  it.
+- Cache health: pip and npm caches actually hitting (read a recent run's
+  log, don't assume), keys not invalidating on every run.
+- Concurrency: superseded runs on the same branch should cancel
+  (`concurrency` groups) — pushing three fixups should not queue three full
+  suites. Check it is configured; add it if not (safe fix).
+- Actions hygiene: third-party actions pinned (by SHA for anything
+  non-GitHub-authored), permissions blocks minimal (`contents: read` unless
+  a job needs more), no `pull_request_target` foot-guns. This repo is
+  public; its workflows are an attack surface.
+- The pinned invariants stay pinned: the skip gate at 2, the `image` job as
+  the only container build (never runnable on this Mac), deploy `needs` all
+  four `ci.yml` jobs. Verify, don't assume.
+- **Free-tier feature audit**: check GitHub's changelog for features now free
+  for public repos — merge queue, artifact attestations, better caching,
+  required workflows. Adoptions that change contributor workflow are queued;
+  pure-win config (a better cache key) is a safe fix.
+- Local/CI parity: everything CI checks must be runnable locally except
+  `image` and `dependency-review` (documented exceptions). A new CI check
+  that cannot run locally violates "CI is never a surprise" — flag it.
+
+## Facet: alerting & self-healing
+
+The goal state: something breaks — the machine, the volume, a deploy, a
+migration — and Aaron's *phone* knows before a friend does, with no human in
+the loop on detection. Text over email is his stated preference.
+
+Most of this facet is infrastructure that costs a decision or a dollar, so
+the run's job is usually to **measure the current posture, keep the gap list
+current, and sharpen the queued proposals** — not to build monitoring nobody
+approved.
+
+- Posture inventory, every run: what watches the site right now? Fly's own
+  health checks (`fly.toml` — are HTTP checks even configured, and does a
+  failing check restart the machine?), Fly's status emails, GitHub's deploy
+  job failure emails, and anything adopted since last run. Write the list in
+  the ledger; the deltas are the story.
+- Probe the instance from outside during the run (uptime, TLS expiry,
+  response time of `/` and an API route) and record the numbers — a manual
+  probe now is the baseline for the automated one later.
+- The standing proposal set to keep sharp (all queued-class, each needs
+  Aaron's yes and possibly dollars):
+  - **External uptime monitoring** — a free checker (UptimeRobot,
+    healthchecks.io) hitting a health endpoint; or a scheduled GitHub
+    Action doing the same for zero new accounts, with the caveat that
+    Actions cron is best-effort.
+  - **Text delivery** — true SMS costs money (Twilio); the free-adjacent
+    paths are carrier email-to-SMS gateways (fragile), ntfy.sh push
+    (free, self-hostable), or Pushover (one-time $5). A recommendation
+    should compare reliability, not just price.
+  - **A health endpoint worth probing** — one that checks the volume is
+    mounted, `app.db` opens, and disk headroom exists, so a probe
+    detects sickness and not just liveness.
+  - **Admin-page surfacing** — Green's facet owns resource *numbers*; the
+    alerting tie-in is thresholds: the admin page showing a number is
+    Aaron checking; a threshold firing a push is nobody needing to.
+- Self-healing posture: Fly restart policy on the machine, what happens on
+  OOM, and the known hard edge — **schema migrations apply on boot,
+  forward-only, unwatched**. Any proposal that increases automatic restarts
+  must reckon with that edge, and say so when queued.
+- Failure-tolerance review: single machine, single volume is the accepted
+  design (held awake deliberately). Don't re-litigate it; do keep the
+  recovery runbook honest — snapshots current, restore path documented in
+  HOSTING.md and actually tried at least once since it last changed.

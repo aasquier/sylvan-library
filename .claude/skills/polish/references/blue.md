@@ -1,0 +1,88 @@
+# Blue — Craft & Knowledge
+
+Three facets: Python best practices, TypeScript/React best practices, and the
+Claude-first documentation and memory audit. Blue is the color of perfected
+craft and of knowing things — including knowing yourself, which is what the
+third facet is.
+
+## Facet: Python craft
+
+The backend's standards are already codified; the audit is whether the tree
+still meets them and whether the standards themselves have fallen behind.
+
+- Strict mypy's exception list (`pyproject.toml`) is meant to shrink:
+  `cli.py` and `cards/db.py` remain. Chipping a module off that list is a
+  classic safe fix — measure the error count first and queue it if it is a
+  rewrite rather than annotations.
+- Ruff's excluded groups were excluded on *measured* cost (ARG 310, PT 65,
+  SLF 63, N 38 at the time). Re-measure occasionally — a group whose count
+  has collapsed is now nearly free to adopt. A group still expensive stays
+  out; update the recorded numbers so the next run knows.
+- ADR 24 decided **no autoformatter** — do not propose black/ruff-format
+  again; the revisit trigger is a second human contributor.
+- The layering rules are checkable: `api/` never imports `cli.py`; DuckDB
+  stays behind `cards/db.py`; `mana.py` and `sim/` stay stdlib+numpy;
+  optional extras are lazy-imported inside functions (the `claude`,
+  `animist`, dotenv pattern). Grep, don't trust.
+- Idiom sweep, judged surgically: dataclasses/Protocols where dicts have
+  grown fields, `pathlib` throughout (PTH is enforced), timezone-aware
+  datetimes (DTZ), no bare `except` (BLE). New code follows
+  `requires-python >= 3.11` — the floor, not the local 3.12; a 3.12-only
+  construct in `src/` is a bug.
+- Performance-adjacent craft belongs to Black; here the question is
+  readability, typing, and structure. A function that needs a comment to
+  parse is a finding; so is a comment restating its line.
+
+## Facet: TypeScript / React craft
+
+- The gauntlet is `npm --prefix web run check` (tsc, oxlint
+  `--deny-warnings`, Vitest). The audit is what the gauntlet *cannot* see:
+  - **No regex lookbehind anywhere under `web/src`** — Safari 15 is a real
+    user (this very dev machine). Grep for `(?<`.
+  - `noUncheckedIndexedAccess` is on and no non-test `!` assertions under
+    `web/src`; remember a tuple type does not satisfy the flag.
+  - jsdom has no layout: a test asserting an element renders has not
+    asserted it has a size. Anything layout-critical needs a real-browser
+    check, not a stronger jsdom test.
+- `web/README.md` is the conventions map — check recent components against
+  it, and it against them; whichever drifted gets the fix.
+- React idioms: effects that should be derived state or event handlers, state
+  that belongs closer to its use, missing `key` semantics, stable callback
+  identity where it matters for memoized children. React 19 is current —
+  flag legacy patterns (forwardRef ceremony, unnecessary memo) as they
+  appear, surgically.
+- One control, one place: the codebase's pattern is a single source per
+  concern (`lib/claudecopy.ts` for wire-token labels, `lib/api.ts` for the
+  401 seam, `lib/stance.ts` for the pin). New code duplicating one of those
+  seams is a finding.
+- If anything under `web/src` changed, the committed bundle must be rebuilt —
+  and after any rebase, rebuilt again.
+
+## Facet: Claude-first docs & memory audit
+
+The repo is Claude's long-term memory as much as Aaron's documentation.
+Sessions restart; whatever is not written down and consistent is lost. This
+facet keeps the written-down parts true, and it audits Claude's own memory
+files against them.
+
+- **Internal consistency sweep**: CLAUDE.md, ROADMAP.md, ENGINEERING.md,
+  HOSTING.md, `docs/adr/`, `web/README.md`, and the skills (`mtg-lab`, this
+  one). Claims about state ("X is built", counts, statuses) are the usual
+  drift; verify a sample against the code. ADRs are immutable — when an ADR
+  and reality disagree because reality moved on, the fix is a superseding
+  ADR or a CLAUDE.md correction, never an ADR edit.
+- **Memory audit**: read `MEMORY.md` and the memory files; verify claims that
+  name files, flags, or numbers against the tree; merge duplicates, prune
+  stale entries, convert anything relative-dated. The `consolidate-memory`
+  skill is the tool for a full pass.
+- **Doc changes ride the run's branch** — this facet is the one place a
+  mostly-doc PR is legitimate, because the corrections are the work. Still
+  batch them; still never open a PR for one paragraph.
+- **Anthropic best-practices currency**: check the current Claude Code docs
+  (skills, hooks, memory, CLAUDE.md guidance) for capabilities this repo
+  should adopt — the platform moves and "stay current on yourself" is
+  Aaron's instruction. New capabilities that change workflow are queued
+  findings with a concrete proposal, not silent adoptions.
+- The question to end on: *could a fresh session, given only this repo and
+  these memories, pick up the work without asking Aaron anything already
+  answered?* Every "no" is a finding.
