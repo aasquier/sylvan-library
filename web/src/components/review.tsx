@@ -144,8 +144,9 @@ export function DeckReviewPanel({ deck, deckRef, status, onChanged }: {
   // Selection list, grouped the way the page's default view groups.
   const groups = new Map<string, typeof deck.cards>()
   for (const card of deck.cards) {
-    if (!groups.has(card.category)) groups.set(card.category, [])
-    groups.get(card.category)!.push(card)
+    const bucket = groups.get(card.category) ?? []
+    bucket.push(card)
+    groups.set(card.category, bucket)
   }
 
   return (

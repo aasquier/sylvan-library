@@ -29,13 +29,16 @@ them as separate steps on purpose, so a type error reports as a type error.
   `lib/api.test.ts` asserts the URL shape directly.
 - **A 401 is handled once**, in `lib/api.ts`, which announces a lost session
   so `App.tsx` re-asks `/api/auth/me`. Screens do not catch it themselves.
-- **The stance control is a header menu; the panels keep a readout.**
-  `components/stancemenu.tsx` is the one control (the pin was always one
-  global value), `components/stance.tsx` is the per-surface line that says
-  what it resolved to, and `lib/claudecopy.ts` is the only place a wire token
-  (`second-opinion`, `on-request`) becomes a label. The readout is still not
-  a computer: the axes shown come from the server's resolved answer, never
-  recomputed here, and a refused pin is dropped and the call retried bare.
+- **Every preference about *you* is one gear; the panels keep a readout.**
+  `components/settings.tsx` is that gear — theme, ambience, table sound, and
+  the Claude stance slider, which is the single stance control (the pin was
+  always one global value in `lib/stance.ts`). `components/stance.tsx` is the
+  per-surface line that says what it resolved to, and `lib/claudecopy.ts` is
+  the only place a wire token (`second-opinion`, `on-request`) becomes a
+  label. The readout is still not a computer: the axes shown come from the
+  server's resolved answer, never recomputed here, and a refused pin is
+  dropped and the call retried bare. A new preference belongs in this panel
+  and in `lib/prefs.ts`, not in a second control somewhere else.
   See ADR 15 and the dial notes in `ROADMAP.md`.
 - **Only the five colours get a drawn glyph** (`components/manasymbol.tsx`,
   the `hasGlyph` branch). A numeral is a numeral, `{X}` is a letter, a hybrid
@@ -70,9 +73,15 @@ them as separate steps on purpose, so a type error reports as a type error.
   reasoning is written next to `.hero-art`). A new visual belongs in
   `index.css` when the two themes need different treatment, and inline
   otherwise.
-- **No non-null assertions outside test files.** `noUncheckedIndexedAccess`
-  is on and a tuple type does not satisfy it — only a literal index does —
-  so walk rotated copies in lockstep rather than indexing `[(i + 1) % 5]`.
+- **No non-null assertions outside test files**, and since 2026-08-16 oxlint
+  says so rather than this file alone: `typescript/no-non-null-assertion` is
+  an error in `.oxlintrc.json`, switched off for `*.test.ts(x)` only. It was
+  prose for months and drifted four times — three `map.get(k)!.push(…)`
+  group-bys and the root mount — which is the argument for the rule.
+  `noUncheckedIndexedAccess` is on and a tuple type does not satisfy it —
+  only a literal index does — so walk rotated copies in lockstep rather than
+  indexing `[(i + 1) % 5]`, and reach for get-or-create (`const bucket =
+  m.get(k) ?? []`) rather than an assertion.
 - **The forest layer is drawn, gated, and removable.** `components/forest.tsx`
   and the whisper sprout are inline SVG on `var(--vine)` — no assets, ever —
   and the two themes get different weather (fireflies at night, falling

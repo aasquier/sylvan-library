@@ -455,8 +455,9 @@ export default function Library() {
   const byOwner = useMemo(() => {
     const out = new Map<string, DeckTile[]>()
     for (const deck of shown) {
-      if (!out.has(deck.owner)) out.set(deck.owner, [])
-      out.get(deck.owner)!.push(deck)
+      const bucket = out.get(deck.owner) ?? []
+      bucket.push(deck)
+      out.set(deck.owner, bucket)
     }
     return [...out.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [shown])

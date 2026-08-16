@@ -284,7 +284,8 @@ drop: every row can be recomputed, and `mtglab sim cache --clear` does exactly
 that. It lives here rather than in a third store because the rows are keyed to
 decks on the same volume and have to survive a deploy the same way they do.
 
-`user_decks.yaml` stores the same YAML the file-backed decks use, so
+The `yaml` column of `user_decks` — a column, not a file — stores the same
+YAML the file-backed decks use, so
 `Deck.load` logic, the gate, and the artifact generator all work unchanged on
 both tiers. One parser, one validator, two sources.
 

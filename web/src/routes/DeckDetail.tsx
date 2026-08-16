@@ -876,8 +876,9 @@ export default function DeckDetail() {
           : groupBy === 'mv'
             ? `MV ${card.cmc ?? 0}`
             : card.category
-      if (!out.has(key)) out.set(key, [])
-      out.get(key)!.push(card)
+      const bucket = out.get(key) ?? []
+      bucket.push(card)
+      out.set(key, bucket)
     }
     return [...out.entries()].sort((a, b) => b[1].length - a[1].length)
   }, [deck, groupBy, onlyUnjustified])
