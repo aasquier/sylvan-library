@@ -43,7 +43,7 @@ vi.mock('../lib/api', async () => ({
     argueDeck: vi.fn(),
     commander: vi.fn(),
     dossier: vi.fn(), writeDossier: vi.fn(), printings: vi.fn(),
-    job: vi.fn(),
+    job: vi.fn(), wheelSpin: vi.fn(),
   },
 }))
 
@@ -563,6 +563,64 @@ describe('DeckDetail validation tab', () => {
  * way to break that is a placeholder that is really a first draft. This test
  * fails if anyone ever pre-fills the field.
  */
+/**
+ * The Wheel of Fortune (punch list 2026-08-15 item 9): server picks the
+ * fate and the card, the client is theatre. The reveal waits for the wheel
+ * to stop turning, so the test stops it by hand with a transitionend.
+ */
+describe('DeckDetail wheel of fortune', () => {
+  it('spins, waits for the wheel to stop, then shows the card', async () => {
+    vi.mocked(api.wheelSpin).mockResolvedValue({
+      pool_available: true, symbol: 'cup', label: 'The Cup',
+      meaning: 'The cup runneth over — a card that refills your hand.',
+      seed: 7, answered_by: 'python',
+      caveat: 'The wheel is deterministic Python rolling dice over the card '
+            + 'pool. The rationale, if it earns one, is yours to write.',
+      card: { name: 'Harmonize', mana_cost: '{2}{G}{G}', type_line: 'Sorcery',
+              oracle_text: 'Draw three cards.', color_identity: ['G'],
+              image: 'https://example.test/harmonize-full.jpg',
+              art_crop: 'https://example.test/harmonize.jpg' },
+    })
+    renderDeck()
+    await screen.findByText(DECK.name)
+    fireEvent.click(screen.getByRole('button', { name: 'Spin the wheel' }))
+    await waitFor(() => expect(vi.mocked(api.wheelSpin)).toHaveBeenCalled())
+
+    // Before the wheel stops, no card; the suspense is the feature.
+    expect(screen.queryByText('Harmonize')).toBeNull()
+    fireEvent.transitionEnd(
+      document.querySelector('.wheel-scene .absolute') as Element)
+
+    expect(await screen.findByText('Harmonize')).toBeTruthy()
+    expect(screen.getByText('The Cup')).toBeTruthy()
+    expect(screen.getByText(/deterministic Python/)).toBeTruthy()
+    expect(screen.getByText(/Seed 7/)).toBeTruthy()
+  })
+
+  it('reports an empty fate honestly', async () => {
+    vi.mocked(api.wheelSpin).mockResolvedValue({
+      pool_available: true, symbol: 'skull', label: 'The Skull',
+      meaning: 'The skull grins.', seed: 3, answered_by: 'python',
+      caveat: 'Deterministic.', card: null,
+      reason: 'The pool holds no legal card in these colours that answers '
+            + 'to this fate.',
+    })
+    renderDeck()
+    await screen.findByText(DECK.name)
+    fireEvent.click(screen.getByRole('button', { name: 'Spin the wheel' }))
+    await waitFor(() => expect(vi.mocked(api.wheelSpin)).toHaveBeenCalled())
+    fireEvent.transitionEnd(
+      document.querySelector('.wheel-scene .absolute') as Element)
+    expect(await screen.findByText(/no legal card in these colours/)).toBeTruthy()
+  })
+
+  it('credits the painting', async () => {
+    renderDeck()
+    await screen.findByText(DECK.name)
+    expect(screen.getByText(/Daniel Gelon, Limited Edition Alpha/)).toBeTruthy()
+  })
+})
+
 /**
  * The stats tab's punch-list additions (2026-08-15 item 6): opening-hand
  * hypergeometrics, the type breakdown, and the Game Changers count — which

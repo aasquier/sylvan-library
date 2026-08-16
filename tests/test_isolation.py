@@ -150,6 +150,10 @@ USER_SCOPED = {
     "/api/decks/{owner}/{slug}/notes/{key}": "item",
     "/api/decks/{owner}/{slug}/shared": "item",
     "/api/decks/{owner}/{slug}/suggestions": "item",
+    # The wheel reads the deck (its identity and its 99) to pick a card, so
+    # its reach is the deck's: spinning a stranger's private wheel would
+    # confirm the deck exists.
+    "/api/decks/{owner}/{slug}/wheel": "item",
     "/api/decks/{owner}/{slug}/commander": "item",
     "/api/decks/{owner}/{slug}/printings": "item",
     "/api/decks/{owner}/{slug}/interview": "item",

@@ -627,7 +627,7 @@ def get_cards(con, names: Iterable[str]) -> dict[str, CardRecord]:
 
 
 def search(con, where: str, params: Sequence[Any] = (), limit: int = 100,
-           order_by: str | None = None) -> list[CardRecord]:
+           order_by: str | None = None, offset: int = 0) -> list[CardRecord]:
     """Escape hatch for ad-hoc pool queries, e.g.
 
         search(con, "oracle_text ILIKE ? AND list_contains(color_identity,'G')",
@@ -635,11 +635,15 @@ def search(con, where: str, params: Sequence[Any] = (), limit: int = 100,
 
     `order_by` matters more than it looks: without it a LIMIT returns an
     arbitrary slice of the matches, which is fine for "show me some" and wrong
-    for anything that then ranks what it got back.
+    for anything that then ranks what it got back. `offset` only means
+    anything *with* an ordering — a counted offset into an ordered query is
+    how the wheel draws a seeded random card without DuckDB's unseedable
+    `random()`.
     """
     ordering = f" ORDER BY {order_by}" if order_by else ""
+    skipping = f" OFFSET {int(offset)}" if offset else ""
     rows = con.execute(
-        f"{_select(con)} WHERE {where}{ordering} LIMIT {int(limit)}",
+        f"{_select(con)} WHERE {where}{ordering} LIMIT {int(limit)}{skipping}",
         list(params),
     ).fetchall()
     return [_to_record(r) for r in rows]
