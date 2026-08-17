@@ -162,8 +162,19 @@ def _matte_backdrop(image: Image, params: dict[str, Any]) -> Image:
     against its neighbour — a chain-tolerance fill would walk straight into
     the subject through a soft shadow.
 
-    `tolerance` is in 0-255 channel distance. `border` is how many pixels
-    of the frame edge are taken as seed.
+    `tolerance` is in 0-255 channel distance and `border` is how many
+    pixels of the frame edge are taken as seed.
+
+    `soft` is what makes this usable on a real plate. With a hard
+    threshold a photographed object's **cast shadow** has nowhere to go:
+    on the Met fish the shadow falls at 143-167 against a ground of 192,
+    so any tolerance tight enough to spare the bronze keeps the shadow as
+    a grey wedge, and any tolerance wide enough to swallow it starts
+    eating the highlights on the fish's scales. `soft` ramps alpha from
+    fully transparent at `tolerance` to fully opaque at `tolerance +
+    soft`, so the shadow fades out instead — faint where it touches the
+    object, gone at its edges, which is what a contact shadow should do
+    anyway.
 
     `enclosed` decides what happens to backdrop the flood cannot reach —
     the gap under a handle, the daylight inside a wave's arch. `keep` (the
@@ -179,12 +190,15 @@ def _matte_backdrop(image: Image, params: dict[str, Any]) -> Image:
     tolerance = float(params.get("tolerance", 26.0))
     border = int(params.get("border", 2))
     enclosed = str(params.get("enclosed", "keep"))
+    soft = float(params.get("soft", 0.0))
     if tolerance <= 0:
         raise OpError("matte_backdrop needs a positive `tolerance`")
     if border < 1:
         raise OpError("matte_backdrop needs a `border` of at least 1")
     if enclosed not in {"keep", "drop"}:
         raise OpError("matte_backdrop `enclosed` must be `keep` or `drop`")
+    if soft < 0:
+        raise OpError("matte_backdrop `soft` cannot be negative")
 
     rgba = image.convert("RGBA")
     rgb = np.asarray(rgba.convert("RGB"), dtype=np.float32)
@@ -199,17 +213,17 @@ def _matte_backdrop(image: Image, params: dict[str, Any]) -> Image:
         rgb[:, :border, :].reshape(-1, 3), rgb[:, -border:, :].reshape(-1, 3)])
     backdrop = np.median(edge, axis=0)
 
-    near = np.max(np.abs(rgb - backdrop), axis=2) <= tolerance
-
-    if enclosed == "drop":
-        # No connectivity test at all: every backdrop-coloured pixel goes,
-        # reachable or not. Still keyed on the colour sampled from the
-        # border, which is the part that makes this different from a
-        # hand-picked chroma key.
-        existing = np.asarray(rgba.getchannel("A"), dtype=np.float32) / 255.0
-        alpha = (existing * (~near) * 255.0).astype(np.uint8)
-        rgba.putalpha(PILImage.fromarray(alpha, mode="L"))
-        return rgba
+    distance = np.max(np.abs(rgb - backdrop), axis=2)
+    near = distance <= tolerance
+    if soft > 0:
+        # 0 at `tolerance`, 1 at `tolerance + soft`: how *opaque* a pixel
+        # is allowed to be once the flood has reached it.
+        keep = np.clip((distance - tolerance) / soft, 0.0, 1.0)
+        # The flood still needs a binary notion of "passable", or a shadow
+        # would halt it; a pixel is walkable while it is not fully opaque.
+        near = keep < 1.0
+    else:
+        keep = (~near).astype(np.float32)
 
     # Flood from the border through `near`, by repeated dilation. Bounded:
     # it stops as soon as a pass adds nothing, and the worst case is the
@@ -230,8 +244,18 @@ def _matte_backdrop(image: Image, params: dict[str, Any]) -> Image:
             break
         reached = grown
 
+    # Reached pixels take the ramp, which is what lets a cast shadow fade
+    # out. Unreached ones keep their alpha -- unless `enclosed` is `drop`,
+    # in which case a pocket that matches the backdrop on the *hard* test
+    # goes too. The hard test matters: the soft band is deliberately wide
+    # enough to catch a shadow, and applying that width to unreachable
+    # pixels eats the highlights on the object's own surface.
+    survives = np.where(reached, keep, 1.0)
+    if enclosed == "drop":
+        survives = np.where(~reached & (distance <= tolerance), 0.0, survives)
+
     existing = np.asarray(rgba.getchannel("A"), dtype=np.float32) / 255.0
-    alpha = (existing * (~reached) * 255.0).astype(np.uint8)
+    alpha = (existing * survives * 255.0).astype(np.uint8)
     rgba.putalpha(PILImage.fromarray(alpha, mode="L"))
     return rgba
 
