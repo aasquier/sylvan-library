@@ -359,10 +359,17 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
   const style = {
     '--deal-delay': `${index * 150}ms`,
     '--settle-rot': `${SETTLE_ROT[index] ?? 0}deg`,
+    '--arc-rot': `${ARC_ROT[index] ?? 0}deg`,
+    '--arc-drop': `${ARC_DROP[index] ?? 0}px`,
   } as React.CSSProperties
 
   return (
     <div className={`tarot-slot${small ? ' is-small' : ''}`} style={style}>
+      {/* The place printed on the cloth, under the card that fills it. Only
+          on the felt: in the folded strip the cards are context for the
+          conversation, and a marked position with a card already in it is a
+          label for something nobody is about to do. */}
+      {!small && <span className="tarot-place" aria-hidden="true" />}
       {onTurn && !faceUp
         ? (
           <button onClick={onTurn} className="tarot-hinge" aria-label={`Turn over ${card.position}`}>
@@ -481,6 +488,18 @@ function SeanceRoom({ children }: { children: React.ReactNode }) {
 
 /** How far off square each dealt card lands, in reading order. */
 const SETTLE_ROT = [-2.2, 1.6, -1.2]
+
+/** The arc, in reading order: the three places are laid out *around the ball*
+ *  rather than in a row, so they radiate from the thing they are being read
+ *  under. `ARC_ROT` turns each place to face the centre and `ARC_DROP` sets
+ *  it on the curve — the outer two ride high, the middle one sits lower,
+ *  which is the shape a hand lays three cards in front of somebody.
+ *
+ *  These are the *place's* numbers and `SETTLE_ROT` is the *card's*: the
+ *  printed position is exact and the card that lands in it is a hair off,
+ *  because the cloth was printed and the deal was not. */
+const ARC_ROT = [-9, 0, 9]
+const ARC_DROP = [0, 26, 0]
 
 /** The three places, laid out. `small` is the strip the conversation runs
  *  under, once the ceremony is over and the cards are context rather than

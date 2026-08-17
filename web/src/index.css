@@ -454,7 +454,14 @@ body {
 }
 
 .tarot-slot {
+  position: relative;
   width: 168px;
+  /* The arc. `margin-top` and not a transform, deliberately: `tarot-deal`
+     ends on `transform: none` and does not carry `forwards`, so a static
+     transform here would be flattened for the length of the deal and then
+     snap back — the card would land in a row and jump onto the curve. A
+     margin is outside that fight. */
+  margin-top: var(--arc-drop, 0px);
   /* The scans are 400x693-700 — a percent or so apart, because they are
      photographs of ninety-year-old cardboard rather than renders. A fixed box
      with `cover` on the image keeps the three the same size; the alternative,
@@ -471,7 +478,45 @@ body {
 
 .tarot-spread.is-small .tarot-slot {
   width: 96px;
+  /* The strip is a row again. The arc is ceremony and the strip is not. */
+  margin-top: 0;
 }
+
+/* ── the places printed on the cloth ────────────────────────────────────────
+ *
+ * ROADMAP item 13's "a felt table with the card positions laid out around the
+ * ball", read the way a reading cloth actually works: the *positions* are
+ * printed on the felt and the cards land in them. A newcomer sees three named
+ * places before three pictures arrive in them, which is commandment 2 — the
+ * table explains its own shape without a sentence of instruction.
+ *
+ * The place carries `--arc-rot` and the card carries `--arc-rot` **plus**
+ * `--settle-rot`. That difference is the whole detail: the cloth was printed
+ * square and the deal was a hand, so every card lies a degree or two off its
+ * own place. Get it the other way round — rotate them together — and three
+ * cards sit in three sockets like a form.
+ *
+ * Gold at a hairline's weight and a wash of shadow inside, so it reads as
+ * something stamped into baize rather than a border drawn on top of it. */
+.tarot-place {
+  position: absolute;
+  top: -15px;
+  left: -15px;
+  width: calc(100% + 30px);
+  aspect-ratio: 400 / 695;
+  border-radius: 14px;
+  border: 1px solid rgba(226, 194, 122, 0.38);
+  box-shadow:
+    inset 0 0 26px rgba(0, 0, 0, 0.34),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.16);
+  transform: rotate(var(--arc-rot, 0deg));
+  pointer-events: none;
+}
+
+/* The place carries no name of its own, and that was a correction: it had
+   one, and `.tarot-caption` under the card already prints the same three
+   words, so the table said THE ROOT twice under every card. The frame is the
+   printing; the caption is the label. One of each. */
 
 .tarot-hinge {
   display: block;
@@ -485,7 +530,10 @@ body {
   /* Each card settles a hair off square (set per slot in `TarotCard`) —
      a hand deals like that and a machine does not. On the hinge rather than
      in the deal keyframes, so it survives the animation's `to { none }`. */
-  transform: rotate(var(--settle-rot, 0deg));
+  /* The arc turns the place to face the ball; the settle is the hand that
+     dealt. Composed rather than either one alone, so a card lies a degree or
+     two off the position printed under it. */
+  transform: rotate(calc(var(--arc-rot, 0deg) + var(--settle-rot, 0deg)));
   transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -520,7 +568,8 @@ button.tarot-hinge {
    and keeps its rule below, where it belongs. */
 @media (hover: hover) {
   .tarot-hinge:has(.is-face-up):hover {
-    transform: rotate(var(--settle-rot, 0deg)) scale(var(--tarot-zoom, 1.35));
+    transform: rotate(calc(var(--arc-rot, 0deg) + var(--settle-rot, 0deg)))
+      scale(var(--tarot-zoom, 1.35));
     z-index: 5;
   }
 
@@ -540,7 +589,8 @@ button.tarot-hinge {
 }
 
 .tarot-hinge:has(.is-face-up):focus-visible {
-  transform: rotate(var(--settle-rot, 0deg)) scale(var(--tarot-zoom, 1.35));
+  transform: rotate(calc(var(--arc-rot, 0deg) + var(--settle-rot, 0deg)))
+    scale(var(--tarot-zoom, 1.35));
   z-index: 5;
 }
 
