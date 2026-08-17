@@ -200,19 +200,25 @@ outputs:
   - file: seance-candles.webp
     from: candles
     ops:
-      # The right edge is 0.53 and it is measured, not judged by eye. The
-      # first cut was 0.42, which put the seam straight through a lit candle
-      # -- and a candle sliced down its length is the one thing in this
-      # composite that cannot be explained away, because wax has a round
-      # side. Scanning the plate column by column for the brightest pixel in
-      # the candle band finds a genuine trough at x=520..570 (peak 134-183
-      # against 255 either side): nothing is lit there, so the cut passes
-      # between two racks rather than through one.
-      - crop: {frac_box: [0.0, 0.14, 0.53, 1.0]}
+      # The right edge has moved twice, measured both times. 0.53 was the
+      # trough between two racks (x=520..570, peak 134-183 against 255
+      # either side) -- the first cut at 0.42 had sliced a lit candle, and
+      # wax has a round side. Then Aaron's eye on the fitted room
+      # (2026-08-17): the tall pair at the crop's inner end crowded the
+      # middle where the carp stands, on BOTH sides once mirrored. 0.371
+      # cuts them away in the dark valley between the middle candle's mass
+      # and the pair (nothing lit at 0.66..0.72 of the old crop), and the
+      # page stretches the remaining rack wider, so the low wax masses run
+      # toward the fish's base instead of two towers leaning over it. The
+      # bottom moved with it: full-height, the trimmed plate went portrait
+      # and the stretched rack poked above the room's own ceiling. The
+      # lower wax cascade was already dissolved by the rack's bottom fade
+      # on the page, so cutting it at 0.74 costs nothing that showed.
+      - crop: {frac_box: [0.0, 0.14, 0.371, 0.74]}
       - duotone: {shadow: "#000000", mid: "#8a6b3e", light: "#fff4cf"}
-      - resize: {width: 700}
+      - resize: {width: 500}
     encode: {format: webp, quality: 84}
-    expect: {width: 700, height: 851, budget_kb: 180, metadata: none}
+    expect: {width: 500, height: 605, budget_kb: 150, metadata: none}
 
   # Small features, fast time, almost no advection. `falloff` is lower than
   # any other loop here (2.2 against 2.9-3.1), which is what keeps the fine

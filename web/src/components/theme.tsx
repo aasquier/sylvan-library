@@ -256,7 +256,7 @@ function RoomSign({ persona }: { persona: string }) {
  *  click the line and it finishes at once, because making the reader wait
  *  is a choice they should be able to decline without making the hand
  *  write like a machine. */
-const INK_MS_PER_CHAR = 62
+const INK_MS_PER_CHAR = 52
 const INK_MIN_MS = 900
 /** Where the pen pauses: lifted between words, longer at a breath, longer
  *  still at a full stop. This unevenness is most of what separates a hand
@@ -266,18 +266,24 @@ const INK_PAUSE_BREATH = 260   // , ; : and the em dash
 const INK_PAUSE_STOP = 420     // . ? !
 
 /**
- * A hand writing on the parchment (overhaul item 5, second pass — Aaron
- * asked for the hand, not just the ink; third pass — the brief asked for
- * the rhythm). The unit is the CHARACTER now, not the word: each glyph is
- * revealed by its own left-to-right wipe on the shared schedule, so the
- * line fills stroke by stroke instead of arriving as blocks. Words keep
- * their own spans around the characters — that is what lets the browser
- * wrap lines at spaces, and it still carries the per-word tilt and drop
- * (deterministic per index — a hand wobbles, a render must not). The ink
- * starts wet-brown and dries dark; the first character of each word comes
- * a touch slower than the run of the word, the way a pen resettles after
- * a lift. A drawn quill travels with the current character, and lifts off
- * when the sentence is done.
+ * A hand writing on the parchment (overhaul item 5; third pass gave it
+ * the rhythm, and the fourth gave it back its joins). The unit of TIMING
+ * is the character; the unit of MARKUP is the word — and the difference
+ * is not pedantry. The third pass wrapped every glyph in its own span,
+ * and a connected script shapes its letters from their neighbours:
+ * OpenType shaping does not cross element boundaries, so Parisienne
+ * rendered every letter in its isolated form and "Before" came out
+ * "Belore". A word kept whole shapes correctly, and a CONTINUOUS linear
+ * wipe across it, timed from its character count, reads as the pen
+ * travelling — precisely because in a joined hand the leading edge never
+ * leaves a stroke. (Handwriting does not join across spaces, so the word
+ * boundary costs nothing.)
+ *
+ * Each word carries a hair of tilt and drop (deterministic per index — a
+ * hand wobbles, a render must not); the ink starts wet-brown and dries
+ * dark; the pen pauses between words, longer at punctuation, and
+ * resettles slightly on each word's opening. A drawn quill rides the
+ * wipe's leading edge, and lifts off when the sentence is done.
  *
  * Reduced motion gets the text already dry and no quill, from the same
  * media query that stills the table.
@@ -320,11 +326,8 @@ function InkText({ text }: { text: string }) {
       pen.style.opacity = '0'
       return
     }
-    const spans = Array.from(el.querySelectorAll<HTMLElement>('.ink-char'))
+    const spans = Array.from(el.querySelectorAll<HTMLElement>('.ink-word'))
     if (spans.length === 0) return
-    // Each character knows its own start; the quill just asks which one is
-    // being written and stands over it.
-    const starts = spans.map((s) => Number(s.dataset.start ?? 0))
     pen.style.opacity = '1'
     const t0 = performance.now()
     // An interval rather than requestAnimationFrame, and not for style: rAF
@@ -338,14 +341,16 @@ function InkText({ text }: { text: string }) {
         window.clearInterval(tick)
         return
       }
-      let i = starts.findIndex((s) => t < s)
-      i = i === -1 ? spans.length - 1 : Math.max(i - 1, 0)
-      const ch = spans[i]
-      if (ch) {
-        const box = ch.getBoundingClientRect()
+      let i = schedule.findIndex((s) => t < s.start + s.dur)
+      if (i === -1) i = spans.length - 1
+      const word = spans[i]
+      const s = schedule[i]
+      if (word && s) {
+        const frac = Math.min(Math.max((t - s.start) / s.dur, 0), 1)
+        const box = word.getBoundingClientRect()
         const home = el.getBoundingClientRect()
-        // The nib rides the current glyph, a touch above the baseline.
-        const x = box.left - home.left + box.width * 0.7
+        // The nib rides the wipe's leading edge, a touch above the baseline.
+        const x = box.left - home.left + box.width * frac
         const y = box.top - home.top
         pen.style.transform =
           `translate(${x}px, ${y - 14}px) rotate(${32 + Math.sin(t / 90) * 4}deg)`
@@ -366,28 +371,16 @@ function InkText({ text }: { text: string }) {
         if (/^\s*$/.test(part)) return part
         const n = word++
         const s = schedule[n]
-        let charClock = s?.start ?? 0
         return (
           <span key={`${i}-${part}`} className="ink-word"
                 style={{
+                  '--ink-delay': `${s?.start ?? 0}ms`,
+                  '--ink-dur': `${s?.dur ?? 200}ms`,
                   // A hand wobbles; a render must not. Deterministic jitter.
                   '--ink-tilt': `${(((n * 7) % 5) - 2) * 0.35}deg`,
                   '--ink-drop': `${(((n * 3) % 3) - 1) * 0.6}px`,
                 } as React.CSSProperties}>
-            {Array.from(part).map((glyph, k) => {
-              const start = charClock
-              const dur = s?.perChar[k] ?? INK_MS_PER_CHAR
-              charClock += dur
-              return (
-                <span key={k} className="ink-char" data-start={start}
-                      style={{
-                        '--ink-delay': `${start}ms`,
-                        '--ink-dur': `${dur}ms`,
-                      } as React.CSSProperties}>
-                  {glyph}
-                </span>
-              )
-            })}
+            {part}
           </span>
         )
       })}

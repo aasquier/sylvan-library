@@ -136,6 +136,18 @@ body {
   font-display: swap;
 }
 
+/* The fortune-teller's hand (Aaron's pick off the five-face board): a
+   joined script, because the ink animation's left-to-right reveal only
+   reads as a pen travelling when the leading edge never leaves a
+   stroke. */
+@font-face {
+  font-family: 'Parisienne';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/parisienne-regular.woff2') format('woff2');
+}
+
 @font-face {
   font-family: 'IM Fell English SC';
   src: url('./assets/fonts/im-fell-english-sc.woff2') format('woff2');
@@ -689,10 +701,10 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   flex-direction: column;
   background:
     radial-gradient(ellipse at 30% 20%,
-      rgba(120, 96, 52, 0.08), transparent 60%),
+      rgba(120, 96, 52, 0.1), transparent 60%),
     radial-gradient(ellipse at 72% 78%,
-      rgba(120, 96, 52, 0.1), transparent 55%),
-    #f0e8d0;
+      rgba(120, 96, 52, 0.13), transparent 55%),
+    #e9dcb6;
   color: #241d10;
   padding: 5.5% 6% 0;
 }
@@ -718,7 +730,7 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   text-align: center;
   letter-spacing: 0.14em;
   border-bottom: 1px solid #2a2213;
-  background: #ede4ca;
+  background: #e6d8b2;
 }
 
 .tarot-rws-canvas {
@@ -743,7 +755,7 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   height: 100%;
   object-fit: cover;
   object-position: var(--rws-focus, 50%) center;
-  filter: saturate(0.8) sepia(0.24) contrast(0.9) brightness(1.05);
+  filter: saturate(0.76) sepia(0.3) contrast(0.9) brightness(1.05);
 }
 
 /* Pale old ink first: a cream screen that lifts the modern art's deep
@@ -967,12 +979,19 @@ button:hover .tarot-fan-card {
       rgba(226, 168, 92, 0.13), transparent 70%),
     radial-gradient(ellipse 32% 95% at 100% 55%,
       rgba(226, 168, 92, 0.13), transparent 70%),
+    /* The age: an edge-burn all round (multiply-dark radial held off the
+       middle), and two foxing stains deeper than the first cut's — the
+       plate brings its own browning along the left, and these meet it. */
+    radial-gradient(ellipse 120% 115% at 50% 46%,
+      transparent 58%, rgba(110, 78, 34, 0.16) 84%, rgba(86, 58, 22, 0.28) 100%),
     radial-gradient(ellipse 42% 30% at 18% 8%,
-      rgba(112, 84, 40, 0.12), transparent),
+      rgba(112, 84, 40, 0.18), transparent),
     radial-gradient(ellipse 50% 34% at 72% 94%,
-      rgba(102, 74, 32, 0.14), transparent),
+      rgba(102, 74, 32, 0.2), transparent),
     url('./assets/seance/seance-parchment.webp');
-  background-size: auto, auto, auto, auto, 635px 455px;
+  /* One sheet of skin under `cover`, not a mirror-tiled kaleidoscope:
+     the folio's own browned cut edge rides the panel's left side. */
+  background-size: auto, auto, auto, auto, auto, cover;
   padding: 1.9rem 2.4rem;
   box-shadow:
     inset 0 0 26px rgba(96, 68, 28, 0.22),
@@ -1006,18 +1025,45 @@ button:hover .tarot-fan-card {
   opacity: 0.5;
 }
 
+/* Candlelight ON the paper (Aaron, 2026-08-17): the votive racks do not
+   stop at the felt's edge — their light breathes over the sheet itself.
+   Two pools riding the same uneven keyframes as the room, on periods that
+   share no useful multiple with the racks', so the page and the room
+   flicker as one lighting without pulsing in step. `soft-light` warms
+   what is already light and leaves the ink alone, which is what keeps
+   this from being a legibility tax. */
+.seance-scroll::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 58% 130% at -6% 50%,
+      rgba(255, 196, 110, 0.5) 0%, rgba(255, 176, 84, 0.2) 48%,
+      transparent 76%),
+    radial-gradient(ellipse 58% 130% at 106% 50%,
+      rgba(255, 196, 110, 0.44) 0%, rgba(255, 176, 84, 0.18) 48%,
+      transparent 76%);
+  mix-blend-mode: soft-light;
+  animation: seance-flicker 6.1s ease-in-out infinite;
+  animation-delay: -1.7s;
+}
+
 .seance-scroll > * {
   position: relative;
 }
 
 .seance-scroll .thinking-pulse,
 .seance-question {
-  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
-  /* The italic: the Fell cut that still reads as a hand rather than a
-     press, which is the whole séance conceit. */
-  font-style: italic;
-  font-size: 1.22rem;
-  line-height: 1.62;
+  /* The reader WRITES; the app around her prints. Parisienne is the
+     writing — a joined hand, so the character-by-character reveal is a
+     pen travelling — and the Fell italic stays as the fallback press.
+     A script face runs small on its body, so the size steps up to keep
+     the same reading size the Fell had. */
+  font-family: 'Parisienne', 'IM Fell English', 'Iowan Old Style', Georgia,
+    serif;
+  font-size: 1.45rem;
+  line-height: 1.58;
 }
 
 /* The hand writing (`InkText` in theme.tsx). The unit is the CHARACTER
@@ -1035,14 +1081,16 @@ button:hover .tarot-fan-card {
   cursor: pointer;
 }
 
+/* The word is ONE text node — a connected script shapes its letters from
+   their neighbours, and OpenType shaping does not cross element
+   boundaries (per-glyph spans rendered "Before" as "Belore"). The wipe is
+   linear and timed from the word's character count, so it moves at the
+   pen's own speed; in a joined face its leading edge never leaves a
+   stroke, which is what makes a reveal read as writing. */
 .ink-word {
   display: inline-block;
   transform: rotate(var(--ink-tilt, 0deg)) translateY(var(--ink-drop, 0px));
-}
-
-.ink-char {
-  display: inline-block;
-  animation: ink-write var(--ink-dur, 60ms) linear both;
+  animation: ink-write var(--ink-dur, 200ms) linear both;
   animation-delay: var(--ink-delay, 0ms);
 }
 
@@ -1051,7 +1099,7 @@ button:hover .tarot-fan-card {
   cursor: default;
 }
 
-.ink-text.is-dry .ink-char {
+.ink-text.is-dry .ink-word {
   animation: none;
   clip-path: none;
   color: #2b2013;
@@ -1059,19 +1107,17 @@ button:hover .tarot-fan-card {
 
 @keyframes ink-write {
   0% {
-    /* 110% right inset: a glyph not yet written shows not one speck. The
-       vertical overhang stays, for ascenders and descenders; the -6% left
-       overhang keeps the previous glyph's exit stroke from being clipped
-       where glyphs kern into each other, which is the whole point of a
-       connected face. */
-    clip-path: inset(-20% 110% -20% -6%);
+    /* 102% right inset: a word not yet written shows not one speck. The
+       vertical overhang stays, for the tall looping ascenders and
+       descenders a script face has. */
+    clip-path: inset(-30% 102% -30% -2%);
     color: #6d4f22;
   }
   55% {
     color: #54401e;
   }
   100% {
-    clip-path: inset(-20% -8% -20% -6%);
+    clip-path: inset(-30% -4% -30% -2%);
     color: #2b2013;
   }
 }
@@ -1254,11 +1300,18 @@ button:hover .tarot-fan-card {
   border-radius: 0.75rem 0.75rem 0 0;
   overflow: hidden;
   pointer-events: none;
+  /* Twice the stops the first pass had, plus the dither below (Aaron's
+     item 8): a smooth ramp through near-blacks quantises into visible
+     terraces on an 8-bit screen — the "hard line that instantly changes
+     colour" — and the two fixes compound: closer stops make each step
+     smaller, and the grain breaks up what remains. */
   background:
     radial-gradient(ellipse 70% 42% at 50% 100%,
-      rgba(84, 52, 18, 0.38) 0%, rgba(32, 18, 8, 0.2) 46%, transparent 78%),
-    linear-gradient(to bottom, #030305 0%, #050408 48%, #0a0709 86%,
-      #0e0a0a 100%);
+      rgba(84, 52, 18, 0.38) 0%, rgba(66, 40, 14, 0.3) 22%,
+      rgba(48, 28, 11, 0.25) 46%, rgba(32, 18, 8, 0.14) 62%,
+      rgba(20, 11, 5, 0.06) 72%, transparent 82%),
+    linear-gradient(to bottom, #030305 0%, #040407 30%, #050408 48%,
+      #070508 68%, #0a0709 86%, #0c0909 94%, #0e0a0a 100%);
   /* A short fade, not a long one. The first pass ran it over 7% of a
      759px stage — a 53px brown smear where the table's back edge should be,
      which is the opposite of the clean border this composition is built on.
@@ -1266,6 +1319,20 @@ button:hover .tarot-fan-card {
   -webkit-mask-image: linear-gradient(to bottom, #000 98%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 98%, transparent 100%);
   animation: seance-flicker 7.3s ease-in-out infinite;
+}
+
+/* The dither: the same browser-drawn turbulence grain the parchment uses,
+   at whisper opacity over the dark. Its one job is to break the gradient
+   terraces item 8 named — noise is how film avoids banding, and it costs
+   no bytes. */
+.seance-dark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='19'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23d)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+  opacity: 0.18;
 }
 
 /* Smoke in the dark, screened so only its lit parts survive. Same loop as the
@@ -1294,6 +1361,26 @@ button:hover .tarot-fan-card {
   height: 132%;
   opacity: 0.17;
   filter: blur(9px);
+}
+
+/* The swirl (item 9): the same air, gathered where a scrying room's smoke
+   actually goes — coiling around the glass. A tight crop of the loop runs
+   its features fastest of the three layers, nearly unblurred so the curls
+   read as SMOKE SWIRLING rather than haze, and the radial mask holds it
+   to the dark around the ball: brightest against the black, gone before
+   the racks. The ball sits centred in the stage, so the mask needs no
+   number the layout does not already own. */
+.seance-haze.is-swirl {
+  inset: -4% 18% 0;
+  width: 64%;
+  height: 104%;
+  left: 18%;
+  opacity: 0.5;
+  filter: blur(1.5px);
+  -webkit-mask-image: radial-gradient(ellipse 52% 58% at 50% 42%,
+    #000 28%, rgba(0, 0, 0, 0.55) 58%, transparent 82%);
+  mask-image: radial-gradient(ellipse 52% 58% at 50% 42%,
+    #000 28%, rgba(0, 0, 0, 0.55) 58%, transparent 82%);
 }
 
 /* The flicker, over the wax it belongs to (ADR 31, seed 1888). A photograph
@@ -1332,7 +1419,10 @@ button:hover .tarot-fan-card {
      detail at the edge of a photograph rather than as the light in the room.
      The number is larger than it looks because the crop grew to 0.53 to
      dodge the sliced candle — same wax at the same scale, more of it. */
-  width: clamp(190px, 34vw, 505px);
+  /* Wider since the plate's tall inner pair was trimmed (Aaron,
+     2026-08-17): the remaining low wax masses stretch toward the middle
+     and meet the fish's base instead of towering over it. */
+  width: clamp(220px, 40vw, 600px);
   mix-blend-mode: screen;
   pointer-events: none;
   animation: seance-flicker 5.9s ease-in-out infinite;
@@ -1387,8 +1477,12 @@ button:hover .tarot-fan-card {
   inset: auto 0 calc(var(--seance-horizon) - 8%) 0;
   height: 15%;
   pointer-events: none;
+  /* Stops every ~15% rather than three across the run — same banding fix
+     as the dark's (item 8). */
   background: radial-gradient(ellipse 78% 100% at 50% 0%,
-    rgba(226, 168, 92, 0.17) 0%, rgba(184, 126, 58, 0.08) 44%, transparent 74%);
+    rgba(226, 168, 92, 0.17) 0%, rgba(210, 150, 76, 0.13) 22%,
+    rgba(184, 126, 58, 0.08) 44%, rgba(150, 100, 46, 0.04) 60%,
+    rgba(120, 80, 36, 0.02) 68%, transparent 78%);
   animation: seance-flicker 8.9s ease-in-out infinite;
   animation-delay: -3.1s;
 }
@@ -1469,6 +1563,67 @@ button:hover .tarot-fan-card {
  * below about a thousand pixels and had to be shrunk and then hidden below
  * `lg`; standing it above the centred spread means nothing is beside it.
  */
+/* The ceremony fits one screen (Aaron's item 6, third report). The stack
+   could never fit by shrinking alone — the board measured 1255px of felt
+   against a 900px viewport, and both levers together still missed by
+   ~380px — so the composition changes while the deal is the event: the
+   page's chrome steps aside (NewDeck hides its masthead), the heading
+   goes (the cloth's printed places are the explanation), the ball sizes
+   against the VIEWPORT'S HEIGHT as well as its width, and the spread
+   rides up over the stage's front felt band — the cards stand on the
+   table in front of the room, which is where a spread on a séance table
+   actually sits. Wide screens only: on a phone the cards wrap and the
+   overlap would stack them into the bronze. */
+@media (min-width: 900px) {
+  .tarot-ceremony {
+    --ballw: clamp(250px, min(38vw, 40vh), 520px);
+  }
+  .tarot-ceremony .crystal-ball {
+    width: var(--ballw);
+  }
+  /* The racks keep their proportion to the bronze rather than to the
+     window — untied, a height-limited viewport left them poking above
+     the room's own ceiling. */
+  .tarot-ceremony .seance-rack {
+    width: calc(var(--ballw) * 1.08);
+  }
+  .tarot-ceremony .tarot-spread {
+    position: relative;
+    z-index: 3;
+    margin-top: calc(var(--ballw) * -0.34);
+    /* The outer cards sit out on the wings (Aaron's call, off the first
+       fitted board): the middle card fronts the table and the bronze's
+       tail and head stay visible in the gaps. */
+    gap: 0 clamp(2.5rem, 13vw, 190px);
+  }
+  /* The cards give a notch of size back to the room; the hover-zoom on a
+     turned card still shows every detail. */
+  .tarot-ceremony .tarot-slot {
+    width: clamp(132px, calc(var(--ballw) * 0.42), 168px);
+  }
+  .tarot-ceremony .seance-stage {
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* The ceremony's controls, riding the dark upper corners of the room —
+   the one part of the composition with nothing in it. Above the racks
+   and under nothing. */
+.tarot-ceremony-controls {
+  position: absolute;
+  inset: 0.6rem 0.9rem auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  z-index: 10;
+}
+
+.seance-stage.is-knockable {
+  cursor: pointer;
+}
+
 .crystal-ball {
   position: relative;
   /* Big, and deliberately so (Aaron, 2026-08-17): a museum bronze on a séance
@@ -1785,7 +1940,8 @@ button:hover .tarot-fan-card {
      the vision above, whose 0% is invisible. */
   .seance-dark,
   .seance-rack,
-  .seance-spill {
+  .seance-spill,
+  .seance-scroll::after {
     animation: none;
   }
   .tarot-hinge {
@@ -1812,12 +1968,10 @@ button:hover .tarot-fan-card {
     transition: none;
   }
   .ink-word {
-    transform: none;
-  }
-  .ink-char {
     animation: none;
     clip-path: none;
     color: #2b2013;
+    transform: none;
   }
   .ink-quill {
     display: none;
@@ -2644,28 +2798,33 @@ button:hover .tarot-fan-card {
   right: -6%;
   width: 55%;
   height: 85%;
-  transform: rotate(24deg);
+  --beam-rot: 24deg;
+  transform: rotate(var(--beam-rot));
   transform-origin: 100% 0;
   /* Raised twice and still unseen the second time, because more alpha was
      the wrong lever: #fce296 on a #f9f9f7 page is light-on-light, and a
      near-white ground has no headroom left to brighten into. What reads on
      pale paper is *colour*, so the beam is amber now rather than a paler
      white — the warmth is the signal, and the alpha only sets how much of
-     it lands. */
+     it lands. (Brighter again 2026-08-17, Aaron's item 7, with the play
+     of light below to carry it.) */
   background: linear-gradient(
     203deg,
-    rgba(255, 196, 92, 0.34) 0%,
-    rgba(255, 196, 92, 0.13) 45%,
+    rgba(255, 190, 80, 0.46) 0%,
+    rgba(255, 196, 92, 0.18) 45%,
     rgba(255, 196, 92, 0) 72%
   );
-  animation: sunbeam-flicker 11s ease-in-out infinite;
+  /* Sun through a window on a cloudy day: long uneven swells, two real
+     cloud passages (the deep dips), and the beam itself leaning a degree
+     as the light moves — not a flicker, weather. */
+  animation: sunbeam-clouds 27s ease-in-out infinite;
 }
 
 .scene-sunbeam-b {
   width: 34%;
-  transform: rotate(31deg);
-  animation-duration: 17s;
-  animation-delay: 4s;
+  --beam-rot: 31deg;
+  animation-duration: 41s;
+  animation-delay: 7s;
 }
 
 /* Night light is the moon's: cooler, dimmer, same window. */
@@ -2689,22 +2848,35 @@ button:hover .tarot-fan-card {
   }
 }
 
-@keyframes sunbeam-flicker {
+@keyframes sunbeam-clouds {
   0%,
   100% {
-    opacity: 0.55;
-  }
-  23% {
-    opacity: 0.95;
-  }
-  41% {
-    opacity: 0.7;
-  }
-  67% {
-    opacity: 1;
-  }
-  84% {
     opacity: 0.6;
+    transform: rotate(var(--beam-rot, 24deg)) translateX(0);
+  }
+  9% {
+    opacity: 0.98;
+  }
+  22% {
+    opacity: 1;
+    transform: rotate(calc(var(--beam-rot, 24deg) + 1.4deg)) translateX(1.5%);
+  }
+  34% {
+    opacity: 0.3;
+  }
+  47% {
+    opacity: 0.88;
+    transform: rotate(calc(var(--beam-rot, 24deg) - 0.8deg)) translateX(-1%);
+  }
+  58% {
+    opacity: 0.97;
+  }
+  71% {
+    opacity: 0.22;
+  }
+  83% {
+    opacity: 0.8;
+    transform: rotate(calc(var(--beam-rot, 24deg) + 0.6deg)) translateX(0.8%);
   }
 }
 

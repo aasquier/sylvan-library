@@ -210,6 +210,40 @@ def test_duotone_refuses_a_bad_colour() -> None:
         apply(grey, "duotone", {"mid": "zzzzzz"})
 
 
+def test_levels_lifts_black_exactly_to_the_floor() -> None:
+    """The op's guarantee: nothing darker than `out_black` survives."""
+    array = np.zeros((3, 1, 3))
+    array[0] = 0        # black -> exactly the floor
+    array[1] = 255      # white stays white
+    array[2] = 128
+    out = np.asarray(apply(rgb(array), "levels",
+                           {"out_black": "#b1945f"}).convert("RGB"))
+    assert out[0, 0].tolist() == [0xb1, 0x94, 0x5f]
+    assert out[1, 0].tolist() == [255, 255, 255]
+    assert (out[2, 0] >= np.array([0xb1, 0x94, 0x5f])).all()
+
+
+def test_levels_keeps_the_plates_own_colour() -> None:
+    """The reason it exists instead of a duotone: hue survives."""
+    warm = rgb(np.full((4, 4, 3), 0.0) + np.array([200.0, 160.0, 90.0]))
+    out = np.asarray(apply(warm, "levels",
+                           {"out_black": "#202020"}).convert("RGB"))
+    r, g, b = (int(v) for v in out[2, 2])
+    assert r > g > b, f"expected the warm cast kept, got {(r, g, b)}"
+
+
+def test_levels_carries_alpha_through() -> None:
+    base = Image.new("RGBA", (4, 4), (10, 10, 10, 90))
+    out = apply(base, "levels", {"out_black": "#402000"})
+    assert np.asarray(out.getchannel("A"))[2, 2] == 90
+
+
+def test_levels_refuses_a_bad_colour() -> None:
+    grey = rgb(np.full((4, 4, 3), 180.0))
+    with pytest.raises(OpError, match="levels `out_black` must be"):
+        apply(grey, "levels", {"out_black": "abc"})
+
+
 def test_mask_circle_keeps_the_disc_and_drops_the_corners() -> None:
     # A square field: the centred disc survives, the corners do not.
     image = Image.new("RGB", (40, 40), (200, 180, 120))

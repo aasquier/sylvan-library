@@ -294,17 +294,47 @@ def _duotone(image: Image, params: dict[str, Any]) -> Image:
 
 
 def _hex(params: dict[str, Any], key: str,
-         default: tuple[int, int, int]) -> tuple[int, int, int]:
+         default: tuple[int, int, int], op: str = "duotone",
+         ) -> tuple[int, int, int]:
     value = params.get(key)
     if value is None:
         return default
     text = str(value).lstrip("#")
     if len(text) != 6:
-        raise OpError(f"duotone `{key}` must be a #rrggbb colour")
+        raise OpError(f"{op} `{key}` must be a #rrggbb colour")
     try:
         return (int(text[0:2], 16), int(text[2:4], 16), int(text[4:6], 16))
     except ValueError as exc:
-        raise OpError(f"duotone `{key}` is not a hex colour") from exc
+        raise OpError(f"{op} `{key}` is not a hex colour") from exc
+
+
+def _levels(image: Image, params: dict[str, Any]) -> Image:
+    """A shadow floor that keeps the plate's own colour: every channel is
+    mapped `out_black + v * (255 - out_black) / 255`, so nothing in the
+    output can be darker than the named colour, a bright field barely
+    moves, and the hues survive.
+
+    The parchment's op, and the gap `duotone` could not fill. A museum
+    plate carries specks a decoration must not: dust, pinholes, a fleck
+    dark enough to drop text contrast below WCAG exactly where a word
+    happens to land. `duotone` fixes that by construction — and throws
+    away the plate's colour doing it, which is what made the first
+    parchment read as monochrome. This lifts the floor and keeps the
+    skin: the contrast guarantee becomes the luminance of `out_black`,
+    a number a recipe can state and a test can hold.
+
+    Alpha is carried through untouched, so it composes after a matte.
+    """
+    import numpy as np
+    from PIL import Image as PILImage
+
+    floor = _hex(params, "out_black", (0, 0, 0), op="levels")
+    rgba = image.convert("RGBA")
+    arr = np.asarray(rgba, dtype=np.float32).copy()
+    lift = np.array(floor, dtype=np.float32)
+    arr[..., :3] = lift + arr[..., :3] * (255.0 - lift) / 255.0
+    return PILImage.fromarray(np.clip(arr, 0, 255).astype(np.uint8),
+                              mode="RGBA")
 
 
 def _mask_circle(image: Image, params: dict[str, Any]) -> Image:
@@ -386,6 +416,7 @@ OPS: dict[str, OpFn] = {
     "matte_green": _matte_green,
     "matte_backdrop": _matte_backdrop,
     "duotone": _duotone,
+    "levels": _levels,
     "mask_circle": _mask_circle,
     "feather": _feather,
     "mirror_tile": _mirror_tile,

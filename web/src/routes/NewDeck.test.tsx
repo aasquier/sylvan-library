@@ -456,10 +456,35 @@ describe('the tarot door', () => {
       fireEvent.click(await screen.findByRole(
         'button', { name: `Turn over ${place}` }, PAST_THE_SHUFFLE))
     }
+    // The table lingers with the spread until the reading is taken — the
+    // conversation must not start on its own (Aaron's item 4).
+    expect(api.themeAsk).not.toHaveBeenCalled()
+    fireEvent.click(await screen.findByRole(
+      'button', { name: /begin the reading/i }, PAST_THE_SHUFFLE))
     await waitFor(() => expect(api.themeAsk).toHaveBeenCalledWith({
       transcript: [], slots: [], facts: [], persona: 'fortune-teller',
       seed: 4242,
     }), PAST_THE_SHUFFLE)
+  })
+
+
+  it('knocking twice on the glass takes the reading too', async () => {
+    // The double-click is the ceremony's flourish; the visible button is
+    // the plain door. Both set the same flag, so the stash agrees with
+    // whichever the querent used.
+    await enterTarot()
+    for (const place of ['The Root', 'The Turning', 'The Table']) {
+      fireEvent.click(await screen.findByRole(
+        'button', { name: `Turn over ${place}` }, PAST_THE_SHUFFLE))
+    }
+    await screen.findByRole(
+      'button', { name: /begin the reading/i }, PAST_THE_SHUFFLE)
+    const stage = document.querySelector('.seance-stage.is-knockable')!
+    expect(stage).not.toBeNull()
+    fireEvent.dblClick(stage)
+    await waitFor(() => expect(api.themeAsk).toHaveBeenCalled(), PAST_THE_SHUFFLE)
+    expect(JSON.parse(localStorage.getItem('mtglab-tarot-table')!).read)
+      .toBe(true)
   })
 
   it('deals nothing for a reader who reads no cards', async () => {
@@ -487,6 +512,8 @@ describe('the tarot door', () => {
       fireEvent.click(await screen.findByRole(
         'button', { name: `Turn over ${place}` }, PAST_THE_SHUFFLE))
     }
+    fireEvent.click(await screen.findByRole(
+      'button', { name: /begin the reading/i }, PAST_THE_SHUFFLE))
     await waitFor(() => expect(api.themeAsk).toHaveBeenCalled(), PAST_THE_SHUFFLE)
     expect(screen.queryByText('A question the plain one asked')).toBeNull()
     expect(vi.mocked(api.themeAsk).mock.calls[0]?.[0].transcript).toEqual([])
@@ -507,7 +534,7 @@ describe('the tarot door', () => {
     await waitFor(() => {
       const stashed = JSON.parse(localStorage.getItem('mtglab-tarot-table')!)
       expect(stashed).toEqual(
-        { persona: 'fortune-teller', seed: 4242, turned: [] })
+        { persona: 'fortune-teller', seed: 4242, turned: [], read: false })
     }, PAST_THE_SHUFFLE)
 
     cleanup()

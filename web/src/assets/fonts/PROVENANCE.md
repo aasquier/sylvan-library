@@ -34,3 +34,27 @@ named only in `@font-face` declarations.
 
 The 1909 Rider tarot scans these sit beside have their own argument in
 `src/mtglab/assets/tarot/PROVENANCE.md`.
+
+## Parisienne
+
+- `parisienne-regular.woff2`
+
+The fortune-teller's handwriting (the séance question card). Chosen by
+Aaron off a board of five OFL script faces, 2026-08-17: a casual joined
+hand — and the joins are the point. The ink animation reveals each
+character left to right, and in a connected face that reveal reads as the
+pen travelling, since the leading edge never leaves a stroke; in the Fell
+italic it could only ever read as a wipe. Parisienne beat the two
+copperplates (Mrs Saint Delafield, Herr Von Muellerhoff) on commandment 2
+grounds — their hairlines go faint at reading size — and Allura on
+Aaron's taste.
+
+**Licence: SIL Open Font License 1.1** (Astigmatic One Eye Typographic
+Institute). Same terms as the Fell faces above; bundled in a free
+application, named only in `@font-face`.
+
+- Upstream: Astigmatic (Brian J. Bonislawsky), via Google Fonts, family
+  "Parisienne".
+- Fetched: 2026-08-17, as the latin woff2 subset from fonts.gstatic.com.
+- Verified: OFL 1.1 text read at fetch time on the family's Google Fonts
+  page; no reserved-name conflict (the name appears only in CSS).
