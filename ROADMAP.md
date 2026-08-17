@@ -1397,17 +1397,22 @@ arc; this is what the next few sessions actually do.
     dropped and counted — the rule had been enforced by nothing); the
     fortune-teller writes on aged parchment (the Fell Types, OFL, with
     per-directory provenance; a quill-tracked word-by-word ink reveal,
-    reduced-motion safe); and the deck grew an **echoes tier** (deep scan
-    2026-08-16): seven real cards whose name and art carry a trump —
-    Gelon's Alpha Wheel of Fortune above all, the same painting the site's
-    Wheel spins — each chosen by eye against the scans, on top of the
-    three printed tarot cards, whose cycle a Scryfall sweep confirmed
-    complete. A Magic card landing is called an omen with precedence in
-    the frame message, and one trump landing twice (the 1909 printing plus
-    Magic's own) is named as the stars aligning — both Python-detected
-    facts, never prompt hopes. Borderline echoes parked for Aaron's eye:
-    Hanged Executioner (XII), Final Judgment (XX), Esika's Chariot as the
-    cozy alternate VII.
+    reduced-motion safe); and the deck grew an **echoes tier** (three deep
+    dives, 2026-08-16): twenty-nine real cards whose name, art and rules
+    carry a tarot card — every one of the 22 trumps answered (Gelon's
+    Alpha Wheel of Fortune above all, the same painting the site's Wheel
+    spins) and the minors opened (the aces, the coins, a page, a king) —
+    on top of the three printed tarot cards, whose cycle a Scryfall sweep
+    confirmed complete. Two disciplines hold the tier: original imagery
+    outranks every other classifier (Stone Rain's tower mid-ruin displaced
+    a better-numbered tower that merely loomed), and every Magic card
+    carries a `note` justifying its slot in checkable pool facts (Flubs
+    has 0 power, Homer is a 0/9, Apatzec's rules text says 4 four times)
+    or it is cut — rendered under the turned card as the fun fact and
+    handed to the reader. A Magic card landing is called an omen with
+    precedence in the frame message, and an original landing beside its
+    Magic answer (trumps and minors both) is named as the stars aligning —
+    all Python-detected facts, never prompt hopes.
 
     **Still to come, in order:** the photo-real crystal ball (a layered
     composite — free-use shell, animist smoke/candle loops, the card

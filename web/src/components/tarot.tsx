@@ -201,14 +201,38 @@ const RWS_FOCUS: Record<string, string> = {
   // the world tree's trunk.
   'mtg-empress-galina': '45%',
   'mtg-emperor-apatzec': '50%',
-  // 33%, not centre: the chariot is wide, and the centred window clipped
-  // both wheels (Aaron's eye). This one holds a whole wheel, the spear
-  // upright, and the dome — checked against rendered crops.
-  'mtg-chariot-of-victory': '33%',
+  // Both cats and the chariot's carved face — the window that says
+  // "drawn by two cats" at a glance.
+  'mtg-esikas-chariot': '40%',
   'mtg-wheel-of-fortune': '52%',
-  'mtg-tower-of-calamities': '42%',
   'mtg-imprisoned-in-the-moon': '70%',
   'mtg-the-world-tree': '42%',
+  // The second and third dives (2026-08-16): every trump answered, and the
+  // suits opened. Same rule as always — the window holds what makes the
+  // painting its original.
+  'mtg-blind-seer': '50%',
+  'mtg-orzhov-pontiff': '62%',
+  'mtg-kynaios-and-tiro': '62%',
+  'mtg-lion-umbra': '45%',
+  'mtg-balance': '38%',
+  'mtg-hanged-executioner': '48%',
+  'mtg-pale-rider': '45%',
+  'mtg-alchemists-apprentice': '45%',
+  'mtg-master-of-cruelties': '45%',
+  'mtg-stone-rain': '38%',
+  'mtg-starfield-of-nyx': '38%',
+  'mtg-approach-second-sun': '30%',
+  'mtg-angelic-renewal': '40%',
+  'mtg-wand-of-the-worldsoul': '55%',
+  'mtg-chart-a-course': '55%',
+  'mtg-tragic-poet': '60%',
+  'mtg-everflowing-chalice': '50%',
+  'mtg-sword-truth-justice': '42%',
+  'mtg-sram-senior-edificer': '45%',
+  'mtg-dragons-hoard': '50%',
+  'mtg-smothering-tithe': '42%',
+  'mtg-alms-collector': '40%',
+  'mtg-king-macar': '45%',
 }
 
 /**
@@ -237,7 +261,11 @@ function CrossoverFace({ card }: { card: TarotDrawn }) {
     <div className={`tarot-rws${card.reversed ? ' is-reversed' : ''}`}
          style={style}>
       <div className="tarot-rws-plate">
-        <p className="tarot-rws-numeral">{ROMAN[card.number] ?? ''}</p>
+        {/* Only the trumps wear a numeral band — the 1909 pips carry their
+            number in the picture, and a Magic minor follows its original. */}
+        {card.arcana === 'major' && (
+          <p className="tarot-rws-numeral">{ROMAN[card.number] ?? ''}</p>
+        )}
         <div className="tarot-rws-canvas">
           <img src={card.image} alt={card.name} className="tarot-rws-art" />
         </div>
@@ -323,13 +351,24 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
               reversed
             </p>
           )}
-          {/* The crossover's provenance (item 13): which trump it is
-              printed after, and whose painting this is — hotlinked art is
+          {/* The crossover's provenance (item 13): which original it
+              answers, and whose painting this is — hotlinked art is
               credited wherever it renders, the persona tiles' rule. */}
           {card.after && (
             <p className="text-center text-[10px]"
                style={{ color: 'var(--text-muted)' }}>
               after {card.after} · art by {card.artist}
+            </p>
+          )}
+          {/* Why this card holds its slot (Aaron, 2026-08-16): the
+              resonance with its original, in checkable facts — a power of
+              0, a fourth of his name. A fun fact, not a meaning; the
+              reading stays the reader's. Hidden in the folded strip,
+              where a paragraph per card would bury the conversation. */}
+          {card.note && !small && (
+            <p className="tarot-note mx-auto mt-1 max-w-[26rem] text-center text-[11px] italic leading-relaxed"
+               style={{ color: 'var(--text-secondary)' }}>
+              {card.note}
             </p>
           )}
         </>

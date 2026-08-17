@@ -114,14 +114,14 @@ def test_image_paths_are_served_from_the_tarot_mount():
 # ------------------------------------------------- the Magic crossovers
 
 def test_the_magic_tiers_join_the_shuffle_but_not_the_seventy_eight():
-    """Punch list 2026-08-15 item 13, widened 2026-08-16: three printed
-    tarot cards and seven echoes. The 78 stay the 78 -- the picture sweeps
-    above run over `DECK` on purpose, because a Magic card's picture is a
-    hotlinked art crop and not package data."""
+    """Punch list 2026-08-15 item 13, widened twice on 2026-08-16: three
+    printed tarot cards and twenty-nine echoes. The 78 stay the 78 -- the
+    picture sweeps above run over `DECK` on purpose, because a Magic card's
+    picture is a hotlinked art crop and not package data."""
     assert len(tarot.DECK) == 78
     assert len(tarot.CROSSOVERS) == 3
-    assert len(tarot.ECHOES) == 7
-    assert len(tarot.FULL_DECK) == 88
+    assert len(tarot.ECHOES) == 29
+    assert len(tarot.FULL_DECK) == 110
     for card in tarot.CROSSOVERS + tarot.ECHOES:
         assert card.after, f"{card.name} names no trump"
         assert card.artist, f"{card.name} credits nobody"
@@ -132,26 +132,71 @@ def test_the_magic_tiers_join_the_shuffle_but_not_the_seventy_eight():
     assert all(c.echo for c in tarot.ECHOES)
 
 
-def test_magic_cards_sit_at_their_trumps_numbers():
+def test_every_trump_is_answered_by_a_magic_card():
+    """Aaron, 2026-08-16: all the trump cards at least. The deep dives are
+    finished only when every one of the 22 has its Magic answer, and this
+    is the sentence that keeps a future trim from quietly unfinishing
+    them."""
+    majors = {c.number for c in tarot.CROSSOVERS + tarot.ECHOES
+              if c.arcana == "major"}
+    assert majors == set(range(22))
+
+
+def test_every_magic_card_justifies_its_slot():
+    """Rule 4's discipline applied to this deck's own slots: every Magic
+    card carries a note stating its resonance in checkable facts, or it
+    should not be in the deck."""
+    for card in tarot.CROSSOVERS + tarot.ECHOES:
+        assert card.note and len(card.note) > 40, \
+            f"{card.name} cannot justify its slot"
+
+
+def test_magic_cards_sit_at_their_originals_numbers():
     by_name = {c.name: c for c in tarot.CROSSOVERS + tarot.ECHOES}
     assert by_name["Flubs, the Fool"].number == 0
     assert by_name["Massimo, the Magician"].number == 1
-    assert by_name["Homer, the Hermit"].number == 9
+    assert by_name["Blind Seer"].number == 2
     assert by_name["Empress Galina"].number == 3
     assert by_name["Emperor Apatzec Intli IV"].number == 4
-    assert by_name["Chariot of Victory"].number == 7
+    assert by_name["Orzhov Pontiff"].number == 5
+    assert by_name["Kynaios and Tiro of Meletis"].number == 6
+    assert by_name["Esika's Chariot"].number == 7
+    assert by_name["Lion Umbra"].number == 8
+    assert by_name["Homer, the Hermit"].number == 9
     assert by_name["Wheel of Fortune"].number == 10
-    assert by_name["Tower of Calamities"].number == 16
+    assert by_name["Balance"].number == 11
+    assert by_name["Hanged Executioner"].number == 12
+    assert by_name["Pale Rider of Trostad"].number == 13
+    assert by_name["Alchemist's Apprentice"].number == 14
+    assert by_name["Master of Cruelties"].number == 15
+    assert by_name["Stone Rain"].number == 16
+    assert by_name["Starfield of Nyx"].number == 17
     assert by_name["Imprisoned in the Moon"].number == 18
+    assert by_name["Approach of the Second Sun"].number == 19
+    assert by_name["Angelic Renewal"].number == 20
     assert by_name["The World Tree"].number == 21
+    # The minors carry their originals' rank and suit the same way.
+    assert (by_name["Wand of the Worldsoul"].suit,
+            by_name["Wand of the Worldsoul"].number) == ("wands", 1)
+    assert (by_name["Chart a Course"].suit,
+            by_name["Chart a Course"].number) == ("wands", 2)
+    assert (by_name["Everflowing Chalice"].suit,
+            by_name["Everflowing Chalice"].number) == ("cups", 1)
+    assert (by_name["Tragic Poet"].suit,
+            by_name["Tragic Poet"].number) == ("cups", 11)
+    assert (by_name["Sword of Truth and Justice"].suit,
+            by_name["Sword of Truth and Justice"].number) == ("swords", 1)
+    assert (by_name["King Macar, the Gold-Cursed"].suit,
+            by_name["King Macar, the Gold-Cursed"].number) == ("pentacles", 14)
 
 
-def test_one_echo_per_trump_at_most():
-    """Two echoes on one trump could land together and read as a misprint
-    rather than an alignment -- the doubles paragraph is written for the
-    1909-plus-Magic pair, and this is what keeps that the only kind."""
-    numbers = [c.number for c in tarot.ECHOES]
-    assert len(numbers) == len(set(numbers))
+def test_one_echo_per_original_at_most():
+    """Two echoes on one original could land together and read as a
+    misprint rather than an alignment -- the doubles paragraph is written
+    for the natural-plus-Magic pair, and this is what keeps that the only
+    kind."""
+    slots = [(c.arcana, c.suit, c.number) for c in tarot.ECHOES]
+    assert len(slots) == len(set(slots))
 
 
 def test_a_crossover_deal_replays_from_its_seed():
@@ -167,15 +212,16 @@ def test_magic_cards_land_about_every_third_reading():
     frequent enough to happen and rare enough to stay an event.
 
     Fully deterministic -- the seeds are fixed, so this rate is a constant.
-    The arithmetic says ~33% of three-card deals hold at least one of the
-    ten (mass 11.5 against 78), and the band holds both 'a real presence'
-    and 'not the norm'.
+    The arithmetic says ~35% of three-card deals hold at least one of the
+    thirty-two (mass 11.75 against 78 -- the tier widened, so each member's
+    weight came down), and the band holds both 'a real presence' and 'not
+    the norm'.
     """
     deals = [tarot.deal(s) for s in range(1500)]
     with_magic = sum(
         1 for r in deals if any(d.card.after for d in r.cards))
     rate = with_magic / len(deals)
-    assert 0.25 < rate < 0.42, rate
+    assert 0.27 < rate < 0.44, rate
 
 
 def test_describe_tells_the_reader_what_kind_of_magic_card_landed():

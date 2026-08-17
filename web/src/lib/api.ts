@@ -1370,9 +1370,12 @@ export interface TarotDrawn {
   /** A Magic crossover's artist, owed a credit line wherever the art
    *  renders. Null for the 78. */
   artist: string | null
-  /** Which trump the crossover is printed after — "The Fool" under Flubs.
+  /** Which original the Magic card answers — "The Fool" under Flubs.
    *  Null for the 78, and the render key for everything crossover-shaped. */
   after: string | null
+  /** Why the Magic card holds its slot: the resonance with its original,
+   *  stated as checkable facts. Null for the 78. */
+  note: string | null
   reversed: boolean
   slot: string
   position: string
