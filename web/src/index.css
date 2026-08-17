@@ -309,6 +309,29 @@ body {
   filter: brightness(1.45) saturate(1.15);
 }
 
+/* The reading room (Learn's foot): Spitzweg's Bookworm in a gallery frame.
+ * Wood and a thin gilt sight-edge, drawn rather than photographed -- the
+ * frame is chrome, the painting is the committed asset. */
+.reading-room-frame {
+  padding: 12px;
+  border-radius: 4px;
+  background:
+    linear-gradient(135deg, #3a2c1c, #241a10 45%, #322517 80%, #1d150c);
+  box-shadow:
+    inset 0 0 0 1px rgba(212, 175, 96, 0.35),
+    inset 0 0 0 12px rgba(0, 0, 0, 0),
+    0 18px 48px rgba(0, 0, 0, 0.45);
+}
+
+.reading-room-painting {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 2px;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(212, 175, 96, 0.5);
+}
+
 /* The colour wheel in `components/pentagram.tsx`.
  *
  * Two things the component cannot express inline. First, hit-testing: a guild
@@ -596,6 +619,25 @@ button:hover .tarot-fan-card {
   background: radial-gradient(ellipse at 50% 36%,
     var(--felt-pool), var(--felt-base) 58%, var(--felt-edge));
   box-shadow: inset 0 0 56px rgba(0, 0, 0, 0.3);
+  /* The wisps layer must clip to the felt's rounded corners. */
+  overflow: hidden;
+}
+
+/* Mana over the felt: the wisps loop, screen-blended and faint, so the
+ * violet reads as light drifting across the table rather than a video
+ * playing on one. Fading toward the top keeps the reader's text on plain
+ * felt. */
+.tarot-wisps {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: screen;
+  opacity: 0.28;
+  -webkit-mask-image: linear-gradient(to top, #000 60%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 60%, transparent 100%);
+  pointer-events: none;
 }
 
 @media (prefers-color-scheme: dark) {

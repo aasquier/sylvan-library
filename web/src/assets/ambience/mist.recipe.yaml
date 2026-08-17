@@ -33,8 +33,8 @@ outputs:
     from: mist
     ops:
       - spectral_noise: {width: 480, height: 270, frames: 120, fps: 20,
-                         scale: 3.0, time_scale: 1.0, falloff: 2.4}
-      - advect: {strength: 9.0, scale: 2.0}
+                         scale: 3.0, time_scale: 1.0, falloff: 2.7}
+      - advect: {strength: 5.0, scale: 2.0}
       - color_ramp: {low: "#0b1611", high: "#89a894"}
       - resize: {width: 960}
     encode: {format: webm, crf: 40}
@@ -45,8 +45,8 @@ outputs:
     from: mist
     ops:
       - spectral_noise: {width: 480, height: 270, frames: 120, fps: 20,
-                         scale: 3.0, time_scale: 1.0, falloff: 2.4}
-      - advect: {strength: 9.0, scale: 2.0}
+                         scale: 3.0, time_scale: 1.0, falloff: 2.7}
+      - advect: {strength: 5.0, scale: 2.0}
       - color_ramp: {low: "#0b1611", high: "#89a894"}
       - resize: {width: 960}
     encode: {format: mp4, crf: 30}
@@ -57,8 +57,8 @@ outputs:
     from: mist
     ops:
       - spectral_noise: {width: 480, height: 270, frames: 120, fps: 20,
-                         scale: 3.0, time_scale: 1.0, falloff: 2.4}
-      - advect: {strength: 9.0, scale: 2.0}
+                         scale: 3.0, time_scale: 1.0, falloff: 2.7}
+      - advect: {strength: 5.0, scale: 2.0}
       - color_ramp: {low: "#0b1611", high: "#89a894"}
       - resize: {width: 960}
     encode: {format: webp, quality: 78}

@@ -249,3 +249,18 @@ describe('the vocabulary tab', () => {
       .toBeGreaterThan(0)
   })
 })
+
+describe('the reading room', () => {
+  it('hangs the Bookworm at the foot of the page, credited', async () => {
+    renderLearn()
+    // The painting is a committed asset (bookworm.recipe.yaml), so the page
+    // must name the painter and the licence -- the caption is the plaque.
+    await screen.findByText(/Der Bücherwurm/)
+    expect(screen.getByText(/Carl Spitzweg/)).toBeTruthy()
+    expect(screen.getByText(/public domain/)).toBeTruthy()
+    // The loop or its still: one of the two must be mounted. jsdom plays no
+    // video, so what this pins is that the figure renders something at all.
+    const painting = document.querySelector('.reading-room-frame video, .reading-room-frame img')
+    expect(painting).not.toBeNull()
+  })
+})

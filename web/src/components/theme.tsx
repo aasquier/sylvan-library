@@ -701,7 +701,11 @@ export function ThemeInterview({
   return (
     <section className="persona-room space-y-5"
              style={{ '--room-accent': accent } as React.CSSProperties}>
-      {roomArt && <SceneBackdrop art={roomArt.art} />}
+      {/* The fortune-teller's room drifts with mana rather than mist — the
+          crystal ball's violet light, given the whole floor. */}
+      {roomArt && <SceneBackdrop art={roomArt.art}
+                                 mood={persona === 'fortune-teller'
+                                   ? 'wisps' : 'mist'} />}
       <div className="flex flex-wrap items-center gap-3">
         <RoomSign persona={persona} />
         {/* The framing paragraph only frames an *empty* table. Once the

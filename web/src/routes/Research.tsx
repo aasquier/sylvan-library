@@ -218,7 +218,8 @@ export default function Research() {
         credit={<>
           <em>Novijen, Heart of Progress</em> by Martina Pilcerova — the
           Simic guildhall, a laboratory the size of a district.
-        </>}>
+        </>}
+        mood="embers">
         <p className="max-w-2xl leading-relaxed">
           Ask about the things this tool cannot compute: the meta, what a ruling
           means in practice, a card spoiled since the last data refresh. Every

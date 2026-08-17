@@ -207,11 +207,27 @@ interface ShedLeaf {
  */
 
 import canopyUrl from '../assets/ambience/ivy-canopy.webp'
+import embersMp4Url from '../assets/ambience/embers-loop.mp4'
+import embersWebmUrl from '../assets/ambience/embers-loop.webm'
 import mistMp4Url from '../assets/ambience/mist-loop.mp4'
 import mistWebmUrl from '../assets/ambience/mist-loop.webm'
 import sprig1Url from '../assets/ambience/ivy-sprig-1.webp'
 import sprig2Url from '../assets/ambience/ivy-sprig-2.webp'
 import sprig3Url from '../assets/ambience/ivy-sprig-3.webp'
+import wispsMp4Url from '../assets/ambience/wisps-loop.mp4'
+import wispsWebmUrl from '../assets/ambience/wisps-loop.webm'
+
+/** What drifts along a room's floor. `mist` is the forest default; `wisps`
+ *  are the fortune-teller's violet mana; `embers` are the Laboratory's
+ *  candlelight. All three are ADR 31 procedural loops — same generator,
+ *  same seeded determinism, different weather. */
+export type RoomMood = 'mist' | 'wisps' | 'embers'
+
+const MOOD_LOOPS: Record<RoomMood, { webm: string; mp4: string }> = {
+  mist: { webm: mistWebmUrl, mp4: mistMp4Url },
+  wisps: { webm: wispsWebmUrl, mp4: wispsMp4Url },
+  embers: { webm: embersWebmUrl, mp4: embersMp4Url },
+}
 
 const SPRIGS = [sprig1Url, sprig2Url, sprig3Url] as const
 
@@ -295,21 +311,26 @@ export function HeaderCanopy() {
  * background and below all in-flow content, which is why nothing in `#root`
  * needs a stacking context of its own.
  */
-export function SceneBackdrop({ art }: { art: string }) {
+export function SceneBackdrop({ art, mood = 'mist' }: {
+  art: string
+  mood?: RoomMood
+}) {
   // Same switch as the weather: a room is ambience too.
   const [ambience] = useAmbience()
   if (!ambience) return null
+  const loop = MOOD_LOOPS[mood]
   return createPortal(
     <div className="scene-backdrop" aria-hidden="true">
       <img src={art} alt="" className="scene-backdrop-art" />
-      {/* The floor of the room: the first asset this site generated from
-          nothing (mist.recipe.yaml, ADR 31 -- seeded noise, loop-perfect
-          by construction). `ambience` mode, so reduced motion or the pref
-          removes it entirely rather than freezing it, and the element
-          pauses its own decoder off-screen. Blend + low opacity keep it a
-          weather layer over any painting rather than a video anyone reads
-          as a video. */}
-      <VideoBackdrop webmSrc={mistWebmUrl} mp4Src={mistMp4Url}
+      {/* The floor of the room: an ADR 31 procedural loop, seeded and
+          loop-perfect by construction, chosen by the room's `mood` --
+          forest mist by default, mana wisps at the fortune-teller's,
+          candlelight in the Laboratory. `ambience` mode, so reduced motion
+          or the pref removes it entirely rather than freezing it, and the
+          element pauses its own decoder off-screen. Blend + low opacity
+          keep it a weather layer over any painting rather than a video
+          anyone reads as a video. */}
+      <VideoBackdrop webmSrc={loop.webm} mp4Src={loop.mp4}
                      mode="ambience" className="scene-mist" />
       {/* The lanes (second punch list, item 5): on a screen wide enough to
           have margins, the margins are walls of this room, and the walls
