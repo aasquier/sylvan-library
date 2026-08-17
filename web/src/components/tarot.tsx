@@ -174,6 +174,79 @@ function CardBack() {
   )
 }
 
+/** The trumps' numerals, as the 1909 deck prints them. Index is the trump's
+ *  own number, so Flubs (printed after The Fool) wears 0. */
+const ROMAN = [
+  '0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI',
+  'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI',
+]
+
+/**
+ * Where the character stands in each crossover's landscape crop, as the
+ * horizontal centre of the portrait window the frame cuts from it. Measured
+ * by eye against the art (the wheel's rule: fitted against the artwork,
+ * checked with a render), because the plate must be *filled* the way
+ * Smith's illustrations fill theirs — and each of the three turns out to
+ * carry its trump's own iconography in that window: Flubs walks a cliff
+ * edge with bindle and white rose, Massimo raises the wand over a table
+ * holding cup and sword, Homer carries the lantern.
+ */
+const RWS_FOCUS: Record<string, string> = {
+  'mtg-flubs-the-fool': '26%',
+  'mtg-massimo-the-magician': '42%',
+  'mtg-homer-the-hermit': '52%',
+  // The echoes (deep scan 2026-08-16): each window centred on what makes
+  // the painting its trump — Galina's throne, Apatzec's radiant seat, the
+  // chariot's body, Gelon's wheel, the burning tower, the imprisoned moon,
+  // the world tree's trunk.
+  'mtg-empress-galina': '45%',
+  'mtg-emperor-apatzec': '50%',
+  // 33%, not centre: the chariot is wide, and the centred window clipped
+  // both wheels (Aaron's eye). This one holds a whole wheel, the spear
+  // upright, and the dome — checked against rendered crops.
+  'mtg-chariot-of-victory': '33%',
+  'mtg-wheel-of-fortune': '52%',
+  'mtg-tower-of-calamities': '42%',
+  'mtg-imprisoned-in-the-moon': '70%',
+  'mtg-the-world-tree': '42%',
+}
+
+/**
+ * A Magic crossover, dressed as the trump it is printed after (overhaul
+ * item 3, 2026-08-16). The old render matted a landscape art crop onto the
+ * parchment and it read as exactly that — a photo letterboxed into a card.
+ *
+ * This draws the 1909 frame instead: ivory ground, black-ruled plate, the
+ * roman numeral in its band, the name hand-set below in the Fell Types
+ * (`assets/fonts/PROVENANCE.md`). The art cover-fills the plate through the
+ * per-card focus above — a deliberate portrait window onto the character,
+ * where the first cut of this frame letterboxed the whole crop and shipped
+ * a tiny picture floating in blur. A muted-watercolour filter sits the
+ * modern art with the ninety-year-old scans beside it. No derivative is
+ * committed anywhere; the image is the Scryfall URL the credit line
+ * already covers, and the "edit" exists only as CSS at render time.
+ *
+ * The reversal is on this wrapper rather than an inner element, because for
+ * the 78 the picture *is* the card face and here the frame is — a reversed
+ * physical card is upside down frame, caption and all.
+ */
+function CrossoverFace({ card }: { card: TarotDrawn }) {
+  const style = { '--rws-focus': RWS_FOCUS[card.key] ?? '50%' } as
+    React.CSSProperties
+  return (
+    <div className={`tarot-rws${card.reversed ? ' is-reversed' : ''}`}
+         style={style}>
+      <div className="tarot-rws-plate">
+        <p className="tarot-rws-numeral">{ROMAN[card.number] ?? ''}</p>
+        <div className="tarot-rws-canvas">
+          <img src={card.image} alt={card.name} className="tarot-rws-art" />
+        </div>
+      </div>
+      <p className="tarot-rws-name">{card.name}</p>
+    </div>
+  )
+}
+
 /**
  * One card in its place: a back, a face, and a hinge between them.
  *
@@ -198,12 +271,14 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
         <CardBack />
       </div>
       <div className="tarot-face tarot-face-front">
-        {/* A Magic crossover shows its art matted in the frame rather than
-            cover-cropped: the crop is landscape, and a vertical slice of it
-            would hide exactly the character the wink depends on. */}
-        <img src={card.image} alt={card.name}
-             className={`${card.reversed ? 'is-reversed' : ''}${
-               card.after ? ' is-crossover' : ''}`} />
+        {/* A Magic crossover wears the 1909 frame (`CrossoverFace`): the crop
+            is landscape, a vertical slice of it would hide exactly the
+            character the wink depends on, and a letterboxed photo on
+            parchment is not a tarot card. */}
+        {card.after
+          ? <CrossoverFace card={card} />
+          : <img src={card.image} alt={card.name}
+                 className={card.reversed ? 'is-reversed' : ''} />}
       </div>
     </div>
   )
@@ -226,7 +301,7 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
           </button>
           )
         : <div className="tarot-hinge" role="img" aria-label={label}>{inner}</div>}
-      <p className="mt-2 text-center text-[11px] uppercase tracking-wide"
+      <p className="tarot-caption mt-2 text-center text-[11px] uppercase tracking-wide"
          style={{ color: 'var(--text-muted)' }}>
         {card.position}
       </p>

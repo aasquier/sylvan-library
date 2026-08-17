@@ -769,3 +769,99 @@ def test_a_refused_or_unparseable_proposal_keeps_its_reason(
                         lambda *a, **kw: _turn(text="{broken"))
     report = theme.run_proposal(theme.check_proposal(TRANSCRIPT, GROUNDED))
     assert "did not parse" in report["reason"]
+
+# ------------------------------------------------- never the same fact twice
+#
+# The prompt has said "never give the same fact twice" since the fact field
+# existed, and until 2026-08-16 it was enforced by nothing: facts ride in the
+# report rather than the transcript, so the model literally could not see
+# what it had already said. The polish pass's lesson — a rule enforced by
+# nothing drifts — wearing a party hat. Two instruments now: the told list is
+# quoted back in the closing instruction, and `repeats` drops what comes back
+# anyway.
+
+def test_a_verbatim_repeat_is_a_repeat():
+    told = ("Green fears artifice above all.",)
+    assert theme.repeats("Green fears artifice above all.", told)
+    assert theme.repeats("  green FEARS artifice above all.  ", told)
+
+
+def test_a_reworded_repeat_is_still_a_repeat():
+    told = ("Black is the colour of ambition; it wants power at any price.",)
+    assert theme.repeats(
+        "The colour black wants power at any price — ambition runs through "
+        "everything it does.", told)
+
+
+def test_two_different_facts_about_one_colour_are_not_repeats():
+    told = ("Ravnica is a plane that is one single endless city.",)
+    assert not theme.repeats(
+        "The Golgari reclaim what the rest of the city throws away — death "
+        "as compost rather than as an ending.", told)
+
+
+def test_an_empty_fact_never_repeats():
+    assert not theme.repeats("", ("anything",))
+    assert not theme.repeats("A fact.", ())
+
+
+def test_the_told_list_is_quoted_back_in_the_closing_instruction():
+    told = ("Green fears artifice.", "Ravnica is one endless city.")
+    partway = theme._closing_for(GROUNDED[:1], TRANSCRIPT, told)
+    assert "Facts you have already told them" in partway
+    assert "Green fears artifice." in partway
+    assert "Ravnica is one endless city." in partway
+    # And once the floor is met, the same ground rides with the wind-down.
+    done = theme._closing_for(GROUNDED, TRANSCRIPT, told)
+    assert "Facts you have already told them" in done
+
+
+def test_no_told_facts_means_no_covered_ground_paragraph():
+    assert "already told them" not in theme._closing_for(GROUNDED, TRANSCRIPT)
+
+
+def test_check_told_keeps_strings_and_refuses_everything_else():
+    assert theme.check_told(None) == ()
+    assert theme.check_told(["A fact.", "  ", "Another."]) == \
+        ("A fact.", "Another.")
+    with pytest.raises(theme.TranscriptRejected):
+        theme.check_told("one big string")
+    with pytest.raises(theme.TranscriptRejected):
+        theme.check_told([{"text": "a fact object has nowhere to ride"}])
+    with pytest.raises(theme.TranscriptRejected):
+        theme.check_told(["x" * (theme.MAX_FACT_CHARS + 1)])
+    with pytest.raises(theme.TranscriptRejected):
+        theme.check_told(["a fact"] * (theme.MAX_EXCHANGES + 1))
+
+
+def test_the_told_list_rides_the_checked_request():
+    request = theme.check_ask(TRANSCRIPT, GROUNDED,
+                              facts=["Green fears artifice."])
+    assert request.told == ("Green fears artifice.",)
+
+
+def test_a_repeated_fact_is_dropped_and_counted(monkeypatch, no_network):
+    monkeypatch.setattr(theme, "converse", lambda *a, **kw: _turn({
+        "question": "Which century would you actually want to live in?",
+        "slots": GROUNDED,
+        "fact": {"text": "Green fears artifice.", "source": "taxonomy"},
+    }))
+    report = theme.run_ask(theme.check_ask(
+        TRANSCRIPT, GROUNDED, facts=["Green fears artifice."]))
+    assert report["fact"] is None
+    assert report["facts_dropped"] == 1
+    # The question is unharmed: dropping the fact costs the fact, not the turn.
+    assert report["question"].endswith("?")
+
+
+def test_a_fresh_fact_survives_the_told_list(monkeypatch, no_network):
+    monkeypatch.setattr(theme, "converse", lambda *a, **kw: _turn({
+        "question": "Which century would you actually want to live in?",
+        "slots": GROUNDED,
+        "fact": {"text": "Blue wants perfection through knowledge.",
+                 "source": "taxonomy"},
+    }))
+    report = theme.run_ask(theme.check_ask(
+        TRANSCRIPT, GROUNDED, facts=["Green fears artifice."]))
+    assert report["fact"] is not None
+    assert report["facts_dropped"] == 0

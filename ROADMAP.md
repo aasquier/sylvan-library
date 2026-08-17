@@ -1381,6 +1381,44 @@ arc; this is what the next few sessions actually do.
     for a human to mind; a second Fly machine appearing; or ffmpeg
     entering the image for any other reason.
 
+13. **The tarot overhaul** — started 2026-08-16, under the new commandment
+    15: the reading is a gift for Aaron's sister, and it gets the best of
+    everything. Aaron's brief is eight items; the phase runs them as five
+    PRs, each verified by eye through the Playwright WebKit rig before it
+    lands (the pane screenshots black on this machine; headless WebKit
+    does not).
+
+    **Landed in the first PR (this branch):** the Magic crossovers wear a
+    drawn 1909 Rider frame (ivory ground, numeral band, Fell-set caption,
+    per-card cover focus — and the `cqw` unit is banned from the flipped
+    card face, where WebKit 17.4 resolves it against the viewport); the
+    fun facts can no longer repeat (the told list rides the wire like the
+    transcript, is quoted back in the closing instruction, and a repeat is
+    dropped and counted — the rule had been enforced by nothing); the
+    fortune-teller writes on aged parchment (the Fell Types, OFL, with
+    per-directory provenance; a quill-tracked word-by-word ink reveal,
+    reduced-motion safe); and the deck grew an **echoes tier** (deep scan
+    2026-08-16): seven real cards whose name and art carry a trump —
+    Gelon's Alpha Wheel of Fortune above all, the same painting the site's
+    Wheel spins — each chosen by eye against the scans, on top of the
+    three printed tarot cards, whose cycle a Scryfall sweep confirmed
+    complete. A Magic card landing is called an omen with precedence in
+    the frame message, and one trump landing twice (the 1909 printing plus
+    Magic's own) is named as the stars aligning — both Python-detected
+    facts, never prompt hopes. Borderline echoes parked for Aaron's eye:
+    Hanged Executioner (XII), Final Judgment (XX), Esika's Chariot as the
+    cozy alternate VII.
+
+    **Still to come, in order:** the photo-real crystal ball (a layered
+    composite — free-use shell, animist smoke/candle loops, the card
+    vision surfacing inside the glass — much larger and central); the
+    reader-as-artist proposal (the spread, flavor text and art crops as
+    real evidence in the commander pick, pool-resolved as ever); an ADR
+    and the 99 ceremony (category by category, a card dealt per category,
+    ending in a draft deck through the import path — rule 4 intact); and
+    the Wheel of Fortune's wildcard slots in that ceremony plus its
+    visual love.
+
 ---
 
 ## 1. Analyse or generate decks with simulation

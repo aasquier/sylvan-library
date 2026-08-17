@@ -65,7 +65,7 @@ ASK_KIND = "claude.theme.ask"
 
 def plan_ask(*, transcript: Any = None, slots: Any = None,
              requested: Any = None, persona: Any = None,
-             seed: Any = None) -> Plan:
+             seed: Any = None, facts: Any = None) -> Plan:
     """One conversation turn, planned in the request and called in a job.
 
     **Why this is a job at all**, given the docstring below spent two years'
@@ -95,7 +95,7 @@ def plan_ask(*, transcript: Any = None, slots: Any = None,
     from mtglab.claude.modes import ModeExhausted
 
     request = theme.check_ask(transcript, slots, requested=requested,
-                              persona=persona, seed=seed)
+                              persona=persona, seed=seed, facts=facts)
 
     label = (f"theme: a question, from {len(request.carried)} thing"
              f"{'' if len(request.carried) == 1 else 's'} known")

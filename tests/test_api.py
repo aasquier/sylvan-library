@@ -2421,6 +2421,17 @@ def test_a_turn_with_a_transcript_the_server_will_not_take_is_a_422(client):
     assert jobs.all_jobs() == [], "nothing should have been queued"
 
 
+def test_a_turn_with_a_malformed_facts_list_is_a_422(client):
+    """The told-facts list is client-held and resent like the transcript, so
+    its validator is the same kind of door: plain strings only, checked in
+    the request rather than trusted into a job."""
+    r = client.post("/api/claude/theme",
+                    json={"transcript": [], "slots": [],
+                          "facts": [{"text": "a fact object"}]})
+    assert r.status_code == 422
+    assert jobs.all_jobs() == []
+
+
 def test_a_turn_with_an_unknown_persona_is_a_422_and_not_a_job(client):
     """`check_ask` resolves the voice in the request for this reason. Carried
     into the worker it would arrive as a job in state `error` — a spinner, then

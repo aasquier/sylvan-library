@@ -35,6 +35,7 @@ import {
   type ClaudeStatus,
   type ThemeCombination,
   type ThemeCommander,
+  type ThemeFact,
   type ThemeProposal,
   type ThemeReport,
   type ThemeSlot,
@@ -69,6 +70,11 @@ interface Saved {
   /** And the answer once it lands, which is the same argument one step on —
    *  four minutes of waiting should not be undone by a refresh. */
   proposal: ThemeProposal | null
+  /** Every fun fact already shown, in the order it appeared. Resent with each
+   *  turn so the server can quote the covered ground back to the model and
+   *  drop a repeat — the transcript's trick, applied to the one output that
+   *  never rides in the transcript. */
+  facts: ThemeFact[]
   /** Who was speaking, and which three cards were on the table.
    *
    *  Stashed because **a persona is fixed for a conversation** (ADR 21): the
@@ -82,7 +88,7 @@ interface Saved {
 }
 
 const EMPTY: Saved = {
-  transcript: [], slots: [], job: null, proposal: null,
+  transcript: [], slots: [], job: null, proposal: null, facts: [],
   persona: 'plain', seed: null,
 }
 
@@ -102,6 +108,9 @@ function load(persona: string, seed: number | null): Saved {
       slots: Array.isArray(parsed.slots) ? parsed.slots : [],
       job: typeof parsed.job === 'string' ? parsed.job : null,
       proposal: parsed.proposal ?? null,
+      facts: Array.isArray(parsed.facts)
+        ? parsed.facts.filter((f) => typeof f?.text === 'string')
+        : [],
       persona, seed,
     }
   } catch {
@@ -239,6 +248,125 @@ function RoomSign({ persona }: { persona: string }) {
   return <span className="room-sign shrink-0" aria-hidden="true">{sign}</span>
 }
 
+/** How long the hand spends writing, per character — clamped so a short
+ *  question is not instant and a long one does not outlast the reader's
+ *  patience. */
+const INK_MS_PER_CHAR = 26
+const INK_MIN_MS = 900
+const INK_MAX_MS = 8000
+
+/**
+ * A hand writing on the parchment (overhaul item 5, second pass — Aaron
+ * asked for the hand, not just the ink). Each word is revealed by a
+ * left-to-right wipe timed to its own length, sequenced along the text, so
+ * the line fills the way a pen fills it; each carries a hair of tilt and
+ * drop (deterministic per index — a hand wobbles, a render must not), and
+ * the ink starts wet-brown and dries dark. A drawn quill travels with the
+ * currently-forming word, held by a `requestAnimationFrame` loop against
+ * the same schedule the CSS delays were cut from, and lifts off when the
+ * sentence is done.
+ *
+ * Reduced motion gets the text already dry and no quill, from the same
+ * media query that stills the table.
+ */
+function InkText({ text }: { text: string }) {
+  const host = useRef<HTMLSpanElement>(null)
+  const quill = useRef<SVGSVGElement>(null)
+
+  // One schedule, used twice: inline delays for the CSS, and the quill's
+  // itinerary in the effect below. Rate adapts so total time stays inside
+  // [INK_MIN_MS, INK_MAX_MS] whatever the question's length.
+  const words = text.split(/\s+/).filter(Boolean)
+  const chars = Math.max(words.reduce((n, w) => n + w.length + 1, 0), 1)
+  const rate = Math.min(
+    INK_MS_PER_CHAR, Math.max(INK_MAX_MS / chars, INK_MIN_MS / chars))
+  let clock = 0
+  const schedule = words.map((w) => {
+    const start = clock
+    const dur = Math.max((w.length + 1) * rate, 90)
+    clock += dur
+    return { start, dur }
+  })
+  const total = clock
+
+  useEffect(() => {
+    const el = host.current
+    const pen = quill.current
+    if (!el || !pen) return
+    // Optional-chained twice for jsdom, which has no matchMedia at all.
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return
+    const spans = Array.from(el.querySelectorAll<HTMLElement>('.ink-word'))
+    if (spans.length === 0) return
+    pen.style.opacity = '1'
+    const t0 = performance.now()
+    // An interval rather than requestAnimationFrame, and not for style: rAF
+    // is starved in throttled and headless tabs, which left the quill parked
+    // on the second word while the ink ran ahead. 50ms is more than smooth
+    // enough for a hand.
+    const tick = window.setInterval(() => {
+      const t = performance.now() - t0
+      if (t >= total + 200) {
+        pen.style.opacity = '0'
+        window.clearInterval(tick)
+        return
+      }
+      let i = schedule.findIndex((s) => t < s.start + s.dur)
+      if (i === -1) i = spans.length - 1
+      const word = spans[i]
+      const s = schedule[i]
+      if (word && s) {
+        const frac = Math.min(Math.max((t - s.start) / s.dur, 0), 1)
+        const box = word.getBoundingClientRect()
+        const home = el.getBoundingClientRect()
+        // The nib rides the wipe's leading edge, a touch above the baseline.
+        const x = box.left - home.left + box.width * frac
+        const y = box.top - home.top
+        pen.style.transform =
+          `translate(${x}px, ${y - 14}px) rotate(${32 + Math.sin(t / 90) * 4}deg)`
+      }
+    }, 50)
+    return () => window.clearInterval(tick)
+    // The schedule is derived from `text` alone; keying on the text keeps
+    // this honest without re-deriving arrays in the dependency list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text])
+
+  let word = 0
+  return (
+    <span ref={host} className="ink-text">
+      {text.split(/(\s+)/).map((part, i) => {
+        if (/^\s*$/.test(part)) return part
+        const n = word++
+        const s = schedule[n]
+        return (
+          <span key={`${i}-${part}`} className="ink-word"
+                style={{
+                  '--ink-delay': `${s?.start ?? 0}ms`,
+                  '--ink-dur': `${s?.dur ?? 200}ms`,
+                  // A hand wobbles; a render must not. Deterministic jitter.
+                  '--ink-tilt': `${(((n * 7) % 5) - 2) * 0.35}deg`,
+                  '--ink-drop': `${(((n * 3) % 3) - 1) * 0.6}px`,
+                } as React.CSSProperties}>
+            {part}
+          </span>
+        )
+      })}
+      {/* The hand. A drawn quill — no asset, no licence — angled the way a
+          right hand holds one, riding the schedule above. */}
+      <svg ref={quill} className="ink-quill" viewBox="0 0 40 40"
+           aria-hidden="true">
+        <path d="M4 36 C 10 28 14 18 24 10 C 30 5 36 2 38 2
+                 C 37 6 34 12 28 18 C 20 26 12 32 6 37 Z"
+              fill="#5a4526" opacity="0.9" />
+        <path d="M4 36 C 12 27 20 19 30 8" stroke="#2b2013"
+              strokeWidth="1.1" fill="none" opacity="0.7" />
+        <path d="M2 39 L 6 34" stroke="#2b2013" strokeWidth="1.6"
+              strokeLinecap="round" />
+      </svg>
+    </span>
+  )
+}
+
 function Chip({ slot }: { slot: ThemeSlot }) {
   return (
     <div className="rounded-lg px-3 py-2"
@@ -258,10 +386,13 @@ function Chip({ slot }: { slot: ThemeSlot }) {
   )
 }
 
-function FactNote({ fact }: { fact: NonNullable<ThemeReport['fact']> }) {
+function FactNote({ fact, seance }: {
+  fact: NonNullable<ThemeReport['fact']>
+  seance?: boolean
+}) {
   return (
-    <aside className="rounded-lg px-4 py-3"
-           style={{ background: 'var(--gridline)' }}>
+    <aside className={`rounded-lg px-4 py-3${seance ? ' seance-note' : ''}`}
+           style={seance ? undefined : { background: 'var(--gridline)' }}>
       <p className="text-[10px] uppercase tracking-wide"
          style={{ color: 'var(--text-muted)' }}>
         While you are here
@@ -404,7 +535,7 @@ export function ThemeInterview({
 }) {
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
   const [saved, setSaved] = useState<Saved>(() => load(persona, seed))
-  const { transcript, slots, proposal } = saved
+  const { transcript, slots, proposal, facts } = saved
   const [report, setReport] = useState<ThemeReport | null>(null)
   const [answer, setAnswer] = useState('')
   const [budget, setBudget] = useState('')
@@ -441,13 +572,17 @@ export function ThemeInterview({
 
   // Stable, so the opening effect below can depend on it honestly rather than
   // being told to ignore it.
-  const send = useCallback(async (next: ThemeTurn[], carried: ThemeSlot[]) => {
+  const send = useCallback(async (next: ThemeTurn[], carried: ThemeSlot[],
+                                  told: ThemeFact[]) => {
     setBusy('asking')
     setError(null)
     asker.current?.cancel()
     try {
       const job = await api.themeAsk({
         transcript: next, slots: carried,
+        // The ground already covered, so the server can hold the model to
+        // "never give the same fact twice" — see `Saved.facts`.
+        facts: told.map((f) => f.text),
         persona, seed: seed ?? undefined, stance: effectivePin(pin, status),
       })
       // `initial` is what keeps the cheap case cheap: stance `off` and a
@@ -465,6 +600,12 @@ export function ThemeInterview({
           ? [...next, { role: 'assistant', text: got.question }]
           : next,
         slots: got.slots,
+        // Each fact joins the covered-ground list the moment it is shown.
+        // Deduplicated here too, because a retried turn must not count its
+        // fact twice against the model.
+        facts: got.fact && !s.facts.some((f) => f.text === got.fact?.text)
+          ? [...s.facts, got.fact]
+          : s.facts,
       }))
     } catch (e) {
       setError(e instanceof ApiError && e.status === 404
@@ -499,8 +640,8 @@ export function ThemeInterview({
     if (transcript[transcript.length - 1]?.role === 'assistant') return
     if (awaited.current === transcript.length) return
     awaited.current = transcript.length
-    void send(transcript, slots)
-  }, [status, busy, transcript, slots, saved.job, send])
+    void send(transcript, slots, facts)
+  }, [status, busy, transcript, slots, facts, saved.job, send])
 
   /** Ask the same question again, of the same conversation.
    *
@@ -524,7 +665,7 @@ export function ThemeInterview({
     awaited.current = transcript.length
     setReport(null)
     setError(null)
-    void send(transcript, slots)
+    void send(transcript, slots, facts)
   }
 
   function answerIt() {
@@ -697,6 +838,11 @@ export function ThemeInterview({
   // keeps a bare room on purpose — no costume includes the walls.
   const roomArt = PERSONA_ART[persona]
   const accent = PERSONA_ACCENT[persona] ?? 'var(--series-1)'
+  // The fortune-teller's table writes in ink on parchment (overhaul item 5,
+  // commandment 15): the question card becomes a scroll, the words arrive
+  // wet, the answer box takes a quill. Every other room keeps the plain
+  // chrome — the costume is the reader's, not the interview's.
+  const seance = persona === 'fortune-teller'
 
   return (
     <section className="persona-room space-y-5"
@@ -783,15 +929,19 @@ export function ThemeInterview({
                   {shown.map((t, i) => (
                     <li key={`${i}-${t.text.slice(0, 12)}`}
                         className={t.role === 'user' ? 'text-right' : ''}>
-                      <span className="chat-bubble inline-block max-w-[85%] rounded-xl px-3 py-2 text-sm"
+                      <span className={`chat-bubble inline-block max-w-[85%] rounded-xl px-3 py-2 text-sm${
+                              seance && t.role === 'assistant'
+                                ? ' seance-bubble' : ''}`}
                             style={t.role === 'user'
                               // The room's accent, not the app's: your own
                               // words wear the colour of whoever you are
                               // talking to (item 8).
                               ? { background: 'var(--room-accent, var(--series-1))',
                                   color: '#fff' }
-                              : { border: '1px solid var(--hairline)',
-                                  color: 'var(--text-secondary)' }}>
+                              : seance
+                                ? undefined
+                                : { border: '1px solid var(--hairline)',
+                                    color: 'var(--text-secondary)' }}>
                         {t.text}
                       </span>
                     </li>
@@ -800,16 +950,22 @@ export function ThemeInterview({
               )
             })()}
 
-            {report?.fact && <FactNote fact={report.fact} />}
+            {report?.fact && <FactNote fact={report.fact} seance={seance} />}
 
-            <div className="card-surface rounded-xl px-5 py-4">
+            <div className={`rounded-xl px-5 py-4${
+                   seance ? ' seance-scroll' : ' card-surface'}`}>
               <p className={`text-base leading-relaxed${
-                   busy === 'asking' ? ' thinking-pulse' : ''}`}
+                   busy === 'asking' ? ' thinking-pulse' : ''}${
+                   seance ? ' seance-question' : ''}`}
                  style={{ color: busy === 'asking'
                    ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                 {busy === 'asking'
-                  ? 'Thinking…'
-                  : question || report?.reason
+                  ? (seance ? 'The quill hovers…' : 'Thinking…')
+                  : seance && question
+                    // The reader's words arrive as ink soaking into the
+                    // page; everyone else's questions simply print.
+                    ? <InkText text={question} />
+                    : question || report?.reason
                     // A thrown turn sets no report, so there is no `reason` to
                     // show — and "Starting…" under a red error line describes
                     // the one thing that is definitely not happening.
@@ -829,10 +985,15 @@ export function ThemeInterview({
                   }
                 }}
                 rows={2}
-                placeholder="However much or little you like…"
-                className="mt-3 w-full rounded-md px-3 py-2 text-sm"
-                style={{ background: 'var(--page)', color: 'var(--text-primary)',
-                         border: '1px solid var(--hairline)' }}
+                placeholder={seance
+                  ? 'Write your answer on the parchment…'
+                  : 'However much or little you like…'}
+                className={`mt-3 w-full rounded-md px-3 py-2 text-sm${
+                  seance ? ' seance-quill' : ''}`}
+                style={seance
+                  ? undefined
+                  : { background: 'var(--page)', color: 'var(--text-primary)',
+                      border: '1px solid var(--hairline)' }}
               />
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <button onClick={answerIt} disabled={!answer.trim() || !!busy}

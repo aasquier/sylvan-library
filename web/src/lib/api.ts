@@ -1248,6 +1248,9 @@ export interface ThemeReport {
   persona: string
   question: string
   fact: ThemeFact | null
+  /** A fact dropped because the person had already been told it — the check
+   *  behind the prompt's "never give the same fact twice". */
+  facts_dropped?: number
   slots: ThemeSlot[]
   /** Readings whose quote was not in the transcript. A number that climbs is a
    *  model inventing preferences, which is why it is rendered, not logged. */
@@ -1603,6 +1606,11 @@ export const api = {
     stance?: string
     persona?: string
     seed?: number
+    /** The texts of every fun fact already shown, client-held and resent the
+     *  way the transcript is — the server quotes them back to the model and
+     *  drops a repeat, which is what makes "never give the same fact twice"
+     *  a rule rather than a hope. */
+    facts?: string[]
   }) => post<Job>('/api/claude/theme', body),
   // Returns a **job**, not a proposal — this one was measured at 226 seconds
   // and no hosted proxy holds a POST open that long. Follow it with

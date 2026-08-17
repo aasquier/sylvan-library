@@ -354,12 +354,14 @@ describe('the tarot door', () => {
     expect(screen.getByText('reversed')).toBeTruthy()
   })
 
-  it('a Magic crossover shows matted art with its provenance', async () => {
-    // Punch list 2026-08-15 item 13: three Magic cards are in the deck.
-    // The face carries `.is-crossover` (the stylesheet mats the landscape
-    // crop instead of cover-cropping it), and the caption states the two
-    // facts the deal is allowed to know — which trump it is printed after,
-    // and whose painting it is. What it *means* stays the reader's.
+  it('a Magic crossover wears the 1909 frame with its provenance', async () => {
+    // Punch list 2026-08-15 item 13, reframed by the overhaul (2026-08-16
+    // item 3): three Magic cards are in the deck, and each is dressed as the
+    // trump it is printed after — drawn ivory frame, the trump's own roman
+    // numeral, the name set below in the Fell caption. The caption under the
+    // card still states the two facts the deal is allowed to know — which
+    // trump it follows, and whose painting it is. What it *means* stays the
+    // reader's.
     vi.mocked(api.tarotReading).mockResolvedValue({
       ...READING,
       cards: [
@@ -376,9 +378,36 @@ describe('the tarot door', () => {
       'button', { name: 'Turn over The Root' }, PAST_THE_SHUFFLE))
 
     const face = await screen.findByAltText('Massimo, the Magician')
-    expect(face.className).toContain('is-crossover')
+    expect(face.className).toContain('tarot-rws-art')
+    expect(face.closest('.tarot-rws')).toBeTruthy()
+    // The Magician's numeral, because Massimo is printed after The Magician.
+    expect(screen.getByText('I')).toBeTruthy()
     expect(screen.getByText(/after The Magician/)).toBeTruthy()
     expect(screen.getByText(/art by Jodie Muir/)).toBeTruthy()
+  })
+
+  it('a reversed crossover turns frame and all', async () => {
+    // For the 78 the picture is the card face, so the reversal rotates the
+    // image; for a crossover the frame is, so it rotates the frame — caption,
+    // numeral and all. Split across two elements it would land upright.
+    vi.mocked(api.tarotReading).mockResolvedValue({
+      ...READING,
+      cards: [
+        { key: 'mtg-flubs-the-fool', name: 'Flubs, the Fool',
+          arcana: 'major', suit: null, number: 0,
+          image: 'https://cards.scryfall.io/art_crop/front/4/1/flubs.jpg',
+          artist: 'Adam Rex', after: 'The Fool',
+          reversed: true, slot: 'taste', position: 'The Root' },
+        ...READING.cards.slice(1),
+      ],
+    } as never)
+    await enterTarot()
+    fireEvent.click(await screen.findByRole(
+      'button', { name: 'Turn over The Root' }, PAST_THE_SHUFFLE))
+
+    const face = await screen.findByAltText('Flubs, the Fool')
+    expect(face.className).not.toContain('is-reversed')
+    expect(face.closest('.tarot-rws')?.className).toContain('is-reversed')
   })
 
   it('sends the reader and the seed with every turn', async () => {
@@ -391,7 +420,8 @@ describe('the tarot door', () => {
         'button', { name: `Turn over ${place}` }, PAST_THE_SHUFFLE))
     }
     await waitFor(() => expect(api.themeAsk).toHaveBeenCalledWith({
-      transcript: [], slots: [], persona: 'fortune-teller', seed: 4242,
+      transcript: [], slots: [], facts: [], persona: 'fortune-teller',
+      seed: 4242,
     }), PAST_THE_SHUFFLE)
   })
 
@@ -401,7 +431,8 @@ describe('the tarot door', () => {
     expect(api.tarotReading).not.toHaveBeenCalled()
     expect(screen.queryByText('The Root')).toBeNull()
     expect(api.themeAsk).toHaveBeenCalledWith(
-      { transcript: [], slots: [], persona: 'plain', seed: undefined })
+      { transcript: [], slots: [], facts: [], persona: 'plain',
+        seed: undefined })
   })
 
   it('will not carry one reader’s conversation into another’s', async () => {
@@ -460,7 +491,8 @@ describe('the theme conversation', () => {
     // are client-held for the reason the transcript is: the server keeps no
     // conversation, so everything that makes this the same one has to travel.
     expect(api.themeAsk).toHaveBeenCalledWith(
-      { transcript: [], slots: [], persona: 'plain', seed: undefined })
+      { transcript: [], slots: [], facts: [], persona: 'plain',
+        seed: undefined })
   })
 
   it('asks about you, and this one is not about Magic', async () => {
@@ -492,6 +524,9 @@ describe('the theme conversation', () => {
       transcript: [{ role: 'assistant', text: PARTWAY.question },
                    { role: 'user', text: 'Dune, easily' }],
       slots: PARTWAY.slots,
+      // The fact shown on the first turn rides back as covered ground, which
+      // is the client's half of "never give the same fact twice".
+      facts: [PARTWAY.fact.text],
       persona: 'plain',
       seed: undefined,
     }))

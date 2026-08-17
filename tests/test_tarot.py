@@ -113,27 +113,45 @@ def test_image_paths_are_served_from_the_tarot_mount():
 
 # ------------------------------------------------- the Magic crossovers
 
-def test_the_crossovers_join_the_shuffle_but_not_the_seventy_eight():
-    """Punch list 2026-08-15 item 13: three Magic cards that are tarot
-    cards. The 78 stay the 78 -- the picture sweeps above run over `DECK`
-    on purpose, because a crossover's picture is a hotlinked art crop and
-    not package data."""
+def test_the_magic_tiers_join_the_shuffle_but_not_the_seventy_eight():
+    """Punch list 2026-08-15 item 13, widened 2026-08-16: three printed
+    tarot cards and seven echoes. The 78 stay the 78 -- the picture sweeps
+    above run over `DECK` on purpose, because a Magic card's picture is a
+    hotlinked art crop and not package data."""
     assert len(tarot.DECK) == 78
-    assert len(tarot.FULL_DECK) == 81
     assert len(tarot.CROSSOVERS) == 3
-    for card in tarot.CROSSOVERS:
+    assert len(tarot.ECHOES) == 7
+    assert len(tarot.FULL_DECK) == 88
+    for card in tarot.CROSSOVERS + tarot.ECHOES:
         assert card.after, f"{card.name} names no trump"
         assert card.artist, f"{card.name} credits nobody"
         assert card.art_url and card.art_url.startswith(
             "https://cards.scryfall.io/art_crop/"), card.name
         assert card.image == card.art_url
+    assert all(not c.echo for c in tarot.CROSSOVERS)
+    assert all(c.echo for c in tarot.ECHOES)
 
 
-def test_crossovers_sit_at_their_trumps_numbers():
-    by_name = {c.name: c for c in tarot.CROSSOVERS}
+def test_magic_cards_sit_at_their_trumps_numbers():
+    by_name = {c.name: c for c in tarot.CROSSOVERS + tarot.ECHOES}
     assert by_name["Flubs, the Fool"].number == 0
     assert by_name["Massimo, the Magician"].number == 1
     assert by_name["Homer, the Hermit"].number == 9
+    assert by_name["Empress Galina"].number == 3
+    assert by_name["Emperor Apatzec Intli IV"].number == 4
+    assert by_name["Chariot of Victory"].number == 7
+    assert by_name["Wheel of Fortune"].number == 10
+    assert by_name["Tower of Calamities"].number == 16
+    assert by_name["Imprisoned in the Moon"].number == 18
+    assert by_name["The World Tree"].number == 21
+
+
+def test_one_echo_per_trump_at_most():
+    """Two echoes on one trump could land together and read as a misprint
+    rather than an alignment -- the doubles paragraph is written for the
+    1909-plus-Magic pair, and this is what keeps that the only kind."""
+    numbers = [c.number for c in tarot.ECHOES]
+    assert len(numbers) == len(set(numbers))
 
 
 def test_a_crossover_deal_replays_from_its_seed():
@@ -143,26 +161,63 @@ def test_a_crossover_deal_replays_from_its_seed():
     assert tarot.deal(seed).as_dict() == tarot.deal(seed).as_dict()
 
 
-def test_crossovers_land_more_often_than_nature_would_allow():
-    """The weight is the feature: a wink nobody ever sees is worthless.
+def test_magic_cards_land_about_every_third_reading():
+    """The weight is the feature: a wink nobody ever sees is worthless, and
+    Aaron asked for a Magic card landing to be a big deal -- which needs it
+    frequent enough to happen and rare enough to stay an event.
 
     Fully deterministic -- the seeds are fixed, so this rate is a constant.
-    Unweighted, ~11% of three-card deals would hold one of three specials;
-    at weight 2 the arithmetic says ~14%, and the band below holds both
-    'clearly above nature' and 'still rare'.
+    The arithmetic says ~33% of three-card deals hold at least one of the
+    ten (mass 11.5 against 78), and the band holds both 'a real presence'
+    and 'not the norm'.
     """
     deals = [tarot.deal(s) for s in range(1500)]
-    with_crossover = sum(
+    with_magic = sum(
         1 for r in deals if any(d.card.after for d in r.cards))
-    rate = with_crossover / len(deals)
-    assert 0.12 < rate < 0.25, rate
+    rate = with_magic / len(deals)
+    assert 0.25 < rate < 0.42, rate
 
 
-def test_describe_tells_the_reader_what_a_crossover_is():
-    """The reader interprets; the deal only states the fact of the design.
-    The line must say which trump the card is printed after, or the voice
-    has nothing to read it as."""
+def test_describe_tells_the_reader_what_kind_of_magic_card_landed():
+    """The reader interprets; the deal states facts. A printed tarot card
+    says which trump it is printed after; an echo says its art and name
+    answer to one -- a design fact and an editorial one, kept distinct."""
+    literal_seed = next(
+        s for s in range(2000)
+        if any(d.card.after and not d.card.echo
+               for d in tarot.deal(s).cards))
+    assert "a Magic card printed after" in tarot.deal(literal_seed).describe()
+
+    echo_seed = next(
+        s for s in range(2000)
+        if any(d.card.echo for d in tarot.deal(s).cards))
+    assert "answer to" in tarot.deal(echo_seed).describe()
+
+
+def test_a_magic_card_is_called_an_omen_with_precedence():
+    """Aaron, 2026-08-16: a Magic card landing is a big deal, and the
+    instruction to treat it as one is Python's to give -- a prompt hope
+    with no sentence behind it is the fact-repeat bug wearing a shawl."""
     seed = next(s for s in range(500)
                 if any(d.card.after for d in tarot.deal(s).cards))
     text = tarot.deal(seed).describe()
-    assert "a Magic card printed after" in text
+    assert "Give it precedence" in text
+
+    quiet = next(s for s in range(500)
+                 if not any(d.card.after for d in tarot.deal(s).cards))
+    assert "precedence" not in tarot.deal(quiet).describe()
+
+
+def test_a_trump_landing_twice_is_named_as_an_alignment():
+    """The stars-aligning case: the sampler draws without replacement over
+    all 88, so the 1909 Fool and Flubs really can share a spread, and when
+    they do the reader is told outright rather than left to notice."""
+    seed = next(
+        (s for s in range(20000) if (lambda r: len({
+            d.card.number for d in r.cards if d.card.arcana == "major"
+        }) < sum(1 for d in r.cards if d.card.arcana == "major"))(
+            tarot.deal(s))),
+        None)
+    assert seed is not None, "no aligned spread in 20000 seeds"
+    text = tarot.deal(seed).describe()
+    assert "The stars have aligned" in text
