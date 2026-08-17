@@ -40,12 +40,24 @@ sources:
   # replaces the Met's sphere in the claws -- the composite the app builds
   # is the fish photograph over the glass, so the bronze foam closes in
   # FRONT of the ball and it reads as held rather than balanced.
+  #
+  # Fetched from the MUSEUM rather than from the aggregator that found it,
+  # and the difference is 2982x4000 against 763x1024: Openverse's record for
+  # this object points at rawpixel's `editor_1024` derivative, which was
+  # enough while the stand was an ornament and stopped being enough the
+  # moment it became the largest thing on the table. One hop instead of two
+  # is also the better provenance -- the institution that owns the object is
+  # the one answering for the rights, through `isPublicDomain` on its own
+  # Open Access API.
   fish:
-    provider: openverse
-    identifier: 36e20fe8-8084-44f9-8036-fe1da5b3256c
+    provider: met
+    identifier: "44054"
     title: "Crystal Ball on a Bronze Stand in the Shape of a Fish"
-    landing: https://www.rawpixel.com/image/8194602/crystal-ball-bronze-stand-the-shape-fish
-    found_via: "Openverse with a license=cc0 filter, searching `crystal ball stand`"
+    landing: https://www.metmuseum.org/art/collection/search/44054
+    found_via: >
+      Openverse with a license=cc0 filter, searching `crystal ball stand`;
+      the plate is rawpixel's re-host of Met object 44054, so the recipe
+      goes to the Met's Open Access API for the full-resolution original
     licence: CC0-1.0
 
   orb:
@@ -98,15 +110,29 @@ outputs:
       # otherwise read as a hole cut in the felt.
       - matte_backdrop: {tolerance: 34, soft: 40, border: 2, enclosed: drop}
       - duotone: {shadow: "#261a0e", mid: "#8c6e44", light: "#faf0d0"}
-      - resize: {width: 700}
+      # 1100 rather than 700, because the stand is 38vw now: at 1440 CSS
+      # pixels the bronze is drawn 458 wide, which is 916 device pixels on
+      # any retina screen, and 700 was being upscaled into softness on the
+      # one object in the room whose whole argument is that it is a
+      # photograph. The Met plate is 2982 wide, so this is still a
+      # downscale; every pixel here is real.
+      - resize: {width: 1100}
     encode: {format: webp, quality: 88}
-    expect: {width: 700, height: 950, budget_kb: 260, metadata: none}
+    expect: {width: 1100, height: 1492, budget_kb: 260, metadata: none}
 
-  # The same quartz as `crystal-shell.webp`, graded through the fish's own
-  # ramp. Two photographs on one table have to share a plate or the glass
-  # reads as pasted onto the bronze -- which it visibly did before this
-  # existed. Kept as a second file rather than a changed one so the violet
-  # ball still works while the fish is being wired up.
+  # The quartz, graded through the fish's own ramp. Two photographs on one
+  # table have to share a plate or the glass reads as pasted onto the bronze
+  # -- which it visibly did before this existed.
+  #
+  # It stays at 640 while the bronze goes to 1100, and that is a limit rather
+  # than a choice: the Flickr original Openverse names for this sphere is
+  # 1024x683, the crop takes 504 of it, and 640 is already an upscale. More
+  # output pixels would invent none. It matters much less than it sounds,
+  # because this file is never drawn as itself -- `.crystal-shell-body` lays
+  # it on at `soft-light` and `.crystal-shell-light` keeps only its specular
+  # arc, so its high frequencies are suppressed by the composite. If the
+  # glass ever needs to be genuinely sharper, the answer is a different
+  # sphere from a larger plate, which is a picture Aaron would have to pick.
   - file: crystal-shell-sepia.webp
     from: orb
     ops:
@@ -117,18 +143,14 @@ outputs:
     encode: {format: webp, quality: 86}
     expect: {width: 640, height: 640, budget_kb: 120, metadata: none}
 
-  - file: crystal-shell.webp
-    from: orb
-    ops:
-      # Square around the sphere, with ~8px of margin outside the radius so
-      # the feather has somewhere to land.
-      - crop: {frac_box: [0.2588, 0.0571, 0.7510, 0.7950]}
-      # r is 244/504 of the cropped width, pulled in a hair so the felt's
-      # blue does not survive as a fringe; the feather straddles the edge.
-      - mask_circle: {cx: 0.5, cy: 0.5, r: 0.482, feather: 2.0}
-      - resize: {width: 640}
-    encode: {format: webp, quality: 86}
-    expect: {width: 640, height: 640, budget_kb: 120, metadata: none}
+  # `crystal-shell.webp` -- the ungraded violet cut of the same sphere -- was
+  # here, and is deleted with the component swap. It existed for exactly one
+  # reason, written down when it was made: so the violet ball kept working
+  # while the fish was wired up. The fish is wired up, nothing imports it,
+  # and a second grade of one photograph that no page renders is a file the
+  # next person has to work out the status of. `verify` holds what is
+  # committed to this recipe, so leaving the output here and the file gone
+  # would fail the suite -- which is the mechanism doing its job.
 
   - file: seance-smoke-loop.webm
     from: smoke

@@ -51,7 +51,12 @@ KNOWN_SEEDED_OPS = frozenset({"spectral_noise", "advect"})
 #: `procedural` is ADR 31's addition: a source with no upstream at all —
 #: the declaration (its seed) *is* the source, the licence is necessarily
 #: `ours-generated`, and the gate has nothing to ask anybody about.
-PROVIDERS = frozenset({"openverse", "wikimedia", "wikimedia-category",
+#: `met` is the Metropolitan Museum of Art's Open Access API, added because an
+#: aggregator's record for a museum plate points at the aggregator's own
+#: downsized derivative — 763x1024 where the museum serves 2982x4000 — and
+#: because one hop to the institution that owns the object is better
+#: provenance than two hops to a re-host of it.
+PROVIDERS = frozenset({"openverse", "met", "wikimedia", "wikimedia-category",
                        "procedural"})
 
 #: Encoding targets, each a dispatch key in `encode.py`. `webp` is a still;
@@ -200,6 +205,9 @@ def _load_source(path: Path, sid: str, raw: Any) -> Source:
     licence = _require_str(path, raw, "licence", f"source `{sid}`")
     if provider == "openverse":
         _require_str(path, raw, "identifier", f"openverse source `{sid}`")
+    if provider == "met":
+        # The Met's object id, which is what `/objects/{id}` takes.
+        _require_str(path, raw, "identifier", f"met source `{sid}`")
     if provider == "wikimedia":
         _require_str(path, raw, "title", f"wikimedia source `{sid}`")
     if provider == "wikimedia-category":

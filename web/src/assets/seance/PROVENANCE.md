@@ -3,7 +3,7 @@
 The rule here is the tarot deck's (`src/mtglab/assets/tarot/PROVENANCE.md`): nothing ships in this directory whose licence was not checked per file, and every transformation applied is written down so the derivation is reproducible from the source.
 
 <!-- animist:begin crystal -->
-## candle-glow-loop.mp4, candle-glow-loop.webm, crystal-fish.webp, crystal-shell-sepia.webp, crystal-shell.webp, seance-smoke-loop.mp4, seance-smoke-loop.webm
+## candle-glow-loop.mp4, candle-glow-loop.webm, crystal-fish.webp, crystal-shell-sepia.webp, seance-smoke-loop.mp4, seance-smoke-loop.webm
 
 ### from `candle`
 - **Source**: `candle`. Procedural, seed 1909.
@@ -21,13 +21,14 @@ The rule here is the tarot deck's (`src/mtglab/assets/tarot/PROVENANCE.md`): not
   - Encoded MP4, crf 32.
 
 ### from `fish`
-- **Source**: "Crystal Ball on a Bronze Stand in the Shape of a Fish", <https://www.rawpixel.com/image/8194602/crystal-ball-bronze-stand-the-shape-fish>, found via Openverse with a license=cc0 filter, searching `crystal ball stand`.
-- **Licence**: cc0. Confirmed through the Openverse record API at fetch time (2026-08-17).
+- **Source**: "Crystal Ball on a Bronze Stand in the Shape of a Fish", <https://www.metmuseum.org/art/collection/search/44054>, found via Openverse with a license=cc0 filter, searching `crystal ball stand`; the plate is rawpixel's re-host of Met object 44054, so the recipe goes to the Met's Open Access API for the full-resolution original
+.
+- **Licence**: CC0. Confirmed through met at fetch time (2026-08-17).
 - **Transformations** (Pillow, scripted -- `mtglab animist build crystal.recipe.yaml`):
   - `crop`: frac_box=[0.0393, 0.0244, 0.9567, 0.9521].
   - `matte_backdrop`: tolerance=34, soft=40, border=2, enclosed='drop'.
   - `duotone`: shadow='#261a0e', mid='#8c6e44', light='#faf0d0'.
-  - `resize`: width=700.
+  - `resize`: width=1100.
   - Encoded WEBP, quality 88.
 
 ### from `orb`
@@ -37,10 +38,6 @@ The rule here is the tarot deck's (`src/mtglab/assets/tarot/PROVENANCE.md`): not
   - `crop`: frac_box=[0.2588, 0.0571, 0.751, 0.795].
   - `mask_circle`: cx=0.5, cy=0.5, r=0.482, feather=2.0.
   - `duotone`: shadow='#241a12', mid='#8e7a5e', light='#f6ecd6'.
-  - `resize`: width=640.
-  - Encoded WEBP, quality 86.
-  - `crop`: frac_box=[0.2588, 0.0571, 0.751, 0.795].
-  - `mask_circle`: cx=0.5, cy=0.5, r=0.482, feather=2.0.
   - `resize`: width=640.
   - Encoded WEBP, quality 86.
 
