@@ -1349,6 +1349,18 @@ arc; this is what the next few sessions actually do.
     make with Aaron, not a default). Sprite sheets and the runtime
     sprite-sheet player remain open.
 
+    Also open, from Aaron's 2026-08-16 eye pass: **motion derivatives are a
+    dev-machine artifact, and the deployed instance has no way to grow
+    one.** `mtglab cardmotion sync` (2026-08-16) is the dev-side answer —
+    every deck's commander, from the printing the deck shows, art swaps and
+    imports both — but a deck imported *on the instance* shows a still
+    until somebody runs the sync here and pushes. The honest options, none
+    picked yet: run `slow-pan` (no torch) in-container at import time,
+    which crosses ADR 32's "nothing generates at request time" line only if
+    done in the request rather than a NET job; a scheduled dev-machine
+    sweep; or accept the still until the next manual sync. Decide with
+    Aaron before building any of them.
+
 ---
 
 ## 1. Analyse or generate decks with simulation

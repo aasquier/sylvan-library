@@ -88,6 +88,25 @@ it('mounts the motion presentation when a derivative is ready', async () => {
   })
 })
 
+it('asks the server about the painting the page is showing', async () => {
+  // The Gyome/Trostani bug: without the art in the question, a deck that
+  // swapped printings was served the old painting's loop. The still (the
+  // correct painting) is the floor a mismatch must land on.
+  const spy = vi.fn((_url: string) => Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({ ready: false, effect: 'depth-drift' }),
+  }))
+  vi.stubGlobal('fetch', spy)
+  render(
+    <CommanderMotion oracleId="abc" still={STILL}
+                     art="https://x/art_crop/chosen.jpg?9" />)
+  await waitFor(() => expect(spy).toHaveBeenCalled())
+  const asked = String(spy.mock.calls[0]?.[0])
+  expect(asked).toContain('/api/art/motion/abc/depth-drift')
+  expect(asked).toContain(
+    `art=${encodeURIComponent('https://x/art_crop/chosen.jpg?9')}`)
+})
+
 it('art mode falls back to the still under reduced motion', () => {
   mockMatchMedia(true)
   render(

@@ -1182,8 +1182,13 @@ only when you know nothing was — the History tab (ADR 28) is how you know.
 
 Generated on the dev machine (`mtglab cardmotion build --deck <slug>
 --effect depth-drift`), never in git and never in the image; the instance
-only serves what sits in its cache. Push a finished derivative up the same
-way everything else reaches the volume:
+only serves what sits in its cache. `mtglab cardmotion sync` is the sweep
+form: every deck's commander checked against the cache, and whatever is
+missing built from the printing that deck actually shows — which is how an
+imported deck's commander first breathes, and how a swapped art choice gets
+its new painting derived (the serving tier matches on the art, so until the
+sync runs the page shows the correct still rather than the old loop). Push
+a finished derivative up the same way everything else reaches the volume:
 
 ```bash
 fly ssh sftp put -r data/cache/cardmotion /data/cache/cardmotion

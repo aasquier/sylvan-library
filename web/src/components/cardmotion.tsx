@@ -20,15 +20,21 @@ import { VideoBackdrop } from './videofx'
 
 export function CommanderMotion({
   oracleId,
+  art,
   still,
   className = '',
 }: {
   oracleId: string | null | undefined
+  /** The crop the page is showing — the deck's chosen printing when it has
+   *  one. The server matches derivatives against it, so a swapped painting
+   *  falls back to the (correct) still rather than breathing as the old
+   *  printing. */
+  art?: string | null
   /** The existing still presentation, rendered verbatim as the floor. */
   still: React.ReactNode
   className?: string
 }) {
-  const motion = useCardMotion(oracleId, ['depth-drift', 'slow-pan'])
+  const motion = useCardMotion(oracleId, ['depth-drift', 'slow-pan'], art)
 
   if (!motion?.ready || !motion.urls) return <>{still}</>
   const { webm, mp4, poster, depth } = motion.urls
