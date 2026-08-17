@@ -75,11 +75,22 @@ def locate(oracle_id: str, art_url: str, effect: Effect) -> CachedDerivative:
     return CachedDerivative(root() / cache_key(oracle_id, art_url, effect))
 
 
-def find_ready(oracle_id: str, effect: Effect) -> CachedDerivative | None:
-    """The serving tier's lookup: it knows the oracle_id and the effect but
-    not the art URL a derivative was built from (the deck may have changed
-    printings since). The attribution names both, so scan the small cache
-    and match — dozens of directories, not thousands; a card has one or two
+def art_stem(url: str) -> str:
+    """A Scryfall image URL sans query string. The path names the painting;
+    the query is a cache-buster a bulk refresh may rewrite, and a refresh
+    must not orphan every derivative."""
+    return url.split("?", 1)[0]
+
+
+def find_ready(oracle_id: str, effect: Effect,
+               art_url: str | None = None) -> CachedDerivative | None:
+    """The serving tier's lookup. `art_url` is the painting the page is
+    actually showing: a deck that chose a printing must never be served a
+    loop derived from a different one — the still is the correct painting,
+    so no match means `ready: false`, not the nearest neighbour. `None`
+    keeps the older any-art answer for callers that do not know the crop.
+    The attribution names all three, so scan the small cache and match —
+    dozens of directories, not thousands; a card has one or two
     derivatives, ever."""
     base = root()
     if not base.is_dir():
@@ -89,9 +100,13 @@ def find_ready(oracle_id: str, effect: Effect) -> CachedDerivative | None:
         if not derivative.ready:
             continue
         meta = derivative.attribution()
-        if meta.get("oracle_id") == oracle_id \
-                and meta.get("fingerprint") == effect.fingerprint():
-            return derivative
+        if meta.get("oracle_id") != oracle_id \
+                or meta.get("fingerprint") != effect.fingerprint():
+            continue
+        if art_url is not None \
+                and art_stem(str(meta.get("art_url", ""))) != art_stem(art_url):
+            continue
+        return derivative
     return None
 
 

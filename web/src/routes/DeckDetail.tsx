@@ -293,6 +293,7 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
               only ever add, never break the band. */}
           <CommanderMotion
             oracleId={card.oracle_id}
+            art={card.art_crop}
             className="deck-hero-motion"
             still={
               <CardArt src={card.art_crop} alt="" ratio="aspect-[1200/300]"

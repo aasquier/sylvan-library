@@ -139,7 +139,11 @@ src/mtglab/
                           `depth` extra (torch, dev-Mac only, NEVER the
                           container), and a cache under data/cache keyed
                           like the sim cache. Built by `mtglab cardmotion
-                          build`, pushed to the volume over sftp, served by
+                          build`, swept by `cardmotion sync` (every deck's
+                          commander, from the printing the deck shows --
+                          the serving tier matches on the art, so a swapped
+                          printing falls to the correct still until synced),
+                          pushed to the volume over sftp, served by
                           two shared routes; nothing generates at request
                           time and git never holds a byte of it
   mana.py                 cost parsing + castability solver

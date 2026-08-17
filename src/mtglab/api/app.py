@@ -1063,10 +1063,16 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     # need no job pool, no dedup key, and no model anywhere near them.
 
     @app.get("/api/art/motion/{oracle_id}/{effect}")
-    def art_motion_status(oracle_id: str, effect: str) -> dict[str, Any]:
+    def art_motion_status(oracle_id: str, effect: str,
+                          art: str | None = None) -> dict[str, Any]:
         """Is there a motion derivative for this painting? `ready: false` is
         a complete, correct answer -- the client shows the still it already
-        has, which is the current page, not an error."""
+        has, which is the current page, not an error. `art` is the crop the
+        page is showing: a deck that picked a printing must not be handed a
+        loop derived from a different painting, so a mismatch is `ready:
+        false`, exactly as if nothing had been built."""
+        from urllib.parse import quote
+
         from mtglab.cardmotion import cache as cardmotion_cache
         from mtglab.cardmotion.effects import EFFECTS
 
@@ -1074,15 +1080,19 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         if chosen is None:
             raise HTTPException(status_code=404,
                                 detail=f"no effect {effect!r}")
-        hit = cardmotion_cache.find_ready(oracle_id, chosen)
+        hit = cardmotion_cache.find_ready(oracle_id, chosen, art)
         if hit is None:
             return {"ready": False, "effect": effect}
         meta = hit.attribution()
         stamp = meta.get("fingerprint", "")
         base = f"/api/art/motion/{oracle_id}/{effect}"
+        # The art rides on the file URLs too: two printings of one commander
+        # are two derivatives under one oracle_id, and the file route must
+        # land on the same one the status answer described.
+        suffix = f"&art={quote(art, safe='')}" if art else ""
         keys = {"loop.webm": "webm", "loop.mp4": "mp4",
                 "poster.webp": "poster", "depth.png": "depth"}
-        urls = {keys[name]: f"{base}/{name}?v={stamp}"
+        urls = {keys[name]: f"{base}/{name}?v={stamp}{suffix}"
                 for name in sorted(cardmotion_cache.SERVABLE)
                 if hit.file(name).exists()}
         return {"ready": True, "effect": effect, "fingerprint": stamp,
@@ -1093,8 +1103,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                          "depth.png": "image/png"}
 
     @app.get("/api/art/motion/{oracle_id}/{effect}/{filename}")
-    def art_motion_file(oracle_id: str, effect: str,
-                        filename: str) -> FileResponse:
+    def art_motion_file(oracle_id: str, effect: str, filename: str,
+                        art: str | None = None) -> FileResponse:
         """One derivative file. Long-lived caching is safe because the
         status payload's URLs carry the fingerprint as a version stamp -- a
         regenerated derivative is a different URL, never a stale hit. The
@@ -1109,7 +1119,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         # reaches the filesystem unless it is one of four fixed names.
         if chosen is None or media_type is None:
             raise HTTPException(status_code=404, detail="no such derivative")
-        hit = cardmotion_cache.find_ready(oracle_id, chosen)
+        hit = cardmotion_cache.find_ready(oracle_id, chosen, art)
         if hit is None or not hit.file(filename).exists():
             raise HTTPException(status_code=404, detail="no such derivative")
         return FileResponse(

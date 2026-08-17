@@ -29,17 +29,24 @@ export interface MotionStatus {
  * reason a page looks broken.
  */
 export function useCardMotion(oracleId: string | null | undefined,
-                              effects: readonly string[]): MotionStatus | null {
+                              effects: readonly string[],
+                              art?: string | null): MotionStatus | null {
   const [status, setStatus] = useState<MotionStatus | null>(null)
   const ladder = effects.join(',')
 
   useEffect(() => {
     if (!oracleId) return
     let cancelled = false
+    // Which painting this page is showing. The server matches derivatives
+    // against it, so a deck that picked a printing gets that printing's
+    // loop or the still -- never the default painting breathing over a
+    // swapped one.
+    const chosen = art ? `?art=${encodeURIComponent(art)}` : ''
     void (async () => {
       for (const effect of ladder.split(',')) {
         try {
-          const resp = await fetch(`/api/art/motion/${oracleId}/${effect}`)
+          const resp = await fetch(
+            `/api/art/motion/${oracleId}/${effect}${chosen}`)
           if (!resp.ok) continue
           const body = (await resp.json()) as MotionStatus
           if (body.ready) {
@@ -54,7 +61,7 @@ export function useCardMotion(oracleId: string | null | undefined,
     return () => {
       cancelled = true
     }
-  }, [oracleId, ladder])
+  }, [oracleId, ladder, art])
 
   return status
 }

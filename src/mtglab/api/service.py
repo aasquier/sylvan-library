@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 from mtglab import colors, config, lore
 from mtglab import glossary as gloss
 from mtglab.cards import db
+from mtglab.cards.db import art_crop_from
 from mtglab.decks import decklist, edit, importer, log, partners, suggest, wheel
 from mtglab.decks.analyze import deck_stats
 from mtglab.decks.edit import EditFailed
@@ -497,26 +498,6 @@ def commander_dossier(slug: str, *,
     finally:
         if con is not None:
             con.close()
-
-
-def art_crop_from(image_normal: str | None) -> str | None:
-    """The `art_crop` URL for a printing whose `normal` URL we have.
-
-    The `printings` table stores `image_normal` and no crop, so a deck showing
-    a chosen printing would have nothing to put in the hero band, which is a
-    crop. Rather than adding a column and requiring a 500MB re-ingest before
-    the feature works at all, the crop is derived: Scryfall's image URLs differ
-    only in the size segment, which is checkable rather than assumed --
-    `oracle_cards` stores both for the same printing id and they are identical
-    but for `normal` / `art_crop`.
-
-    Anything not matching that shape returns None rather than a guess, and the
-    caller falls back to the full card image. A wrong URL renders as a broken
-    image; None renders as the card.
-    """
-    if not image_normal or "/normal/" not in image_normal:
-        return None
-    return image_normal.replace("/normal/", "/art_crop/", 1)
 
 
 def commander_printings(slug: str, *, card: str | None = None,

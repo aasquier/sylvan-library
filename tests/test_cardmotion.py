@@ -135,6 +135,29 @@ def test_ready_means_attribution_written_last(tmp_path) -> None:
         assert cache.find_ready("oracle-9", EFFECTS["slow-pan"]) is None
 
 
+def test_find_ready_matches_the_painting_being_shown(tmp_path) -> None:
+    """The Gyome/Trostani bug: a deck that swapped printings was served the
+    old painting's loop, because the lookup ignored the art entirely."""
+    with config.use_paths(data_dir=tmp_path / "data"):
+        effect = EFFECTS["slow-pan"]
+        entry = cache.locate("oracle-1", "https://x/a.jpg?123", effect)
+        entry.directory.mkdir(parents=True)
+        cache.write_attribution(entry, oracle_id="oracle-1", card_name="X",
+                                artist="A. Painter",
+                                art_url="https://x/a.jpg?123",
+                                scryfall_uri="https://scryfall.com/x",
+                                effect=effect)
+        # The painting the page shows, query string and all, matches on stem
+        # -- a bulk refresh rewriting the cache-buster must not orphan it.
+        assert cache.find_ready("oracle-1", effect,
+                                "https://x/a.jpg?456") is not None
+        # A different painting is a miss, never the nearest neighbour.
+        assert cache.find_ready("oracle-1", effect,
+                                "https://x/other.jpg") is None
+        # No art means the older any-art answer.
+        assert cache.find_ready("oracle-1", effect) is not None
+
+
 # ------------------------------------------------------------- the build
 
 def test_build_writes_the_derivative_from_pool_facts(pool) -> None:
@@ -184,6 +207,125 @@ def test_resolve_subject_reads_the_pool_row(pool) -> None:
     assert subject.art_url
 
 
+def _insert_printing(pool, printing_id: str, normal_url: str) -> None:
+    pool.execute(
+        "INSERT INTO printings (id, name, image_normal) VALUES (?, ?, ?)",
+        [printing_id, "Gyome, Master Chef", normal_url])
+
+
+def test_resolve_subject_honours_the_chosen_printing(pool) -> None:
+    """A deck's `commander_art` names the painting to derive; the artist for
+    that printing comes from Scryfall at build time (the pool stores none)
+    rather than crediting the default printing's painter."""
+    _insert_printing(pool, "print-2",
+                     "https://cards.scryfall.io/normal/front/9/9/p2.jpg")
+    subject = resolve_subject(
+        pool, "Gyome, Master Chef", art_id="print-2",
+        fetch_card_json=lambda pid: {"artist": "Alt Painter",
+                                     "scryfall_uri": "https://scryfall.com/p2"})
+    assert subject.art_url == \
+        "https://cards.scryfall.io/art_crop/front/9/9/p2.jpg"
+    assert subject.artist == "Alt Painter"
+    assert subject.scryfall_uri == "https://scryfall.com/p2"
+
+
+def test_a_chosen_printing_with_no_reachable_artist_degrades(pool) -> None:
+    def unreachable(pid: str):
+        raise OSError("offline")
+
+    _insert_printing(pool, "print-3",
+                     "https://cards.scryfall.io/normal/front/9/9/p3.jpg")
+    subject = resolve_subject(pool, "Gyome, Master Chef", art_id="print-3",
+                              fetch_card_json=unreachable)
+    assert subject.artist == "(artist unrecorded)", \
+        "an unknown painter must not be credited as the default printing's"
+
+
+def test_a_chosen_printing_the_pool_lacks_is_refused(pool) -> None:
+    with pytest.raises(BuildRefused, match="chosen printing"):
+        resolve_subject(pool, "Gyome, Master Chef", art_id="print-gone")
+
+
+def test_two_printings_are_two_derivatives(pool) -> None:
+    """The originals cache and the derivative key must both carry the art's
+    identity, or the second build silently reuses the first painting."""
+    _insert_printing(pool, "print-2",
+                     "https://cards.scryfall.io/normal/front/9/9/p2.jpg")
+    first = build_derivative(pool, card="Gyome, Master Chef",
+                             effect_key="slow-pan", download=fake_download)
+    second = build_derivative(
+        pool, card="Gyome, Master Chef", effect_key="slow-pan",
+        download=fake_download, art_id="print-2",
+        fetch_card_json=lambda pid: {"artist": "Alt Painter"})
+    assert first.directory != second.directory
+    assert second.attribution()["artist"] == "Alt Painter"
+
+
+# -------------------------------------------------------------- the sync
+
+class _DeckStub:
+    def __init__(self, slug, commander, commander_art=""):
+        self.slug = slug
+        self.commander = commander
+        self.commander_art = commander_art
+
+
+def test_sync_builds_the_missing_and_skips_the_present(pool) -> None:
+    from mtglab.cardmotion.build import sync
+
+    decks = [
+        _DeckStub("gyome-food", ["Gyome, Master Chef"]),
+        _DeckStub("no-commander", []),
+    ]
+    report = sync(pool, decks, effect_key="slow-pan",
+                  download=fake_download)
+    assert report.built == ["gyome-food"]
+    assert report.skipped == ["no-commander"]
+    assert report.refused == []
+
+    # A second sweep finds the derivative and builds nothing.
+    again = sync(pool, decks, effect_key="slow-pan", download=fake_download)
+    assert again.built == []
+    assert again.present == ["gyome-food"]
+
+
+def test_sync_rebuilds_after_an_art_swap(pool) -> None:
+    """Aaron's resync case: the deck picks a new printing, the old loop no
+    longer matches what the page shows, and the sweep builds the new one."""
+    from mtglab.cardmotion.build import sync
+
+    deck = _DeckStub("gyome-food", ["Gyome, Master Chef"])
+    sync(pool, [deck], effect_key="slow-pan", download=fake_download)
+
+    _insert_printing(pool, "print-2",
+                     "https://cards.scryfall.io/normal/front/9/9/p2.jpg")
+    deck.commander_art = "print-2"
+    report = sync(pool, [deck], effect_key="slow-pan",
+                  download=fake_download,
+                  fetch_card_json=lambda pid: {"artist": "Alt Painter"})
+    assert report.built == ["gyome-food"], \
+        "a swapped painting is a missing derivative, not a present one"
+
+
+def test_sync_loads_the_model_lazily_and_at_most_once(pool) -> None:
+    from mtglab.cardmotion.build import sync
+
+    loads = []
+
+    def loader():
+        loads.append(1)
+        return FakeDepthModel()
+
+    decks = [_DeckStub("gyome-food", ["Gyome, Master Chef"])]
+    sync(pool, decks, effect_key="depth-drift", download=fake_download,
+         model_loader=loader)
+    assert loads == [1]
+    # Fully synced: the model is never loaded at all.
+    sync(pool, decks, effect_key="depth-drift", download=fake_download,
+         model_loader=loader)
+    assert loads == [1]
+
+
 # ------------------------------------------------------------- the routes
 
 fastapi = pytest.importorskip("fastapi")
@@ -218,6 +360,35 @@ def test_status_and_files_serve_a_built_derivative(pool) -> None:
             resp = client.get(url)
             assert resp.status_code == 200
             assert "immutable" in resp.headers["cache-control"]
+
+
+def test_status_matches_the_art_the_page_is_showing(pool) -> None:
+    """The HTTP half of the printing match — the tier that actually served
+    Gyome's old painting over his new one."""
+    from fastapi.testclient import TestClient
+
+    from mtglab.api.app import create_app
+
+    entry = build_derivative(pool, card="Gyome, Master Chef",
+                             effect_key="slow-pan", download=fake_download)
+    meta = entry.attribution()
+    oracle_id, built_art = meta["oracle_id"], meta["art_url"]
+    with TestClient(create_app()) as client:
+        base = f"/api/art/motion/{oracle_id}/slow-pan"
+        # The art the derivative was built from: ready, and the file URLs
+        # carry the art so the file route lands on the same derivative.
+        body = client.get(base, params={"art": built_art}).json()
+        assert body["ready"] is True
+        for url in body["urls"].values():
+            assert "art=" in url
+            assert client.get(url).status_code == 200
+        # A different painting: not ready, and files 404 rather than serve
+        # the wrong painting's loop.
+        other = "https://cards.scryfall.io/art_crop/front/0/0/other.jpg"
+        assert client.get(base, params={"art": other}).json() == \
+            {"ready": False, "effect": "slow-pan"}
+        resp = client.get(f"{base}/loop.webm", params={"art": other})
+        assert resp.status_code == 404
 
 
 def test_an_unknown_effect_is_a_404(tmp_path) -> None:
