@@ -6,6 +6,7 @@ is what lets these run everywhere the mana solver does.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -208,6 +209,32 @@ def test_magic_cards_sit_at_their_originals_numbers():
             by_name["Murder"].number) == ("swords", 10)
     assert (by_name["King Macar, the Gold-Cursed"].suit,
             by_name["King Macar, the Gold-Cursed"].number) == ("pentacles", 14)
+
+
+def test_every_magic_card_has_a_portrait_window():
+    """`RWS_FOCUS` in `components/tarot.tsx` is the per-card crop, and it
+    is the seam this suite has to hold: the roster is Python, the window is
+    TypeScript, and nothing in either language notices when one grows.
+
+    It went wrong the first time it could. Eighteen cards landed with
+    Aaron's verdicts and not one carried a window, so all eighteen
+    defaulted to dead centre -- True Love's Kiss framed the knight's
+    pauldron and cropped out both faces -- while nine entries went on
+    pointing at cards that had been cut. A missing window is invisible in
+    every test that renders a card, because a wrong crop is still a crop.
+    So the check is exact in both directions, like the isolation sweep's.
+    """
+    src = (Path(__file__).parent.parent / "web" / "src"
+           / "components" / "tarot.tsx").read_text()
+    block = src.split("const RWS_FOCUS: Record<string, string> = {", 1)[1]
+    block = block.split("\n}", 1)[0]
+    windowed = set(re.findall(r"^\s*'([^']+)':", block, re.MULTILINE))
+    magic = {c.key for c in tarot.CROSSOVERS + tarot.ECHOES}
+    assert not magic - windowed, (
+        f"no portrait window: {sorted(magic - windowed)}")
+    assert not windowed - magic, (
+        f"window for a card that is not in the deck: "
+        f"{sorted(windowed - magic)}")
 
 
 def test_a_double_faced_echo_is_captioned_by_its_front_face():
