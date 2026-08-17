@@ -1357,17 +1357,29 @@ arc; this is what the next few sessions actually do.
     (true parallax rather than the breath) is the natural next step and
     needs the where-does-a-depth-map-live story from ADR 31.
 
-    Also open, from Aaron's 2026-08-16 eye pass: **motion derivatives are a
+    From Aaron's 2026-08-16 eye pass: **motion derivatives are a
     dev-machine artifact, and the deployed instance has no way to grow
     one.** `mtglab cardmotion sync` (2026-08-16) is the dev-side answer —
     every deck's commander, from the printing the deck shows, art swaps and
     imports both — but a deck imported *on the instance* shows a still
-    until somebody runs the sync here and pushes. The honest options, none
-    picked yet: run `slow-pan` (no torch) in-container at import time,
-    which crosses ADR 32's "nothing generates at request time" line only if
-    done in the request rather than a NET job; a scheduled dev-machine
-    sweep; or accept the still until the next manual sync. Decide with
-    Aaron before building any of them.
+    until somebody runs the sync here and pushes.
+
+    **Decided 2026-08-16 (at Aaron's direction, in session): the still is
+    the intake-time story.** A deck imported on the instance shows its
+    commander's still — the browser ladder's designed floor, not a
+    degraded state — until the next dev-machine `cardmotion sync` + push,
+    which joins the end-of-session ritual rather than a schedule. The
+    other two options lost on their own terms: in-container `slow-pan`
+    needs ffmpeg in the image, which ADR 31 deliberately keeps out
+    ("dev and CI only, never the image"), and spends shared-machine CPU
+    upgrading a decorative layer a few hours earlier; a scheduled
+    unattended sweep is automation on a laptop that sleeps, and a
+    schedule that silently doesn't run is worse than a ritual that
+    visibly does. Three named triggers reopen this, and the shape it
+    would take is a NET job (never the request, per ADR 32): another
+    pilot's instance-imported deck visibly living on a still long enough
+    for a human to mind; a second Fly machine appearing; or ffmpeg
+    entering the image for any other reason.
 
 ---
 
