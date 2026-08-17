@@ -1432,6 +1432,40 @@ arc; this is what the next few sessions actually do.
     Magic answer (trumps and minors both) is named as the stars aligning —
     all Python-detected facts, never prompt hopes.
 
+    **Round two of the minors, and three rulings, the same day.** Aaron
+    settled the three questions round one left open: **Temperance keeps
+    Chalice of Life** over Angel of Serenity (the better fact, and the
+    monochrome suits 1909 stock — the earlier "unreadable grey blob"
+    report was a screenshot of the folded 96px strip, not of the card);
+    **suit colour is a tiebreaker and not a law**; and **the pale horse
+    stays, as the Knight of Swords** — Pale Rider of Trostad, cut from
+    Death in round one, takes the charging knight instead, which is the
+    better slot for it, since the Knight's horse gallops and Death's
+    walks. Seventeen more minors then filled in the same method
+    (tag-search, contact sheets beside the 1909 scans, ruled card by
+    card): the Six, Seven, Eight, Ten and Queen of Wands; the Two, Eight,
+    Nine and King of Cups; the Four, Six and Knight of Swords; and the
+    Ace, Seven, Eight, Nine and Ten of Pentacles. **Fifty-five echoes,
+    136 cards**, thirty-six of the fifty-six minors now answered.
+    `ECHO_WEIGHT` came down 0.2 → 0.14, and that number was **measured
+    rather than reasoned**: 38 echoes at 0.20 put a Magic card in 35.5%
+    of spreads and 55 at 0.14 put one in 35.7%, over 40,000 seeded deals.
+    The landing rate is the constant; the weight is what moves.
+
+    The colour tiebreaker is worth recording as **a rule that did almost
+    no work**: round two seated four white cards in the fire suit and no
+    white card at all in the suit of air, because in every one of those
+    slots the painting and the rules text pointed where the colour pie
+    did not. It breaks a genuine tie and nothing more — if colour is the
+    best argument a candidate has, it is not a good enough candidate.
+
+    **Murderous Rider changed printing** in the same pass, and it is the
+    clearest case the printing rule has: the pool's default (Josh Hass)
+    is a colour painting of a green-faced Zombie Knight, while Ravenna
+    Tran's Eldraine showcase is pen and ink and, under the ageing filter,
+    reads as though it came off the same press as the 1909 plate next to
+    it. Five echoes now name their printing.
+
     **Still to come, in order:** the photo-real crystal ball (a layered
     composite — free-use shell, animist smoke/candle loops, the card
     vision surfacing inside the glass — much larger and central); the

@@ -115,15 +115,15 @@ def test_image_paths_are_served_from_the_tarot_mount():
 # ------------------------------------------------- the Magic crossovers
 
 def test_the_magic_tiers_join_the_shuffle_but_not_the_seventy_eight():
-    """Punch list 2026-08-15 item 13, widened twice on 2026-08-16 and again
-    at Aaron's verdicts on 2026-08-17: three printed tarot cards and
-    thirty-eight echoes. The 78 stay the 78 -- the picture sweeps above run
+    """Punch list 2026-08-15 item 13, widened twice on 2026-08-16 and twice
+    more at Aaron's verdicts on 2026-08-17: three printed tarot cards and
+    fifty-five echoes. The 78 stay the 78 -- the picture sweeps above run
     over `DECK` on purpose, because a Magic card's picture is a hotlinked
     art crop and not package data."""
     assert len(tarot.DECK) == 78
     assert len(tarot.CROSSOVERS) == 3
-    assert len(tarot.ECHOES) == 38
-    assert len(tarot.FULL_DECK) == 119
+    assert len(tarot.ECHOES) == 55
+    assert len(tarot.FULL_DECK) == 136
     for card in tarot.CROSSOVERS + tarot.ECHOES:
         assert card.after, f"{card.name} names no trump"
         assert card.artist, f"{card.name} credits nobody"
