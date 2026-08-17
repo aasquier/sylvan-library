@@ -104,6 +104,65 @@ def test_feather_needs_positive_radius() -> None:
         apply(hard_edge(), "feather", {"radius": 0})
 
 
+def test_mask_circle_keeps_the_disc_and_drops_the_corners() -> None:
+    # A square field: the centred disc survives, the corners do not.
+    image = Image.new("RGB", (40, 40), (200, 180, 120))
+    out = apply(image, "mask_circle", {"cx": 0.5, "cy": 0.5, "r": 0.4,
+                                       "feather": 0})
+    alpha = np.asarray(out.getchannel("A"))
+    assert alpha[20, 20] == 255          # dead centre
+    assert alpha[20, 3] == 0             # outside the radius, same row
+    assert alpha[0, 0] == 0              # every corner
+    assert alpha[0, 39] == 0
+    assert alpha[39, 0] == 0
+    assert alpha[39, 39] == 0
+    # The RGB is untouched -- this op moves alpha and nothing else, which is
+    # what lets the glass keep the room it was photographed in.
+    assert np.asarray(out.convert("RGB"))[20, 20].tolist() == [200, 180, 120]
+
+
+def test_mask_circle_stays_round_on_a_wide_frame() -> None:
+    # `r` measures against the width in both axes. On a 2:1 frame a radius
+    # keyed to height would be an ellipse; this asserts it is not.
+    image = Image.new("RGB", (80, 40), (255, 255, 255))
+    out = apply(image, "mask_circle", {"cx": 0.5, "cy": 0.25, "r": 0.25,
+                                       "feather": 0})
+    alpha = np.asarray(out.getchannel("A"))
+    centre_x, centre_y, radius = 40, 10, 20
+    for dx, dy in ((radius - 2, 0), (0, radius - 2), (-(radius - 2), 0)):
+        assert alpha[centre_y + dy, centre_x + dx] == 255, (dx, dy)
+    for dx, dy in ((radius + 2, 0), (0, radius + 2)):
+        assert alpha[centre_y + dy, centre_x + dx] == 0, (dx, dy)
+
+
+def test_mask_circle_feathers_across_the_edge() -> None:
+    image = Image.new("RGB", (40, 40), (255, 255, 255))
+    out = apply(image, "mask_circle", {"cx": 0.5, "cy": 0.5, "r": 0.4,
+                                       "feather": 4})
+    alpha = np.asarray(out.getchannel("A")).astype(int)
+    # Walking out along the centre row, the ramp is monotonically decreasing
+    # and passes through the middle rather than jumping.
+    walk = alpha[20, 20:40]
+    assert all(a >= b for a, b in pairwise(walk))
+    assert any(20 < value < 235 for value in walk)
+
+
+def test_mask_circle_multiplies_an_alpha_that_is_already_there() -> None:
+    # Order matters in a recipe: a feather before the mask must survive it.
+    image = Image.new("RGBA", (40, 40), (255, 255, 255, 128))
+    out = apply(image, "mask_circle", {"cx": 0.5, "cy": 0.5, "r": 0.4,
+                                       "feather": 0})
+    assert np.asarray(out.getchannel("A"))[20, 20] == 128
+
+
+def test_mask_circle_refusals() -> None:
+    image = Image.new("RGB", (10, 10), (0, 0, 0))
+    with pytest.raises(OpError, match="positive `r`"):
+        apply(image, "mask_circle", {"r": 0})
+    with pytest.raises(OpError, match="negative"):
+        apply(image, "mask_circle", {"r": 0.5, "feather": -1})
+
+
 def test_mirror_tile_is_seamless() -> None:
     image = green_field(6, 4)
     tiled = apply(image, "mirror_tile", {"axis": "x"})

@@ -1062,309 +1062,191 @@ button:hover .tarot-fan-card {
 
 /* The reader's crystal ball (`CrystalBall` in components/tarot.tsx).
  *
- * Three fogs turn against each other at incommensurate speeds — 26s, 41s and
- * 19s never line up, so the weather inside the glass does not visibly loop.
- * The gleam breathes, four glints twinkle on their own delays, the aura the
- * ball throws on the felt swells and settles, and a turned card surfaces
- * through the fog (`.crystal-vision`). All of it is transform/opacity work
- * on a handful of nodes, and all of it holds still under reduced motion.
+ * The glass is a photograph now (ADR 29, `assets/seance/crystal.recipe.yaml`)
+ * and the composite is the whole design: the card has to be *inside* the
+ * ball, so the stack is candle and smoke behind, the depths, the vision,
+ * and then the same photograph twice on top — `.crystal-shell-body` laying
+ * the glass over the card, `.crystal-shell-light` crushed to its highlights
+ * and screened back so the specular arc and the rim sit above everything.
  *
- * `transform-box: view-box` is load-bearing on every rotating piece: without
- * it an SVG group rotates about the viewBox origin and the fog exits the
- * ball on the first frame.
+ * The two blend modes are what make it read as glass rather than as a
+ * sticker over a card, and they need a stacking context to blend *within*:
+ * `.crystal-orb` isolates, or `mix-blend-mode: screen` reaches the felt and
+ * the ball turns into a bright hole in the table.
+ *
+ * Larger and central since PR 2. The old ball was pinned to the felt's right
+ * edge and the CSS here carried a paragraph of clearance arithmetic against
+ * the spread — it collided with the third card at every width below about a
+ * thousand, and the fix was to shrink it and then to hide it below `lg`.
+ * Standing it above the centred spread deletes that whole problem: nothing
+ * is beside it, so nothing can collide with it, and it can be the size a
+ * crystal ball on a séance table should be at every width.
  */
 .crystal-ball {
-  /* Sized against the viewport rather than fixed, because on the dealing
-     table the clearance between the ball and the cards is a function of the
-     page width and nothing else. The ball is absolutely positioned at the
-     felt's right edge while the spread is centred in the *whole* felt, so the
-     two close on each other as the felt narrows: at a fixed 168px they
-     collided at every width below about 1000px, and the third card — "the
-     table" — spent that whole range underneath the glass.
-
-     Measured, not guessed. The spread is three 168px slots and two 1.5rem
-     gaps, plus a little for the settle rotation, so its right edge sits about
-     280px past centre; the ball's left edge sits at `feltW - 20 - width`.
-     They clear when `feltW / 2 > 300 + width`, which at 168px wants a felt
-     938px wide and a window near a thousand.
-
-     The clamp buys back most of that: at the `lg` breakpoint the ball is
-     ~133px and clears the cards by about 55px, and it reaches full size on a
-     desktop where there was never a problem. `tarot.tsx` holds the other half
-     — the ball is not rendered at all below `lg`, because a ball squeezed to
-     its 120px floor to fit a tablet is a worse table than one with no ball.
-
-     The ceiling rose 168 → 190 with the punch-list rework (item 11): the
-     vision shows the whole card now, so on a desktop the glass earns the
-     extra inch. 190px only applies above ~1460px wide, where the clearance
-     arithmetic has hundreds of pixels to spare. */
   position: relative;
-  width: clamp(120px, 13vw, 190px);
-  filter: drop-shadow(0 12px 22px rgba(8, 4, 34, 0.55));
+  width: clamp(180px, 24vw, 340px);
+  margin: 0 auto;
+  filter: drop-shadow(0 16px 28px rgba(8, 4, 34, 0.55));
 }
 
-/* The svg joins the positioned stacking order, or the (positioned) haze
-   behind it would paint on top regardless of DOM order. */
-.crystal-ball svg {
-  position: relative;
-}
-
-/* The room behind the glass (item 11): smoke that drifts, and a light in it
-   that will not hold steady — a candle somewhere off the table's edge. All
-   blurred radial washes on three spans, all behind the sphere. */
-.crystal-haze {
+/* The room behind the glass: our own candle, and our own smoke drifting
+   through its light. Both are wider than the ball and masked to a soft
+   circle, so the light falls off into the felt instead of ending at a box. */
+.crystal-room {
   position: absolute;
-  inset: -34% -55%;
+  inset: -18% -30% 12%;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse at 50% 44%, #000 34%,
+    transparent 72%);
+  mask-image: radial-gradient(ellipse at 50% 44%, #000 34%, transparent 72%);
+}
+
+.crystal-candle,
+.crystal-smoke {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: screen;
+}
+
+.crystal-candle {
+  opacity: 0.55;
+  filter: blur(16px) saturate(1.15);
+}
+
+.crystal-smoke {
+  opacity: 0.34;
+  filter: blur(7px);
+}
+
+/* The drawn brass, and the shadow and aura it stands in. Relative so it
+   joins the positioned stacking order above `.crystal-room`. */
+.crystal-cradle {
+  position: relative;
+}
+
+/* The near side of the cradle's ring, painted over the glass so the brass
+   occludes it and the ball reads as seated rather than balanced. Same box
+   as the back half, and inert to the pointer. */
+.crystal-cradle-front {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
 }
 
-.crystal-haze-puff {
+/* The glass. Placed on the circle the old svg drew — cx 60, cy 62, r 44 in
+   a 120x150 viewBox — so the cradle's cushion ring still cups it:
+   left (60-44)/120, top (62-44)/150, width 88/120, and a square aspect. */
+.crystal-orb {
   position: absolute;
-  border-radius: 9999px;
-  filter: blur(13px);
-  background: radial-gradient(
-    closest-side,
-    rgba(158, 128, 226, 0.3),
-    rgba(158, 128, 226, 0)
-  );
+  left: 13.333%;
+  top: 12%;
+  width: 73.333%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  /* The isolation the blend modes need. Without it `screen` composites
+     against the felt instead of against the layers below it. */
+  isolation: isolate;
 }
 
-.crystal-haze-a {
-  left: 2%;
-  top: 26%;
-  width: 62%;
-  height: 42%;
-  animation: haze-drift 23s ease-in-out infinite alternate;
-}
-
-.crystal-haze-b {
-  right: 0%;
-  top: 44%;
-  width: 55%;
-  height: 38%;
-  animation: haze-drift-back 31s ease-in-out infinite alternate;
-}
-
-.crystal-haze-c {
-  left: 22%;
-  bottom: 4%;
-  width: 58%;
-  height: 34%;
-  opacity: 0.8;
-  animation: haze-drift 41s ease-in-out infinite alternate-reverse;
-}
-
-@keyframes haze-drift {
-  from {
-    transform: translate(0, 0) scale(1);
-  }
-  to {
-    transform: translate(26px, -14px) scale(1.18);
-  }
-}
-
-@keyframes haze-drift-back {
-  from {
-    transform: translate(0, 0) scale(1.1);
-  }
-  to {
-    transform: translate(-30px, 10px) scale(0.94);
-  }
-}
-
-.crystal-backlight {
+.crystal-depths {
   position: absolute;
-  inset: 12% 18% 24% 18%;
-  background: radial-gradient(
-    closest-side,
-    rgba(255, 196, 128, 0.26),
-    rgba(255, 196, 128, 0)
-  );
-  filter: blur(9px);
-  animation: backlight-flicker 7.3s ease-in-out infinite;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 36%, #2e2266 0%, #170f3f 46%,
+    #06041b 100%);
 }
 
-/* Candle arithmetic: mostly steady, two fast dips, one surge — flicker is
-   irregularity, and a sine wave is the opposite of that. */
-@keyframes backlight-flicker {
-  0%,
-  100% {
-    opacity: 0.75;
-  }
-  11% {
-    opacity: 0.95;
-  }
-  14% {
-    opacity: 0.55;
-  }
-  17% {
-    opacity: 0.9;
-  }
-  43% {
-    opacity: 0.7;
-  }
-  61% {
-    opacity: 1;
-  }
-  64% {
-    opacity: 0.6;
-  }
-  67% {
-    opacity: 0.85;
-  }
+.crystal-shell-body,
+.crystal-shell-light {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
-.crystal-fog,
-.crystal-vision,
-.crystal-vision-smoke,
-.crystal-nebula,
-.crystal-stars {
-  transform-box: view-box;
-  transform-origin: 60px 62px;
+/* The glass over the card: the photograph's own veils and internal cloud,
+   imprinted without lightening the interior. `soft-light` is the whole
+   choice here — `hard-light` at any useful opacity washed a scrying ball
+   into a white marble, because the quartz's mid-greys are brighter than
+   the depths they are supposed to be suspended in. Soft-light keeps the
+   dark and carries the texture. */
+.crystal-shell-body {
+  mix-blend-mode: soft-light;
+  opacity: 0.85;
 }
 
-/* The depths: two pools of colour turning against each other far below the
-   smoke, and a field of stars drifting slower than either. Nothing in here
-   ever holds still while motion is allowed — a crystal ball with static
-   weather is a paperweight. */
-.crystal-nebula-a {
-  animation: crystal-swirl 67s linear infinite;
+/* The same file, crushed until only the specular arc and the rim highlight
+   survive, screened on top of everything. This is the layer that says
+   "glass" — a bright, hard, *unblurred* edge above a soft interior — and
+   the brightness goes DOWN before the contrast goes up, so the crush
+   discards the body of the photograph instead of blowing it out. */
+.crystal-shell-light {
+  mix-blend-mode: screen;
+  opacity: 0.9;
+  filter: brightness(0.52) contrast(4.2);
 }
 
-.crystal-nebula-b {
-  animation: crystal-swirl-back 49s linear infinite;
-}
-
-.crystal-stars {
-  animation: crystal-swirl 140s linear infinite;
-}
-
-.crystal-fog-a {
-  animation: crystal-swirl 26s linear infinite;
-}
-
-.crystal-fog-b {
-  animation: crystal-swirl-back 41s linear infinite;
-}
-
-.crystal-fog-c {
-  animation: crystal-heave 19s ease-in-out infinite;
-}
-
-@keyframes crystal-swirl {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes crystal-swirl-back {
-  to {
-    transform: rotate(-360deg);
-  }
-}
-
-@keyframes crystal-heave {
-  0%,
-  100% {
-    transform: scale(1) translateY(0);
-    opacity: 0.9;
-  }
-  50% {
-    transform: scale(1.14) translateY(-2px);
-    opacity: 0.55;
-  }
-}
-
-.crystal-spark {
-  animation: crystal-twinkle 4.2s ease-in-out infinite;
-  opacity: 0;
-}
-
-.crystal-spark-2 {
-  animation-delay: 1.3s;
-}
-
-.crystal-spark-3 {
-  animation-delay: 2.4s;
-}
-
-.crystal-spark-4 {
-  animation-delay: 3.1s;
-}
-
-.crystal-spark-5 {
-  animation-delay: 1.9s;
-  animation-duration: 5.6s;
-}
-
-@keyframes crystal-twinkle {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  12% {
-    opacity: 0.95;
-  }
-  30% {
-    opacity: 0.15;
-  }
-}
-
-/* The fortune arriving, in two acts. First the smoke billows up out of
-   nothing (`.crystal-vision-smoke`, one-shot); the card surfaces underneath
-   it, so by the time the billow thins the picture is simply *there* — a
-   fortune is discovered, never delivered. The appear and the sway share the
-   transform, so the sway takes over exactly when the appear ends (its delay
-   is the appear's duration). */
+/* The fortune arriving: the card surfaces inside the glass rather than
+   being delivered to it — already there once the mist thins. Whole, not
+   cropped, and a reversed card hangs upside down; the ball does not
+   editorialise. */
 .crystal-vision {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 58%;
+  translate: -50% -50%;
   opacity: 0;
-  filter: saturate(0.82) brightness(1.04);
+  filter: saturate(0.78) brightness(1.05) blur(0.4px);
+  /* The edges dissolve rather than stop. A rectangle with corners reads as
+     a picture stuck on the glass; the whole illusion is that the fortune is
+     *suspended in* it, which means the picture has to end in the fog and
+     not at a border.
+     `closest-side` is load-bearing and was the bug: a radial-gradient sizes
+     to `farthest-corner` by default, so on a landscape art crop the ramp
+     was still ~80% opaque where the image's top and bottom edges fell, and
+     the picture ended on a visible horizontal line. Sized to the closest
+     side, the mask reaches zero exactly at every edge. */
+  -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%,
+    #000 30%, rgba(0, 0, 0, 0.5) 66%, transparent 100%);
+  mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 30%,
+    rgba(0, 0, 0, 0.5) 66%, transparent 100%);
   animation:
     crystal-vision-appear 2.4s ease-out 0.5s forwards,
     crystal-vision-sway 9s ease-in-out 2.9s infinite;
 }
 
+/* `rotate` rather than a transform, so it composes with the `translate`
+   that centres it instead of replacing it. */
+.crystal-vision.is-reversed {
+  rotate: 180deg;
+}
+
 @keyframes crystal-vision-appear {
   from {
     opacity: 0;
-    transform: scale(1.16);
+    scale: 1.16;
   }
   to {
-    opacity: 0.92;
-    transform: scale(1);
-  }
-}
-
-.crystal-vision-smoke {
-  opacity: 0;
-  animation: crystal-billow 3.2s ease-out forwards;
-}
-
-@keyframes crystal-billow {
-  0% {
-    opacity: 0;
-    transform: scale(0.55) translateY(14px);
-  }
-  22% {
-    opacity: 0.95;
-  }
-  60% {
-    opacity: 0.55;
-    transform: scale(1.18) translateY(-4px) rotate(14deg);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.42) translateY(-10px) rotate(26deg);
+    opacity: 0.88;
+    scale: 1;
   }
 }
 
 @keyframes crystal-vision-sway {
   0%,
   100% {
-    transform: scale(1) translateY(0);
+    scale: 1;
   }
   50% {
-    transform: scale(1.03) translateY(-2px);
+    scale: 1.03;
   }
 }
 
@@ -1380,20 +1262,6 @@ button:hover .tarot-fan-card {
   }
   50% {
     opacity: 0.34;
-  }
-}
-
-.crystal-gleam {
-  animation: crystal-breathe 3.4s ease-in-out infinite;
-}
-
-@keyframes crystal-breathe {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 0.95;
   }
 }
 
@@ -1441,32 +1309,17 @@ button:hover .tarot-fan-card {
   button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
     transform: none;
   }
-  .crystal-gleam {
+  /* The ball's own weather. The candle and the smoke are `VideoBackdrop`
+     in `ambience` mode, so they remove themselves in JS and need no rule
+     here — what is left to arrest is the aura on the felt and the card
+     surfacing in the glass, and the vision must end up *visible* rather
+     than stuck at its opening keyframe's zero. */
+  .crystal-aura {
     animation: none;
-    opacity: 0.7;
-  }
-  .crystal-fog,
-  .crystal-aura,
-  .crystal-nebula-a,
-  .crystal-nebula-b,
-  .crystal-stars,
-  .crystal-haze-puff,
-  .crystal-backlight {
-    animation: none;
-  }
-  .crystal-spark {
-    animation: none;
-    opacity: 0.5;
   }
   .crystal-vision {
     animation: none;
-    opacity: 0.92;
-  }
-  .crystal-vision-smoke {
-    /* Arrested weather, not vanished: the billow's job under reduced motion
-       is simply to not obscure the vision. */
-    animation: none;
-    opacity: 0;
+    opacity: 0.88;
   }
   .reader-tile,
   .reader-tile:hover {

@@ -145,6 +145,55 @@ def _mirror_tile(image: Image, params: dict[str, Any]) -> Image:
     return out
 
 
+def _mask_circle(image: Image, params: dict[str, Any]) -> Image:
+    """Everything outside a circle to alpha. `cx`/`cy`/`r` in fractions of
+    the frame's *width*, `feather` in pixels.
+
+    The sphere matte, and deliberately geometric rather than perceptual.
+    `matte_green` next door keys on colour because foliage has no edge a
+    number can name; a photographed crystal ball does — it is a circle, and
+    the photographer put it somewhere specific in the frame. Keying a glass
+    sphere on its colour is the one thing that cannot work, since the whole
+    subject is the background seen through it: a chroma matte would cut the
+    ball out and leave the room.
+
+    `cx` is a fraction of the width and `cy` a fraction of the height, so a
+    centre means the same place it would in CSS; `r` is a fraction of the
+    **width in both axes**, which is what keeps the mask a circle rather
+    than an ellipse on a non-square frame. The antialiased edge is computed
+    from the distance field rather than drawn, so the result does not
+    depend on Pillow's polygon rasteriser.
+    """
+    import numpy as np
+    from PIL import Image as PILImage
+
+    cx = float(params.get("cx", 0.5))
+    cy = float(params.get("cy", 0.5))
+    r = float(params.get("r", 0.5))
+    feather = float(params.get("feather", 1.0))
+    if r <= 0:
+        raise OpError("mask_circle needs a positive `r`")
+    if feather < 0:
+        raise OpError("mask_circle `feather` cannot be negative")
+
+    rgba = image.convert("RGBA")
+    w, h = rgba.width, rgba.height
+    # The centre is placed in its own axis; the radius is the width's in
+    # both, so the mask is round and not oval.
+    px_cx, px_cy, px_r = cx * w, cy * h, r * w
+    ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
+    dist = np.hypot(xs - px_cx, ys - px_cy)
+    if feather == 0:
+        mask = (dist <= px_r).astype(np.float32)
+    else:
+        # 1 inside, 0 outside, one feather-wide ramp straddling the edge.
+        mask = np.clip((px_r - dist) / feather + 0.5, 0.0, 1.0)
+    existing = np.asarray(rgba.getchannel("A"), dtype=np.float32) / 255.0
+    alpha = (existing * mask * 255.0).astype(np.uint8)
+    rgba.putalpha(PILImage.fromarray(alpha, mode="L"))
+    return rgba
+
+
 def _resize(image: Image, params: dict[str, Any]) -> Image:
     """`width` (aspect kept) and/or `height`. Lanczos, always — the one
     resampler that neither softens linework nor invents ringing at these
@@ -173,6 +222,7 @@ def _resize(image: Image, params: dict[str, Any]) -> Image:
 OPS: dict[str, OpFn] = {
     "crop": _crop,
     "matte_green": _matte_green,
+    "mask_circle": _mask_circle,
     "feather": _feather,
     "mirror_tile": _mirror_tile,
     "resize": _resize,

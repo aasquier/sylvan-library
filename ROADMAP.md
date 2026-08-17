@@ -1466,9 +1466,41 @@ arc; this is what the next few sessions actually do.
     reads as though it came off the same press as the 1909 plate next to
     it. Five echoes now name their printing.
 
-    **Still to come, in order:** the photo-real crystal ball (a layered
-    composite — free-use shell, animist smoke/candle loops, the card
-    vision surfacing inside the glass — much larger and central); the
+    **PR 2 landed the photo-real crystal ball.** The old one was inline
+    SVG and it was good SVG — fresnel ring, caustic pool, a hand-turned
+    brass cradle — and it still read as a rendering, because what a real
+    sphere has that geometry does not is *dirt*: veils, fractures, internal
+    cloud that no gradient stack proposes. The glass is now a CC0
+    photograph of a smoky-quartz sphere (Ervins Strauhmanis, via
+    Openverse), fetched, licence-gated, matted and committed through the
+    animist rather than hand-placed, and the room behind it is two ADR 31
+    procedural loops of our own — smoke at seed 1848, the year the Fox
+    sisters started the spiritualist craze, and candlelight at 1909, for
+    the printing.
+
+    Three things are worth keeping from building it. **The composite is
+    four layers because the card has to be *inside* the ball** — candle and
+    smoke behind, the depths, the vision, then the photograph twice on top
+    (once at `soft-light` to lay the glass over the card, once crushed to
+    its highlights and screened so the specular arc sits above everything).
+    Flatten any of it and the card is in front of a ball instead of in one.
+    **The brass stays drawn**, because a cradle is turned geometry — a
+    stack of profiles each catching its own light — which is what SVG is
+    good at and what a photograph would have bolted a stranger's taste
+    onto. And **moving it to the centre deleted a problem rather than
+    managing one**: pinned to the felt's right edge it closed on the
+    centred spread as the page narrowed, sat across the third card below
+    about a thousand pixels, and had to be shrunk and then hidden below
+    `lg` to cope. Standing it above the cards means nothing is beside it,
+    so it shows at every width and can be the size the thing deserves.
+
+    The animist grew one op for it, `mask_circle`, and the reason it is
+    geometric rather than perceptual is the point: `matte_green` keys on
+    colour because foliage has no edge a number can name, while a glass
+    sphere is the one subject a chroma matte *cannot* cut out, since the
+    whole subject is the background seen through it.
+
+    **Still to come, in order:** the
     reader-as-artist proposal (the spread, flavor text and art crops as
     real evidence in the commander pick, pool-resolved as ever); an ADR
     and the 99 ceremony (category by category, a card dealt per category,

@@ -50,6 +50,11 @@ import { useTableSound } from '../lib/prefs'
 import { PERSONA_ART } from '../lib/personart'
 import wispsMp4Url from '../assets/ambience/wisps-loop.mp4'
 import wispsWebmUrl from '../assets/ambience/wisps-loop.webm'
+import candleMp4Url from '../assets/seance/candle-glow-loop.mp4'
+import candleWebmUrl from '../assets/seance/candle-glow-loop.webm'
+import shellUrl from '../assets/seance/crystal-shell.webp'
+import smokeMp4Url from '../assets/seance/seance-smoke-loop.mp4'
+import smokeWebmUrl from '../assets/seance/seance-smoke-loop.webm'
 import { ThemeInterview } from './theme'
 import { CardArt } from './ui'
 import { VideoBackdrop } from './videofx'
@@ -450,28 +455,37 @@ function ShufflingDeck() {
 }
 
 /**
- * The reader's crystal ball — a real one this time.
+ * The reader's crystal ball — a photograph now, not a drawing of one.
  *
- * Inline SVG like `CardBack`, so it costs no asset and owes nobody a licence:
- * the glass, the fog and the brass are all geometry. Three layers of blurred
- * fog turn against each other inside a clip of the sphere (`.crystal-fog-*`),
- * glints twinkle on their own delays, the gleam still breathes, and an aura
- * pools on the felt underneath. Everything holds still under
- * `prefers-reduced-motion` — the fog is simply weather, arrested.
+ * The previous ball was inline SVG, and it was good SVG: a fresnel ring, a
+ * caustic pool, a hand-turned brass cradle. It still read as a rendering,
+ * because the thing a real sphere has that geometry does not is *dirt* —
+ * veils, fractures, a bloom of internal cloud that no gradient stack
+ * proposes. Commandment 5 asks for the real thing wherever a real thing is
+ * free, so the glass is now a CC0 photograph of a smoky-quartz sphere,
+ * fetched, licence-gated, matted and committed through the animist
+ * (`assets/seance/crystal.recipe.yaml`, ADR 29) rather than hand-placed.
+ *
+ * **The composite is why it is four layers and not one picture.** The card
+ * has to be *inside* the glass, so the stack is: our own candle and our own
+ * smoke behind (two ADR 31 procedural loops, seeds 1848 and 1909 — the
+ * spiritualist craze and the printing); the depths; the vision; then the
+ * photograph on top, twice. `.crystal-shell-body` carries the glass over
+ * the card, and `.crystal-shell-light` is the same file crushed to its
+ * highlights and screened back on, so the specular arc and the rim sit
+ * above everything the way they do on real glass. Flatten any of that and
+ * the card is in front of a ball instead of inside one.
+ *
+ * **The brass stays drawn**, and that is not laziness: a cradle is turned
+ * geometry — a stack of profiles, each catching its own light — which is
+ * exactly what SVG is good at and exactly what a photograph would have
+ * bolted a stranger's taste onto. The photographed sphere is cropped free
+ * of its own glass stand, so what it sits in is ours.
  *
  * `vision` is the trick the ball was bought for: the card most recently
- * turned over surfaces inside the glass, under the fog, the way a fortune
- * arrives — already there once the mist thins. Whole, since the punch list
- * (2026-08-15 item 11) — the old crop filled the glass with a detail nobody
- * could name. A reversed card appears upside down in the glass too; the
- * ball does not editorialise.
- *
- * The same punch list called the ball clip art, and the answer is optics
- * rather than assets: a fresnel ring (glass darkens at its own silhouette),
- * one hard specular hotspot, a contact shadow under a properly turned
- * cradle — lathework is a stack of profiles, each catching its own light —
- * and behind the whole thing, slow smoke with a light flickering in it
- * (`.crystal-haze`), so the ball sits in a séance and not on a sticker.
+ * turned surfaces inside the glass, the way a fortune arrives — already
+ * there once the mist thins. Whole rather than cropped, and a reversed card
+ * hangs upside down in the glass too; the ball does not editorialise.
  *
  * Decorative and marked so. The spread announces every card by name; the
  * ball repeating it to a screen reader would be saying everything twice.
@@ -482,55 +496,18 @@ function CrystalBall({ vision }: {
   const id = useId().replace(/:/g, '')
   return (
     <div className="crystal-ball" aria-hidden="true">
-      {/* The room behind the glass: drifting smoke, and a light somewhere
-          in it that will not hold steady. Behind the svg in paint order. */}
-      <div className="crystal-haze">
-        <span className="crystal-backlight" />
-        <span className="crystal-haze-puff crystal-haze-a" />
-        <span className="crystal-haze-puff crystal-haze-b" />
-        <span className="crystal-haze-puff crystal-haze-c" />
+      {/* The room behind the glass. Both are `ambience` mode, so reduced
+          motion or the ambience pref removes them outright rather than
+          freezing them — frozen weather is a smudge. */}
+      <div className="crystal-room">
+        <VideoBackdrop webmSrc={candleWebmUrl} mp4Src={candleMp4Url}
+                       mode="ambience" className="crystal-candle" />
+        <VideoBackdrop webmSrc={smokeWebmUrl} mp4Src={smokeMp4Url}
+                       mode="ambience" className="crystal-smoke" />
       </div>
-      <svg viewBox="0 0 120 150" className="h-full w-full">
+
+      <svg viewBox="0 0 120 150" className="crystal-cradle h-full w-full">
         <defs>
-          {/* The depths: a nebula rather than a flat gradient. The base is
-              near-black indigo; two coloured pools drift through it below
-              (`.crystal-nebula-*`) so the interior reads as space with
-              weather in it, not as a tinted circle. */}
-          <radialGradient id={`${id}-depth`} cx="50%" cy="44%" r="70%">
-            <stop offset="0%" stopColor="#312566" />
-            <stop offset="45%" stopColor="#1d1548" />
-            <stop offset="100%" stopColor="#080520" />
-          </radialGradient>
-          <radialGradient id={`${id}-nebula-violet`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(147,98,255,0.55)" />
-            <stop offset="100%" stopColor="rgba(147,98,255,0)" />
-          </radialGradient>
-          <radialGradient id={`${id}-nebula-teal`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(64,201,198,0.4)" />
-            <stop offset="100%" stopColor="rgba(64,201,198,0)" />
-          </radialGradient>
-          <radialGradient id={`${id}-sheen`} cx="34%" cy="26%" r="60%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.55)" />
-            <stop offset="34%" stopColor="rgba(255,255,255,0.13)" />
-            <stop offset="62%" stopColor="rgba(255,255,255,0)" />
-          </radialGradient>
-          {/* Light gathering at the bottom of the sphere, the way it does in
-              real glass: a caustic pool, faintly violet. */}
-          <radialGradient id={`${id}-caustic`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(196,170,255,0.4)" />
-            <stop offset="70%" stopColor="rgba(196,170,255,0.08)" />
-            <stop offset="100%" stopColor="rgba(196,170,255,0)" />
-          </radialGradient>
-          <radialGradient id={`${id}-fog`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(224,212,255,0.9)" />
-            <stop offset="55%" stopColor="rgba(168,142,255,0.35)" />
-            <stop offset="100%" stopColor="rgba(168,142,255,0)" />
-          </radialGradient>
-          <linearGradient id={`${id}-rim`} x1="0" y1="0" x2="0.6" y2="1">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.75)" />
-            <stop offset="45%" stopColor="rgba(190,170,255,0.18)" />
-            <stop offset="100%" stopColor="rgba(120,90,220,0.45)" />
-          </linearGradient>
           {/* Brass, with the stops a photograph of brass actually has: a
               bright turned band, a fast fall to shadow, a bounce of warm
               reflected light off the felt near the foot. The lip runs the
@@ -559,202 +536,104 @@ function CrystalBall({ vision }: {
             <stop offset="55%" stopColor="rgba(255,244,200,0.55)" />
             <stop offset="100%" stopColor="rgba(255,244,200,0)" />
           </linearGradient>
-          {/* Fresnel: real glass goes dark and reflective at its silhouette.
-              Transparent through the body, a deep violet ring at the edge —
-              this one gradient is most of the difference between "sphere"
-              and "circle with a border". */}
-          <radialGradient id={`${id}-fresnel`} cx="50%" cy="46%" r="54%">
-            <stop offset="0%" stopColor="rgba(8,5,32,0)" />
-            <stop offset="78%" stopColor="rgba(8,5,32,0)" />
-            <stop offset="93%" stopColor="rgba(24,14,64,0.42)" />
-            <stop offset="100%" stopColor="rgba(5,3,24,0.75)" />
-          </radialGradient>
-          <radialGradient id={`${id}-hotspot`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
-            <stop offset="40%" stopColor="rgba(255,255,255,0.35)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-          </radialGradient>
           <radialGradient id={`${id}-shadow`} cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="rgba(4,2,18,0.6)" />
             <stop offset="70%" stopColor="rgba(4,2,18,0.25)" />
             <stop offset="100%" stopColor="rgba(4,2,18,0)" />
           </radialGradient>
-          <clipPath id={`${id}-glass`}>
-            <circle cx="60" cy="62" r="44" />
-          </clipPath>
-          {/* What turns flat ellipses into weather: static turbulence tears
-              the fog's edges into wisps as each layer drifts through it. The
-              noise itself never animates (no SMIL — reduced motion must be
-              able to arrest everything from CSS); the *layers* move, and the
-              displacement makes their edges boil as they go. */}
-          <filter id={`${id}-wisp`} x="-60%" y="-60%" width="220%" height="220%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.055 0.09"
-                          numOctaves="3" seed="7" result="noise" />
-            <feDisplacementMap in="SourceGraphic" in2="noise" scale="26"
-                               xChannelSelector="R" yChannelSelector="G" />
-            <feGaussianBlur stdDeviation="2.6" />
-          </filter>
-          <filter id={`${id}-soft`} x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="5" />
-          </filter>
         </defs>
 
         {/* What the ball does to the table: its violet light, and under the
             stand the shadow the light cannot argue away. Shadow first, so
             everything sits *on* something — the missing contact shadow was
             half of what read as clip art. */}
-        <ellipse cx="60" cy="144" rx="34" ry="6" fill={`url(#${id}-shadow)`} />
-        <ellipse className="crystal-aura" cx="60" cy="130" rx="46" ry="10"
+        <ellipse cx="60" cy="132" rx="30" ry="5" fill={`url(#${id}-shadow)`} />
+        <ellipse className="crystal-aura" cx="60" cy="120" rx="46" ry="10"
                  fill="#8f79e8" />
 
-        {/* The stand: a turned brass cradle. Real lathework is a stack of
-            profiles — a cushion ring the sphere sits in, a waisted ogee
-            body, a beaded band, a flared foot — and each course carries the
-            lip gradient across it so every turning catches its own light. */}
-        {/* The body, waisted then flared. */}
-        <path d="M36 116 C 36 108 84 108 84 116 C 84 124 76 126 74 130
-                 L 78 140 C 78 148 42 148 42 140 L 46 130
-                 C 44 126 36 124 36 116 Z"
+        {/* The stand, in two halves around the glass — and the split is
+            the whole fix. Every course used to be painted before the
+            sphere, so the ball sat *on* a brass cup like a scoop of ice
+            cream, with a dark socket showing under it that read as an
+            empty goblet. A ball rests **in** a cradle, which means the
+            near side of the ring has to occlude the bottom of the sphere.
+            So: foot, stem and the ring's far side here, the glass next,
+            and `.crystal-cradle-front` after it.
+
+            The ring is at y=100, six units above the sphere's lowest point
+            (cy 62 + r 44 = 106), so the glass genuinely sinks into it. */}
+
+        {/* The foot: low and wide, a turned moulding rather than a slab,
+            and it MEETS the stem — an earlier pass left a gap here with the
+            bead course floating in it. */}
+        <path d="M46 117 C 46 120 42 122 40 126 C 38 129 44 131 60 131
+                 C 76 131 82 129 80 126 C 78 122 74 120 74 117 Z"
               fill={`url(#${id}-brass)`} />
-        {/* The cushion ring the sphere rests in, seen edge-on. */}
-        <ellipse cx="60" cy="112" rx="26" ry="7" fill={`url(#${id}-brass-lip)`} />
-        <ellipse cx="60" cy="111" rx="21" ry="5" fill="#1a1030" />
-        <ellipse cx="60" cy="110.4" rx="21" ry="5" fill="none"
-                 stroke="#f8e6a8" strokeWidth="0.7" opacity="0.7" />
-        {/* Engraved turnings on the body. */}
-        <path d="M42 122 C 50 126 70 126 78 122" stroke="#2c1d0a"
-              strokeWidth="1" fill="none" opacity="0.55" />
-        <path d="M43 120.6 C 51 124.6 69 124.6 77 120.6" stroke="#f3dc96"
-              strokeWidth="0.7" fill="none" opacity="0.6" />
-        <path d="M45 132 C 52 135 68 135 75 132" stroke="#2c1d0a"
-              strokeWidth="0.9" fill="none" opacity="0.5" />
-        {/* The window's streak down the polished body. */}
-        <path d="M50 112 L 48 146 L 56 146 L 56 112 Z"
-              fill={`url(#${id}-brass-streak)`} opacity="0.5" />
-        {/* The beaded band above the foot. */}
-        {[46, 52.5, 59, 65.5, 72].map((x) => (
+        <path d="M40.5 127.5 C 46 130 74 130 79.5 127.5" stroke="#f3dc96"
+              strokeWidth="0.8" fill="none" opacity="0.5" />
+        {/* The bead course sitting on the foot's shoulder, where the stem
+            lands — a real turning has a bead at every join. */}
+        {[49, 53.5, 58, 62.5, 67].map((x) => (
           <g key={x}>
-            <circle cx={x + 1} cy="137.5" r="1.6" fill="#e8c76a"
-                    opacity="0.9" />
-            <circle cx={x + 0.5} cy="137" r="0.55" fill="#fff7dd"
+            <circle cx={x + 1} cy="118" r="1.3" fill="#e8c76a"
+                    opacity="0.92" />
+            <circle cx={x + 0.6} cy="117.6" r="0.45" fill="#fff7dd"
                     opacity="0.9" />
           </g>
         ))}
-        {/* The flared foot, its own turning and its own light. */}
-        <path d="M42 140 C 42 138 78 138 78 140 L 82 144
-                 C 84 147 76 149 60 149 C 44 149 36 147 38 144 Z"
+        {/* The stem: short and waisted. It was a tall truncated cone and
+            read as a lampshade; a crystal ball's stand is a *low* pedestal,
+            because the glass is meant to be the tallest thing on the table. */}
+        <path d="M48 102 C 48 109 52 111 52 118 L 68 118
+                 C 68 111 72 109 72 102 Z"
               fill={`url(#${id}-brass)`} />
-        <path d="M38.5 144.5 C 44 147.5 76 147.5 81.5 144.5" stroke="#f3dc96"
-              strokeWidth="0.8" fill="none" opacity="0.55" />
-        {/* Three stones: amethyst, opal, jade — each with its own glint. */}
-        <circle cx="60" cy="128" r="3.4" fill="#7d4b8f" />
-        <circle cx="60" cy="128" r="3.4" fill="none" stroke="#2c1d0a"
-                strokeWidth="0.5" opacity="0.6" />
-        <circle cx="59" cy="127" r="1" fill="#e6c8f2" opacity="0.9" />
-        <circle cx="46" cy="126" r="2.4" fill="#cfd8e8" />
-        <circle cx="45.4" cy="125.4" r="0.8" fill="#fff" opacity="0.95" />
-        <circle cx="74" cy="126" r="2.4" fill="#2e6f6a" />
-        <circle cx="73.4" cy="125.4" r="0.8" fill="#bff0e2" opacity="0.9" />
+        <path d="M51.5 114 C 56 116 64 116 68.5 114" stroke="#2c1d0a"
+              strokeWidth="0.8" fill="none" opacity="0.45" />
+        {/* The window's streak down the polished stem. */}
+        <path d="M54 102 L 53 118 L 58 118 L 58 102 Z"
+              fill={`url(#${id}-brass-streak)`} opacity="0.45" />
+        {/* Three stones set into the stem's waist. */}
+        <circle cx="60" cy="111" r="2.6" fill="#7d4b8f" />
+        <circle cx="60" cy="111" r="2.6" fill="none" stroke="#2c1d0a"
+                strokeWidth="0.45" opacity="0.6" />
+        <circle cx="59.3" cy="110.2" r="0.8" fill="#e6c8f2" opacity="0.9" />
+        <circle cx="53" cy="110.2" r="1.6" fill="#cfd8e8" />
+        <circle cx="52.6" cy="109.8" r="0.55" fill="#fff" opacity="0.95" />
+        <circle cx="67" cy="110.2" r="1.6" fill="#2e6f6a" />
+        <circle cx="66.6" cy="109.8" r="0.55" fill="#bff0e2" opacity="0.9" />
+        {/* The ring's FAR side: the rim seen over the ball's shoulder. A
+            band with thickness, not a wire — outer curve out, inner curve
+            back. */}
+        <path d="M34 100 C 34 93.5 86 93.5 86 100 L 79 100
+                 C 79 96.5 41 96.5 41 100 Z"
+              fill={`url(#${id}-brass-lip)`} />
+      </svg>
 
-        {/* The glass, and everything it holds. */}
-        <circle cx="60" cy="62" r="44" fill={`url(#${id}-depth)`} />
-        <g clipPath={`url(#${id}-glass)`}>
-          {/* The nebula: two pools of colour turning slowly against each
-              other, far below the fog. */}
-          <g className="crystal-nebula crystal-nebula-a">
-            <ellipse cx="44" cy="50" rx="30" ry="20"
-                     fill={`url(#${id}-nebula-violet)`} />
-          </g>
-          <g className="crystal-nebula crystal-nebula-b">
-            <ellipse cx="76" cy="76" rx="26" ry="18"
-                     fill={`url(#${id}-nebula-teal)`} />
-          </g>
-          {/* A drift of stars, deeper than the smoke. */}
-          <g className="crystal-stars" fill="#fff">
-            {[[34, 44, 0.7], [50, 30, 0.5], [72, 38, 0.6], [86, 60, 0.45],
-              [78, 84, 0.55], [52, 92, 0.5], [30, 72, 0.45], [63, 58, 0.8],
-              [42, 62, 0.4], [70, 68, 0.5]].map(([x, y, r]) => (
-                <circle key={`${x}-${y}`} cx={x} cy={y} r={r} opacity="0.7" />
-            ))}
-          </g>
+      {/* The glass, and everything it holds. Positioned to land exactly on
+          the circle the old svg drew — cx 60, cy 62, r 44 in a 120x150
+          viewBox — so the cradle's cushion ring still cups it. */}
+      <div className="crystal-orb">
+        <span className="crystal-depths" />
+        {vision && (
+          <img className={`crystal-vision${vision.reversed ? ' is-reversed' : ''}`}
+               src={vision.image} alt="" />
+        )}
+        <img className="crystal-shell-body" src={shellUrl} alt="" />
+        <img className="crystal-shell-light" src={shellUrl} alt="" />
+      </div>
 
-          {vision && (
-            // Keyed on the image so a new turn arrives as a new vision. Two
-            // players in the arrival: the smoke billows up first
-            // (`.crystal-vision-smoke`), and the card surfaces through it,
-            // unblurring as the smoke thins — the fortune is simply *there*
-            // once the mist parts. A reversed card appears upside down; the
-            // ball does not editorialise.
-            <g key={vision.image}>
-              <g transform={vision.reversed ? 'rotate(180 60 62)' : undefined}>
-                {/* `meet`, not `slice`, and a modest footprint (punch list
-                    2026-08-15 item 11): the old crop filled the glass and
-                    showed a fist-sized detail of a card nobody could name.
-                    The whole picture floats in the sphere now, its corners
-                    just kissing the glass — a vision of the card, not a
-                    zoom into it. */}
-                <image className="crystal-vision" href={vision.image}
-                       x="35.5" y="20" width="49" height="84"
-                       preserveAspectRatio="xMidYMid meet" />
-              </g>
-              <g className="crystal-vision-smoke" filter={`url(#${id}-wisp)`}>
-                <ellipse cx="60" cy="70" rx="34" ry="22" fill={`url(#${id}-fog)`} />
-                <ellipse cx="48" cy="52" rx="22" ry="14" fill={`url(#${id}-fog)`} />
-                <ellipse cx="74" cy="58" rx="20" ry="13" fill={`url(#${id}-fog)`} />
-              </g>
-            </g>
-          )}
-
-          {/* The standing weather: three layers of torn smoke drifting at
-              incommensurate speeds, so the glass never visibly loops. */}
-          <g className="crystal-fog crystal-fog-a" filter={`url(#${id}-wisp)`}>
-            <ellipse cx="42" cy="52" rx="27" ry="13" fill={`url(#${id}-fog)`} />
-            <ellipse cx="76" cy="76" rx="23" ry="11" fill={`url(#${id}-fog)`} />
-          </g>
-          <g className="crystal-fog crystal-fog-b" filter={`url(#${id}-wisp)`}>
-            <ellipse cx="68" cy="42" rx="21" ry="10" fill={`url(#${id}-fog)`} />
-            <ellipse cx="46" cy="84" rx="25" ry="11" fill={`url(#${id}-fog)`} />
-          </g>
-          <g className="crystal-fog crystal-fog-c" filter={`url(#${id}-soft)`}>
-            <ellipse cx="60" cy="64" rx="31" ry="16" fill={`url(#${id}-fog)`} />
-          </g>
-
-          <g fill="#fff">
-            <circle className="crystal-spark" cx="44" cy="46" r="1.4" />
-            <circle className="crystal-spark crystal-spark-2" cx="77" cy="58" r="1" />
-            <circle className="crystal-spark crystal-spark-3" cx="55" cy="86" r="1.2" />
-            <circle className="crystal-spark crystal-spark-4" cx="69" cy="33" r="0.9" />
-            <circle className="crystal-spark crystal-spark-5" cx="36" cy="66" r="1.1" />
-          </g>
-
-          {/* Glasswork, over everything inside: the caustic pool at the foot
-              of the sphere, the sheen, then the fresnel — the darkening a
-              sphere of glass does at its own silhouette, which is most of
-              what separates a ball from a circle. Last, the hotspot: one
-              small hard reflection of the room's light, blurred just enough
-              to sit *on* the glass rather than in it. */}
-          <ellipse cx="60" cy="94" rx="26" ry="10" fill={`url(#${id}-caustic)`} />
-          <circle cx="60" cy="62" r="44" fill={`url(#${id}-sheen)`} />
-          <circle cx="60" cy="62" r="44" fill={`url(#${id}-fresnel)`} />
-          <ellipse cx="44" cy="35" rx="7" ry="4.5" fill={`url(#${id}-hotspot)`}
-                   transform="rotate(-28 44 35)" />
-          <circle cx="47.5" cy="32.5" r="1.3" fill="#fff" opacity="0.95" />
-        </g>
-
-        {/* The rim: a gradient stroke so the sphere's edge catches light at
-            the top and holds shadowed violet at the base — one flat stroke
-            was most of what read as clip art. */}
-        <circle cx="60" cy="62" r="44" fill="none"
-                stroke={`url(#${id}-rim)`} strokeWidth="1.6" />
-        <circle cx="60" cy="62" r="42.2" fill="none"
-                stroke="rgba(255,255,255,0.08)" strokeWidth="0.8" />
-        {/* The gleam that breathes, and its small answer across the glass. */}
-        <path className="crystal-gleam" d="M29 46 A 35 35 0 0 1 50 23"
-              fill="none" stroke="rgba(255,255,255,0.92)" strokeWidth="3"
-              strokeLinecap="round" />
-        <path d="M83 90 A 34 34 0 0 1 74 98" fill="none"
-              stroke="rgba(255,255,255,0.28)" strokeWidth="2"
-              strokeLinecap="round" />
+      {/* The ring's NEAR side, painted over the glass. This one element is
+          what turns "a ball balanced on a cup" into "a ball sitting in a
+          cradle": it crosses in front of the sphere's lower curve, so the
+          brass occludes the glass instead of stopping politely beneath it.
+          Same viewBox, same gradients — SVG ids are document-global, so it
+          reuses the ones defined above rather than declaring them twice. */}
+      <svg viewBox="0 0 120 150" className="crystal-cradle-front">
+        <path d="M34 100 C 34 106.5 86 106.5 86 100 L 79 100
+                 C 79 103.5 41 103.5 41 100 Z"
+              fill={`url(#${id}-brass-lip)`} />
+        <path d="M35.5 101.3 C 41 105.8 79 105.8 84.5 101.3" stroke="#f8e6a8"
+              strokeWidth="0.6" fill="none" opacity="0.6" />
       </svg>
     </div>
   )
@@ -1203,25 +1082,24 @@ export function TarotTable({ onPick, onLeave }: {
       )}
 
       {/* The spread. Centred and large while it is the event — on the felt,
-          with the reader's crystal ball at the table's edge; a strip against
-          the left margin once the conversation is, where it sits over the
-          column the questions are in rather than floating in the middle of
-          the page with nothing under it. The felt goes when the table folds:
-          a green rectangle beside a chat column is furniture, not ceremony. */}
+          under the reader's crystal ball; a strip against the left margin
+          once the conversation is, where it sits over the column the
+          questions are in rather than floating in the middle of the page
+          with nothing under it. The felt goes when the table folds: a green
+          rectangle beside a chat column is furniture, not ceremony. */}
       {cards.length > 0 && (
         <div className={dealing ? 'tarot-table-felt relative px-4 py-8' : ''}>
           {dealing && <TableWisps />}
           {dealing && (
-            /* `lg`, not `sm`. The ball is positioned against the felt's right
-               edge while the spread is centred in the whole felt, so the two
-               close on each other as the page narrows — at `sm` it sat on top
-               of the third card for every width from 640px to about a
-               thousand, which is most laptops in a half-width window. The
-               arithmetic is in `index.css` beside `.crystal-ball`, which
-               shrinks it with the viewport for the widths where it does fit.
-               Below that it is absent rather than squeezed: no ball is a
-               plainer table, and a ball across the cards is a broken one. */
-            <div className="absolute right-5 top-1/2 hidden -translate-y-1/2 lg:block">
+            /* Above the spread and centred, which is where a crystal ball
+               on a séance table goes — and which deletes a problem rather
+               than managing one. Pinned to the felt's right edge it closed
+               on the centred spread as the page narrowed, sat across the
+               third card everywhere below about a thousand pixels, and had
+               to be shrunk and then hidden below `lg` to cope. Standing it
+               over the cards means nothing is beside it, so it shows at
+               every width and can be the size the thing deserves. */
+            <div className="relative mb-6 flex justify-center">
               <CrystalBall vision={lastTurned && lastTurned.image
                 ? { image: lastTurned.image, reversed: lastTurned.reversed }
                 : null} />
