@@ -196,13 +196,16 @@ const ROSTER = {
 const READING = {
   seed: 4242,
   cards: [
-    { key: '13-death', name: 'Death', arcana: 'major', suit: null, number: 13,
+    { key: '13-death', name: 'Death', face_name: 'Death',
+      arcana: 'major', suit: null, number: 13,
       image: '/tarot/13-death.webp', reversed: true,
       slot: 'taste', position: 'The Root' },
-    { key: 'swords-03', name: 'Three of Swords', arcana: 'minor',
+    { key: 'swords-03', name: 'Three of Swords',
+      face_name: 'Three of Swords', arcana: 'minor',
       suit: 'swords', number: 3, image: '/tarot/swords-03.webp',
       reversed: false, slot: 'temperament', position: 'The Turning' },
-    { key: 'wands-03', name: 'Three of Wands', arcana: 'minor',
+    { key: 'wands-03', name: 'Three of Wands',
+      face_name: 'Three of Wands', arcana: 'minor',
       suit: 'wands', number: 3, image: '/tarot/wands-03.webp',
       reversed: false, slot: 'posture', position: 'The Table' },
   ],
@@ -366,6 +369,7 @@ describe('the tarot door', () => {
       ...READING,
       cards: [
         { key: 'mtg-massimo-the-magician', name: 'Massimo, the Magician',
+          face_name: 'Massimo, the Magician',
           arcana: 'major', suit: null, number: 1,
           image: 'https://cards.scryfall.io/art_crop/front/b/e/massimo.jpg',
           artist: 'Jodie Muir', after: 'The Magician',
@@ -394,6 +398,7 @@ describe('the tarot door', () => {
       ...READING,
       cards: [
         { key: 'mtg-flubs-the-fool', name: 'Flubs, the Fool',
+          face_name: 'Flubs, the Fool',
           arcana: 'major', suit: null, number: 0,
           image: 'https://cards.scryfall.io/art_crop/front/4/1/flubs.jpg',
           artist: 'Adam Rex', after: 'The Fool',

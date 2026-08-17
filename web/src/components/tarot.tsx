@@ -267,10 +267,11 @@ function CrossoverFace({ card }: { card: TarotDrawn }) {
           <p className="tarot-rws-numeral">{ROMAN[card.number] ?? ''}</p>
         )}
         <div className="tarot-rws-canvas">
-          <img src={card.image} alt={card.name} className="tarot-rws-art" />
+          <img src={card.image} alt={card.face_name}
+               className="tarot-rws-art" />
         </div>
       </div>
-      <p className="tarot-rws-name">{card.name}</p>
+      <p className="tarot-rws-name">{card.face_name}</p>
     </div>
   )
 }
@@ -291,7 +292,7 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
   small?: boolean
 }) {
   const label = faceUp
-    ? `${card.position}: ${card.name}${card.reversed ? ', reversed' : ''}`
+    ? `${card.position}: ${card.face_name}${card.reversed ? ', reversed' : ''}`
     : `${card.position}: face down`
   const inner = (
     <div className={`tarot-card${faceUp ? ' is-face-up' : ''}`}>
@@ -340,7 +341,7 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
         <>
           <p className="text-center text-xs"
              style={{ color: 'var(--text-secondary)' }}>
-            {card.name}
+            {card.face_name}
           </p>
           {/* Its own line rather than a suffix. At 96px "Nine of Swords ·
               reversed" wraps wherever it likes, and the word that says which

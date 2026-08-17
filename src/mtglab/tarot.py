@@ -32,17 +32,28 @@ his "get weird" and "leave no stone unturned"). The **crossovers** are the
 three cards Magic has printed that *are* tarot cards -- Flubs, the Fool;
 Homer, the Hermit; Massimo, the Magician -- and a deep scan of the pool on
 2026-08-16 confirmed the cycle is exactly those three (a Scryfall
-name-pattern search agreed). The **echoes** are twenty-nine real cards
+name-pattern search agreed). The **echoes** are thirty-eight real cards
 whose name, art and rules genuinely carry a tarot card: every one of the
 22 trumps is answered (the Alpha Wheel of Fortune above all, which is also
 the painting this site's own Wheel spins), and the tier reaches into the
-minors -- the aces, the coins, a page, a king. Each was chosen by looking
-at the art beside the 1909 scans AND by its `note`: original imagery
-outranks every other classifier (Aaron's rule -- Stone Rain's tower
-mid-ruin beat a better-numbered tower that merely loomed), and a card that
-cannot justify its slot in checkable facts is cut; the rejects (a
-comic-styled Justice, a playtest-doodle Moon, Thor and Loki wearing a
-Pacifism frame) are why both rules exist. Every one is a `Card` like the
+minors -- the aces, the coins, a page, a king, and since Aaron's verdicts
+nine more. Each was chosen by looking at the art beside the 1909 scans AND
+by its `note`: original imagery outranks every other classifier (Aaron's
+rule), and a card that cannot justify its slot in checkable facts is cut;
+the rejects (a comic-styled Justice, a playtest-doodle Moon, Thor and Loki
+wearing a Pacifism frame) are why both rules exist.
+
+**The rubric widened on 2026-08-17**, at Aaron's "expand your associations":
+art still outranks, but a slot may also be won on the card's *name*, its
+*rules text*, or its place in the game -- Command Tower answers The Tower
+on all four at once, and Murder holds the Ten of Swords on three of them
+with art that merely does not embarrass it. What did not widen is the
+evidence: a `note` states facts checked against the pool row, and a
+resonance a reader can verify is a wink while one they cannot is a lie with
+candles on it. That session also settled the **printing** question -- the
+pool's default printing is not always the right painting, so Command Tower,
+Young Pyromancer, Thassa and Murder each hotlink a chosen one. Every one is
+a `Card` like the
 78 with extra facts: the Scryfall
 art crop it shows (hotlinked with the artist credited, never committed;
 rule 5 and the persona tiles' precedent), who painted it, which trump it
@@ -146,10 +157,25 @@ class Card:
     def image(self) -> str:
         return self.art_url or f"/tarot/{self.key}.webp"
 
+    @property
+    def face_name(self) -> str:
+        """What is hand-set under the picture, which is not always `name`.
+
+        Three echoes are double-faced cards, and `name` is the pool's name
+        for the whole card -- "Murderous Rider // Swift End". That form is
+        right in `describe`, where the reader is being told what the card
+        *is* and the second half is half the resonance, and wrong on the
+        card face, where it is two names and a piece of punctuation in
+        12px small caps on a 1909 plate. The front face is the picture, so
+        the front face is the caption.
+        """
+        return self.name.split(" // ")[0]
+
     def as_dict(self) -> dict[str, object]:
         return {"key": self.key, "name": self.name, "arcana": self.arcana,
                 "suit": self.suit, "number": self.number, "image": self.image,
-                "artist": self.artist, "after": self.after, "note": self.note}
+                "artist": self.artist, "after": self.after, "note": self.note,
+                "face_name": self.face_name}
 
 
 def _build_deck() -> tuple[Card, ...]:
@@ -169,11 +195,13 @@ DECK: tuple[Card, ...] = _build_deck()
 #: How often each Magic tier lands, against a natural card's 1.0. The three
 #: printed tarot cards stay the most favoured; an echo is *rarer* than a
 #: natural card since the deep dives widened the tier (Aaron, 2026-08-16)
-#: -- twenty-nine of them supply the presence now, every trump covered and
+#: -- thirty-eight of them supply the presence now, every trump covered and
 #: the suits opened, so each member's weight drops as the roster grows to
-#: keep the whole tier landing about every third reading.
+#: keep the whole tier landing about every third reading. It came down
+#: again from 0.25 with Aaron's 2026-08-17 verdicts, which added nine
+#: minors: the landing rate is the constant, the weight is what moves.
 CROSSOVER_WEIGHT = 1.5
-ECHO_WEIGHT = 0.25
+ECHO_WEIGHT = 0.2
 
 #: The three Magic cards that are tarot cards, each carrying its trump's
 #: number so a reader who cares about such things sees it sit where its
@@ -211,25 +239,32 @@ CROSSOVERS: tuple[Card, ...] = (
 )
 
 #: The echoes: real Magic cards whose name, art and rules genuinely carry a
-#: tarot card, found in two deep dives (2026-08-16, the second at Aaron's
-#: "get weird"). Chosen by eye against the 1909 scans AND by note: every
-#: entry justifies its slot with checkable resonances or it was cut -- the
-#: rejects (a comic-book Justice, a playtest-doodle Moon, a Cait Sith too
-#: cute to sit beside 1909 cardboard) are why both rules exist. Art and
-#: artists come from the pool's rows; the Wheel deliberately uses Daniel
-#: Gelon's Alpha painting -- the same one `components/wheel.tsx` spins, so
-#: the card on the table and the wheel on the deck page are one image. Two
-#: echoes reach into the minor arcana (the aces), which is why the tier is
-#: keyed on suit as well as number.
+#: tarot card, found in three deep dives (2026-08-16 twice, at Aaron's "get
+#: weird" and "leave no stone unturned"; 2026-08-17 at his verdicts, which
+#: swapped eight trumps and opened nine more minors). Chosen by eye against
+#: the 1909 scans AND by note: every entry justifies its slot with
+#: checkable resonances or it was cut -- the rejects (a comic-book Justice,
+#: a playtest-doodle Moon, a Cait Sith too cute to sit beside 1909
+#: cardboard) are why both rules exist. Art and artists come from the
+#: pool's rows *unless a printing was chosen deliberately* -- the Wheel uses
+#: Daniel Gelon's Alpha painting, the same one `components/wheel.tsx` spins,
+#: so the card on the table and the wheel on the deck page are one image,
+#: and four more name their printing because the pool's default was the
+#: wrong picture. Nineteen echoes now reach into the minor arcana, which is
+#: why the tier is keyed on suit as well as number.
 ECHOES: tuple[Card, ...] = (
-    Card("mtg-blind-seer", "Blind Seer", "major", None, 2,
-         art_url="https://cards.scryfall.io/art_crop/front/5/c/"
-                 "5c54ec26-c7f1-4258-9cc9-1709987f293c.jpg",
-         artist="Dave Dorman", after="The High Priestess", echo=True,
+    Card("mtg-willow-priestess", "Willow Priestess", "major", None, 2,
+         art_url="https://cards.scryfall.io/art_crop/front/3/1/"
+                 "31479296-5ea7-470c-9d3f-257e67844fbc.jpg",
+         artist="Susan Van Camp", after="The High Priestess", echo=True,
          weight=ECHO_WEIGHT,
-         note="The High Priestess keeps knowledge behind a veil, and the "
-              "Blind Seer is Urza himself behind blindfold and disguise — "
-              "his flavor text suspects he sees more than he lets on."),
+         note="The High Priestess keeps what she knows behind a veil, and "
+              "Homelands printed a priestess who does the same — she puts "
+              "Faerie permanents onto the battlefield straight out of her "
+              "hand, the hidden thing brought into the world without "
+              "paying for it. Her flavor text is scripture quoted from her "
+              "own goddess: \"Those of faith are those of strength.\" "
+              "—Autumn Willow"),
     Card("mtg-empress-galina", "Empress Galina", "major", None, 3,
          art_url="https://cards.scryfall.io/art_crop/front/6/8/"
                  "6851dbc7-f072-41e7-a899-897445d99425.jpg",
@@ -255,17 +290,16 @@ ECHOES: tuple[Card, ...] = (
               "blesses one congregation or damns the other — and when he "
               "dies his office passes on, haunting a successor. Painted "
               "by Adam Rex, who also painted Flubs."),
-    Card("mtg-kynaios-and-tiro", "Kynaios and Tiro of Meletis", "major",
-         None, 6,
-         art_url="https://cards.scryfall.io/art_crop/front/9/7/"
-                 "97fa8615-2b6c-445a-bcaf-44a7e847bf65.jpg",
-         artist="Willian Murai", after="The Lovers", echo=True,
+    Card("mtg-true-loves-kiss", "True Love's Kiss", "major", None, 6,
+         art_url="https://cards.scryfall.io/art_crop/front/2/3/"
+                 "23a4bac2-f6cb-4712-8510-a63657c43a5c.jpg",
+         artist="Donato Giancola", after="The Lovers", echo=True,
          weight=ECHO_WEIGHT,
-         note="The Lovers are two figures under a blessing light, and "
-              "Theros printed them: two kings, one card, a light between "
-              "colossi above their city, whose text gives gifts to the "
-              "whole table — look what we fought for, look what we built "
-              "together."),
+         note="The Lovers stand under a blessing with a serpent in the "
+              "tree behind them, and Eldraine printed the fairy tale's own "
+              "answer to a curse: true love's kiss exiles an enchantment "
+              "outright. The trump's warning survives in the flavor text — "
+              "\"Be careful, dear. Some people deserve their curses.\""),
     Card("mtg-esikas-chariot", "Esika's Chariot", "major", None, 7,
          art_url="https://cards.scryfall.io/art_crop/front/a/8/"
                  "a87606cc-fbf0-4e2c-9798-f1c935d0573d.jpg",
@@ -304,61 +338,75 @@ ECHOES: tuple[Card, ...] = (
               "and Kev Walker painted exactly that figure — a card that "
               "levels every player's lands, hand and creatures down to "
               "equal, which is the scales made rules text."),
-    Card("mtg-hanged-executioner", "Hanged Executioner", "major", None, 12,
-         art_url="https://cards.scryfall.io/art_crop/front/7/6/"
-                 "7676deeb-b80d-49c9-b810-5ed0a68fa618.jpg",
-         artist="Johann Bodin", after="The Hanged Man", echo=True,
+    Card("mtg-suspension-field", "Suspension Field", "major", None, 12,
+         art_url="https://cards.scryfall.io/art_crop/front/b/a/"
+                 "ba5c9628-1801-43d9-8bb4-4cca168510b2.jpg",
+         artist="Seb McKinnon", after="The Hanged Man", echo=True,
          weight=ECHO_WEIGHT,
-         note="The Hanged Man hangs serene between sky and earth, and "
-              "this spirit hangs at its own gallows — flying, suspended, "
-              "and willing to give itself up to pass judgment."),
-    Card("mtg-pale-rider", "Pale Rider of Trostad", "major", None, 13,
-         art_url="https://cards.scryfall.io/art_crop/front/8/d/"
-                 "8dad70b8-0dec-4634-a31a-b78438a313a2.jpg",
-         artist="Seb McKinnon", after="Death", echo=True,
+         note="The Hanged Man hangs serene between sky and earth, and Seb "
+              "McKinnon painted a figure held in the air with its arms "
+              "open inside a ring of light. The card exiles a creature "
+              "until the field leaves the battlefield and then hands it "
+              "back to its owner — time stopped, and nothing lost."),
+    Card("mtg-murderous-rider", "Murderous Rider // Swift End", "major",
+         None, 13,
+         art_url="https://cards.scryfall.io/art_crop/front/8/0/"
+                 "80fffad3-2486-4350-8dff-54a215ebfc28.jpg",
+         artist="Josh Hass", after="Death", echo=True,
          weight=ECHO_WEIGHT,
-         note="Trump XIII rides a pale horse, as Death has since "
-              "Revelation named the rider — and skulk means no greater "
-              "power can block this one, which is the trump's whole "
-              "sermon: kings fall before it too."),
-    Card("mtg-alchemists-apprentice", "Alchemist's Apprentice", "major",
-         None, 14,
-         art_url="https://cards.scryfall.io/art_crop/front/3/1/"
-                 "31abba67-1241-4fb3-88b5-4c4668ec5f25.jpg",
-         artist="David Palumbo", after="Temperance", echo=True,
+         note="Trump XIII is an armoured skeleton riding at a walk, and "
+              "this is a Zombie Knight on a warhorse whose other half is "
+              "an instant called Swift End: destroy target creature or "
+              "planeswalker, and pay two life for it. It has lifelink — "
+              "what it takes, it gives you — and when it dies it goes to "
+              "the bottom of the library rather than the graveyard. Death "
+              "goes back into the deck and comes round again."),
+    Card("mtg-chalice-of-life", "Chalice of Life // Chalice of Death",
+         "major", None, 14,
+         art_url="https://cards.scryfall.io/art_crop/front/e/4/"
+                 "e432b156-baf0-48a1-b8fb-1aa18bfbf7de.jpg",
+         artist="Ryan Yee", after="Temperance", echo=True,
          weight=ECHO_WEIGHT,
-         note="Temperance pours one vessel into another, blending what "
-              "should not mix — and this apprentice is caught mid-pour, "
-              "one measure falling into the flask, the whole art of "
-              "moderation one drop from going wrong."),
-    Card("mtg-master-of-cruelties", "Master of Cruelties", "major", None, 15,
-         art_url="https://cards.scryfall.io/art_crop/front/f/f/"
-                 "ffd68fe1-5cfc-44cf-8dfe-3488278cdcef.jpg",
-         artist="Chase Stone", after="The Devil", echo=True,
+         note="Temperance pours between two cups, and this is two cups on "
+              "one card. The Chalice of Life gives a life at a time — and "
+              "the moment you hold ten more than you started with, it "
+              "transforms into the Chalice of Death. Excess tips the cup, "
+              "which is the trump's entire warning printed as a trigger."),
+    Card("mtg-asmodeus-the-archfiend", "Asmodeus the Archfiend", "major",
+         None, 15,
+         art_url="https://cards.scryfall.io/art_crop/front/a/5/"
+                 "a5e6b864-58e7-43b9-9d79-1d0361340960.jpg",
+         artist="Aleksi Briclot", after="The Devil", echo=True,
          weight=ECHO_WEIGHT,
-         note="The Devil keeps his captives chained but alive, and this "
-              "one attacks alone and leaves its victim at exactly 1 life "
-              "— bondage, never release — horned above the twisted "
-              "figures crawling at his steps."),
-    Card("mtg-stone-rain", "Stone Rain", "major", None, 16,
-         art_url="https://cards.scryfall.io/art_crop/front/d/2/"
-                 "d2334c10-fa96-4f8e-8187-c7ecc00cbac8.jpg",
-         artist="John Matson", after="The Tower", echo=True,
+         note="The Devil sits enthroned above two captives whose chains "
+              "are loose enough to lift off. Magic's answer has the type "
+              "line Devil God, costs six mana for a 6/6, and its ability "
+              "is called Binding Contract: every card you would draw is "
+              "taken and held face down, and you buy them all back by "
+              "paying a life for each one."),
+    Card("mtg-command-tower", "Command Tower", "major", None, 16,
+         art_url="https://cards.scryfall.io/art_crop/front/e/c/"
+                 "ec1f1041-f667-4b73-b1f2-e5bcae84095e.jpg",
+         artist="Evan Shipard", after="The Tower", echo=True,
          weight=ECHO_WEIGHT,
          note="The Tower is a crown struck from a turret by fire out of "
-              "the sky, and Magic's oldest land-destruction spell paints "
-              "the very act — a castle tower under a burning rain, walls "
-              "already going. It has been knocking towers down since the "
-              "game's first set."),
-    Card("mtg-starfield-of-nyx", "Starfield of Nyx", "major", None, 17,
-         art_url="https://cards.scryfall.io/art_crop/front/b/f/"
-                 "bfe4e1cb-ceee-46aa-96d1-f3f26516cd77.jpg",
-         artist="Tyler Jacobson", after="The Star", echo=True,
+              "the sky, and Evan Shipard painted precisely that — forked "
+              "lightning around the battlements, the sky behind it "
+              "burning. It is the land written for this format — it taps "
+              "for any colour in your commander's identity — and it has "
+              "been reprinted in more than fifty different sets, which is "
+              "its own kind of monument."),
+    Card("mtg-ephara", "Ephara, God of the Polis", "major", None, 17,
+         art_url="https://cards.scryfall.io/art_crop/front/6/8/"
+                 "6832e495-7ee9-43e0-94ea-03c88344080e.jpg",
+         artist="Eric Deschamps", after="The Star", echo=True,
          weight=ECHO_WEIGHT,
-         note="The Star is the hope that follows the Tower — trump XVII "
-              "after XVI — and this sky returns what was lost from the "
-              "graveyard, until the constellations themselves step down "
-              "and walk."),
+         note="The Star is the water-bearer's card, a figure kneeling to "
+              "pour under eight stars — and Ephara stands over her city "
+              "tipping an urn of starlit water into it. She is "
+              "indestructible and yet not a creature at all until seven "
+              "of her people stand with her: hope you can see and cannot "
+              "touch until the city gathers."),
     Card("mtg-imprisoned-in-the-moon", "Imprisoned in the Moon", "major",
          None, 18,
          art_url="https://cards.scryfall.io/art_crop/front/0/d/"
@@ -408,14 +456,46 @@ ECHOES: tuple[Card, ...] = (
               "— and this wand is painted mid-blossom in a lifted hand, "
               "named for the soul of the world, gathering the whole "
               "community into every spell it kindles."),
-    Card("mtg-chart-a-course", "Chart a Course", "minor", "wands", 2,
-         art_url="https://cards.scryfall.io/art_crop/front/7/5/"
-                 "7599d459-fe71-48f4-8c65-0f519bb63a68.jpg",
-         artist="James Ryman", after="the Two of Wands", echo=True,
+    Card("mtg-expedition-map", "Expedition Map", "minor", "wands", 2,
+         art_url="https://cards.scryfall.io/art_crop/front/0/8/"
+                 "08e66835-c228-48fa-bcaa-eb96edbd4f5a.jpg",
+         artist="Franz Vohwinkel", after="the Two of Wands", echo=True,
          weight=ECHO_WEIGHT,
-         note="The Two of Wands holds a globe and plans the voyage — and "
-              "this captain stands over his charts and orrery doing "
-              "exactly that. The card even draws exactly two."),
+         note="The Two of Wands holds a globe on the battlements and "
+              "plans the voyage. This is a map whose whole text is "
+              "reaching ground you have not stood on: sacrifice it, search "
+              "your library, and the place you were looking at is in your "
+              "hand."),
+    Card("mtg-goblin-gathering", "Goblin Gathering", "minor", "wands", 5,
+         art_url="https://cards.scryfall.io/art_crop/front/1/4/"
+                 "147bef05-4497-44d5-9dd6-fb5dc08e78f7.jpg",
+         artist="Svetlin Velinov", after="the Five of Wands", echo=True,
+         weight=ECHO_WEIGHT,
+         note="The Five of Wands is five youths swinging staves at each "
+              "other with nobody much hurt. This one makes two goblins, "
+              "and one more for every copy of itself already in the "
+              "graveyard — the same brawl, bigger each time it happens. "
+              "\"Two's a party. Three's a felony.\""),
+    Card("mtg-young-pyromancer", "Young Pyromancer", "minor", "wands", 11,
+         art_url="https://cards.scryfall.io/art_crop/front/e/3/"
+                 "e349c204-3a93-4bf7-b79a-5f5f261ea2d3.jpg",
+         artist="Cynthia Sheppard", after="the Page of Wands", echo=True,
+         weight=ECHO_WEIGHT,
+         note="The Page of Wands is a youth looking up at a staff that "
+              "has just come into leaf. Cynthia Sheppard painted the same "
+              "moment in fire — a young shaman turning a flame over in an "
+              "open hand — and every instant or sorcery cast leaves "
+              "another 1/1 Elemental standing there."),
+    Card("mtg-hellrider", "Hellrider", "minor", "wands", 12,
+         art_url="https://cards.scryfall.io/art_crop/front/7/b/"
+                 "7bbfd905-8c71-4389-9174-6e84bcbcf05c.jpg",
+         artist="Svetlin Velinov", after="the Knight of Wands", echo=True,
+         weight=ECHO_WEIGHT,
+         note="The Knight of Wands charges on a rearing horse in a "
+              "salamander-figured tabard. Magic's is a Devil on one, with "
+              "haste, and every creature that attacks alongside it burns "
+              "the defender for one more — the cavalry charge written as "
+              "a trigger."),
     Card("mtg-everflowing-chalice", "Everflowing Chalice", "minor", "cups", 1,
          art_url="https://cards.scryfall.io/art_crop/front/e/4/"
                  "e4ed0052-d6dd-4f69-8313-10863baefac9.jpg",
@@ -425,6 +505,35 @@ ECHOES: tuple[Card, ...] = (
               "it, kicked any number of times, filling without limit "
               "from the moment it costs nothing at all to place on the "
               "table."),
+    Card("mtg-rite-of-harmony", "Rite of Harmony", "minor", "cups", 3,
+         art_url="https://cards.scryfall.io/art_crop/front/e/b/"
+                 "eb1a16f9-13d4-4188-8e1e-0f2394349c7a.jpg",
+         artist="Rovina Cai", after="the Three of Cups", echo=True,
+         weight=ECHO_WEIGHT,
+         note="The Three of Cups is three figures in a ring with their "
+              "cups raised. Rovina Cai painted three in a ring with their "
+              "hands joined, and the card pays you a card for every "
+              "creature or enchantment that joins them that turn."),
+    Card("mtg-happily-ever-after", "Happily Ever After", "minor", "cups", 10,
+         art_url="https://cards.scryfall.io/art_crop/front/d/3/"
+                 "d32d85d5-a6f0-4cc5-9fd6-6b329aae2e5b.jpg",
+         artist="Matt Stewart", after="the Ten of Cups", echo=True,
+         weight=ECHO_WEIGHT,
+         note="The Ten of Cups is the rainbow over the settled house — "
+              "the one card in the deck that is simply happy. This one "
+              "hands every player five life and a card, and if you ever "
+              "hold all five colours, six card types and the life you "
+              "started with, you win the game outright."),
+    Card("mtg-thassa", "Thassa, God of the Sea", "minor", "cups", 13,
+         art_url="https://cards.scryfall.io/art_crop/front/d/6/"
+                 "d6876c7a-8bbe-484e-b733-70229fa336cd.jpg",
+         artist="Jason Chan", after="the Queen of Cups", echo=True,
+         weight=ECHO_WEIGHT,
+         note="The Queen of Cups sits at the water's edge holding a "
+              "covered cup that only she looks into. Thassa is the sea "
+              "itself, indestructible, and not a creature at all until "
+              "five of her people stand with her — and every upkeep she "
+              "scries: she looks first, then decides what comes."),
     Card("mtg-tragic-poet", "Tragic Poet", "minor", "cups", 11,
          art_url="https://cards.scryfall.io/art_crop/front/f/9/"
                  "f957b353-7765-4c16-9645-d41000154130.jpg",
@@ -445,6 +554,39 @@ ECHOES: tuple[Card, ...] = (
               "blade — truth's first cut — and Chris Rahn painted that "
               "exact gauntlet, on a sword named for the ace's own "
               "meanings, whose counters grow from one into many."),
+    Card("mtg-curse-of-the-pierced-heart", "Curse of the Pierced Heart",
+         "minor", "swords", 3,
+         art_url="https://cards.scryfall.io/art_crop/front/7/1/"
+                 "71010182-c004-4d18-adab-80319cd1e625.jpg",
+         artist="E. M. Gist", after="the Three of Swords", echo=True,
+         weight=ECHO_WEIGHT,
+         note="The Three of Swords is a heart run through by three blades "
+              "under rain. This is a Curse — that is the card type — and "
+              "it pierces the player it enchants for one damage at the "
+              "beginning of every one of their upkeeps. Grief that comes "
+              "back each morning."),
+    Card("mtg-startled-awake", "Startled Awake // Persistent Nightmare",
+         "minor", "swords", 9,
+         art_url="https://cards.scryfall.io/art_crop/front/e/6/"
+                 "e630fc56-a96f-4abf-be8d-f0f40d5a9edf.jpg",
+         artist="Sean Sevestre", after="the Nine of Swords", echo=True,
+         weight=ECHO_WEIGHT,
+         note="The Nine of Swords is a figure sitting up in bed with "
+              "their face in their hands at the worst hour of the night, "
+              "and Magic painted that exact picture and gave it that "
+              "exact name. It mills thirteen, then climbs back out of the "
+              "graveyard as Persistent Nightmare — and returns to hand "
+              "every time it connects, so it can do it again."),
+    Card("mtg-murder", "Murder", "minor", "swords", 10,
+         art_url="https://cards.scryfall.io/art_crop/front/c/8/"
+                 "c8676f02-cf1e-4d40-a0c5-6e5a97417898.jpg",
+         artist="Allen Williams", after="the Ten of Swords", echo=True,
+         weight=ECHO_WEIGHT,
+         note="The Ten of Swords is a body face down with ten blades in "
+              "its back — the plainest ending the deck has. Magic's "
+              "plainest ending is three mana and three words: destroy "
+              "target creature. Allen Williams painted it as the blade "
+              "already through the chest."),
     Card("mtg-sram-senior-edificer", "Sram, Senior Edificer", "minor",
          "pentacles", 3,
          art_url="https://cards.scryfall.io/art_crop/front/8/f/"
@@ -497,7 +639,7 @@ ECHOES: tuple[Card, ...] = (
               "to gold."),
 )
 
-#: What actually gets shuffled: 110 cards -- every trump answered by a
+#: What actually gets shuffled: 119 cards -- every trump answered by a
 #: Magic card, and the suits opening one number at a time. The Magic tiers
 #: are dealt at their weights against every natural card's 1 -- present
 #: often enough to be found, rare enough to stay a surprise.
@@ -571,7 +713,7 @@ class Reading:
         precedence -- the game the reading serves has walked into it. And a
         trump landing twice, once as the 1909 printing and once as Magic's
         own card, is named as the alignment it is: the sampler draws
-        without replacement across all 88, so the two Fools really can
+        without replacement across all 119, so the two Fools really can
         share a table, and a reader who is not told how rare that is will
         read past it.
         """
