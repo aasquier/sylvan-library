@@ -588,23 +588,7 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   padding: 5.5% 6% 0;
 }
 
-/* A reversed Magic card turns its *picture* over and keeps its typography
-   the right way up (Aaron, 2026-08-17: "keep reversed, that is standard
-   tarot, but text should be readable, and not reversed left to right").
-   Rotating the whole card was the obvious reading of a physical reversal
-   and it made the hand-set caption run backwards — a 180° turn reverses
-   reading order, so "QUEEN MARCHESA" came out right-to-left in upside-down
-   small caps. That is illegible rather than atmospheric, and commandment 2
-   settles it: a newcomer should not have to turn their head to find out
-   which card they are looking at.
-
-   The line this draws is between a scan and our own frame. The 1909 plates
-   keep rotating whole (`.tarot-face-front > img.is-reversed`), because
-   their titles are printed *in the photograph* — an upside-down title is
-   what a reversed Rider-Waite card actually looks like and there is no
-   layer to separate. This frame is drawn here, so its numeral band and
-   caption are real elements and can simply stay put. */
-.tarot-rws.is-reversed .tarot-rws-canvas {
+.tarot-rws.is-reversed {
   transform: rotate(180deg);
 }
 
