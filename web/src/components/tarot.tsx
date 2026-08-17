@@ -547,57 +547,66 @@ function CrystalBall({ vision }: {
             stand the shadow the light cannot argue away. Shadow first, so
             everything sits *on* something — the missing contact shadow was
             half of what read as clip art. */}
-        <ellipse cx="60" cy="144" rx="34" ry="6" fill={`url(#${id}-shadow)`} />
-        <ellipse className="crystal-aura" cx="60" cy="130" rx="46" ry="10"
+        <ellipse cx="60" cy="132" rx="30" ry="5" fill={`url(#${id}-shadow)`} />
+        <ellipse className="crystal-aura" cx="60" cy="120" rx="46" ry="10"
                  fill="#8f79e8" />
 
-        {/* The stand: a turned brass cradle. Real lathework is a stack of
-            profiles — a cushion ring the sphere sits in, a waisted ogee
-            body, a beaded band, a flared foot — and each course carries the
-            lip gradient across it so every turning catches its own light. */}
-        <path d="M36 116 C 36 108 84 108 84 116 C 84 124 76 126 74 130
-                 L 78 140 C 78 148 42 148 42 140 L 46 130
-                 C 44 126 36 124 36 116 Z"
+        {/* The stand, in two halves around the glass — and the split is
+            the whole fix. Every course used to be painted before the
+            sphere, so the ball sat *on* a brass cup like a scoop of ice
+            cream, with a dark socket showing under it that read as an
+            empty goblet. A ball rests **in** a cradle, which means the
+            near side of the ring has to occlude the bottom of the sphere.
+            So: foot, stem and the ring's far side here, the glass next,
+            and `.crystal-cradle-front` after it.
+
+            The ring is at y=100, six units above the sphere's lowest point
+            (cy 62 + r 44 = 106), so the glass genuinely sinks into it. */}
+
+        {/* The foot: low and wide, a turned moulding rather than a slab,
+            and it MEETS the stem — an earlier pass left a gap here with the
+            bead course floating in it. */}
+        <path d="M46 117 C 46 120 42 122 40 126 C 38 129 44 131 60 131
+                 C 76 131 82 129 80 126 C 78 122 74 120 74 117 Z"
               fill={`url(#${id}-brass)`} />
-        {/* The cushion ring the sphere rests in, seen edge-on. */}
-        <ellipse cx="60" cy="112" rx="26" ry="7" fill={`url(#${id}-brass-lip)`} />
-        <ellipse cx="60" cy="111" rx="21" ry="5" fill="#1a1030" />
-        <ellipse cx="60" cy="110.4" rx="21" ry="5" fill="none"
-                 stroke="#f8e6a8" strokeWidth="0.7" opacity="0.7" />
-        {/* Engraved turnings on the body. */}
-        <path d="M42 122 C 50 126 70 126 78 122" stroke="#2c1d0a"
-              strokeWidth="1" fill="none" opacity="0.55" />
-        <path d="M43 120.6 C 51 124.6 69 124.6 77 120.6" stroke="#f3dc96"
-              strokeWidth="0.7" fill="none" opacity="0.6" />
-        <path d="M45 132 C 52 135 68 135 75 132" stroke="#2c1d0a"
-              strokeWidth="0.9" fill="none" opacity="0.5" />
-        {/* The window's streak down the polished body. */}
-        <path d="M50 112 L 48 146 L 56 146 L 56 112 Z"
-              fill={`url(#${id}-brass-streak)`} opacity="0.5" />
-        {/* The beaded band above the foot. */}
-        {[46, 52.5, 59, 65.5, 72].map((x) => (
+        <path d="M40.5 127.5 C 46 130 74 130 79.5 127.5" stroke="#f3dc96"
+              strokeWidth="0.8" fill="none" opacity="0.5" />
+        {/* The bead course sitting on the foot's shoulder, where the stem
+            lands — a real turning has a bead at every join. */}
+        {[49, 53.5, 58, 62.5, 67].map((x) => (
           <g key={x}>
-            <circle cx={x + 1} cy="137.5" r="1.6" fill="#e8c76a"
-                    opacity="0.9" />
-            <circle cx={x + 0.5} cy="137" r="0.55" fill="#fff7dd"
+            <circle cx={x + 1} cy="118" r="1.3" fill="#e8c76a"
+                    opacity="0.92" />
+            <circle cx={x + 0.6} cy="117.6" r="0.45" fill="#fff7dd"
                     opacity="0.9" />
           </g>
         ))}
-        {/* The flared foot, its own turning and its own light. */}
-        <path d="M42 140 C 42 138 78 138 78 140 L 82 144
-                 C 84 147 76 149 60 149 C 44 149 36 147 38 144 Z"
+        {/* The stem: short and waisted. It was a tall truncated cone and
+            read as a lampshade; a crystal ball's stand is a *low* pedestal,
+            because the glass is meant to be the tallest thing on the table. */}
+        <path d="M48 102 C 48 109 52 111 52 118 L 68 118
+                 C 68 111 72 109 72 102 Z"
               fill={`url(#${id}-brass)`} />
-        <path d="M38.5 144.5 C 44 147.5 76 147.5 81.5 144.5" stroke="#f3dc96"
-              strokeWidth="0.8" fill="none" opacity="0.55" />
-        {/* Three stones: amethyst, opal, jade — each with its own glint. */}
-        <circle cx="60" cy="128" r="3.4" fill="#7d4b8f" />
-        <circle cx="60" cy="128" r="3.4" fill="none" stroke="#2c1d0a"
-                strokeWidth="0.5" opacity="0.6" />
-        <circle cx="59" cy="127" r="1" fill="#e6c8f2" opacity="0.9" />
-        <circle cx="46" cy="126" r="2.4" fill="#cfd8e8" />
-        <circle cx="45.4" cy="125.4" r="0.8" fill="#fff" opacity="0.95" />
-        <circle cx="74" cy="126" r="2.4" fill="#2e6f6a" />
-        <circle cx="73.4" cy="125.4" r="0.8" fill="#bff0e2" opacity="0.9" />
+        <path d="M51.5 114 C 56 116 64 116 68.5 114" stroke="#2c1d0a"
+              strokeWidth="0.8" fill="none" opacity="0.45" />
+        {/* The window's streak down the polished stem. */}
+        <path d="M54 102 L 53 118 L 58 118 L 58 102 Z"
+              fill={`url(#${id}-brass-streak)`} opacity="0.45" />
+        {/* Three stones set into the stem's waist. */}
+        <circle cx="60" cy="111" r="2.6" fill="#7d4b8f" />
+        <circle cx="60" cy="111" r="2.6" fill="none" stroke="#2c1d0a"
+                strokeWidth="0.45" opacity="0.6" />
+        <circle cx="59.3" cy="110.2" r="0.8" fill="#e6c8f2" opacity="0.9" />
+        <circle cx="53" cy="110.2" r="1.6" fill="#cfd8e8" />
+        <circle cx="52.6" cy="109.8" r="0.55" fill="#fff" opacity="0.95" />
+        <circle cx="67" cy="110.2" r="1.6" fill="#2e6f6a" />
+        <circle cx="66.6" cy="109.8" r="0.55" fill="#bff0e2" opacity="0.9" />
+        {/* The ring's FAR side: the rim seen over the ball's shoulder. A
+            band with thickness, not a wire — outer curve out, inner curve
+            back. */}
+        <path d="M34 100 C 34 93.5 86 93.5 86 100 L 79 100
+                 C 79 96.5 41 96.5 41 100 Z"
+              fill={`url(#${id}-brass-lip)`} />
       </svg>
 
       {/* The glass, and everything it holds. Positioned to land exactly on
@@ -612,6 +621,20 @@ function CrystalBall({ vision }: {
         <img className="crystal-shell-body" src={shellUrl} alt="" />
         <img className="crystal-shell-light" src={shellUrl} alt="" />
       </div>
+
+      {/* The ring's NEAR side, painted over the glass. This one element is
+          what turns "a ball balanced on a cup" into "a ball sitting in a
+          cradle": it crosses in front of the sphere's lower curve, so the
+          brass occludes the glass instead of stopping politely beneath it.
+          Same viewBox, same gradients — SVG ids are document-global, so it
+          reuses the ones defined above rather than declaring them twice. */}
+      <svg viewBox="0 0 120 150" className="crystal-cradle-front">
+        <path d="M34 100 C 34 106.5 86 106.5 86 100 L 79 100
+                 C 79 103.5 41 103.5 41 100 Z"
+              fill={`url(#${id}-brass-lip)`} />
+        <path d="M35.5 101.3 C 41 105.8 79 105.8 84.5 101.3" stroke="#f8e6a8"
+              strokeWidth="0.6" fill="none" opacity="0.6" />
+      </svg>
     </div>
   )
 }

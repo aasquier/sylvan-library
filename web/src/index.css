@@ -1127,6 +1127,17 @@ button:hover .tarot-fan-card {
   position: relative;
 }
 
+/* The near side of the cradle's ring, painted over the glass so the brass
+   occludes it and the ball reads as seated rather than balanced. Same box
+   as the back half, and inert to the pointer. */
+.crystal-cradle-front {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 /* The glass. Placed on the circle the old svg drew — cx 60, cy 62, r 44 in
    a 120x150 viewBox — so the cradle's cushion ring still cups it:
    left (60-44)/120, top (62-44)/150, width 88/120, and a square aspect. */
