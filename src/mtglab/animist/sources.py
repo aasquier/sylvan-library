@@ -34,6 +34,7 @@ from mtglab.animist.recipe import Source
 
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 OPENVERSE_API = "https://api.openverse.org/v1/images"
+MET_API = "https://collectionapi.metmuseum.org/public/collection/v1/objects"
 
 # Scryfall asks for one in writing, Cloudflare blocks urllib's default outright
 # (see the 403 story on `auth/mail.py`'s USER_AGENT), and Wikimedia's API
@@ -59,6 +60,12 @@ ALLOWED_OPENVERSE = frozenset({
     # The Public Domain Mark: identified as free of known copyright.
     "pdm",
 })
+#: The Met publishes no licence *string* — `isPublicDomain` is a boolean, and
+#: their Open Access programme releases exactly those objects' images under
+#: CC0. So this provider's whole vocabulary is one value, and the gate's
+#: question is the boolean; a false reads as `restricted` and is refused with
+#: the same machinery as any other unfree licence.
+ALLOWED_MET = frozenset({"CC0"})
 
 
 class SourceError(RuntimeError):
@@ -175,6 +182,44 @@ def _confirm_openverse(source: Source, transport: Transport) -> Confirmed:
     return Confirmed(confirmation, (RemoteFile(name, file_url, licence),))
 
 
+def _confirm_met(source: Source, transport: Transport) -> Confirmed:
+    """The Metropolitan Museum of Art's Open Access API.
+
+    Added 2026-08-17 for one concrete reason: the séance table's bronze fish
+    came in through Openverse, whose record for it points at rawpixel's
+    `editor_1024` derivative — 763x1024. The Met's own plate of the same
+    object is **2982x4000**, and the moment the stand went from an ornament
+    to the largest thing on the table, a 700px asset drawn at 1040 device
+    pixels started to show. Going to the museum rather than to a re-host is
+    also better provenance, not merely more pixels: one hop, and the
+    institution that owns the object answers for the licence.
+
+    The gate's question here is a **boolean**, and that is the interesting
+    difference from the other three providers. There is no licence string to
+    match: the Met publishes `isPublicDomain`, and their Open Access
+    programme puts exactly those images under CC0. So this reader maps the
+    boolean onto the one vocabulary word that can pass, and anything else --
+    false, missing, or not a boolean at all -- is refused as `restricted`
+    rather than guessed at. An object with no `primaryImage` is a
+    `SourceError` and not a refusal, because that is a fact about the record
+    rather than about the rights.
+    """
+    url = f"{MET_API}/{urllib.parse.quote(source.identifier)}"
+    record = _get_json(url, transport, source.id)
+    open_access = record.get("isPublicDomain")
+    licence = "CC0" if open_access is True else "restricted"
+    if licence not in ALLOWED_MET:
+        raise LicenceRefused(source.id, licence, ALLOWED_MET,
+                             detail=f"object {source.identifier}")
+    file_url = str(record.get("primaryImage", "") or "")
+    if not file_url:
+        raise SourceError(f"source `{source.id}`: the Met record for object "
+                          f"{source.identifier} carries no `primaryImage`")
+    name = urllib.parse.unquote(file_url.rsplit("/", 1)[-1]) or source.identifier
+    confirmation = LicenceConfirmation(source.id, licence, _today(), url)
+    return Confirmed(confirmation, (RemoteFile(name, file_url, licence),))
+
+
 def _commons_query(params: dict[str, str]) -> str:
     base = {"action": "query", "format": "json", "formatversion": "2",
             "prop": "imageinfo", "iiprop": "url|extmetadata"}
@@ -284,6 +329,8 @@ def confirm(source: Source, *, transport: Transport | None = None) -> Confirmed:
     get: Transport = transport if transport is not None else _urllib_get
     if source.provider == "openverse":
         return _confirm_openverse(source, get)
+    if source.provider == "met":
+        return _confirm_met(source, get)
     if source.provider == "wikimedia":
         return _confirm_wikimedia(source, get)
     if source.provider == "wikimedia-category":

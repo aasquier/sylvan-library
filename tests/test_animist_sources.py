@@ -10,6 +10,7 @@ import pytest
 from mtglab.animist.recipe import Source
 from mtglab.animist.sources import (
     ALLOWED_COMMONS,
+    ALLOWED_MET,
     ALLOWED_OPENVERSE,
     USER_AGENT,
     LicenceRefused,
@@ -174,3 +175,54 @@ def test_openverse_record_without_url_is_an_error() -> None:
     with pytest.raises(SourceError) as excinfo:
         confirm(openverse_source(), transport=get)
     assert "no direct file URL" in str(excinfo.value)
+
+
+# ── the Met ──────────────────────────────────────────────────────────────────
+# The one provider whose gate reads a boolean rather than a licence string, so
+# these pin the mapping in both directions rather than trusting it.
+
+def met_source(**overrides: str) -> Source:
+    fields: dict[str, str] = {"identifier": "44054", "licence": "CC0-1.0"}
+    fields.update(overrides)
+    return Source(id="fish", provider="met", **fields)
+
+
+def test_met_open_access_object_passes_as_cc0() -> None:
+    get = transport_returning({
+        "objectID": 44054, "isPublicDomain": True,
+        "primaryImage": "https://images.metmuseum.org/CRDImages/as/original/"
+                        "17104.jpg"})
+    confirmed = confirm(met_source(), transport=get)
+    assert confirmed.confirmation.licence == "CC0"
+    assert confirmed.confirmation.api_url.endswith("/objects/44054")
+    (remote,) = confirmed.files
+    assert remote.name == "17104.jpg"
+    assert remote.licence == "CC0"
+
+
+def test_met_object_not_in_open_access_is_refused() -> None:
+    get = transport_returning({"isPublicDomain": False,
+                               "primaryImage": "https://images.met/x.jpg"})
+    with pytest.raises(LicenceRefused) as excinfo:
+        confirm(met_source(), transport=get)
+    assert excinfo.value.found == "restricted"
+    assert excinfo.value.allowed == ALLOWED_MET
+    assert "44054" in str(excinfo.value)
+
+
+@pytest.mark.parametrize("flag", [None, "true", 1, "yes"])
+def test_met_anything_but_a_true_boolean_is_refused(flag: object) -> None:
+    # `isPublicDomain: "true"` is a string, and a truthy one. The gate must
+    # not take a provider's word in the wrong type for a rights clearance --
+    # this is the whole reason the check is `is True` and not `if flag`.
+    get = transport_returning({"isPublicDomain": flag,
+                               "primaryImage": "https://images.met/x.jpg"})
+    with pytest.raises(LicenceRefused):
+        confirm(met_source(), transport=get)
+
+
+def test_met_object_without_an_image_is_an_error_not_a_refusal() -> None:
+    get = transport_returning({"isPublicDomain": True, "primaryImage": ""})
+    with pytest.raises(SourceError) as excinfo:
+        confirm(met_source(), transport=get)
+    assert "primaryImage" in str(excinfo.value)

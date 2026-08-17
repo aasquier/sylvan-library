@@ -32,12 +32,54 @@ why_committed: >
   making.
 
 sources:
+  # The Met's own crystal ball on a bronze stand in the shape of a fish
+  # (Aaron chose it, 2026-08-17, from a board of six). Museum open access,
+  # so the plate is CC0, and it solves the problem the drawn cradle never
+  # could: the sphere and its stand come from ONE photograph, with one
+  # light, one shadow and one set of material responses. Our own quartz
+  # replaces the Met's sphere in the claws -- the composite the app builds
+  # is the fish photograph over the glass, so the bronze foam closes in
+  # FRONT of the ball and it reads as held rather than balanced.
+  #
+  # Fetched from the MUSEUM rather than from the aggregator that found it,
+  # and the difference is 2982x4000 against 763x1024: Openverse's record for
+  # this object points at rawpixel's `editor_1024` derivative, which was
+  # enough while the stand was an ornament and stopped being enough the
+  # moment it became the largest thing on the table. One hop instead of two
+  # is also the better provenance -- the institution that owns the object is
+  # the one answering for the rights, through `isPublicDomain` on its own
+  # Open Access API.
+  fish:
+    provider: met
+    identifier: "44054"
+    title: "Crystal Ball on a Bronze Stand in the Shape of a Fish"
+    landing: https://www.metmuseum.org/art/collection/search/44054
+    found_via: >
+      Openverse with a license=cc0 filter, searching `crystal ball stand`;
+      the plate is rawpixel's re-host of Met object 44054, so the recipe
+      goes to the Met's Open Access API for the full-resolution original
+    licence: CC0-1.0
+
   orb:
     provider: openverse
     identifier: 6c8678e6-c6d5-4f94-bfe9-8eeef47814ba
     title: "Crystal ball"
     landing: https://www.flickr.com/photos/76523360@N03/27935639395
     found_via: "Openverse with a license=cc0 filter, searching `crystal ball`"
+    licence: CC0-1.0
+
+  # The votive rack at the back of the room (Aaron picked it off a board of
+  # twelve, 2026-08-17). A bank of church candles with real wax runs down
+  # them -- which is the half of "candles that drip wax" a photograph can
+  # actually answer, and it answers it better than any drip animation would.
+  # Shot on a black ground with the flames blown out to white, which is what
+  # makes the two-layer treatment on the page possible.
+  candles:
+    provider: openverse
+    identifier: 55ba1cf3-417e-4eed-8459-bcf27bb461eb
+    title: "Burning candles, wax running (public domain, CC0)"
+    landing: https://www.rawpixel.com/image/5963706/free-public-domain-cc0-photo
+    found_via: "Openverse with a license=cc0 filter, searching `dripping wax candle`"
     licence: CC0-1.0
 
   # Séance smoke: slower and larger-featured than the Laboratory's mist,
@@ -50,6 +92,21 @@ sources:
     seed: 1848
     licence: ours-generated
 
+  # The rack's own flicker, and it is a different animal from `candle` below:
+  # that one is a broad pool of light breathing, this one is FLAME -- small
+  # features, fast, and almost no drift, because a wick moves quickly and
+  # goes nowhere. It is laid over the photographed candles rather than
+  # standing on its own, so what it has to supply is the one thing a
+  # photograph structurally cannot: the fact that the light is not the same
+  # from one second to the next.
+  # Seed 1888, the year Margaret Fox stood on a stage and confessed the
+  # rappings were her own toe joints -- and the séances went on anyway, which
+  # is the most candle-like fact in the whole story.
+  flame:
+    provider: procedural
+    seed: 1888
+    licence: ours-generated
+
   # The candle that lights the smoke from behind. Same construction as the
   # Laboratory's embers and deliberately not the same numbers: a single
   # flame's light is one broad pool that breathes, so the scale is lower
@@ -60,18 +117,130 @@ sources:
     licence: ours-generated
 
 outputs:
-  - file: crystal-shell.webp
+  # THE GEOMETRY THE APP NEEDS, measured off this output and recorded here
+  # because nothing in the file can carry it: in the 700x950 asset the
+  # bronze foam closes at y=290 (0.3053 of the height) and its centre is
+  # x=529 (0.7557 of the width). The ball is drawn at r=265 (0.3786 of the
+  # width) with its centre 0.88 radii ABOVE the claw line -- 0.88 is
+  # Aaron's, off a board of four: at 0.62 the claws crossed the ball's
+  # belly and it read as impaled, and past 0.96 it floats. The ball
+  # deliberately overhangs this asset's box, which is free because the orb
+  # is an absolutely positioned layer.
+  - file: crystal-fish.webp
+    from: fish
+    ops:
+      # The object, dropping the museum label band along the bottom.
+      - crop: {frac_box: [0.0393, 0.0244, 0.9567, 0.9521]}
+      # `soft` is doing the real work: what survives a hard threshold here
+      # is not backdrop but the object's own cast shadow (143-167 against a
+      # ground of 192), and no single cut spares the bronze while taking
+      # the shadow. The ramp fades it out instead. `enclosed: drop` kills
+      # the studio grey framed inside the arch of the wave, which would
+      # otherwise read as a hole cut in the felt.
+      - matte_backdrop: {tolerance: 34, soft: 40, border: 2, enclosed: drop}
+      - duotone: {shadow: "#261a0e", mid: "#8c6e44", light: "#faf0d0"}
+      # 1100 rather than 700, because the stand is 38vw now: at 1440 CSS
+      # pixels the bronze is drawn 458 wide, which is 916 device pixels on
+      # any retina screen, and 700 was being upscaled into softness on the
+      # one object in the room whose whole argument is that it is a
+      # photograph. The Met plate is 2982 wide, so this is still a
+      # downscale; every pixel here is real.
+      - resize: {width: 1100}
+    encode: {format: webp, quality: 88}
+    expect: {width: 1100, height: 1492, budget_kb: 260, metadata: none}
+
+  # The quartz, graded through the fish's own ramp. Two photographs on one
+  # table have to share a plate or the glass reads as pasted onto the bronze
+  # -- which it visibly did before this existed.
+  #
+  # It stays at 640 while the bronze goes to 1100, and that is a limit rather
+  # than a choice: the Flickr original Openverse names for this sphere is
+  # 1024x683, the crop takes 504 of it, and 640 is already an upscale. More
+  # output pixels would invent none. It matters much less than it sounds,
+  # because this file is never drawn as itself -- `.crystal-shell-body` lays
+  # it on at `soft-light` and `.crystal-shell-light` keeps only its specular
+  # arc, so its high frequencies are suppressed by the composite. If the
+  # glass ever needs to be genuinely sharper, the answer is a different
+  # sphere from a larger plate, which is a picture Aaron would have to pick.
+  - file: crystal-shell-sepia.webp
     from: orb
     ops:
-      # Square around the sphere, with ~8px of margin outside the radius so
-      # the feather has somewhere to land.
       - crop: {frac_box: [0.2588, 0.0571, 0.7510, 0.7950]}
-      # r is 244/504 of the cropped width, pulled in a hair so the felt's
-      # blue does not survive as a fringe; the feather straddles the edge.
       - mask_circle: {cx: 0.5, cy: 0.5, r: 0.482, feather: 2.0}
+      - duotone: {shadow: "#241a12", mid: "#8e7a5e", light: "#f6ecd6"}
       - resize: {width: 640}
     encode: {format: webp, quality: 86}
     expect: {width: 640, height: 640, budget_kb: 120, metadata: none}
+
+  # `crystal-shell.webp` -- the ungraded violet cut of the same sphere -- was
+  # here, and is deleted with the component swap. It existed for exactly one
+  # reason, written down when it was made: so the violet ball kept working
+  # while the fish was wired up. The fish is wired up, nothing imports it,
+  # and a second grade of one photograph that no page renders is a file the
+  # next person has to work out the status of. `verify` holds what is
+  # committed to this recipe, so leaving the output here and the file gone
+  # would fail the suite -- which is the mechanism doing its job.
+
+  # The rack, cut once and used twice: the page mirrors this file for the
+  # right-hand side (Aaron's call, and it is the right one — two crops of one
+  # photograph read as two racks, while a mirror of one reads as the same
+  # rack seen from the other end of the same table).
+  #
+  # NOT matted, and that is the whole technique. The plate is candles on a
+  # **black** ground, and black is already transparent under `screen`: the
+  # page lays this on at `mix-blend-mode: screen`, so the ground disappears
+  # exactly, and — the part a matte could never give — the flames' halos and
+  # the glow bleeding off the wax survive as photographed, with no cut edge
+  # anywhere. `matte_backdrop` was built for the bronze because a museum
+  # plate's studio grey is *lighter* than its subject; here the ground is
+  # darker than everything, which is a different problem with a free answer.
+  # The `duotone` still runs, because two photographs on one table share a
+  # plate, and the ramp's `light` stop is hotter than the fish's so the
+  # flames stay flames rather than becoming warm paper.
+  - file: seance-candles.webp
+    from: candles
+    ops:
+      # The right edge is 0.53 and it is measured, not judged by eye. The
+      # first cut was 0.42, which put the seam straight through a lit candle
+      # -- and a candle sliced down its length is the one thing in this
+      # composite that cannot be explained away, because wax has a round
+      # side. Scanning the plate column by column for the brightest pixel in
+      # the candle band finds a genuine trough at x=520..570 (peak 134-183
+      # against 255 either side): nothing is lit there, so the cut passes
+      # between two racks rather than through one.
+      - crop: {frac_box: [0.0, 0.14, 0.53, 1.0]}
+      - duotone: {shadow: "#000000", mid: "#8a6b3e", light: "#fff4cf"}
+      - resize: {width: 700}
+    encode: {format: webp, quality: 84}
+    expect: {width: 700, height: 851, budget_kb: 180, metadata: none}
+
+  # Small features, fast time, almost no advection. `falloff` is lower than
+  # any other loop here (2.2 against 2.9-3.1), which is what keeps the fine
+  # detail a flame has and the smoke does not -- a high falloff would give a
+  # soft blob that reads as another glow rather than as burning.
+  - file: seance-flame-loop.webm
+    from: flame
+    ops:
+      - spectral_noise: {width: 300, height: 300, frames: 96, fps: 24,
+                         scale: 0.6, time_scale: 3.4, falloff: 2.2}
+      - advect: {strength: 1.0, scale: 0.6}
+      - color_ramp: {low: "#000000", high: "#ffd79a"}
+      - resize: {width: 460}
+    encode: {format: webm, crf: 44}
+    expect: {width: 460, height: 460, frames: 96, fps: 24, budget_kb: 420,
+             metadata: none}
+
+  - file: seance-flame-loop.mp4
+    from: flame
+    ops:
+      - spectral_noise: {width: 300, height: 300, frames: 96, fps: 24,
+                         scale: 0.6, time_scale: 3.4, falloff: 2.2}
+      - advect: {strength: 1.0, scale: 0.6}
+      - color_ramp: {low: "#000000", high: "#ffd79a"}
+      - resize: {width: 460}
+    encode: {format: mp4, crf: 34}
+    expect: {width: 460, height: 460, frames: 96, budget_kb: 420,
+             metadata: none}
 
   - file: seance-smoke-loop.webm
     from: smoke
