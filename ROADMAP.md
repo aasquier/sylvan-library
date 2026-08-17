@@ -1500,7 +1500,8 @@ arc; this is what the next few sessions actually do.
     sphere is the one subject a chroma matte *cannot* cut out, since the
     whole subject is the background seen through it.
 
-    **PR 3 is part-built on `tarot-fish-stand`.** Aaron's verdict on the
+    **PR 3 is [#151](https://github.com/aasquier/sylvan-library/pull/151), and
+    it grew past its brief into the whole table.** Aaron's verdict on the
     drawn brass was blunt and correct — asked whether it looked photo-real,
     the answer was no, and the argument for it ("a cradle is turned
     geometry, which is what SVG is good at") was a rationalisation for not
@@ -1543,17 +1544,66 @@ arc; this is what the next few sessions actually do.
     line** — Aaron's number, off a board of four, because at 0.62 the claws
     crossed the ball's belly and it read as impaled.
 
-    **What is left on that branch:** the component swap (the fish replaces
-    the drawn cradle, the orb becomes an absolutely positioned layer that
-    may overhang the stand's box), and two nits — the shell's dark navy
-    fresnel rim reads as a drawn stroke against warm bronze, and the ball
-    wants centring in its frame.
+    The plate is the **Met's own**, not the aggregator's, and that is an
+    animist provider rather than a URL: Openverse's record for this object
+    points at rawpixel's `editor_1024` derivative, 763x1024, while the
+    museum serves 2982x4000. Irrelevant while the stand was an ornament and
+    decisive the moment it became the largest thing in the room. The `met`
+    provider's gate reads a **boolean** rather than a licence string —
+    `isPublicDomain`, mapped onto CC0 — so the check is `is True` and not
+    truthiness, and a test pins that a string `"true"` is refused; one hop to
+    the institution that owns the object is also the better provenance.
 
-    **Then, from Aaron's brief and not yet started:** candles that drip wax
-    and flicker (a CC0 candle plate through the same matte, plus a flame
-    loop), more smoke, and **a felt table with the card positions laid out
-    around the ball** — that last one reframes the whole table rather than
-    adjusting the ball, so it is its own PR.
+    **Aaron's two nits were one bug and one bug's cousin.** The "dark navy
+    fresnel rim" was never a colour: the shell photograph's sphere is
+    `mask_circle: {r: 0.482}` of its file, so the glass ends at 96.4% of the
+    orb's box while `border-radius: 50%` clips at 100%, and that 3.6%
+    annulus of bare `.crystal-depths` was hard-cut by the radius — a drawn
+    stroke by any other name. Warming the palette only made it a warmer
+    stroke; ending the depths where the glass ends removes it. Its cousin:
+    `filter: drop-shadow` follows an element's **clip**, so the orb's perfect
+    circle cast a perfect ring of shadow in the same place. A third of the
+    family sat next door — the vision's mask ramp reached zero *at* the box
+    edge, and under a permanent `scale` animation WebKit squares it off
+    there. **A mask that ends at the edge is one you are trusting the
+    compositor to round off.**
+
+    **Then the table became a room**, which is Aaron's composition and not a
+    decoration on the old one: black above, green below, one horizontal line
+    between them, and that line is the back edge of the table. A rack of
+    CC0 church candles burns along it on either side — one crop mirrored, so
+    it reads as one rack seen from both ends rather than two racks to
+    compare — and the carp stands in the gap with its base bridging them,
+    which is what puts the mirror's seam behind a foot of bronze. The
+    horizon needs no number: the stage is exactly as tall as the ball and
+    the stand occupies 17.98%–100% of that box, so `--seance-horizon` is
+    measured up from the carp's own foot and used by the dark and both
+    racks. The candles are **screened, not matted** — their ground is black
+    and black is already transparent under `screen`, so the flames' halos
+    survive as photographed; `matte_backdrop` is for the opposite case, the
+    bronze, whose studio grey is *lighter* than its subject.
+
+    The cloth is printed, too, which is the item's "card positions laid out
+    around the ball": three named places stamped into the felt on an arc
+    that radiates from the ball, with the cards landing in them. The place
+    carries `--arc-rot` and the card carries `--arc-rot` *plus*
+    `--settle-rot`, so every card lies a degree or two off its own place —
+    the cloth was printed square and the deal was a hand. And turned cards
+    zoom under the pointer (1.35x on the felt, 2.1x in the 96px strip),
+    gated on `(hover: hover)` because on a touch screen `:hover` latches.
+
+    **Three rig facts came out of it, and each looked like a product bug.**
+    An **element** screenshot is not what a person sees — the first scale
+    board cropped to `.crystal-ball` and would have shipped a ball whose
+    tail is cut off by the viewport. A **narrow viewport is not a phone**:
+    headless WebKit at 390px reports `hover: hover`, so the latched-hover bug
+    rendered as correct behaviour until the context got `hasTouch: true,
+    isMobile: true`. And headless WebKit **ignores `backface-visibility:
+    hidden`** (proved in isolation, not inferred), so a face-down card paints
+    its own face, mirrored — the card back cannot be photographed through
+    this rig at all. Same ledger as the black Browser pane and the missing
+    media codecs: the rig is not the browser, and where it differs it
+    differs silently.
 
     **Still to come, in order:** the
     reader-as-artist proposal (the spread, flavor text and art crops as
