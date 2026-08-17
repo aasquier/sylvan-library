@@ -248,23 +248,36 @@ function RoomSign({ persona }: { persona: string }) {
   return <span className="room-sign shrink-0" aria-hidden="true">{sign}</span>
 }
 
-/** How long the hand spends writing, per character — clamped so a short
- *  question is not instant and a long one does not outlast the reader's
- *  patience. */
-const INK_MS_PER_CHAR = 26
+/** The hand's pace (the brief's front two, third pass). A fixed,
+ *  comfortable rate — a long sentence takes longer, which is the honest
+ *  arithmetic the old 8-second cap inverted (past ~308 characters it made
+ *  the hand HURRY, faster the more it had to say). The floor stays so a
+ *  two-word answer is not instant; the cap is gone, replaced by a skip —
+ *  click the line and it finishes at once, because making the reader wait
+ *  is a choice they should be able to decline without making the hand
+ *  write like a machine. */
+const INK_MS_PER_CHAR = 62
 const INK_MIN_MS = 900
-const INK_MAX_MS = 8000
+/** Where the pen pauses: lifted between words, longer at a breath, longer
+ *  still at a full stop. This unevenness is most of what separates a hand
+ *  from a metronome. */
+const INK_PAUSE_WORD = 90
+const INK_PAUSE_BREATH = 260   // , ; : and the em dash
+const INK_PAUSE_STOP = 420     // . ? !
 
 /**
  * A hand writing on the parchment (overhaul item 5, second pass — Aaron
- * asked for the hand, not just the ink). Each word is revealed by a
- * left-to-right wipe timed to its own length, sequenced along the text, so
- * the line fills the way a pen fills it; each carries a hair of tilt and
- * drop (deterministic per index — a hand wobbles, a render must not), and
- * the ink starts wet-brown and dries dark. A drawn quill travels with the
- * currently-forming word, held by a `requestAnimationFrame` loop against
- * the same schedule the CSS delays were cut from, and lifts off when the
- * sentence is done.
+ * asked for the hand, not just the ink; third pass — the brief asked for
+ * the rhythm). The unit is the CHARACTER now, not the word: each glyph is
+ * revealed by its own left-to-right wipe on the shared schedule, so the
+ * line fills stroke by stroke instead of arriving as blocks. Words keep
+ * their own spans around the characters — that is what lets the browser
+ * wrap lines at spaces, and it still carries the per-word tilt and drop
+ * (deterministic per index — a hand wobbles, a render must not). The ink
+ * starts wet-brown and dries dark; the first character of each word comes
+ * a touch slower than the run of the word, the way a pen resettles after
+ * a lift. A drawn quill travels with the current character, and lifts off
+ * when the sentence is done.
  *
  * Reduced motion gets the text already dry and no quill, from the same
  * media query that stills the table.
@@ -272,20 +285,28 @@ const INK_MAX_MS = 8000
 function InkText({ text }: { text: string }) {
   const host = useRef<HTMLSpanElement>(null)
   const quill = useRef<SVGSVGElement>(null)
+  // Clicking the line finishes it at once: every delay collapses and the
+  // quill lifts. State rather than a class flip so React owns the DOM.
+  const [skipped, setSkipped] = useState(false)
 
   // One schedule, used twice: inline delays for the CSS, and the quill's
-  // itinerary in the effect below. Rate adapts so total time stays inside
-  // [INK_MIN_MS, INK_MAX_MS] whatever the question's length.
+  // itinerary in the effect below. Built per word, spent per character.
   const words = text.split(/\s+/).filter(Boolean)
-  const chars = Math.max(words.reduce((n, w) => n + w.length + 1, 0), 1)
-  const rate = Math.min(
-    INK_MS_PER_CHAR, Math.max(INK_MAX_MS / chars, INK_MIN_MS / chars))
+  const chars = Math.max(words.reduce((n, w) => n + w.length, 0), 1)
+  // The floor only ever slows a very short line down; nothing speeds up.
+  const rate = Math.max(INK_MS_PER_CHAR, INK_MIN_MS / chars)
   let clock = 0
   const schedule = words.map((w) => {
     const start = clock
-    const dur = Math.max((w.length + 1) * rate, 90)
+    const perChar = Array.from(w).map((_, i) =>
+      i === 0 ? rate * 1.35 : rate * 0.95)
+    const dur = perChar.reduce((a, b) => a + b, 0)
     clock += dur
-    return { start, dur }
+    // The pen lifts between words; punctuation holds it in the air longer.
+    clock += /[.?!]$/.test(w) ? INK_PAUSE_STOP
+      : /[,;:]$/.test(w) || /[—–-]$/.test(w) ? INK_PAUSE_BREATH
+        : INK_PAUSE_WORD
+    return { start, dur, perChar }
   })
   const total = clock
 
@@ -295,8 +316,15 @@ function InkText({ text }: { text: string }) {
     if (!el || !pen) return
     // Optional-chained twice for jsdom, which has no matchMedia at all.
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return
-    const spans = Array.from(el.querySelectorAll<HTMLElement>('.ink-word'))
+    if (skipped) {
+      pen.style.opacity = '0'
+      return
+    }
+    const spans = Array.from(el.querySelectorAll<HTMLElement>('.ink-char'))
     if (spans.length === 0) return
+    // Each character knows its own start; the quill just asks which one is
+    // being written and stands over it.
+    const starts = spans.map((s) => Number(s.dataset.start ?? 0))
     pen.style.opacity = '1'
     const t0 = performance.now()
     // An interval rather than requestAnimationFrame, and not for style: rAF
@@ -310,16 +338,14 @@ function InkText({ text }: { text: string }) {
         window.clearInterval(tick)
         return
       }
-      let i = schedule.findIndex((s) => t < s.start + s.dur)
-      if (i === -1) i = spans.length - 1
-      const word = spans[i]
-      const s = schedule[i]
-      if (word && s) {
-        const frac = Math.min(Math.max((t - s.start) / s.dur, 0), 1)
-        const box = word.getBoundingClientRect()
+      let i = starts.findIndex((s) => t < s)
+      i = i === -1 ? spans.length - 1 : Math.max(i - 1, 0)
+      const ch = spans[i]
+      if (ch) {
+        const box = ch.getBoundingClientRect()
         const home = el.getBoundingClientRect()
-        // The nib rides the wipe's leading edge, a touch above the baseline.
-        const x = box.left - home.left + box.width * frac
+        // The nib rides the current glyph, a touch above the baseline.
+        const x = box.left - home.left + box.width * 0.7
         const y = box.top - home.top
         pen.style.transform =
           `translate(${x}px, ${y - 14}px) rotate(${32 + Math.sin(t / 90) * 4}deg)`
@@ -329,25 +355,39 @@ function InkText({ text }: { text: string }) {
     // The schedule is derived from `text` alone; keying on the text keeps
     // this honest without re-deriving arrays in the dependency list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text])
+  }, [text, skipped])
 
   let word = 0
   return (
-    <span ref={host} className="ink-text">
+    <span ref={host} className={`ink-text${skipped ? ' is-dry' : ''}`}
+          onClick={() => setSkipped(true)}
+          title={skipped ? undefined : 'Click to let the ink dry at once'}>
       {text.split(/(\s+)/).map((part, i) => {
         if (/^\s*$/.test(part)) return part
         const n = word++
         const s = schedule[n]
+        let charClock = s?.start ?? 0
         return (
           <span key={`${i}-${part}`} className="ink-word"
                 style={{
-                  '--ink-delay': `${s?.start ?? 0}ms`,
-                  '--ink-dur': `${s?.dur ?? 200}ms`,
                   // A hand wobbles; a render must not. Deterministic jitter.
                   '--ink-tilt': `${(((n * 7) % 5) - 2) * 0.35}deg`,
                   '--ink-drop': `${(((n * 3) % 3) - 1) * 0.6}px`,
                 } as React.CSSProperties}>
-            {part}
+            {Array.from(part).map((glyph, k) => {
+              const start = charClock
+              const dur = s?.perChar[k] ?? INK_MS_PER_CHAR
+              charClock += dur
+              return (
+                <span key={k} className="ink-char" data-start={start}
+                      style={{
+                        '--ink-delay': `${start}ms`,
+                        '--ink-dur': `${dur}ms`,
+                      } as React.CSSProperties}>
+                  {glyph}
+                </span>
+              )
+            })}
           </span>
         )
       })}
@@ -952,8 +992,13 @@ export function ThemeInterview({
 
             {report?.fact && <FactNote fact={report.fact} seance={seance} />}
 
-            <div className={`rounded-xl px-5 py-4${
-                   seance ? ' seance-scroll' : ' card-surface'}`}>
+            {/* The scroll carries its own geometry: the deckle mask sets its
+                silhouette and its padding (letters that reach the torn edge
+                get torn with it), so the utility classes stay on the plain
+                card only. */}
+            <div className={seance
+              ? 'seance-scroll'
+              : 'rounded-xl px-5 py-4 card-surface'}>
               <p className={`text-base leading-relaxed${
                    busy === 'asking' ? ' thinking-pulse' : ''}${
                    seance ? ' seance-question' : ''}`}
