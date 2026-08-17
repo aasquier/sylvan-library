@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { COLOR_NAMES, COLOR_VAR, manaSymbols, splitManaText } from '../lib/mtg'
 import { ManaGlyph } from './manasymbol'
 import { hasGlyph } from '../lib/managlyphs'
-import { SceneBackdrop } from './forest'
+import { SceneBackdrop, type RoomMood } from './forest'
 
 /* ------------------------------------------------------------------ pips */
 
@@ -409,13 +409,16 @@ export function Caveat({ children }: { children: React.ReactNode }) {
  *
  * The `h1` lives here, so a page that uses this must not render another.
  */
-export function PageMasthead({ art, alt, title, credit, children }: {
+export function PageMasthead({ art, alt, title, credit, children, mood }: {
   art: string
   alt: string
   title: React.ReactNode
   /** Card, artist, printing — and one clause on why this painting. */
   credit: React.ReactNode
   children?: React.ReactNode
+  /** What drifts along this room's floor — see `RoomMood`. Absent means
+   *  the forest mist, which is every room's default weather. */
+  mood?: RoomMood
 }) {
   return (
     <section className="card-surface overflow-hidden rounded-xl">
@@ -442,7 +445,7 @@ export function PageMasthead({ art, alt, title, credit, children }: {
           nothing layout-wise; it renders *after* the real image so the
           masthead art stays the section's first `img` — the one a screen
           reader should meet, and the one the accessibility test checks. */}
-      <SceneBackdrop art={art} />
+      <SceneBackdrop art={art} mood={mood} />
     </section>
   )
 }

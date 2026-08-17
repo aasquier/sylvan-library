@@ -46,7 +46,11 @@ import {
 const SYLVAN_LIBRARY_ART =
   'https://cards.scryfall.io/art_crop/front/6/a/6ada256f-2e55-4c1f-b4d3-d7b10b498956.jpg'
 import { ColorPentagram, TierGlyph } from '../components/pentagram'
+import { VideoBackdrop } from '../components/videofx'
 import { useGlossary } from '../lib/glossary'
+import bookwormMp4 from '../assets/learn/bookworm-loop.mp4'
+import bookwormStill from '../assets/learn/bookworm-still.webp'
+import bookwormWebm from '../assets/learn/bookworm-loop.webm'
 
 type Tab = 'colors' | 'words'
 
@@ -473,6 +477,43 @@ function WordsTab() {
   )
 }
 
+/* ------------------------------------------------------------ the reading
+   room */
+
+const BOOKWORM_ALT =
+  'The Bookworm, painted by Carl Spitzweg: an old scholar stands on top of ' +
+  'a library ladder, reading one book with another under his arm and a ' +
+  'third clamped between his knees, sunlight falling down the shelves.'
+
+/**
+ * The painting at the foot of the page — the first public-domain canvas the
+ * animist brought to life as a *committed* asset (bookworm.recipe.yaml,
+ * ADR 31: a wikimedia source through the licence gate, then a ken_burns
+ * breath that closes on itself). The card the site is named for hangs in
+ * the masthead and is Wizards' art, hotlinked under the Fan Content Policy;
+ * this one is ours to carry, which is why it can live in the bundle and
+ * breathe. Art mode: reduced motion gets the still, the page as it would
+ * be in print.
+ */
+function ReadingRoom() {
+  return (
+    <figure className="mx-auto max-w-xs space-y-3 pt-6 sm:max-w-sm">
+      <div className="reading-room-frame">
+        <VideoBackdrop
+          webmSrc={bookwormWebm} mp4Src={bookwormMp4} poster={bookwormStill}
+          mode="art" className="reading-room-painting"
+          fallback={<img src={bookwormStill} alt={BOOKWORM_ALT}
+                         className="reading-room-painting" />} />
+      </div>
+      <figcaption className="text-center text-[11px] leading-relaxed"
+                  style={{ color: 'var(--text-muted)' }}>
+        <em>Der Bücherwurm</em> (The Bookworm), Carl Spitzweg, c. 1850 —
+        public domain. Every library keeps one reader who cannot stop.
+      </figcaption>
+    </figure>
+  )
+}
+
 /* --------------------------------------------------------------- the page */
 
 const TABS: { key: Tab; label: string }[] = [
@@ -540,6 +581,8 @@ export default function Learn() {
       ) : !error && (
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
       )}
+
+      <ReadingRoom />
     </div>
   )
 }

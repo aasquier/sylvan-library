@@ -1342,12 +1342,20 @@ arc; this is what the next few sessions actually do.
     (`.venv-depth`); the main venv never downgrades. The extra's comment in
     `pyproject.toml` records the whole argument.
 
-    Still ahead: a public-domain painting brought to life as a *committed*
-    asset (the tooling is ready — a wikimedia source plus `ken_burns` works
-    today, and a committed depth map would ride the same recipe; what
-    remains is choosing the painting, which is a Commandment 5 decision to
-    make with Aaron, not a default). Sprite sheets and the runtime
-    sprite-sheet player remain open.
+    The committed painting landed 2026-08-16, chosen with Aaron over the
+    alternatives (Rembrandt's Philosopher, Böcklin's Isle, Friedrich's
+    Wanderer): **Spitzweg's *Der Bücherwurm*** (bookworm.recipe.yaml — a
+    wikimedia source through the gate, resize, then a `ken_burns` breath
+    with `bounce`), hanging framed at the foot of the Learn page. Two more
+    procedural loops joined the mist the same day — **mana wisps** (seed
+    1909, the fortune-teller's table and room; `color_ramp` grew a `gamma`
+    for them, because a wisp is mostly the dark around it) and **candlelight
+    embers** (seed 1666, the Laboratory) — behind a `mood` prop on
+    `SceneBackdrop`, and the mist itself was softened (falloff 2.7, advect
+    5) after its chewed edges read as moss. Sprite sheets and the runtime
+    sprite-sheet player remain open; a committed depth map for the painting
+    (true parallax rather than the breath) is the natural next step and
+    needs the where-does-a-depth-map-live story from ADR 31.
 
     Also open, from Aaron's 2026-08-16 eye pass: **motion derivatives are a
     dev-machine artifact, and the deployed instance has no way to grow

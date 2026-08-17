@@ -151,6 +151,29 @@ def test_color_ramp_refuses_a_malformed_colour() -> None:
                      "color_ramp", {"low": "red"})
 
 
+def test_color_ramp_gamma_sinks_the_midtones() -> None:
+    """gamma > 1 pulls mid luminance toward `low` -- how a full-field cloud
+    becomes sparse wisps -- while the endpoints stay the endpoints."""
+    ramp = {"low": "#000000", "high": "#ffffff"}
+    mid = Image.new("L", (2, 2), 128)
+    linear = apply_motion(FrameSequence.still(mid), "color_ramp", dict(ramp))
+    curved = apply_motion(FrameSequence.still(mid), "color_ramp",
+                          {**ramp, "gamma": 2.4})
+    assert int(np.asarray(curved.frames[0])[0, 0, 0]) \
+        < int(np.asarray(linear.frames[0])[0, 0, 0])
+    for value, name in ((0, "black"), (255, "white")):
+        flat = Image.new("L", (2, 2), value)
+        out = apply_motion(FrameSequence.still(flat), "color_ramp",
+                           {**ramp, "gamma": 2.4})
+        assert int(np.asarray(out.frames[0])[0, 0, 0]) == value, name
+
+
+def test_color_ramp_refuses_a_nonpositive_gamma() -> None:
+    with pytest.raises(OpError, match="gamma"):
+        apply_motion(FrameSequence.still(Image.new("L", (2, 2))),
+                     "color_ramp", {"gamma": 0})
+
+
 def test_ken_burns_builds_the_timeline_from_a_still() -> None:
     still = FrameSequence.still(Image.new("RGB", (64, 40), (10, 90, 40)))
     clip = apply_motion(still, "ken_burns",

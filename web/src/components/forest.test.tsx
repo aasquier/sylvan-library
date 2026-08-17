@@ -76,6 +76,28 @@ it('is decoration, so nothing in it reaches a screen reader', () => {
   expect(screen.queryAllByRole('img')).toHaveLength(0)
 })
 
+it('drifts the mood the room asked for, and mist when it asked nothing', () => {
+  // The mood is the whole prop: wrong sources here means the Laboratory's
+  // candlelight silently reverts to forest mist, which no other test sees.
+  render(<SceneBackdrop art={ART} mood="embers" />)
+  let sources = [...document.querySelectorAll('.scene-mist source')]
+  expect(sources.length).toBeGreaterThan(0)
+  expect(sources.every((s) => s.getAttribute('src')?.includes('embers')))
+    .toBe(true)
+  cleanup()
+
+  render(<SceneBackdrop art={ART} mood="wisps" />)
+  sources = [...document.querySelectorAll('.scene-mist source')]
+  expect(sources.every((s) => s.getAttribute('src')?.includes('wisps')))
+    .toBe(true)
+  cleanup()
+
+  render(<SceneBackdrop art={ART} />)
+  sources = [...document.querySelectorAll('.scene-mist source')]
+  expect(sources.every((s) => s.getAttribute('src')?.includes('mist')))
+    .toBe(true)
+})
+
 it('is removed entirely when ambience is switched off', () => {
   // The opt-out key `lib/prefs.ts` serves the forest from. Off means gone,
   // not stilled — a frozen room is just a picture nobody asked for.

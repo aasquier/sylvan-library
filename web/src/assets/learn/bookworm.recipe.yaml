@@ -1,0 +1,61 @@
+# The reading room's painting (ADR 31's promise kept): Carl Spitzweg's
+# "Der Bücherwurm" (c. 1850, Museum Georg Schäfer), the closest thing the
+# public domain has to the card this site is named for -- one scholar up a
+# ladder, lost in the stacks, a book in each hand and one between his
+# knees. It hangs at the foot of the Learn page, where its argument is the
+# page's argument: getting lost in this is the pleasure, not the price.
+#
+# The camera is a slow breath rather than a tour: `ken_burns` with
+# `bounce`, so the clip closes on itself and loops without a seam. Resize
+# precedes the camera because the painting arrives at 1500x2793 and a
+# 192-frame timeline at full resolution would cost gigabytes of RAM for
+# detail the page never shows; 576 wide is comfortably past the ~360px the
+# figure renders at. Deterministic end to end -- a camera path has no
+# randomness to seed, so this recipe carries none.
+animist: 1
+
+why_committed: >
+  Public domain -- Spitzweg died in 1885, and Commons records the file as
+  such (the gate confirms it at fetch time, per file, through the API).
+  Committed rather than hotlinked for the same reason as the tarot: a
+  page decoration that breaks when a third-party CDN moves is a
+  decoration the app does not own.
+
+sources:
+  bookworm:
+    provider: wikimedia
+    title: 'Carl Spitzweg - "The Bookworm".jpg'
+    found_via: "Commons search; the Museum Georg Schäfer original, not the
+      Grohmann or Schweinfurt variants"
+    landing: https://commons.wikimedia.org/wiki/File:Carl_Spitzweg_-_%22The_Bookworm%22.jpg
+    licence: Public domain
+
+outputs:
+  - file: bookworm-loop.webm
+    from: bookworm
+    ops:
+      - resize: {width: 576, height: 1072}
+      - ken_burns: {frames: 192, fps: 16, zoom_from: 1.02, zoom_to: 1.12,
+                    pan_from: [0.5, 0.6], pan_to: [0.5, 0.4], bounce: true}
+    encode: {format: webm, crf: 40}
+    expect: {width: 576, height: 1072, frames: 192, fps: 16,
+             budget_kb: 900, metadata: none}
+
+  - file: bookworm-loop.mp4
+    from: bookworm
+    ops:
+      - resize: {width: 576, height: 1072}
+      - ken_burns: {frames: 192, fps: 16, zoom_from: 1.02, zoom_to: 1.12,
+                    pan_from: [0.5, 0.6], pan_to: [0.5, 0.4], bounce: true}
+    encode: {format: mp4, crf: 30}
+    expect: {width: 576, height: 1072, frames: 192, budget_kb: 1200,
+             metadata: none}
+
+  - file: bookworm-still.webp
+    from: bookworm
+    ops:
+      - resize: {width: 576, height: 1072}
+      - ken_burns: {frames: 192, fps: 16, zoom_from: 1.02, zoom_to: 1.12,
+                    pan_from: [0.5, 0.6], pan_to: [0.5, 0.4], bounce: true}
+    encode: {format: webp, quality: 72}
+    expect: {width: 576, height: 1072, budget_kb: 140, metadata: none}

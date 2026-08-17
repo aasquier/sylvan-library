@@ -281,8 +281,12 @@ def _color_ramp(sequence: FrameSequence,
     """Map luminance through a two-colour gradient: `low` and `high` hex.
 
     This is where grayscale noise becomes mist, mana, or candlelight.
-    `alpha_from_luma: true` writes luminance into an alpha channel too, for
-    the still formats — video encodes drop alpha at yuv420p anyway.
+    `gamma` curves the luminance first (default 1.0, linear): above 1 sinks
+    the midtones toward `low`, which is how a full-field cloud becomes
+    sparse filaments with dark air between them — a wisp is mostly the
+    space around it. `alpha_from_luma: true` writes luminance into an alpha
+    channel too, for the still formats — video encodes drop alpha at
+    yuv420p anyway.
     """
     import numpy as np
     from PIL import Image as PILImage
@@ -290,12 +294,17 @@ def _color_ramp(sequence: FrameSequence,
     low = _parse_hex(params.get("low", "#000000"), "low")
     high = _parse_hex(params.get("high", "#ffffff"), "high")
     with_alpha = bool(params.get("alpha_from_luma", False))
+    gamma = float(params.get("gamma", 1.0))
+    if gamma <= 0:
+        raise OpError("color_ramp `gamma` must be positive")
 
     low_arr = np.array(low, dtype=np.float32)
     high_arr = np.array(high, dtype=np.float32)
     out_frames = []
     for frame in sequence.frames:
         luma = np.asarray(frame.convert("L"), dtype=np.float32) / 255.0
+        if gamma != 1.0:
+            luma = np.power(luma, gamma)
         rgb = (low_arr + (high_arr - low_arr) * luma[:, :, np.newaxis])
         if with_alpha:
             alpha = (luma * 255.0)[:, :, np.newaxis]

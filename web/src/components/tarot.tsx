@@ -48,8 +48,20 @@ import { deal as dealSound, flip as flipSound, riffle, shimmer }
   from '../lib/tablesounds'
 import { useTableSound } from '../lib/prefs'
 import { PERSONA_ART } from '../lib/personart'
+import wispsMp4Url from '../assets/ambience/wisps-loop.mp4'
+import wispsWebmUrl from '../assets/ambience/wisps-loop.webm'
 import { ThemeInterview } from './theme'
 import { CardArt } from './ui'
+import { VideoBackdrop } from './videofx'
+
+/** Mana over the felt: the wisps loop (ADR 31, seed 1909 — the Rider
+ *  printing's year) drifting across the table at screen-blend opacity.
+ *  Ambience mode, so reduced motion or the pref removes it entirely and
+ *  the felt is exactly the table it always was. */
+function TableWisps() {
+  return <VideoBackdrop webmSrc={wispsWebmUrl} mp4Src={wispsMp4Url}
+                        mode="ambience" className="tarot-wisps" />
+}
 
 /** The table survives a reload, for the reason the transcript does: a reading
  *  is of one person on one evening, and re-dealing it would make it somebody
@@ -936,6 +948,7 @@ export function TarotTable({ onPick, onLeave }: {
         {shuffling
           ? (
             <div className="tarot-table-felt relative flex flex-col items-center gap-4 py-10">
+              <TableWisps />
               <CrystalBall />
               <ShufflingDeck />
               <p className="text-sm tracking-wide" style={{ color: 'var(--tarot-felt-text)' }}>
@@ -1030,6 +1043,7 @@ export function TarotTable({ onPick, onLeave }: {
           a green rectangle beside a chat column is furniture, not ceremony. */}
       {cards.length > 0 && (
         <div className={dealing ? 'tarot-table-felt relative px-4 py-8' : ''}>
+          {dealing && <TableWisps />}
           {dealing && (
             /* `lg`, not `sm`. The ball is positioned against the felt's right
                edge while the spread is centred in the whole felt, so the two
