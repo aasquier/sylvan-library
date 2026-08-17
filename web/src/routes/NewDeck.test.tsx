@@ -320,6 +320,38 @@ describe('the tarot door', () => {
     expect(screen.getByText('A voice this file has never heard of.')).toBeTruthy()
   })
 
+  it('shuffles again without leaving the table', async () => {
+    // A spread costs one integer to remember, and the seed is stashed — so
+    // coming back to the table re-deals the *same* three cards forever, and
+    // the only path to a new deal ran through a button labelled "Different
+    // reader". Aaron found it on the instance the honest way: he went
+    // looking for Magic cards and got the same Rider-Waite spread every
+    // time. The reshuffle asks the server for a fresh reading and stashes
+    // the seed it answers with.
+    await enterTarot()
+    expect(vi.mocked(api.tarotReading)).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(
+      JSON.parse(localStorage.getItem('mtglab-tarot-table') ?? '{}').seed)
+      .toBe(4242), PAST_THE_SHUFFLE)
+
+    vi.mocked(api.tarotReading).mockResolvedValue(
+      { ...READING, seed: 777 } as never)
+    fireEvent.click(screen.getByRole('button', { name: /shuffle again/i }))
+
+    await waitFor(() => expect(
+      JSON.parse(localStorage.getItem('mtglab-tarot-table') ?? '{}').seed)
+      .toBe(777), PAST_THE_SHUFFLE)
+    // And it asks for a *new* deal rather than replaying the stashed one.
+    expect(vi.mocked(api.tarotReading)).toHaveBeenLastCalledWith()
+  })
+
+  it('offers no reshuffle to a reader who deals no cards', async () => {
+    // The plain voices have no cards on the table to shuffle, and a control
+    // that did nothing would be worse than none.
+    await enterTarot('plain')
+    expect(screen.queryByRole('button', { name: /shuffle again/i })).toBeNull()
+  })
+
   it('deals face down, and names nothing until it is turned over', async () => {
     await enterTarot()
     // The places are announced; the cards are not. A spread that told you what

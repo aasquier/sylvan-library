@@ -210,21 +210,12 @@ const RWS_FOCUS: Record<string, string> = {
   // The second and third dives (2026-08-16): every trump answered, and the
   // suits opened. Same rule as always — the window holds what makes the
   // painting its original.
-  'mtg-blind-seer': '50%',
   'mtg-orzhov-pontiff': '62%',
-  'mtg-kynaios-and-tiro': '62%',
   'mtg-lion-umbra': '45%',
   'mtg-balance': '38%',
-  'mtg-hanged-executioner': '48%',
-  'mtg-pale-rider': '45%',
-  'mtg-alchemists-apprentice': '45%',
-  'mtg-master-of-cruelties': '45%',
-  'mtg-stone-rain': '38%',
-  'mtg-starfield-of-nyx': '38%',
   'mtg-approach-second-sun': '30%',
   'mtg-angelic-renewal': '40%',
   'mtg-wand-of-the-worldsoul': '55%',
-  'mtg-chart-a-course': '55%',
   'mtg-tragic-poet': '60%',
   'mtg-everflowing-chalice': '50%',
   'mtg-sword-truth-justice': '42%',
@@ -233,6 +224,29 @@ const RWS_FOCUS: Record<string, string> = {
   'mtg-smothering-tithe': '42%',
   'mtg-alms-collector': '40%',
   'mtg-king-macar': '45%',
+  // Aaron's verdicts (2026-08-17). Eighteen cards arrived with no window
+  // between them and every one defaulted to dead centre, which is where
+  // True Love's Kiss keeps the knight's dark pauldron and loses both
+  // faces. Each of these was picked off a rendered strip of the same crop
+  // at 20/35/50/65/80, judged at the size the felt actually draws it.
+  'mtg-willow-priestess': '70%',        // her face and the cat, not the faerie
+  'mtg-true-loves-kiss': '30%',         // both of them in the window
+  'mtg-suspension-field': '45%',        // the hanging figure, arms open
+  'mtg-murderous-rider': '42%',         // the rider, not the horse's head
+  'mtg-chalice-of-life': '50%',         // the cup, base to rim
+  'mtg-asmodeus-the-archfiend': '60%',  // horns and throne
+  'mtg-command-tower': '60%',           // the struck crown of the tower
+  'mtg-ephara': '45%',                  // the urn and what pours from it
+  'mtg-expedition-map': '30%',          // the compass rose
+  'mtg-goblin-gathering': '30%',        // two goblins and the fire
+  'mtg-young-pyromancer': '62%',        // the face *and* the flame in hand
+  'mtg-hellrider': '45%',               // the devil on the horse
+  'mtg-rite-of-harmony': '55%',         // all three of the ring
+  'mtg-happily-ever-after': '28%',      // the two crowned figures
+  'mtg-thassa': '30%',                  // her face, before the bident
+  'mtg-curse-of-the-pierced-heart': '25%',  // the heart, not the screamer
+  'mtg-startled-awake': '42%',          // the figure sitting up in bed
+  'mtg-murder': '58%',                  // the blade already through
 }
 
 /**
@@ -1137,6 +1151,25 @@ export function TarotTable({ onPick, onLeave }: {
             )}
         <span className="ml-auto flex items-center gap-2">
           <SoundToggle />
+          {/* A spread costs one integer to remember, and the consequence
+              nobody saw until Aaron went looking for Magic cards on the
+              instance: coming back to the table re-deals the *stashed*
+              seed, so the cards never change. A new deal only ever
+              happened inside `chooseReader`, which meant the way to
+              reshuffle was to leave and pick the same reader again —
+              behind a button that says "Different reader", which is the
+              one thing you do not want. This is that path, named for what
+              it does. Only for a reader who deals; the plain voices have
+              no cards to shuffle. */}
+          {chosen.deals && (
+            <button onClick={() => { void chooseReader(chosen) }}
+                    disabled={shuffling}
+                    className="rounded-md px-3 py-1.5 text-sm disabled:opacity-50"
+                    style={{ border: '1px solid var(--hairline)',
+                             color: 'var(--text-muted)' }}>
+              {shuffling ? 'Shuffling…' : 'Shuffle again'}
+            </button>
+          )}
           <button onClick={leaveTable}
                   className="rounded-md px-3 py-1.5 text-sm"
                   style={{ border: '1px solid var(--hairline)',
