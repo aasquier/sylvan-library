@@ -70,6 +70,17 @@ animist = ["Pillow>=11", "imageio-ffmpeg>=0.6"]
 # (`uv venv .venv-depth && uv pip install -e '.[animist,depth]'`), resolved
 # to numpy 1.26 throughout, while the main venv stays on current numpy.
 # transformers is capped below 5 because v5 refuses to see a torch this old.
+#
+# Security posture for that exact pin (triaged 2026-08-16, nine Dependabot
+# alerts including one critical -- the torch.load pickle RCE, patched in
+# 2.6.0): dismissed as tolerable risk, and the argument is containment
+# rather than absence. This extra runs on the maintainer's machine only --
+# never the container, never CI, never `dev` -- and the one model it loads
+# is a pinned Hugging Face snapshot shipping safetensors, so torch.load's
+# unpickling path is never exercised. There is no upgrade to take: the pin
+# IS the platform ceiling (see above). New torch alerts inherit this triage
+# until the depth tier leaves this machine; the day it does, this paragraph
+# is the checklist of what must be re-decided.
 depth = ["torch==2.2.2", "transformers>=4.45,<5", "numpy<2"]
 # httpx backs fastapi's TestClient, so the API tests need it. ruff's floor is
 # 0.16 because the rule selection in [tool.ruff.lint] names rules added after

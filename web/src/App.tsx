@@ -4,6 +4,7 @@ import Claim from './routes/Claim'
 import Library from './routes/Library'
 import Login from './routes/Login'
 import { Spinner } from './components/ui'
+import { RouteErrorBoundary } from './components/boundary'
 import { SettingsMenu } from './components/settings'
 import { ForestAmbience, HeaderCanopy, LibraryMark } from './components/forest'
 import { LibraryWhisper } from './components/whisper'
@@ -257,14 +258,14 @@ export default function App() {
                 background: 'color-mix(in srgb, var(--page) 88%, transparent)',
                 borderBottom: '1px solid var(--hairline)',
               }}>
-        {/* One row on a laptop; two on a phone. Below `lg` the seven nav
+        {/* One row on a laptop; two or three on a phone. Below `lg` the nav
             entries cannot share a 375px line with the wordmark and the theme
             button — they used to wrap *inside their own labels* ("Start a
             deck" on three lines) and clip everything past Import off-screen —
-            so the nav drops to its own full-width line and scrolls
-            horizontally if it must. `flex-wrap` plus `order-last` is the
-            whole mechanism; at `lg` the nav rejoins the row and none of the
-            mobile classes apply. */}
+            so the nav drops below the wordmark and wraps whole entries onto
+            as many lines as the width demands. `flex-wrap` plus `order-last`
+            is the whole mechanism; at `lg` the nav rejoins the row and none
+            of the mobile classes apply. */}
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 px-4 py-3 sm:px-6">
           {/* `shrink-0` and no wrapping: the signed-in name and Sign out add a
               second cluster to this row, and without it a narrow window breaks
@@ -282,15 +283,15 @@ export default function App() {
             </span>
           </NavLink>
 
-          {/* The negative margin lets the scrolled row bleed to the viewport
-              edge rather than clipping mid-padding, which is what makes the
-              overflow read as "more this way" instead of as a defect. */}
-          {/* The scrollbar is hidden because the cut-off last label already
-              says "more this way", and a bar under the nav reads as clutter
-              on the one row that is supposed to look effortless. */}
-          <nav className="order-last -mx-4 mt-2 flex w-full gap-1 overflow-x-auto px-4
-                          [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
-                          lg:order-none lg:mx-0 lg:mt-0 lg:w-auto lg:overflow-visible lg:px-0">
+          {/* The row *wraps* rather than scrolls. It used to be an
+              `overflow-x-auto` strip with the scrollbar suppressed, and the
+              polish ledger measured what that cost on a phone: 47% of the
+              nav visible at 375px, no fade or affordance, and Learn — the
+              page built for the newcomer — off-screen where nobody would
+              guess to swipe (Commandment 2). Two short lines every phone
+              can see beat one effortless line most phones cannot. */}
+          <nav className="order-last mt-2 flex w-full flex-wrap gap-1
+                          lg:order-none lg:mt-0 lg:w-auto">
             {nav.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.end}
                        title={item.hint}
@@ -353,6 +354,11 @@ export default function App() {
             place — see its docstring. Anything fixed added under here needs
             the same treatment. */}
         <div key={location.pathname} className="page-enter">
+        {/* Inside the keyed wrapper on purpose: navigating remounts the
+            boundary, so one page's failure never deadens the next tap.
+            Without this net a failed route chunk unmounts the whole root —
+            a black page whose nav is dead too (see boundary.tsx). */}
+        <RouteErrorBoundary>
         <Suspense fallback={<Spinner label="Loading…" />}>
         <Routes>
           <Route path="/" element={<Library />} />
@@ -384,6 +390,7 @@ export default function App() {
           } />
         </Routes>
         </Suspense>
+        </RouteErrorBoundary>
         </div>
       </main>
 

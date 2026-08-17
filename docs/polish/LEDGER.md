@@ -692,6 +692,14 @@ state, never checklists.
      decision (Commandment 1). Three options, cheapest first: an edge fade
      mask on the scroll container; letting the strip wrap to two lines below
      `lg`; a proper disclosure menu.
+     **Landed 2026-08-16: the wrap.** Aaron hit this on his own phone the
+     same day ("I can't navigate to the lab"), which settled the design
+     question the run had queued: the strip now wraps whole entries below
+     `lg` (all eight destinations visible at 375px, three short lines) and
+     the scroll-with-hidden-scrollbar mechanism is gone. Same branch fixed
+     the sharper half of what his phone showed: a failed lazy route chunk
+     unmounted the React root — black page, dead nav — and now lands in
+     `RouteErrorBoundary` (reload once, then an in-theme card).
   3. **Touch targets: 82% of the deck page's controls are under 44px.** 27 of
      33 interactive elements at 375px. The dense action cluster the checklist
      names — Write why, Card art, Ask Claude, Argue slot, Entomb, + Add a card,
