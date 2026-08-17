@@ -1248,6 +1248,42 @@ button:hover .tarot-fan-card {
   filter: blur(3px);
 }
 
+/* The far body of air: the same file again, bigger, softer and dimmer, drawn
+   under the near one. Two layers moving at different apparent rates are the
+   only depth cue a flat black wall has — and because it is the same loop,
+   the second one costs no bytes at all. Slowed by playing a larger crop of
+   the same motion rather than by touching the video's rate, which nothing
+   here can do without dropping frames. */
+.seance-haze.is-far {
+  inset: -26% -22% -6%;
+  width: 144%;
+  height: 132%;
+  opacity: 0.17;
+  filter: blur(9px);
+}
+
+/* The flicker, over the wax it belongs to (ADR 31, seed 1888). A photograph
+   of candles is a photograph of one instant, and the one thing it
+   structurally cannot say is that the light is different a second later.
+   `screen` so it only ever adds light, and masked to the upper half of the
+   rack — the wicks are up there, and light crawling over the puddled wax at
+   the bottom would read as water rather than as burning. */
+.seance-flame {
+  position: absolute;
+  inset: 0 0 auto 0;
+  width: 100%;
+  height: 62%;
+  object-fit: cover;
+  mix-blend-mode: screen;
+  opacity: 0.3;
+  filter: blur(5px) saturate(1.2);
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse 78% 88% at 42% 74%, #000 18%,
+    rgba(0, 0, 0, 0.5) 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 78% 88% at 42% 74%, #000 18%,
+    rgba(0, 0, 0, 0.5) 62%, transparent 100%);
+}
+
 /* The rack. Screened, because the plate's ground is black and black is
    already transparent under `screen` — which is also what keeps every flame's
    halo exactly as photographed instead of at whatever radius a matte's

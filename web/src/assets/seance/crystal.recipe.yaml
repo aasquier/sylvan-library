@@ -92,6 +92,21 @@ sources:
     seed: 1848
     licence: ours-generated
 
+  # The rack's own flicker, and it is a different animal from `candle` below:
+  # that one is a broad pool of light breathing, this one is FLAME -- small
+  # features, fast, and almost no drift, because a wick moves quickly and
+  # goes nowhere. It is laid over the photographed candles rather than
+  # standing on its own, so what it has to supply is the one thing a
+  # photograph structurally cannot: the fact that the light is not the same
+  # from one second to the next.
+  # Seed 1888, the year Margaret Fox stood on a stage and confessed the
+  # rappings were her own toe joints -- and the séances went on anyway, which
+  # is the most candle-like fact in the whole story.
+  flame:
+    provider: procedural
+    seed: 1888
+    licence: ours-generated
+
   # The candle that lights the smoke from behind. Same construction as the
   # Laboratory's embers and deliberately not the same numbers: a single
   # flame's light is one broad pool that breathes, so the scale is lower
@@ -198,6 +213,34 @@ outputs:
       - resize: {width: 700}
     encode: {format: webp, quality: 84}
     expect: {width: 700, height: 851, budget_kb: 180, metadata: none}
+
+  # Small features, fast time, almost no advection. `falloff` is lower than
+  # any other loop here (2.2 against 2.9-3.1), which is what keeps the fine
+  # detail a flame has and the smoke does not -- a high falloff would give a
+  # soft blob that reads as another glow rather than as burning.
+  - file: seance-flame-loop.webm
+    from: flame
+    ops:
+      - spectral_noise: {width: 300, height: 300, frames: 96, fps: 24,
+                         scale: 0.6, time_scale: 3.4, falloff: 2.2}
+      - advect: {strength: 1.0, scale: 0.6}
+      - color_ramp: {low: "#000000", high: "#ffd79a"}
+      - resize: {width: 460}
+    encode: {format: webm, crf: 44}
+    expect: {width: 460, height: 460, frames: 96, fps: 24, budget_kb: 420,
+             metadata: none}
+
+  - file: seance-flame-loop.mp4
+    from: flame
+    ops:
+      - spectral_noise: {width: 300, height: 300, frames: 96, fps: 24,
+                         scale: 0.6, time_scale: 3.4, falloff: 2.2}
+      - advect: {strength: 1.0, scale: 0.6}
+      - color_ramp: {low: "#000000", high: "#ffd79a"}
+      - resize: {width: 460}
+    encode: {format: mp4, crf: 34}
+    expect: {width: 460, height: 460, frames: 96, budget_kb: 420,
+             metadata: none}
 
   - file: seance-smoke-loop.webm
     from: smoke

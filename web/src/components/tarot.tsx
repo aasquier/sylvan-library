@@ -55,6 +55,8 @@ import candleWebmUrl from '../assets/seance/candle-glow-loop.webm'
 import standUrl from '../assets/seance/crystal-fish.webp'
 import shellUrl from '../assets/seance/crystal-shell-sepia.webp'
 import candlesUrl from '../assets/seance/seance-candles.webp'
+import flameMp4Url from '../assets/seance/seance-flame-loop.mp4'
+import flameWebmUrl from '../assets/seance/seance-flame-loop.webm'
 import smokeMp4Url from '../assets/seance/seance-smoke-loop.mp4'
 import smokeWebmUrl from '../assets/seance/seance-smoke-loop.webm'
 import { ThemeInterview } from './theme'
@@ -463,6 +465,13 @@ function SeanceRoom({ children }: { children: React.ReactNode }) {
   return (
     <div className="seance-stage">
       <div className="seance-dark" aria-hidden="true">
+        {/* Two bodies of air rather than one, and the second costs no bytes:
+            it is the same seed-1848 loop again, slower, larger and higher in
+            the room. One layer of smoke reads as a texture laid over the
+            dark; two moving at different rates read as depth, because that
+            is the only cue a flat black wall can give. */}
+        <VideoBackdrop webmSrc={smokeWebmUrl} mp4Src={smokeMp4Url}
+                       mode="ambience" className="seance-haze is-far" />
         <VideoBackdrop webmSrc={smokeWebmUrl} mp4Src={smokeMp4Url}
                        mode="ambience" className="seance-haze" />
       </div>
@@ -474,9 +483,13 @@ function SeanceRoom({ children }: { children: React.ReactNode }) {
           fades the wax into the table. */}
       <span className="seance-rack is-left" aria-hidden="true">
         <img src={candlesUrl} alt="" />
+        <VideoBackdrop webmSrc={flameWebmUrl} mp4Src={flameMp4Url}
+                       mode="ambience" className="seance-flame" />
       </span>
       <span className="seance-rack is-right" aria-hidden="true">
         <img src={candlesUrl} alt="" />
+        <VideoBackdrop webmSrc={flameWebmUrl} mp4Src={flameMp4Url}
+                       mode="ambience" className="seance-flame" />
       </span>
       {/* The light the rack puts back on the felt, in front of the dark so it
           washes over the table's edge rather than stopping at it. */}
