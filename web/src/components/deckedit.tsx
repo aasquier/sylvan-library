@@ -547,7 +547,7 @@ export function RationaleEditor({
           </PrimaryButton>
           <QuietButton onClick={onCancel} disabled={busy}>Cancel</QuietButton>
           <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-            Writes deck.yaml — commit it, deck history is git history.
+            Writes deck.yaml — the History tab records the edit.
           </span>
         </div>
       </div>
