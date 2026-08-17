@@ -72,6 +72,12 @@ load-bearing.
     prompt, render a simple artifact outlining the roadmap — high level: what
     just landed, what is next, the next couple of outstanding work items. It
     guides the next step; it is not a changelog.
+14. **A green suite has not seen the page.** Anything a user will look at is
+    verified by driving the real surface — the deployed instance when it's
+    deployed there, signed in through the claude seat when it's behind the
+    login — before it is called done. Screenshots are the evidence; "the
+    tests pass" is not. (Added with Aaron 2026-08-16, after the twelfth bug
+    no green suite could see.)
 
 ## Setup
 
