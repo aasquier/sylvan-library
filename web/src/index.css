@@ -1491,6 +1491,70 @@ button:hover .tarot-fan-card {
   animation-delay: -3.1s;
 }
 
+/* ── the dance (`FlameDance` in tarot.tsx) ─────────────────────────────────
+ *
+ * Per-flame motion, three layers deep. The clone below carries the
+ * photographed tips through the animated turbulence; the halos are each
+ * wick's own light breathing and swaying; the gutter wrapper throws one
+ * flame at a time into a quick squash-and-dart. Everything is screened —
+ * fire only ever adds light. */
+.flame-bend {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  filter: url(#seance-flame-bend) brightness(1.04);
+  mix-blend-mode: screen;
+}
+
+.flame-gutter {
+  position: absolute;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  pointer-events: none;
+  animation: flame-gutter-cycle 9s linear infinite;
+}
+
+.flame-halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  background: radial-gradient(circle,
+    rgba(255, 240, 200, 0.42) 0%,
+    rgba(255, 196, 100, 0.22) 34%,
+    rgba(190, 100, 24, 0.08) 58%,
+    transparent 74%);
+  animation: flame-breathe 2s ease-in-out infinite;
+}
+
+/* Mostly steady, with quick unevenly-spaced dips and a visible SWAY — the
+   lateral drift is what reads as dancing rather than dimming. */
+@keyframes flame-breathe {
+  0%, 100% { opacity: 0.95; transform: scale(1) translate(0, 0); }
+  13% { opacity: 0.78; transform: scale(0.9, 1.06) translate(-3%, 1.5%); }
+  19% { opacity: 1; transform: scale(1.06, 0.97) translate(2%, -1%); }
+  37% { opacity: 0.92; transform: scale(0.97) translate(3%, 0.5%); }
+  52% { opacity: 1.0; transform: scale(1.1, 1.02) translate(-2%, -2.5%); }
+  61% { opacity: 0.8; transform: scale(0.92, 1.08) translate(1.5%, 1%); }
+  78% { opacity: 0.98; transform: scale(1.03, 0.98) translate(-1%, -0.5%); }
+  90% { opacity: 0.88; transform: scale(0.96) translate(2%, 0.8%); }
+}
+
+/* The gutter: for most of its long cycle this wrapper does nothing, then
+   for one beat the flame squashes, flares, and darts — the irregular
+   event that reads as air moving through the room. On the wrapper so its
+   transform COMPOSES with the halo's breathe instead of fighting it over
+   the property. */
+@keyframes flame-gutter-cycle {
+  0%, 91% { transform: scale(1) translateX(0); }
+  93% { transform: scale(1.28, 0.72) translateX(4%); }
+  95% { transform: scale(0.8, 1.18) translateX(-4%); }
+  97% { transform: scale(1.12, 0.9) translateX(2%); }
+  100% { transform: scale(1) translateX(0); }
+}
+
 /* Candlelight, which is not a sine wave. Real flicker is mostly steady with
    irregular dips, so the keyframes are uneven on purpose and the three layers
    run at 5.9s / 7.3s / 8.9s — three periods with no common multiple worth
@@ -1941,6 +2005,17 @@ button:hover .tarot-fan-card {
   .seance-spill,
   .seance-scroll::after {
     animation: none;
+  }
+  /* The dance stands down: halos hold steady light, and the bending
+     clone is removed outright — SMIL cannot hear this media query, so
+     the element goes rather than the animation. */
+  .flame-halo,
+  .flame-gutter {
+    animation: none;
+    opacity: 0.85;
+  }
+  .flame-bend {
+    display: none;
   }
   .tarot-hinge {
     transition: none;

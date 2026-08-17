@@ -72,6 +72,88 @@ function TableWisps() {
                         mode="ambience" className="tarot-wisps" />
 }
 
+/** Every wick on the candle plate, MEASURED rather than eyeballed: the
+ *  flames are blown out to white, so a >235 luminance threshold and a
+ *  connected-component sweep finds all seventeen — x/y as fractions of
+ *  the plate, `s` from the sqrt of each flame's area against the median.
+ *  Re-run the sweep whenever the recipe's crop moves; hand-nudged
+ *  coordinates are how the first wax prototype ended up dripping from
+ *  thin air. */
+const RACK_FLAMES = [
+  { x: 0.010, y: 0.375, s: 0.62 },
+  { x: 0.013, y: 0.116, s: 0.81 },
+  { x: 0.112, y: 0.383, s: 1.13 },
+  { x: 0.149, y: 0.325, s: 0.61 },
+  { x: 0.181, y: 0.343, s: 0.90 },
+  { x: 0.220, y: 0.395, s: 1.42 },
+  { x: 0.245, y: 0.371, s: 1.17 },
+  { x: 0.304, y: 0.635, s: 1.12 },
+  { x: 0.383, y: 0.571, s: 0.86 },
+  { x: 0.398, y: 0.480, s: 1.19 },
+  { x: 0.422, y: 0.596, s: 0.91 },
+  { x: 0.521, y: 0.267, s: 1.00 },
+  { x: 0.602, y: 0.228, s: 0.93 },
+  { x: 0.737, y: 0.446, s: 1.46 },
+  { x: 0.770, y: 0.446, s: 1.13 },
+  { x: 0.952, y: 0.448, s: 1.37 },
+  { x: 0.997, y: 0.521, s: 0.44 },
+]
+
+/** The union mask that keeps only the flame teardrops of a plate clone —
+ *  what lets the turbulence filter bend the photographed tips without
+ *  doubling the wax under them. */
+const FLAME_MASK = RACK_FLAMES.map((f) =>
+  `radial-gradient(ellipse ${(5.5 * f.s).toFixed(1)}% ${(7 * f.s).toFixed(1)}% `
+  + `at ${(f.x * 100).toFixed(1)}% ${(f.y * 100).toFixed(1)}%, `
+  + '#000 45%, transparent 78%)').join(',')
+
+/**
+ * The dance (Aaron's ruling off the flicker board, 2026-08-17): a rack's
+ * fire moves per FLAME, never per rack. Three motions compose, all
+ * deterministic — periods and phases are functions of each flame's index,
+ * because a hand wobbles but a render must not:
+ *
+ * - the plate's own tips BEND: a clone of the photograph, masked to the
+ *   teardrops, displaced by SMIL-animated turbulence (probed in WebKit
+ *   before it was trusted);
+ * - a halo on every wick breathes and sways on its own period;
+ * - and each flame occasionally GUTTERS — a quick squash-flare-dart on a
+ *   long cycle, carried by a wrapper span so its transform composes with
+ *   the breathe instead of fighting it.
+ *
+ * Reduced motion stills all three from the same media query that stills
+ * the room: halos hold steady light and the bending clone is removed
+ * (SMIL cannot hear the media query, so the element goes, not the
+ * animation).
+ */
+function FlameDance() {
+  return (
+    <>
+      <img className="flame-bend" src={candlesUrl} alt="" aria-hidden="true"
+           style={{
+             WebkitMaskImage: FLAME_MASK,
+             maskImage: FLAME_MASK,
+           } as React.CSSProperties} />
+      {RACK_FLAMES.map((f, i) => (
+        <span key={i} className="flame-gutter" aria-hidden="true"
+              style={{
+                left: `${f.x * 100}%`,
+                top: `${f.y * 100}%`,
+                width: `${(6.2 * f.s).toFixed(1)}%`,
+                animationDuration: `${(6 + ((i * 5) % 11) * 1.1).toFixed(1)}s`,
+                animationDelay: `${(-(i * 1.9)).toFixed(1)}s`,
+              }}>
+          <span className="flame-halo"
+                style={{
+                  animationDuration: `${(1.3 + ((i * 7) % 9) * 0.17).toFixed(2)}s`,
+                  animationDelay: `${(-(i * 0.37)).toFixed(2)}s`,
+                }} />
+        </span>
+      ))}
+    </>
+  )
+}
+
 /** The table survives a reload, for the reason the transcript does: a reading
  *  is of one person on one evening, and re-dealing it would make it somebody
  *  else's. Only three integers' worth — the seed re-deals the rest. */
@@ -544,14 +626,33 @@ function SeanceRoom({ children, onKnock }: {
           fades the wax into the table. */}
       <span className="seance-rack is-left" aria-hidden="true">
         <img src={candlesUrl} alt="" />
+        <FlameDance />
         <VideoBackdrop webmSrc={flameWebmUrl} mp4Src={flameMp4Url}
                        mode="ambience" className="seance-flame" />
       </span>
       <span className="seance-rack is-right" aria-hidden="true">
         <img src={candlesUrl} alt="" />
+        <FlameDance />
         <VideoBackdrop webmSrc={flameWebmUrl} mp4Src={flameMp4Url}
                        mode="ambience" className="seance-flame" />
       </span>
+      {/* The turbulence that bends the tips. One filter, referenced by both
+          racks' clones; the seed is 1888, as ever. Width/height zero — this
+          is a definition, not a drawing. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }}
+           aria-hidden="true">
+        <filter id="seance-flame-bend" x="-15%" y="-15%" width="130%"
+                height="130%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.05"
+                        numOctaves="2" seed="1888" result="n">
+            <animate attributeName="baseFrequency"
+                     values="0.012 0.05;0.017 0.075;0.011 0.045;0.012 0.05"
+                     dur="1.9s" repeatCount="indefinite" />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="11"
+                             xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
       {/* The light the rack puts back on the felt, in front of the dark so it
           washes over the table's edge rather than stopping at it. */}
       <span className="seance-spill" aria-hidden="true" />
