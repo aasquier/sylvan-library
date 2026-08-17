@@ -254,6 +254,34 @@ body {
   );
 }
 
+/* The generated mist (mist.recipe.yaml, ADR 31) as the room's floor: fixed
+ * to the viewport bottom inside the portalled backdrop, stretched wide and
+ * faded upward so only the lower third of the page ever carries weather.
+ * `screen` lifts the mist's light over any painting behind it; opacity per
+ * theme because a light page needs far less fog than a dark one. Removal is
+ * the component's job (VideoBackdrop, ambience mode) -- when motion is
+ * unwelcome this element does not exist, so there is nothing here to
+ * freeze. */
+.scene-mist {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 38vh;
+  object-fit: cover;
+  mix-blend-mode: screen;
+  opacity: 0.1;
+  -webkit-mask-image: linear-gradient(to top, #000 55%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 55%, transparent 100%);
+  pointer-events: none;
+}
+
+:root[data-theme='dark'] .scene-mist,
+:root:where(:not([data-theme='light'])) .scene-mist {
+  opacity: 0.2;
+}
+
 /* The motion tier's hero presentations (ADR 32). The container claims the
  * same 4:1 box the still band draws, so a derivative arriving can only ever
  * change what is inside the box, never the layout around it. The theme

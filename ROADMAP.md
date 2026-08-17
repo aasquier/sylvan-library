@@ -1326,15 +1326,28 @@ arc; this is what the next few sessions actually do.
     `verify` reads video through the same bundled ffmpeg that wrote it, and
     `measure` sweeps crf where a video output is the subject.
 
-    Still ahead: **2.5D depth parallax** (torch 2.2.2 CPU +
-    Depth-Anything-V2-Small, Apache-2.0, both verified installable on
-    macOS 12 Intel) for public-domain paintings as committed assets — and
-    for **card art through ADR 32's runtime tier**, which supersedes the
-    exclusion this paragraph used to state: a depth map of a Wizards
-    painting is still never *committed*, but a derivative generated
-    server-side into the gitignored cache and served by the free fan-content
-    app is the runtime-only rule kept, not bent. Sprite sheets and the
-    runtime sprite-sheet player remain open.
+    The whole chain is live as of the same day. The first procedural asset
+    shipped — `mist.recipe.yaml`, seed 6161, the forest mist every room's
+    floor now carries through `SceneBackdrop`, budgeted at `measure`'s crf
+    knees (webm 40, mp4 30) — and **2.5D depth parallax runs for real**:
+    ADR 32's runtime tier derived depth-drift loops for all six commanders
+    with Depth-Anything-V2-Small on this machine, the browser plays them
+    through `CommanderMotion` (WebGL tilt where a depth map ships, the
+    baked loop elsewhere, the still as the floor), and the derivatives
+    travel to the instance over sftp, never through git.
+
+    One trap worth the paragraph: torch 2.2.2 is the **last** torch with
+    macOS x86_64 wheels and it predates numpy 2, so the `depth` extra pins
+    `numpy<2` and lives in **its own venv** on this machine
+    (`.venv-depth`); the main venv never downgrades. The extra's comment in
+    `pyproject.toml` records the whole argument.
+
+    Still ahead: a public-domain painting brought to life as a *committed*
+    asset (the tooling is ready — a wikimedia source plus `ken_burns` works
+    today, and a committed depth map would ride the same recipe; what
+    remains is choosing the painting, which is a Commandment 5 decision to
+    make with Aaron, not a default). Sprite sheets and the runtime
+    sprite-sheet player remain open.
 
 ---
 

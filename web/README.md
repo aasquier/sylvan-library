@@ -67,6 +67,16 @@ them as separate steps on purpose, so a type error reports as a type error.
   the recipe. Never hand-place a `.webp` — and mind Vite's
   `assets/[name].[ext]` rule: asset basenames must be unique across the app
   or the committed bundle diverges between macOS and CI Linux.
+- **Motion assets are the same rule with more formats** (ADR 31). A video
+  loop or animated still is committed only through a recipe — procedural
+  ones (the mist) declare a seed instead of an upstream and rebuild
+  identically from the recipe alone. Play them through `VideoBackdrop`
+  (`components/videofx.tsx`) and pick the mode deliberately: `ambience`
+  removes the element under reduced motion or the ambience pref ("frozen
+  weather is a smudge"); `art` falls back to the still it replaced. Card-art
+  motion is never a committed asset at all — it arrives from the runtime
+  tier (ADR 32) through `CommanderMotion`, and `ready: false` renders
+  yesterday's page.
 - **Both themes, every time.** Light/dark live in `index.css` on
   `data-theme` with a `prefers-color-scheme` fallback; decorative art needs
   *opposite* treatment per theme (dark mode brightens, light mode dims — the

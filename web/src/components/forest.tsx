@@ -34,6 +34,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAmbience } from '../lib/prefs'
+import { VideoBackdrop } from './videofx'
 
 /* ------------------------------------------------------------ the ambience */
 
@@ -206,6 +207,8 @@ interface ShedLeaf {
  */
 
 import canopyUrl from '../assets/ambience/ivy-canopy.webp'
+import mistMp4Url from '../assets/ambience/mist-loop.mp4'
+import mistWebmUrl from '../assets/ambience/mist-loop.webm'
 import sprig1Url from '../assets/ambience/ivy-sprig-1.webp'
 import sprig2Url from '../assets/ambience/ivy-sprig-2.webp'
 import sprig3Url from '../assets/ambience/ivy-sprig-3.webp'
@@ -299,6 +302,15 @@ export function SceneBackdrop({ art }: { art: string }) {
   return createPortal(
     <div className="scene-backdrop" aria-hidden="true">
       <img src={art} alt="" className="scene-backdrop-art" />
+      {/* The floor of the room: the first asset this site generated from
+          nothing (mist.recipe.yaml, ADR 31 -- seeded noise, loop-perfect
+          by construction). `ambience` mode, so reduced motion or the pref
+          removes it entirely rather than freezing it, and the element
+          pauses its own decoder off-screen. Blend + low opacity keep it a
+          weather layer over any painting rather than a video anyone reads
+          as a video. */}
+      <VideoBackdrop webmSrc={mistWebmUrl} mp4Src={mistMp4Url}
+                     mode="ambience" className="scene-mist" />
       {/* The lanes (second punch list, item 5): on a screen wide enough to
           have margins, the margins are walls of this room, and the walls
           carry the painting — near-sharp, drifting very slowly (the Ken

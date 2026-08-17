@@ -64,8 +64,13 @@ animist = ["Pillow>=11", "imageio-ffmpeg>=0.6"]
 # may import (the suite drives the pipeline through a FakeDepthModel; the
 # real model runs only on the maintainer's machine). torch is pinned exact
 # because the fingerprint story assumes same-weights-same-depth, and the
-# pin is the verified-installable version for macOS 12 Intel (ROADMAP 12).
-depth = ["torch==2.2.2", "transformers>=4.40"]
+# pin is the last torch with macOS x86_64 wheels at all -- which is also why
+# `numpy<2` rides here: 2.2.2 predates numpy 2 and cannot initialise
+# against it. On this machine that makes the depth extra **its own venv**
+# (`uv venv .venv-depth && uv pip install -e '.[animist,depth]'`), resolved
+# to numpy 1.26 throughout, while the main venv stays on current numpy.
+# transformers is capped below 5 because v5 refuses to see a torch this old.
+depth = ["torch==2.2.2", "transformers>=4.45,<5", "numpy<2"]
 # httpx backs fastapi's TestClient, so the API tests need it. ruff's floor is
 # 0.16 because the rule selection in [tool.ruff.lint] names rules added after
 # 0.4, and an older ruff would error on the config rather than lint the code.
