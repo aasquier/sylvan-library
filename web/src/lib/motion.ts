@@ -58,3 +58,28 @@ export function useCardMotion(oracleId: string | null | undefined,
 
   return status
 }
+
+/**
+ * The window of texture the shader may sample: `object-fit: cover;
+ * object-position: center top`, in GL texture coordinates (v = 1 is the
+ * painting's top — textures are uploaded with UNPACK_FLIP_Y_WEBGL, so
+ * image rows and GL's v axis agree).
+ *
+ * A band wider than the painting shows the full width and the TOP slice
+ * of the height — the hero band's contract, argued at its call site: the
+ * bottom of card art is ground and robes, the top is the subject's head.
+ * A box taller than the painting shows full height, centred horizontally.
+ */
+export function coverTopWindow(
+  texWidth: number, texHeight: number,
+  boxWidth: number, boxHeight: number,
+): { scale: [number, number]; offset: [number, number] } {
+  const texAspect = texWidth / texHeight
+  const boxAspect = boxWidth / boxHeight
+  if (boxAspect >= texAspect) {
+    const sliceHeight = texAspect / boxAspect
+    return { scale: [1, sliceHeight], offset: [0, 1 - sliceHeight] }
+  }
+  const sliceWidth = boxAspect / texAspect
+  return { scale: [sliceWidth, 1], offset: [(1 - sliceWidth) / 2, 0] }
+}

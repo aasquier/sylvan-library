@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { reducedMotion } from '../lib/motion'
+import { coverTopWindow, reducedMotion } from '../lib/motion'
 import { useAmbience } from '../lib/prefs'
 
 export const VERTEX_SHADER = `
@@ -33,19 +33,30 @@ void main() {
 // Depth displaces the sample point along the camera offset; a small zoom
 // keeps the warp from ever sampling past the canvas edge. Lighter depth =
 // nearer = moves more, matching `cardmotion/depth.py`'s polarity.
+//
+// `uvScale`/`uvOffset` are the cover-crop window (see `coverTopWindow`):
+// the canvas box and the painting have different aspects, so the shader
+// samples only the slice of the texture the still's `object-fit: cover;
+// object-position: center top` would show. Displacement happens in box
+// space, then maps through the window, so amplitude means the same thing
+// whatever the crop.
 export const FRAGMENT_SHADER = `
 precision mediump float;
 varying vec2 uv;
 uniform sampler2D art;
 uniform sampler2D depth;
 uniform vec2 offset;
+uniform vec2 uvScale;
+uniform vec2 uvOffset;
 void main() {
   vec2 centred = (uv - 0.5) / 1.06 + 0.5;
-  float d = texture2D(depth, centred).r - 0.5;
-  vec2 shifted = centred + d * offset;
+  vec2 base = centred * uvScale + uvOffset;
+  float d = texture2D(depth, base).r - 0.5;
+  vec2 shifted = (centred + d * offset) * uvScale + uvOffset;
   gl_FragColor = texture2D(art, clamp(shifted, 0.0, 1.0));
 }
 `
+
 
 type GL = WebGLRenderingContext
 
@@ -61,6 +72,9 @@ function loadTexture(gl: GL, unit: number, image: HTMLImageElement): void {
   const texture = gl.createTexture()
   gl.activeTexture(gl.TEXTURE0 + unit)
   gl.bindTexture(gl.TEXTURE_2D, texture)
+  // Image rows arrive top-first; GL's v axis points up. Without this flip
+  // the painting renders upside-down.
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
   // Non-power-of-two textures under WebGL1: clamp + linear, no mips.
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
@@ -111,6 +125,7 @@ export function ParallaxArt({
 
     let raf = 0
     let disposed = false
+    let resize: ResizeObserver | null = null
     // Pointer position in [-1, 1], eased toward with a lerp so the painting
     // settles rather than snaps; the sine path takes over when idle.
     const target = { x: 0, y: 0, active: false }
@@ -169,11 +184,27 @@ export function ParallaxArt({
       gl.uniform1i(gl.getUniformLocation(program, 'art'), 0)
       gl.uniform1i(gl.getUniformLocation(program, 'depth'), 1)
       const offsetLoc = gl.getUniformLocation(program, 'offset')
+      const uvScaleLoc = gl.getUniformLocation(program, 'uvScale')
+      const uvOffsetLoc = gl.getUniformLocation(program, 'uvOffset')
 
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      canvas.width = Math.max(1, Math.round(canvas.clientWidth * dpr))
-      canvas.height = Math.max(1, Math.round(canvas.clientHeight * dpr))
-      gl.viewport(0, 0, canvas.width, canvas.height)
+      // The buffer, the viewport and the crop window all follow the box,
+      // so a rotated phone or a dragged window re-crops instead of
+      // stretching a stale buffer.
+      const fit = () => {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2)
+        canvas.width = Math.max(1, Math.round(canvas.clientWidth * dpr))
+        canvas.height = Math.max(1, Math.round(canvas.clientHeight * dpr))
+        gl.viewport(0, 0, canvas.width, canvas.height)
+        const window_ = coverTopWindow(art.naturalWidth, art.naturalHeight,
+                                       canvas.width, canvas.height)
+        gl.uniform2f(uvScaleLoc, window_.scale[0], window_.scale[1])
+        gl.uniform2f(uvOffsetLoc, window_.offset[0], window_.offset[1])
+      }
+      fit()
+      if (typeof ResizeObserver !== 'undefined') {
+        resize = new ResizeObserver(fit)
+        resize.observe(canvas)
+      }
 
       if (fine) {
         canvas.addEventListener('pointermove', onMove)
@@ -202,6 +233,7 @@ export function ParallaxArt({
     return () => {
       disposed = true
       cancelAnimationFrame(raf)
+      resize?.disconnect()
       canvas.removeEventListener('pointermove', onMove)
       canvas.removeEventListener('pointerleave', onLeave)
     }

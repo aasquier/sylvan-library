@@ -11,9 +11,9 @@
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { reducedMotion } from '../lib/motion'
+import { coverTopWindow, reducedMotion } from '../lib/motion'
 import { CommanderMotion } from './cardmotion'
-import { ParallaxArt } from './parallax'
+import { FRAGMENT_SHADER, ParallaxArt } from './parallax'
 import { VideoBackdrop } from './videofx'
 
 beforeEach(() => {
@@ -121,6 +121,43 @@ it('offers webm before mp4 so the smaller file wins where both play', () => {
   const video = container.querySelector('video')
   expect(video?.muted).toBe(true)
   expect(video?.getAttribute('playsinline')).not.toBeNull()
+})
+
+/* The crop window is the one part of the GL path jsdom can check: pure
+ * numbers in, pure numbers out. What it pins is that the canvas frames the
+ * painting exactly as the still's `object-fit: cover; object-position:
+ * center top` does — the bug these cases came from was the full painting
+ * squashed into the band, upside-down. */
+
+it('a band wider than the painting shows the full width and the TOP slice', () => {
+  // The deck hero: a 4:1 band over a ~1.37:1 art crop.
+  const { scale, offset } = coverTopWindow(1200, 875, 2440, 610)
+  expect(scale[0]).toBe(1)
+  expect(offset[0]).toBe(0)
+  const slice = (1200 / 875) / (2440 / 610)
+  expect(scale[1]).toBeCloseTo(slice, 10)
+  // Top-anchored in GL coordinates: the window ends at v = 1, the top row.
+  expect(offset[1] + scale[1]).toBeCloseTo(1, 10)
+})
+
+it('a box taller than the painting shows full height, centred', () => {
+  const { scale, offset } = coverTopWindow(1200, 600, 500, 500)
+  expect(scale).toEqual([0.5, 1])
+  expect(offset).toEqual([0.25, 0])
+})
+
+it('a box matching the painting is the identity window', () => {
+  const { scale, offset } = coverTopWindow(1200, 875, 2400, 1750)
+  expect(scale).toEqual([1, 1])
+  expect(offset).toEqual([0, 0])
+})
+
+it('the shader samples art and depth through the same window', () => {
+  // A refactor that drops the uniforms fails here rather than silently
+  // rendering the stretched full texture again.
+  expect(FRAGMENT_SHADER).toContain('uvScale')
+  expect(FRAGMENT_SHADER).toContain('uvOffset')
+  expect(FRAGMENT_SHADER).toContain('texture2D(depth, base)')
 })
 
 it('parallax falls back when webgl is unavailable, as in jsdom', async () => {
