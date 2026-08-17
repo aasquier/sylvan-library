@@ -559,6 +559,35 @@ tests.**
   262 kB, with Recharts in a 398 kB chunk only DeckDetail and Simulator load,
   and the Vite warning is gone.
 
+### Mobile engines, and the live seat — 2026-08-16
+
+Two standing gaps in "drive the real surface" closed the same afternoon, and
+both are facts about tooling rather than code, recorded here so a fresh
+session knows they exist.
+
+**Both phone engines are now testable from this laptop.** Android was always
+effectively covered — the Browser pane's mobile preset runs the same Blink a
+real Android phone runs. iOS was the gap: macOS 12 caps desktop Safari at 15.6
+and Xcode at simulators below the bundle's own floor. The answer is
+Playwright pinned at **1.45.3** — the last release with macOS 12 browser
+builds — whose bundled **WebKit 17.4** launches here, wrapped in Playwright's
+iPhone descriptors (viewport, DPR, touch, UA). It is the real iOS engine, not
+true iOS Safari: the URL-bar viewport dance, rubber-banding and iOS autoplay
+policy still need Aaron's physical iPhone. The pin cannot move on this
+hardware, and the ledger's Green section carries the consequence.
+
+**The deployed instance has a live-testing seat: the `claude` account.** A
+plain user (never `--admin`, deliberately), created at the break-glass console
+per HOSTING §4, signed in by Aaron in his own Chrome and driven through the
+Claude-in-Chrome integration — Claude never touches the password, only the
+session. The containment is the existing architecture doing its job: the
+write gate scopes edits to the account's own decks, ADR 28 attributes every
+edit to `claude` by name in the deck's History, and ADR 22 keeps its drafts
+private by default. Its first exercise (import → rationale → entomb → return
+→ history → delete, end to end on the instance) is what caught the stale
+"deck history is git history" captions this section's own history is written
+in.
+
 ---
 
 ## 5. CI/CD

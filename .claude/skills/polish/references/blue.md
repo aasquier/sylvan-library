@@ -81,6 +81,13 @@ files against them.
   drift; verify a sample against the code. ADRs are immutable — when an ADR
   and reality disagree because reality moved on, the fix is a superseding
   ADR or a CLAUDE.md correction, never an ADR edit.
+- **UI copy is part of the drift surface.** Rendered strings that assert an
+  architecture fact go stale the same way docs do, and nothing tests them:
+  "deck history is git history" shipped in two components for two ADRs'
+  worth of time after ADR 28 built the activity log and ADR 30 took decks
+  out of git (caught 2026-08-16, by driving the live surface). Grep
+  `web/src` for captions and helper text that state where data lives or
+  what records what, and check each against the ADR that owns the fact.
 - **Memory audit**: read `MEMORY.md` and the memory files; verify claims that
   name files, flags, or numbers against the tree; merge duplicates, prune
   stale entries, convert anything relative-dated. The `consolidate-memory`
@@ -88,6 +95,20 @@ files against them.
 - **Doc changes ride the run's branch** — this facet is the one place a
   mostly-doc PR is legitimate, because the corrections are the work. Still
   batch them; still never open a PR for one paragraph.
+- **Scrub context that has stopped earning its tokens** (Aaron's ask,
+  2026-08-16). These files are read by Claude at the top of every session,
+  so their length is a per-session cost and their clarity is a correctness
+  input. Each pass, trim: dates that no longer change any decision (keep
+  the ones that do — an API-key expiry matters, the day a test landed
+  rarely does); episodic narratives whose lesson is already stated as a
+  rule (keep the rule, cut the reenactment — one sentence of provenance is
+  plenty); decisions with no long-term bearing; and flowery language where
+  a plain sentence says the same thing shorter. The test for any cut:
+  *would a fresh session behave differently without this sentence?* If no,
+  it goes; if yes, it stays whatever its style. Two hard bounds: ADRs are
+  immutable and are never scrubbed, and a trimmed claim must not become a
+  wrong claim — compression that loses a load-bearing caveat is drift
+  wearing a nicer name.
 - **Anthropic best-practices currency**: check the current Claude Code docs
   (skills, hooks, memory, CLAUDE.md guidance) for capabilities this repo
   should adopt — the platform moves and "stay current on yourself" is

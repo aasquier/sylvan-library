@@ -44,8 +44,15 @@ is opening it on *their* phone, in *their* browser. It has to just work.
   `prefers-reduced-motion` is a promise to users who get motion-sick.
   Animations should respect it — reduced, not necessarily removed.
 - Cross-browser: Chrome, Firefox, Safari on desktop; Safari and Chrome on
-  mobile. The practical method is feature-floor discipline plus real-device
-  spot checks when Aaron can; flag anything that needs his physical phone.
+  mobile. The practical method is feature-floor discipline plus real-engine
+  checks, and since 2026-08-16 both phone engines are testable from this
+  laptop: Blink via the Browser pane's mobile preset, and real WebKit via
+  the Playwright rig — `playwright@1.45.3` pinned (the last macOS 12
+  builds; **WebKit 17.4**, which is also the newest this hardware will
+  ever run), launched with iPhone device descriptors. ENGINEERING §4 has
+  the rig's story. iOS-Safari-only behavior — the URL-bar viewport dance,
+  rubber-banding, autoplay policy, `viewport-fit=cover` — still needs
+  Aaron's physical phone; flag those, test everything else yourself.
 
 ## Facet: cloud resource watch
 
@@ -71,6 +78,20 @@ trend is read.
   the "then it texts me" half. Keep the admin-surfacing proposal sharp in
   the queue: which numbers, which thresholds, which endpoint serves them
   (admin-mounted, 403 to non-admins, per ADR 17).
+- **Scan for infrastructure wins** (Aaron's ask, 2026-08-16 — the cost is
+  out of pocket, so efficiency is a standing goal, not a nice-to-have).
+  Two questions, asked of every component each run: *what needs upgrading*
+  (runtime versions, base images, Fly machine generation, dependency majors
+  parked in Dependabot — staying current is usually the cheap half of
+  staying efficient) and *what could be swapped for something better* —
+  cheaper, faster, or simpler, with evidence. Itemise the actual monthly
+  bill (machine, volume GB, bandwidth, the Anthropic key — share Black's
+  spend numbers rather than re-deriving them) and put a price on each line
+  so a swap proposal can say what it saves. HOSTING §7's standing example
+  is the pattern: Fly-vs-Hetzner is already written down with its trigger.
+  A swap that saves money but adds risk or migration work is **queued with
+  the arithmetic attached**, never applied; a free upgrade the project is
+  merely behind on is a safe fix if the gauntlet can prove it green.
 
 ## Facet: scalability & user adaptability
 

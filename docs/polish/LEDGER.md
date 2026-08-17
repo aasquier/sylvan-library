@@ -676,6 +676,17 @@ state, never checklists.
      pinning Tailwind v3, which is a large change. `FLOOR` in
      `tests/test_browser_floor.py` records 16.4 as *observed*, deliberately not
      as chosen; changing it is one line.
+     **Addendum 2026-08-16: the laptop can now test above the floor.** "No
+     one has looked" is half-settled: a real-WebKit rig exists on the dev
+     machine — Playwright pinned at **1.45.3**, the last release shipping
+     macOS 12 browser builds, whose `webkit_mac12_special` build is
+     **WebKit 17.4** — and the deployed site loads in it clean, iPhone 13
+     viewport, zero console errors. That verifies the *above*-floor side;
+     what Safari 15 loses below the floor is still Aaron's ten-second check
+     on his own desktop Safari, and the floor decision itself is still his.
+     Note the pin is permanent on this hardware: 17.4 is the newest WebKit
+     macOS 12 will ever run, so a future floor above 17.4 puts engine
+     testing back out of the laptop's reach.
   2. **Five of eight nav destinations are unreachable on a phone, and one of
      them is Learn.** Measured at 375px: the nav strip is 736px of content in a
      343px window (**47% visible**), `overflow-x: auto` with the scrollbar

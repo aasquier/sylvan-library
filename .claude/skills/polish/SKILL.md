@@ -1,6 +1,6 @@
 ---
 name: polish
-description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Python or TypeScript best practices, testing, performance, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, browser/mobile compatibility, scalability, or the repo's Claude-facing docs. Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' or 'polish all' (all five in one merged report), on 'polish rainbow' (all five as separate runs, one color at a time), on 'run the polish pass', and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears."
+description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Python or TypeScript best practices, testing (including mutation testing), performance, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, infrastructure efficiency/upgrades/cost, browser/mobile compatibility, scalability, or the repo's Claude-facing docs (including trimming stale or verbose context). Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' or 'polish all' (all five in one merged report), on 'polish rainbow' (all five as separate runs, one color at a time), on 'run the polish pass', and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears."
 ---
 
 # The Polish Pass
@@ -195,7 +195,12 @@ It is what makes the pass cumulative rather than repetitive.
    tests`, `mypy`, and `npm --prefix web run check`; rebuild the committed
    bundle (`npm --prefix web run build`) if anything under `web/src` changed.
    Check `data/app.db` was not dirtied by the suite. For UI-visible changes,
-   drive the real surface — a green jsdom test has not seen a layout. For a
+   drive the real surface — a green jsdom test has not seen a layout. Since
+   2026-08-16 that includes authenticated flows on the deployed instance:
+   the `claude` account (a plain user; its edits are confined to its own
+   decks and attributed by name in deck History) can be driven through the
+   Claude-in-Chrome integration once Aaron has signed it in — so "verify on
+   the live instance" no longer stops at the login page. For a
    **security fix**, three extra beats, learned the hard way: (a) prove the
    bug with a *mutation-verified* test — revert the guard, watch the test
    fail, restore it — so the fix is demonstrably closing a real hole, not

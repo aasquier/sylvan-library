@@ -159,6 +159,19 @@ tests never feels expensive.
 - Verify new guard tests by mutation, not by greenness: a test written to
   hold a boundary gets the boundary broken locally once to prove it fires
   (the conftest-hides-the-deployed-branch lesson).
+- **Random mutation sampling, every run of this facet** (Aaron's ask,
+  2026-08-16): the bullet above checks tests you just wrote; this one checks
+  the suite nobody is watching. Pick a handful of mutations at random across
+  load-bearing modules (`mana.py`, `decks/validate.py`, `sim/`, `auth/`) —
+  flip a comparison, off-by-one a boundary, drop a guard clause, swap
+  `and`/`or` — apply one at a time, run the affected tests, and **count the
+  survivors**. A mutation the suite never catches is a finding naming the
+  exact weak spot, worth more than a coverage percentage. Record the
+  sample size and kill rate in the ledger so the number can trend. Do it
+  by hand with `git diff`/`git checkout --` as the harness — `mutmut` or
+  `cosmic-ray` would automate it but are new dev dependencies, so the
+  tooling decision stays queued with the manual protocol as the evidence
+  for it. Leave the tree clean; a surviving mutant never gets committed.
 - After the suite, **`git status data/` proves nothing** — `app.db` is
   gitignored, so a test that writes the developer's real database leaves the
   status clean. That check was in this file for one run and was blind the whole

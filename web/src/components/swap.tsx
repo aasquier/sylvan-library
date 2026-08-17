@@ -78,7 +78,7 @@ export function SwapComposer({ deck, out, into, onDone, onCancel }: {
           Cancel
         </button>
         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Writes deck.yaml. Commit it — deck history is git history.
+          Writes deck.yaml. The History tab records the swap.
         </span>
       </div>
     </div>
