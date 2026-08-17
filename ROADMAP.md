@@ -1381,6 +1381,49 @@ arc; this is what the next few sessions actually do.
     for a human to mind; a second Fly machine appearing; or ffmpeg
     entering the image for any other reason.
 
+13. **The tarot overhaul** — started 2026-08-16, under the new commandment
+    15: the reading is a gift for Aaron's sister, and it gets the best of
+    everything. Aaron's brief is eight items; the phase runs them as five
+    PRs, each verified by eye through the Playwright WebKit rig before it
+    lands (the pane screenshots black on this machine; headless WebKit
+    does not).
+
+    **Landed in the first PR (this branch):** the Magic crossovers wear a
+    drawn 1909 Rider frame (ivory ground, numeral band, Fell-set caption,
+    per-card cover focus — and the `cqw` unit is banned from the flipped
+    card face, where WebKit 17.4 resolves it against the viewport); the
+    fun facts can no longer repeat (the told list rides the wire like the
+    transcript, is quoted back in the closing instruction, and a repeat is
+    dropped and counted — the rule had been enforced by nothing); the
+    fortune-teller writes on aged parchment (the Fell Types, OFL, with
+    per-directory provenance; a quill-tracked word-by-word ink reveal,
+    reduced-motion safe); and the deck grew an **echoes tier** (three deep
+    dives, 2026-08-16): twenty-nine real cards whose name, art and rules
+    carry a tarot card — every one of the 22 trumps answered (Gelon's
+    Alpha Wheel of Fortune above all, the same painting the site's Wheel
+    spins) and the minors opened (the aces, the coins, a page, a king) —
+    on top of the three printed tarot cards, whose cycle a Scryfall sweep
+    confirmed complete. Two disciplines hold the tier: original imagery
+    outranks every other classifier (Stone Rain's tower mid-ruin displaced
+    a better-numbered tower that merely loomed), and every Magic card
+    carries a `note` justifying its slot in checkable pool facts (Flubs
+    has 0 power, Homer is a 0/9, Apatzec's rules text says 4 four times)
+    or it is cut — rendered under the turned card as the fun fact and
+    handed to the reader. A Magic card landing is called an omen with
+    precedence in the frame message, and an original landing beside its
+    Magic answer (trumps and minors both) is named as the stars aligning —
+    all Python-detected facts, never prompt hopes.
+
+    **Still to come, in order:** the photo-real crystal ball (a layered
+    composite — free-use shell, animist smoke/candle loops, the card
+    vision surfacing inside the glass — much larger and central); the
+    reader-as-artist proposal (the spread, flavor text and art crops as
+    real evidence in the commander pick, pool-resolved as ever); an ADR
+    and the 99 ceremony (category by category, a card dealt per category,
+    ending in a draft deck through the import path — rule 4 intact); and
+    the Wheel of Fortune's wildcard slots in that ceremony plus its
+    visual love.
+
 ---
 
 ## 1. Analyse or generate decks with simulation

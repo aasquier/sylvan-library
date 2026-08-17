@@ -114,6 +114,36 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The Fell Types — the fortune-teller's letterforms (commandment 15), cut for
+   Oxford in the 1670s and revived under the OFL; the argument is
+   `assets/fonts/PROVENANCE.md`. Declared here, paid for only where used: a
+   browser fetches a face the first time text asks for it, so every room that
+   is not the séance costs nothing. `swap` because a question readable in the
+   wrong face beats a blank line in the right one. */
+@font-face {
+  font-family: 'IM Fell English';
+  src: url('./assets/fonts/im-fell-english-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IM Fell English';
+  src: url('./assets/fonts/im-fell-english-italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IM Fell English SC';
+  src: url('./assets/fonts/im-fell-english-sc.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Columns that must align vertically get tabular figures; standalone numbers
    keep proportional ones. */
 .tabular {
@@ -508,7 +538,13 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   background: #efe7d4;
 }
 
-.tarot-face-front img {
+/* Direct child only. The 78 naturals render one full-bleed scan as the face;
+   a crossover's imgs live deeper, inside `.tarot-rws`, and this rule reaching
+   them was a real bug — its `object-fit: cover` outranks a single-class
+   selector, so the frame's contain copy shipped as a vertical slice of a
+   landscape crop: a skinny, unrecognisable strip of exactly the character
+   the wink depends on (Aaron's eye, 2026-08-16). */
+.tarot-face-front > img {
   height: 100%;
   width: 100%;
   object-fit: cover;
@@ -517,15 +553,149 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
 
 /* The whole point of a reversed card, and the one thing in this file worth
    checking with your own eyes rather than trusting. */
-.tarot-face-front img.is-reversed {
+.tarot-face-front > img.is-reversed {
   transform: rotate(180deg);
 }
 
-/* A Magic crossover's art is a landscape crop in a portrait frame (punch
-   list item 13): matted on the parchment rather than cover-cropped, since
-   a vertical slice would hide exactly the character the wink depends on. */
-.tarot-face-front img.is-crossover {
-  object-fit: contain;
+/* A Magic crossover dressed as its trump (`CrossoverFace`, overhaul item 3).
+   The 1909 frame, drawn: ivory ground, a black-ruled plate with the numeral
+   in its band, the caption hand-set below in the Fell Types. The art
+   *fills* the plate the way Smith's illustrations fill theirs —
+   `object-fit: cover` with a per-card focus (`--rws-focus`) that keeps the
+   character in the window — and wears a muted-watercolour filter so modern
+   art sits with ninety-year-old scans.
+
+   Pixel type sizes on purpose, two of them, and no container units: the
+   card renders at exactly two widths (168px on the felt, 96px in the
+   strip), and `cqw` inside the 3D-flipped face resolved against the
+   *viewport* in WebKit 17.4 — 76px of padding on a 176px card, which is
+   the sliver Aaron saw. A unit that lies on the oldest engine the bundle
+   supports is not a unit this file uses.
+
+   One palette in both themes, the card back's argument: a card is a
+   physical object on a table, not UI chrome. */
+.tarot-rws {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse at 30% 20%,
+      rgba(120, 96, 52, 0.08), transparent 60%),
+    radial-gradient(ellipse at 72% 78%,
+      rgba(120, 96, 52, 0.1), transparent 55%),
+    #f0e8d0;
+  color: #241d10;
+  padding: 5.5% 6% 0;
+}
+
+.tarot-rws.is-reversed {
+  transform: rotate(180deg);
+}
+
+.tarot-rws-plate {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid #2a2213;
+  outline: 1px solid rgba(42, 34, 19, 0.35);
+  outline-offset: 2px;
+}
+
+.tarot-rws-numeral {
+  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: center;
+  letter-spacing: 0.14em;
+  border-bottom: 1px solid #2a2213;
+  background: #ede4ca;
+}
+
+.tarot-rws-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The ageing, in two passes matched by eye against the 1909 scans on the
+   same felt (Aaron's note, 2026-08-16: the Magic cards did not read as
+   old). The filter fades the modern pigments the way ninety years fade
+   lithography — saturation well down, warm sepia, contrast softened, a
+   touch of lift because old inks go pale, never dark. The overlay then
+   prints it on the scans' stock: a warm ivory tint multiplied over
+   everything, print grain from the same turbulence the parchment uses,
+   and the faint edge-darkening the old cards all carry. */
+.tarot-rws-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--rws-focus, 50%) center;
+  filter: saturate(0.8) sepia(0.24) contrast(0.9) brightness(1.05);
+}
+
+/* Pale old ink first: a cream screen that lifts the modern art's deep
+   shadows, because nothing in a 1909 scan is ever actually dark. */
+.tarot-rws-canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: rgba(248, 238, 206, 0.2);
+  mix-blend-mode: screen;
+}
+
+/* Then the varnish: honey-yellow multiplied over everything, print grain,
+   and the faint edge-darkening the old cards all carry. */
+.tarot-rws-canvas::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(ellipse 120% 105% at 50% 46%,
+      rgba(250, 240, 200, 0.04) 58%, rgba(150, 120, 62, 0.28)),
+    linear-gradient(rgba(240, 218, 150, 0.3), rgba(240, 218, 150, 0.3)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.36 0 0 0 0 0.2 0 0 0 0.32 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23g)'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+
+/* The caption, below the plate the way Smith's captions sit: small caps, a
+   full stop the 1909 lettering always carries, room to breathe. */
+.tarot-rws-name {
+  font-family: 'IM Fell English SC', 'IM Fell English', Georgia, serif;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 6px 2px 7px;
+}
+
+.tarot-rws-name::after {
+  content: '.';
+}
+
+/* The strip's sizes, once the reading folds away. */
+.tarot-spread.is-small .tarot-rws-numeral {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.tarot-spread.is-small .tarot-rws-name {
+  font-size: 7px;
+  padding: 3px 1px 4px;
+}
+
+/* The place-names under the spread wear the same small caps, so the table's
+   own labels agree with the cards lying on it. */
+.tarot-caption {
+  font-family: 'IM Fell English SC', 'IM Fell English', Georgia, serif;
 }
 
 /* The deck, while it is being shuffled. Three backs a couple of degrees
@@ -658,6 +828,169 @@ button:hover .tarot-fan-card {
   --felt-pool: #6f9a7c;
   --felt-base: #547b61;
   --felt-edge: #3d5d49;
+}
+
+/* --------------------------------------------------------------- the séance
+ *
+ * The fortune-teller's text (overhaul item 5, commandment 15). The question
+ * card is a scroll, the reader's words arrive as ink, the answer box takes a
+ * quill — and only in that room: `theme.tsx` gates every one of these on the
+ * persona, because the costume belongs to the reader, not to the interview.
+ *
+ * Parchment keeps one palette in both themes, the card back's argument: it
+ * is a physical object on the table. The ink is fixed against it for the
+ * same reason, and the pair clears WCAG AA with room to spare. */
+.seance-scroll {
+  position: relative;
+  background:
+    radial-gradient(ellipse 42% 30% at 18% 8%,
+      rgba(112, 84, 40, 0.2), transparent),
+    radial-gradient(ellipse 30% 22% at 86% 16%,
+      rgba(96, 68, 30, 0.16), transparent),
+    radial-gradient(ellipse 50% 34% at 72% 94%,
+      rgba(102, 74, 32, 0.22), transparent),
+    radial-gradient(ellipse 24% 16% at 8% 76%,
+      rgba(88, 60, 26, 0.14), transparent),
+    radial-gradient(ellipse 120% 100% at 50% 45%,
+      rgba(252, 246, 228, 0.5), rgba(196, 172, 122, 0.35)),
+    linear-gradient(174deg, #ecdfbd, #e3d3a8 58%, #d6c290);
+  border: 1px solid #a08a58;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 250, 230, 0.4),
+    inset 0 0 26px rgba(96, 68, 28, 0.28),
+    inset 0 0 80px rgba(96, 68, 28, 0.16),
+    0 8px 22px rgba(20, 12, 2, 0.22);
+  color: #2b2013;
+  /* Re-inked text tokens, the felt's own trick one surface over: everything
+     inside that says `var(--text-muted)` stays legible on parchment without
+     knowing where it is sitting, in both themes. */
+  --text-primary: #2b2013;
+  --text-secondary: #3d2f1a;
+  --text-muted: #6d5a35;
+}
+
+/* The paper itself: turbulence-grain fibres, drawn by the browser from a
+   data URI rather than fetched — the animist gate has nothing to gate, the
+   way the card back owes nobody anything. Multiplied so it darkens the
+   stains it lies over. */
+.seance-scroll::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='19'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.33 0 0 0 0 0.18 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23p)'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+.seance-scroll > * {
+  position: relative;
+}
+
+.seance-scroll .thinking-pulse,
+.seance-question {
+  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  /* The italic: the Fell cut that still reads as a hand rather than a
+     press, which is the whole séance conceit. */
+  font-style: italic;
+  font-size: 1.22rem;
+  line-height: 1.62;
+}
+
+/* The hand writing (`InkText` in theme.tsx). Each word is revealed by a
+   left-to-right wipe on its own schedule — the line fills the way a pen
+   fills it — with a hair of tilt and drop per word, and ink that starts
+   wet-brown and dries dark. The negative vertical insets keep ascenders
+   and descenders out of the clip. */
+.ink-text {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.ink-word {
+  display: inline-block;
+  transform: rotate(var(--ink-tilt, 0deg)) translateY(var(--ink-drop, 0px));
+  animation: ink-write var(--ink-dur, 200ms) linear both;
+  animation-delay: var(--ink-delay, 0ms);
+}
+
+@keyframes ink-write {
+  0% {
+    /* 102% right inset: a word not yet written shows not one speck — the
+       -2% draft leaked the left edge of every glyph onto the page. The
+       vertical overhang stays, for ascenders and descenders. */
+    clip-path: inset(-20% 102% -20% 0);
+    color: #6d4f22;
+  }
+  55% {
+    color: #54401e;
+  }
+  100% {
+    clip-path: inset(-20% -4% -20% 0);
+    color: #2b2013;
+  }
+}
+
+/* The hand's quill: positioned by the rAF loop in `InkText`, gone the
+   moment the sentence is dry. */
+.ink-quill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 26px;
+  opacity: 0;
+  transition: opacity 400ms ease;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 2px rgba(20, 12, 2, 0.3));
+}
+
+/* The quill: parchment under the pen, ink in it, and the placeholder in the
+   italic the Fell Types actually cut. */
+.seance-quill {
+  background: rgba(255, 251, 240, 0.72);
+  border: 1px solid #b9a878;
+  color: #2b2013;
+  caret-color: #4a3417;
+  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  font-size: 1.02rem;
+}
+
+.seance-quill::placeholder {
+  font-style: italic;
+  color: #8a7853;
+}
+
+.seance-quill:focus {
+  outline: 2px solid rgba(126, 100, 52, 0.45);
+  outline-offset: 1px;
+}
+
+/* What the reader already said, and the margin notes: quieter parchment, so
+   the live question stays the brightest page on the table. */
+.seance-bubble {
+  background: linear-gradient(172deg, #efe7d1, #e7dcbe);
+  border: 1px solid #bdac7e;
+  color: #372a18;
+  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  font-size: 0.98rem;
+}
+
+.seance-note {
+  background: linear-gradient(168deg, #ece3ca, #e3d7b6);
+  border: 1px solid #b9a878;
+  box-shadow: inset 0 0 22px rgba(110, 86, 40, 0.12);
+  /* The components on the parchment set their ink through these, so the
+     note needs no !important war with anybody's inline style. */
+  --text-muted: #6d5a35;
+  --text-secondary: #3d2f1a;
+  color: #2b2013;
+}
+
+.seance-note a {
+  color: #5c4520;
 }
 
 /* The interview's "you can stop now" banner: quietly lit in the proposal
@@ -1154,6 +1487,15 @@ button:hover .tarot-fan-card {
   .lab-note:hover {
     transform: none;
     transition: none;
+  }
+  .ink-word {
+    animation: none;
+    clip-path: none;
+    color: #2b2013;
+    transform: none;
+  }
+  .ink-quill {
+    display: none;
   }
 }
 

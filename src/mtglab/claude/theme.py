@@ -52,7 +52,7 @@ import logging
 import random
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from mtglab import tarot
@@ -98,6 +98,12 @@ MAX_EXCHANGES = 10
 #: because the transcript is client-held and resent, so its size is the
 #: client's to inflate and the bill is not.
 MAX_TURN_CHARS = 2000
+
+#: A fun fact longer than this was not a fun fact. The schema asks for one or
+#: two sentences; the cap exists because the told-facts list below is
+#: client-held and resent, so its size is the client's to inflate and the
+#: bill is not — the same argument `MAX_TURN_CHARS` makes about the turns.
+MAX_FACT_CHARS = 600
 
 
 class TranscriptRejected(ValueError):
@@ -308,9 +314,13 @@ given carries the string 'taxonomy'. Do not include a fact you cannot source
 either way, and do not pad with a mediocre one -- a question with no fact is
 better than a question with a boring one.
 
-Never give the same fact twice. If the interesting thing you have to say is one
-you have already said in this conversation, omit the fact entirely and just ask
-the question.
+Never give the same fact twice. The facts you have already told this person
+ride along with the final instruction each turn, quoted back to you exactly as
+they read them -- treat that list as ground you have covered. If the
+interesting thing you have to say is on it, in those words or in different
+words, omit the fact entirely and just ask the question. A repeated fact is
+checked for and discarded, so repeating one costs you the fact slot and gains
+nobody anything.
 
 You have no access to the card pool, so you do not know what any card does.
 Do not state card facts. Talk about colours, planes, history and people; the
@@ -667,6 +677,90 @@ def may_propose(grounded: list[dict[str, str]]) -> bool:
     return len({s["kind"] for s in grounded}) >= FLOOR
 
 
+#: Words that carry no meaning for the repeat check below. Small on purpose:
+#: the check is about content words, and a longer list starts making decisions
+#: about what counts as content.
+_STOP_WORDS = frozenset(
+    ["the", "a", "an", "of", "and", "or", "in", "to", "is", "are", "was", "were", "it", "its", "that", "this", "for", "on", "as", "with", "by", "at", "from", "be", "has", "have", "had", "not", "but", "they", "their", "there"])
+
+#: How much of the shorter fact's content vocabulary must appear in a fact
+#: already given before the new one counts as a repeat. Tuned against the
+#: cases in `tests/test_theme.py`: a reworded repeat shares most of its
+#: content words, two genuinely different facts about the same colour do not.
+_REPEAT_OVERLAP = 0.7
+
+
+def _content_words(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9']+", _normalise(text))
+            if w not in _STOP_WORDS}
+
+
+def repeats(text: str, told: tuple[str, ...] | list[str]) -> bool:
+    """Whether a fact is one already given, verbatim or lightly reworded.
+
+    The backstop behind the prompt's "never give the same fact twice", which
+    was enforced by nothing at all until 2026-08-16: facts ride in the report
+    rather than the transcript, so the model literally could not see what it
+    had already said -- the polish pass's lesson ("a rule enforced by nothing
+    drifts") wearing a party hat. The prompt now gets the told list quoted
+    back each turn, and this is the deterministic check behind it: exact
+    normalised equality, or most of the shorter fact's content words appearing
+    in a fact already given. Crude the way `ground()` is crude, and for the
+    same reason -- it catches the failure that matters (the same fact again)
+    and is hard to trip by accident.
+    """
+    needle = _normalise(text)
+    if not needle:
+        return False
+    words = _content_words(text)
+    for old in told:
+        if needle == _normalise(old):
+            return True
+        if not words:
+            continue
+        old_words = _content_words(old)
+        small, large = sorted((words, old_words), key=len)
+        if small and len(small & large) / len(small) >= _REPEAT_OVERLAP:
+            return True
+    return False
+
+
+def check_told(raw: Any) -> tuple[str, ...]:
+    """Validate the client-held list of facts already shown, refuse the rest.
+
+    The same door `check_transcript` is, one field over: the told list is a
+    thing a client composes, so its shape and size are checked here rather
+    than trusted. Plain strings only -- a fact object has nowhere to ride --
+    and capped in both directions, because the list is resent every turn and
+    the bill is not the client's.
+
+    Tampering buys nothing, which is worth stating: a client that trims the
+    list gets a fact it has already seen, and one that pads it loses facts it
+    has not. Both are somebody lying to themselves about their own evening.
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise TranscriptRejected("facts must be a list of strings")
+    out: list[str] = []
+    for i, item in enumerate(raw):
+        if not isinstance(item, str):
+            raise TranscriptRejected(f"fact {i} is not a string")
+        text = item.strip()
+        if not text:
+            continue
+        if len(text) > MAX_FACT_CHARS:
+            raise TranscriptRejected(
+                f"fact {i} is {len(text)} characters; the cap is "
+                f"{MAX_FACT_CHARS}")
+        out.append(text)
+    if len(out) > MAX_EXCHANGES:
+        raise TranscriptRejected(
+            f"{len(out)} facts is more than a {MAX_EXCHANGES}-exchange "
+            f"conversation can have produced")
+    return tuple(out)
+
+
 def keep_fact(raw: Any, searched: list[dict[str, Any]]) -> dict[str, str] | None:
     """A fun fact, if it came from somewhere. None otherwise.
 
@@ -939,6 +1033,11 @@ class AskRequest:
     effective: stance_mod.Stance
     persona: str = persona_mod.DEFAULT
     seed: int | None = None
+    #: The facts already shown, client-held and resent the way the transcript
+    #: is. Quoted back in the closing instruction so the model can honour
+    #: "never give the same fact twice", and checked by `repeats` because a
+    #: rule enforced by nothing drifts.
+    told: tuple[str, ...] = field(default=())
 
     @property
     def exchanges(self) -> int:
@@ -963,7 +1062,7 @@ class AskRequest:
 
 def check_ask(transcript: Any = None, slots: Any = None, *,
               requested: Any = None, persona: Any = None,
-              seed: Any = None) -> AskRequest:
+              seed: Any = None, facts: Any = None) -> AskRequest:
     """Everything that can refuse a turn, done before anything is spent.
 
     Unlike `check_proposal` there is no floor to fail: a conversation with
@@ -981,19 +1080,20 @@ def check_ask(transcript: Any = None, slots: Any = None, *,
     return AskRequest(history=history, carried=carried, effective=effective,
                       persona=who.key,
                       seed=int(seed) if who.deals and seed is not None
-                      else None)
+                      else None,
+                      told=check_told(facts))
 
 
 def ask(transcript: Any = None, slots: Any = None, *,
-        requested: Any = None, persona: Any = None, seed: Any = None
-        ) -> dict[str, Any]:
+        requested: Any = None, persona: Any = None, seed: Any = None,
+        facts: Any = None) -> dict[str, Any]:
     """One turn of the theme conversation: a question back, and what it heard.
 
     Check and run in one call, which is what the tests of the whole path use.
     The app splits the two so the network half can be a job; see `check_ask`.
     """
     return run_ask(check_ask(transcript, slots, requested=requested,
-                             persona=persona, seed=seed))
+                             persona=persona, seed=seed, facts=facts))
 
 
 def run_ask(req: AskRequest, *,
@@ -1016,7 +1116,8 @@ def run_ask(req: AskRequest, *,
 
     if not effective.allows_calls:
         return _report(None, mode=mode.name, effective=effective, persona=who.key,
-                       asked=False, question="", fact=None, slots=carried,
+                       asked=False, question="", fact=None, facts_dropped=0,
+                       slots=carried,
                        slots_dropped=0, grounded=len(carried),
                        floor=FLOOR, may_propose=may_propose(carried),
                        exchanges=_exchanges(history), max_exchanges=MAX_EXCHANGES,
@@ -1027,14 +1128,15 @@ def run_ask(req: AskRequest, *,
         # a finished conversation rather than an error: what it has is what it
         # has, and if that is three grounded slots there is still a proposal.
         return _report(None, mode=mode.name, effective=effective, persona=who.key,
-                       asked=False, question="", fact=None, slots=carried,
+                       asked=False, question="", fact=None, facts_dropped=0,
+                       slots=carried,
                        slots_dropped=0, grounded=len(carried),
                        floor=FLOOR, may_propose=may_propose(carried),
                        exchanges=_exchanges(history), max_exchanges=MAX_EXCHANGES,
                        reason=f"That is {MAX_EXCHANGES} exchanges, which is as "
                               f"long as this conversation goes.")
 
-    closing = _closing_for(carried, history)
+    closing = _closing_for(carried, history, req.told)
     turn = converse(mode,
                     messages=_messages(history, closing=closing,
                                        frame=_frame_for(reading)),
@@ -1046,7 +1148,8 @@ def run_ask(req: AskRequest, *,
 
     if turn.refused:
         return _report(turn, mode=mode.name, effective=effective, persona=who.key,
-                       asked=True, question="", fact=None, slots=carried,
+                       asked=True, question="", fact=None, facts_dropped=0,
+                       slots=carried,
                        slots_dropped=0, grounded=len(carried), floor=FLOOR,
                        may_propose=may_propose(carried),
                        exchanges=_exchanges(history),
@@ -1056,7 +1159,8 @@ def run_ask(req: AskRequest, *,
         payload = turn.parsed()
     except json.JSONDecodeError:
         return _report(turn, mode=mode.name, effective=effective, persona=who.key,
-                       asked=True, question="", fact=None, slots=carried,
+                       asked=True, question="", fact=None, facts_dropped=0,
+                       slots=carried,
                        slots_dropped=0, grounded=len(carried), floor=FLOOR,
                        may_propose=may_propose(carried),
                        exchanges=_exchanges(history),
@@ -1072,10 +1176,22 @@ def run_ask(req: AskRequest, *,
         question = ""
     grounded, dropped = ground(payload.get("slots") or [], history)
 
+    # The backstop behind "never give the same fact twice": a fact the person
+    # has already been told is dropped and counted, the same fate an
+    # unsourced one meets in `keep_fact`. Counted rather than swallowed,
+    # because a model that keeps reaching for its favourite fact should read
+    # as a number somewhere, not as an evening quietly getting duller.
+    fact = keep_fact(payload.get("fact"), turn.searched)
+    facts_dropped = 0
+    if fact is not None and repeats(fact["text"], req.told):
+        fact = None
+        facts_dropped = 1
+
     return _report(
         turn, mode=mode.name, effective=effective, persona=who.key, asked=True,
         question=question,
-        fact=keep_fact(payload.get("fact"), turn.searched),
+        fact=fact,
+        facts_dropped=facts_dropped,
         slots=grounded,
         slots_dropped=dropped,
         grounded=len(grounded),
@@ -1108,13 +1224,20 @@ OPENING_ANGLES = (
 
 
 def _closing_for(grounded: list[dict[str, str]],
-                 transcript: list[dict[str, str]]) -> str:
+                 transcript: list[dict[str, str]],
+                 told: tuple[str, ...] = ()) -> str:
     """What to ask the model for, given how far along the conversation is.
 
     Assembled in Python from the grounded slots rather than left to the model
     to work out, so "what is still missing" is the same answer the button is
     computed from. A mode that thought it had heard something the readiness
     check disagreed with would ask the wrong next question.
+
+    `told` is the list of facts already shown, quoted back so the prompt's
+    "never give the same fact twice" is a rule the model can actually follow:
+    facts ride in the report rather than the transcript, so without this the
+    model could not see what it had already said -- which is exactly how the
+    rule was being broken.
     """
     if not transcript:
         # The angle is drawn here, in Python, rather than left to the model.
@@ -1129,6 +1252,15 @@ def _closing_for(grounded: list[dict[str, str]],
                 "sentence first so they know what this is. Tonight, open from "
                 f"this angle rather than whatever you usually reach for: "
                 f"{angle}.")
+    # The ground already covered, so the no-repeats rule is followable rather
+    # than aspirational. After the conversation itself, before the ask.
+    covered = ""
+    if told:
+        listed = "\n".join(f"- {t}" for t in told)
+        covered = (f"\n\nFacts you have already told them, exactly as they "
+                   f"read them:\n{listed}\nDo not repeat any of these, in "
+                   f"these words or in other words -- a fact covering the "
+                   f"same ground is omitted, never reworded.")
     have = {s["kind"] for s in grounded}
     missing = [k for k in SLOT_KINDS if k not in have and k != "anchor"]
     if missing:
@@ -1136,7 +1268,7 @@ def _closing_for(grounded: list[dict[str, str]],
         return (f"Ask the next question. Still unknown -- {wanted} Follow what "
                 f"they are actually interested in rather than working through "
                 f"that list in order, and re-state every slot you are confident "
-                f"of, including ones from earlier turns.")
+                f"of, including ones from earlier turns.") + covered
     # Ready is the short circuit, not a licence to keep dealing. An earlier
     # version of this said "keep going while they are enjoying it", and what
     # that produced -- most visibly at the fortune-teller's table, where three
@@ -1150,7 +1282,7 @@ def _closing_for(grounded: list[dict[str, str]],
             "close with one light, clearly optional question -- something that "
             "sharpens what you already know or might turn up an anchor, never "
             "a new line of enquiry -- and it must still end in a question "
-            "mark. Re-state every slot you are confident of.")
+            "mark. Re-state every slot you are confident of.") + covered
 
 
 @dataclass(frozen=True)

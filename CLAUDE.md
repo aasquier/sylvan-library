@@ -78,6 +78,13 @@ load-bearing.
     login — before it is called done. Screenshots are the evidence; "the
     tests pass" is not. (Added with Aaron 2026-08-16, after the twelfth bug
     no green suite could see.)
+15. **The tarot reading is a gift for Aaron's sister.** Of everything built
+    here, the fortune-teller's table is for one person first. It is
+    commandment 2 at full strength — the room a newcomer walks into — and it
+    gets the best of everything: the realest art, the richest motion, the
+    most care. When effort has to be rationed anywhere, it is rationed here
+    last. The reading should be the belle of the ball, every session,
+    forever. (Added with Aaron 2026-08-16.)
 
 ## Setup
 

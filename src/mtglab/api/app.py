@@ -794,7 +794,12 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 # An unknown persona is an `UnknownPersona`, which is a
                 # `ValueError`, which the handler below already answers 422.
                 persona=payload.get("persona") or None,
-                seed=payload.get("seed"))
+                seed=payload.get("seed"),
+                # The facts already shown, client-held like the transcript,
+                # so "never give the same fact twice" is enforceable rather
+                # than aspirational. `check_told` refuses a malformed list
+                # as a 422 like everything else about the request.
+                facts=payload.get("facts"))
         except (TranscriptRejected, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ClaudeUnavailable as exc:
