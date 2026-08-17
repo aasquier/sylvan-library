@@ -80,6 +80,32 @@ ENV PYTHONUNBUFFERED=1 \
     MTGLAB_DATA_DIR=/data \
     MTGLAB_DECKS_DIR=/data/decks
 
+# Take Debian's security updates rather than waiting for Docker Hub to
+# republish the base, which is what broke the deploy on 2026-08-17.
+#
+# The image had no `apt-get upgrade` at all: it inherited exactly whatever
+# `python:3.12-slim` last shipped, so a Debian security fix reached us only
+# when the base image was rebuilt. Debian fixed CVE-2026-53615 — an integer
+# overflow in `libblkid/src/partitions/dos.c`, HIGH — in util-linux
+# `2.41.5-0+deb13u1`; the base was still on `2.41-5`; Trivy's database learned
+# about it between #151's pull-request run and the `main` run of the very same
+# commit, so a merge that had been green went red on push and `deploy` was
+# skipped. **The scan was right and the image was stale**, which is why the
+# answer here is to take the fix rather than to add a `.trivyignore`:
+# `ignore-unfixed: true` in `ci.yml` means the gate only ever fires when a
+# fixed version actually exists.
+#
+# Runtime stage only — the builder's packages never ship. And a known edge,
+# written down rather than discovered later: `cache-from: type=gha` can serve
+# this layer from cache, so it goes stale exactly while the base image digest
+# is unchanged AND Debian has shipped something new. A base-image rebuild
+# busts it automatically (FROM is the parent), and the Trivy gate catches the
+# window in between — but if that window is ever hit, this line needs a
+# deliberate cache bust rather than a re-run.
+RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && rm -rf /var/lib/apt/lists/*
+
 # A fixed uid, so the volume's ownership survives a rebuild that would
 # otherwise renumber the account.
 RUN useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin mtglab
