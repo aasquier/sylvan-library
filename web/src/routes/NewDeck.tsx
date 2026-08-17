@@ -140,6 +140,11 @@ export default function NewDeck() {
     }
   }, [mode])
 
+  // Whether the séance deal is the event right now — the table reports it
+  // (`TarotTable onCeremony`), and while it is, the masthead and the doors
+  // step aside so the room and its cards can share one screen.
+  const [ceremony, setCeremony] = useState(false)
+
   const [tier, setTier] = useState('guild')
   const [index, setIndex] = useState(0)
 
@@ -368,6 +373,11 @@ export default function NewDeck() {
 
   return (
     <div className="space-y-8">
+      {/* The masthead and the doors step aside while the séance deal is the
+          event (Aaron's item 6): the felt used to start ~500px down the
+          page, and the room could never share a screen with its own cards.
+          `ceremony` is the table's own word for it, via `onCeremony`. */}
+      {!ceremony && (
       <header className="space-y-3">
         <PageMasthead
           art={FORK_IN_THE_ROAD_ART}
@@ -404,6 +414,7 @@ export default function NewDeck() {
           </div>
         )}
       </header>
+      )}
 
       {/* ---------------- step 1, theme: pick who you talk to, then answer.
           The persona grid and the tarot table share a component (ADR 21) —
@@ -411,7 +422,8 @@ export default function NewDeck() {
           every other voice goes straight to the questions, and all of them
           reach step 3 by exactly the same route. */}
       {!chosen && !commander && mode === 'theme' && (
-        <TarotTable onPick={takeProposal} onLeave={() => setMode('guided')} />
+        <TarotTable onPick={takeProposal} onLeave={() => setMode('guided')}
+                    onCeremony={setCeremony} />
       )}
 
       {/* ------------------------------- step 1, direct: no lesson, just 32 */}

@@ -34,6 +34,7 @@ VERSION = 1
 
 #: The still transform vocabulary. Implementations live in `ops.py`.
 KNOWN_OPS = frozenset({"crop", "matte_green", "matte_backdrop", "duotone",
+                       "levels",
                        "mask_circle", "feather", "mirror_tile", "resize"})
 
 #: The motion vocabulary (ADR 31). Implementations live in `motion.py`;

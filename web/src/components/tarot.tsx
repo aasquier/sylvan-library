@@ -72,6 +72,88 @@ function TableWisps() {
                         mode="ambience" className="tarot-wisps" />
 }
 
+/** Every wick on the candle plate, MEASURED rather than eyeballed: the
+ *  flames are blown out to white, so a >235 luminance threshold and a
+ *  connected-component sweep finds all seventeen — x/y as fractions of
+ *  the plate, `s` from the sqrt of each flame's area against the median.
+ *  Re-run the sweep whenever the recipe's crop moves; hand-nudged
+ *  coordinates are how the first wax prototype ended up dripping from
+ *  thin air. */
+const RACK_FLAMES = [
+  { x: 0.010, y: 0.375, s: 0.62 },
+  { x: 0.013, y: 0.116, s: 0.81 },
+  { x: 0.112, y: 0.383, s: 1.13 },
+  { x: 0.149, y: 0.325, s: 0.61 },
+  { x: 0.181, y: 0.343, s: 0.90 },
+  { x: 0.220, y: 0.395, s: 1.42 },
+  { x: 0.245, y: 0.371, s: 1.17 },
+  { x: 0.304, y: 0.635, s: 1.12 },
+  { x: 0.383, y: 0.571, s: 0.86 },
+  { x: 0.398, y: 0.480, s: 1.19 },
+  { x: 0.422, y: 0.596, s: 0.91 },
+  { x: 0.521, y: 0.267, s: 1.00 },
+  { x: 0.602, y: 0.228, s: 0.93 },
+  { x: 0.737, y: 0.446, s: 1.46 },
+  { x: 0.770, y: 0.446, s: 1.13 },
+  { x: 0.952, y: 0.448, s: 1.37 },
+  { x: 0.997, y: 0.521, s: 0.44 },
+]
+
+/** The union mask that keeps only the flame teardrops of a plate clone —
+ *  what lets the turbulence filter bend the photographed tips without
+ *  doubling the wax under them. */
+const FLAME_MASK = RACK_FLAMES.map((f) =>
+  `radial-gradient(ellipse ${(5.5 * f.s).toFixed(1)}% ${(7 * f.s).toFixed(1)}% `
+  + `at ${(f.x * 100).toFixed(1)}% ${(f.y * 100).toFixed(1)}%, `
+  + '#000 45%, transparent 78%)').join(',')
+
+/**
+ * The dance (Aaron's ruling off the flicker board, 2026-08-17): a rack's
+ * fire moves per FLAME, never per rack. Three motions compose, all
+ * deterministic — periods and phases are functions of each flame's index,
+ * because a hand wobbles but a render must not:
+ *
+ * - the plate's own tips BEND: a clone of the photograph, masked to the
+ *   teardrops, displaced by SMIL-animated turbulence (probed in WebKit
+ *   before it was trusted);
+ * - a halo on every wick breathes and sways on its own period;
+ * - and each flame occasionally GUTTERS — a quick squash-flare-dart on a
+ *   long cycle, carried by a wrapper span so its transform composes with
+ *   the breathe instead of fighting it.
+ *
+ * Reduced motion stills all three from the same media query that stills
+ * the room: halos hold steady light and the bending clone is removed
+ * (SMIL cannot hear the media query, so the element goes, not the
+ * animation).
+ */
+function FlameDance() {
+  return (
+    <>
+      <img className="flame-bend" src={candlesUrl} alt="" aria-hidden="true"
+           style={{
+             WebkitMaskImage: FLAME_MASK,
+             maskImage: FLAME_MASK,
+           } as React.CSSProperties} />
+      {RACK_FLAMES.map((f, i) => (
+        <span key={i} className="flame-gutter" aria-hidden="true"
+              style={{
+                left: `${f.x * 100}%`,
+                top: `${f.y * 100}%`,
+                width: `${(6.2 * f.s).toFixed(1)}%`,
+                animationDuration: `${(6 + ((i * 5) % 11) * 1.1).toFixed(1)}s`,
+                animationDelay: `${(-(i * 1.9)).toFixed(1)}s`,
+              }}>
+          <span className="flame-halo"
+                style={{
+                  animationDuration: `${(1.3 + ((i * 7) % 9) * 0.17).toFixed(2)}s`,
+                  animationDelay: `${(-(i * 0.37)).toFixed(2)}s`,
+                }} />
+        </span>
+      ))}
+    </>
+  )
+}
+
 /** The table survives a reload, for the reason the transcript does: a reading
  *  is of one person on one evening, and re-dealing it would make it somebody
  *  else's. Only three integers' worth — the seed re-deals the rest. */
@@ -85,9 +167,16 @@ interface Table {
   /** Which of the three have been turned face up, by index. Stored rather
    *  than derived so a reload does not re-hide a card somebody has read. */
   turned: number[]
+  /** Whether the querent has taken the reading — knocked on the glass and
+   *  moved on to the conversation. Before this the table LINGERS with all
+   *  three cards up (Aaron, 2026-08-17): the spread is the event, and
+   *  folding it away the moment the last card landed stole the one moment
+   *  somebody might want to sit with. Stored so a reload lands where the
+   *  querent actually is. */
+  read: boolean
 }
 
-const NO_TABLE: Table = { persona: null, seed: null, turned: [] }
+const NO_TABLE: Table = { persona: null, seed: null, turned: [], read: false }
 
 function loadTable(): Table {
   try {
@@ -100,6 +189,10 @@ function loadTable(): Table {
       turned: Array.isArray(p.turned)
         ? p.turned.filter((n) => typeof n === 'number')
         : [],
+      // A stash from before the linger existed has no `read`; those tables
+      // were already in conversation, so landing them back on the felt with
+      // the knock hint costs one double-click and loses nothing.
+      read: p.read === true,
     }
   } catch {
     return NO_TABLE
@@ -157,8 +250,14 @@ function CardBack() {
       <rect x="12.5" y="12.5" width="175" height="323" rx="3" fill="none"
             stroke="#c9a227" strokeWidth="0.7" opacity="0.5" />
 
-      {/* A sun with alternating straight and wavy rays — Smith drew one on
-          nearly every card in the deck that needed a sky. */}
+      {/* The medallion is Magic's own compass now (Aaron's item 10): the
+          five colours in their pentagon, antiqued to the back's palette
+          and joined by the thin gold ring-and-star the lattice already
+          speaks. Drawn, like everything else on this back — the actual
+          Magic card back is exactly what the Fan Content Policy does not
+          let us reprint, and five muted orbs in a wheel is the game's
+          signature without a pixel of its property. Smith's sun keeps the
+          outer rays; the wheel takes the sky. */}
       <g transform="translate(100 174)">
         <circle r="34" fill="#141d33" opacity="0.9" />
         <circle r="34" fill="none" stroke="#c9a227" strokeWidth="1.1"
@@ -177,7 +276,38 @@ function CardBack() {
         })}
         <circle r="17" fill="none" stroke="#c9a227" strokeWidth="0.9"
                 opacity="0.7" />
-        <circle r="6" fill="#c9a227" opacity="0.85" />
+        {/* The pentagram under the wheel: each colour joined to its two
+            enemies, which is the geometry every Magic player knows. */}
+        {Array.from({ length: 5 }, (_, i) => {
+          const a1 = -Math.PI / 2 + (i * Math.PI * 2) / 5
+          const a2 = -Math.PI / 2 + (((i + 2) % 5) * Math.PI * 2) / 5
+          return (
+            <line key={`p-${i}`}
+                  x1={Math.cos(a1) * 22} y1={Math.sin(a1) * 22}
+                  x2={Math.cos(a2) * 22} y2={Math.sin(a2) * 22}
+                  stroke="#c9a227" strokeWidth="0.7" opacity="0.5" />
+          )
+        })}
+        {/* WUBRG clockwise from the top, the colours pulled toward the
+            back's own lamplight — antique enough to sit on 1909 stock,
+            plain enough that anyone who has shuffled a Magic deck knows
+            the wheel at a glance. */}
+        {[['#e8ddb5', '#b8ac82'], ['#4f6f9e', '#31517d'],
+          ['#3a3245', '#211c2c'], ['#a8442f', '#7e2c1c'],
+          ['#3f6d44', '#28502e']].map(([fill, rim], i) => {
+          const a = -Math.PI / 2 + (i * Math.PI * 2) / 5
+          return (
+            <g key={`w-${i}`}
+               transform={`translate(${Math.cos(a) * 22} ${Math.sin(a) * 22})`}>
+              <circle r="6.4" fill={fill} stroke={rim} strokeWidth="1" />
+              <circle r="6.4" fill="none" stroke="#c9a227"
+                      strokeWidth="0.7" opacity="0.75" />
+              {/* the lamplight's glint, so the orbs sit with the rings */}
+              <circle r="2" cx="-1.6" cy="-1.8" fill="#fff6dd"
+                      opacity="0.28" />
+            </g>
+          )
+        })}
       </g>
     </svg>
   )
@@ -461,19 +591,32 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
  * the ambience pref leaves the room lit and still rather than frozen mid
  * flicker.
  */
-function SeanceRoom({ children }: { children: React.ReactNode }) {
+function SeanceRoom({ children, onKnock }: {
+  children: React.ReactNode
+  /** Two raps on the glass, while the spread lingers: the ceremonial way
+   *  to take the reading. Purely additive — the visible button beside the
+   *  spread is the accessible door, so this carries no key handling and
+   *  no focus of its own. */
+  onKnock?: () => void
+}) {
   return (
-    <div className="seance-stage">
+    <div className={`seance-stage${onKnock ? ' is-knockable' : ''}`}
+         onDoubleClick={onKnock}
+         title={onKnock ? 'Knock twice on the glass to begin the reading'
+                        : undefined}>
       <div className="seance-dark" aria-hidden="true">
-        {/* Two bodies of air rather than one, and the second costs no bytes:
-            it is the same seed-1848 loop again, slower, larger and higher in
-            the room. One layer of smoke reads as a texture laid over the
-            dark; two moving at different rates read as depth, because that
-            is the only cue a flat black wall can give. */}
+        {/* Three bodies of air, and the third is the point (Aaron's item
+            9): the far and near layers give the dark its depth, and the
+            swirl — the same loop, tighter crop, brighter and barely
+            blurred — coils around the glass itself, where a scrying
+            room's smoke actually gathers. All the same seed-1848 file,
+            so the extra layers cost no bytes at all. */}
         <VideoBackdrop webmSrc={smokeWebmUrl} mp4Src={smokeMp4Url}
                        mode="ambience" className="seance-haze is-far" />
         <VideoBackdrop webmSrc={smokeWebmUrl} mp4Src={smokeMp4Url}
                        mode="ambience" className="seance-haze" />
+        <VideoBackdrop webmSrc={smokeWebmUrl} mp4Src={smokeMp4Url}
+                       mode="ambience" className="seance-haze is-swirl" />
       </div>
       {/* Two elements per rack, and it is not decoration: the inner edge
           needs a horizontal fade and the bottom needs a vertical one, which
@@ -483,14 +626,33 @@ function SeanceRoom({ children }: { children: React.ReactNode }) {
           fades the wax into the table. */}
       <span className="seance-rack is-left" aria-hidden="true">
         <img src={candlesUrl} alt="" />
+        <FlameDance />
         <VideoBackdrop webmSrc={flameWebmUrl} mp4Src={flameMp4Url}
                        mode="ambience" className="seance-flame" />
       </span>
       <span className="seance-rack is-right" aria-hidden="true">
         <img src={candlesUrl} alt="" />
+        <FlameDance />
         <VideoBackdrop webmSrc={flameWebmUrl} mp4Src={flameMp4Url}
                        mode="ambience" className="seance-flame" />
       </span>
+      {/* The turbulence that bends the tips. One filter, referenced by both
+          racks' clones; the seed is 1888, as ever. Width/height zero — this
+          is a definition, not a drawing. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }}
+           aria-hidden="true">
+        <filter id="seance-flame-bend" x="-15%" y="-15%" width="130%"
+                height="130%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.05"
+                        numOctaves="2" seed="1888" result="n">
+            <animate attributeName="baseFrequency"
+                     values="0.012 0.05;0.017 0.075;0.011 0.045;0.012 0.05"
+                     dur="1.9s" repeatCount="indefinite" />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="11"
+                             xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
       {/* The light the rack puts back on the felt, in front of the dark so it
           washes over the table's edge rather than stopping at it. */}
       <span className="seance-spill" aria-hidden="true" />
@@ -814,9 +976,14 @@ function ReaderPanel({ persona, onPick }: {
 
 /* --------------------------------------------------------------- the table */
 
-export function TarotTable({ onPick, onLeave }: {
+export function TarotTable({ onPick, onLeave, onCeremony }: {
   onPick: (key: string, card: ThemeCommander) => void
   onLeave: () => void
+  /** Fires with `true` while the deal is the event — the shuffle and the
+   *  face-down/lingering spread — so the page around the table can clear
+   *  its chrome and give the room the viewport (Aaron's item 6: the whole
+   *  table in one screen). Always fired `false` on unmount. */
+  onCeremony?: (active: boolean) => void
 }) {
   const [roster, setRoster] = useState<PersonaRoster | null>(null)
   const [table, setTable] = useState<Table>(loadTable)
@@ -877,11 +1044,25 @@ export function TarotTable({ onPick, onLeave }: {
     return () => clearTimeout(t)
   }, [allTurned])
 
+  // Tell the page when the deal is the event. Computed here rather than
+  // reusing `dealing` below because hooks cannot follow the early returns,
+  // and the two must agree: this is `dealing || shuffling` by another
+  // route. Cleanup fires `false` so leaving the door restores the chrome.
+  // `shuffling` stands alone because only the dealing reader ever shuffles,
+  // and during her shuffle `table.persona` is not yet written.
+  const ceremonyActive = shuffling || (Boolean(
+    roster?.personas.find((p) => p.key === table.persona)?.deals)
+    && !(allTurned && settled && table.read))
+  useEffect(() => {
+    onCeremony?.(ceremonyActive)
+  }, [ceremonyActive, onCeremony])
+  useEffect(() => () => { onCeremony?.(false) }, [onCeremony])
+
   const chooseReader = useCallback(async (persona: Persona) => {
     setError(null)
     if (!persona.deals) {
       setReading(null)
-      setTable({ persona: persona.key, seed: null, turned: [] })
+      setTable({ persona: persona.key, seed: null, turned: [], read: false })
       return
     }
     // The shuffle is a beat rather than a spinner. `/api/tarot/reading` is a
@@ -894,7 +1075,7 @@ export function TarotTable({ onPick, onLeave }: {
       const dealt = await api.tarotReading()
       later(() => {
         setReading(dealt)
-        setTable({ persona: persona.key, seed: dealt.seed, turned: [] })
+        setTable({ persona: persona.key, seed: dealt.seed, turned: [], read: false })
         setShuffling(false)
         dealSound()
       }, 1100)
@@ -1003,7 +1184,12 @@ export function TarotTable({ onPick, onLeave }: {
 
   /* ------------------------------------------- a reader, and maybe a deal */
 
-  const dealing = chosen.deals && !(allTurned && settled)
+  // The linger (Aaron's item 4): all three cards up is not the end of the
+  // ceremony — it is the moment the querent gets to sit with the spread.
+  // The table folds only once they knock on the glass (`table.read`).
+  const dealing = chosen.deals && !(allTurned && settled && table.read)
+  const lingering = chosen.deals && allTurned && settled && !table.read
+  const takeReading = () => setTable((t) => ({ ...t, read: true }))
   // What the ball is showing: the card most recently turned face up. Indexed
   // through `turned` rather than tracked separately, so a table restored from
   // a stash scries its last card too.
@@ -1033,55 +1219,50 @@ export function TarotTable({ onPick, onLeave }: {
       {/* One heading, and only while the cards are the event. Once the
           conversation starts the reader supplies its own (`intro` below), and
           two headings a paragraph apart were one heading too many. */}
-      <div className="flex flex-wrap items-start gap-3">
-        {dealing
-          ? (
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight">
-                Three cards, face down
-              </h2>
-              <p className="mt-1 max-w-2xl text-sm"
-                 style={{ color: 'var(--text-secondary)' }}>
-                Dealt for three places — the root, the turning, the table. Turn
-                them over when you are ready.
-              </p>
-            </div>
-            )
-          : cards.length > 0 && (
+      {/* While dealing there is no heading and no outer control row at all:
+          the felt explains itself (the places are printed on the cloth) and
+          the controls ride ON the room as overlays, because every line of
+          chrome above the felt is a line the ceremony cannot fit in one
+          screen (item 6). Once the conversation is the event the plain
+          header row returns. */}
+      {!dealing && (
+        <div className="flex flex-wrap items-start gap-3">
+          {cards.length > 0 && (
             <p className="text-[10px] uppercase tracking-wide"
                style={{ color: 'var(--text-muted)' }}>
               Your spread
             </p>
+          )}
+          <span className="ml-auto flex items-center gap-2">
+            <SoundToggle />
+            {/* A spread costs one integer to remember, and the consequence
+                nobody saw until Aaron went looking for Magic cards on the
+                instance: coming back to the table re-deals the *stashed*
+                seed, so the cards never change. A new deal only ever
+                happened inside `chooseReader`, which meant the way to
+                reshuffle was to leave and pick the same reader again —
+                behind a button that says "Different reader", which is the
+                one thing you do not want. This is that path, named for what
+                it does. Only for a reader who deals; the plain voices have
+                no cards to shuffle. */}
+            {chosen.deals && (
+              <button onClick={() => { void chooseReader(chosen) }}
+                      disabled={shuffling}
+                      className="rounded-md px-3 py-1.5 text-sm disabled:opacity-50"
+                      style={{ border: '1px solid var(--hairline)',
+                               color: 'var(--text-muted)' }}>
+                {shuffling ? 'Shuffling…' : 'Shuffle again'}
+              </button>
             )}
-        <span className="ml-auto flex items-center gap-2">
-          <SoundToggle />
-          {/* A spread costs one integer to remember, and the consequence
-              nobody saw until Aaron went looking for Magic cards on the
-              instance: coming back to the table re-deals the *stashed*
-              seed, so the cards never change. A new deal only ever
-              happened inside `chooseReader`, which meant the way to
-              reshuffle was to leave and pick the same reader again —
-              behind a button that says "Different reader", which is the
-              one thing you do not want. This is that path, named for what
-              it does. Only for a reader who deals; the plain voices have
-              no cards to shuffle. */}
-          {chosen.deals && (
-            <button onClick={() => { void chooseReader(chosen) }}
-                    disabled={shuffling}
-                    className="rounded-md px-3 py-1.5 text-sm disabled:opacity-50"
+            <button onClick={leaveTable}
+                    className="rounded-md px-3 py-1.5 text-sm"
                     style={{ border: '1px solid var(--hairline)',
                              color: 'var(--text-muted)' }}>
-              {shuffling ? 'Shuffling…' : 'Shuffle again'}
+              Different reader
             </button>
-          )}
-          <button onClick={leaveTable}
-                  className="rounded-md px-3 py-1.5 text-sm"
-                  style={{ border: '1px solid var(--hairline)',
-                           color: 'var(--text-muted)' }}>
-            Different reader
-          </button>
-        </span>
-      </div>
+          </span>
+        </div>
+      )}
 
       {error && (
         <p className="text-sm" style={{ color: 'var(--status-critical)' }}>{error}</p>
@@ -1094,8 +1275,61 @@ export function TarotTable({ onPick, onLeave }: {
           with nothing under it. The felt goes when the table folds: a green
           rectangle beside a chat column is furniture, not ceremony. */}
       {cards.length > 0 && (
-        <div className={dealing ? 'tarot-table-felt relative px-4 py-8' : ''}>
-          {dealing && <TableWisps />}
+        <div className={dealing ? 'tarot-table-felt tarot-ceremony relative px-4 pt-2 pb-2' : ''}>
+          {/* No TableWisps here (Aaron's item 9): a loop over the whole felt
+              read as haze on the picture frame, cards included. The room
+              carries its own air — the two haze layers in the dark and the
+              swirl behind the ball — and the felt stays a table. */}
+          {dealing && (
+            /* The controls ride the room's dark upper corners — the one
+               part of the composition with nothing in it. Left: the act
+               (turn, or take the reading). Right: the table's own
+               housekeeping. */
+            <div className="tarot-ceremony-controls">
+              <span className="flex items-center gap-3">
+                {!allTurned && (
+                  <>
+                    <button onClick={turnAll}
+                            className="rounded-md px-4 py-2 text-sm font-medium"
+                            style={{ background: 'var(--series-1)', color: '#fff' }}>
+                      Turn them over
+                    </button>
+                    <span className="text-xs" style={{ color: 'var(--tarot-felt-text)' }}>
+                      or one at a time — {table.turned.length} of {cards.length}
+                    </span>
+                  </>
+                )}
+                {lingering && (
+                  <>
+                    <button onClick={takeReading}
+                            className="rounded-md px-4 py-2 text-sm font-medium"
+                            style={{ background: 'var(--series-1)', color: '#fff' }}>
+                      Begin the reading
+                    </button>
+                    <span className="text-xs" style={{ color: 'var(--tarot-felt-text)' }}>
+                      sit as long as you like — or knock twice on the glass
+                    </span>
+                  </>
+                )}
+              </span>
+              <span className="flex items-center gap-2">
+                <SoundToggle />
+                <button onClick={() => { void chooseReader(chosen) }}
+                        disabled={shuffling}
+                        className="rounded-md px-3 py-1.5 text-sm disabled:opacity-50"
+                        style={{ border: '1px solid var(--hairline)',
+                                 color: 'var(--tarot-felt-text)' }}>
+                  {shuffling ? 'Shuffling…' : 'Shuffle again'}
+                </button>
+                <button onClick={leaveTable}
+                        className="rounded-md px-3 py-1.5 text-sm"
+                        style={{ border: '1px solid var(--hairline)',
+                                 color: 'var(--tarot-felt-text)' }}>
+                  Different reader
+                </button>
+              </span>
+            </div>
+          )}
           {dealing && (
             /* Above the spread and centred, which is where a crystal ball
                on a séance table goes — and which deletes a problem rather
@@ -1104,8 +1338,13 @@ export function TarotTable({ onPick, onLeave }: {
                third card everywhere below about a thousand pixels, and had
                to be shrunk and then hidden below `lg` to cope. Standing it
                over the cards means nothing is beside it, so it shows at
-               every width and can be the size the thing deserves. */
-            <SeanceRoom>
+               every width and can be the size the thing deserves.
+
+               The knock (item 4): while the spread lingers, two raps on the
+               glass take the reading. Double-click only ever PROCEEDS — it
+               is decorated with a visible invitation below, so the gesture
+               is a flourish, never the only door. */
+            <SeanceRoom onKnock={lingering ? takeReading : undefined}>
               <CrystalBall vision={lastTurned && lastTurned.image
                 ? { image: lastTurned.image, reversed: lastTurned.reversed }
                 : null} />
@@ -1116,18 +1355,10 @@ export function TarotTable({ onPick, onLeave }: {
         </div>
       )}
 
-      {dealing && (
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <button onClick={turnAll} disabled={allTurned}
-                  className="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
-                  style={{ background: 'var(--series-1)', color: '#fff' }}>
-            Turn them over
-          </button>
-          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            or turn them one at a time — {table.turned.length} of {cards.length}
-          </span>
-        </div>
-      )}
+      {/* The act controls (turn them over; begin the reading) live in the
+          overlay above — commandment 2 note: the knock is a flourish, and
+          the visible "Begin the reading" button beside it is the plain
+          door, so the gesture is never the only way forward. */}
 
       {/* Keyed on the reader and the spread, so choosing differently remounts
           rather than reuses. A persona is fixed for a conversation (ADR 21)

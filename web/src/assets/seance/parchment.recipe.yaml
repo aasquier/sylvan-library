@@ -42,21 +42,25 @@ sources:
     licence: CC0-1.0
 
 outputs:
-  # The tile the scroll is papered with. Duotone before mirror_tile
-  # because it is the same arithmetic on a quarter of the pixels; the
-  # ramp is graded to the room -- the shadow stop sits at the warmth the
-  # votive light leans in with, and it is also the contrast floor: after
-  # this grade the darkest pixel in the tile holds the séance ink
-  # (#2b2013) at 9.9:1, so the text needs no scrim. Mirrored both ways,
-  # the tile repeats seamlessly at any panel size, which is the answer to
-  # the one-crop-shows-its-rectangle trap the candle rack already fell
-  # into once.
+  # The plate the scroll is papered with -- SECOND cut, after Aaron's eye
+  # on the first ("this looks monochrome"). The first cut ran `duotone`,
+  # which maps every pixel onto one hue ramp: exactly the operation that
+  # deletes what a photograph of skin has that a gradient does not -- the
+  # reddish foxing, the ochre browning along the folio's cut edge, the
+  # cooler patches. So no duotone. The crop moves to the folio's LEFT
+  # margin, where that browning lives, and is served whole under
+  # `background-size: cover` rather than mirror-tiled -- one sheet of
+  # skin, not a kaleidoscope of one clean patch.
+  #
+  # `levels` is the contrast guarantee duotone used to provide by
+  # accident: the raw plate carries specks dark enough to put the séance
+  # ink (#2b2013) at 1:1 exactly where a word could land. Lifting the
+  # floor to #b1945f keeps every hue and makes the darkest possible
+  # pixel a stated number -- 5.5:1 against the ink, AA with room.
   - file: seance-parchment.webp
     from: vellum
     ops:
-      - crop: {frac_box: [0.6403, 0.8193, 0.8069, 0.9857]}
-      - duotone: {shadow: "#a8905e", mid: "#ddcda2", light: "#f4ecd6"}
-      - mirror_tile: {axis: x}
-      - mirror_tile: {axis: y}
-    encode: {format: webp, quality: 82}
-    expect: {width: 1270, height: 910, budget_kb: 40, metadata: none}
+      - crop: {frac_box: [0.0, 0.7132, 0.2204, 0.9327]}
+      - levels: {out_black: "#b1945f"}
+    encode: {format: webp, quality: 84}
+    expect: {width: 840, height: 600, budget_kb: 90, metadata: none}

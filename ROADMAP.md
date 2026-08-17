@@ -1605,6 +1605,28 @@ arc; this is what the next few sessions actually do.
     media codecs: the rig is not the browser, and where it differs it
     differs silently.
 
+    **The two researched fronts and Aaron's ten-item polish landed
+    2026-08-17 evening** (PRs #153 and #154, both ruled live off boards).
+    The parchment is a photograph now — the Met's Qur'an folio 448369
+    through `parchment.recipe.yaml`, its own hue kept (a duotone
+    monochromes skin; the new `levels` op floors the shadows at a stated
+    colour instead, 6.4:1 against the ink), a seeded deckle mask for a
+    silhouette, candlelight breathing on the sheet. The hand writes in
+    **Parisienne** at 52ms/char with pen-lift and punctuation pauses, no
+    cap, click-to-dry — and the trap worth remembering: per-character
+    spans break OpenType shaping in a joined face, so the timing is per
+    character while the markup stays per word. The ceremony **fits one
+    screen**: the page's chrome steps aside (`onCeremony`), the ball
+    sizes against the viewport's height, the controls ride the room's
+    dark corners, and the spread pulls up with its outer cards on the
+    wings of the trimmed, widened racks. The table **lingers** once all
+    three are up until the querent knocks twice on the glass (or takes
+    the visible button). The card backs wear Magic's colour wheel, drawn.
+    **The dripping-wax feature is scrapped** — five prototype mechanisms
+    (falling beads, screened runs, curved SVG paths, photographed
+    self-clones) all failed Aaron's eye; the photographed frozen runs
+    stand, and the motion budget went to the flicker instead.
+
     **Still to come, in order:** the
     reader-as-artist proposal (the spread, flavor text and art crops as
     real evidence in the commander pick, pool-resolved as ever); an ADR
