@@ -232,7 +232,7 @@ const RWS_FOCUS: Record<string, string> = {
   'mtg-willow-priestess': '70%',        // her face and the cat, not the faerie
   'mtg-true-loves-kiss': '30%',         // both of them in the window
   'mtg-suspension-field': '45%',        // the hanging figure, arms open
-  'mtg-murderous-rider': '42%',         // the rider, not the horse's head
+  'mtg-murderous-rider': '38%',         // the ink showcase: rider and skull horse
   'mtg-chalice-of-life': '50%',         // the cup, base to rim
   'mtg-asmodeus-the-archfiend': '60%',  // horns and throne
   'mtg-command-tower': '60%',           // the struck crown of the tower
@@ -247,6 +247,25 @@ const RWS_FOCUS: Record<string, string> = {
   'mtg-curse-of-the-pierced-heart': '25%',  // the heart, not the screamer
   'mtg-startled-awake': '42%',          // the figure sitting up in bed
   'mtg-murder': '58%',                  // the blade already through
+  // Round two of the minors (2026-08-17): seventeen more, every one picked
+  // off a rendered strip at 20/35/50/65/80 before it was written down.
+  'mtg-darling-of-the-masses': '32%',   // her, and the petals falling
+  'mtg-high-ground': '30%',             // the defenders, the drop below
+  'mtg-hail-of-arrows': '28%',          // the sky full of shafts
+  'mtg-burdened-stoneback': '55%',      // the load, and the face under it
+  'mtg-queen-marchesa': '50%',          // enthroned, straight to camera
+  'mtg-wedding-announcement': '22%',    // both of them, not just the groom
+  'mtg-forsake-the-worldly': '40%',     // the figure, arms open, leaving
+  'mtg-golden-wish': '50%',             // the hand and what it holds
+  'mtg-svyelun': '40%',                 // her, and the whirlpool under her
+  'mtg-winters-rest': '80%',            // the head and the roses, not the feet
+  'mtg-rescue-from-the-underworld': '22%',  // the ferryman and his lamp
+  'mtg-pale-rider-of-trostad': '45%',   // the pale horse at full gallop
+  'mtg-chromatic-star': '35%',          // the five points of it
+  'mtg-harvest-season': '50%',          // the seedling in the hand
+  'mtg-argivian-blacksmith': '40%',     // the hammer at the top of its swing
+  'mtg-soraya-the-falconer': '30%',     // her face and the bird together
+  'mtg-inheritance': '40%',             // both generations in the window
 }
 
 /**
