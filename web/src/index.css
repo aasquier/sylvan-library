@@ -1419,10 +1419,14 @@ button:hover .tarot-fan-card {
      detail at the edge of a photograph rather than as the light in the room.
      The number is larger than it looks because the crop grew to 0.53 to
      dodge the sliced candle — same wax at the same scale, more of it. */
-  /* Wider since the plate's tall inner pair was trimmed (Aaron,
-     2026-08-17): the remaining low wax masses stretch toward the middle
-     and meet the fish's base instead of towering over it. */
-  width: clamp(220px, 40vw, 600px);
+  /* Half the room each (Aaron, 2026-08-17, third call: "if they almost
+     touch in the middle, they would backlight the crystal ball
+     perfect"). The plate reads as one bank of candles receding to the
+     right, so mirrored at half-width apiece the two banks run downhill
+     into the middle and all but meet -- the seam and its short dissolve
+     land behind the bronze, and the inner candles' glow becomes the
+     ball's backlight. */
+  width: 50%;
   mix-blend-mode: screen;
   pointer-events: none;
   animation: seance-flicker 5.9s ease-in-out infinite;
@@ -1437,10 +1441,10 @@ button:hover .tarot-fan-card {
      it can show a straight line. The outer edge needs nothing — it hangs off
      the stage — and the top needs nothing, because the plate is already
      black up there. */
-  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 48%,
-    rgba(0, 0, 0, 0.45) 76%, transparent 96%);
-  mask-image: linear-gradient(to right, #000 0%, #000 48%,
-    rgba(0, 0, 0, 0.45) 76%, transparent 96%);
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 76%,
+    rgba(0, 0, 0, 0.5) 90%, transparent 99%);
+  mask-image: linear-gradient(to right, #000 0%, #000 76%,
+    rgba(0, 0, 0, 0.5) 90%, transparent 99%);
 }
 
 /* The wax into the table. Its own element because this is the second mask,
@@ -1456,7 +1460,7 @@ button:hover .tarot-fan-card {
 /* Far enough in that the inner ends fall behind the carp, which is what makes
    the mirror a room rather than a mirror. */
 .seance-rack.is-left {
-  left: -3%;
+  left: -1%;
 }
 
 /* `scaleX(-1)` and not a second crop: two crops of one photograph read as two
@@ -1464,7 +1468,7 @@ button:hover .tarot-fan-card {
    a table is what a room looks like. The seam it would make in the middle is
    behind the carp. */
 .seance-rack.is-right {
-  right: -3%;
+  right: -1%;
   transform: scaleX(-1);
   animation-delay: -2.4s;
   animation-duration: 6.7s;
@@ -1580,12 +1584,6 @@ button:hover .tarot-fan-card {
   }
   .tarot-ceremony .crystal-ball {
     width: var(--ballw);
-  }
-  /* The racks keep their proportion to the bronze rather than to the
-     window — untied, a height-limited viewport left them poking above
-     the room's own ceiling. */
-  .tarot-ceremony .seance-rack {
-    width: calc(var(--ballw) * 1.08);
   }
   .tarot-ceremony .tarot-spread {
     position: relative;
