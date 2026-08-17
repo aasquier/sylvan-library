@@ -70,6 +70,46 @@ const ANGLES: Record<string, number> = {
  *  ratchet in `tablesounds` is scheduled against the same figure. */
 const SPIN_MS = 3800
 
+/** The red-cloaked figure's home in the crop (fractions of the scene) —
+ *  the ellipse the living-copy mask feathers around, and the feet the
+ *  breathe pivots on. Measured off the painting, like everything else
+ *  in this file. */
+const FIGURE = { cx: 0.16, cy: 0.55, rx: 0.155, ry: 0.33, feet: '16% 84%' }
+
+/** The crowned skull in the treetop — the wheel's clicker. Pivots where
+ *  the bone meets the branch. */
+const CLICKER = { cx: 0.645, cy: 0.055, rx: 0.075, ry: 0.085 }
+
+const ellipseMask = (f: { cx: number; cy: number; rx: number; ry: number }) =>
+  `radial-gradient(ellipse ${f.rx * 100}% ${f.ry * 100}% at `
+  + `${f.cx * 100}% ${f.cy * 100}%, #000 55%, rgba(0,0,0,0.6) 78%, `
+  + 'transparent 98%)'
+
+/**
+ * A living copy: the same hotlinked crop, masked to one painted thing, so
+ * a CSS transform moves that thing and nothing else. The mask feathers
+ * wide and the motion is small, which is what keeps the seam invisible —
+ * the copy's edges land on pixels that barely move. Same argument as the
+ * wheel cutout: no derivative exists anywhere, the "edit" is CSS at
+ * render time.
+ */
+function LivingCopy({ region, className, style }: {
+  region: { cx: number; cy: number; rx: number; ry: number }
+  className: string
+  style?: React.CSSProperties
+}) {
+  const mask = ellipseMask(region)
+  return (
+    <img src={WHEEL_ART} alt="" aria-hidden
+         className={`absolute inset-0 w-full ${className}`}
+         style={{
+           WebkitMaskImage: mask,
+           maskImage: mask,
+           ...style,
+         } as React.CSSProperties} />
+  )
+}
+
 /**
  * The painted wheel, cut loose: the full crop absolutely positioned inside a
  * circle-masked box so the wheel's centre sits at the box's centre, rotated
@@ -197,8 +237,33 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
                     Edition Alpha: a red-cloaked figure spins a plank wheel
                     mounted on a great tree."
                className="block w-full" />
+          {/* The light through the trees: two cold shafts falling from the
+              upper left across the pale forest curtain, swelling and dying
+              on long uneven cycles — sun through a dead wood on a moving
+              sky. Under the living copies, so the figure and the clicker
+              catch it. */}
+          <span className="wheel-ray" aria-hidden="true" />
+          <span className="wheel-ray is-second" aria-hidden="true" />
+          {/* The figure lives: breath from the feet up, and on a long cycle
+              a slow lean toward the wheel it keeps spinning. */}
+          <LivingCopy region={FIGURE} className="wheel-figure"
+                      style={{ transformOrigin: FIGURE.feet }} />
           <PaintedWheelCutout rotation={rotation} spinning={spinning}
                               onDone={reveal} />
+          {/* The clicker, above the disc: the crowned skull rocks on its
+              branch — a slow watchful tilt at rest, a decaying flap while
+              the planks rattle under it. */}
+          <LivingCopy region={CLICKER}
+                      className={`wheel-clicker${spinning ? ' is-flapping' : ''}`}
+                      style={{ transformOrigin: '64.5% 2%' }} />
+          {/* What the landed fate does to the room, once, at the reveal:
+              the cup shimmers gold, the heart beats twice, the sword's
+              steel sweeps, the skull breathes up a green gloom. */}
+          {revealed && spin?.symbol && (
+            <span key={`${spin.seed}-${spin.symbol}`}
+                  className={`wheel-fatefx is-${spin.symbol}`}
+                  aria-hidden="true" />
+          )}
         </div>
 
         <div className="min-w-0 flex-1 space-y-2">
