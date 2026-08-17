@@ -54,6 +54,7 @@ import candleMp4Url from '../assets/seance/candle-glow-loop.mp4'
 import candleWebmUrl from '../assets/seance/candle-glow-loop.webm'
 import standUrl from '../assets/seance/crystal-fish.webp'
 import shellUrl from '../assets/seance/crystal-shell-sepia.webp'
+import candlesUrl from '../assets/seance/seance-candles.webp'
 import smokeMp4Url from '../assets/seance/seance-smoke-loop.mp4'
 import smokeWebmUrl from '../assets/seance/seance-smoke-loop.webm'
 import { ThemeInterview } from './theme'
@@ -413,6 +414,67 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+/**
+ * The room the ball stands in (Aaron's composition, 2026-08-17).
+ *
+ * The felt used to be a green rectangle with a crystal ball on it. It is a
+ * *room* now, and the whole thing is one horizontal line: **black above,
+ * green below, and the line between them is the back edge of the table.**
+ * A votive rack burns along that line on either side, and the fish stands in
+ * the gap with its base bridging the two racks — which is what stops the
+ * mirror reading as a mirror, because the seam where the two halves would
+ * meet is behind a foot of bronze.
+ *
+ * Three things make it work and each was a choice.
+ *
+ * **The stage is exactly as tall as the ball**, so the horizon is not a
+ * number anybody has to keep in step: `.crystal-ball`'s box ends where the
+ * carp's own foot ends (the stand occupies 17.98%–100% of it), so putting
+ * the dark on `inset: 0` of this wrapper puts the table's back edge under the
+ * fish automatically, at every width and every clamp of the ball's size.
+ *
+ * **The candles are screened, not matted.** The plate is candles on a black
+ * ground, and black is already transparent under `screen` — so the ground
+ * goes exactly, and the flames' halos and the light bleeding off the wax
+ * survive as photographed rather than as whatever a matte's edge decided.
+ * `matte_backdrop` exists for the opposite case, which is the bronze: a
+ * studio grey *lighter* than its subject.
+ *
+ * **One file, mirrored.** Two crops of one photograph read as two different
+ * racks and invite you to compare them; one rack seen from both ends of the
+ * same table is what a room actually looks like.
+ *
+ * The dark is `ambience` weather like everything else here: reduced motion or
+ * the ambience pref leaves the room lit and still rather than frozen mid
+ * flicker.
+ */
+function SeanceRoom({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="seance-stage">
+      <div className="seance-dark" aria-hidden="true">
+        <VideoBackdrop webmSrc={smokeWebmUrl} mp4Src={smokeMp4Url}
+                       mode="ambience" className="seance-haze" />
+      </div>
+      {/* Two elements per rack, and it is not decoration: the inner edge
+          needs a horizontal fade and the bottom needs a vertical one, which
+          is two masks on one box. `mask-composite` is exactly the sort of
+          thing WebKit 17.4 disagrees about, so each mask gets its own
+          element — the span fades the edge that faces the fish, the img
+          fades the wax into the table. */}
+      <span className="seance-rack is-left" aria-hidden="true">
+        <img src={candlesUrl} alt="" />
+      </span>
+      <span className="seance-rack is-right" aria-hidden="true">
+        <img src={candlesUrl} alt="" />
+      </span>
+      {/* The light the rack puts back on the felt, in front of the dark so it
+          washes over the table's edge rather than stopping at it. */}
+      <span className="seance-spill" aria-hidden="true" />
+      {children}
     </div>
   )
 }
@@ -1011,11 +1073,11 @@ export function TarotTable({ onPick, onLeave }: {
                to be shrunk and then hidden below `lg` to cope. Standing it
                over the cards means nothing is beside it, so it shows at
                every width and can be the size the thing deserves. */
-            <div className="relative mb-6 flex justify-center">
+            <SeanceRoom>
               <CrystalBall vision={lastTurned && lastTurned.image
                 ? { image: lastTurned.image, reversed: lastTurned.reversed }
                 : null} />
-            </div>
+            </SeanceRoom>
           )}
           <Spread cards={cards} turned={table.turned} small={!dealing}
                   onTurn={dealing ? turn : undefined} />

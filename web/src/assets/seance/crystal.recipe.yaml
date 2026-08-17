@@ -68,6 +68,20 @@ sources:
     found_via: "Openverse with a license=cc0 filter, searching `crystal ball`"
     licence: CC0-1.0
 
+  # The votive rack at the back of the room (Aaron picked it off a board of
+  # twelve, 2026-08-17). A bank of church candles with real wax runs down
+  # them -- which is the half of "candles that drip wax" a photograph can
+  # actually answer, and it answers it better than any drip animation would.
+  # Shot on a black ground with the flames blown out to white, which is what
+  # makes the two-layer treatment on the page possible.
+  candles:
+    provider: openverse
+    identifier: 55ba1cf3-417e-4eed-8459-bcf27bb461eb
+    title: "Burning candles, wax running (public domain, CC0)"
+    landing: https://www.rawpixel.com/image/5963706/free-public-domain-cc0-photo
+    found_via: "Openverse with a license=cc0 filter, searching `dripping wax candle`"
+    licence: CC0-1.0
+
   # Séance smoke: slower and larger-featured than the Laboratory's mist,
   # because this is one room's air rather than weather over a landscape,
   # and it drifts across the ball rather than past it. Seed 1848 -- the
@@ -151,6 +165,39 @@ outputs:
   # next person has to work out the status of. `verify` holds what is
   # committed to this recipe, so leaving the output here and the file gone
   # would fail the suite -- which is the mechanism doing its job.
+
+  # The rack, cut once and used twice: the page mirrors this file for the
+  # right-hand side (Aaron's call, and it is the right one — two crops of one
+  # photograph read as two racks, while a mirror of one reads as the same
+  # rack seen from the other end of the same table).
+  #
+  # NOT matted, and that is the whole technique. The plate is candles on a
+  # **black** ground, and black is already transparent under `screen`: the
+  # page lays this on at `mix-blend-mode: screen`, so the ground disappears
+  # exactly, and — the part a matte could never give — the flames' halos and
+  # the glow bleeding off the wax survive as photographed, with no cut edge
+  # anywhere. `matte_backdrop` was built for the bronze because a museum
+  # plate's studio grey is *lighter* than its subject; here the ground is
+  # darker than everything, which is a different problem with a free answer.
+  # The `duotone` still runs, because two photographs on one table share a
+  # plate, and the ramp's `light` stop is hotter than the fish's so the
+  # flames stay flames rather than becoming warm paper.
+  - file: seance-candles.webp
+    from: candles
+    ops:
+      # The right edge is 0.53 and it is measured, not judged by eye. The
+      # first cut was 0.42, which put the seam straight through a lit candle
+      # -- and a candle sliced down its length is the one thing in this
+      # composite that cannot be explained away, because wax has a round
+      # side. Scanning the plate column by column for the brightest pixel in
+      # the candle band finds a genuine trough at x=520..570 (peak 134-183
+      # against 255 either side): nothing is lit there, so the cut passes
+      # between two racks rather than through one.
+      - crop: {frac_box: [0.0, 0.14, 0.53, 1.0]}
+      - duotone: {shadow: "#000000", mid: "#8a6b3e", light: "#fff4cf"}
+      - resize: {width: 700}
+    encode: {format: webp, quality: 84}
+    expect: {width: 700, height: 851, budget_kb: 180, metadata: none}
 
   - file: seance-smoke-loop.webm
     from: smoke

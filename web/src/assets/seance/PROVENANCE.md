@@ -3,7 +3,7 @@
 The rule here is the tarot deck's (`src/mtglab/assets/tarot/PROVENANCE.md`): nothing ships in this directory whose licence was not checked per file, and every transformation applied is written down so the derivation is reproducible from the source.
 
 <!-- animist:begin crystal -->
-## candle-glow-loop.mp4, candle-glow-loop.webm, crystal-fish.webp, crystal-shell-sepia.webp, seance-smoke-loop.mp4, seance-smoke-loop.webm
+## candle-glow-loop.mp4, candle-glow-loop.webm, crystal-fish.webp, crystal-shell-sepia.webp, seance-candles.webp, seance-smoke-loop.mp4, seance-smoke-loop.webm
 
 ### from `candle`
 - **Source**: `candle`. Procedural, seed 1909.
@@ -19,6 +19,15 @@ The rule here is the tarot deck's (`src/mtglab/assets/tarot/PROVENANCE.md`): not
   - `color_ramp`: low='#0b0602', high='#ffcf87'.
   - `resize`: width=560.
   - Encoded MP4, crf 32.
+
+### from `candles`
+- **Source**: "Burning candles, wax running (public domain, CC0)", <https://www.rawpixel.com/image/5963706/free-public-domain-cc0-photo>, found via Openverse with a license=cc0 filter, searching `dripping wax candle`.
+- **Licence**: cc0. Confirmed through the Openverse record API at fetch time (2026-08-17).
+- **Transformations** (Pillow, scripted -- `mtglab animist build crystal.recipe.yaml`):
+  - `crop`: frac_box=[0.0, 0.14, 0.53, 1.0].
+  - `duotone`: shadow='#000000', mid='#8a6b3e', light='#fff4cf'.
+  - `resize`: width=700.
+  - Encoded WEBP, quality 84.
 
 ### from `fish`
 - **Source**: "Crystal Ball on a Bronze Stand in the Shape of a Fish", <https://www.metmuseum.org/art/collection/search/44054>, found via Openverse with a license=cc0 filter, searching `crystal ball stand`; the plate is rawpixel's re-host of Met object 44054, so the recipe goes to the Met's Open Access API for the full-resolution original
