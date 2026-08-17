@@ -104,6 +104,112 @@ def test_feather_needs_positive_radius() -> None:
         apply(hard_edge(), "feather", {"radius": 0})
 
 
+def plate() -> Image.Image:
+    """A museum plate in miniature: a grey ground lit unevenly, a DARK bar
+    and a BRIGHT bar sitting on it. The bright bar is the whole point —
+    it is the crystal sphere, and it is brighter than the ground."""
+    array = np.zeros((40, 40, 3))
+    # A backdrop sweep: 196 at the top down to 176 at the bottom.
+    for y in range(40):
+        array[y, :, :] = 196 - y * 0.5
+    array[12:20, 8:32, :] = 40      # the bronze
+    array[24:32, 8:32, :] = 250     # the crystal
+    return rgb(array)
+
+
+def test_matte_backdrop_drops_the_ground_and_keeps_both_subjects() -> None:
+    out = apply(plate(), "matte_backdrop", {"tolerance": 26, "border": 1})
+    alpha = np.asarray(out.getchannel("A"))
+    assert alpha[0, 0] == 0, "the corner is backdrop"
+    assert alpha[5, 20] == 0, "so is the space above the object"
+    assert alpha[16, 20] == 255, "the dark bar survives"
+    # The one a luminance key gets wrong: brighter than the ground, kept.
+    assert alpha[28, 20] == 255, "the bright bar survives"
+
+
+def test_matte_backdrop_follows_a_lit_gradient_to_the_far_edge() -> None:
+    """A studio sweep is 20 levels darker at the bottom than the top. The
+    fill must still reach it, or the matte leaves a band along one edge."""
+    out = apply(plate(), "matte_backdrop", {"tolerance": 26, "border": 1})
+    alpha = np.asarray(out.getchannel("A"))
+    assert alpha[39, 2] == 0, "the far corner of the sweep is still backdrop"
+    assert alpha[39, 20] == 0
+
+
+def test_matte_backdrop_keeps_background_it_cannot_reach() -> None:
+    """An enclosed hole is not removed, and that is the documented rule."""
+    array = np.full((30, 30, 3), 200.0)
+    array[8:22, 8:22, :] = 30        # a ring of object...
+    array[13:17, 13:17, :] = 200     # ...around a pocket of backdrop
+    out = apply(rgb(array), "matte_backdrop", {"tolerance": 20, "border": 1})
+    alpha = np.asarray(out.getchannel("A"))
+    assert alpha[0, 0] == 0, "the reachable ground goes"
+    assert alpha[15, 15] == 255, "the enclosed pocket stays"
+
+
+def test_matte_backdrop_can_drop_what_it_cannot_reach() -> None:
+    """`enclosed: drop` for openwork — the Met fish frames studio grey in
+    the arch of its wave, and on a table that reads as a hole in the felt."""
+    array = np.full((30, 30, 3), 200.0)
+    array[8:22, 8:22, :] = 30
+    array[13:17, 13:17, :] = 200
+    out = apply(rgb(array), "matte_backdrop",
+                {"tolerance": 20, "border": 1, "enclosed": "drop"})
+    alpha = np.asarray(out.getchannel("A"))
+    assert alpha[0, 0] == 0
+    assert alpha[15, 15] == 0, "the enclosed pocket goes too"
+    assert alpha[10, 10] == 255, "the object is untouched"
+
+
+def test_matte_backdrop_refusals() -> None:
+    with pytest.raises(OpError, match="positive `tolerance`"):
+        apply(plate(), "matte_backdrop", {"tolerance": 0})
+    with pytest.raises(OpError, match="at least 1"):
+        apply(plate(), "matte_backdrop", {"border": 0})
+    with pytest.raises(OpError, match="wider than the image"):
+        apply(plate(), "matte_backdrop", {"border": 40})
+    with pytest.raises(OpError, match="`keep` or `drop`"):
+        apply(plate(), "matte_backdrop", {"enclosed": "maybe"})
+
+
+def test_duotone_maps_luminance_onto_the_ramp() -> None:
+    array = np.zeros((3, 1, 3))
+    array[0] = 0        # black
+    array[1] = 128      # mid
+    array[2] = 255      # white
+    out = apply(rgb(array), "duotone",
+                {"shadow": "#000000", "mid": "#808080", "light": "#ffffff"})
+    got = np.asarray(out.convert("RGB"))
+    assert got[0, 0].tolist() == [0, 0, 0]
+    assert all(abs(int(v) - 128) <= 2 for v in got[1, 0])
+    assert got[2, 0].tolist() == [255, 255, 255]
+
+
+def test_duotone_actually_tints() -> None:
+    """The point of the op: a grey plate comes out warm."""
+    grey = rgb(np.full((4, 4, 3), 180.0))
+    out = np.asarray(apply(grey, "duotone",
+                           {"shadow": "#261a0e", "mid": "#8c6e44",
+                            "light": "#faf0d0"}).convert("RGB"))
+    r, g, b = (int(v) for v in out[2, 2])
+    assert r > g > b, f"expected a warm cast, got {(r, g, b)}"
+
+
+def test_duotone_carries_alpha_through() -> None:
+    """So it composes after a matte instead of undoing one."""
+    base = Image.new("RGBA", (4, 4), (180, 180, 180, 90))
+    out = apply(base, "duotone", {})
+    assert np.asarray(out.getchannel("A"))[2, 2] == 90
+
+
+def test_duotone_refuses_a_bad_colour() -> None:
+    grey = rgb(np.full((4, 4, 3), 180.0))
+    with pytest.raises(OpError, match="#rrggbb"):
+        apply(grey, "duotone", {"mid": "abc"})
+    with pytest.raises(OpError, match="not a hex colour"):
+        apply(grey, "duotone", {"mid": "zzzzzz"})
+
+
 def test_mask_circle_keeps_the_disc_and_drops_the_corners() -> None:
     # A square field: the centred disc survives, the corners do not.
     image = Image.new("RGB", (40, 40), (200, 180, 120))

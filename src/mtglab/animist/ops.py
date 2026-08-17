@@ -145,6 +145,144 @@ def _mirror_tile(image: Image, params: dict[str, Any]) -> Image:
     return out
 
 
+def _matte_backdrop(image: Image, params: dict[str, Any]) -> Image:
+    """The studio ground to alpha, by flooding inward from the frame edges.
+
+    The museum-plate matte. A luminance key is the obvious tool and it
+    cannot work here: on the Met's bronze-and-crystal plates the metal is
+    *darker* than the grey ground while the sphere is *brighter*, so any
+    single threshold keeps one and eats the other. What actually separates
+    subject from ground is not brightness but **connectivity** — the ground
+    touches the frame edge and the object does not.
+
+    So the seed is the border, and the fill spreads to any neighbour within
+    `tolerance` of the sampled backdrop colour. A gradient-lit sweep (which
+    is what a studio backdrop is) is followed the whole way down, because
+    each step only compares against the backdrop's own colour rather than
+    against its neighbour — a chain-tolerance fill would walk straight into
+    the subject through a soft shadow.
+
+    `tolerance` is in 0-255 channel distance. `border` is how many pixels
+    of the frame edge are taken as seed.
+
+    `enclosed` decides what happens to backdrop the flood cannot reach —
+    the gap under a handle, the daylight inside a wave's arch. `keep` (the
+    default) leaves it, which is the safe answer when a subject has pale
+    passages of its own that a colour key would eat. `drop` removes it too,
+    which is what a plate of openwork wants: on the Met's fish the arch of
+    the wave frames a patch of studio grey that is not reachable from any
+    edge and reads, on a table, as a hole cut in the felt.
+    """
+    import numpy as np
+    from PIL import Image as PILImage
+
+    tolerance = float(params.get("tolerance", 26.0))
+    border = int(params.get("border", 2))
+    enclosed = str(params.get("enclosed", "keep"))
+    if tolerance <= 0:
+        raise OpError("matte_backdrop needs a positive `tolerance`")
+    if border < 1:
+        raise OpError("matte_backdrop needs a `border` of at least 1")
+    if enclosed not in {"keep", "drop"}:
+        raise OpError("matte_backdrop `enclosed` must be `keep` or `drop`")
+
+    rgba = image.convert("RGBA")
+    rgb = np.asarray(rgba.convert("RGB"), dtype=np.float32)
+    h, w = rgb.shape[:2]
+    if border * 2 >= min(h, w):
+        raise OpError("matte_backdrop `border` is wider than the image")
+
+    # The backdrop's colour, sampled from the frame edge itself rather than
+    # passed in -- the edge is the one place it is guaranteed to be.
+    edge = np.concatenate([
+        rgb[:border, :, :].reshape(-1, 3), rgb[-border:, :, :].reshape(-1, 3),
+        rgb[:, :border, :].reshape(-1, 3), rgb[:, -border:, :].reshape(-1, 3)])
+    backdrop = np.median(edge, axis=0)
+
+    near = np.max(np.abs(rgb - backdrop), axis=2) <= tolerance
+
+    if enclosed == "drop":
+        # No connectivity test at all: every backdrop-coloured pixel goes,
+        # reachable or not. Still keyed on the colour sampled from the
+        # border, which is the part that makes this different from a
+        # hand-picked chroma key.
+        existing = np.asarray(rgba.getchannel("A"), dtype=np.float32) / 255.0
+        alpha = (existing * (~near) * 255.0).astype(np.uint8)
+        rgba.putalpha(PILImage.fromarray(alpha, mode="L"))
+        return rgba
+
+    # Flood from the border through `near`, by repeated dilation. Bounded:
+    # it stops as soon as a pass adds nothing, and the worst case is the
+    # image's own diameter.
+    reached = np.zeros((h, w), dtype=bool)
+    reached[:border, :] = near[:border, :]
+    reached[-border:, :] = near[-border:, :]
+    reached[:, :border] = near[:, :border]
+    reached[:, -border:] = near[:, -border:]
+    for _ in range(h + w):
+        grown = reached.copy()
+        grown[1:, :] |= reached[:-1, :]
+        grown[:-1, :] |= reached[1:, :]
+        grown[:, 1:] |= reached[:, :-1]
+        grown[:, :-1] |= reached[:, 1:]
+        grown &= near
+        if np.array_equal(grown, reached):
+            break
+        reached = grown
+
+    existing = np.asarray(rgba.getchannel("A"), dtype=np.float32) / 255.0
+    alpha = (existing * (~reached) * 255.0).astype(np.uint8)
+    rgba.putalpha(PILImage.fromarray(alpha, mode="L"))
+    return rgba
+
+
+def _duotone(image: Image, params: dict[str, Any]) -> Image:
+    """Luminance mapped onto a three-stop colour ramp: `shadow`, `mid`,
+    `light`, each a hex string.
+
+    `color_ramp` in `motion.py` does this to a generated field; this is its
+    still-image sibling, and it exists for one subject in particular. A
+    monochrome museum plate carries no hue to preserve, so tinting it is
+    not throwing information away — and bronze is close to the ideal case,
+    being genuinely one hue with luminance variation rather than a subject
+    whose colours a ramp would flatten.
+
+    Alpha is carried through untouched, so this composes after a matte.
+    """
+    import numpy as np
+    from PIL import Image as PILImage
+
+    shadow = _hex(params, "shadow", (26, 18, 10))
+    mid = _hex(params, "mid", (140, 110, 68))
+    light = _hex(params, "light", (250, 240, 208))
+
+    rgba = image.convert("RGBA")
+    lum = np.asarray(rgba.convert("L"), dtype=np.float32)[..., None] / 255.0
+    s, m, li = (np.array(c, dtype=np.float32) for c in (shadow, mid, light))
+    # Two linear segments meeting at mid-grey, which is where a plate's
+    # midtones actually sit.
+    low = s + (m - s) * (np.clip(lum, 0.0, 0.5) / 0.5)
+    high = m + (li - m) * (np.clip(lum - 0.5, 0.0, 0.5) / 0.5)
+    rgb = np.where(lum < 0.5, low, high)
+    out = np.dstack([np.clip(rgb, 0, 255),
+                     np.asarray(rgba.getchannel("A"), dtype=np.float32)])
+    return PILImage.fromarray(out.astype(np.uint8), mode="RGBA")
+
+
+def _hex(params: dict[str, Any], key: str,
+         default: tuple[int, int, int]) -> tuple[int, int, int]:
+    value = params.get(key)
+    if value is None:
+        return default
+    text = str(value).lstrip("#")
+    if len(text) != 6:
+        raise OpError(f"duotone `{key}` must be a #rrggbb colour")
+    try:
+        return (int(text[0:2], 16), int(text[2:4], 16), int(text[4:6], 16))
+    except ValueError as exc:
+        raise OpError(f"duotone `{key}` is not a hex colour") from exc
+
+
 def _mask_circle(image: Image, params: dict[str, Any]) -> Image:
     """Everything outside a circle to alpha. `cx`/`cy`/`r` in fractions of
     the frame's *width*, `feather` in pixels.
@@ -222,6 +360,8 @@ def _resize(image: Image, params: dict[str, Any]) -> Image:
 OPS: dict[str, OpFn] = {
     "crop": _crop,
     "matte_green": _matte_green,
+    "matte_backdrop": _matte_backdrop,
+    "duotone": _duotone,
     "mask_circle": _mask_circle,
     "feather": _feather,
     "mirror_tile": _mirror_tile,

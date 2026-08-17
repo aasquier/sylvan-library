@@ -33,8 +33,8 @@ import yaml
 VERSION = 1
 
 #: The still transform vocabulary. Implementations live in `ops.py`.
-KNOWN_OPS = frozenset({"crop", "matte_green", "mask_circle", "feather",
-                       "mirror_tile", "resize"})
+KNOWN_OPS = frozenset({"crop", "matte_green", "matte_backdrop", "duotone",
+                       "mask_circle", "feather", "mirror_tile", "resize"})
 
 #: The motion vocabulary (ADR 31). Implementations live in `motion.py`;
 #: these are the schema's copies, pinned equal in
