@@ -1,0 +1,62 @@
+# The reader's parchment (ROADMAP item 13, the brief's front one).
+#
+# The question card was six CSS gradients -- a rounded rectangle with a
+# nice colour ramp, and the last drawing in a room where every other
+# surface had become a photograph. Commandment 5 asks for the real thing
+# where a real thing is free, and here it is free: the Met's Open Access
+# collection holds actual vellum at full plate resolution, and the same
+# `met` provider built for the bronze fish opens it.
+#
+# The crop is measured, not eyeballed: the plate was scanned with a
+# sliding-window local standard deviation, and the 635x455 region below is
+# the flattest field of pure skin on it (std 4.6 against 24-40 for every
+# larger window, all of which catch ink strokes or the pencilled accession
+# number). Fibre grain, foxing, and a natural darkening toward one edge --
+# none of which a gradient proposes.
+animist: 1
+
+why_committed: >
+  The folio is CC0 through the museum's own isPublicDomain flag, so the
+  derived tile is clean to commit, and the ivy's argument holds one more
+  time: the paper under the reader's own words must not break when a
+  third-party CDN moves. Four kilobytes of webp is cheaper than the
+  gradient stack it replaces.
+
+sources:
+  # A Kufic Qur'an folio, ink and gold on parchment -- picked precisely
+  # because it is MOSTLY parchment: wide margins and interlinear space,
+  # so the plate carries large fields of pure skin to crop from. Fetched
+  # from the museum rather than an aggregator, as with the fish: one hop,
+  # full resolution, and the institution that owns the object answering
+  # for the rights.
+  vellum:
+    provider: met
+    identifier: "448369"
+    title: "Folio from a Qur'an Manuscript"
+    landing: https://www.metmuseum.org/art/collection/search/448369
+    found_via: >
+      the Met Open Access API, searching `parchment` after Wikimedia's
+      best vellum plates all turned out to be CC BY -- an attribution
+      obligation a decoration must not carry (the gate refuses it, and
+      the gate is right)
+    licence: CC0-1.0
+
+outputs:
+  # The tile the scroll is papered with. Duotone before mirror_tile
+  # because it is the same arithmetic on a quarter of the pixels; the
+  # ramp is graded to the room -- the shadow stop sits at the warmth the
+  # votive light leans in with, and it is also the contrast floor: after
+  # this grade the darkest pixel in the tile holds the séance ink
+  # (#2b2013) at 9.9:1, so the text needs no scrim. Mirrored both ways,
+  # the tile repeats seamlessly at any panel size, which is the answer to
+  # the one-crop-shows-its-rectangle trap the candle rack already fell
+  # into once.
+  - file: seance-parchment.webp
+    from: vellum
+    ops:
+      - crop: {frac_box: [0.6403, 0.8193, 0.8069, 0.9857]}
+      - duotone: {shadow: "#a8905e", mid: "#ddcda2", light: "#f4ecd6"}
+      - mirror_tile: {axis: x}
+      - mirror_tile: {axis: y}
+    encode: {format: webp, quality: 82}
+    expect: {width: 1270, height: 910, budget_kb: 40, metadata: none}

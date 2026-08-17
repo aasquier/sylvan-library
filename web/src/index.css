@@ -951,24 +951,37 @@ button:hover .tarot-fan-card {
  * same reason, and the pair clears WCAG AA with room to spare. */
 .seance-scroll {
   position: relative;
+  /* The paper is a photograph now (parchment.recipe.yaml): the margin of a
+     Met Qur'an folio -- real skin, fibre, foxing -- mirror-tiled so it
+     repeats seamlessly at any panel size. The gradients that survive are
+     the room's, not the paper's: the votive racks lean their warmth in
+     from left and right, and two faint stains keep the sheet from reading
+     as freshly cut. The silhouette is the deckle mask below rather than a
+     border-radius, so the drop-shadow follows the torn edge (filter, not
+     box-shadow: a box-shadow would paint the rectangle the mask just took
+     away). Padding lives here rather than on the component because the
+     deckle eats up to 2% of each edge, and letters that reach the torn
+     edge get torn with it. */
   background:
+    radial-gradient(ellipse 32% 95% at 0% 55%,
+      rgba(226, 168, 92, 0.13), transparent 70%),
+    radial-gradient(ellipse 32% 95% at 100% 55%,
+      rgba(226, 168, 92, 0.13), transparent 70%),
     radial-gradient(ellipse 42% 30% at 18% 8%,
-      rgba(112, 84, 40, 0.2), transparent),
-    radial-gradient(ellipse 30% 22% at 86% 16%,
-      rgba(96, 68, 30, 0.16), transparent),
+      rgba(112, 84, 40, 0.12), transparent),
     radial-gradient(ellipse 50% 34% at 72% 94%,
-      rgba(102, 74, 32, 0.22), transparent),
-    radial-gradient(ellipse 24% 16% at 8% 76%,
-      rgba(88, 60, 26, 0.14), transparent),
-    radial-gradient(ellipse 120% 100% at 50% 45%,
-      rgba(252, 246, 228, 0.5), rgba(196, 172, 122, 0.35)),
-    linear-gradient(174deg, #ecdfbd, #e3d3a8 58%, #d6c290);
-  border: 1px solid #a08a58;
+      rgba(102, 74, 32, 0.14), transparent),
+    url('./assets/seance/seance-parchment.webp');
+  background-size: auto, auto, auto, auto, 635px 455px;
+  padding: 1.9rem 2.4rem;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 250, 230, 0.4),
-    inset 0 0 26px rgba(96, 68, 28, 0.28),
-    inset 0 0 80px rgba(96, 68, 28, 0.16),
-    0 8px 22px rgba(20, 12, 2, 0.22);
+    inset 0 0 26px rgba(96, 68, 28, 0.22),
+    inset 0 0 80px rgba(96, 68, 28, 0.12);
+  -webkit-mask-image: url('./assets/seance/parchment-deckle.svg');
+  mask-image: url('./assets/seance/parchment-deckle.svg');
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  filter: drop-shadow(0 8px 18px rgba(20, 12, 2, 0.3));
   color: #2b2013;
   /* Re-inked text tokens, the felt's own trick one surface over: everything
      inside that says `var(--text-muted)` stays legible on parchment without
@@ -1007,37 +1020,58 @@ button:hover .tarot-fan-card {
   line-height: 1.62;
 }
 
-/* The hand writing (`InkText` in theme.tsx). Each word is revealed by a
-   left-to-right wipe on its own schedule — the line fills the way a pen
-   fills it — with a hair of tilt and drop per word, and ink that starts
-   wet-brown and dries dark. The negative vertical insets keep ascenders
-   and descenders out of the clip. */
+/* The hand writing (`InkText` in theme.tsx). The unit is the CHARACTER
+   (the brief's front two): each glyph is revealed by its own
+   left-to-right wipe on the shared schedule, so the line fills stroke by
+   stroke rather than word-blocks arriving. The word span survives around
+   the characters — it is what lets lines wrap at spaces, and it carries
+   the per-word tilt and drop. Ink starts wet-brown and dries dark. The
+   negative vertical insets keep ascenders and descenders out of the
+   clip. */
 .ink-text {
   position: relative;
   display: inline-block;
   width: 100%;
+  cursor: pointer;
 }
 
 .ink-word {
   display: inline-block;
   transform: rotate(var(--ink-tilt, 0deg)) translateY(var(--ink-drop, 0px));
-  animation: ink-write var(--ink-dur, 200ms) linear both;
+}
+
+.ink-char {
+  display: inline-block;
+  animation: ink-write var(--ink-dur, 60ms) linear both;
   animation-delay: var(--ink-delay, 0ms);
+}
+
+/* The skip (click): every delay collapses and the page is simply dry. */
+.ink-text.is-dry {
+  cursor: default;
+}
+
+.ink-text.is-dry .ink-char {
+  animation: none;
+  clip-path: none;
+  color: #2b2013;
 }
 
 @keyframes ink-write {
   0% {
-    /* 102% right inset: a word not yet written shows not one speck — the
-       -2% draft leaked the left edge of every glyph onto the page. The
-       vertical overhang stays, for ascenders and descenders. */
-    clip-path: inset(-20% 102% -20% 0);
+    /* 110% right inset: a glyph not yet written shows not one speck. The
+       vertical overhang stays, for ascenders and descenders; the -6% left
+       overhang keeps the previous glyph's exit stroke from being clipped
+       where glyphs kern into each other, which is the whole point of a
+       connected face. */
+    clip-path: inset(-20% 110% -20% -6%);
     color: #6d4f22;
   }
   55% {
     color: #54401e;
   }
   100% {
-    clip-path: inset(-20% -4% -20% 0);
+    clip-path: inset(-20% -8% -20% -6%);
     color: #2b2013;
   }
 }
@@ -1778,10 +1812,12 @@ button:hover .tarot-fan-card {
     transition: none;
   }
   .ink-word {
+    transform: none;
+  }
+  .ink-char {
     animation: none;
     clip-path: none;
     color: #2b2013;
-    transform: none;
   }
   .ink-quill {
     display: none;
