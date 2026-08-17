@@ -1360,6 +1360,10 @@ export interface PersonaRoster {
 export interface TarotDrawn {
   key: string
   name: string
+  /** What goes under the picture. Same as `name` for all but the
+   *  double-faced echoes, where `name` is the pool's whole-card name
+   *  ("Murderous Rider // Swift End") and this is the front face alone. */
+  face_name: string
   /** major | minor */
   arcana: string
   suit: string | null

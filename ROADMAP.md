@@ -1398,18 +1398,36 @@ arc; this is what the next few sessions actually do.
     fortune-teller writes on aged parchment (the Fell Types, OFL, with
     per-directory provenance; a quill-tracked word-by-word ink reveal,
     reduced-motion safe); and the deck grew an **echoes tier** (three deep
-    dives, 2026-08-16): twenty-nine real cards whose name, art and rules
-    carry a tarot card — every one of the 22 trumps answered (Gelon's
-    Alpha Wheel of Fortune above all, the same painting the site's Wheel
-    spins) and the minors opened (the aces, the coins, a page, a king) —
-    on top of the three printed tarot cards, whose cycle a Scryfall sweep
-    confirmed complete. Two disciplines hold the tier: original imagery
-    outranks every other classifier (Stone Rain's tower mid-ruin displaced
-    a better-numbered tower that merely loomed), and every Magic card
+    dives, 2026-08-16): real cards whose name, art and rules carry a tarot
+    card — every one of the 22 trumps answered (Gelon's Alpha Wheel of
+    Fortune above all, the same painting the site's Wheel spins) and the
+    minors opened — on top of the three printed tarot cards, whose cycle a
+    Scryfall sweep confirmed complete. Two disciplines hold the tier:
+    original imagery outranks every other classifier, and every Magic card
     carries a `note` justifying its slot in checkable pool facts (Flubs
     has 0 power, Homer is a 0/9, Apatzec's rules text says 4 four times)
     or it is cut — rendered under the turned card as the fun fact and
-    handed to the reader. A Magic card landing is called an omen with
+    handed to the reader.
+
+    **Aaron judged the roster on 2026-08-17** and it is now thirty-eight
+    echoes, 119 cards. Eight trumps changed hands: The High Priestess to
+    Willow Priestess, The Lovers to True Love's Kiss, The Hanged Man to
+    Suspension Field, Temperance to Chalice of Life // Chalice of Death,
+    The Devil to Asmodeus the Archfiend (type line: Devil God, 6/6 for
+    six, ability called Binding Contract), The Tower to Command Tower
+    (Evan Shipard's struck-and-burning painting, on the land written for
+    this format), The Star to Ephara, God of the Polis, and Death to
+    Murderous Rider // Swift End. Nine minors opened: the Two, Five, Page
+    and Knight of Wands; the Three, Ten and Queen of Cups; the Three, Nine
+    and Ten of Swords. Two rules came out of that session. The rubric
+    **widened past art alone** — a slot can be won on name, rules text or
+    the card's place in the game, so long as the `note`'s facts are still
+    checked against the pool. And the **printing is a choice**: the pool's
+    default is not always the right painting, so Command Tower, Young
+    Pyromancer, Thassa and Murder each name theirs. The search method that
+    found them is worth keeping: Scryfall's Tagger vocabulary (`art:` /
+    `otag:`) over the API, then Pillow contact sheets of every candidate
+    beside the 1909 scan, judged by eye. A Magic card landing is called an omen with
     precedence in the frame message, and an original landing beside its
     Magic answer (trumps and minors both) is named as the stars aligning —
     all Python-detected facts, never prompt hopes.

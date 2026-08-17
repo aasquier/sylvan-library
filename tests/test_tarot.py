@@ -114,14 +114,15 @@ def test_image_paths_are_served_from_the_tarot_mount():
 # ------------------------------------------------- the Magic crossovers
 
 def test_the_magic_tiers_join_the_shuffle_but_not_the_seventy_eight():
-    """Punch list 2026-08-15 item 13, widened twice on 2026-08-16: three
-    printed tarot cards and twenty-nine echoes. The 78 stay the 78 -- the
-    picture sweeps above run over `DECK` on purpose, because a Magic card's
-    picture is a hotlinked art crop and not package data."""
+    """Punch list 2026-08-15 item 13, widened twice on 2026-08-16 and again
+    at Aaron's verdicts on 2026-08-17: three printed tarot cards and
+    thirty-eight echoes. The 78 stay the 78 -- the picture sweeps above run
+    over `DECK` on purpose, because a Magic card's picture is a hotlinked
+    art crop and not package data."""
     assert len(tarot.DECK) == 78
     assert len(tarot.CROSSOVERS) == 3
-    assert len(tarot.ECHOES) == 29
-    assert len(tarot.FULL_DECK) == 110
+    assert len(tarot.ECHOES) == 38
+    assert len(tarot.FULL_DECK) == 119
     for card in tarot.CROSSOVERS + tarot.ECHOES:
         assert card.after, f"{card.name} names no trump"
         assert card.artist, f"{card.name} credits nobody"
@@ -155,22 +156,22 @@ def test_magic_cards_sit_at_their_originals_numbers():
     by_name = {c.name: c for c in tarot.CROSSOVERS + tarot.ECHOES}
     assert by_name["Flubs, the Fool"].number == 0
     assert by_name["Massimo, the Magician"].number == 1
-    assert by_name["Blind Seer"].number == 2
+    assert by_name["Willow Priestess"].number == 2
     assert by_name["Empress Galina"].number == 3
     assert by_name["Emperor Apatzec Intli IV"].number == 4
     assert by_name["Orzhov Pontiff"].number == 5
-    assert by_name["Kynaios and Tiro of Meletis"].number == 6
+    assert by_name["True Love's Kiss"].number == 6
     assert by_name["Esika's Chariot"].number == 7
     assert by_name["Lion Umbra"].number == 8
     assert by_name["Homer, the Hermit"].number == 9
     assert by_name["Wheel of Fortune"].number == 10
     assert by_name["Balance"].number == 11
-    assert by_name["Hanged Executioner"].number == 12
-    assert by_name["Pale Rider of Trostad"].number == 13
-    assert by_name["Alchemist's Apprentice"].number == 14
-    assert by_name["Master of Cruelties"].number == 15
-    assert by_name["Stone Rain"].number == 16
-    assert by_name["Starfield of Nyx"].number == 17
+    assert by_name["Suspension Field"].number == 12
+    assert by_name["Murderous Rider // Swift End"].number == 13
+    assert by_name["Chalice of Life // Chalice of Death"].number == 14
+    assert by_name["Asmodeus the Archfiend"].number == 15
+    assert by_name["Command Tower"].number == 16
+    assert by_name["Ephara, God of the Polis"].number == 17
     assert by_name["Imprisoned in the Moon"].number == 18
     assert by_name["Approach of the Second Sun"].number == 19
     assert by_name["Angelic Renewal"].number == 20
@@ -178,16 +179,66 @@ def test_magic_cards_sit_at_their_originals_numbers():
     # The minors carry their originals' rank and suit the same way.
     assert (by_name["Wand of the Worldsoul"].suit,
             by_name["Wand of the Worldsoul"].number) == ("wands", 1)
-    assert (by_name["Chart a Course"].suit,
-            by_name["Chart a Course"].number) == ("wands", 2)
+    assert (by_name["Expedition Map"].suit,
+            by_name["Expedition Map"].number) == ("wands", 2)
+    assert (by_name["Goblin Gathering"].suit,
+            by_name["Goblin Gathering"].number) == ("wands", 5)
+    assert (by_name["Young Pyromancer"].suit,
+            by_name["Young Pyromancer"].number) == ("wands", 11)
+    assert (by_name["Hellrider"].suit,
+            by_name["Hellrider"].number) == ("wands", 12)
     assert (by_name["Everflowing Chalice"].suit,
             by_name["Everflowing Chalice"].number) == ("cups", 1)
+    assert (by_name["Rite of Harmony"].suit,
+            by_name["Rite of Harmony"].number) == ("cups", 3)
+    assert (by_name["Happily Ever After"].suit,
+            by_name["Happily Ever After"].number) == ("cups", 10)
     assert (by_name["Tragic Poet"].suit,
             by_name["Tragic Poet"].number) == ("cups", 11)
+    assert (by_name["Thassa, God of the Sea"].suit,
+            by_name["Thassa, God of the Sea"].number) == ("cups", 13)
     assert (by_name["Sword of Truth and Justice"].suit,
             by_name["Sword of Truth and Justice"].number) == ("swords", 1)
+    assert (by_name["Curse of the Pierced Heart"].suit,
+            by_name["Curse of the Pierced Heart"].number) == ("swords", 3)
+    assert (by_name["Startled Awake // Persistent Nightmare"].suit,
+            by_name["Startled Awake // Persistent Nightmare"].number) == (
+                "swords", 9)
+    assert (by_name["Murder"].suit,
+            by_name["Murder"].number) == ("swords", 10)
     assert (by_name["King Macar, the Gold-Cursed"].suit,
             by_name["King Macar, the Gold-Cursed"].number) == ("pentacles", 14)
+
+
+def test_a_double_faced_echo_is_captioned_by_its_front_face():
+    """Three echoes are DFCs, and the pool's name for the whole card is the
+    right thing in the reader's prompt and the wrong thing hand-set in 12px
+    small caps under a 1909 plate. `face_name` is the split, and it is on
+    the wire because the CLI and the table must caption a card the same
+    way -- a second `split(' // ')` in TypeScript would be the same
+    decision made twice, and would disagree the day one of them changed."""
+    by_name = {c.name: c for c in tarot.ECHOES}
+    assert by_name["Murderous Rider // Swift End"].face_name == (
+        "Murderous Rider")
+    assert by_name["Chalice of Life // Chalice of Death"].face_name == (
+        "Chalice of Life")
+    assert by_name["Startled Awake // Persistent Nightmare"].face_name == (
+        "Startled Awake")
+    # A single-faced card is its own caption, which is what lets the client
+    # render `face_name` unconditionally.
+    for card in tarot.FULL_DECK:
+        assert card.as_dict()["face_name"] == card.name.split(" // ")[0]
+    assert tarot.BY_KEY["13-death"].face_name == "Death"
+
+
+def test_describe_keeps_the_whole_card_name():
+    """The other half of the same decision: `describe` names the card the
+    pool names, because on a DFC the second half is half the resonance --
+    Swift End is why Murderous Rider answers to Death at all."""
+    seed = next(s for s in range(4000)
+                if any(d.card.name.startswith("Murderous Rider")
+                       for d in tarot.deal(s).cards))
+    assert "Murderous Rider // Swift End" in tarot.deal(seed).describe()
 
 
 def test_one_echo_per_original_at_most():
