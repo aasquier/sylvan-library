@@ -1500,6 +1500,61 @@ arc; this is what the next few sessions actually do.
     sphere is the one subject a chroma matte *cannot* cut out, since the
     whole subject is the background seen through it.
 
+    **PR 3 is part-built on `tarot-fish-stand`.** Aaron's verdict on the
+    drawn brass was blunt and correct — asked whether it looked photo-real,
+    the answer was no, and the argument for it ("a cradle is turned
+    geometry, which is what SVG is good at") was a rationalisation for not
+    doing the harder half. A photographed sphere on a vector stand is worse
+    than an all-drawn ball, because the sphere sets a standard of realism
+    the stand cannot meet and the eye goes to the seam.
+
+    So the stand is now **the Met's own crystal ball on a bronze stand in
+    the shape of a fish** — a carp leaping through waves with the sphere
+    held in a spray of foam, museum open access, CC0. Aaron picked it off a
+    board of six and chose the **sepia** grade off a board of four. The
+    decisive property is that sphere and stand come from ONE photograph:
+    one light, one shadow, one set of material responses, and no
+    compositing mismatch to manage. It also deletes the problem three
+    passes went into — the ball does not need to be made to *sit in* the
+    ring, because in the photograph it already does.
+
+    Two animist ops were built for it, both tested and committed.
+    **`matte_backdrop`** cuts a subject off a studio ground by flooding
+    inward from the frame edges, because on these plates the bronze is
+    darker than the ground while the crystal is brighter and no single
+    threshold keeps both; what separates subject from ground is
+    connectivity, not brightness. Its `soft` ramp exists because what
+    survived a hard cut was not backdrop but the object's own **cast
+    shadow** (143-167 against a ground of 192), and `enclosed: drop` runs
+    the flood first and only then removes unreachable pockets — the studio
+    grey framed inside the arch of the wave, which on a table reads as a
+    hole cut in the felt. **`duotone`** maps luminance onto a three-stop
+    ramp, the still sibling of `color_ramp`; a monochrome museum plate has
+    no hue to preserve, and bronze is close to the ideal subject, being
+    genuinely one hue with luminance variation.
+
+    The assets are built and verified: `crystal-fish.webp` and
+    `crystal-shell-sepia.webp` (the same quartz through the fish's own
+    ramp — two photographs on one table have to share a plate, or the glass
+    reads as pasted onto the bronze, which it visibly did). **The geometry
+    is recorded in the recipe** because no image can carry it: in the
+    700x950 asset the foam closes at y=290 and its centre is x=529, and the
+    ball is drawn at r=265 with its centre **0.88 radii above the claw
+    line** — Aaron's number, off a board of four, because at 0.62 the claws
+    crossed the ball's belly and it read as impaled.
+
+    **What is left on that branch:** the component swap (the fish replaces
+    the drawn cradle, the orb becomes an absolutely positioned layer that
+    may overhang the stand's box), and two nits — the shell's dark navy
+    fresnel rim reads as a drawn stroke against warm bronze, and the ball
+    wants centring in its frame.
+
+    **Then, from Aaron's brief and not yet started:** candles that drip wax
+    and flicker (a CC0 candle plate through the same matte, plus a flame
+    loop), more smoke, and **a felt table with the card positions laid out
+    around the ball** — that last one reframes the whole table rather than
+    adjusting the ball, so it is its own PR.
+
     **Still to come, in order:** the
     reader-as-artist proposal (the spread, flavor text and art crops as
     real evidence in the commander pick, pool-resolved as ever); an ADR

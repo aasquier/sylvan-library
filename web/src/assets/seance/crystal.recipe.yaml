@@ -32,6 +32,22 @@ why_committed: >
   making.
 
 sources:
+  # The Met's own crystal ball on a bronze stand in the shape of a fish
+  # (Aaron chose it, 2026-08-17, from a board of six). Museum open access,
+  # so the plate is CC0, and it solves the problem the drawn cradle never
+  # could: the sphere and its stand come from ONE photograph, with one
+  # light, one shadow and one set of material responses. Our own quartz
+  # replaces the Met's sphere in the claws -- the composite the app builds
+  # is the fish photograph over the glass, so the bronze foam closes in
+  # FRONT of the ball and it reads as held rather than balanced.
+  fish:
+    provider: openverse
+    identifier: 36e20fe8-8084-44f9-8036-fe1da5b3256c
+    title: "Crystal Ball on a Bronze Stand in the Shape of a Fish"
+    landing: https://www.rawpixel.com/image/8194602/crystal-ball-bronze-stand-the-shape-fish
+    found_via: "Openverse with a license=cc0 filter, searching `crystal ball stand`"
+    licence: CC0-1.0
+
   orb:
     provider: openverse
     identifier: 6c8678e6-c6d5-4f94-bfe9-8eeef47814ba
@@ -60,6 +76,47 @@ sources:
     licence: ours-generated
 
 outputs:
+  # THE GEOMETRY THE APP NEEDS, measured off this output and recorded here
+  # because nothing in the file can carry it: in the 700x950 asset the
+  # bronze foam closes at y=290 (0.3053 of the height) and its centre is
+  # x=529 (0.7557 of the width). The ball is drawn at r=265 (0.3786 of the
+  # width) with its centre 0.88 radii ABOVE the claw line -- 0.88 is
+  # Aaron's, off a board of four: at 0.62 the claws crossed the ball's
+  # belly and it read as impaled, and past 0.96 it floats. The ball
+  # deliberately overhangs this asset's box, which is free because the orb
+  # is an absolutely positioned layer.
+  - file: crystal-fish.webp
+    from: fish
+    ops:
+      # The object, dropping the museum label band along the bottom.
+      - crop: {frac_box: [0.0393, 0.0244, 0.9567, 0.9521]}
+      # `soft` is doing the real work: what survives a hard threshold here
+      # is not backdrop but the object's own cast shadow (143-167 against a
+      # ground of 192), and no single cut spares the bronze while taking
+      # the shadow. The ramp fades it out instead. `enclosed: drop` kills
+      # the studio grey framed inside the arch of the wave, which would
+      # otherwise read as a hole cut in the felt.
+      - matte_backdrop: {tolerance: 34, soft: 40, border: 2, enclosed: drop}
+      - duotone: {shadow: "#261a0e", mid: "#8c6e44", light: "#faf0d0"}
+      - resize: {width: 700}
+    encode: {format: webp, quality: 88}
+    expect: {width: 700, height: 950, budget_kb: 260, metadata: none}
+
+  # The same quartz as `crystal-shell.webp`, graded through the fish's own
+  # ramp. Two photographs on one table have to share a plate or the glass
+  # reads as pasted onto the bronze -- which it visibly did before this
+  # existed. Kept as a second file rather than a changed one so the violet
+  # ball still works while the fish is being wired up.
+  - file: crystal-shell-sepia.webp
+    from: orb
+    ops:
+      - crop: {frac_box: [0.2588, 0.0571, 0.7510, 0.7950]}
+      - mask_circle: {cx: 0.5, cy: 0.5, r: 0.482, feather: 2.0}
+      - duotone: {shadow: "#241a12", mid: "#8e7a5e", light: "#f6ecd6"}
+      - resize: {width: 640}
+    encode: {format: webp, quality: 86}
+    expect: {width: 640, height: 640, budget_kb: 120, metadata: none}
+
   - file: crystal-shell.webp
     from: orb
     ops:
