@@ -537,12 +537,29 @@ export interface Account {
   /** "active" | "invited" | "no password" | "disabled" — four real states. */
   state: string
   sessions: number
+  /** Which Claude answers this account. Always a key the server still knows:
+   *  a row holding a tier this build has forgotten reports the one it will
+   *  actually be answered by, never the stale string. */
+  model_tier: string
+}
+
+/** One model tier, as the Admin page offers it. No model id — commandment 10,
+ *  and the reason the roster is served rather than written in TypeScript. */
+export interface ModelTier {
+  key: string
+  label: string
+  blurb: string
 }
 
 export interface AccountList {
   users: Account[]
   /** Admins who can actually sign in. The last one cannot be demoted. */
   admins: number
+  /** The tiers this instance knows, in the order it wants them shown. Served
+   *  rather than hard-coded here so the page can only offer what the server
+   *  will accept — a second list in TypeScript would drift the day one is
+   *  added, and the drift would present as a control that 422s. */
+  tiers: ModelTier[]
 }
 
 /** `GET /api/admin/stats/system` — the process and the box, self-reported.
@@ -1790,7 +1807,9 @@ export const api = {
   // One route for both levers, and both refusals come from the server: the
   // last admin who can sign in cannot be demoted or disabled, and the answer
   // is a 409 rather than a silent no-op.
-  updateAccount: (username: string, body: { is_admin?: boolean; disabled?: boolean }) =>
+  updateAccount: (username: string,
+                  body: { is_admin?: boolean; disabled?: boolean
+                          model_tier?: string | null }) =>
     send<Account>('PATCH', `/api/admin/users/${encodeURIComponent(username)}`, body),
   // The only thing an admin may do about a forgotten password. ADR 16 is
   // unconditional that nobody chooses a password for anybody else.

@@ -252,6 +252,7 @@ def _server_results(content: Any) -> tuple[list[dict[str, Any]], list[str]]:
 
 def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
              source: DeckSource | None = None,
+             tier: str | None = None,
              max_turns: int = MAX_TOOL_TURNS,
              on_turn: Callable[[int, int], None] | None = None) -> Turn:
     """Run `mode` over `messages` until it stops asking for tools.
@@ -269,8 +270,17 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
     finishes on turn four of eight jumps straight to done, which `jobs.submit`
     already squares up. Anything more truthful would need to know in advance
     how many searches the model was going to run.
+
+    `tier` is the asking account's model grant (`tiers.py`), resolved **once**
+    here rather than per turn: a conversation that changed model halfway would
+    throw away its prompt cache -- caches are model-scoped -- and would put two
+    models' answers in one transcript. `None` is every account by default and
+    means the house model. A background job captures the tier at plan time, the
+    way it captures a `DeckSource`, because a job outlives the request that
+    knew who was asking.
     """
     con = client.connect()
+    answering = client.model(tier)
     schemas = mode.schemas()
     output_config: dict[str, Any] = {"effort": mode.effort}
     if mode.response_schema is not None:
@@ -319,7 +329,7 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
         # never sees it.
         extra: dict[str, Any] = {"container": container} if container else {}
         resp = con.messages.create(
-            model=client.model(),
+            model=answering,
             max_tokens=mode.max_tokens,
             **extra,
             # A cache breakpoint on the system block caches the tools and the
@@ -427,7 +437,12 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
             marked["cache_control"] = {"type": "ephemeral"}
         history.append({"role": "user", "content": results})
 
-    ledger.record(mode=mode.name, model=client.model(),
+    # `answering` — what was *asked for* — rather than a served-by value,
+    # because this path has no final response to read one off. Every other
+    # ledger row carries `resp.model`; this is the one that cannot, and a row
+    # that named the house model while a tiered seat ran up the bill would
+    # misattribute exactly the spend the tiers were added to make visible.
+    ledger.record(mode=mode.name, model=answering,
                   stop_reason="exhausted", requests=requests,
                   input_tokens=tokens_in, output_tokens=tokens_out,
                   cache_read_tokens=tokens_cached)

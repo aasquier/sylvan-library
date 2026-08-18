@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 // stays because `ClaudePanel` takes one as a prop.
 import {
   api, errorMessage, type Account, type AccountList, type AdminClaude,
+  type ModelTier,
 } from '../lib/api'
 import { Badge, ErrorNote, PageMasthead, Spinner } from '../components/ui'
 import { EditsChart, TrafficChart } from '../components/charts'
@@ -661,16 +662,54 @@ function InviteForm({ onInvited, onError }: {
   )
 }
 
-function AccountRow({ account, lastAdmin, isSelf, onChanged, onNote, onError }: {
+/**
+ * Which Claude answers one account (punch list 2026-08-18 item 1).
+ *
+ * A `<select>` and not the `.btn` family, deliberately: this is a choice among
+ * three named things rather than an action, which is what commandment 17's own
+ * carve-out for `.chip-toggle` and `.strip-tab` is about — controls that are
+ * places, not verbs. It still answers the hand, through `.tier-select`.
+ *
+ * The options come from the server (`AccountList.tiers`), so the page can only
+ * offer what the server will accept. The blurb rides as the `title`, which is
+ * where prose belongs on a control this narrow — the maintainer choosing gets
+ * the argument on hover, and the table stays a table.
+ */
+function TierPicker({ account, tiers, busy, onPick }: {
+  account: Account
+  tiers: ModelTier[]
+  busy: boolean
+  onPick: (tier: string) => void
+}) {
+  const chosen = tiers.find((t) => t.key === account.model_tier)
+  return (
+    <select className="tier-select rounded-md px-2 py-1 text-xs"
+            value={account.model_tier}
+            disabled={busy || tiers.length === 0}
+            title={chosen?.blurb ?? 'Which Claude answers this account.'}
+            aria-label={`Which Claude answers ${account.username}`}
+            onChange={(e) => onPick(e.target.value)}>
+      {tiers.map((tier) => (
+        <option key={tier.key} value={tier.key}>{tier.label}</option>
+      ))}
+    </select>
+  )
+}
+
+function AccountRow({ account, lastAdmin, isSelf, tiers,
+                     onChanged, onNote, onError }: {
   account: Account
   /** True when this is the only admin who can sign in. */
   lastAdmin: boolean
   /** True when this row is the account the caller is signed in as. */
   isSelf: boolean
+  /** The tiers this instance knows, served rather than written here. */
+  tiers: ModelTier[]
   onChanged: () => Promise<void>
   onNote: (message: string) => void
   onError: (message: string) => void
 }) {
+  const [tierBusy, setTierBusy] = useState(false)
   async function run(work: () => Promise<string>) {
     try {
       onNote(await work())
@@ -679,6 +718,7 @@ function AccountRow({ account, lastAdmin, isSelf, onChanged, onNote, onError }: 
       onError(errorMessage(e))
     }
   }
+
 
   const protection = lastAdmin
     ? 'The only admin who can sign in. Promote somebody else first.'
@@ -701,6 +741,19 @@ function AccountRow({ account, lastAdmin, isSelf, onChanged, onNote, onError }: 
       <td className="py-2 pr-4 text-xs tabular-nums"
           style={{ color: 'var(--text-muted)' }}>
         {account.sessions}
+      </td>
+      <td className="py-2 pr-4">
+        <TierPicker account={account} tiers={tiers} busy={tierBusy}
+                    onPick={(tier) => {
+                      setTierBusy(true)
+                      void run(async () => {
+                        const next = await api.updateAccount(
+                          account.username, { model_tier: tier })
+                        const label = tiers.find((t) => t.key === next.model_tier)
+                        return `${next.username} is answered by `
+                             + `${label?.label ?? next.model_tier}.`
+                      }).finally(() => setTierBusy(false))
+                    }} />
       </td>
       <td className="py-2">
         <div className="flex flex-wrap gap-1.5">
@@ -905,6 +958,7 @@ export default function Admin() {
                     <th className="pb-2 pr-4 font-medium">Email</th>
                     <th className="pb-2 pr-4 font-medium">State</th>
                     <th className="pb-2 pr-4 font-medium">Sessions</th>
+                    <th className="pb-2 pr-4 font-medium">Answered by</th>
                     <th className="pb-2 font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -916,6 +970,7 @@ export default function Admin() {
                       lastAdmin={data.admins === 1 && account.is_admin
                         && account.state === 'active'}
                       isSelf={me !== null && me === account.username}
+                      tiers={data.tiers ?? []}
                       onChanged={load}
                       onNote={report}
                       onError={complain}

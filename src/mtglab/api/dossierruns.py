@@ -65,6 +65,7 @@ KIND = "claude.dossier"
 
 
 def plan_dossier(*, slug: str, requested: Any = None, refresh: bool = False,
+                 tier: str | None = None,
                  source: DeckSource | None = None) -> Plan:
     """Refuse now if it is refusable; otherwise hand back the work.
 
@@ -76,7 +77,7 @@ def plan_dossier(*, slug: str, requested: Any = None, refresh: bool = False,
     from mtglab.claude import dossier
     from mtglab.claude.modes import ModeExhausted
 
-    request = dossier.check_dossier(slug, requested=requested,
+    request = dossier.check_dossier(slug, requested=requested, tier=tier,
                                     refresh=refresh, source=source)
     label = f"dossier: {request.commander}"
 

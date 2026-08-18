@@ -56,6 +56,13 @@ class UserScope:
     username: str | None = None
     is_admin: bool = False
     authenticated: bool = False
+    #: Which Claude answers this caller (`claude/tiers.py`), or `None` for the
+    #: house model — which is every account until a maintainer says otherwise,
+    #: and is also what an unauthenticated caller and the local single-user app
+    #: get. It belongs on the scope for the same reason `is_admin` does: it is
+    #: a fact about the caller that a handler is allowed to know and that must
+    #: be read fresh per request rather than captured anywhere longer-lived.
+    model_tier: str | None = None
 
 
 # Auth off: one person, on their own machine, holding the file the app reads.

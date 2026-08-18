@@ -116,7 +116,11 @@ def scripted(monkeypatch):
     def install(script: list[_Response]) -> _Client:
         stub = _Client(script)
         monkeypatch.setattr(client, "connect", lambda: stub)
-        monkeypatch.setattr(client, "model", lambda: "claude-sonnet-5")
+        # Takes the tier `converse` now resolves through it, and ignores it:
+        # what the tier resolves *to* is `tests/test_claude_tiers.py`'s
+        # business, and these cases are about the loop around the call.
+        monkeypatch.setattr(client, "model",
+                            lambda tier=None: "claude-sonnet-5")
         return stub
     return install
 

@@ -36,7 +36,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+# `claude.tiers` is a pure table — a dataclass and three lookups, no SDK and no
+# network — which is what makes it importable here. `auth/` must stay usable on
+# a box with no web server and no `claude` extra installed (`mtglab users` is
+# the bootstrap path on a fresh volume), and that module costs it nothing. The
+# table lives there rather than here because a tier is a Claude concept that
+# accounts happen to carry, not an account concept Claude happens to read.
 from mtglab.auth import passwords
+from mtglab.claude import tiers
 
 # Deliberately narrow. A username is a login handle, not a display name -- it
 # ends up in URLs, log lines and `mtglab users list` output, and the set of
@@ -122,6 +129,15 @@ class User:
     is_admin: bool
     disabled_at: datetime | None
     created_at: datetime
+    #: Which Claude answers this account (`claude/tiers.py`). `None` is the
+    #: ordinary case and means the house default — stored as NULL rather than
+    #: as the default's key so that changing which tier is the default never
+    #: means rewriting every row that never asked for anything.
+    #:
+    #: Unlike `email` this is **not** withheld from `as_dict`: a tier is a
+    #: fact about the instance's spending, not about a person, and the account
+    #: it belongs to already knows which Claude answered it.
+    model_tier: str | None = None
 
     @property
     def disabled(self) -> bool:
@@ -148,8 +164,25 @@ class User:
             "is_admin": self.is_admin,
             "disabled": self.disabled,
             "created_at": self.created_at.isoformat(),
+            # The *key*, resolved through `tiers.get` so a row holding a tier
+            # this build no longer knows about reports the tier it will
+            # actually be answered by rather than the string in the column.
+            # A screen showing `opus` for an account served Sonnet would be a
+            # lie of exactly the kind ADR 18's cached-number rule forbids.
+            "model_tier": tiers.get(self.model_tier).key,
         }
         return {**body, "email": self.email} if include_email else body
+
+
+def _columns(row: sqlite3.Row) -> frozenset[str]:
+    """The column names a row actually carries.
+
+    Its own function because `row.keys()` reads like a dict method and is not
+    one — it is a list, so `in` over it is a scan, and a linter will rightly
+    complain about `.keys()` on something dict-shaped. Both problems go away
+    behind a name that says what the call is for.
+    """
+    return frozenset(row.keys())
 
 
 def _row_to_user(row: sqlite3.Row) -> User:
@@ -161,6 +194,13 @@ def _row_to_user(row: sqlite3.Row) -> User:
         disabled_at=datetime.fromisoformat(row["disabled_at"])
         if row["disabled_at"] else None,
         created_at=datetime.fromisoformat(row["created_at"]),
+        # `SELECT *` against a database migrated to v10 or later. Probed from
+        # the cursor description rather than indexed directly, so that a row
+        # assembled by a test fixture from an older schema still builds a
+        # `User` — the same tolerance the column itself has for an unknown
+        # value, one layer down.
+        model_tier=(row["model_tier"]
+                    if "model_tier" in _columns(row) else None),
     )
 
 
@@ -432,6 +472,41 @@ def set_admin(con: sqlite3.Connection, user_id: int, is_admin: bool) -> None:
             _refuse_if_last_admin(con, user_id, "revoke admin")
         cur = con.execute("UPDATE users SET is_admin = ? WHERE id = ?",
                           (int(is_admin), user_id))
+        if cur.rowcount == 0:
+            raise NoSuchUser(str(user_id))
+
+
+class UnknownTier(ValueError):
+    """Raised rather than writing a tier key nothing resolves.
+
+    The read path deliberately tolerates an unknown key — a stale value in the
+    column resolves to the default instead of erroring, which is what makes a
+    rolled-back deploy survivable (`claude/tiers.py`). The write path must not
+    inherit that tolerance, or the next typo in a route silently grants a tier
+    that does not exist and reads on the Admin page as the ordinary one.
+    """
+
+
+def set_model_tier(con: sqlite3.Connection, user_id: int,
+                   tier: str | None) -> None:
+    """Choose which Claude answers this account. `None` restores the default.
+
+    No `LastAdmin`-style guard, because there is nothing to lock anybody out
+    of: every tier can hold a conversation, and the worst outcome of the worst
+    value here is a cheaper answer. Sessions are not revoked for the same
+    reason `set_admin` does not revoke them — the tier is read fresh per call.
+
+    Stored as NULL rather than as the default's key when `tier` is `None` or
+    already the default: one representation for "nobody has chosen anything",
+    so changing which tier is the default never means rewriting rows.
+    """
+    if tier is not None and not tiers.known(tier):
+        raise UnknownTier(tier)
+    if tier == tiers.DEFAULT_TIER:
+        tier = None
+    with _exclusive(con):
+        cur = con.execute("UPDATE users SET model_tier = ? WHERE id = ?",
+                          (tier, user_id))
         if cur.rowcount == 0:
             raise NoSuchUser(str(user_id))
 

@@ -62,7 +62,8 @@ KIND = "claude.research"
 LABEL_CHARS = 60
 
 
-def plan_research(*, question: Any, requested: Any = None) -> Plan:
+def plan_research(*, question: Any, requested: Any = None,
+                  tier: str | None = None) -> Plan:
     """Refuse now if it is refusable; otherwise hand back the work.
 
     Raises `QuestionRejected` and `ClaudeUnavailable` to the caller, which is
@@ -73,7 +74,7 @@ def plan_research(*, question: Any, requested: Any = None) -> Plan:
     from mtglab.claude import research
     from mtglab.claude.modes import ModeExhausted
 
-    request = research.check_research(question, requested=requested)
+    request = research.check_research(question, requested=requested, tier=tier)
 
     short = request.question[:LABEL_CHARS]
     if len(request.question) > LABEL_CHARS:

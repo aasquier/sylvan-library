@@ -36,6 +36,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from mtglab.claude import tiers
+
 # Aaron's call, argued in ADR 14 and recorded in ROADMAP: start on Sonnet and
 # find out whether it is enough, rather than paying for Opus on the assumption
 # that it is not. Most of what the modes will do is conversation over tool
@@ -45,6 +47,11 @@ from typing import Any
 # evidence, and the override below exists so that evidence can be gathered --
 # an A/B against a named model for one run -- not so a deployment can drift
 # onto a costlier default nobody chose.
+#
+# That rule held and still holds: this is the answer for every account nobody
+# has said otherwise about. What arrived 2026-08-18 is a *per-seat* grant on
+# top of it (`tiers.py`) -- Aaron's call, made deliberately and one account at
+# a time, which is the opposite of the drift the paragraph above forbids.
 MODEL = "claude-sonnet-5"
 
 _MODEL_ENV = "MTGLAB_CLAUDE_MODEL"
@@ -63,14 +70,30 @@ class ClaudeUnavailable(Exception):
     """
 
 
-def model() -> str:
-    """The model to call. `MODEL` unless deliberately overridden.
+def model(tier: str | None = None) -> str:
+    """The model to call: the environment's override, this tier's, or `MODEL`.
 
-    The override is for measuring Sonnet against something else on the same
-    prompt, which is the open question ADR 14 left. It is read at call time so
-    a comparison run is one environment variable rather than an edit.
+    Three sources, and the precedence between them is the decision:
+
+    1. **`MTGLAB_CLAUDE_MODEL` wins over everything.** It is the A/B lever ADR
+       14 left for the open question, and an A/B whose answer depended on which
+       seat happened to ask would not be one. Setting it deliberately makes the
+       whole instance answer on one model for the duration.
+    2. **The account's tier**, when it has one (`tiers.py`, 2026-08-18). This
+       is the per-seat grant, and `None` — every account by default — falls
+       through.
+    3. **`MODEL`**, the house answer.
+
+    An unknown tier lands on the default rather than raising; `tiers.get` says
+    why. Read at call time throughout, so none of the three is captured at
+    import by a module that outlives the request.
     """
-    return os.environ.get(_MODEL_ENV) or MODEL
+    override = os.environ.get(_MODEL_ENV)
+    if override:
+        return override
+    if tier is not None:
+        return tiers.resolve(tier)
+    return MODEL
 
 
 def sdk_installed() -> bool:

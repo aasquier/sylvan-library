@@ -1230,7 +1230,8 @@ class ClaudeFailed(Exception):
 
 def claude_interview(*, slug: str, card: str, requested: Any = None,
                      focus: str = "",
-                     source: DeckSource | None = None) -> dict[str, Any]:
+                     source: DeckSource | None = None,
+                     tier: str | None = None) -> dict[str, Any]:
     """Ask the rationale interview about one card. Returns questions.
 
     The whole of this project's Claude surface, so far. It reads the deck, the
@@ -1243,7 +1244,8 @@ def claude_interview(*, slug: str, card: str, requested: Any = None,
     from mtglab.claude.modes import ModeExhausted
 
     try:
-        return ask(slug, card, requested=requested, focus=focus, source=source)
+        return ask(slug, card, requested=requested, focus=focus,
+                   source=source, tier=tier)
     except (claude_client.ClaudeUnavailable, CardNotInDeck, DeckNotFound):
         # Answerable by the caller, and each maps to its own status code.
         raise
@@ -1259,7 +1261,8 @@ def claude_interview(*, slug: str, card: str, requested: Any = None,
 
 def claude_argue(*, slug: str, card: str, requested: Any = None,
                  focus: str = "",
-                 source: DeckSource | None = None) -> dict[str, Any]:
+                 source: DeckSource | None = None,
+                 tier: str | None = None) -> dict[str, Any]:
     """Make the case against one card's slot (ADR 25). Returns charges.
 
     The interview's sibling and deliberately its twin: same arguments, same
@@ -1273,7 +1276,8 @@ def claude_argue(*, slug: str, card: str, requested: Any = None,
     from mtglab.claude.modes import ModeExhausted
 
     try:
-        return ask(slug, card, requested=requested, focus=focus, source=source)
+        return ask(slug, card, requested=requested, focus=focus,
+                   source=source, tier=tier)
     except (claude_client.ClaudeUnavailable, CardNotInDeck, DeckNotFound):
         # Answerable by the caller, and each maps to its own status code.
         raise

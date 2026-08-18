@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import tiny_pool
 from mtglab import config
-from mtglab.claude import client, dossier, modes, stance, tools
+from mtglab.claude import client, dossier, modes, stance, tiers, tools
 from mtglab.decks.model import Deck
 from mtglab.decks.source import MemoryDeckSource
 
@@ -379,8 +379,31 @@ def test_editing_the_prompt_invalidates_stored_dossiers(monkeypatch):
 
 def test_changing_the_model_invalidates_them_too(monkeypatch):
     before = dossier.cache_key("abc")
-    monkeypatch.setattr(client, "model", lambda: "claude-opus-5")
+    monkeypatch.setattr(client, "model", lambda tier=None: "claude-opus-5")
     assert dossier.cache_key("abc") != before
+
+
+def test_two_tiers_do_not_share_a_commander_s_dossier():
+    """The same commander, two grants, two keys — and no monkeypatching.
+
+    This is the property that makes per-account model tiers safe next to a
+    cache the whole instance shares. A seat granted Opus must not be served the
+    text Sonnet wrote for somebody else, and must not overwrite it either; the
+    model id was already in the fingerprint, so the fix was to let the tier
+    reach it rather than to add a second key.
+
+    Written against the real `tiers` table rather than a stub, because what is
+    being pinned is that the tiers *resolve differently* — a table that
+    accidentally pointed two keys at one model would make this pass with a
+    stub and fail in production.
+    """
+    keys = {tier["key"]: dossier.cache_key("abc", tier["key"])
+            for tier in tiers.roster()}
+    assert len(set(keys.values())) == len(keys), keys
+    # And the default tier's key is the one an ungranted account already had,
+    # so turning tiers on does not orphan a single stored dossier.
+    assert keys[tiers.DEFAULT_TIER] == dossier.cache_key("abc")
+    assert keys[tiers.DEFAULT_TIER] == dossier.cache_key("abc", None)
 
 
 def test_a_dossier_round_trips_through_the_store(pool):
