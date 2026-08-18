@@ -116,7 +116,8 @@ describe('the nav', () => {
     renderApp()
     await screen.findByRole('link', { name: 'Laboratory' })
     for (const label of ['Library', 'Start a deck', 'Import', 'Card search',
-                         'Simulator', 'Laboratory', 'Learn', 'Accounts']) {
+                         'Simulator', 'Laboratory', 'Learn', 'About Claude',
+                         'Accounts']) {
       const title = screen.getByRole('link', { name: label }).getAttribute('title')
       expect(title, `${label} has no hint`).toBeTruthy()
     }
