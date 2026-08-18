@@ -84,7 +84,7 @@ export function AuthSubmit({ label, busyLabel, busy, disabled }: {
 /**
  * A statement of fact that is neither success nor failure.
  *
- * `ErrorNote` is red and the Accounts page's note is green; the reset endpoint's
+ * `ErrorNote` is red and the Admin page's note is green; the reset endpoint's
  * answer must be neither, because it says nothing about whether anything
  * happened. Rendering it as a success would be the UI asserting what ADR 16
  * built the endpoint not to say.

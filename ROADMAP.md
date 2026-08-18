@@ -1698,14 +1698,19 @@ arc; this is what the next few sessions actually do.
     its masthead and room, Simic argued as the site's own name said
     quietly, Kwain and Tatyova as live pool-fetched exhibit cases, and a
     four-painting gallery — Poole, Avon, Guay, McKinnon — every credit
-    looked up at writing time and pinned by test, never recalled).
+    looked up at writing time and pinned by test, never recalled); and
+    **the Admin tab** (Accounts renamed, wearing *Teferi's Protection* —
+    the steward's spell — plus an on-box dashboard: four read-only
+    `/api/admin/stats/*` views classified ADMIN in the isolation suite,
+    all facts the box can report without an external API or a new secret.
+    The ledger's tokens are labelled a floor on the bill in the payload
+    itself — the Anthropic dollar widget was dropped with Aaron
+    2026-08-18, his Console account is individual and the Usage & Cost
+    Admin API does not exist for those; the Console links out, a person
+    adds money. The job registry's view is `jobs.census()`, counts only,
+    because labels can name another person's deck).
 
     **Still to come, in order:**
-    the **Admin tab** (rename from Accounts + an on-box dashboard:
-    system/storage/claude/activity stats endpoints under `/api/admin/stats`,
-    the ledger's tokens honestly labelled a floor — the Anthropic dollar
-    widget was dropped with Aaron 2026-08-18, his Console account is
-    individual and the Usage & Cost Admin API does not exist for those);
     the **visitor ledger** (schema v9, `request_log` of route templates
     only — no IPs, no UAs — on its own watched branch); and **Fly metrics**
     (`FLY_METRICS_TOKEN` → managed Prometheus for machine + edge stats,

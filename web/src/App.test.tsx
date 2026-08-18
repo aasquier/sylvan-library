@@ -96,11 +96,11 @@ describe('with auth off', () => {
     expect(screen.queryByLabelText('Password')).toBeNull()
   })
 
-  it('still offers the Accounts page, because the local caller is the admin', async () => {
+  it('still offers the Admin page, because the local caller is the admin', async () => {
     renderApp()
     // `is_admin` is true with auth off — there is nobody else for it to be
     // true relative to — so `mtglab users` as a page keeps working on a laptop.
-    expect(await screen.findByText('Accounts')).toBeTruthy()
+    expect(await screen.findByText('Admin')).toBeTruthy()
   })
 })
 
@@ -117,7 +117,7 @@ describe('the nav', () => {
     await screen.findByRole('link', { name: 'Laboratory' })
     for (const label of ['Library', 'Start a deck', 'Import', 'Card search',
                          'Simulator', 'Laboratory', 'Learn', 'About Claude',
-                         'Accounts']) {
+                         'Admin']) {
       const title = screen.getByRole('link', { name: label }).getAttribute('title')
       expect(title, `${label} has no hint`).toBeTruthy()
     }
@@ -261,9 +261,9 @@ describe('with auth on and somebody signed in', () => {
 
     expect(screen.getByText('Start a deck')).toBeTruthy()
     expect(screen.getByText('Import')).toBeTruthy()
-    // Accounts is a different question and still an admin's. ADR 17's prefix
+    // Admin is a different question and still an admin's. ADR 17's prefix
     // rule refuses `/api/admin` to everybody else before routing.
-    expect(screen.queryByText('Accounts')).toBeNull()
+    expect(screen.queryByText('Admin')).toBeNull()
   })
 
   it('signs out to the login screen', async () => {

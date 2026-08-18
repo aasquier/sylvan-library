@@ -273,6 +273,22 @@ def all_jobs(*, owner: int | None = None) -> list[Job]:
     return sorted(mine, key=lambda j: j.created_at, reverse=True)
 
 
+def census() -> dict[str, int]:
+    """How many jobs the registry holds, by status. Counts and nothing else.
+
+    The admin dashboard's view of this registry, and deliberately the only
+    cross-owner one: `get` and `all_jobs` scope to an owner because a job's
+    label can name another person's deck, and administering the instance
+    (ADR 17) is about load, not about reading anybody's work. Counts cannot
+    carry a name.
+    """
+    with _LOCK:
+        counts: dict[str, int] = {}
+        for job in _JOBS.values():
+            counts[job.status] = counts.get(job.status, 0) + 1
+    return counts
+
+
 def forget_owner(owner: int) -> int:
     """Drop every job belonging to one account. Returns how many went.
 

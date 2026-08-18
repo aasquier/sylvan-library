@@ -133,7 +133,7 @@ be undone. `delete` exists for the one thing disabling cannot do — a disabled
 row still holds its `username` and `email`, both `UNIQUE`, so **an address
 cannot be invited again until the account is gone.** It asks for the username
 to be typed back (`--yes` for scripts), and it will delete the account you are
-using, which the Accounts page deliberately refuses to do.
+using, which the Admin page deliberately refuses to do.
 
 The invitee follows the link and sets their own password. Password reset is the
 same token machinery behind a second entry point — one implementation, because
@@ -974,7 +974,7 @@ they once looked like — both cascade. It is for releasing a `username` or an
 `email` so it can be invited again, which is the one thing disabling cannot do.)
 
 Everyone else gets an invite rather than an account you made a password for
-(ADR 16) — `mtglab users invite <email>`, or the Accounts page once you are in.
+(ADR 16) — `mtglab users invite <email>`, or the Admin page once you are in.
 Note that neither the CLI nor that page will demote or disable the last admin
 who can sign in; to hand the instance over, promote the successor first.
 
@@ -1556,7 +1556,7 @@ unticked box below is an open question, not a blocker that was ignored.
       non-admin before routing; `tests/test_isolation.py` has a fourth
       classification that is checked against that prefix in both directions and
       sweeps every admin route with a logged-in non-admin, expecting **403**.
-      The Accounts page does what `mtglab users` does, and as of the login
+      The Admin page does what `mtglab users` does, and as of the login
       screen above it is reachable with auth on — which it was not on the day
       it shipped.
 - [x] **The maintainer is always an admin, on every instance.** All four parts,
@@ -1581,7 +1581,7 @@ unticked box below is an open question, not a blocker that was ignored.
         anything written later inherit it and two concurrent callers cannot
         walk through it together.
       - **A way to grant it after the fact.** `mtglab users promote|demote`,
-        and the Promote/Demote buttons on the Accounts page. `set_admin` had
+        and the Promote/Demote buttons on the Admin page. `set_admin` had
         had no caller at all.
       - **Recovery that does not depend on the app.** `mtglab users` over
         `fly ssh console` still, and now a second path that needs no shell: fix

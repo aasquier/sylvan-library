@@ -446,3 +446,33 @@ describe('deck URLs', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/decks/a%20b/c%2Fd')
   })
 })
+
+/**
+ * The admin stats URLs. Same argument as the deck URLs above: `Admin.tsx`
+ * mocks `api`, so its tests pass whatever these functions actually fetch —
+ * and a stats call that drifted off `/api/admin/` would stop being refused
+ * to non-admins before routing (ADR 17), which no component test can see.
+ */
+describe('admin stats URLs', () => {
+  function capture() {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true, status: 200, json: async () => ({}),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('keeps all four views under the admin prefix', async () => {
+    const fetchMock = capture()
+    await api.adminSystem()
+    await api.adminStorage()
+    await api.adminClaude()
+    await api.adminActivity()
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+      '/api/admin/stats/system',
+      '/api/admin/stats/storage',
+      '/api/admin/stats/claude',
+      '/api/admin/stats/activity',
+    ])
+  })
+})

@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 
 import mtglab
 from mtglab import config
-from mtglab.api import admin, auth, jobs, service
+from mtglab.api import admin, adminstats, auth, jobs, service
 from mtglab.api.deps import Scope, UserScope, deck_source, library
 from mtglab.auth import bootstrap
 from mtglab.auth.mail import EmailSender
@@ -188,6 +188,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     auth.install(app, require=required, secure_cookies=secure,
                  email_sender=email_sender)
     admin.install(app, email_sender=email_sender)
+    adminstats.install(app)
 
     # Registered *after* auth.install on purpose: `add_middleware` prepends, so
     # the later registration is the outer layer and these headers land on the

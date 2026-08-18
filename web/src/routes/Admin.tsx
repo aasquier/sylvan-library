@@ -1,15 +1,28 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, errorMessage, type Account, type AccountList } from '../lib/api'
-import { Badge, ErrorNote, Spinner } from '../components/ui'
+import {
+  api, errorMessage, type Account, type AccountList, type AdminActivity,
+  type AdminClaude, type AdminStorage, type AdminSystem,
+} from '../lib/api'
+import { Badge, ErrorNote, PageMasthead, Spinner } from '../components/ui'
+import { EditsChart } from '../components/charts'
 
 /**
- * Accounts on this instance: who exists, who can sign in, and the four levers.
+ * Admin: the instance at a glance, and the account levers.
  *
- * `mtglab users` as a page, for the reason the deck editor is a page — a hosted
- * app whose administration is SSH-only is one the maintainer can only run from
- * a laptop with the key on it. The CLI stays regardless: it is the bootstrap
- * path on a fresh volume, the break-glass path when mail is misconfigured, and
- * the only path that still works when the thing that is broken is this page.
+ * Two halves. The dashboard on top is four read-only views of the box —
+ * system, storage, Claude's ledger, activity — refreshed every thirty
+ * seconds, each one a fact the process can report without an external API
+ * or a new secret (`api/adminstats.py` says what was deliberately left
+ * out, the dollar figure first among them). The accounts table below is
+ * `mtglab users` as a page, unchanged by the rename: who exists, who can
+ * sign in, and the four levers.
+ *
+ * The page is a page for the reason the deck editor is one — a hosted
+ * app whose administration is SSH-only is one the maintainer can only run
+ * from a laptop with the key on it. The CLI stays regardless: it is the
+ * bootstrap path on a fresh volume, the break-glass path when mail is
+ * misconfigured, and the only path that still works when the thing that is
+ * broken is this page.
  *
  * Nothing here is the protection. Every route it calls is refused to a
  * non-admin by the middleware before routing (ADR 17); the nav hides this page
@@ -38,6 +51,259 @@ const STATE_TONE: Record<string, 'good' | 'warning' | 'critical' | 'neutral'> = 
   invited: 'neutral',
   'no password': 'warning',
   disabled: 'critical',
+}
+
+/** Teferi's Protection, Minttu Hynninen, Strixhaven Mystical Archive (2021)
+ *  — the steward raising a ward over everything he owns while the swarm
+ *  arrives. Part of the Mystical Archive cycle the page mastheads share;
+ *  the argument is in `CardSearch.tsx`. Looked up on Scryfall, not
+ *  recalled. */
+const TEFERIS_PROTECTION_ART =
+  'https://cards.scryfall.io/art_crop/front/2/8/28e21c8c-5ad1-4830-8621-f0fd6500ca79.jpg'
+
+/** Bytes for a human, or an em-dash for "nothing there" — the storage
+ *  endpoint sends null for a store that does not exist yet, and `0 B`
+ *  would claim an empty file does. */
+function fmtBytes(n: number | null | undefined): string {
+  if (n === null || n === undefined) return '—'
+  const units = ['B', 'kB', 'MB', 'GB', 'TB']
+  let value = n
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  const label = units[unit] ?? 'TB'
+  return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${label}`
+}
+
+function StatTile({ label, value, hint }: {
+  label: string
+  value: React.ReactNode
+  /** One clause of context under the number — units, window, caveat. */
+  hint?: React.ReactNode
+}) {
+  return (
+    <div className="card-surface rounded-xl px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wide"
+         style={{ color: 'var(--text-muted)' }}>
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
+      {hint && (
+        <p className="mt-0.5 text-[11px] leading-relaxed"
+           style={{ color: 'var(--text-muted)' }}>
+          {hint}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** The three ledger windows, offered as chips. `all` is the honest default
+ *  on an instance young enough that a month is its whole history. */
+const WINDOWS = [
+  { key: 'week', label: '7 days' },
+  { key: 'month', label: '30 days' },
+  { key: 'all', label: 'All time' },
+] as const
+type WindowKey = (typeof WINDOWS)[number]['key']
+
+function ClaudePanel({ claude }: { claude: AdminClaude }) {
+  // `span`, not `window`: shadowing the global in a file that also calls
+  // `window.setInterval` is a bug that reads as a typo.
+  const [span, setSpan] = useState<WindowKey>('month')
+  const rows = claude.windows[span]
+  return (
+    <div className="card-surface rounded-xl p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold tracking-tight">
+          Where Claude’s tokens went
+        </h2>
+        <div className="flex gap-1">
+          {WINDOWS.map((w) => (
+            <button key={w.key} type="button"
+                    onClick={() => setSpan(w.key)}
+                    className={`chip-toggle rounded-md px-2.5 py-1 text-xs font-medium${
+                      span === w.key ? ' is-on' : ''}`}>
+              {w.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+          No conversations recorded in this window.
+        </p>
+      ) : (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[34rem] text-left text-sm">
+            <thead>
+              <tr className="text-[11px] uppercase tracking-wide"
+                  style={{ color: 'var(--text-muted)' }}>
+                <th className="pb-2 pr-4 font-medium">Mode</th>
+                <th className="pb-2 pr-4 font-medium">Conversations</th>
+                <th className="pb-2 pr-4 font-medium">Requests</th>
+                <th className="pb-2 pr-4 font-medium">Tokens in</th>
+                <th className="pb-2 pr-4 font-medium">Tokens out</th>
+                <th className="pb-2 font-medium">Cache reads</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.mode} style={{ borderTop: '1px solid var(--hairline)' }}>
+                  <td className="py-1.5 pr-4 font-medium">{row.mode}</td>
+                  <td className="py-1.5 pr-4 tabular-nums">{row.conversations.toLocaleString()}</td>
+                  <td className="py-1.5 pr-4 tabular-nums">{row.requests.toLocaleString()}</td>
+                  <td className="py-1.5 pr-4 tabular-nums">{row.input_tokens.toLocaleString()}</td>
+                  <td className="py-1.5 pr-4 tabular-nums">{row.output_tokens.toLocaleString()}</td>
+                  <td className="py-1.5 tabular-nums">{row.cache_read_tokens.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="mt-3 text-[11px] leading-relaxed"
+         style={{ color: 'var(--text-muted)' }}>
+        {claude.caveat}{' '}
+        The{' '}
+        <a href="https://console.anthropic.com/settings/usage"
+           target="_blank" rel="noreferrer"
+           className="underline decoration-dotted">
+          Console’s usage page
+        </a>{' '}
+        has the billed truth, and{' '}
+        <a href="https://console.anthropic.com/settings/billing"
+           target="_blank" rel="noreferrer"
+           className="underline decoration-dotted">
+          billing
+        </a>{' '}
+        is where money is added — by a person, never by this page.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * The dashboard: four views, fetched together, refreshed every thirty
+ * seconds. `Promise.allSettled` rather than `all`, so one failing view
+ * costs its own tiles and not the whole glance; a view that has never
+ * answered renders em-dashes rather than zeros.
+ */
+function Dashboard() {
+  const [system, setSystem] = useState<AdminSystem | null>(null)
+  const [storage, setStorage] = useState<AdminStorage | null>(null)
+  const [claude, setClaude] = useState<AdminClaude | null>(null)
+  const [activity, setActivity] = useState<AdminActivity | null>(null)
+
+  const refresh = useCallback(async () => {
+    const [sys, sto, cla, act] = await Promise.allSettled([
+      api.adminSystem(), api.adminStorage(),
+      api.adminClaude(), api.adminActivity(),
+    ])
+    if (sys.status === 'fulfilled') setSystem(sys.value)
+    if (sto.status === 'fulfilled') setStorage(sto.value)
+    if (cla.status === 'fulfilled') setClaude(cla.value)
+    if (act.status === 'fulfilled') setActivity(act.value)
+  }, [])
+
+  useEffect(() => {
+    void refresh()
+    const id = window.setInterval(() => { void refresh() }, 30_000)
+    return () => window.clearInterval(id)
+  }, [refresh])
+
+  const jobsLine = activity && Object.keys(activity.jobs).length > 0
+    ? Object.entries(activity.jobs)
+        .map(([status, count]) => `${count} ${status}`).join(' · ')
+    : 'none right now'
+
+  return (
+    <section className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatTile label="Process memory"
+                  value={system ? fmtBytes(system.process.bytes) : '—'}
+                  hint={system
+                    ? (system.process.kind === 'peak'
+                        ? 'peak since start — this machine cannot report a level'
+                        : 'resident, right now')
+                    : undefined} />
+        <StatTile label="Machine memory"
+                  value={system?.memory.total_bytes != null
+                    ? fmtBytes(system.memory.total_bytes) : '—'}
+                  hint={system?.memory.available_bytes != null
+                    ? `${fmtBytes(system.memory.available_bytes)} still available`
+                    : undefined} />
+        <StatTile label="Load"
+                  value={system && system.load.length > 0
+                    ? system.load.map((n) => n.toFixed(2)).join(' · ')
+                    : '—'}
+                  hint={system?.cpus != null
+                    ? `1, 5 and 15 minutes, on ${system.cpus} CPU${system.cpus === 1 ? '' : 's'}`
+                    : undefined} />
+        <StatTile label="Volume"
+                  value={system
+                    ? `${fmtBytes(system.disk.used_bytes)} used`
+                    : '—'}
+                  hint={system
+                    ? `${fmtBytes(system.disk.free_bytes)} free of ${fmtBytes(system.disk.total_bytes)}`
+                    : undefined} />
+        <StatTile label="Card pool"
+                  value={storage ? fmtBytes(storage.pool_bytes) : '—'}
+                  hint={storage
+                    ? `bulk files ${fmtBytes(storage.scryfall_bulk_bytes)}`
+                    : undefined} />
+        <StatTile label="Accounts db"
+                  value={storage ? fmtBytes(storage.app_db_bytes) : '—'}
+                  hint="users, sessions, caches and the ledgers" />
+        <StatTile label="Caches"
+                  value={storage ? fmtBytes(storage.cache_bytes) : '—'}
+                  hint={storage
+                    ? `motion ${fmtBytes(storage.cache.cardmotion_bytes)} · symbols ${fmtBytes(storage.cache.symbols_bytes)}`
+                    : undefined} />
+        <StatTile label="Decks on the volume"
+                  value={storage ? storage.decks.count : '—'}
+                  hint={storage
+                    ? `${fmtBytes(storage.decks.bytes)}${storage.decks.trashed > 0
+                        ? ` · ${storage.decks.trashed} in the trash` : ''}`
+                    : undefined} />
+        <StatTile label="Accounts"
+                  value={activity
+                    ? Object.values(activity.accounts)
+                        .reduce((a, b) => a + b, 0)
+                    : '—'}
+                  hint={activity
+                    ? Object.entries(activity.accounts)
+                        .map(([state, count]) => `${count} ${state}`)
+                        .join(' · ') || 'none yet'
+                    : undefined} />
+        <StatTile label="Sessions"
+                  value={activity ? activity.sessions.total : '—'}
+                  hint={activity
+                    ? `${activity.sessions.seen_day} seen today · ${activity.sessions.seen_week} this week`
+                    : undefined} />
+        <StatTile label="Memoised simulations"
+                  value={activity ? activity.sim_cache_rows : '—'}
+                  hint="Tier 1 results answered from cache" />
+        <StatTile label="Jobs" value={activity ? jobsLine : '—'}
+                  hint="the registry's census — counts, never labels" />
+      </div>
+
+      {activity && activity.deck_edits_by_day.length > 0 && (
+        <div className="card-surface rounded-xl p-5">
+          <h2 className="text-sm font-semibold tracking-tight">
+            Deck edits, last thirty days
+          </h2>
+          <div className="mt-3">
+            <EditsChart rows={activity.deck_edits_by_day} />
+          </div>
+        </div>
+      )}
+
+      {claude && <ClaudePanel claude={claude} />}
+    </section>
+  )
 }
 
 /** A button that reports what happened where it happened.
@@ -390,16 +656,27 @@ export default function Admin() {
     setNote(null)
   }
 
-  if (!data && !error) return <Spinner label="Loading accounts…" />
+  if (!data && !error) return <Spinner label="Loading the instance…" />
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Accounts</h1>
-        <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Who can use this instance, and who administers it.
+      <PageMasthead
+        art={TEFERIS_PROTECTION_ART}
+        alt="Teferi's Protection, painted by Minttu Hynninen: Teferi raises
+             his staff and concentric wards spread over his homeland as a
+             swarm descends."
+        title="Admin"
+        credit={<>
+          <em>Teferi’s Protection</em> by Minttu Hynninen, Strixhaven
+          Mystical Archive — the steward’s spell: everything you keep, kept
+          safe until the trouble passes.
+        </>}>
+        <p>
+          The instance at a glance — the box it runs on, what the volume
+          holds, where Claude’s tokens went, who has been in — and the
+          account levers below.
         </p>
-      </header>
+      </PageMasthead>
 
       {error && <ErrorNote>{error}</ErrorNote>}
       {note && (
@@ -410,6 +687,8 @@ export default function Admin() {
           {note}
         </div>
       )}
+
+      <Dashboard />
 
       <InviteForm onInvited={report} onError={complain} />
 
