@@ -88,6 +88,39 @@ def test_the_caveat_says_which_system_answered(pool):
     assert "yours to write" in out["caveat"]
 
 
+def test_every_fate_lands_twice(pool):
+    """The second landing (Aaron, 2026-08-17, expanded the same evening):
+    every fate carries a face key now — the coin, the heart, the winning
+    sword, the skull's give-or-take. The meaning names the face that
+    landed, both faces of each fate are reachable, and the whole thing
+    replays from one seed."""
+    fields = {"cup": "coin", "heart": "heart_face",
+              "sword": "sword_face", "skull": "skull_face"}
+    words = {"heads": "heads", "tails": "tails",
+             "whole": "whole", "broken": "broken",
+             "edge": "edge", "hilt": "hilt",
+             "buried": "grave takes", "risen": "grave gives"}
+    seen: dict[str, set[str]] = {s: set() for s in wheel.SYMBOLS}
+    for seed in range(160):
+        out = _spin(pool, seed)
+        field = fields[out["symbol"]]
+        face = out[field]
+        expected = set(wheel.FACES[out["symbol"]][1])
+        assert face in expected
+        assert words[face] in out["meaning"]
+        seen[out["symbol"]].add(face)
+        # No other fate's face key leaks onto this spin.
+        for other, key in fields.items():
+            if other != out["symbol"]:
+                assert key not in out
+    for symbol, faces in seen.items():
+        assert faces == set(wheel.FACES[symbol][1]), symbol
+    # And a face replays with its seed, card and all.
+    once = _spin(pool, 11)
+    again = _spin(pool, 11)
+    assert once == again
+
+
 def test_no_candidates_is_an_honest_reason_not_an_error(pool):
     """A colourless-only identity in the tiny pool leaves some fates with
     nothing to hand out; the wheel still names the fate and says so."""

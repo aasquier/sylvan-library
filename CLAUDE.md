@@ -90,6 +90,15 @@ load-bearing.
     most care. When effort has to be rationed anywhere, it is rationed here
     last. The reading should be the belle of the ball, every session,
     forever. (Added with Aaron 2026-08-16.)
+16. **UI work is looked at before it lands.** Before any user-visible
+    change is committed, Aaron walks it in a local browser — not
+    screenshots, not the rig's word for it. Claude keeps the dev servers
+    running and says exactly where to look and when: cycle times included,
+    so nobody stares at a hole waiting for a snake that comes out once a
+    minute. Commandment 14 is about the deployed truth after landing; this
+    one is about Aaron's eye before it. (Added with Aaron 2026-08-17,
+    mid-menagerie, after three effects his eye threw out had already been
+    photographed "done".)
 
 ## Setup
 

@@ -1,0 +1,124 @@
+# What the fates are made of (Aaron, 2026-08-17: "lets think big here" --
+# the landing effects should be photo-real, not gradient washes; then,
+# same evening: "I want photo-real swords clashing and sparking").
+#
+# The cup pays in the oldest coin anyone recognises: an Athenian owl,
+# heads-and-tails legible from across a room, both faces museum plates
+# of the same decade's striking — struck in silver, graded to gold here
+# by the duotone (Aaron: "can we color that coin gold?"), baked into
+# the asset because a CSS filter anywhere inside the coin's 3D stage is
+# exactly what broke the flip once already. The sword is the Met's own two-hander,
+# ca. 1400-1450, battle-worn steel on a studio ground; mirrored at
+# render time it becomes the matched pair the clash needs, and its
+# sparks are a photographed shower on true black. (A wax anatomical
+# heart was tried for the heart and ruled too real -- that fate now
+# blooms Gelon's own painted heart, which is CSS over the art and needs
+# no asset here. The Fishpool Hoard paid the cup for one evening and
+# was retired unreadable.)
+animist: 1
+
+why_committed:
+  CC0 on both plates, so the cutouts are clean to commit; and a fate
+  whose gold evaporates when a CDN moves would be a poor omen for a
+  fortune wheel.
+
+sources:
+  # The Fishpool Hoard's case-angle photography was tried for the coin
+  # twice and could not read as heads-and-tails at spin size; these two
+  # Cleveland Museum plates are straight-on museum photography of the
+  # most legible coinage ever struck.
+  heads:
+    provider: openverse
+    identifier: ee515272-f922-4656-8c90-2995958cfa02
+    title: "Tetradrachm: Head of Athena, r. (obverse) 449-440 BCE"
+    landing: https://www.flickr.com/photos/clevelandart/25279094634
+    found_via: >
+      Openverse with a license=cc0 filter, searching `tetradrachm owl
+      athena`; the Cleveland Museum of Art's open-access dedication,
+      photographed dead-on with the relief lit
+    licence: CC0-1.0
+
+  tails:
+    provider: openverse
+    identifier: 85d6bd8a-c74b-4e1e-84a4-1b9de10016bf
+    title: >
+      Tetradrachm: Owl, standing, r., crescent moon and olive branch
+      above (reverse) 449-440 BCE
+    landing: https://www.flickr.com/photos/clevelandart/24677217172
+    found_via: >
+      the same search and the same collection, same decade of striking
+      -- the matched reverse, and the owl on it answers the owl on the
+      limb
+    licence: CC0-1.0
+
+  blade:
+    provider: met
+    identifier: "35388"
+    title: "Two-Handed Sword, ca. 1400-1450"
+    landing: https://www.metmuseum.org/art/collection/search/35388
+    found_via: >
+      the Met Open Access API, searching `sword` -- the one European
+      two-hander in the results with isPublicDomain set and a full
+      studio plate, and its date sits inside the century the painting
+      wears
+    licence: CC0-1.0
+
+  tinder:
+    provider: openverse
+    identifier: 1b6e21c7-dfb5-4e37-9e3e-c744a0148470
+    title: "Free burning sparkler black background"
+    landing: https://www.rawpixel.com/search?page=1&q=burning%20sparkler
+    found_via: >
+      Openverse with a license=cc0 filter, searching `sparks black
+      background`; a real spark shower on true black, which screen
+      blend composites the same way the shades' smoke goes -- the
+      black vanishes and only fire survives, the sparkler's own stick
+      included
+    licence: CC0-1.0
+
+outputs:
+  # One coin, both faces (Aaron, mid-session: "a single coin that is
+  # rendered on both sides... a spinning coin"; round three: "I still
+  # can't make out a heads and tails"). Athena is heads and her owl is
+  # tails — nobody has ever needed that explained — and the flood matte
+  # keeps each flan's true irregular silhouette, because an ancient
+  # coin's shape IS its signature.
+  - file: wheel-coin-obverse.webp
+    from: heads
+    ops:
+      - matte_backdrop: {tolerance: 16, soft: 10, border: 2, enclosed: keep}
+      - duotone: {shadow: "#2a1a06", mid: "#b8862e", light: "#ffeab0"}
+      - resize: {width: 128}
+    encode: {format: webp, quality: 86}
+    expect: {width: 128, height: 131, budget_kb: 20, metadata: none}
+
+  - file: wheel-coin-reverse.webp
+    from: tails
+    ops:
+      - matte_backdrop: {tolerance: 16, soft: 10, border: 2, enclosed: keep}
+      - duotone: {shadow: "#2a1a06", mid: "#b8862e", light: "#ffeab0"}
+      - resize: {width: 128}
+    encode: {format: webp, quality: 86}
+    expect: {width: 128, height: 133, budget_kb: 20, metadata: none}
+
+  # The strike's sparks, real ones: the sparkler's central burst. The
+  # render mounts it twice at the bind, mirrored and staggered.
+  - file: wheel-sparks.webp
+    from: tinder
+    ops:
+      - crop: {frac_box: [0.08, 0.04, 0.88, 0.96]}
+      - resize: {width: 320}
+    encode: {format: webp, quality: 82}
+    expect: {width: 320, height: 246, budget_kb: 40, metadata: none}
+
+  # The Met's two-hander, matted off its studio ground: pommel to point,
+  # the whole blade. The clash renders it twice, one copy mirrored -- a
+  # matched pair meeting over the wheel.
+  - file: wheel-sword.webp
+    from: blade
+    ops:
+      - crop: {frac_box: [0.22, 0.015, 0.78, 0.985]}
+      - matte_backdrop: {tolerance: 18, soft: 10, border: 2, enclosed: drop}
+      - resize: {height: 380}
+    encode: {format: webp, quality: 80}
+    expect: {width: 157, height: 380, budget_kb: 44, metadata: none}

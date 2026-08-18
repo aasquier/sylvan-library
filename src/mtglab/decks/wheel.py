@@ -73,6 +73,79 @@ FATES: dict[str, dict[str, str]] = {
     },
 }
 
+#: EVERY fate lands twice now (Aaron, 2026-08-17, in two rulings): the
+#: cup tosses a coin, the heart comes up whole or broken, one of the two
+#: clashing swords wins, and the skull either takes or gives back. The
+#: second roll comes off the same seeded rng, so one seed still replays
+#: the whole spin. Each face carries its own prose and its own filter,
+#: side by side like the fates' own, so they cannot drift apart; when a
+#: face lands, its meaning and its filter REPLACE the fate's base ones.
+#: The wire keys are per fate and the words are real-world words — coin
+#: words, heart words, sword words — not implementation (commandment 10
+#: does not reach them).
+FACES: dict[str, tuple[str, dict[str, dict[str, str]]]] = {
+    "cup": ("coin", {
+        "heads": {
+            "meaning": "The coin lands heads — the cup fills your hand: "
+                       "a card that draws.",
+            "where": ("(oracle_text ILIKE '%draw a card%'"
+                      " OR oracle_text ILIKE '%draws a card%'"
+                      " OR oracle_text ILIKE '%draw two cards%'"
+                      " OR oracle_text ILIKE '%draw three cards%'"
+                      " OR oracle_text ILIKE '%draw cards%')"),
+        },
+        "tails": {
+            "meaning": "The coin lands tails — the cup spills into the "
+                       "water: a card that mills.",
+            "where": ("(oracle_text ILIKE '%mill%'"
+                      " OR oracle_text ILIKE "
+                      "'%library%into%graveyard%')"),
+        },
+    }),
+    "heart": ("heart_face", {
+        "whole": {
+            "meaning": "The heart beats whole — a card that gives "
+                       "life back.",
+            "where": "(oracle_text ILIKE '%gain%life%')",
+        },
+        "broken": {
+            "meaning": "The heart comes up broken — a card that drains "
+                       "life away.",
+            "where": ("(oracle_text ILIKE '%loses%life%'"
+                      " OR oracle_text ILIKE '%lose%life%')"),
+        },
+    }),
+    "sword": ("sword_face", {
+        "edge": {
+            "meaning": "The sword falls edge-first — a card that "
+                       "removes or damages.",
+            "where": ("(oracle_text ILIKE '%destroy target%'"
+                      " OR oracle_text ILIKE '%deals%damage%'"
+                      " OR oracle_text ILIKE '%exile target%')"),
+        },
+        "hilt": {
+            "meaning": "The sword is offered hilt-first — a weapon to "
+                       "take up: an equipment.",
+            "where": "(type_line ILIKE '%Equipment%')",
+        },
+    }),
+    "skull": ("skull_face", {
+        "buried": {
+            "meaning": "The skull grins — the grave takes: a card that "
+                       "fills the graveyard.",
+            "where": ("(oracle_text ILIKE '%mill%'"
+                      " OR oracle_text ILIKE '%sacrifice%'"
+                      " OR oracle_text ILIKE '%discard%')"),
+        },
+        "risen": {
+            "meaning": "The skull whispers — the grave gives back: a "
+                       "card that raises what was lost.",
+            "where": ("(oracle_text ILIKE '%return%from%graveyard%'"
+                      " OR oracle_text ILIKE '%from%graveyard%to the%')"),
+        },
+    }),
+}
+
 #: How the caveat states which system answered (ADR 14 boundary 3) —
 #: without naming one (commandment 10, Aaron's ruling 2026-08-17: a
 #: programming language is an implementation detail, and so is a seed).
@@ -104,6 +177,21 @@ def spin(deck: Deck, identity: frozenset[str], con: Any, *,
     symbol = SYMBOLS[rng.randrange(len(SYMBOLS))]
     fate = FATES[symbol]
 
+    # The second landing, for the fates that have one: same rng, so the
+    # seed replays coin and card alike. Insertion order is the contract
+    # (heads before tails, whole before broken), the same way SYMBOLS'
+    # index is.
+    meaning = fate["meaning"]
+    fate_where = fate["where"]
+    face_field: str | None = None
+    face_key: str | None = None
+    if symbol in FACES:
+        face_field, options = FACES[symbol]
+        keys = list(options)
+        face_key = keys[rng.randrange(len(keys))]
+        meaning = options[face_key]["meaning"]
+        fate_where = options[face_key]["where"]
+
     in_deck = sorted({c.name for c in deck.cards}
                      | set(deck.commander)
                      | ({deck.companion} if deck.companion else set()))
@@ -116,7 +204,7 @@ def spin(deck: Deck, identity: frozenset[str], con: Any, *,
     where = " AND ".join([
         "json_extract_string(legalities, 'commander') = 'legal'",
         fits,
-        fate["where"],
+        fate_where,
         "name NOT IN (" + ", ".join("?" for _ in in_deck) + ")"
         if in_deck else "1=1",
     ])
@@ -128,11 +216,13 @@ def spin(deck: Deck, identity: frozenset[str], con: Any, *,
     base = {
         "symbol": symbol,
         "label": fate["label"],
-        "meaning": fate["meaning"],
+        "meaning": meaning,
         "seed": seed,
         "answered_by": "python",
         "caveat": CAVEAT,
     }
+    if face_field is not None:
+        base[face_field] = face_key
     if not total:
         return {**base, "card": None,
                 "reason": "The pool holds no legal card in these colours "

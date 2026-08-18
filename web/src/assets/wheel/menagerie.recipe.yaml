@@ -1,0 +1,70 @@
+# The Wheel of Fortune's menagerie (Aaron, 2026-08-17: the beetle
+# should have company). The lesson that shaped it, learned across three
+# of his eye passes: the beetle works because it is a MATTED CUTOUT --
+# the animal's silhouette and nothing else, moved by CSS -- and a
+# rectangle of somebody else's photograph pasted on Gelon's painting is
+# a sticker no matter how it is graded. The crocodile is matted off
+# seamless white; the barn owl off near-dark. (A snake for the
+# knot-hole was built twice and cut twice -- the hole keeps varying
+# glowing eyes instead, and what owns them stays the wood's secret.)
+animist: 1
+
+why_committed:
+  Both plates are CC0 -- the crocodile by rawpixel's dedication, the
+  owl by StockSnap's -- so the matted cutouts are clean to commit, and
+  the beetle's rule holds for the whole menagerie; a creature that
+  vanishes when a CDN moves is a haunting nobody asked for.
+
+sources:
+  lurker:
+    provider: openverse
+    identifier: eda4b571-f610-46f1-b9d9-333362af97d2
+    title: "Free crocodile white background image"
+    landing: https://www.rawpixel.com/image/5914013/image-background-public-domain-eye
+    found_via: >
+      Openverse with a license=cc0 filter, searching `crocodile white
+      background`; a real photograph on seamless white -- the one
+      background the flood matte cannot get wrong
+    licence: CC0-1.0
+
+  watcher:
+    provider: openverse
+    identifier: d8af7f12-3139-4a90-9d98-77e987efd994
+    title: "Owl Eyes"
+    landing: https://stocksnap.io/photo/owl-eyes-E1CMK2AIID
+    found_via: >
+      Openverse with a license=cc0 filter, searching `owl portrait
+      dark`; a barn owl photographed pale against near-dark, which is
+      the contrast the flood matte wants -- a great horned owl on a
+      branch was tried first and its dark plumage shredded, being
+      within tolerance of its own background everywhere
+    licence: CC0-1.0
+
+outputs:
+  # The crocodile's upper head -- brow, eye, snout ridge and the teeth
+  # of the open jaw -- everything the waterline will ever show. The
+  # white ground mattes off tight; the pool's own clip rig does the
+  # rest at render time.
+  - file: wheel-croc.webp
+    from: lurker
+    ops:
+      - crop: {frac_box: [0.08, 0.10, 0.97, 0.55]}
+      - matte_backdrop: {tolerance: 16, soft: 10, border: 2, enclosed: drop}
+      - resize: {width: 300}
+    encode: {format: webp, quality: 84}
+    expect: {width: 300, height: 100, budget_kb: 40, metadata: none}
+
+  # The barn owl, cropped TIGHT to the body -- headroom and stalk both
+  # gone, because on the page she perches on the painted limb and every
+  # pixel of margin is height the perch cannot spare (round three:
+  # "a lot bigger"). Tolerance runs tight because her wing carries true
+  # darks; a little speckle transparency in the coverts is invisible at
+  # perch size and better than eating the wing.
+  - file: wheel-owl.webp
+    from: watcher
+    ops:
+      - crop: {frac_box: [0.115, 0.055, 0.50, 0.79]}
+      - matte_backdrop: {tolerance: 14, soft: 12, border: 2, enclosed: drop}
+      - resize: {width: 190}
+    encode: {format: webp, quality: 84}
+    expect: {width: 190, height: 242, budget_kb: 40, metadata: none}
