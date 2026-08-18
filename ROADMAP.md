@@ -1782,6 +1782,52 @@ arc; this is what the next few sessions actually do.
     needs Aaron's eye on real cards in real light rather than a green
     suite's word.
 
+15. **The punch list** — Aaron's second list of 2026-08-18, five PRs, all
+    merged and deployed the same day. **Four of the six items are done.**
+
+    **Landed:** the deck page's defaults turned over (#167) — the 99 opens
+    folded, the Wheel never remembers being open, the ivy withdraws the
+    moment the page scrolls, and the commander's painting takes the crop's
+    own 1.37:1 rather than a 4:1 stripe; **Admin became five wards** (#168)
+    — Accounts, Claude, Machine, Storage, Activity, each fetching only what
+    it shows, which cut the page from six polled endpoints to one or two;
+    **per-account model tiers** (#169, schema v10) — a named seat may be
+    answered by Opus or Fable, the column holds a tier *name* and never a
+    model id, an unknown tier reads as the default while writing one is
+    refused, and the dossier cache fragments per tier because the model id
+    was already in its fingerprint; **the bill, estimated and dated**
+    (#170) — `claude/prices.py` reverses the written-down "no price table"
+    decision deliberately, answering each clause of the original objection
+    (the rate that moves is modelled on both sides of 2026-08-31, rates
+    carry the date a person read them, an unpriceable model is counted
+    rather than charged zero), the ledger gained a per-model axis, and
+    "Answered by" names the Claude rather than the model id; and **the
+    glass cleared, then showed something** (#171, #172) — two separate Fly
+    bugs, the second only findable once the first was fixed. A Fly token
+    carries its own scheme, so `Bearer FlyV1 …` had 401'd every request the
+    panel ever made; and with that fixed it reported success and five
+    em-dashes, because `status` is the full code rather than a class
+    (`status="2xx"` matched nothing) and `fly_instance_memory_resident` has
+    never existed (it is `mem_total` − `mem_available`). Nothing had
+    misbehaved: an empty vector reads as `None` reads as an em-dash, correct
+    at every step — three correct behaviours hiding two wrong strings, and
+    neither visible until the credential worked. Verified live: 244 MB of
+    962 MB, 3,581 edge 2xx, 20 4xx, 5xx honestly absent.
+
+    **Still open: items 5 and 6.** *Item 5* is a polish-skill pass for API
+    hygiene — do routes match the button names, what relics survive from
+    previous dev cycles, and a sweep for stale build/Claude artifacts and
+    admin warning signs of instability. Two findings are already banked for
+    it: `mtglab animist verify` runs in the suite but pins only **2 of the
+    12** committed recipes, so the other ten pass by not being looked at;
+    and the import ring #171 fixed was invisible to a 2,100-test suite
+    because nothing imported a module first. *Item 6* is a checked-in
+    corpus of 10–20 facts for each of the 78 tarot cards, woven into the
+    reading and never repeating within a session — **it extends the
+    `theme.py` fact mechanism rather than rebuilding it** (the schema, the
+    `'taxonomy'`-or-real-URL sourcing rule and the `told`/`repeats` dedup
+    all exist), and at 780–1560 sourced facts it wants its own session.
+
 ---
 
 ## 1. Analyse or generate decks with simulation
