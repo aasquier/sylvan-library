@@ -87,6 +87,37 @@ export function identityName(identity: string[]): string {
   return mono ? `Mono-${mono}` : key
 }
 
+/**
+ * A symbol's spoken name — the tooltip and the accessible name of a pip.
+ *
+ * Every pip is a drawing now (ADR 33), so no symbol contributes its letter
+ * to the page as text; the name is the only way any of them read aloud.
+ * Extends `COLOR_NAMES` with the rest of the vocabulary the prose regex
+ * recognises. Anything unknown falls back to the symbol as written, which
+ * is thin but never wrong.
+ */
+export function symbolName(sym: string): string {
+  const colour = COLOR_NAMES[sym]
+  if (colour) return colour
+  if (sym === 'T') return 'Tap'
+  if (sym === 'Q') return 'Untap'
+  if (sym === 'S') return 'Snow'
+  if (sym === 'E') return 'Energy'
+  if (sym === 'X') return 'X'
+  if (/^\d+$/.test(sym)) return `Generic ${sym}`
+  const hybrid = /^([WUBRG2C])\/([WUBRGP])$/.exec(sym)
+  if (hybrid) {
+    // The pattern's groups always participate, but the checker cannot see
+    // that; `?? sym` keeps a miss loud enough to notice instead of "undefined".
+    const left = hybrid[1] ?? sym
+    const right = hybrid[2] ?? sym
+    if (right === 'P') return `Phyrexian ${COLOR_NAMES[left] ?? left}`
+    const first = left === '2' ? 'Two' : COLOR_NAMES[left] ?? left
+    return `${first} or ${COLOR_NAMES[right] ?? right}`
+  }
+  return sym
+}
+
 /** Split "{2}{B}{G}" into ["2","B","G"] for pip rendering. */
 export function manaSymbols(cost?: string | null): string[] {
   if (!cost) return []

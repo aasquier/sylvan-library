@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { COLOR_NAMES, COLOR_VAR, manaSymbols, splitManaText } from '../lib/mtg'
-import { ManaGlyph } from './manasymbol'
+import { COLOR_NAMES, COLOR_VAR, manaSymbols, splitManaText, symbolName } from '../lib/mtg'
+import { ManaGlyph, OfficialSymbol } from './manasymbol'
 import { hasGlyph } from '../lib/managlyphs'
 import { SceneBackdrop, type RoomMood } from './forest'
 
@@ -9,42 +9,46 @@ import { SceneBackdrop, type RoomMood } from './forest'
 /**
  * One mana symbol. Shared so a cost and a pip in prose cannot drift apart.
  *
- * The five colours are drawn as their real icons — sun, drop, skull, flame,
- * tree — and everything else keeps its character, because everything else *is*
- * a character: a generic cost is a numeral, `{X}` is a letter, and a hybrid
- * like `{G/W}` is two colours in one pip that no single glyph says. So the
- * branch is on `hasGlyph` rather than on "is this a colour", and the text path
- * stays exactly as it was.
- *
- * The glyph is inset slightly rather than filling the disc, so the ink has a
- * ring of colour around it. Flush to the edge, adjacent pips in a cost read as
- * one dark smear at 13px.
+ * Every pip is the official symbol now (ADR 33) — the real tap arrow, the
+ * real hybrid split disc, the numeral in its proper circle — served from our
+ * own origin. The coloured disc underneath is both the loading placeholder
+ * and the fallback's canvas: with the cache cold and no network, the five
+ * colours fall back to the hand-drawn sun/drop/skull/flame/tree and
+ * everything else to its character, which is exactly what every pip was
+ * before this ADR.
  */
 function Pip({ sym, size }: { sym: string; size: number }) {
-  const solid = COLOR_VAR[sym]
-  const glyph = hasGlyph(sym)
+  const name = symbolName(sym)
   return (
     <span
-      title={COLOR_NAMES[sym] ?? sym}
-      // A lettered pip was its own text: `{G}` in a sentence reached the
-      // accessibility tree as the character "G", which is thin but real. A
-      // drawn one contributes nothing, so the name has to be stated. `img`
-      // rather than nothing, because a pip is one indivisible mark and a
-      // screen reader should say "Green" rather than walking into an SVG.
-      role={glyph ? 'img' : undefined}
-      aria-label={glyph ? COLOR_NAMES[sym] ?? sym : undefined}
-      className="inline-flex items-center justify-center rounded-full align-middle font-semibold text-[#141414]"
+      title={name}
+      // The name has to be stated: a drawn pip contributes nothing to the
+      // accessibility tree, and since ADR 33 every pip is a drawing — the
+      // numeral in `{3}` included. `img` rather than nothing, because a pip
+      // is one indivisible mark and a screen reader should say "Green"
+      // rather than walking into an image.
+      role="img"
+      aria-label={name}
+      className="inline-flex items-center justify-center overflow-hidden rounded-full align-middle font-semibold text-[#141414]"
       style={{
         width: size,
         height: size,
         fontSize: size * 0.62,
-        background: solid ?? 'var(--mtg-c)',
+        background: COLOR_VAR[sym] ?? 'var(--mtg-c)',
         // A ring keeps adjacent pips from merging into one blob, which is the
         // 2px surface-gap rule applied to inline marks.
         boxShadow: '0 0 0 1px var(--hairline)',
       }}
     >
-      {glyph ? <ManaGlyph symbol={sym} size={size * 0.74} /> : sym.replace('/', '')}
+      <OfficialSymbol
+        symbol={sym}
+        size={size}
+        // The drawn glyph keeps its slight inset so the ink has a ring of
+        // colour around it; the official image carries its own margins.
+        fallback={hasGlyph(sym)
+          ? <ManaGlyph symbol={sym} size={size * 0.74} />
+          : sym.replace('/', '')}
+      />
     </span>
   )
 }
@@ -118,13 +122,17 @@ export function ColorRing({ colors, size = 34 }: { colors: string[]; size?: numb
     return (
       <span
         title="Colourless"
-        className="inline-flex items-center justify-center rounded-full font-semibold"
+        role="img"
+        aria-label="Colourless"
+        className="inline-flex items-center justify-center overflow-hidden rounded-full font-semibold"
         style={{
           width: size, height: size, fontSize: size * 0.4,
           background: 'var(--mtg-c)', color: '#141414',
           boxShadow: '0 0 0 1px var(--hairline)',
         }}
-      >C</span>
+      >
+        <OfficialSymbol symbol="C" size={size} fallback="C" />
+      </span>
     )
   }
   return (
@@ -133,7 +141,9 @@ export function ColorRing({ colors, size = 34 }: { colors: string[]; size?: numb
         <span
           key={c}
           title={COLOR_NAMES[c]}
-          className="inline-flex items-center justify-center rounded-full font-semibold"
+          role="img"
+          aria-label={COLOR_NAMES[c] ?? c}
+          className="inline-flex items-center justify-center overflow-hidden rounded-full font-semibold"
           style={{
             width: size, height: size, fontSize: size * 0.45,
             background: COLOR_VAR[c], color: '#141414',
@@ -142,8 +152,12 @@ export function ColorRing({ colors, size = 34 }: { colors: string[]; size?: numb
         >
           {/* The identity headline, so it gets the real icons for the same
               reason `Pip` does. `title` still carries the colour's name, which
-              is what a glyph cannot say to a screen reader. */}
-          {hasGlyph(c) ? <ManaGlyph symbol={c} size={size * 0.7} /> : c}
+              is what a drawing cannot say to a screen reader. */}
+          <OfficialSymbol
+            symbol={c}
+            size={size}
+            fallback={hasGlyph(c) ? <ManaGlyph symbol={c} size={size * 0.7} /> : c}
+          />
         </span>
       ))}
     </span>
@@ -170,10 +184,17 @@ export function ColorPips({ identity }: { identity: string[] }) {
         <span
           key={c}
           title={COLOR_NAMES[c] ?? c}
-          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full"
+          role="img"
+          aria-label={COLOR_NAMES[c] ?? c}
+          className="inline-flex h-3.5 w-3.5 items-center justify-center overflow-hidden rounded-full"
           style={{ background: COLOR_VAR[c], boxShadow: '0 0 0 1px var(--hairline)' }}
         >
-          {hasGlyph(c) && <ManaGlyph symbol={c} size={10} />}
+          {/* 14 matches h-3.5; the official image fills the disc it draws. */}
+          <OfficialSymbol
+            symbol={c}
+            size={14}
+            fallback={hasGlyph(c) ? <ManaGlyph symbol={c} size={10} /> : null}
+          />
         </span>
       ))}
     </span>

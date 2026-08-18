@@ -1131,6 +1131,30 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             hit.file(filename), media_type=media_type,
             headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
+    # ----------------------------------------------------- mana symbols
+    #
+    # ADR 33: the official symbols, filled into a runtime cache on first
+    # ask and served first-party ever after. The client's drawn glyphs are
+    # the fallback, so a 404 here is a complete answer, not an error the
+    # user sees — same contract as the motion routes above.
+
+    @app.get("/api/symbols/{code}.svg")
+    def symbol_svg(code: str) -> FileResponse:
+        """One official mana-symbol SVG. `code` is the braced symbol with
+        its punctuation dropped ({W/U} -> WU); the module's shape check is
+        the path-traversal guard, so nothing unvetted reaches the
+        filesystem. A week of caching rather than immutable: there is no
+        version stamp to bust with, and the set of symbols moves a few
+        times a year."""
+        from mtglab import symbols as symbolcache
+
+        path = symbolcache.ensure(code.upper())
+        if path is None:
+            raise HTTPException(status_code=404, detail="no such symbol")
+        return FileResponse(
+            path, media_type="image/svg+xml",
+            headers={"Cache-Control": "public, max-age=604800"})
+
     # -------------------------------------------------------------- sim
 
     # The job closures capture `decks` and run after the response has been

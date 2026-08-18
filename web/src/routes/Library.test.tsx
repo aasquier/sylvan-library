@@ -427,9 +427,11 @@ describe('Library mana pips', () => {
     expect(card.textContent).not.toContain('{G}')
     expect(card.textContent).toContain('A ')
     expect(card.textContent).toContain(' deck that wants ')
-    // A generic cost has no icon and stays a numeral, which is the branch in
-    // `Pip` that decides between a glyph and a character.
-    expect(card.textContent).toContain('1.')
+    // Since ADR 33 every pip is a drawing, the numeral in `{1}` included —
+    // it no longer contributes its character to the page. What it does
+    // contribute is a name.
+    expect(card.textContent).not.toContain('1.')
+    expect(within(card).getByLabelText('Generic 1')).toBeTruthy()
     // Each pip carries the colour's name, which is what makes it readable
     // without the letter being spelled out in the prose. Both the tooltip and
     // the accessible name, because they serve different readers and the letter
@@ -440,7 +442,7 @@ describe('Library mana pips', () => {
     expect(within(card).getByLabelText('White')).toBeTruthy()
   })
 
-  it('draws a colour identity but leaves numerals and X as characters', async () => {
+  it('names every pip, numerals and X included', async () => {
     vi.mocked(api.decks).mockResolvedValue([
       deck({ slug: 'cats', name: 'Cats', color_identity: [],
              strategy: 'Pay {2} or {X}, then {B}.' }),
@@ -448,11 +450,12 @@ describe('Library mana pips', () => {
     renderLibrary()
     await waitFor(() => expect(shownNames()).toHaveLength(1))
     const card = screen.getByText('Cats').closest('a')!
-    // Nothing but the five colours has an icon: a generic cost is a number and
-    // `{X}` is a letter, so both keep their character and neither acquires a
-    // drawing that would be asserting a meaning they do not have.
-    expect(card.textContent).toContain('2')
-    expect(card.textContent).toContain('X')
+    // ADR 33: a generic cost and `{X}` are official symbols like any other,
+    // so they read through their accessible names rather than as characters.
+    // "Generic 2" rather than "2" because a bare numeral read aloud in prose
+    // is indistinguishable from prose.
+    expect(within(card).getByLabelText('Generic 2')).toBeTruthy()
+    expect(within(card).getByLabelText('X')).toBeTruthy()
     expect(within(card).getByLabelText('Black')).toBeTruthy()
     expect(within(card).queryByLabelText('2')).toBeNull()
   })
