@@ -87,6 +87,8 @@ def test_it_asks_for_every_query_and_carries_the_credentials(monkeypatch):
     assert len(seen) == len(flymetrics.QUERIES)
     url, headers = seen[0]
     assert url.startswith(flymetrics.BASE_URL)
+    # A bare key keeps `Bearer`. The macaroon case is below, and is the one
+    # that was broken in production for a fortnight.
     assert headers["Authorization"] == "Bearer fo1_readonly"
     # The lesson auth/mail.py paid for: never the default urllib agent.
     assert headers["User-Agent"] == flymetrics.USER_AGENT
@@ -171,3 +173,59 @@ def test_a_failure_is_cached_so_a_bad_token_is_not_retried_per_tile(monkeypatch)
     flymetrics.fetch(transport=refusing, now=500.0 + 10)
 
     assert calls["n"] == 1, "the failure was retried inside the cache window"
+
+
+# ------------------------------------------------- the header that was wrong
+
+def test_a_fly_macaroon_is_sent_verbatim_because_it_carries_its_own_scheme():
+    """The bug the panel shipped with, as an assertion.
+
+    A Fly token *is* `FlyV1 fm2_...` — the scheme is part of the value. This
+    module wrapped it in `Bearer `, so every request carried two schemes and no
+    valid credential, and Fly answered 401 forever. Two good tokens were
+    suspected before the code was.
+    """
+    assert (flymetrics.authorization("FlyV1 fm2_abc123")
+            == "FlyV1 fm2_abc123")
+
+
+def test_no_header_ever_contains_two_schemes():
+    """The shape of the failure, guarded directly.
+
+    Written against the symptom rather than the mechanism: whatever
+    `authorization` does next, `Bearer FlyV1` is never a thing to send.
+    """
+    for secret in ("FlyV1 fm2_abc", "FlyV2 fm3_abc", "fo1_bare"):
+        assert "Bearer FlyV1" not in flymetrics.authorization(secret)
+        assert "Bearer FlyV2" not in flymetrics.authorization(secret)
+
+
+def test_a_bare_token_still_gets_bearer():
+    """A plain API key has no scheme of its own and needs one."""
+    assert flymetrics.authorization("fo1_readonly") == "Bearer fo1_readonly"
+
+
+def test_a_future_scheme_name_is_honoured_without_naming_it():
+    """`FlyV1` is not the first version of this prefix and will not be the
+    last. Matching the literal string would fail the same silent way on the
+    next one, so the check is structural: a first word with no underscore is a
+    scheme, and every bare key shape has no space at all."""
+    assert flymetrics.authorization("FlyV2 fm3_abc") == "FlyV2 fm3_abc"
+    assert flymetrics.authorization("fm2_looks_like_a_token") == (
+        "Bearer fm2_looks_like_a_token")
+
+
+def test_the_live_header_shape_reaches_the_transport(monkeypatch):
+    """End to end through `fetch`, because `authorization` being right does not
+    prove the caller uses it — which is exactly the gap that let the original
+    bug through a suite that already asserted a header."""
+    monkeypatch.setenv("FLY_METRICS_TOKEN", "FlyV1 fm2_abc123")
+    flymetrics.reset()
+    seen: list[tuple[str, dict[str, str]]] = []
+
+    def transport(url, headers):
+        seen.append((url, headers))
+        return 200, vector(1)
+
+    flymetrics.fetch(transport=transport)
+    assert seen[0][1]["Authorization"] == "FlyV1 fm2_abc123"

@@ -36,14 +36,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-# `claude.tiers` is a pure table — a dataclass and three lookups, no SDK and no
-# network — which is what makes it importable here. `auth/` must stay usable on
-# a box with no web server and no `claude` extra installed (`mtglab users` is
-# the bootstrap path on a fresh volume), and that module costs it nothing. The
-# table lives there rather than here because a tier is a Claude concept that
-# accounts happen to carry, not an account concept Claude happens to read.
 from mtglab.auth import passwords
-from mtglab.claude import tiers
 
 # Deliberately narrow. A username is a login handle, not a display name -- it
 # ends up in URLs, log lines and `mtglab users list` output, and the set of
@@ -169,9 +162,35 @@ class User:
             # actually be answered by rather than the string in the column.
             # A screen showing `opus` for an account served Sonnet would be a
             # lie of exactly the kind ADR 18's cached-number rule forbids.
-            "model_tier": tiers.get(self.model_tier).key,
+            "model_tier": _tiers().get(self.model_tier).key,
         }
         return {**body, "email": self.email} if include_email else body
+
+
+def _tiers() -> Any:
+    """`claude.tiers`, imported at call time rather than at module scope.
+
+    The module itself is a pure table — a dataclass and three lookups, no SDK
+    and no network — so importing it costs `auth/` nothing, and it lives there
+    rather than here because a tier is a Claude concept that accounts happen to
+    carry. What it costs is the *package*: `from mtglab.claude import tiers`
+    executes `mtglab/claude/__init__.py`, which eagerly imports the whole
+    Claude surface, which imports `api.service`, which imports `decks.library`,
+    which imports **this module**.
+
+    That cycle shipped in the tiers PR and is why `pytest tests/test_flymetrics.py`
+    alone could not collect: `import mtglab.api.service` as a process's *first*
+    import walked the ring and found `service.list_decks` on a half-initialised
+    module. Nothing user-facing broke, because every real entry point happens
+    to import `service` early enough to win the race — which is precisely what
+    made it invisible, and what makes it worth fixing rather than documenting.
+
+    Deferring the import breaks the ring at the only edge `auth/` owns. Same
+    idiom as `adminstats.ledger_summary`, and after the first call it is a dict
+    lookup in `sys.modules`.
+    """
+    from mtglab.claude import tiers
+    return tiers
 
 
 def _columns(row: sqlite3.Row) -> frozenset[str]:
@@ -500,9 +519,9 @@ def set_model_tier(con: sqlite3.Connection, user_id: int,
     already the default: one representation for "nobody has chosen anything",
     so changing which tier is the default never means rewriting rows.
     """
-    if tier is not None and not tiers.known(tier):
+    if tier is not None and not _tiers().known(tier):
         raise UnknownTier(tier)
-    if tier == tiers.DEFAULT_TIER:
+    if tier == _tiers().DEFAULT_TIER:
         tier = None
     with _exclusive(con):
         cur = con.execute("UPDATE users SET model_tier = ? WHERE id = ?",

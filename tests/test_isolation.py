@@ -41,6 +41,7 @@ isolation filter by exempting admins from it.
 """
 
 import ast
+import subprocess
 import sys
 from pathlib import Path
 
@@ -813,3 +814,36 @@ def test_an_admin_is_refused_a_private_deck_s_writes_as_404_too(instance,
                           ).status_code == 404
     assert client.put("/api/decks/bob/bobs-brew/shared",
                       json={"shared": True}).status_code == 404
+
+# ------------------------------------------------------- the import ring
+
+@pytest.mark.parametrize("first", [
+    "mtglab.api.service",
+    "mtglab.auth.users",
+    "mtglab.claude.tools",
+    "mtglab.api.flymetrics",
+    "mtglab.decks.library",
+])
+def test_every_package_imports_first_without_a_cycle(first: str) -> None:
+    """Import each module into a *fresh* interpreter, as the only import.
+
+    A subprocess per case, and that is the whole point rather than an
+    extravagance: a cycle like this one is invisible the moment anything else
+    has already been imported, so a check that shares the suite's interpreter
+    would pass while the bug was live. It was live — the tiers PR had
+    `auth/users` import `mtglab.claude`, whose package `__init__` pulls the
+    whole Claude surface, which imports `api.service`, which imports
+    `decks.library`, which imports `auth.users`. Every real entry point
+    happened to import `service` early enough to win the race, so the app
+    worked, the suite passed, and `pytest tests/test_flymetrics.py` alone could
+    not collect.
+
+    Cheap insurance against a class of bug that only bites the next person to
+    write a script, a worker, or a test file with a short import list.
+    """
+    proc = subprocess.run(
+        [sys.executable, "-c", f"import {first}"],
+        capture_output=True, text=True, timeout=120,
+    )
+    assert proc.returncode == 0, (
+        f"importing {first} first fails:\n{proc.stderr[-1500:]}")
