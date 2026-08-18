@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 
 import mtglab
 from mtglab import config
-from mtglab.api import admin, adminstats, auth, jobs, service
+from mtglab.api import admin, adminstats, auth, jobs, service, traffic
 from mtglab.api.deps import Scope, UserScope, deck_source, library
 from mtglab.auth import bootstrap
 from mtglab.auth.mail import EmailSender
@@ -155,6 +155,10 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         """
         bootstrap.ensure_maintainer()
         yield
+        # The visitor ledger's last write: whatever the request counter still
+        # buffers goes to disk as the server stops, so a quiet instance's
+        # final minute is not the minute that never happened.
+        traffic.flush()
 
     app = FastAPI(title="sylvan-library", version=mtglab.__version__,
                   description="Local Commander deckbuilding and simulation.",
@@ -234,6 +238,11 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             headers.setdefault("Strict-Transport-Security",
                                "max-age=31536000")
         return response
+
+    # Registered after the headers middleware, so it is the outer layer and
+    # counts everything — the auth middleware's own refusals included, which
+    # never reach routing and land in the ledger's one shared bucket.
+    traffic.install(app)
 
     if dev:
         # Vite dev server runs on another port, so the browser needs CORS. Only

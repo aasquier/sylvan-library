@@ -462,17 +462,19 @@ describe('admin stats URLs', () => {
     return fetchMock
   }
 
-  it('keeps all four views under the admin prefix', async () => {
+  it('keeps every view under the admin prefix', async () => {
     const fetchMock = capture()
     await api.adminSystem()
     await api.adminStorage()
     await api.adminClaude()
     await api.adminActivity()
+    await api.adminTraffic()
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
       '/api/admin/stats/system',
       '/api/admin/stats/storage',
       '/api/admin/stats/claude',
       '/api/admin/stats/activity',
+      '/api/admin/stats/traffic',
     ])
   })
 })

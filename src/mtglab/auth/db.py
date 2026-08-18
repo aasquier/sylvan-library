@@ -39,7 +39,7 @@ from mtglab import config
 
 # Bumped when `_MIGRATIONS` grows. Stored in SQLite's own `user_version`, which
 # costs no table and cannot be forgotten in a schema dump.
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 # One entry per version, applied in order to whatever the file is at. A fresh
 # database runs all of them; an existing one runs the tail. The invite and
@@ -398,6 +398,25 @@ _MIGRATIONS: tuple[str, ...] = (
     -- identically but two edits inside the same second would tie, and an
     -- autoincrementing id cannot.
     CREATE INDEX deck_log_by_deck ON deck_log(owner_id, slug, id);
+    """,
+    # -- 9 ------------------------------------------------------------------
+    # The visitor ledger (`api/traffic.py`, ROADMAP item 14 PR 6): how much
+    # this instance is used, kept the way this project keeps personal data --
+    # by not keeping it. Four columns and no fifth: the UTC day, the matched
+    # route TEMPLATE (`/api/decks/{owner}/{slug}`, never the concrete path a
+    # person typed -- a path can carry a slug and a slug can carry a person),
+    # the status class, and a count. No IP, no user agent, no username, no
+    # timestamp finer than the day. `tests/test_traffic.py` pins the column
+    # set. Derived-adjacent like `sim_cache`: dropping it loses history,
+    # never anybody's data.
+    """
+    CREATE TABLE request_log (
+        day          TEXT    NOT NULL,
+        route        TEXT    NOT NULL,
+        status_class TEXT    NOT NULL,
+        count        INTEGER NOT NULL,
+        PRIMARY KEY (day, route, status_class)
+    );
     """,
 )
 

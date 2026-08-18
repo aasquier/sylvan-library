@@ -35,6 +35,7 @@ vi.mock('../lib/api', async () => {
       adminStorage: vi.fn(),
       adminClaude: vi.fn(),
       adminActivity: vi.fn(),
+      adminTraffic: vi.fn(),
     },
   }
 })
@@ -110,6 +111,13 @@ beforeEach(() => {
     deck_edits_by_day: [{ day: '2026-08-17', edits: 4 }],
     sim_cache_rows: 12,
     jobs: { running: 1 },
+  })
+  vi.mocked(api.adminTraffic).mockResolvedValue({
+    days: [{ day: '2026-08-17', total: 41, '2xx': 38, '4xx': 3 }],
+    top_routes: [{ route: '/api/decks/{owner}/{slug}', count: 17 },
+                 { route: '/api/health', count: 12 }],
+    note: 'Route templates and status classes only — the ledger never '
+      + 'records an address, an agent, a name, or a concrete path.',
   })
 })
 
@@ -415,5 +423,28 @@ describe('the dashboard', () => {
     await screen.findByText('root')
 
     expect(await screen.findByText('1 running')).toBeTruthy()
+  })
+})
+
+describe('the visitor ledger', () => {
+  it('renders templates and counts, with the privacy note beside them', async () => {
+    render(<Admin />)
+    await screen.findByText('root')
+
+    expect(await screen.findByText('Visitors, last thirty days')).toBeTruthy()
+    // The top routes are templates — the payload's own shape — and the
+    // note travels with the numbers, the same rule the ledger panel keeps.
+    expect(screen.getByText('/api/decks/{owner}/{slug}')).toBeTruthy()
+    expect(screen.getByText(/never records an address/)).toBeTruthy()
+  })
+
+  it('stays absent while the ledger has nothing to show', async () => {
+    vi.mocked(api.adminTraffic).mockResolvedValue({
+      days: [], top_routes: [], note: 'n/a',
+    })
+    render(<Admin />)
+    await screen.findByText('root')
+
+    expect(screen.queryByText('Visitors, last thirty days')).toBeNull()
   })
 })
