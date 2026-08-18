@@ -5,6 +5,7 @@ import {
   type Job,
 } from '../lib/api'
 import { CardHover, ManaCost, Spinner } from './ui'
+import { ReplayGlyph } from './glyphs'
 
 /**
  * Where a run's id is parked so a reload can reattach to it.
@@ -179,8 +180,7 @@ export function CommanderDossierPanel({
         <button
           type="button"
           onClick={() => { setOpen(!open); void load() }}
-          className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide"
-          style={{ color: 'var(--text-muted)' }}
+          className="disclosure-toggle flex items-center gap-2 text-xs font-medium uppercase tracking-wide"
           aria-expanded={open}
         >
           <span aria-hidden style={{
@@ -213,14 +213,9 @@ export function CommanderDossierPanel({
             type="button"
             onClick={() => { setOpen(true); void write(!!body) }}
             disabled={busy}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium"
-            style={{
-              border: '1px solid var(--hairline)',
-              background: 'var(--page)',
-              opacity: busy ? 0.6 : 1,
-              color: 'var(--text-secondary)',
-            }}
+            className="btn btn-quiet btn-sm"
           >
+            {body && !busy && <ReplayGlyph />}
             {busy ? 'searching…' : body ? 'Write it again' : 'Write the dossier'}
           </button>
         )}

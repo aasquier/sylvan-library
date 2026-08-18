@@ -262,9 +262,7 @@ export default function Research() {
             </p>
             {/* The door to the dossier (second punch list, item 8). */}
             <button type="button" onClick={() => setAboutOpen(true)}
-                    className="mt-2 self-start rounded-md px-2.5 py-1 text-xs font-medium"
-                    style={{ border: '1px solid var(--hairline)',
-                             color: 'var(--text-secondary)' }}>
+                    className="btn btn-quiet btn-xs mt-2 self-start">
               About the keeper
             </button>
             <p className="mt-auto pt-1 text-[10px]"
@@ -304,8 +302,7 @@ export default function Research() {
         />
         <div className="flex flex-wrap items-center gap-3">
           <button type="submit" disabled={busy || !question.trim() || !!unavailable}
-                  className="rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-40"
-                  style={{ background: 'var(--series-2)', color: 'var(--page)' }}>
+                  className="btn btn-primary btn-accent-2">
             {busy ? 'Searching…' : 'Ask'}
           </button>
           {busy && (

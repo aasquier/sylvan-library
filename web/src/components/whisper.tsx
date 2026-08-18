@@ -83,14 +83,11 @@ export function LibraryWhisper() {
           </p>
           <div className="mt-3 flex items-center gap-3">
             <button onClick={() => setStep((n) => n + 1)}
-                    className="rounded-md px-2.5 py-1 text-xs font-medium"
-                    style={{ border: '1px solid var(--hairline)',
-                             color: 'var(--text-secondary)' }}>
+                    className="btn btn-quiet btn-xs">
               Another leaf
             </button>
             <button onClick={() => setOpen(false)}
-                    className="ml-auto text-xs"
-                    style={{ color: 'var(--text-muted)' }}>
+                    className="btn btn-ghost btn-xs ml-auto">
               Close
             </button>
           </div>

@@ -179,16 +179,14 @@ export default function Import() {
             <button
               onClick={() => run(true)}
               disabled={!ready || busy !== null}
-              className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40"
-              style={{ border: '1px solid var(--hairline)', color: 'var(--text-primary)' }}
+              className="btn btn-quiet"
             >
               {busy === 'preview' ? 'Resolving…' : 'Preview'}
             </button>
             <button
               onClick={() => run(false)}
               disabled={!ready || busy !== null}
-              className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40"
-              style={{ background: 'var(--series-1)', color: '#fff' }}
+              className="btn btn-primary btn-accent-1"
             >
               {busy === 'create' ? 'Importing…' : 'Import as draft'}
             </button>
@@ -294,7 +292,7 @@ function Preview({ result, showYaml, onToggleYaml }: {
         unlock.
       </div>
 
-      <button onClick={onToggleYaml} className="text-xs underline"
+      <button onClick={onToggleYaml} className="btn btn-ghost btn-xs"
               style={{ color: 'var(--series-1)' }}>
         {showYaml ? 'Hide' : 'Show'} the deck.yaml this writes
       </button>

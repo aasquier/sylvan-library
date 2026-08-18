@@ -75,8 +75,7 @@ export function AuthSubmit({ label, busyLabel, busy, disabled }: {
 }) {
   return (
     <button type="submit" disabled={busy || disabled}
-            className="h-9 rounded-lg px-4 text-sm font-medium disabled:opacity-40"
-            style={{ background: 'var(--text-primary)', color: 'var(--page)' }}>
+            className="btn btn-primary">
       {busy ? busyLabel : label}
     </button>
   )

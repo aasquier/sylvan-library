@@ -186,8 +186,7 @@ export default function Claim({ onClaimed }: {
             normal one.
           </PlainNote>
           <button type="button" onClick={() => onClaimed(claimed)}
-                  className="h-9 rounded-lg px-4 text-sm font-medium"
-                  style={{ background: 'var(--text-primary)', color: 'var(--page)' }}>
+                  className="btn btn-primary">
             Sign in
           </button>
         </div>

@@ -108,10 +108,7 @@ function ShareToggle({ deck, deckRef, onChanged }: {
           the simulate link and the art picker, and it used to be the odd one
           out in all three of padding, weight and vertical position. */}
       <button onClick={() => void toggle()} disabled={busy}
-              className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40"
-              style={{ border: '1px solid var(--hairline)',
-                       background: 'var(--page)',
-                       color: 'var(--text-secondary)' }}>
+              className="btn btn-quiet">
         {busy ? 'Saving…' : deck.shared ? 'Make private' : 'Share this deck'}
       </button>
       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -210,8 +207,7 @@ function PilotLine({ deck, deckRef, onRefresh }: {
       {!editing && deck.writable && (deck.pilot ? (
         <button type="button"
                 onClick={() => { setValue(deck.pilot); setEditing(true) }}
-                className="text-xs underline decoration-dotted"
-                style={{ color: 'var(--text-muted)' }}>
+                className="btn btn-ghost btn-xs decoration-dotted">
           change
         </button>
       ) : (
@@ -235,12 +231,12 @@ function PilotLine({ deck, deckRef, onRefresh }: {
                           border: '1px solid var(--hairline)',
                           color: 'var(--text-primary)' }} />
           <button type="button" onClick={() => void save()}
-                  className="text-xs font-medium underline"
+                  className="btn btn-ghost btn-xs font-medium"
                   style={{ color: 'var(--series-1)' }}>
             Save
           </button>
           <button type="button" onClick={() => setEditing(false)}
-                  className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  className="btn btn-ghost btn-xs">
             Cancel
           </button>
         </span>
@@ -971,8 +967,7 @@ export default function DeckDetail() {
               <div className="mt-2">
                 <button
                   onClick={() => { setTab('cards'); setOnlyUnjustified(true) }}
-                  className="rounded-lg px-3 py-1.5 text-xs font-medium"
-                  style={{ background: 'var(--gridline)', color: 'var(--text-primary)' }}>
+                  className="btn btn-quiet btn-sm">
                   Show the {deck.needs_rationale} that need one
                 </button>
               </div>
@@ -990,8 +985,7 @@ export default function DeckDetail() {
               {deck.writable && (
                 <div className="mt-2">
                   <button onClick={promote} disabled={promoting}
-                          className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                          style={{ background: 'var(--series-1)', color: '#fff' }}>
+                          className="btn btn-primary btn-accent-1 btn-sm">
                     {promoting ? 'Promoting…' : 'Promote to curated'}
                   </button>
                 </div>
@@ -1015,11 +1009,8 @@ export default function DeckDetail() {
       <div className="flex gap-1 border-b" style={{ borderColor: 'var(--hairline)' }}>
         {tabs.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
-                  className="px-3 py-2 text-sm font-medium transition"
-                  style={{
-                    color: tab === t.id ? 'var(--text-primary)' : 'var(--text-muted)',
-                    borderBottom: `2px solid ${tab === t.id ? 'var(--series-1)' : 'transparent'}`,
-                  }}>
+                  className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm font-medium${
+                    tab === t.id ? ' is-active' : ''}`}>
             {t.label}
           </button>
         ))}
@@ -1141,8 +1132,7 @@ export default function DeckDetail() {
                   put the bar away.{' '}
                   <button type="button"
                           onClick={() => { setAction(null); setPendingEntomb(null) }}
-                          className="underline"
-                          style={{ color: 'var(--text-muted)' }}>
+                          className="btn btn-ghost btn-xs">
                     Done
                   </button>
                 </span>
@@ -1626,9 +1616,7 @@ export default function DeckDetail() {
                           {deck.writable && (
                             <button
                               onClick={() => setSwapping({ out: shortlist.card, into: c.name })}
-                              className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
-                              style={{ background: 'var(--gridline)',
-                                       color: 'var(--text-primary)' }}>
+                              className="btn btn-quiet btn-sm shrink-0">
                               Use this card
                             </button>
                           )}

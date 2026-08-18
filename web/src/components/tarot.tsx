@@ -47,6 +47,7 @@ import {
 import { deal as dealSound, flip as flipSound, riffle, shimmer }
   from '../lib/tablesounds'
 import { useTableSound } from '../lib/prefs'
+import { HandFanGlyph } from './glyphs'
 import { reducedMotion } from '../lib/motion'
 import { PERSONA_ART } from '../lib/personart'
 import backUrl from '../assets/seance/tarot-back.webp'
@@ -529,9 +530,8 @@ function SoundToggle() {
             title={on
               ? 'Table sounds are on'
               : 'Turn on table sounds — the shuffle, the deal, the flip'}
-            className="rounded-md px-3 py-1.5 text-sm"
-            style={{ border: '1px solid var(--hairline)',
-                     color: on ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+            className="btn btn-felt btn-sm"
+            style={{ opacity: on ? 1 : 0.75 }}>
       {on ? '♪ Sound on' : '♪ Sound off'}
     </button>
   )
@@ -811,9 +811,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
     return (
       <div className="card-surface rounded-xl px-6 py-8">
         <p className="text-sm" style={{ color: 'var(--status-critical)' }}>{error}</p>
-        <button onClick={onLeave} className="mt-3 rounded-md px-3 py-1.5 text-sm"
-                style={{ border: '1px solid var(--hairline)',
-                         color: 'var(--text-secondary)' }}>
+        <button onClick={onLeave} className="btn btn-quiet btn-sm mt-3">
           ← Pick colours myself
         </button>
       </div>
@@ -847,9 +845,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
           <span className="ml-auto flex items-center gap-2">
             <SoundToggle />
             <button onClick={onLeave}
-                    className="rounded-md px-3 py-1.5 text-sm"
-                    style={{ border: '1px solid var(--hairline)',
-                             color: 'var(--text-secondary)' }}>
+                    className="btn btn-felt btn-sm">
               ← Pick colours myself
             </button>
           </span>
@@ -947,16 +943,13 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
             {chosen.deals && (
               <button onClick={() => { void chooseReader(chosen) }}
                       disabled={shuffling}
-                      className="rounded-md px-3 py-1.5 text-sm disabled:opacity-50"
-                      style={{ border: '1px solid var(--hairline)',
-                               color: 'var(--text-muted)' }}>
+                      className="btn btn-felt btn-sm">
+                <HandFanGlyph />
                 {shuffling ? 'Shuffling…' : 'Shuffle again'}
               </button>
             )}
             <button onClick={leaveTable}
-                    className="rounded-md px-3 py-1.5 text-sm"
-                    style={{ border: '1px solid var(--hairline)',
-                             color: 'var(--text-muted)' }}>
+                    className="btn btn-felt btn-sm">
               Different reader
             </button>
           </span>
@@ -989,8 +982,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
                 {!allTurned && (
                   <>
                     <button onClick={turnAll}
-                            className="rounded-md px-4 py-2 text-sm font-medium"
-                            style={{ background: 'var(--series-1)', color: '#fff' }}>
+                            className="btn btn-primary btn-accent-1">
                       Turn them over
                     </button>
                     <span className="text-xs" style={{ color: 'var(--tarot-felt-text)' }}>
@@ -1001,8 +993,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
                 {lingering && (
                   <>
                     <button onClick={takeReading}
-                            className="rounded-md px-4 py-2 text-sm font-medium"
-                            style={{ background: 'var(--series-1)', color: '#fff' }}>
+                            className="btn btn-primary btn-accent-1">
                       Begin the reading
                     </button>
                     <span className="text-xs" style={{ color: 'var(--tarot-felt-text)' }}>
@@ -1015,15 +1006,12 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
                 <SoundToggle />
                 <button onClick={() => { void chooseReader(chosen) }}
                         disabled={shuffling}
-                        className="rounded-md px-3 py-1.5 text-sm disabled:opacity-50"
-                        style={{ border: '1px solid var(--hairline)',
-                                 color: 'var(--tarot-felt-text)' }}>
+                        className="btn btn-felt btn-sm">
+                  <HandFanGlyph />
                   {shuffling ? 'Shuffling…' : 'Shuffle again'}
                 </button>
                 <button onClick={leaveTable}
-                        className="rounded-md px-3 py-1.5 text-sm"
-                        style={{ border: '1px solid var(--hairline)',
-                                 color: 'var(--tarot-felt-text)' }}>
+                        className="btn btn-felt btn-sm">
                   Different reader
                 </button>
               </span>

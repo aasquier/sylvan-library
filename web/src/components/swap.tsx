@@ -68,13 +68,11 @@ export function SwapComposer({ deck, out, into, onDone, onCancel }: {
       <div className="flex items-center gap-2">
         <button onClick={() => void apply()}
                 disabled={!why.trim() || busy}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                style={{ background: 'var(--series-1)', color: '#fff' }}>
+                className="btn btn-primary btn-accent-1 btn-sm">
           {busy ? 'Swapping…' : 'Apply swap'}
         </button>
         <button onClick={onCancel}
-                className="text-xs underline"
-                style={{ color: 'var(--text-muted)' }}>
+                className="btn btn-ghost btn-xs">
           Cancel
         </button>
         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>

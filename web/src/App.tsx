@@ -97,8 +97,7 @@ function ThemeButton({ theme, onToggle }: { theme: Theme; onToggle: () => void }
   return (
     <button onClick={onToggle}
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            className="rounded-md px-2 py-1.5 text-sm"
-            style={{ color: 'var(--text-secondary)', border: '1px solid var(--hairline)' }}>
+            className="btn btn-quiet btn-sm">
       {theme === 'dark' ? '☀' : '☾'}
     </button>
   )
@@ -322,9 +321,7 @@ export default function App() {
                   {auth?.user?.username}
                 </span>
                 <button onClick={() => void signOut()}
-                        className="whitespace-nowrap rounded-md px-2 py-1.5 text-sm"
-                        style={{ color: 'var(--text-secondary)',
-                                 border: '1px solid var(--hairline)' }}>
+                        className="btn btn-quiet btn-sm whitespace-nowrap">
                   Sign out
                 </button>
               </span>

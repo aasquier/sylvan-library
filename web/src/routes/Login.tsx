@@ -142,8 +142,7 @@ export default function Login({ initialUsername = '', onSignedIn }: {
         ? <ResetPanel />
         : (
           <button type="button" onClick={() => setForgotten(true)}
-                  className="mt-5 text-xs underline underline-offset-2"
-                  style={{ color: 'var(--text-muted)' }}>
+                  className="btn btn-ghost btn-xs mt-5">
             Forgotten your password?
           </button>
           )}

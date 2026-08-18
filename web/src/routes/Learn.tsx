@@ -314,12 +314,8 @@ function ColorsTab({ taxonomy, selected, onSelect }: {
             return (
               <button key={t.key} onClick={() => first && onSelect(first.key)}
                       aria-pressed={on}
-                      className="flex items-center gap-2 rounded-lg py-1.5 pl-2 pr-3 text-sm font-medium transition"
-                      style={{
-                        color: on ? 'var(--text-primary)' : 'var(--text-muted)',
-                        background: on ? 'var(--gridline)' : 'transparent',
-                        border: `1px solid ${on ? 'var(--baseline)' : 'var(--hairline)'}`,
-                      }}>
+                      className={`chip-toggle flex items-center gap-2 rounded-lg py-1.5 pl-2 pr-3 text-sm font-medium${
+                        on ? ' is-on' : ''}`}>
                 <TierGlyph tier={t.key} />
                 {t.label}
               </button>
@@ -341,12 +337,8 @@ function ColorsTab({ taxonomy, selected, onSelect }: {
           {taxonomy.combinations.filter((c) => c.tier === combo.tier).map((c) => (
             <button key={c.key} onClick={() => onSelect(c.key)}
                     aria-pressed={c.key === combo.key}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition"
-                    style={{
-                      color: c.key === combo.key ? 'var(--text-primary)' : 'var(--text-secondary)',
-                      background: c.key === combo.key ? 'var(--gridline)' : 'transparent',
-                      border: `1px solid ${c.key === combo.key ? 'var(--baseline)' : 'var(--hairline)'}`,
-                    }}>
+                    className={`chip-toggle flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm${
+                      c.key === combo.key ? ' is-on' : ''}`}>
               <ColorRing colors={c.colors} size={14} />
               {c.name}
             </button>
@@ -389,9 +381,7 @@ function TermEntry({ term, byKey, onJump }: {
             See also
             {term.see_also.map((key) => (
               <button key={key} onClick={() => onJump(key)}
-                      className="rounded px-1.5 py-0.5"
-                      style={{ border: '1px solid var(--hairline)',
-                               color: 'var(--text-secondary)' }}>
+                      className="chip-toggle rounded px-1.5 py-0.5">
                 {byKey.get(key)?.term ?? key}
               </button>
             ))}
@@ -562,12 +552,8 @@ export default function Learn() {
                   onClick={() => setParams(
                     t.key === 'words' ? { tab: 'words' } : { tab: 'colors', c: selected },
                     { replace: true })}
-                  className="rounded-md px-3 py-1.5 text-sm font-medium transition"
-                  style={{
-                    color: tab === t.key ? 'var(--text-primary)' : 'var(--text-muted)',
-                    background: tab === t.key ? 'var(--gridline)' : 'transparent',
-                    border: '1px solid var(--hairline)',
-                  }}>
+                  className={`chip-toggle rounded-md px-3 py-1.5 text-sm font-medium${
+                    tab === t.key ? ' is-on' : ''}`}>
             {t.label}
           </button>
         ))}

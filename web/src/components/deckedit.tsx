@@ -36,11 +36,7 @@ const inputStyle: React.CSSProperties = {
 
 function PrimaryButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button
-      {...rest}
-      className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-      style={{ background: 'var(--series-1)', color: '#fff' }}
-    >
+    <button {...rest} className="btn btn-primary btn-accent-1 btn-sm">
       {children}
     </button>
   )
@@ -48,8 +44,7 @@ function PrimaryButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLBut
 
 function QuietButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button {...rest} className="text-xs underline disabled:opacity-50"
-            style={{ color: 'var(--text-muted)' }}>
+    <button {...rest} className="btn btn-ghost btn-xs">
       {children}
     </button>
   )
@@ -140,9 +135,7 @@ function InterviewPanel({ deck, card, askNow = false }: {
         <button
           onClick={askIt}
           disabled={busy}
-          className="rounded-md px-2 py-1 text-[11px] font-medium disabled:opacity-50"
-          style={{ border: '1px solid var(--hairline)',
-                   color: 'var(--text-primary)' }}
+          className="btn btn-quiet btn-xs"
         >
           {busy ? 'Asking…' : report ? 'Ask again' : 'Ask for questions'}
         </button>
@@ -316,13 +309,10 @@ export function SlotArgumentPanel({ deck, card, onClose, writable = false, onSwa
       <div className="flex items-center gap-2">
         <strong style={{ color: 'var(--text-primary)' }}>The case against</strong>
         <button onClick={askIt} disabled={busy}
-                className="rounded-md px-2 py-1 text-[11px] disabled:opacity-50"
-                style={{ border: '1px solid var(--hairline)',
-                         color: 'var(--text-primary)' }}>
+                className="btn btn-quiet btn-xs">
           {busy ? 'Arguing…' : report ? 'Argue again' : 'Argue'}
         </button>
-        <button onClick={onClose} className="ml-auto text-[11px]"
-                style={{ color: 'var(--text-muted)' }}>Close</button>
+        <button onClick={onClose} className="btn btn-ghost btn-xs ml-auto">Close</button>
       </div>
 
       {error && <ErrorNote>{error}</ErrorNote>}
@@ -441,9 +431,7 @@ export function SlotArgumentBody({ deck, report, writable = false, onSwapped }: 
                     {writable && (
                       <button
                         onClick={() => setSwapInto(swapInto === a.name ? null : a.name)}
-                        className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
-                        style={{ background: 'var(--gridline)',
-                                 color: 'var(--text-primary)' }}>
+                        className="btn btn-quiet btn-sm shrink-0">
                         Use this card
                       </button>
                     )}
@@ -615,8 +603,7 @@ export function AddCardForm({ deck, stage, onDone }: {
   if (!open) {
     return (
       <button onClick={() => setOpen(true)}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium"
-              style={{ background: 'var(--gridline)', color: 'var(--text-primary)' }}>
+              className="btn btn-quiet btn-sm">
         + Add a card
       </button>
     )
@@ -716,7 +703,7 @@ export function NoteEditor({ deck, noteKey, value, onDone, writable = true }: {
         </p>
         {writable && (
           <button onClick={() => { setText(value); setEditing(true) }}
-                  className="mt-2 text-xs underline" style={{ color: 'var(--text-muted)' }}>
+                  className="btn btn-ghost btn-xs mt-2">
             Edit
           </button>
         )}
@@ -772,8 +759,7 @@ export function AddNoteForm({ deck, existing, onDone }: {
   if (!open) {
     return (
       <button onClick={() => setOpen(true)}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium"
-              style={{ background: 'var(--gridline)', color: 'var(--text-primary)' }}>
+              className="btn btn-quiet btn-sm">
         + Add a note
       </button>
     )

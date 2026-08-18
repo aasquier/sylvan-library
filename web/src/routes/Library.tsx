@@ -125,14 +125,11 @@ function DeleteDialog({ deck, onCancel, onDeleted }: {
         {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
         <div className="mt-5 flex items-center gap-3">
           <button onClick={remove} disabled={!matches || busy}
-                  className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40"
-                  style={{ background: 'var(--status-critical)', color: '#fff' }}>
+                  className="btn btn-danger-solid">
             {busy ? 'Entombing…' : 'Entomb this deck'}
           </button>
           <button onClick={onCancel} disabled={busy}
-                  className="rounded-lg px-3 py-2 text-sm"
-                  style={{ border: '1px solid var(--hairline)',
-                           color: 'var(--text-secondary)' }}>
+                  className="btn btn-quiet">
             Cancel
           </button>
         </div>
@@ -286,9 +283,8 @@ function DeckCard({ deck, onDelete, heading: Heading = 'h2', index = 0 }: {
           onClick={() => onDelete(deck)}
           title={`Entomb ${deck.name} — the whole deck moves to the trash`}
           aria-label={`Entomb ${deck.name}`}
-          className="absolute right-2 top-2 z-10 rounded-md px-2 py-1 text-[11px] opacity-0 transition focus:opacity-100 group-hover/card:opacity-100"
-          style={{ background: 'var(--surface-1)', color: 'var(--status-critical)',
-                   border: '1px solid color-mix(in srgb, var(--status-critical) 45%, transparent)' }}
+          className="btn btn-danger btn-xs absolute right-2 top-2 z-10 opacity-0 focus:opacity-100 group-hover/card:opacity-100"
+          style={{ background: 'var(--surface-1)' }}
         >
           Entomb
         </button>
@@ -510,11 +506,8 @@ export default function Library() {
           ] as const).map(([key, label, count]) => (
             <button key={key} role="tab" aria-selected={shelf === key}
                     onClick={() => setShelf(key)}
-                    className="-mb-px border-b-2 px-3 py-2 text-sm font-medium transition"
-                    style={{
-                      borderColor: shelf === key ? 'var(--series-1)' : 'transparent',
-                      color: shelf === key ? 'var(--text-primary)' : 'var(--text-muted)',
-                    }}>
+                    className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm font-medium${
+                      shelf === key ? ' is-active' : ''}`}>
               {label}
               <span className="ml-1.5 text-xs tabular" style={{ color: 'var(--text-muted)' }}>
                 {count}
@@ -568,8 +561,7 @@ export default function Library() {
             <code>{deleted.movedTo}</code> — not gone, aside.
           </span>
           <button onClick={() => setDeleted(null)}
-                  className="ml-auto text-xs underline"
-                  style={{ color: 'var(--text-muted)' }}>
+                  className="btn btn-ghost btn-xs ml-auto">
             Dismiss
           </button>
         </div>
