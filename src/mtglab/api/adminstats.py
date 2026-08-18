@@ -210,6 +210,26 @@ def install(app: FastAPI) -> None:
                       "kept here to go stale.",
         }
 
+    @app.get("/api/admin/stats/traffic")
+    def traffic_stats(caller: Admin) -> dict[str, Any]:
+        """The visitor ledger: requests per day by status class, top routes.
+
+        Route templates and status classes only — the recording side
+        (`api/traffic.py`, schema v9) never held anything finer, so this
+        view cannot leak what was never kept: no addresses, no agents, no
+        names, no concrete paths. `note` rides in the payload the way the
+        Claude view's caveat does, because the sentence belongs wherever
+        the numbers go.
+        """
+        del caller
+        from mtglab.api import traffic
+        return {
+            **traffic.summary(days=30),
+            "note": "Route templates and status classes only — the ledger "
+                    "never records an address, an agent, a name, or a "
+                    "concrete path.",
+        }
+
     @app.get("/api/admin/stats/activity")
     def activity_stats(caller: Admin) -> dict[str, Any]:
         """Who has been here and what the instance has been doing.

@@ -88,6 +88,7 @@ def test_a_version_one_database_migrates_in_place(tmp_path):
     old.executescript("DROP TABLE auth_tokens; DROP TABLE sim_cache; "
                       "DROP TABLE dossier_cache; DROP TABLE user_decks; "
                       "DROP TABLE claude_usage; DROP TABLE deck_log; "
+                      "DROP TABLE request_log; "
                       "PRAGMA user_version = 1;")
     old.commit()
     old.close()
@@ -120,6 +121,7 @@ def test_a_version_two_database_gains_the_sim_cache(tmp_path):
     users.create(old, "ada", password=PASSWORD)
     old.executescript("DROP TABLE sim_cache; DROP TABLE dossier_cache; DROP TABLE user_decks; "
                       "DROP TABLE claude_usage; DROP TABLE deck_log; "
+                      "DROP TABLE request_log; "
                       "PRAGMA user_version = 2;")
     old.commit()
     old.close()
@@ -193,6 +195,7 @@ def test_migrating_to_autoincrement_keeps_sessions_and_tokens(tmp_path):
         DROP TABLE user_decks;
         DROP TABLE claude_usage;
         DROP TABLE deck_log;
+        DROP TABLE request_log;
         PRAGMA user_version = 4;
         COMMIT;
     """)
@@ -238,6 +241,7 @@ def test_a_version_three_database_gains_the_dossier_cache(tmp_path):
                 "last_used_at) VALUES ('k', 'sim.mana', '{}', 'then', 'then')")
     old.executescript("DROP TABLE dossier_cache; DROP TABLE user_decks; "
                       "DROP TABLE claude_usage; DROP TABLE deck_log; "
+                      "DROP TABLE request_log; "
                       "PRAGMA user_version = 3;")
     old.commit()
     old.close()

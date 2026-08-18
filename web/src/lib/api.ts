@@ -602,6 +602,26 @@ export interface AdminActivity {
   jobs: Record<string, number>
 }
 
+/** One day of the visitor ledger: a total and whichever status classes the
+ *  day actually saw (`2xx`…`5xx` arrive as optional keys). */
+export interface TrafficDay {
+  day: string
+  total: number
+  '2xx'?: number
+  '3xx'?: number
+  '4xx'?: number
+  '5xx'?: number
+}
+
+/** `GET /api/admin/stats/traffic` — the visitor ledger (schema v9). Route
+ *  templates and status classes only; the recording side never held an
+ *  address, an agent, a name or a concrete path, so this cannot show one. */
+export interface AdminTraffic {
+  days: TrafficDay[]
+  top_routes: { route: string; count: number }[]
+  note: string
+}
+
 /** `POST /api/auth/login`. The session is the cookie; this is who it belongs to. */
 export interface LoginResult {
   user: { id: number; username: string; is_admin: boolean }
@@ -1741,6 +1761,7 @@ export const api = {
   adminStorage: () => get<AdminStorage>('/api/admin/stats/storage'),
   adminClaude: () => get<AdminClaude>('/api/admin/stats/claude'),
   adminActivity: () => get<AdminActivity>('/api/admin/stats/activity'),
+  adminTraffic: () => get<AdminTraffic>('/api/admin/stats/traffic'),
   inviteAccount: (body: { email: string; username?: string; is_admin?: boolean }) =>
     post<Account>('/api/admin/users', body),
   // One route for both levers, and both refusals come from the server: the

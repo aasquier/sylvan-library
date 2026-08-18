@@ -141,6 +141,37 @@ def _no_usage_ledger(monkeypatch):
                         SimpleNamespace(record=lambda **kwargs: None))
 
 @pytest.fixture(autouse=True)
+def _no_request_counts(monkeypatch):
+    """No test deposits request counts in the developer's real app.db.
+
+    The third door of the `_no_usage_ledger` kind, and the first one caught
+    by the detector above rather than by looking at the file: the visitor
+    ledger (`api/traffic.py`, schema v9) counts every response through
+    `record`, which resolves its database from `config` — and its write is
+    *deferred*, so a count taken in one test could flush inside another.
+    Its first full-suite run tripped `_real_app_db_untouched` 115 times.
+
+    The middleware and the traffic endpoint both reach these through the
+    module's own globals, so replacing the two names silences every
+    TestClient in the suite. `tests/test_traffic.py` is the file that is
+    about this module; it points the names back at the `_REAL_*` aliases
+    and runs against a scratch directory.
+
+    One footgun this stub cannot reach, written down after it cost an
+    afternoon of moving blame: a **running `mtglab ui` in another process**
+    now writes the real `app.db` on its own clock — the counter flushes
+    every minute the server sees traffic, and an open Admin tab refreshes
+    every thirty seconds. Run the suite with the local server up and the
+    detector above will fail whichever test happens to be underway when
+    that flush lands. Stop the server before a full run; CI has no server
+    and never sees this.
+    """
+    from mtglab.api import traffic
+    monkeypatch.setattr(traffic, "record", lambda template, status: None)
+    monkeypatch.setattr(traffic, "flush", lambda: None)
+
+
+@pytest.fixture(autouse=True)
 def _no_deck_log(monkeypatch):
     """No test writes activity-log rows into the developer's real app.db.
 

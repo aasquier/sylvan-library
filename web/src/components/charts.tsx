@@ -362,3 +362,39 @@ export function EditsChart({ rows }: { rows: { day: string; edits: number }[] })
     </ResponsiveContainer>
   )
 }
+
+/* -------------------------------------------------------------- traffic */
+
+/** The visitor ledger's chart: requests per day, stacked by status class.
+ *  Reds are reserved for the classes that mean trouble — 4xx wears the
+ *  warning tone and 5xx the critical one — so a bad day reads as a bad
+ *  day from across the room. */
+const TRAFFIC_SERIES = [
+  { key: '2xx', name: 'Answered', color: 'var(--series-1)' },
+  { key: '3xx', name: 'Redirected', color: 'var(--series-2)' },
+  { key: '4xx', name: 'Refused', color: 'var(--status-warning)' },
+  { key: '5xx', name: 'Failed', color: 'var(--status-critical)' },
+]
+
+export function TrafficChart({ days }: {
+  days: { day: string; total: number }[]
+}) {
+  const data = days.map((d) => ({ ...d, day: d.day.slice(5) }))
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <BarChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: -14 }}>
+        <CartesianGrid stroke={GRID} vertical={false} />
+        <XAxis dataKey="day" tick={AXIS} axisLine={{ stroke: 'var(--baseline)' }}
+               tickLine={false} />
+        <YAxis tick={AXIS} axisLine={false} tickLine={false} allowDecimals={false} />
+        <Tooltip content={<TooltipBox />}
+                 cursor={{ fill: 'var(--gridline)', opacity: 0.4 }} />
+        <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-secondary)' }} />
+        {TRAFFIC_SERIES.map((s) => (
+          <Bar key={s.key} dataKey={s.key} name={s.name} stackId="day"
+               fill={s.color} maxBarSize={28} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}

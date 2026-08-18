@@ -1710,9 +1710,19 @@ arc; this is what the next few sessions actually do.
     adds money. The job registry's view is `jobs.census()`, counts only,
     because labels can name another person's deck).
 
-    **Still to come, in order:**
-    the **visitor ledger** (schema v9, `request_log` of route templates
-    only — no IPs, no UAs — on its own watched branch); and **Fly metrics**
+    Sixth: **the visitor ledger** (schema v9 — `request_log(day, route,
+    status_class, count)`, four columns and a test that fails on a
+    helpful fifth. Route *templates* only, never the concrete path a
+    person typed; no IP, no user agent, no username, nothing finer than
+    the UTC day. `api/traffic.py` buffers in memory and flushes
+    opportunistically — no per-request write, and the flush never
+    raises; requests refused before routing share one `(unrouted)`
+    bucket because recording which door was tried is recording the
+    path. `GET /api/admin/stats/traffic` + the dashboard's stacked
+    chart and top-routes list. Landed on its own watched branch, the
+    rule for anything that migrates on boot).
+
+    **Still to come:** **Fly metrics**
     (`FLY_METRICS_TOKEN` → managed Prometheus for machine + edge stats,
     Grafana link-out for alerting).
 

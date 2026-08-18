@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   api, errorMessage, type Account, type AccountList, type AdminActivity,
-  type AdminClaude, type AdminStorage, type AdminSystem,
+  type AdminClaude, type AdminStorage, type AdminSystem, type AdminTraffic,
 } from '../lib/api'
 import { Badge, ErrorNote, PageMasthead, Spinner } from '../components/ui'
-import { EditsChart } from '../components/charts'
+import { EditsChart, TrafficChart } from '../components/charts'
 
 /**
  * Admin: the instance at a glance, and the account levers.
@@ -196,16 +196,18 @@ function Dashboard() {
   const [storage, setStorage] = useState<AdminStorage | null>(null)
   const [claude, setClaude] = useState<AdminClaude | null>(null)
   const [activity, setActivity] = useState<AdminActivity | null>(null)
+  const [traffic, setTraffic] = useState<AdminTraffic | null>(null)
 
   const refresh = useCallback(async () => {
-    const [sys, sto, cla, act] = await Promise.allSettled([
+    const [sys, sto, cla, act, tra] = await Promise.allSettled([
       api.adminSystem(), api.adminStorage(),
-      api.adminClaude(), api.adminActivity(),
+      api.adminClaude(), api.adminActivity(), api.adminTraffic(),
     ])
     if (sys.status === 'fulfilled') setSystem(sys.value)
     if (sto.status === 'fulfilled') setStorage(sto.value)
     if (cla.status === 'fulfilled') setClaude(cla.value)
     if (act.status === 'fulfilled') setActivity(act.value)
+    if (tra.status === 'fulfilled') setTraffic(tra.value)
   }, [])
 
   useEffect(() => {
@@ -289,6 +291,43 @@ function Dashboard() {
         <StatTile label="Jobs" value={activity ? jobsLine : '—'}
                   hint="the registry's census — counts, never labels" />
       </div>
+
+      {traffic && traffic.days.length > 0 && (
+        <div className="card-surface rounded-xl p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold tracking-tight">
+              Visitors, last thirty days
+            </h2>
+            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              {traffic.note}
+            </span>
+          </div>
+          <div className="mt-3">
+            <TrafficChart days={traffic.days} />
+          </div>
+          {traffic.top_routes.length > 0 && (
+            <div className="mt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide"
+                 style={{ color: 'var(--text-muted)' }}>
+                Most asked-for
+              </p>
+              <ul className="mt-1 grid gap-x-6 gap-y-0.5 sm:grid-cols-2">
+                {traffic.top_routes.map((row) => (
+                  <li key={row.route}
+                      className="flex items-baseline justify-between gap-3 text-xs">
+                    <code className="truncate" style={{ color: 'var(--text-secondary)' }}>
+                      {row.route}
+                    </code>
+                    <span className="tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                      {row.count.toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {activity && activity.deck_edits_by_day.length > 0 && (
         <div className="card-surface rounded-xl p-5">
