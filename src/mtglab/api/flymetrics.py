@@ -26,6 +26,21 @@ Three habits inherited rather than reinvented:
   signature to at least one WAF, which cost an afternoon of blaming a valid
   key. Set it, and set it where a test can see it.
 
+**A 401 did not prove the address was right, and believing it did cost this
+panel its first fortnight.** The commit that added this module reported that it
+had "verified the URL by probing with an invalid token: 401 not 404 — that
+isolates wrong-credential from wrong-address." The inference was wrong. The
+header was malformed on *every* request (see `authorization`), so 401 was the
+only answer the endpoint could ever give, and the probe was incapable of
+distinguishing anything. Two good tokens were then suspected in turn, because
+the one measurement everybody trusted had never measured anything.
+
+The lesson generalises past Fly: **a probe that cannot fail differently is not
+a probe.** Before an error code is used to rule something out, check that the
+other code was reachable — here, that meant asking the running container to try
+two header shapes side by side, which took one command and settled it at once
+(`Bearer <tok>` → 401, `<tok>` verbatim → 200).
+
 Answers are cached for five minutes in memory. The numbers move on
 Prometheus's own scrape interval, the dashboard refreshes every thirty
 seconds, and a metrics API is not something to poll once per tile per
@@ -112,6 +127,33 @@ def token() -> str:
     return os.environ.get("FLY_METRICS_TOKEN", "").strip()
 
 
+def authorization(secret: str) -> str:
+    """The `Authorization` value for `secret` — **scheme included, or added.**
+
+    The bug this function exists for, found 2026-08-18 by asking the running
+    container instead of reasoning: a Fly token is a macaroon whose value
+    *begins with its own scheme*, `FlyV1 fm2_...`. Wrapping that in `Bearer `
+    produces `Authorization: Bearer FlyV1 fm2_...` — two schemes, no valid
+    credential — and Fly answers 401 to every request forever. The panel had
+    never worked, through two different tokens, and the fault was here rather
+    than in either of them.
+
+    So: a value that already carries a scheme is sent **verbatim**. Only a bare
+    token gets `Bearer ` put in front of it, which is what a plain API key
+    would want and costs nothing to keep.
+
+    A scheme is detected as "first word, no underscore" rather than by matching
+    `FlyV1` literally. Fly has versioned this prefix before (`FlyV1` is not the
+    first), and a check that only knows today's name would fail the same silent
+    way on the next one — whereas `fm2_...` and every bare key shape has no
+    space at all.
+    """
+    head, _, rest = secret.partition(" ")
+    if rest and "_" not in head:
+        return secret
+    return f"Bearer {secret}"
+
+
 def _scalar(payload: dict[str, Any]) -> float | None:
     """The one number out of a Prometheus instant-vector response.
 
@@ -152,7 +194,7 @@ def fetch(*, transport: Transport | None = None,
 
     get: Transport = transport if transport is not None else _urllib_get
     headers = {
-        "Authorization": f"Bearer {secret}",
+        "Authorization": authorization(secret),
         "Accept": "application/json",
         # Above the seam, so a test can pin it. See the module docstring for
         # what learning this the hard way cost.
