@@ -57,6 +57,27 @@ function account(overrides: Partial<Account> & { username: string }): Account {
   }
 }
 
+/** One ledger row, with both axes — the server sends `(various)` for whichever
+ *  one was not grouped on, and the panel is expected to render it verbatim
+ *  rather than hiding a row that spans models. */
+function row(over: { mode: string; model: string; model_label: string }) {
+  return {
+    conversations: 2, requests: 6,
+    input_tokens: 2000, output_tokens: 400, cache_read_tokens: 800,
+    first_at: '2026-08-10T00:00:00+00:00',
+    last_at: '2026-08-17T00:00:00+00:00',
+    ...over,
+  }
+}
+
+function emptyWindow() {
+  return {
+    by_mode: [], by_model: [],
+    estimated_usd: { usd: 0, unpriced: 0, unpriced_models: [],
+                     complete: true, checked: '2026-08-18' },
+  }
+}
+
 /** The tiers a server serves. Written out here rather than imported from
  *  `claude/tiers.py`'s roster because TypeScript cannot read it — the seam is
  *  the payload, and what these cases pin is that the page renders whatever
@@ -122,15 +143,23 @@ beforeEach(() => {
   })
   vi.mocked(api.adminClaude).mockResolvedValue({
     windows: {
-      week: [],
-      month: [{ mode: 'dossier', conversations: 2, requests: 6,
-                input_tokens: 2000, output_tokens: 400,
-                cache_read_tokens: 800,
-                first_at: '2026-08-10T00:00:00+00:00',
-                last_at: '2026-08-17T00:00:00+00:00' }],
-      all: [],
+      week: emptyWindow(),
+      month: {
+        by_mode: [row({ mode: 'dossier', model: '(various)',
+                        model_label: 'Several' })],
+        by_model: [row({ mode: '(various)', model: 'claude-sonnet-5',
+                         model_label: 'Sonnet' })],
+        // 2000 in at $2/M + 400 out at $10/M + 800 cached at a tenth of
+        // input — the arithmetic `prices.cost` does, done by hand.
+        estimated_usd: { usd: 0.00976, unpriced: 0, unpriced_models: [],
+                         complete: true, checked: '2026-08-18' },
+      },
+      all: emptyWindow(),
     },
     caveat: 'Token counts are a floor on the bill, not the bill.',
+    prices: { checked: '2026-08-18',
+              source: 'https://platform.claude.com/docs/en/pricing',
+              note: 'Estimated from list rates read by a person.' },
   })
   vi.mocked(api.adminActivity).mockResolvedValue({
     accounts: { active: 2 },
@@ -517,6 +546,19 @@ describe('the dashboard', () => {
     const decksTile = screen.getByText('Decks on the volume')
       .closest('div') as HTMLElement
     expect(within(decksTile).getByText('7')).toBeTruthy()
+  })
+
+  it('names the Claude that answered, never the model id', async () => {
+    // Commandment 10 in the place it was still being broken: this column used
+    // to render `claude-sonnet-5`, which is technology. The tier picker on the
+    // Accounts tab already said "Sonnet"; this is the two agreeing.
+    render(<Admin />)
+    await openTab('Claude')
+    await screen.findByText('dossier')
+
+    fireEvent.click(screen.getByRole('button', { name: 'By model' }))
+    expect(await screen.findByText('Sonnet')).toBeTruthy()
+    expect(screen.queryByText('claude-sonnet-5')).toBeNull()
   })
 
   it('shows the ledger with its caveat riding along', async () => {

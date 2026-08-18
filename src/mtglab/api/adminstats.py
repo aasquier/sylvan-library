@@ -8,18 +8,27 @@ the suite fails until it is.
 
 All four views are facts about this box, read from the box: the process,
 the filesystem the volume is mounted on, `app.db`, and the in-memory job
-registry. No external API and no new secret. Two deliberate absences:
+registry. No external API and no new secret.
 
-- **No dollar figure.** Decided with Aaron 2026-08-18: his Console account
-  is individual, and Anthropic's Usage & Cost Admin API exists only for
-  organizations. The ledger's token totals below are the ceiling of what
-  this box can know, and they are labelled what they are — a floor on the
-  bill (cache writes are not captured), never the bill. Adding money to the
-  account stays a human act; the page links out rather than pretending.
+**No invoice — an estimate, and the difference is the whole design.** Decided
+with Aaron 2026-08-18: his Console account is individual, and Anthropic's Usage
+& Cost Admin API exists only for organizations, so *the real bill is not
+reachable from here and never will be by this route*. That has not changed.
+What changed later the same day is that the page stopped refusing to say
+anything about money: `claude/prices.py` multiplies the ledger's tokens by list
+rates a person read on a dated day, which is an estimate and is labelled one
+everywhere it appears. It remains a **floor** — cache writes bill at 1.25x
+input and are captured nowhere — and a conversation whose model carries no rate
+is counted rather than priced at zero, so the figure is never quietly wrong
+downward. Adding money to the account stays a human act; the page links out
+rather than pretending.
+
+One absence survives:
+
 - **No machine-level metrics from outside.** Fly's managed Prometheus
-  (edge traffic, instance memory as the platform sees it) is a later PR
-  behind a read-only token; this module reports what the process can see
-  without asking anybody.
+  (edge traffic, instance memory as the platform sees it) came later, behind a
+  read-only token in `api/flymetrics.py`; *this* module still reports only what
+  the process can see without asking anybody.
 """
 
 from __future__ import annotations
@@ -38,6 +47,7 @@ from mtglab import config
 from mtglab.api import jobs
 from mtglab.api.deps import Admin
 from mtglab.auth import db, tokens, users
+from mtglab.claude import prices, tiers
 
 _LOG = logging.getLogger("mtglab.api.adminstats")
 
@@ -189,7 +199,7 @@ def install(app: FastAPI) -> None:
 
     @app.get("/api/admin/stats/claude")
     def claude_stats(caller: Admin) -> dict[str, Any]:
-        """Where the Claude tokens went, per mode, over three windows.
+        """Where the Claude tokens went — per mode, per model, and in dollars.
 
         The ledger's numbers (ADR 28's sibling in `claude/ledger.py`):
         aggregate counters only — no user, no deck, no question text. The
@@ -197,17 +207,67 @@ def install(app: FastAPI) -> None:
         anywhere they are shown, the same rule the simulator's Tier 1
         caveats follow: cache *writes* are not captured, so these totals
         are a floor on the bill, never the bill.
+
+        Two axes per window, because they answer different questions and
+        neither substitutes for the other: **per mode** is "which surface is
+        spending this", **per model** is "on which Claude" — the question
+        per-account tiers made worth asking. Each is grouped in SQL rather
+        than pivoted here, so a window's two lists sum to the same totals by
+        construction.
+
+        The **dollar figure is estimated from the per-model rollup only**, and
+        that is not an optimisation. Pricing the per-mode one would mean
+        pricing rows whose model column reads `(various)` — every rate would be
+        a guess, and the guess would look like arithmetic.
+
+        `estimated_usd` carries its own honesty with it: the date the rates
+        were last checked by a person, and a count of conversations whose model
+        this build cannot price. A caller rendering the figure without the
+        second is showing a number that is wrong downward.
         """
         del caller
+
+        def labelled(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            """Each row, plus how to name the model on a screen.
+
+            Beside the id rather than instead of it. The label is what renders
+            (commandment 10 — a model id is technology, and the tier picker two
+            tabs over already says "Sonnet"); the id stays in the payload
+            because it is what the pricing question is actually about, and a
+            client that wanted to group or key on it should not have to parse
+            prose to get it back.
+            """
+            return [{**row, "model_label": tiers.label_for(row["model"])}
+                    for row in rows]
+
+        def window(since: str | None) -> dict[str, Any]:
+            by_mode = ledger_summary(since=since)
+            by_model = ledger_summary(since=since, by="model")
+            return {
+                "by_mode": labelled(by_mode),
+                "by_model": labelled(by_model),
+                # Priced from the unlabelled rows: the estimate keys on the id,
+                # and two ids that share a label (two Opus generations, say)
+                # are two rates.
+                "estimated_usd": prices.estimate(by_model).as_dict(),
+            }
+
         return {
             "windows": {
-                "week": ledger_summary(since=_ago(7)),
-                "month": ledger_summary(since=_ago(30)),
-                "all": ledger_summary(),
+                "week": window(_ago(7)),
+                "month": window(_ago(30)),
+                "all": window(None),
             },
             "caveat": "Token counts are a floor on the bill, not the bill: "
-                      "cache writes are not captured, and no price table is "
-                      "kept here to go stale.",
+                      "cache writes bill at 1.25x input and are not captured.",
+            "prices": {
+                "checked": prices.CHECKED.isoformat(),
+                "source": prices.SOURCE,
+                "note": "Estimated from list rates read by a person on the "
+                        "date above, not from an invoice. A conversation "
+                        "whose model is not in the table is counted, never "
+                        "priced at zero.",
+            },
         }
 
     @app.get("/api/admin/stats/fly")
@@ -298,10 +358,16 @@ def install(app: FastAPI) -> None:
         }
 
 
-def ledger_summary(*, since: str | None = None) -> list[dict[str, Any]]:
+def ledger_summary(*, since: str | None = None,
+                   by: str = "mode") -> list[dict[str, Any]]:
     """`claude.ledger.summary`, imported lazily the way the runs modules
     import their planners: the ledger rides the base install, but keeping
     the import at call time keeps this module importable in any test that
-    stubs it."""
+    stubs it.
+
+    `claude.prices` is imported at module level instead, and the difference is
+    deliberate: this one touches the database and is the thing tests stub,
+    while that one is a table and some arithmetic with nothing to fail.
+    """
     from mtglab.claude import ledger
-    return ledger.summary(since=since)
+    return ledger.summary(since=since, by=by)

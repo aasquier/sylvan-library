@@ -116,6 +116,52 @@ def known(key: str) -> bool:
     return key in _BY_KEY
 
 
+# How a model id is spoken about on a screen. Prefix-matched on the family,
+# because the family is the name Anthropic uses in prose and the digits after
+# it are the technology commandment 10 keeps off every surface.
+#
+# Not derived from `TIERS`, deliberately, even though the three labels coincide
+# today. A ledger row can hold a model that is no tier at all -- a model served
+# after a fallback, an older id, an A/B via `MTGLAB_CLAUDE_MODEL` -- and
+# resolving those through `get` would label them with the *default tier*, which
+# is how a screen ends up naming the wrong Claude with total confidence. A test
+# pins that every tier's model still lands on that tier's label.
+_FAMILIES: tuple[tuple[str, str], ...] = (
+    ("claude-fable-", "Fable"),
+    ("claude-mythos-", "Mythos"),
+    ("claude-opus-", "Opus"),
+    ("claude-sonnet-", "Sonnet"),
+    ("claude-haiku-", "Haiku"),
+)
+
+#: What a roll-up says in the column it aggregated away. `ledger.summary`
+#: writes the marker; this is the word for it.
+VARIOUS = "(various)"
+
+
+def label_for(model: str) -> str:
+    """How to name the Claude that answered, on a screen.
+
+    Commandment 10 in the one place it was still being broken: the Admin
+    ledger rendered `claude-sonnet-5` in its "Answered by" column, which is a
+    model id, which is technology. The tier picker two tabs over already said
+    "Sonnet"; this is the two agreeing.
+
+    An id from no known family is **"Another Claude"** rather than a guess.
+    That is deliberately uninformative on the page and deliberately paired with
+    the unpriced counter beside it: both mean "this build does not know that
+    model", and the maintainer who needs the id itself has `mtglab claude
+    usage`, which prints it — a terminal is the same carve-out `mtglab users
+    list` gets for printing addresses.
+    """
+    if model == VARIOUS:
+        return "Several"
+    for prefix, label in _FAMILIES:
+        if model.startswith(prefix):
+            return label
+    return "Another Claude"
+
+
 def roster() -> list[dict[str, str]]:
     """The tiers, for the Admin page. Keys and prose — never a model id.
 

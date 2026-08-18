@@ -97,9 +97,14 @@ def test_storage_says_null_for_absent_and_sized_for_present(client):
 def test_claude_totals_carry_their_caveat(client):
     """The numbers and the sentence travel together, Tier 1's rule."""
     empty = client.get("/api/admin/stats/claude").json()
-    assert empty["windows"]["week"] == []
-    assert empty["windows"]["all"] == []
+    assert empty["windows"]["week"]["by_mode"] == []
+    assert empty["windows"]["all"]["by_model"] == []
+    assert empty["windows"]["all"]["estimated_usd"]["usd"] == 0
     assert "floor" in empty["caveat"]
+    # The date a person last read the pricing page rides with the figure. A
+    # number whose age is invisible is the wrong invoice the old no-price-table
+    # comment warned about; one a reader can discount is not.
+    assert empty["prices"]["checked"]
 
     ledger.record(mode="dossier", model="claude-sonnet-5",
                   stop_reason="end_turn", requests=3,
@@ -107,11 +112,60 @@ def test_claude_totals_carry_their_caveat(client):
                   cache_read_tokens=400)
 
     body = client.get("/api/admin/stats/claude").json()
-    week = {row["mode"]: row for row in body["windows"]["week"]}
+    week = {row["mode"]: row for row in body["windows"]["week"]["by_mode"]}
     assert week["dossier"]["conversations"] == 1
     assert week["dossier"]["input_tokens"] == 1000
     # A row recorded now is inside every window.
-    assert {row["mode"] for row in body["windows"]["all"]} == {"dossier"}
+    assert {row["mode"] for row in body["windows"]["all"]["by_mode"]} == {"dossier"}
+
+
+def test_the_two_axes_sum_to_the_same_totals(client):
+    """Each is its own `GROUP BY`, not a pivot of the other — so a disagreement
+    here means one of the two queries lost rows."""
+    for mode in ("dossier", "research"):
+        ledger.record(mode=mode, model="claude-sonnet-5",
+                      stop_reason="end_turn", requests=2,
+                      input_tokens=500, output_tokens=100,
+                      cache_read_tokens=50)
+
+    pane = client.get("/api/admin/stats/claude").json()["windows"]["all"]
+    for field in ("conversations", "requests", "input_tokens",
+                  "output_tokens", "cache_read_tokens"):
+        assert (sum(r[field] for r in pane["by_mode"])
+                == sum(r[field] for r in pane["by_model"])), field
+
+
+def test_a_per_mode_row_says_various_rather_than_naming_one_model(client):
+    """Grouping by mode aggregates the model, so the column cannot name one
+    truthfully. `(various)` is the honest answer; whichever id SQLite happened
+    to keep would look like a fact and be an accident."""
+    for model in ("claude-sonnet-5", "claude-opus-5"):
+        ledger.record(mode="dossier", model=model, stop_reason="end_turn",
+                      requests=1, input_tokens=10, output_tokens=10,
+                      cache_read_tokens=0)
+
+    pane = client.get("/api/admin/stats/claude").json()["windows"]["all"]
+    assert [r["model"] for r in pane["by_mode"]] == ["(various)"]
+    assert {r["model"] for r in pane["by_model"]} == {"claude-sonnet-5",
+                                                     "claude-opus-5"}
+    assert {r["mode"] for r in pane["by_model"]} == {"(various)"}
+
+
+def test_a_model_with_no_rate_is_counted_rather_than_priced_at_zero(client):
+    """The ledger stores the served-by id, which can be one this build has
+    never heard of. Charging it nothing without saying so would make the total
+    read low and reassuring — which is worse than refusing to price it."""
+    ledger.record(mode="dossier", model="claude-archaeopteryx-9",
+                  stop_reason="end_turn", requests=1,
+                  input_tokens=9_000_000, output_tokens=9_000_000,
+                  cache_read_tokens=0)
+
+    spend = (client.get("/api/admin/stats/claude").json()
+             ["windows"]["all"]["estimated_usd"])
+    assert spend["usd"] == 0
+    assert spend["unpriced"] == 1
+    assert spend["unpriced_models"] == ["claude-archaeopteryx-9"]
+    assert spend["complete"] is False
 
 
 def test_activity_counts_accounts_sessions_and_the_registry(client):

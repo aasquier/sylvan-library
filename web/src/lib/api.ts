@@ -592,6 +592,18 @@ export interface AdminStorage {
  *  and nothing that could name a person, a deck or a question. */
 export interface ClaudeUsageRow {
   mode: string
+  /** The model that answered. Every row carries both axes; the one that was
+   *  *not* grouped on reads `(various)`, so a per-mode row spanning models
+   *  says so rather than naming an arbitrary winner.
+   *
+   *  Kept in the payload but **not rendered** — it is a model id, which is
+   *  technology (commandment 10). Show `model_label`. */
+  model: string
+  /** How to name that Claude on a screen: "Sonnet", "Opus", "Several" for an
+   *  aggregated row, "Another Claude" for a model this build does not know.
+   *  Computed server-side, so there is no id-to-name table in TypeScript to
+   *  drift from the one in `claude/tiers.py`. */
+  model_label: string
   conversations: number
   requests: number
   input_tokens: number
@@ -601,13 +613,38 @@ export interface ClaudeUsageRow {
   last_at: string
 }
 
+/** What a window came to in money, and what could not be counted.
+ *
+ *  `unpriced` is not a footnote: a conversation whose model carries no rate
+ *  contributes nothing to `usd`, so rendering the figure without it shows a
+ *  number that is wrong downward and reads as reassuring. */
+export interface ClaudeSpend {
+  usd: number
+  unpriced: number
+  unpriced_models: string[]
+  complete: boolean
+  /** When a person last read the pricing page. Shown beside the figure — the
+   *  honest substitute for a freshness guarantee it cannot make. */
+  checked: string
+}
+
+/** One window of the ledger, on both axes. They sum to the same totals by
+ *  construction — each is its own `GROUP BY`, not a pivot of the other. */
+export interface ClaudeWindow {
+  by_mode: ClaudeUsageRow[]
+  by_model: ClaudeUsageRow[]
+  /** Estimated from the per-model rollup only. Pricing the per-mode one would
+   *  mean guessing a rate for rows that span models. */
+  estimated_usd: ClaudeSpend
+}
+
 /** `GET /api/admin/stats/claude`. The caveat rides with the numbers because
  *  they are a floor on the bill, and any surface that shows one without the
  *  other is quoting a cached number as fresh, one abstraction over. */
 export interface AdminClaude {
-  windows: { week: ClaudeUsageRow[]; month: ClaudeUsageRow[]
-             all: ClaudeUsageRow[] }
+  windows: { week: ClaudeWindow; month: ClaudeWindow; all: ClaudeWindow }
   caveat: string
+  prices: { checked: string; source: string; note: string }
 }
 
 /** `GET /api/admin/stats/activity`. Counts all the way down. */
