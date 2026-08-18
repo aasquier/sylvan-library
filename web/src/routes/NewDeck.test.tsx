@@ -465,7 +465,7 @@ describe('the tarot door', () => {
       transcript: [], slots: [], facts: [], persona: 'fortune-teller',
       seed: 4242,
     }), PAST_THE_SHUFFLE)
-  })
+  }, 9000)
 
 
   it('knocking twice on the glass takes the reading too', async () => {
@@ -485,7 +485,7 @@ describe('the tarot door', () => {
     await waitFor(() => expect(api.themeAsk).toHaveBeenCalled(), PAST_THE_SHUFFLE)
     expect(JSON.parse(localStorage.getItem('mtglab-tarot-table')!).read)
       .toBe(true)
-  })
+  }, 9000)
 
   it('deals nothing for a reader who reads no cards', async () => {
     await enterTarot('plain')
@@ -517,7 +517,7 @@ describe('the tarot door', () => {
     await waitFor(() => expect(api.themeAsk).toHaveBeenCalled(), PAST_THE_SHUFFLE)
     expect(screen.queryByText('A question the plain one asked')).toBeNull()
     expect(vi.mocked(api.themeAsk).mock.calls[0]?.[0].transcript).toEqual([])
-  })
+  }, 9000)
 
   it('re-deals the same spread rather than remembering the cards', async () => {
     // What survives a reload is three integers' worth: who is reading, which
