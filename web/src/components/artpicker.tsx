@@ -111,8 +111,8 @@ export function CardArtPicker({ deck, card, onPicked, onClose }: {
       {!printings && !error && <Spinner label="finding printings…" />}
       {printings && printings.length === 0 && (
         <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-          No printings found. Without a card pool this list is empty — run
-          <code className="mx-1">mtglab data refresh</code>.
+          No printings found. The library&rsquo;s card pool has not been
+          stocked yet.
         </p>
       )}
       {printings && printings.length > 0 && (
@@ -260,8 +260,8 @@ export function ArtPicker({ deck, onPicked }: {
           {!printings && !error && <Spinner label="finding printings…" />}
           {printings && printings.length === 0 && (
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              No printings found. Without a card pool this list is empty — run
-              <code className="mx-1">mtglab data refresh</code>.
+              No printings found. The library&rsquo;s card pool has not been
+              stocked yet.
             </p>
           )}
           {printings && printings.length > 0 && (

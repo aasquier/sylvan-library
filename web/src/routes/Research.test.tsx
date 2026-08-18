@@ -209,7 +209,7 @@ describe('the two kinds of card fact', () => {
     expect(await screen.findByText('Sporeback Wurmcaller')).toBeTruthy()
     // And labelled, in this file's words. Everything said about it upstream
     // rests on a page rather than on a lookup.
-    expect(screen.getByText(/Not in the card pool/)).toBeTruthy()
+    expect(screen.getByText(/Not yet in the library/)).toBeTruthy()
   })
 
   it('does not file the unresolved count with the dropped counts', async () => {

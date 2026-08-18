@@ -80,7 +80,11 @@ def test_every_fate_is_reachable(pool):
 
 def test_the_caveat_says_which_system_answered(pool):
     out = _spin(pool, 3)
-    assert "deterministic Python" in out["caveat"]
+    # Commandment 10 (Aaron, 2026-08-17): the caveat states the
+    # distinction — dice, not judgment — without naming an
+    # implementation. "Python" rendering anywhere user-facing is the bug.
+    assert "Python" not in out["caveat"]
+    assert "dice" in out["caveat"]
     assert "yours to write" in out["caveat"]
 
 

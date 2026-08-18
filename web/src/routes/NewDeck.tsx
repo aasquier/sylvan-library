@@ -715,7 +715,7 @@ export default function NewDeck() {
               </div>
 
               <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Colour identity here is Scryfall’s, checked against{' '}
+                Colour identity comes from the printed cards, checked against{' '}
                 <em>{current.verified_by}</em>.
               </p>
             </article>
@@ -750,8 +750,8 @@ export default function NewDeck() {
           {commanders?.length === 0 && (
             <div className="card-surface rounded-xl px-6 py-8 text-center">
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                No commanders found. This needs the card pool — run{' '}
-                <code>mtglab data refresh</code>.
+                No commanders found — the library&rsquo;s card pool has not been
+                stocked yet.
               </p>
             </div>
           )}

@@ -53,12 +53,17 @@ load-bearing.
    charges a solitary penny, for anything. And ALWAYS honor the rules and
    regulations of Wizards of the Coast (and Hasbro) — the Fan Content Policy
    is a hard boundary, not a guideline.
-10. **Don't leak implementation details.** Users care about their cards and
-    about Magic, not about which model or programming language is under the
-    hood. This is an immersive Magic: the Gathering experience. Claude being
-    in the loop is the one exception — we are proud of that and may say so —
-    but model ids, framework names, and wire tokens never render in the
-    user's face. (`lib/claudecopy.ts` is this rule in code.)
+10. **Claude is the only technology a user may ever see named.** (Sharpened
+    with Aaron 2026-08-17, after "Python rolls" and a seed rendered on the
+    Wheel.) Users care about their cards and about Magic; this is an
+    immersive Magic: the Gathering experience, and no technology backing it
+    ever renders — not languages, not databases or frameworks, not seeds,
+    not model ids, not wire tokens. Claude is the one exception: we are
+    proud Claude is in the loop and may say so, by name, never by model id.
+    When a distinction matters to the user — dice rather than judgment, a
+    cached answer rather than a fresh one — it is said in plain or
+    Magic-flavoured words that never name what computes it.
+    (`lib/claudecopy.ts` is this rule in code.)
 11. **CI is never a surprise.** Run all tests locally before opening a PR —
     the full pytest, `ruff`, `mypy`, and `npm --prefix web run check`. A red
     check should only ever be news about the environment, never about the
