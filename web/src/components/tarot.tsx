@@ -47,112 +47,15 @@ import {
 import { deal as dealSound, flip as flipSound, riffle, shimmer }
   from '../lib/tablesounds'
 import { useTableSound } from '../lib/prefs'
+import { reducedMotion } from '../lib/motion'
 import { PERSONA_ART } from '../lib/personart'
-import wispsMp4Url from '../assets/ambience/wisps-loop.mp4'
-import wispsWebmUrl from '../assets/ambience/wisps-loop.webm'
-import candleMp4Url from '../assets/seance/candle-glow-loop.mp4'
-import candleWebmUrl from '../assets/seance/candle-glow-loop.webm'
-import standUrl from '../assets/seance/crystal-fish.webp'
-import shellUrl from '../assets/seance/crystal-shell-sepia.webp'
-import candlesUrl from '../assets/seance/seance-candles.webp'
-import flameMp4Url from '../assets/seance/seance-flame-loop.mp4'
-import flameWebmUrl from '../assets/seance/seance-flame-loop.webm'
-import smokeMp4Url from '../assets/seance/seance-smoke-loop.mp4'
-import smokeWebmUrl from '../assets/seance/seance-smoke-loop.webm'
+import backUrl from '../assets/seance/tarot-back.webp'
+import roomMp4Url from '../assets/seance/seance-room-loop.mp4'
+import roomStillUrl from '../assets/seance/seance-room-still.webp'
+import roomWebmUrl from '../assets/seance/seance-room-loop.webm'
 import { ThemeInterview } from './theme'
 import { CardArt } from './ui'
 import { VideoBackdrop } from './videofx'
-
-/** Mana over the felt: the wisps loop (ADR 31, seed 1909 — the Rider
- *  printing's year) drifting across the table at screen-blend opacity.
- *  Ambience mode, so reduced motion or the pref removes it entirely and
- *  the felt is exactly the table it always was. */
-function TableWisps() {
-  return <VideoBackdrop webmSrc={wispsWebmUrl} mp4Src={wispsMp4Url}
-                        mode="ambience" className="tarot-wisps" />
-}
-
-/** Every wick on the candle plate, MEASURED rather than eyeballed: the
- *  flames are blown out to white, so a >235 luminance threshold and a
- *  connected-component sweep finds all seventeen — x/y as fractions of
- *  the plate, `s` from the sqrt of each flame's area against the median.
- *  Re-run the sweep whenever the recipe's crop moves; hand-nudged
- *  coordinates are how the first wax prototype ended up dripping from
- *  thin air. */
-const RACK_FLAMES = [
-  { x: 0.010, y: 0.375, s: 0.62 },
-  { x: 0.013, y: 0.116, s: 0.81 },
-  { x: 0.112, y: 0.383, s: 1.13 },
-  { x: 0.149, y: 0.325, s: 0.61 },
-  { x: 0.181, y: 0.343, s: 0.90 },
-  { x: 0.220, y: 0.395, s: 1.42 },
-  { x: 0.245, y: 0.371, s: 1.17 },
-  { x: 0.304, y: 0.635, s: 1.12 },
-  { x: 0.383, y: 0.571, s: 0.86 },
-  { x: 0.398, y: 0.480, s: 1.19 },
-  { x: 0.422, y: 0.596, s: 0.91 },
-  { x: 0.521, y: 0.267, s: 1.00 },
-  { x: 0.602, y: 0.228, s: 0.93 },
-  { x: 0.737, y: 0.446, s: 1.46 },
-  { x: 0.770, y: 0.446, s: 1.13 },
-  { x: 0.952, y: 0.448, s: 1.37 },
-  { x: 0.997, y: 0.521, s: 0.44 },
-]
-
-/** The union mask that keeps only the flame teardrops of a plate clone —
- *  what lets the turbulence filter bend the photographed tips without
- *  doubling the wax under them. */
-const FLAME_MASK = RACK_FLAMES.map((f) =>
-  `radial-gradient(ellipse ${(5.5 * f.s).toFixed(1)}% ${(7 * f.s).toFixed(1)}% `
-  + `at ${(f.x * 100).toFixed(1)}% ${(f.y * 100).toFixed(1)}%, `
-  + '#000 45%, transparent 78%)').join(',')
-
-/**
- * The dance (Aaron's ruling off the flicker board, 2026-08-17): a rack's
- * fire moves per FLAME, never per rack. Three motions compose, all
- * deterministic — periods and phases are functions of each flame's index,
- * because a hand wobbles but a render must not:
- *
- * - the plate's own tips BEND: a clone of the photograph, masked to the
- *   teardrops, displaced by SMIL-animated turbulence (probed in WebKit
- *   before it was trusted);
- * - a halo on every wick breathes and sways on its own period;
- * - and each flame occasionally GUTTERS — a quick squash-flare-dart on a
- *   long cycle, carried by a wrapper span so its transform composes with
- *   the breathe instead of fighting it.
- *
- * Reduced motion stills all three from the same media query that stills
- * the room: halos hold steady light and the bending clone is removed
- * (SMIL cannot hear the media query, so the element goes, not the
- * animation).
- */
-function FlameDance() {
-  return (
-    <>
-      <img className="flame-bend" src={candlesUrl} alt="" aria-hidden="true"
-           style={{
-             WebkitMaskImage: FLAME_MASK,
-             maskImage: FLAME_MASK,
-           } as React.CSSProperties} />
-      {RACK_FLAMES.map((f, i) => (
-        <span key={i} className="flame-gutter" aria-hidden="true"
-              style={{
-                left: `${f.x * 100}%`,
-                top: `${f.y * 100}%`,
-                width: `${(6.2 * f.s).toFixed(1)}%`,
-                animationDuration: `${(6 + ((i * 5) % 11) * 1.1).toFixed(1)}s`,
-                animationDelay: `${(-(i * 1.9)).toFixed(1)}s`,
-              }}>
-          <span className="flame-halo"
-                style={{
-                  animationDuration: `${(1.3 + ((i * 7) % 9) * 0.17).toFixed(2)}s`,
-                  animationDelay: `${(-(i * 0.37)).toFixed(2)}s`,
-                }} />
-        </span>
-      ))}
-    </>
-  )
-}
 
 /** The table survives a reload, for the reason the transcript does: a reading
  *  is of one person on one evening, and re-dealing it would make it somebody
@@ -202,115 +105,26 @@ function loadTable(): Table {
 /* --------------------------------------------------------------- the cards */
 
 /**
- * The back of a card, drawn.
+ * The back of a card.
  *
- * Drawn rather than photographed for the same reason `managlyphs.ts` draws the
- * mana symbols: the 78 faces are a public-domain scan with a provenance file
- * behind them, and a back lifted off the internet would be a 79th image with
- * no such argument attached. This one is geometry — an interlocking-ring
- * lattice on a deep field, which is what every card back has looked like since
- * the eighteenth century — so it owes nobody anything.
+ * A painted Magic back (Aaron, 2026-08-17), replacing a drawn one. The drawn
+ * version was geometry — an interlocking-ring lattice with the colour wheel
+ * on it — chosen so the deck owed nobody anything, and it was fine. This is
+ * better, and the reason is commandment 3 rather than craft: the back of the
+ * deck is the one surface a querent looks at for the whole deal, and a
+ * planeswalker's crown on it says *what game this is* before a single card
+ * is turned.
+ *
+ * It is `cover`, and `index.css` says why: the plate is a Magic card's
+ * proportions and the 1909 scans are a tarot card's, so one of them has to
+ * give a tenth away, and a cropped margin beats two black bands.
  *
  * It commits to one palette in both themes on purpose. A card back is a
  * physical object on a table, not a piece of UI chrome, and a card that
  * changed colour with the system theme would stop reading as one.
  */
 function CardBack() {
-  const id = useId().replace(/:/g, '')
-  return (
-    <svg viewBox="0 0 200 348" className="h-full w-full" aria-hidden="true">
-      <defs>
-        <pattern id={`lattice-${id}`} width="26" height="26"
-                 patternUnits="userSpaceOnUse">
-          {/* Rings on a half-drop grid, so the tile has no visible seam and
-              the eye reads a weave rather than a checkerboard. */}
-          <circle cx="13" cy="13" r="9.5" fill="none"
-                  stroke="#c9a227" strokeWidth="0.9" opacity="0.55" />
-          <circle cx="0" cy="0" r="9.5" fill="none"
-                  stroke="#c9a227" strokeWidth="0.9" opacity="0.55" />
-          <circle cx="26" cy="0" r="9.5" fill="none"
-                  stroke="#c9a227" strokeWidth="0.9" opacity="0.55" />
-          <circle cx="0" cy="26" r="9.5" fill="none"
-                  stroke="#c9a227" strokeWidth="0.9" opacity="0.55" />
-          <circle cx="26" cy="26" r="9.5" fill="none"
-                  stroke="#c9a227" strokeWidth="0.9" opacity="0.55" />
-          <circle cx="13" cy="13" r="1.6" fill="#c9a227" opacity="0.7" />
-        </pattern>
-        <radialGradient id={`glow-${id}`} cx="50%" cy="46%" r="62%">
-          <stop offset="0%" stopColor="#2c3f6b" />
-          <stop offset="100%" stopColor="#141d33" />
-        </radialGradient>
-      </defs>
-
-      <rect width="200" height="348" rx="9" fill={`url(#glow-${id})`} />
-      <rect x="7" y="7" width="186" height="334" rx="5"
-            fill={`url(#lattice-${id})`} />
-      <rect x="7" y="7" width="186" height="334" rx="5" fill="none"
-            stroke="#c9a227" strokeWidth="1.4" opacity="0.85" />
-      <rect x="12.5" y="12.5" width="175" height="323" rx="3" fill="none"
-            stroke="#c9a227" strokeWidth="0.7" opacity="0.5" />
-
-      {/* The medallion is Magic's own compass now (Aaron's item 10): the
-          five colours in their pentagon, antiqued to the back's palette
-          and joined by the thin gold ring-and-star the lattice already
-          speaks. Drawn, like everything else on this back — the actual
-          Magic card back is exactly what the Fan Content Policy does not
-          let us reprint, and five muted orbs in a wheel is the game's
-          signature without a pixel of its property. Smith's sun keeps the
-          outer rays; the wheel takes the sky. */}
-      <g transform="translate(100 174)">
-        <circle r="34" fill="#141d33" opacity="0.9" />
-        <circle r="34" fill="none" stroke="#c9a227" strokeWidth="1.1"
-                opacity="0.85" />
-        {Array.from({ length: 16 }, (_, i) => {
-          const a = (i * Math.PI * 2) / 16
-          const inner = 36
-          const outer = i % 2 === 0 ? 52 : 45
-          return (
-            <line key={i}
-                  x1={Math.cos(a) * inner} y1={Math.sin(a) * inner}
-                  x2={Math.cos(a) * outer} y2={Math.sin(a) * outer}
-                  stroke="#c9a227" strokeWidth={i % 2 === 0 ? 1.5 : 0.9}
-                  opacity="0.8" strokeLinecap="round" />
-          )
-        })}
-        <circle r="17" fill="none" stroke="#c9a227" strokeWidth="0.9"
-                opacity="0.7" />
-        {/* The pentagram under the wheel: each colour joined to its two
-            enemies, which is the geometry every Magic player knows. */}
-        {Array.from({ length: 5 }, (_, i) => {
-          const a1 = -Math.PI / 2 + (i * Math.PI * 2) / 5
-          const a2 = -Math.PI / 2 + (((i + 2) % 5) * Math.PI * 2) / 5
-          return (
-            <line key={`p-${i}`}
-                  x1={Math.cos(a1) * 22} y1={Math.sin(a1) * 22}
-                  x2={Math.cos(a2) * 22} y2={Math.sin(a2) * 22}
-                  stroke="#c9a227" strokeWidth="0.7" opacity="0.5" />
-          )
-        })}
-        {/* WUBRG clockwise from the top, the colours pulled toward the
-            back's own lamplight — antique enough to sit on 1909 stock,
-            plain enough that anyone who has shuffled a Magic deck knows
-            the wheel at a glance. */}
-        {[['#e8ddb5', '#b8ac82'], ['#4f6f9e', '#31517d'],
-          ['#3a3245', '#211c2c'], ['#a8442f', '#7e2c1c'],
-          ['#3f6d44', '#28502e']].map(([fill, rim], i) => {
-          const a = -Math.PI / 2 + (i * Math.PI * 2) / 5
-          return (
-            <g key={`w-${i}`}
-               transform={`translate(${Math.cos(a) * 22} ${Math.sin(a) * 22})`}>
-              <circle r="6.4" fill={fill} stroke={rim} strokeWidth="1" />
-              <circle r="6.4" fill="none" stroke="#c9a227"
-                      strokeWidth="0.7" opacity="0.75" />
-              {/* the lamplight's glint, so the orbs sit with the rings */}
-              <circle r="2" cx="-1.6" cy="-1.8" fill="#fff6dd"
-                      opacity="0.28" />
-            </g>
-          )
-        })}
-      </g>
-    </svg>
-  )
+  return <img className="tarot-back" src={backUrl} alt="" aria-hidden="true" />
 }
 
 /** The trumps' numerals, as the 1909 deck prints them. Index is the trump's
@@ -490,9 +304,6 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
   // not. Fixed per slot rather than random: the same table on a reload.
   const style = {
     '--deal-delay': `${index * 150}ms`,
-    '--settle-rot': `${SETTLE_ROT[index] ?? 0}deg`,
-    '--arc-rot': `${ARC_ROT[index] ?? 0}deg`,
-    '--arc-drop': `${ARC_DROP[index] ?? 0}px`,
   } as React.CSSProperties
 
   return (
@@ -509,8 +320,8 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
           </button>
           )
         : <div className="tarot-hinge" role="img" aria-label={label}>{inner}</div>}
-      <p className="tarot-caption mt-2 text-center text-[11px] uppercase tracking-wide"
-         style={{ color: 'var(--text-muted)' }}>
+      <div className="tarot-legend">
+      <p className="tarot-caption mt-2 text-center text-[11px] uppercase tracking-wide">
         {card.position}
       </p>
       {/* Only once it is face up. A name under a face-down card would be the
@@ -518,16 +329,14 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
           form with candles on it. */}
       {faceUp && (
         <>
-          <p className="text-center text-xs"
-             style={{ color: 'var(--text-secondary)' }}>
+          <p className="tarot-legend-name text-center text-xs">
             {card.face_name}
           </p>
           {/* Its own line rather than a suffix. At 96px "Nine of Swords ·
               reversed" wraps wherever it likes, and the word that says which
               way up the picture is should not be the orphan. */}
           {card.reversed && (
-            <p className="text-center text-[11px] italic"
-               style={{ color: 'var(--text-muted)' }}>
+            <p className="tarot-legend-aside text-center text-[11px] italic">
               reversed
             </p>
           )}
@@ -535,8 +344,7 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
               answers, and whose painting this is — hotlinked art is
               credited wherever it renders, the persona tiles' rule. */}
           {card.after && (
-            <p className="text-center text-[10px]"
-               style={{ color: 'var(--text-muted)' }}>
+            <p className="tarot-legend-aside text-center text-[10px]">
               after {card.after} · art by {card.artist}
             </p>
           )}
@@ -546,135 +354,123 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
               reading stays the reader's. Hidden in the folded strip,
               where a paragraph per card would bury the conversation. */}
           {card.note && !small && (
-            <p className="tarot-note mx-auto mt-1 max-w-[26rem] text-center text-[11px] italic leading-relaxed"
-               style={{ color: 'var(--text-secondary)' }}>
+            <p className="tarot-note tarot-legend-name mx-auto mt-1 max-w-[26rem] text-center text-[11px] italic leading-relaxed">
               {card.note}
             </p>
           )}
         </>
       )}
+      </div>
     </div>
   )
 }
 
 /**
- * The room the ball stands in (Aaron's composition, 2026-08-17).
+ * The room, photographed (Aaron, 2026-08-17).
  *
- * The felt used to be a green rectangle with a crystal ball on it. It is a
- * *room* now, and the whole thing is one horizontal line: **black above,
- * green below, and the line between them is the back edge of the table.**
- * A votive rack burns along that line on either side, and the fish stands in
- * the gap with its base bridging the two racks — which is what stops the
- * mirror reading as a mirror, because the seam where the two halves would
- * meet is behind a foot of bronze.
+ * This replaced a composite the previous pass built out of parts — a drawn
+ * gradient room, a CC0 candle plate mirrored into two racks, three smoke
+ * loops and a museum bronze holding a smoky-quartz sphere. All of it was
+ * doing one job: convincing you that a séance table was there. A single
+ * photographed table does that job outright, and every seam the composite
+ * had to manage — the rack's mirror line, the sphere against its stand, the
+ * horizon where black met felt — is not managed here. It is absent.
  *
- * Three things make it work and each was a choice.
+ * Three things about the arrangement, each a choice rather than a default.
  *
- * **The stage is exactly as tall as the ball**, so the horizon is not a
- * number anybody has to keep in step: `.crystal-ball`'s box ends where the
- * carp's own foot ends (the stand occupies 17.98%–100% of it), so putting
- * the dark on `inset: 0` of this wrapper puts the table's back edge under the
- * fish automatically, at every width and every clamp of the ball's size.
+ * **Nothing is cropped, so nothing drifts.** The room keeps the footage's
+ * own 16:9 and the ball's position is written down once, in `index.css`, as
+ * a percentage of that frame. `object-fit: cover` on a box whose aspect is
+ * the video's own is a no-op — which is the point: the vision has to land
+ * inside the glass at every window width, and a crop that moves with the
+ * viewport would move the glass out from under it.
  *
- * **The candles are screened, not matted.** The plate is candles on a black
- * ground, and black is already transparent under `screen` — so the ground
- * goes exactly, and the flames' halos and the light bleeding off the wax
- * survive as photographed rather than as whatever a matte's edge decided.
- * `matte_backdrop` exists for the opposite case, which is the bronze: a
- * studio grey *lighter* than its subject.
+ * **The card is screened INTO the glass, over a dim.** The footage's sphere
+ * is lit from within, and a picture screened onto a near-white ball adds
+ * nothing you can see. So a soft dark disc multiplies the interior down
+ * first and the card is screened on top of that — which is the same order
+ * the old composite used (depths, vision, then the shell's specular arc
+ * back over), minus the two photographs it needed to fake the glass, since
+ * this glass is real and its highlights are already in the footage.
  *
- * **One file, mirrored.** Two crops of one photograph read as two different
- * racks and invite you to compare them; one rack seen from both ends of the
- * same table is what a room actually looks like.
- *
- * The dark is `ambience` weather like everything else here: reduced motion or
- * the ambience pref leaves the room lit and still rather than frozen mid
- * flicker.
+ * **`art` mode, not `ambience`.** The distinction is `videofx.tsx`'s and it
+ * decides what reduced motion means: weather is removed, a painting falls
+ * back to its still. A room the whole ceremony is staged in is the second
+ * kind — remove it and the cards are dealt onto nothing — so the still is
+ * the floor and the loop is what plays over it.
  */
-function SeanceRoom({ children, onKnock }: {
-  children: React.ReactNode
+function SeanceRoom({ children, vision, onKnock }: {
+  children?: React.ReactNode
+  /** The card most recently turned, surfacing inside the glass — the way a
+   *  fortune arrives, already there once the mist thins. A reversed card
+   *  hangs upside down in the glass too; the ball does not editorialise. */
+  vision?: { image: string; reversed: boolean } | null
   /** Two raps on the glass, while the spread lingers: the ceremonial way
    *  to take the reading. Purely additive — the visible button beside the
    *  spread is the accessible door, so this carries no key handling and
    *  no focus of its own. */
   onKnock?: () => void
 }) {
+  // Read once per mount, the way `VideoBackdrop` does: a live change of the
+  // OS setting lands on the next navigation.
+  const [still] = useState(() => reducedMotion())
   return (
-    <div className={`seance-stage${onKnock ? ' is-knockable' : ''}`}
+    <div className={`seance-room${onKnock ? ' is-knockable' : ''}`}
          onDoubleClick={onKnock}
          title={onKnock ? 'Knock twice on the glass to begin the reading'
                         : undefined}>
-      <div className="seance-dark" aria-hidden="true">
-        {/* Three bodies of air, and the third is the point (Aaron's item
-            9): the far and near layers give the dark its depth, and the
-            swirl — the same loop, tighter crop, brighter and barely
-            blurred — coils around the glass itself, where a scrying
-            room's smoke actually gathers. All the same seed-1848 file,
-            so the extra layers cost no bytes at all. */}
-        <VideoBackdrop webmSrc={smokeWebmUrl} mp4Src={smokeMp4Url}
-                       mode="ambience" className="seance-haze is-far" />
-        <VideoBackdrop webmSrc={smokeWebmUrl} mp4Src={smokeMp4Url}
-                       mode="ambience" className="seance-haze" />
-        <VideoBackdrop webmSrc={smokeWebmUrl} mp4Src={smokeMp4Url}
-                       mode="ambience" className="seance-haze is-swirl" />
-      </div>
-      {/* Two elements per rack, and it is not decoration: the inner edge
-          needs a horizontal fade and the bottom needs a vertical one, which
-          is two masks on one box. `mask-composite` is exactly the sort of
-          thing WebKit 17.4 disagrees about, so each mask gets its own
-          element — the span fades the edge that faces the fish, the img
-          fades the wax into the table. */}
-      <span className="seance-rack is-left" aria-hidden="true">
-        <img src={candlesUrl} alt="" />
-        <FlameDance />
-        <VideoBackdrop webmSrc={flameWebmUrl} mp4Src={flameMp4Url}
-                       mode="ambience" className="seance-flame" />
-      </span>
-      <span className="seance-rack is-right" aria-hidden="true">
-        <img src={candlesUrl} alt="" />
-        <FlameDance />
-        <VideoBackdrop webmSrc={flameWebmUrl} mp4Src={flameMp4Url}
-                       mode="ambience" className="seance-flame" />
-      </span>
-      {/* The turbulence that bends the tips. One filter, referenced by both
-          racks' clones; the seed is 1888, as ever. Width/height zero — this
-          is a definition, not a drawing. */}
+      <VideoBackdrop webmSrc={roomWebmUrl} mp4Src={roomMp4Url}
+                     mode="art" className="seance-room-plate"
+                     poster={roomStillUrl}
+                     fallback={<img className="seance-room-plate"
+                                    src={roomStillUrl} alt="" aria-hidden />} />
+      {/* Siblings rather than children of a wrapper, and deliberately: a
+          `mix-blend-mode` blends against its stacking context, so a box
+          around these two would blend them with each other and hand the
+          video a flat composite. Two absolutely-positioned spans over the
+          plate each see the plate as their backdrop. */}
+      <span className="seance-glass-dim" aria-hidden="true" />
+      {vision && (
+        <img className={`seance-vision${vision.reversed ? ' is-reversed' : ''}`}
+             src={vision.image} alt="" aria-hidden="true" />
+      )}
+      {/* What makes the picture read as suspended IN something rather than
+          shown on a screen: turbulence displacing its own pixels, so the
+          edges wander and the whole card breathes the way an image does
+          through moving glass. Width/height zero because this is a
+          definition, not a drawing; the seed is 1848, the year the
+          spiritualist craze began, as everywhere else in this room.
+          The animation is dropped rather than stilled under reduced
+          motion, because SMIL cannot hear a media query. */}
       <svg width="0" height="0" style={{ position: 'absolute' }}
            aria-hidden="true">
-        <filter id="seance-flame-bend" x="-15%" y="-15%" width="130%"
-                height="130%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.05"
-                        numOctaves="2" seed="1888" result="n">
-            <animate attributeName="baseFrequency"
-                     values="0.012 0.05;0.017 0.075;0.011 0.045;0.012 0.05"
-                     dur="1.9s" repeatCount="indefinite" />
+        <filter id="seance-ripple" x="-20%" y="-20%" width="140%"
+                height="140%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.014 0.022"
+                        numOctaves="2" seed="1848" result="n">
+            {!still && (
+              <animate attributeName="baseFrequency"
+                       values="0.014 0.022;0.019 0.03;0.012 0.018;0.014 0.022"
+                       dur="11s" repeatCount="indefinite" />
+            )}
           </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="n" scale="11"
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="15"
                              xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </svg>
-      {/* The light the rack puts back on the felt, in front of the dark so it
-          washes over the table's edge rather than stopping at it. */}
-      <span className="seance-spill" aria-hidden="true" />
       {children}
     </div>
   )
 }
 
-/** How far off square each dealt card lands, in reading order. */
-const SETTLE_ROT = [-2.2, 1.6, -1.2]
-
-/** The arc, in reading order: the three places are laid out *around the ball*
- *  rather than in a row, so they radiate from the thing they are being read
- *  under. `ARC_ROT` turns each place to face the centre and `ARC_DROP` sets
- *  it on the curve — the outer two ride high, the middle one sits lower,
- *  which is the shape a hand lays three cards in front of somebody.
- *
- *  These are the *place's* numbers and `SETTLE_ROT` is the *card's*: the
- *  printed position is exact and the card that lands in it is a hair off,
- *  because the cloth was printed and the deal was not. */
-const ARC_ROT = [-9, 0, 9]
-const ARC_DROP = [0, 26, 0]
+/* Nothing rotates any more (Aaron, 2026-08-18: "still not all oriented in
+   the same manner"). Two rotations used to compose here — a fan turning
+   each place to face the ball, and a per-card wobble so the deal read as a
+   hand rather than a machine. Both were arguments about a drawn table. On a
+   photographed one the perspective is already in the footage, and cards
+   lying at three different angles in front of it read as three cards
+   somebody knocked, not as a spread. The custom properties they set are
+   gone, and so are the `rotate()` calls in `index.css` that read them. */
 
 /** The three places, laid out. `small` is the strip the conversation runs
  *  under, once the ceremony is over and the cards are context rather than
@@ -707,102 +503,6 @@ function ShufflingDeck() {
           <CardBack />
         </div>
       ))}
-    </div>
-  )
-}
-
-/**
- * The reader's crystal ball — a photograph now, both halves of it.
- *
- * The glass was the first half (PR 2): a CC0 smoky-quartz sphere, fetched,
- * licence-gated, matted and committed through the animist
- * (`assets/seance/crystal.recipe.yaml`, ADR 29) rather than hand-placed,
- * because the thing a real sphere has that geometry does not is *dirt* —
- * veils, fractures, a bloom of internal cloud that no gradient stack
- * proposes.
- *
- * **The stand is the second half, and it had to be.** It was inline SVG, and
- * it was good SVG — a turned foot, a bead course, a cushion ring split in
- * two so the near side occluded the glass. Asked whether it looked
- * photo-real, the answer was no, and the argument for keeping it ("a cradle
- * is turned geometry, which is what SVG is good at") was a rationalisation
- * for not doing the harder half. A photographed sphere on a drawn stand is
- * *worse* than an all-drawn ball, because the sphere sets a standard of
- * realism the stand cannot meet and the eye goes straight to the seam.
- *
- * So the stand is the Met's own crystal ball on a bronze stand in the shape
- * of a fish — a carp leaping through waves, the sphere held in a spray of
- * foam; museum open access, CC0. The decisive property is that **sphere and
- * stand come from ONE photograph**: one light, one shadow, one set of
- * material responses, and no compositing mismatch to manage. It also deletes
- * the problem three passes went into — the ball does not have to be made to
- * *sit in* the foam, because in the photograph it already does.
- *
- * **The composite is why it is five layers and not one picture.** The card
- * has to be *inside* the glass, so the stack is: our own candle and our own
- * smoke behind (two ADR 31 procedural loops, seeds 1848 and 1909 — the
- * spiritualist craze and the printing); the depths; the vision; the
- * photographed glass twice (`.crystal-shell-body` carrying it over the card
- * at `soft-light`, `.crystal-shell-light` crushed to its specular arc and
- * screened back on); and then the bronze **over all of it**, so the foam
- * closes in FRONT of the ball and it reads as held rather than balanced.
- * Flatten any of that and the card is in front of a ball instead of in one.
- *
- * **The geometry is the recipe's, not this file's**, and it is not to be
- * re-guessed here: in the 700×950 stand the foam closes at y=290, its centre
- * is x=529, and the ball is drawn at r=265 with its centre 0.88 radii
- * *above* that claw line — Aaron's number off a rendered board, because at
- * 0.62 the claws crossed the ball's belly and it read as impaled. Those four
- * numbers are ground into the percentages in `index.css`, where the
- * arithmetic that turns them into a box is written out.
- *
- * `vision` is the trick the ball was bought for: the card most recently
- * turned surfaces inside the glass, the way a fortune arrives — already
- * there once the mist thins. Whole rather than cropped, and a reversed card
- * hangs upside down in the glass too; the ball does not editorialise.
- *
- * Decorative and marked so. The spread announces every card by name; the
- * ball repeating it to a screen reader would be saying everything twice.
- */
-function CrystalBall({ vision }: {
-  vision?: { image: string; reversed: boolean } | null
-}) {
-  return (
-    <div className="crystal-ball" aria-hidden="true">
-      {/* The room behind the glass. Both are `ambience` mode, so reduced
-          motion or the ambience pref removes them outright rather than
-          freezing them — frozen weather is a smudge. */}
-      <div className="crystal-room">
-        <VideoBackdrop webmSrc={candleWebmUrl} mp4Src={candleMp4Url}
-                       mode="ambience" className="crystal-candle" />
-        <VideoBackdrop webmSrc={smokeWebmUrl} mp4Src={smokeMp4Url}
-                       mode="ambience" className="crystal-smoke" />
-      </div>
-
-      {/* What the ball does to the table: its light on the felt. The stand's
-          own cast shadow is in the photograph — the matte's `soft` ramp was
-          built to keep it — so this is the glow and nothing else, and there
-          is no drawn contact shadow to disagree with the real one. */}
-      <span className="crystal-aura" />
-
-      {/* The glass, and everything it holds. Absolutely positioned and it
-          deliberately overhangs the stand's box on three sides, which is
-          free precisely because it is a layer rather than a sibling. */}
-      <div className="crystal-orb">
-        <span className="crystal-depths" />
-        {vision && (
-          <img className={`crystal-vision${vision.reversed ? ' is-reversed' : ''}`}
-               src={vision.image} alt="" />
-        )}
-        <img className="crystal-shell-body" src={shellUrl} alt="" />
-        <img className="crystal-shell-light" src={shellUrl} alt="" />
-      </div>
-
-      {/* The bronze, last, so the foam closes in front of the glass. This one
-          ordering is what turns "a ball balanced on a fish" into "a ball held
-          by one" — the same argument the drawn cradle's split made, except
-          that here the occluding edge is photographed rather than drawn. */}
-      <img className="crystal-stand" src={standUrl} alt="" />
     </div>
   )
 }
@@ -1161,9 +861,8 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
 
         {shuffling
           ? (
-            <div className="tarot-table-felt relative flex flex-col items-center gap-4 py-10">
-              <TableWisps />
-              <CrystalBall />
+            <div className="tarot-table-felt relative flex flex-col items-center gap-4 pb-10">
+              <SeanceRoom />
               <ShufflingDeck />
               <p className="text-sm tracking-wide" style={{ color: 'var(--tarot-felt-text)' }}>
                 Shuffling, and cutting the deck…
@@ -1275,11 +974,11 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
           with nothing under it. The felt goes when the table folds: a green
           rectangle beside a chat column is furniture, not ceremony. */}
       {cards.length > 0 && (
-        <div className={dealing ? 'tarot-table-felt tarot-ceremony relative px-4 pt-2 pb-2' : ''}>
-          {/* No TableWisps here (Aaron's item 9): a loop over the whole felt
-              read as haze on the picture frame, cards included. The room
-              carries its own air — the two haze layers in the dark and the
-              swirl behind the ball — and the felt stays a table. */}
+        <div className={dealing ? 'tarot-table-felt tarot-ceremony relative px-4 pb-2' : ''}>
+          {/* No weather layer over the felt (Aaron's item 9): a loop across
+              the whole table read as haze on the picture frame, cards
+              included. The room's own air is in the footage, where it
+              belongs, and the felt stays a table. */}
           {dealing && (
             /* The controls ride the room's dark upper corners — the one
                part of the composition with nothing in it. Left: the act
@@ -1344,11 +1043,11 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
                glass take the reading. Double-click only ever PROCEEDS — it
                is decorated with a visible invitation below, so the gesture
                is a flourish, never the only door. */
-            <SeanceRoom onKnock={lingering ? takeReading : undefined}>
-              <CrystalBall vision={lastTurned && lastTurned.image
-                ? { image: lastTurned.image, reversed: lastTurned.reversed }
-                : null} />
-            </SeanceRoom>
+            <SeanceRoom onKnock={lingering ? takeReading : undefined}
+                        vision={lastTurned && lastTurned.image
+                          ? { image: lastTurned.image,
+                              reversed: lastTurned.reversed }
+                          : null} />
           )}
           <Spread cards={cards} turned={table.turned} small={!dealing}
                   onTurn={dealing ? turn : undefined} />
