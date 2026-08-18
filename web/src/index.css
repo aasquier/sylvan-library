@@ -754,14 +754,21 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   overflow: hidden;
 }
 
-/* The ageing, in two passes matched by eye against the 1909 scans on the
-   same felt (Aaron's note, 2026-08-16: the Magic cards did not read as
-   old). The filter fades the modern pigments the way ninety years fade
-   lithography — saturation well down, warm sepia, contrast softened, a
-   touch of lift because old inks go pale, never dark. The overlay then
-   prints it on the scans' stock: a warm ivory tint multiplied over
-   everything, print grain from the same turbulence the parchment uses,
-   and the faint edge-darkening the old cards all carry. */
+/* The ageing, and where it stops (Aaron, 2026-08-18: "keep it sepia
+   except the art itself"). The plate is the old thing — ivory stock, the
+   black rules, the numeral band, the hand-set caption below — and it goes
+   on wearing 1909. The *picture inside it* does not: it is the painting
+   somebody chose this card for, and the first cut of this ageing put a
+   desaturating filter, a cream screen and a honey wash over it, which
+   between them fade a Magic painting to a brown smudge. A washed-out
+   picture is not an old picture; it is a picture nobody can see.
+
+   So the art keeps its own colour, and what remains over it is texture
+   rather than tint: the print grain the plate is struck through, and the
+   faint edge-darkening every old card carries. Both are physical facts
+   about paper and neither moves a hue. That is the rule to keep if this
+   block is ever tuned again — grain and shadow yes, saturation and colour
+   casts no. */
 .tarot-rws-art {
   position: absolute;
   inset: 0;
@@ -769,23 +776,13 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   height: 100%;
   object-fit: cover;
   object-position: var(--rws-focus, 50%) center;
-  filter: saturate(0.76) sepia(0.3) contrast(0.9) brightness(1.05);
 }
 
-/* Pale old ink first: a cream screen that lifts the modern art's deep
-   shadows, because nothing in a 1909 scan is ever actually dark. */
-.tarot-rws-canvas::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: rgba(248, 238, 206, 0.2);
-  mix-blend-mode: screen;
-}
-
-/* Then the varnish: honey-yellow multiplied over everything, print grain,
-   and the faint edge-darkening the old cards all carry. */
+/* The plate's own grain and its edge-darkening, multiplied. Grey grain,
+   not the brown it used to be: multiplied brown *is* a sepia filter with
+   extra steps, which is the thing this stopped doing. Kept light — enough
+   that the picture reads as struck on the same stock as the caption, not
+   enough to touch its colour. */
 .tarot-rws-canvas::after {
   content: '';
   position: absolute;
@@ -794,9 +791,8 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   pointer-events: none;
   background-image:
     radial-gradient(ellipse 120% 105% at 50% 46%,
-      rgba(250, 240, 200, 0.04) 58%, rgba(150, 120, 62, 0.28)),
-    linear-gradient(rgba(240, 218, 150, 0.3), rgba(240, 218, 150, 0.3)),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.36 0 0 0 0 0.2 0 0 0 0.32 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23g)'/%3E%3C/svg%3E");
+      rgba(255, 255, 255, 0) 62%, rgba(90, 74, 44, 0.22)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.4 0 0 0 0 0.36 0 0 0 0.16 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23g)'/%3E%3C/svg%3E");
   mix-blend-mode: multiply;
 }
 

@@ -866,6 +866,21 @@ export function ThemeInterview({
   // the identical screen: no question, and a disabled Answer under it.
   const stuck = !busy && !question && (error !== null || report?.asked === true)
 
+  // The other way a turn comes back with no question, and the opposite kind of
+  // thing: not a failure to retry but a conversation that has ended. Ten
+  // exchanges is the ceiling (`theme.MAX_EXCHANGES`), and past it the server
+  // answers without calling anybody — `asked: false`, a reason, no question.
+  //
+  // It needed a name because until it had one this was a wall. The scroll
+  // printed "that is as long as this conversation goes", the answer box stayed
+  // open under it, and every further answer fetched the same sentence back;
+  // "Suggest my colours" was disabled if the floor had not been met, and the
+  // only live controls on the screen threw the evening away. Somebody who
+  // answers ten questions shyly and is handed that has been told, by a room
+  // built for them, that they answered wrong.
+  const finished = !busy && !question && report?.asked === false
+    && spent >= ceiling
+
   // The room (punch list item 8): each voice's own painting washed across
   // the viewport, its accent on the chrome, its sign by the door. `plain`
   // keeps a bare room on purpose — no costume includes the walls.
@@ -1009,6 +1024,12 @@ export function ThemeInterview({
                     // the one thing that is definitely not happening.
                     || (stuck ? 'That question did not arrive.' : 'Starting…')}
               </p>
+              {/* Gone once the conversation is over. A box that accepts
+                  typing and returns the same closing sentence every time is
+                  worse than no box: it reads as the person failing to say the
+                  magic word. */}
+              {!finished && (
+              <>
               <textarea
                 ref={box}
                 value={answer}
@@ -1068,6 +1089,35 @@ export function ThemeInterview({
                       : `${spent} of ${ceiling} questions at most`}
                 </span>
               </div>
+              </>
+              )}
+
+              {/* The end of the road, when the floor was never reached. The
+                  reading cannot be given — `may_propose` counts grounded
+                  quotes and there are not three of them — so the honest thing
+                  is to say that plainly, put it on the reading rather than on
+                  the person, and open the door that does still work.
+                  Commandment 2: a newcomer must never be left holding a
+                  disabled button as the last thing that happened. */}
+              {finished && !ready && (
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button onClick={onLeave}
+                          className="rounded-md px-4 py-2 text-sm font-medium"
+                          style={{ background: 'var(--series-1)', color: '#fff' }}>
+                    {leaveLabel ?? 'Pick colours with me instead'}
+                  </button>
+                  <button onClick={startOver}
+                          className="rounded-md px-4 py-2 text-sm"
+                          style={{ border: '1px solid var(--hairline)',
+                                   color: 'var(--text-primary)' }}>
+                    Ask me again
+                  </button>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Nothing here was wrong — the cards just did not settle on
+                    enough to read from.
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* The short circuit, where the eye already is. The sidebar
@@ -1093,6 +1143,30 @@ export function ThemeInterview({
                         style={{ background: 'var(--series-2)', color: '#fff' }}>
                   {seed !== null ? 'Read my cards' : 'Get my colours'}
                 </button>
+              </div>
+            )}
+
+            {/* The same argument the banner above it is made of: the person is
+                reading the conversation column, so that is where the answer to
+                "did my click do anything" has to be. The sidebar has carried
+                this clock since the proposal became a job, and the sidebar is
+                *below* the conversation on anything narrower than a laptop
+                (`lg:grid-cols-…`) — so pressing the button made it vanish and
+                put the only sign of life off the bottom of the screen, for the
+                two to four minutes this takes. That is a working feature that
+                looks exactly like a broken one. */}
+            {busy === 'proposing' && (
+              <div className="ready-banner rounded-xl px-5 py-4">
+                <p className="text-sm font-medium thinking-pulse"
+                   style={{ color: 'var(--text-primary)' }}>
+                  {seed !== null
+                    ? `Reading the cards… ${elapsed}s`
+                    : `Reading around… ${elapsed}s`}
+                </p>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  A few minutes — it reads around and checks every card against
+                  the pool. It carries on if you reload or close the tab.
+                </p>
               </div>
             )}
           </div>

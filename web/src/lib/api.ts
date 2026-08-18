@@ -1710,6 +1710,21 @@ export const api = {
   job: (id: string) => get<Job>(`/api/jobs/${id}`),
 }
 
+/** How many polls in a row may fail before a followed job is given up on.
+ *
+ * Not zero, which is what this was. A poll is a bare GET and the thing it is
+ * watching runs for minutes — the theme proposal is measured at 226 seconds —
+ * so over a four-minute run on a phone in somebody's living room, one dropped
+ * request is ordinary. It used to end the run: the first throw rejected the
+ * promise, the surface showed an error, and the *server carried on and
+ * finished the work* nobody was listening for any more.
+ *
+ * Six at two seconds is around ten seconds of silence tolerated, which is long
+ * enough to cross a wifi handover and short enough that a server that really
+ * has gone still reports quickly.
+ */
+const POLL_FAILURES_TOLERATED = 6
+
 /** Poll a job to completion. Resolves on done, rejects on error.
  *
  * `initial` is the job as the submitting POST returned it. Since results are
@@ -1717,6 +1732,12 @@ export const api = {
  * finished before the request arrived — and polling for a job that has nothing
  * left to do is a wasted round trip and a frame of "Running…" for something
  * that is not running.
+ *
+ * A failing *poll* is not a failing job (`POLL_FAILURES_TOLERATED`). Two kinds
+ * are told apart: a 404 is the server saying it has never heard of this job —
+ * definitive, since jobs live in memory and die with the process — and
+ * anything else (a dropped connection, a 502 from the proxy, a moment of no
+ * network) is provisional and worth asking again about.
  */
 export function followJob(
   id: string,
@@ -1733,16 +1754,22 @@ export function followJob(
     return { promise: Promise.resolve(initial), cancel }
   }
   const promise = new Promise<Job>((resolve, reject) => {
+    // Consecutive, not cumulative: one blip an hour into a long watch says
+    // nothing about the next one, so a successful poll clears the count.
+    let missed = 0
     const tick = async () => {
       if (cancelled) return
       try {
         const job = await api.job(id)
+        missed = 0
         onTick(job)
         if (job.status === 'done') return resolve(job)
         if (job.status === 'error') return reject(new Error(job.error ?? 'job failed'))
         setTimeout(tick, intervalMs)
       } catch (err) {
-        reject(err)
+        const gone = err instanceof ApiError && err.status === 404
+        if (gone || ++missed > POLL_FAILURES_TOLERATED) return reject(err)
+        setTimeout(tick, intervalMs)
       }
     }
     tick()

@@ -150,23 +150,50 @@ describe('followJob', () => {
     await expect(promise).rejects.toThrow('job failed')
   })
 
-  it('rejects when the request itself fails, rather than polling forever', async () => {
+  /* A failing poll is not a failing job. The theme proposal runs for around
+     226 seconds, so a run spans a hundred-odd bare GETs on whatever network
+     the person happens to be on — and one dropped request used to end it,
+     while the server carried on and finished work nobody was listening for.
+     These three pin the shape of the tolerance rather than its exact size. */
+  it('rides out a dropped poll and keeps watching', async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError('network down'))
+      .mockResolvedValue({ ok: true, status: 200,
+                           json: async () => job({ status: 'done', percent: 100 }) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { promise } = followJob('j1', () => {})
+    await nextPoll()
+
+    await expect(promise).resolves.toMatchObject({ status: 'done' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('gives up once the failures stop being a blip', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network down')))
 
     const { promise } = followJob('j1', () => {})
-    await expect(promise).rejects.toThrow('network down')
+    const settled = expect(promise).rejects.toThrow('network down')
+    // Well past the tolerance, so this asserts it ends rather than that it
+    // ends on any particular attempt.
+    await vi.advanceTimersByTimeAsync(400 * 20)
+    await settled
   })
 
   it('surfaces the API error detail for a job that no longer exists', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 404,
       statusText: 'Not Found',
       json: async () => ({ detail: "no job 'j1'" }),
-    }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
 
     const { promise } = followJob('j1', () => {})
     await expect(promise).rejects.toThrow("no job 'j1'")
+    // A 404 is the server saying it has never heard of this job — jobs live in
+    // memory and die with the process — so there is nothing to wait out.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('stops polling once cancelled', async () => {
