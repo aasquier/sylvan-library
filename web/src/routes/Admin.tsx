@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   api, errorMessage, type Account, type AccountList, type AdminActivity,
-  type AdminClaude, type AdminStorage, type AdminSystem, type AdminTraffic,
+  type AdminClaude, type AdminFly, type AdminStorage, type AdminSystem,
+  type AdminTraffic,
 } from '../lib/api'
 import { Badge, ErrorNote, PageMasthead, Spinner } from '../components/ui'
 import { EditsChart, TrafficChart } from '../components/charts'
@@ -75,6 +76,15 @@ function fmtBytes(n: number | null | undefined): string {
   }
   const label = units[unit] ?? 'TB'
   return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${label}`
+}
+
+/** A count for a human, or an em-dash for a series that returned nothing —
+ *  the same null-is-not-zero rule the storage tiles follow. Rounded,
+ *  because a Prometheus `increase()` over a window is a float and nobody
+ *  wants 41.99999 requests. */
+function fmtCount(n: number | null | undefined): string {
+  if (n === null || n === undefined) return '—'
+  return Math.round(n).toLocaleString()
 }
 
 function StatTile({ label, value, hint }: {
@@ -197,17 +207,20 @@ function Dashboard() {
   const [claude, setClaude] = useState<AdminClaude | null>(null)
   const [activity, setActivity] = useState<AdminActivity | null>(null)
   const [traffic, setTraffic] = useState<AdminTraffic | null>(null)
+  const [fly, setFly] = useState<AdminFly | null>(null)
 
   const refresh = useCallback(async () => {
-    const [sys, sto, cla, act, tra] = await Promise.allSettled([
+    const [sys, sto, cla, act, tra, ffl] = await Promise.allSettled([
       api.adminSystem(), api.adminStorage(),
       api.adminClaude(), api.adminActivity(), api.adminTraffic(),
+      api.adminFly(),
     ])
     if (sys.status === 'fulfilled') setSystem(sys.value)
     if (sto.status === 'fulfilled') setStorage(sto.value)
     if (cla.status === 'fulfilled') setClaude(cla.value)
     if (act.status === 'fulfilled') setActivity(act.value)
     if (tra.status === 'fulfilled') setTraffic(tra.value)
+    if (ffl.status === 'fulfilled') setFly(ffl.value)
   }, [])
 
   useEffect(() => {
@@ -291,6 +304,58 @@ function Dashboard() {
         <StatTile label="Jobs" value={activity ? jobsLine : '—'}
                   hint="the registry's census — counts, never labels" />
       </div>
+
+      {/* What the platform sees. Absent entirely on an instance with no
+          token — every laptop — because a panel of em-dashes reads as
+          breakage rather than as "not set up". Configured-but-unreachable
+          renders as a clouded glass instead, which is a different fact and
+          the one worth acting on. */}
+      {fly?.configured && (
+        <div className="card-surface rounded-xl p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold tracking-tight">
+              The far-seeing glass
+            </h2>
+            <a href="https://fly-metrics.net" target="_blank" rel="noreferrer"
+               className="text-[11px] underline decoration-dotted"
+               style={{ color: 'var(--text-muted)' }}>
+              Grafana, where the alerts live →
+            </a>
+          </div>
+          {fly.ok ? (
+            <>
+              <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+                <StatTile label="Instance memory"
+                          value={fmtBytes(fly.values.memory_bytes)}
+                          hint={fly.values.memory_total_bytes != null
+                            ? `of ${fmtBytes(fly.values.memory_total_bytes)}, as the platform counts it`
+                            : 'as the platform counts it'} />
+                <StatTile label="Edge answered"
+                          value={fmtCount(fly.values.edge_2xx)}
+                          hint="2xx at the edge, last 24 hours" />
+                <StatTile label="Edge refused"
+                          value={fmtCount(fly.values.edge_4xx)}
+                          hint="4xx at the edge, last 24 hours" />
+                <StatTile label="Edge failed"
+                          value={fmtCount(fly.values.edge_5xx)}
+                          hint="5xx at the edge, last 24 hours" />
+              </div>
+              <p className="mt-3 text-[11px] leading-relaxed"
+                 style={{ color: 'var(--text-muted)' }}>
+                The edge counts what reached the platform; the ledger above
+                counts what this app answered. The gap between them is the
+                requests the app never got to see.
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              The glass is clouded — {fly.error ?? 'the platform did not answer'}.
+              The rest of this page is the box’s own account of itself and is
+              unaffected.
+            </p>
+          )}
+        </div>
+      )}
 
       {traffic && traffic.days.length > 0 && (
         <div className="card-surface rounded-xl p-5">

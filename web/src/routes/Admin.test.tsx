@@ -36,6 +36,7 @@ vi.mock('../lib/api', async () => {
       adminClaude: vi.fn(),
       adminActivity: vi.fn(),
       adminTraffic: vi.fn(),
+      adminFly: vi.fn(),
     },
   }
 })
@@ -118,6 +119,11 @@ beforeEach(() => {
                  { route: '/api/health', count: 12 }],
     note: 'Route templates and status classes only — the ledger never '
       + 'records an address, an agent, a name, or a concrete path.',
+  })
+  // Unconfigured by default, which is what a laptop is — the tests that
+  // are about the glass configure it themselves.
+  vi.mocked(api.adminFly).mockResolvedValue({
+    configured: false, ok: false, values: {},
   })
 })
 
@@ -446,5 +452,48 @@ describe('the visitor ledger', () => {
     await screen.findByText('root')
 
     expect(screen.queryByText('Visitors, last thirty days')).toBeNull()
+  })
+})
+
+describe('the far-seeing glass', () => {
+  it('is absent entirely when no token is configured', async () => {
+    render(<Admin />)
+    await screen.findByText('root')
+
+    // A panel of em-dashes reads as breakage; absence reads as "not set
+    // up", which is what an instance without the token actually is.
+    expect(screen.queryByText('The far-seeing glass')).toBeNull()
+  })
+
+  it('shows what the platform sees when it is configured', async () => {
+    vi.mocked(api.adminFly).mockResolvedValue({
+      configured: true, ok: true, app: 'sylvan-library', org: 'personal',
+      values: { memory_bytes: 256 * 1024 ** 2,
+                memory_total_bytes: 1024 ** 3,
+                edge_2xx: 1240.4, edge_4xx: 12, edge_5xx: null },
+    })
+    render(<Admin />)
+    await screen.findByText('root')
+
+    expect(await screen.findByText('The far-seeing glass')).toBeTruthy()
+    expect(screen.getByText('256 MB')).toBeTruthy()
+    // A float from `increase()` renders as a whole number of requests.
+    expect(screen.getByText('1,240')).toBeTruthy()
+    // An empty series is an em-dash, never a zero.
+    const failed = screen.getByText('Edge failed').closest('div') as HTMLElement
+    expect(within(failed).getByText('—')).toBeTruthy()
+  })
+
+  it('says the glass is clouded when the platform cannot be reached', async () => {
+    vi.mocked(api.adminFly).mockResolvedValue({
+      configured: true, ok: false, error: 'Fly answered HTTP 401', values: {},
+    })
+    render(<Admin />)
+    await screen.findByText('root')
+
+    expect(await screen.findByText(/glass is clouded/)).toBeTruthy()
+    expect(screen.getByText(/HTTP 401/)).toBeTruthy()
+    // The rest of the dashboard is unaffected — the box's own numbers stay.
+    expect(screen.getByText('120 MB')).toBeTruthy()
   })
 })
