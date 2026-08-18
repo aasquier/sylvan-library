@@ -1692,11 +1692,15 @@ arc; this is what the next few sessions actually do.
     reshuffle verbs; and **the 99 rollup** (each category folds behind a
     header wearing a drawn glyph, folds remembered per deck, plus the
     CardHover fix — the ~200 capture-phase scroll listeners the cards tab
-    used to register are now at most one).
+    used to register are now at most one); and **the About Claude page**
+    (`/claude`, after Learn in the nav — the librarian's own bio in the
+    Keeper's structural pattern, with the tarot grid's spark serialized as
+    its masthead and room, Simic argued as the site's own name said
+    quietly, Kwain and Tatyova as live pool-fetched exhibit cases, and a
+    four-painting gallery — Poole, Avon, Guay, McKinnon — every credit
+    looked up at writing time and pinned by test, never recalled).
 
-    **Still to come, in order:** the **About Claude** page (a fresh
-    session by design — the bio deserves a clean context; nav tab, the
-    Keeper's structural pattern, pool-checked favourites, credited art);
+    **Still to come, in order:**
     the **Admin tab** (rename from Accounts + an on-box dashboard:
     system/storage/claude/activity stats endpoints under `/api/admin/stats`,
     the ledger's tokens honestly labelled a floor — the Anthropic dollar

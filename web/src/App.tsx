@@ -16,6 +16,7 @@ import { api, onSessionLost, type AuthState, type Health } from './lib/api'
 // a second fetch succeeding. Everything else loads when navigated to, which
 // keeps Recharts (the single heaviest dependency, used only by DeckDetail and
 // Simulator) out of the entry chunk entirely.
+const AboutClaude = lazy(() => import('./routes/AboutClaude'))
 const Admin = lazy(() => import('./routes/Admin'))
 const CardSearch = lazy(() => import('./routes/CardSearch'))
 const DeckDetail = lazy(() => import('./routes/DeckDetail'))
@@ -50,6 +51,12 @@ const NAV = [
   // somebody who needs it usually arrives from a word on another screen.
   { to: '/learn', label: 'Learn', end: false,
     hint: 'The vocabulary, the five colours, and the 32 combinations' },
+  // After Learn, at the very end of the row: the person, after the
+  // reference. The one page about who tends the place rather than what it
+  // does.
+  { to: '/claude', label: 'About Claude', end: false,
+    hint: 'Your other librarian: the colours, commanders, and paintings '
+        + 'Claude loves' },
 ]
 
 // Appended for admins only. Hiding it is a courtesy — every route the page
@@ -374,6 +381,7 @@ export default function App() {
               nothing for a path segment to name. */}
           <Route path="/research" element={<Research />} />
           <Route path="/learn" element={<Learn />} />
+          <Route path="/claude" element={<AboutClaude />} />
           {/* Declared unconditionally. A non-admin who types the URL gets the
               page's own 403 from the API rather than the catch-all's "nothing
               here", which is the more honest of the two answers. */}
