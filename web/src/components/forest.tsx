@@ -231,10 +231,48 @@ const MOOD_LOOPS: Record<RoomMood, { webm: string; mp4: string }> = {
 
 const SPRIGS = [sprig1Url, sprig2Url, sprig3Url] as const
 
+/** How far the page may move before the growth withdraws. Small on purpose:
+ *  the ask was "as soon as you start scrolling", and anything larger reads as
+ *  a lag rather than as a response. */
+const CANOPY_RETRACT_AT = 8
+
+/**
+ * The vine draped along the header's underside — and, since the 2026-08-18
+ * punch list (item 3), one that gets out of the way.
+ *
+ * It hangs 84px below a *sticky* header, so it travels down the page with the
+ * chrome, and once the page has scrolled it hangs over whatever the page put
+ * at its own top: on Admin it lay across the "Visitors" heading. A decoration
+ * that covers a heading has stopped decorating. So the moment the page moves
+ * it rolls back up into the header — the same `scaleY` from the same origin
+ * that the growth came down on, played backwards — and unrolls when you
+ * return to the top.
+ *
+ * One listener, passive, and it sets state only when the answer *changes*:
+ * the updater returns the previous value otherwise, so React bails out and a
+ * flick of the wheel costs no renders. #162 is why that sentence is here —
+ * this page has been brought to its knees once already by scroll listeners
+ * nobody counted.
+ */
 export function HeaderCanopy() {
   const rootRef = useRef<HTMLDivElement>(null)
   const [shed, setShed] = useState<ShedLeaf[]>([])
   const counter = useRef(0)
+  const [retracted, setRetracted] = useState(
+    () => window.scrollY > CANOPY_RETRACT_AT,
+  )
+
+  useEffect(() => {
+    const onScroll = () => {
+      const now = window.scrollY > CANOPY_RETRACT_AT
+      setRetracted((was) => (was === now ? was : now))
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    // Navigating restores the scroll position before this mounts on some
+    // routes, so ask once rather than waiting for a scroll that may not come.
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   useEffect(() => {
     const root = rootRef.current
@@ -261,7 +299,9 @@ export function HeaderCanopy() {
   }, [])
 
   return (
-    <div ref={rootRef} className="header-canopy" aria-hidden="true">
+    <div ref={rootRef}
+         className={`header-canopy${retracted ? ' is-retracted' : ''}`}
+         aria-hidden="true">
       <div className="canopy-photo"
            style={{ backgroundImage: `url(${canopyUrl})` }} />
       {shed.map((leaf) => (

@@ -25,9 +25,9 @@
  * was.
  */
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it } from 'vitest'
-import { SceneBackdrop } from './forest'
+import { HeaderCanopy, SceneBackdrop } from './forest'
 
 const ART = 'https://cards.scryfall.io/art_crop/front/0/a/test.jpg'
 
@@ -106,4 +106,44 @@ it('is removed entirely when ambience is switched off', () => {
   render(<SceneBackdrop art={ART} />)
 
   expect(document.querySelector('.scene-backdrop')).toBeNull()
+})
+
+/*
+ * The canopy's retraction (punch list 2026-08-18 item 3).
+ *
+ * What these can hold is the *class*, which is the whole of the logic: the
+ * threshold, the listener and the bail-out. What they cannot hold is that the
+ * class does anything — the roll-up is a `transform` in `index.css` and jsdom
+ * has no layout, which is this file's opening lesson wearing a second hat.
+ * Aaron's eye on a real browser is the guard for that half (commandment 16).
+ */
+function scrollTo(y: number) {
+  window.scrollY = y
+  fireEvent.scroll(window)
+}
+
+it('withdraws the growth as soon as the page moves', () => {
+  render(<HeaderCanopy />)
+  const canopy = document.querySelector('.header-canopy')
+  expect(canopy?.className).not.toContain('is-retracted')
+
+  scrollTo(40)
+  expect(canopy?.className).toContain('is-retracted')
+
+  // And unrolls on the way back, so the top of every page still has its vine.
+  scrollTo(0)
+  expect(canopy?.className).not.toContain('is-retracted')
+})
+
+it('arrives retracted when the page is restored mid-scroll', () => {
+  // Routing can restore a scroll position before this mounts, in which case
+  // no scroll event is ever fired and a canopy that waited for one would hang
+  // over the page until the reader happened to move.
+  window.scrollY = 400
+
+  render(<HeaderCanopy />)
+
+  expect(document.querySelector('.header-canopy')?.className)
+    .toContain('is-retracted')
+  window.scrollY = 0
 })
