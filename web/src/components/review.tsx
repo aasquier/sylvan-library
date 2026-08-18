@@ -26,6 +26,7 @@ import { categoryLabel } from '../lib/mtg'
 import { effectivePin, useStance } from '../lib/stance'
 import type { ClaudeStatus } from '../lib/api'
 import { ErrorNote } from './ui'
+import { ReplayGlyph } from './glyphs'
 import { SlotArgumentBody } from './deckedit'
 
 /** Where a running sweep's job id lives, per deck, so a reload reattaches. */
@@ -131,8 +132,7 @@ export function DeckReviewPanel({ deck, deckRef, status, onChanged }: {
           // selectable below.
           setPicked(new Set(spells.map((c) => c.name)))
         }}
-        className="rounded-lg px-3 py-1.5 text-xs font-medium"
-        style={{ background: 'var(--gridline)', color: 'var(--text-primary)' }}>
+        className="btn btn-quiet btn-sm">
         Review with Claude
       </button>
     )
@@ -161,8 +161,7 @@ export function DeckReviewPanel({ deck, deckRef, status, onChanged }: {
           you can leave and come back.
         </span>
         <button onClick={() => { poller.current?.cancel(); setOpen(false) }}
-                className="ml-auto text-[11px]"
-                style={{ color: 'var(--text-muted)' }}>
+                className="btn btn-ghost btn-xs ml-auto">
           Close
         </button>
       </div>
@@ -173,21 +172,15 @@ export function DeckReviewPanel({ deck, deckRef, status, onChanged }: {
         <>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => pickAll(spells.map((c) => c.name))}
-                    className="rounded-md px-2 py-1"
-                    style={{ border: '1px solid var(--hairline)',
-                             color: 'var(--text-secondary)' }}>
+                    className="btn btn-quiet btn-xs">
               All spells
             </button>
             <button onClick={() => pickAll(deck.cards.map((c) => c.name))}
-                    className="rounded-md px-2 py-1"
-                    style={{ border: '1px solid var(--hairline)',
-                             color: 'var(--text-secondary)' }}>
+                    className="btn btn-quiet btn-xs">
               Everything
             </button>
             <button onClick={() => setPicked(new Set())}
-                    className="rounded-md px-2 py-1"
-                    style={{ border: '1px solid var(--hairline)',
-                             color: 'var(--text-secondary)' }}>
+                    className="btn btn-quiet btn-xs">
               None
             </button>
           </div>
@@ -227,8 +220,7 @@ export function DeckReviewPanel({ deck, deckRef, status, onChanged }: {
 
           <div className="flex flex-wrap items-center gap-3">
             <button onClick={() => void start()} disabled={count === 0}
-                    className="rounded-lg px-3 py-1.5 font-medium disabled:opacity-50"
-                    style={{ background: 'var(--series-1)', color: '#fff' }}>
+                    className="btn btn-primary btn-accent-1 btn-sm">
               Argue {count} slot{count === 1 ? '' : 's'}
             </button>
             {/* The cost, stated before the click rather than discovered after:
@@ -288,9 +280,8 @@ export function DeckReviewPanel({ deck, deckRef, status, onChanged }: {
             </div>
           )}
           <button onClick={() => { setResult(null) }}
-                  className="rounded-md px-2 py-1"
-                  style={{ border: '1px solid var(--hairline)',
-                           color: 'var(--text-secondary)' }}>
+                  className="btn btn-quiet btn-xs">
+            <ReplayGlyph />
             Pick cards again
           </button>
         </div>

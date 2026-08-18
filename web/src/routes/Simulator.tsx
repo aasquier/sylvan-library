@@ -4,6 +4,7 @@ import {
   api, errorMessage, followJob, type DeckTile, type Job, type LandResult,
   type ManaResult,
 } from '../lib/api'
+import { ReplayGlyph } from '../components/glyphs'
 import { percent } from '../lib/mtg'
 import {
   Badge, Caveat, ErrorNote, NumberField, PageMasthead, Select, Spinner,
@@ -241,14 +242,13 @@ export default function Simulator() {
         <NumberField label="Seed" value={seed} onChange={setSeed}
                      min={1} max={999999} help={help('sim.seed')} />
         <button onClick={() => run()} disabled={running || !slug}
-                className="h-9 rounded-lg px-4 text-sm font-medium disabled:opacity-50"
-                style={{ background: 'var(--series-1)', color: '#fff' }}>
+                className="btn btn-primary btn-accent-1">
           {running ? 'Running…' : 'Run simulation'}
         </button>
         <button onClick={resample} disabled={running || !slug}
                 title="Run the same deck against a different shuffle"
-                className="h-9 rounded-lg border px-4 text-sm font-medium disabled:opacity-50"
-                style={{ borderColor: 'var(--gridline)' }}>
+                className="btn btn-quiet">
+          <ReplayGlyph />
           New sample
         </button>
       </div>

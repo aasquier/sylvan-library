@@ -401,12 +401,8 @@ export default function NewDeck() {
               <button
                 key={d.key}
                 onClick={() => setMode(d.key)}
-                className="rounded-md px-3 py-1.5 text-sm font-medium transition"
-                style={{
-                  color: mode === d.key ? 'var(--text-primary)' : 'var(--text-muted)',
-                  background: mode === d.key ? 'var(--gridline)' : 'transparent',
-                  border: '1px solid var(--hairline)',
-                }}
+                className={`chip-toggle rounded-md px-3 py-1.5 text-sm font-medium${
+                  mode === d.key ? ' is-on' : ''}`}
               >
                 {d.label}
               </button>
@@ -459,8 +455,7 @@ export default function NewDeck() {
                           (c) => c.key === key) ?? null)
                         pickCommander(card)
                       }}
-                      className="w-full rounded-md px-3 py-2 text-left text-sm"
-                      style={{ border: '1px solid var(--hairline)' }}
+                      className="card-action w-full rounded-md px-3 py-2 text-left text-sm"
                     >
                       <span className="font-medium">{card.name}</span>{' '}
                       <span style={{ color: 'var(--text-muted)' }}>
@@ -519,15 +514,11 @@ export default function NewDeck() {
                 key={t.key}
                 onClick={() => pickTier(t.key)}
                 aria-pressed={tier === t.key}
-                className="flex items-center gap-2 rounded-lg py-1.5 pl-2 pr-3 text-sm font-medium transition"
-                style={{
-                  color: tier === t.key ? 'var(--text-primary)' : 'var(--text-muted)',
-                  background: tier === t.key ? 'var(--gridline)' : 'transparent',
-                  // The selected tier gets a real border rather than a hairline,
-                  // because a filled background alone is nearly invisible on the
-                  // dark theme where `--gridline` is two steps off the page.
-                  border: `1px solid ${tier === t.key ? 'var(--baseline)' : 'var(--hairline)'}`,
-                }}
+                // `.chip-toggle`'s is-on carries the baseline border the old
+                // inline comment argued for: a filled background alone is
+                // nearly invisible on the dark theme.
+                className={`chip-toggle flex items-center gap-2 rounded-lg py-1.5 pl-2 pr-3 text-sm font-medium${
+                  tier === t.key ? ' is-on' : ''}`}
               >
                 <TierGlyph tier={t.key} />
                 {t.label}
@@ -694,22 +685,17 @@ export default function NewDeck() {
                 {many && (
                   <>
                     <button onClick={() => step(-1)}
-                            className="rounded-md px-3 py-2 text-sm"
-                            style={{ border: '1px solid var(--hairline)',
-                                     color: 'var(--text-secondary)' }}>
+                            className="btn btn-quiet">
                       ← Previous
                     </button>
                     <button onClick={() => step(1)}
-                            className="rounded-md px-3 py-2 text-sm"
-                            style={{ border: '1px solid var(--hairline)',
-                                     color: 'var(--text-secondary)' }}>
+                            className="btn btn-quiet">
                       Next →
                     </button>
                   </>
                 )}
                 <button onClick={() => choose(current)}
-                        className="ml-auto rounded-md px-4 py-2 text-sm font-medium"
-                        style={{ background: 'var(--series-1)', color: '#fff' }}>
+                        className="btn btn-primary btn-accent-1 ml-auto">
                   Build {current.name}
                 </button>
               </div>
@@ -732,9 +718,7 @@ export default function NewDeck() {
               {chosen.name} commanders
             </h2>
             <button onClick={() => { setChosen(null); setCommanders(null) }}
-                    className="ml-auto rounded-md px-3 py-1.5 text-sm"
-                    style={{ border: '1px solid var(--hairline)',
-                             color: 'var(--text-secondary)' }}>
+                    className="btn btn-quiet btn-sm ml-auto">
               ← Choose different colours
             </button>
           </div>
@@ -790,9 +774,7 @@ export default function NewDeck() {
               {commander.name}
             </h2>
             <button onClick={() => setCommander(null)}
-                    className="ml-auto rounded-md px-3 py-1.5 text-sm"
-                    style={{ border: '1px solid var(--hairline)',
-                             color: 'var(--text-secondary)' }}>
+                    className="btn btn-quiet btn-sm ml-auto">
               ← Pick another commander
             </button>
           </div>
@@ -826,8 +808,7 @@ export default function NewDeck() {
 
           <div className="flex flex-wrap items-center gap-3">
             <button onClick={create} disabled={!slug || creating}
-                    className="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
-                    style={{ background: 'var(--series-1)', color: '#fff' }}>
+                    className="btn btn-primary btn-accent-1">
               {creating ? 'Creating…' : 'Create the deck'}
             </button>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>

@@ -3913,6 +3913,279 @@ button:hover .tarot-fan-card {
   }
 }
 
+/* ------------------------------------------------------------- the buttons
+ *
+ * Commandment 17: thou shalt not make a simple button. `.card-action` above
+ * learned the lesson first — an inline style cannot say `:hover`, and a
+ * control that does not answer the pointer reads as disabled — and this
+ * family applies it to every button in the app. Four voices and three
+ * sizes; a route composes them and says nothing else about how a button
+ * looks:
+ *
+ *   .btn-primary   the one action a surface is for; carries the surface's
+ *                  accent through --btn-accent and answers a hover with a
+ *                  glint sweep, the wheel's brass at one-tenth volume
+ *   .btn-quiet     bordered and patient; brightens to the vine on hover
+ *   .btn-danger    outlined red before it is touched (the ADR 27 idiom);
+ *                  .btn-danger-solid for the final "yes, delete" form
+ *   .btn-ghost     prose-adjacent; underlined text that inks up on hover
+ *
+ * Sizes: default (h-9-ish), .btn-sm, .btn-xs. Focus is one rule for all of
+ * them — the vine ring — because a keyboard should find every button the
+ * same way. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+.btn-sm {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8125rem;
+  border-radius: 0.45rem;
+}
+.btn-xs {
+  padding: 0.2rem 0.625rem;
+  font-size: 0.75rem;
+  border-radius: 0.375rem;
+}
+
+.btn-primary {
+  background: var(--btn-accent, var(--text-primary));
+  border-color: color-mix(in srgb, var(--btn-accent, var(--text-primary)) 82%, #000);
+  color: var(--btn-ink, var(--page));
+}
+/* The glint: one light-sweep across the face, only ever on hover, and gone
+ * entirely under reduced motion. Kept subtle — the wheel's spin button is
+ * the loud one and stays the loud one. */
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.32) 46%,
+    rgba(255, 255, 255, 0.1) 55%,
+    transparent 66%
+  );
+  transform: translateX(-130%);
+  pointer-events: none;
+}
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px
+    color-mix(in srgb, var(--btn-accent, var(--text-primary)) 35%, transparent);
+}
+.btn-primary:hover:not(:disabled)::after {
+  transform: translateX(130%);
+  transition: transform 650ms ease;
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Per-surface accents, so the Simulator stays its series colour and the
+ * Laboratory its own. `--btn-ink` rides along because a pale accent needs
+ * dark ink where a deep one needs the page's. */
+.btn-accent-1 { --btn-accent: var(--series-1); --btn-ink: #fff; }
+.btn-accent-2 { --btn-accent: var(--series-2); --btn-ink: var(--page); }
+
+.btn-quiet {
+  background: var(--page);
+  border-color: var(--hairline);
+  color: var(--text-secondary);
+}
+.btn-quiet:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--vine);
+  color: var(--text-primary);
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--vine) 22%, transparent);
+}
+.btn-quiet:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.btn-danger {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--status-critical) 45%, transparent);
+  color: var(--status-critical);
+}
+.btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--status-critical) 12%, transparent);
+  border-color: var(--status-critical);
+}
+.btn-danger-solid {
+  background: var(--status-critical);
+  border-color: var(--status-critical);
+  color: #fff;
+}
+.btn-danger-solid:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--status-critical) 35%, transparent);
+}
+.btn-danger-solid:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.btn-ghost:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+/* At the fortune-teller's table the quiet voice dresses for the room:
+ * transparent over the baize, the table's own ink, and a hover that warms
+ * to the lantern's brass rather than the forest's vine (commandment 15 —
+ * this room gets its own tailoring, not a hand-me-down). Outside the felt
+ * the token fallback keeps it a perfectly ordinary quiet button. */
+.btn-felt {
+  background: transparent;
+  border-color: var(--hairline);
+  color: var(--tarot-felt-text, var(--text-secondary));
+}
+.btn-felt:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, #c9a227 70%, var(--hairline));
+  box-shadow: 0 1px 6px rgba(201, 162, 39, 0.28);
+}
+.btn-felt:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Chip pickers (the Learn page's tiers and guilds, the create flow's doors,
+ * the vocabulary's see-also trail): aria-pressed toggles that used to wear
+ * their states inline, where no :hover could reach them. One class, one
+ * `is-on`, and every chip answers the pointer. */
+.chip-toggle {
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  transition: color 120ms ease, border-color 120ms ease,
+    background-color 120ms ease;
+}
+.chip-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+.chip-toggle:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+.chip-toggle.is-on {
+  color: var(--text-primary);
+  background: var(--gridline);
+  border-color: var(--baseline);
+}
+
+/* Quiet disclosure headers (the dossier's drawer) — muted until the hand
+ * arrives, ink when it does. The colour lives here so :hover outranks it. */
+.disclosure-toggle {
+  color: var(--text-muted);
+  transition: color 120ms ease;
+}
+.disclosure-toggle:hover {
+  color: var(--text-primary);
+}
+.disclosure-toggle:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+
+/* Rows inside a dropdown menu (the settings gear): the whole row is the
+ * control, so the whole row answers. */
+.menu-row {
+  transition: background-color 120ms ease;
+}
+.menu-row:hover {
+  background: var(--gridline);
+}
+
+/* The art picker's printing tiles: a lift, since their selection state
+ * already owns the outline. */
+.art-pick-tile {
+  transition: transform 120ms ease;
+}
+.art-pick-tile:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .art-pick-tile,
+  .art-pick-tile:hover:not(:disabled) {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Tab strips (the library's shelves, the deck page's tabs). Not `.btn` — a
+ * tab is a place rather than an action — but commandment 17 still applies:
+ * the inactive ones answer a hover by inking up. The colours live here
+ * rather than inline so `:hover` can outrank them. */
+.strip-tab {
+  color: var(--text-muted);
+  border-color: transparent;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.strip-tab:hover {
+  color: var(--text-primary);
+}
+.strip-tab:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: -2px;
+}
+.strip-tab.is-active {
+  color: var(--text-primary);
+  border-color: var(--series-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .btn::after {
+    transition: none;
+  }
+  .btn:hover:not(:disabled),
+  .btn-primary:hover:not(:disabled),
+  .btn-quiet:hover:not(:disabled),
+  .btn-danger-solid:hover:not(:disabled) {
+    transform: none;
+  }
+  .btn-primary:hover:not(:disabled)::after {
+    transform: translateX(-130%);
+  }
+}
+
 /* -------------------------------------------------------- the forest layer
  *
  * `components/forest.tsx` draws it; this is where it lives and breathes.

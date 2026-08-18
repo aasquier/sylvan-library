@@ -70,11 +70,7 @@ function RowAction({ label, busyLabel, disabled, title, onRun, danger }: {
           setBusy(false)
         }
       }}
-      className="rounded-md px-2.5 py-1 text-xs font-medium transition disabled:opacity-40"
-      style={{
-        border: '1px solid var(--hairline)',
-        color: danger ? 'var(--status-critical)' : 'var(--text-secondary)',
-      }}
+      className={`btn btn-xs ${danger ? 'btn-danger' : 'btn-quiet'}`}
     >
       {busy ? busyLabel : label}
     </button>
@@ -135,9 +131,7 @@ function DeleteAccount({ account, disabled, title, onRun }: {
       <button
         type="button"
         disabled={!matches || busy}
-        className="rounded-md px-2.5 py-1 text-xs font-medium transition disabled:opacity-40"
-        style={{ border: '1px solid var(--hairline)',
-                 color: 'var(--status-critical)' }}
+        className="btn btn-danger btn-xs"
         onClick={async () => {
           setBusy(true)
           try {
@@ -153,8 +147,7 @@ function DeleteAccount({ account, disabled, title, onRun }: {
       </button>
       <button
         type="button"
-        className="rounded-md px-2 py-1 text-xs transition"
-        style={{ color: 'var(--text-muted)' }}
+        className="btn btn-ghost btn-xs"
         onClick={() => { setOpen(false); setTyped('') }}
       >
         Cancel
@@ -239,8 +232,7 @@ function InviteForm({ onInvited, onError }: {
           as an admin
         </label>
         <button type="submit" disabled={busy || !email.trim()}
-                className="h-9 rounded-lg px-4 text-sm font-medium disabled:opacity-40"
-                style={{ background: 'var(--text-primary)', color: 'var(--page)' }}>
+                className="btn btn-primary">
           {busy ? 'Inviting…' : 'Send invite'}
         </button>
       </div>

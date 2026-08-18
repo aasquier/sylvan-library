@@ -86,13 +86,13 @@ export function TheShelves() {
 
       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
         <button type="button" onClick={() => setOpen((o) => !o)}
-                className="font-medium underline"
+                className="btn btn-ghost btn-xs font-medium"
                 style={{ color: 'var(--series-1)' }}>
           {open ? 'Enough' : 'Tell me more'}
         </button>
         <button type="button"
                 onClick={() => { setOpen(false); setStep((n) => n + 1) }}
-                style={{ color: 'var(--text-muted)' }}>
+                className="btn btn-ghost btn-xs">
           Another
         </button>
         {/* `words` opens the vocabulary tab; a `colors` link lands on the

@@ -66,7 +66,7 @@ function Toggle({ label, hint, on, onChange }: {
   return (
     <button type="button" role="switch" aria-checked={on}
             onClick={() => onChange(!on)}
-            className="flex w-full items-center gap-3 rounded-md px-1.5 py-1.5 text-left">
+            className="menu-row flex w-full items-center gap-3 rounded-md px-1.5 py-1.5 text-left">
       <span className="min-w-0 flex-1">
         <span className="block text-[12px] font-medium"
               style={{ color: 'var(--text-primary)' }}>{label}</span>
@@ -129,8 +129,7 @@ export function SettingsMenu({ theme, onToggleTheme }: {
         aria-expanded={open}
         aria-label="Settings"
         title="Settings — theme, ambience, sound, and Claude"
-        className="flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 text-sm"
-        style={{ color: 'var(--text-secondary)', border: '1px solid var(--hairline)' }}
+        className="btn btn-quiet btn-sm whitespace-nowrap gap-1.5"
       >
         <GearGlyph />
         {claude && (

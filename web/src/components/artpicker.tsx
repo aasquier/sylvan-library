@@ -97,9 +97,7 @@ export function CardArtPicker({ deck, card, onPicked, onClose }: {
       <div className="flex items-center gap-2">
         <p className="text-xs font-medium">Art for {card}</p>
         <button type="button" onClick={onClose}
-                className="ml-auto rounded-md px-2 py-1 text-[11px]"
-                style={{ border: '1px solid var(--hairline)',
-                         color: 'var(--text-muted)' }}>
+                className="btn btn-quiet btn-xs ml-auto">
           Close
         </button>
       </div>
@@ -133,7 +131,7 @@ export function CardArtPicker({ deck, card, onPicked, onClose }: {
                   onDoubleClick={() => gesture.doubleClick(printing.id)}
                   disabled={!!saving}
                   title={`${printing.set_name ?? printing.set_code} · #${printing.collector_number ?? '?'}`}
-                  className="overflow-hidden rounded-lg text-left"
+                  className="art-pick-tile overflow-hidden rounded-lg text-left"
                   style={{
                     outline: on ? '2px solid var(--series-1)' : '1px solid var(--hairline)',
                     outlineOffset: on ? '1px' : '0',
@@ -242,9 +240,7 @@ export function ArtPicker({ deck, onPicked }: {
         onClick={() => setOpen(!open)}
         // Sized to match the hero action row it sits in — see the share
         // toggle's note; three button idioms in one row was the defect.
-        className="rounded-lg px-4 py-2 text-sm font-medium"
-        style={{ border: '1px solid var(--hairline)', background: 'var(--page)',
-                 color: 'var(--text-secondary)' }}
+        className="btn btn-quiet"
         aria-expanded={open}
       >
         {open ? 'Close art picker' : 'Change art'}
@@ -283,7 +279,7 @@ export function ArtPicker({ deck, onPicked }: {
                       onDoubleClick={() => gesture.doubleClick(printing.id)}
                       disabled={!!saving}
                       title={`${printing.set_name ?? printing.set_code} · #${printing.collector_number ?? '?'}`}
-                      className="overflow-hidden rounded-lg text-left"
+                      className="art-pick-tile overflow-hidden rounded-lg text-left"
                       style={{
                         // The selected one is ringed rather than merely
                         // brighter: "which am I showing" has to survive a

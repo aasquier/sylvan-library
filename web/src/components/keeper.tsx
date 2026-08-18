@@ -148,8 +148,8 @@ export function KeeperDossier({ open, onClose }: {
             </h2>
           </div>
           <button type="button" onClick={onClose} aria-label="Close"
-                  className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white"
-                  style={{ background: 'rgba(0,0,0,0.45)' }}>
+                  className="btn absolute right-3 top-3 h-8 w-8 rounded-full p-0 text-white"
+                  style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'transparent' }}>
             ✕
           </button>
         </div>

@@ -27,7 +27,7 @@
  * same truth: the deck is made by the person whose deck it is.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   ApiError,
   api,
@@ -46,6 +46,7 @@ import { PERSONA_ACCENT, PERSONA_ART } from '../lib/personart'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 import { SceneBackdrop } from './forest'
 import { ArmedButton, CardHover, ColorRing } from './ui'
+import { ReplayGlyph } from './glyphs'
 import { StanceReadout } from './stance'
 
 /** Held here so a closed tab does not cost ten minutes of somebody's thinking.
@@ -379,7 +380,7 @@ function InkText({ text }: { text: string }) {
                   // A hand wobbles; a render must not. Deterministic jitter.
                   '--ink-tilt': `${(((n * 7) % 5) - 2) * 0.35}deg`,
                   '--ink-drop': `${(((n * 3) % 3) - 1) * 0.6}px`,
-                } as React.CSSProperties}>
+                } as CSSProperties}>
             {part}
           </span>
         )
@@ -833,9 +834,7 @@ export function ThemeInterview({
               : <><code>pip install -e &quot;.[claude]&quot;</code> adds it.</>}
           </span>
         </p>
-        <button onClick={onLeave} className="mt-3 rounded-md px-3 py-1.5 text-sm"
-                style={{ border: '1px solid var(--hairline)',
-                         color: 'var(--text-secondary)' }}>
+        <button onClick={onLeave} className="btn btn-quiet btn-sm mt-3">
           {leaveLabel ?? '← Pick colours myself'}
         </button>
       </div>
@@ -894,7 +893,7 @@ export function ThemeInterview({
 
   return (
     <section className="persona-room space-y-5"
-             style={{ '--room-accent': accent } as React.CSSProperties}>
+             style={{ '--room-accent': accent } as CSSProperties}>
       {/* The fortune-teller's room drifts with mana rather than mist — the
           crystal ball's violet light, given the whole floor. */}
       {roomArt && <SceneBackdrop art={roomArt.art}
@@ -946,9 +945,7 @@ export function ThemeInterview({
               Start over
             </ArmedButton>
           )}
-          <button onClick={onLeave} className="rounded-md px-3 py-1.5 text-sm"
-                  style={{ border: '1px solid var(--hairline)',
-                           color: 'var(--text-secondary)' }}>
+          <button onClick={onLeave} className="btn btn-quiet btn-sm">
             {leaveLabel ?? '← Pick colours myself'}
           </button>
         </div>
@@ -1056,8 +1053,7 @@ export function ThemeInterview({
               />
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <button onClick={answerIt} disabled={!answer.trim() || !!busy}
-                        className="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
-                        style={{ background: 'var(--series-1)', color: '#fff' }}>
+                        className="btn btn-primary btn-accent-1">
                   Answer
                 </button>
                 {/* The way out of a turn that produced nothing. Sits next to
@@ -1067,9 +1063,8 @@ export function ThemeInterview({
                     opening turn most of the time. */}
                 {stuck && (
                   <button onClick={retry}
-                          className="rounded-md px-4 py-2 text-sm font-medium"
-                          style={{ border: '1px solid var(--hairline)',
-                                   color: 'var(--text-primary)' }}>
+                          className="btn btn-quiet">
+                    <ReplayGlyph />
                     Try that again
                   </button>
                 )}
@@ -1102,14 +1097,12 @@ export function ThemeInterview({
               {finished && !ready && (
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <button onClick={onLeave}
-                          className="rounded-md px-4 py-2 text-sm font-medium"
-                          style={{ background: 'var(--series-1)', color: '#fff' }}>
+                          className="btn btn-primary btn-accent-1">
                     {leaveLabel ?? 'Pick colours with me instead'}
                   </button>
                   <button onClick={startOver}
-                          className="rounded-md px-4 py-2 text-sm"
-                          style={{ border: '1px solid var(--hairline)',
-                                   color: 'var(--text-primary)' }}>
+                          className="btn btn-quiet">
+                    <ReplayGlyph />
                     Ask me again
                   </button>
                   <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -1139,8 +1132,8 @@ export function ThemeInterview({
                     two controls, one act, and a reader (or a test) should be
                     able to tell which one they pressed. */}
                 <button onClick={proposeIt} disabled={!!busy}
-                        className="mt-3 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
-                        style={{ background: 'var(--series-2)', color: '#fff' }}>
+                        className="btn btn-primary btn-accent-2"
+                        style={{ '--btn-ink': '#fff' } as CSSProperties}>
                   {seed !== null ? 'Read my cards' : 'Get my colours'}
                 </button>
               </div>
@@ -1209,10 +1202,8 @@ export function ThemeInterview({
                                 border: '1px solid var(--hairline)' }} />
               </label>
               <button onClick={proposeIt} disabled={!ready || !!busy}
-                      className="mt-3 w-full rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
-                      style={{ background: ready ? 'var(--series-2)' : 'transparent',
-                               color: ready ? '#fff' : 'var(--text-muted)',
-                               border: ready ? 'none' : '1px solid var(--hairline)' }}>
+                      className={`btn mt-3 w-full ${ready ? 'btn-primary btn-accent-2' : 'btn-quiet'}`}
+                      style={ready ? { '--btn-ink': '#fff' } as CSSProperties : undefined}>
                 {busy === 'proposing'
                   ? `Reading around… ${elapsed}s`
                   : 'Suggest my colours'}
@@ -1249,9 +1240,7 @@ export function ThemeInterview({
               nothing is created until you say so.
             </p>
             <button onClick={() => setSaved((s) => ({ ...s, proposal: null }))}
-                    className="ml-auto rounded-md px-3 py-1.5 text-sm"
-                    style={{ border: '1px solid var(--hairline)',
-                             color: 'var(--text-secondary)' }}>
+                    className="btn btn-quiet btn-sm ml-auto">
               ← Keep talking
             </button>
           </div>

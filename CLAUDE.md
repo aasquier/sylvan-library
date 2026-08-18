@@ -99,6 +99,16 @@ load-bearing.
     one is about Aaron's eye before it. (Added with Aaron 2026-08-17,
     mid-menagerie, after three effects his eye threw out had already been
     photographed "done".)
+17. **Thou shalt not make a simple button.** Every control answers the
+    hand that reaches for it — hover, focus and press all visibly reply —
+    and buttons wear Magic's materials where they can: the glint, the
+    vine, the felt's brass, the colours of the surface they serve. The
+    `.btn` family in `web/src/index.css` is this commandment in code
+    (with `.chip-toggle`, `.strip-tab` and their siblings for controls
+    that are places rather than actions); a bare unstyled `<button>` in a
+    route is a bug, and an inline `style` that a `:hover` can never reach
+    is how the last hundred of them happened. (Proposed by Aaron
+    2026-08-18, wording confirmed at the button-overhaul PR.)
 
 ## Setup
 
