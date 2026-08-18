@@ -574,8 +574,8 @@ describe('DeckDetail wheel of fortune', () => {
       pool_available: true, symbol: 'cup', label: 'The Cup',
       meaning: 'The cup runneth over — a card that refills your hand.',
       seed: 7, answered_by: 'python',
-      caveat: 'The wheel is deterministic Python rolling dice over the card '
-            + 'pool. The rationale, if it earns one, is yours to write.',
+      caveat: 'The wheel is blind dice over the card pool. The rationale, '
+            + 'if it earns one, is yours to write.',
       card: { name: 'Harmonize', mana_cost: '{2}{G}{G}', type_line: 'Sorcery',
               oracle_text: 'Draw three cards.', color_identity: ['G'],
               image: 'https://example.test/harmonize-full.jpg',
@@ -593,8 +593,11 @@ describe('DeckDetail wheel of fortune', () => {
 
     expect(await screen.findByText('Harmonize')).toBeTruthy()
     expect(screen.getByText('The Cup')).toBeTruthy()
-    expect(screen.getByText(/deterministic Python/)).toBeTruthy()
-    expect(screen.getByText(/Seed 7/)).toBeTruthy()
+    expect(screen.getByText(/blind dice/)).toBeTruthy()
+    // Commandment 10 (sharpened 2026-08-17): no technology but Claude ever
+    // renders — the seed rides the wire for tests and QA, never the page.
+    expect(screen.queryByText(/Seed 7/)).toBeNull()
+    expect(screen.queryByText(/Python/)).toBeNull()
   })
 
   it('reports an empty fate honestly', async () => {

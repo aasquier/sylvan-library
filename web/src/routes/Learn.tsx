@@ -252,15 +252,14 @@ function CombinationPanel({ combo, taxonomy }: {
           <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
             {combo.signature.join(' · ')}
             <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
-              The cards themselves need the pool — run <code>mtglab data
-              refresh</code>.
+              The cards themselves appear once the library&rsquo;s pool is stocked.
             </span>
           </p>
         )}
       </section>
 
       <p className="mt-5 text-xs" style={{ color: 'var(--text-muted)' }}>
-        Colour identity here is Scryfall’s, checked against{' '}
+        Colour identity comes from the printed cards, checked against{' '}
         <em>{combo.verified_by}</em>.
         {/* A dropped name is a bug in the reference table, not in the pool,
             so it says so rather than failing quietly. */}

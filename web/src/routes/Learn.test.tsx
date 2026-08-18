@@ -180,7 +180,7 @@ describe('the colours tab', () => {
     // so the page still says who Jarad is.
     expect(await screen.findByText('Jarad, Golgari Lich Lord')).toBeTruthy()
     expect(screen.getByText(/Dead, and in charge/)).toBeTruthy()
-    expect(screen.getByText(/mtglab data refresh/)).toBeTruthy()
+    expect(screen.getByText(/pool is stocked/)).toBeTruthy()
   })
 
   it('renames the combination when the data renames it', async () => {

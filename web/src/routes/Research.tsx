@@ -428,10 +428,9 @@ function NamedCard({ card }: { card: ResearchCard }) {
         </span>
         <p className="mt-1 text-xs leading-relaxed"
            style={{ color: 'var(--text-muted)' }}>
-          Not in the card pool. Everything said about this card above comes from
-          a cited page, not from a card lookup — run{' '}
-          <code>mtglab data refresh</code> once it is in Scryfall&rsquo;s bulk
-          data.
+          Not yet in the library&rsquo;s card pool — a spoiler this fresh
+          arrives with the next restock. Everything said about it above comes
+          from a cited page, not from a card lookup.
         </p>
       </li>
     )

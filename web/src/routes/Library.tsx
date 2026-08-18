@@ -205,7 +205,7 @@ function LibraryMasthead({ decks, health }: {
         {decks} deck{decks === 1 ? '' : 's'} ·{' '}
         {health?.pool
           ? `${health.oracle_cards.toLocaleString()} cards in the local pool`
-          : 'no card pool yet — run `mtglab data refresh`'}
+          : 'no card pool yet — the library awaits its first stocking'}
       </p>
     </PageMasthead>
   )
@@ -490,7 +490,7 @@ export default function Library() {
           <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
             {health?.pool
               ? `${health.oracle_cards.toLocaleString()} cards in the local pool`
-              : 'no card pool yet — run `mtglab data refresh`'}
+              : 'no card pool yet — the library awaits its first stocking'}
           </p>
         </div>
       )}

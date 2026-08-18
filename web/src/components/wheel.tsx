@@ -238,8 +238,8 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
       <div className="flex flex-wrap items-baseline gap-2">
         <h3 className="text-sm font-semibold">The Wheel of Fortune</h3>
         <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          Spin for a card in this deck&rsquo;s colours. Python rolls; nobody
-          opines.
+          Spin for a card in this deck&rsquo;s colours. The dice decide;
+          nobody opines.
         </span>
       </div>
 
@@ -361,8 +361,7 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
                   )}
               <p className="text-[11px] leading-relaxed"
                  style={{ color: 'var(--text-muted)' }}>
-                {spin.caveat} Seed {spin.seed} — the same seed re-spins the
-                same fate.
+                {spin.caveat}
               </p>
             </div>
           )}

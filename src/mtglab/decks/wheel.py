@@ -73,12 +73,19 @@ FATES: dict[str, dict[str, str]] = {
     },
 }
 
-#: How the caveat states which system answered (ADR 14 boundary 3).
-CAVEAT = ("The wheel is deterministic Python rolling dice over the card "
-          "pool — a fate, then a random legal card in this deck's colours "
-          "that answers to it. A suggestion to argue with, never a "
-          "recommendation: the rationale, if it earns one, is yours to "
-          "write.")
+#: How the caveat states which system answered (ADR 14 boundary 3) —
+#: without naming one (commandment 10, Aaron's ruling 2026-08-17: a
+#: programming language is an implementation detail, and so is a seed).
+#: What the user needs from boundary 3 is the DISTINCTION: this was
+#: blind dice, nobody's judgment — and that survives with no language
+#: named. The wire still carries `answered_by: "python"` and `seed` as
+#: tokens for clients and tests; rendering them is the sin, not sending
+#: them. (The Simulator's seed is different: there it is an input
+#: control with a glossary entry — a feature, not trivia.)
+CAVEAT = ("The wheel is blind dice over the card pool — a fate, then a "
+          "random legal card in this deck's colours that answers to it. "
+          "A suggestion to argue with, never a recommendation: the "
+          "rationale, if it earns one, is yours to write.")
 
 
 def spin(deck: Deck, identity: frozenset[str], con: Any, *,
