@@ -63,9 +63,17 @@ const WHEEL_ART =
 const WHEEL_CARD =
   'https://cards.scryfall.io/normal/front/6/7/67b369c4-faa8-45c8-a1b9-98f228b69682.jpg'
 
-/** Folded or unfolded survives a reload; open is the absence of the key,
- *  the same shape as every other preference here. */
-const OPEN_KEY = 'mtglab-wheel-open'
+/*
+ * The fold does **not** survive a reload (punch list 2026-08-18 item 2).
+ *
+ * It used to: `mtglab-wheel-open` remembered an unfolded clearing, which is
+ * the right shape for a preference and the wrong shape for this. The wheel is
+ * a thing you go to, spin, and are done with — an amusement, not a panel of
+ * the deck — and left unfolded it greets every later visit with a clearing,
+ * its rain, its crickets and its storm timers, in front of the deck you
+ * actually came back for. So leaving the page or reloading closes it, always,
+ * and one click opens it again. There is no key to read and none to write.
+ */
 
 /** The wheel's circle within the art crop: centre as fractions of the crop's
  *  width and height, diameter as a fraction of width. Fitted against the
@@ -226,23 +234,10 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
   const fallback = useRef<number | null>(null)
   const landed = useRef<WheelSpin | null>(null)
   const [sound] = useTableSound()
-  const [open, setOpen] = useState(() => {
-    try {
-      return localStorage.getItem(OPEN_KEY) !== '0'
-    } catch {
-      return true
-    }
-  })
+  const [open, setOpen] = useState(false)
 
   function toggleOpen() {
-    setOpen((was) => {
-      const next = !was
-      try {
-        if (next) localStorage.removeItem(OPEN_KEY)
-        else localStorage.setItem(OPEN_KEY, '0')
-      } catch { /* private browsing: the fold just does not persist */ }
-      return next
-    })
+    setOpen((was) => !was)
   }
 
   useEffect(() => () => {

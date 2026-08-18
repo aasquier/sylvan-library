@@ -209,6 +209,34 @@ const REF = { owner: 'aasquier', slug: 'goreclaw-stompy' }
  *  reason: two people's `goreclaw-stompy` are two decks and two runs. */
 const JOB_KEY = 'mtglab-dossier-job:aasquier/goreclaw-stompy'
 
+/**
+ * The 99 opens folded now (punch list 2026-08-18 item 4 — see `stored` in
+ * `DeckDetail`), so almost every test here would otherwise be asserting
+ * against a page of closed signs. This seeds the stash the way a reader who
+ * has opened the shelf leaves it: an *explicit* empty list per grouping, which
+ * is the "I unfolded these" answer rather than the absent "never touched" one.
+ *
+ * The default itself is not tested through this helper for that exact reason —
+ * `describe('DeckDetail rollup')` renders without it and asserts the closed
+ * page directly.
+ */
+function renderUnfolded() {
+  localStorage.setItem(
+    'mtglab-99-collapsed:aasquier/goreclaw-stompy',
+    JSON.stringify({ category: [], type: [], mv: [] }),
+  )
+  return renderDeck()
+}
+
+/**
+ * Open the clearing. The wheel arrives folded on every visit now (punch list
+ * 2026-08-18 item 2) — it is an amusement you go to, not a panel of the deck —
+ * so anything testing the spin has to walk in first.
+ */
+function unfoldWheel() {
+  fireEvent.click(screen.getByTitle('Unfold the Wheel of Fortune'))
+}
+
 function renderDeck() {
   return render(
     <MemoryRouter initialEntries={['/decks/aasquier/goreclaw-stompy']}>
@@ -403,7 +431,7 @@ afterEach(cleanup)
 
 describe('DeckDetail validation tab', () => {
   it('does not fetch a shortlist until the tab is opened', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByRole('button', { name: 'Validation' })
     expect(api.suggestions).not.toHaveBeenCalled()
 
@@ -412,7 +440,7 @@ describe('DeckDetail validation tab', () => {
   })
 
   it('fetches the shortlist once, not on every tab switch', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByRole('button', { name: 'Validation' })
     openValidation()
     await waitFor(() => expect(api.suggestions).toHaveBeenCalledTimes(1))
@@ -424,7 +452,7 @@ describe('DeckDetail validation tab', () => {
   })
 
   it('renders candidates under the error they belong to, with their reasons', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByRole('button', { name: 'Validation' })
     openValidation()
 
@@ -437,7 +465,7 @@ describe('DeckDetail validation tab', () => {
   it('says the shortlist is not a recommendation', async () => {
     // The whole design rests on this being a measurement the user overrules.
     // If the disclaimer ever quietly disappears, that is a change worth failing.
-    renderDeck()
+    renderUnfolded()
     await screen.findByRole('button', { name: 'Validation' })
     openValidation()
     await screen.findByText('Cultivator Colossus')
@@ -448,7 +476,7 @@ describe('DeckDetail validation tab', () => {
     vi.mocked(api.suggestions).mockResolvedValue({
       slug: 'goreclaw-stompy', pool_available: false, targets: [],
     })
-    renderDeck()
+    renderUnfolded()
     await screen.findByRole('button', { name: 'Validation' })
     openValidation()
 
@@ -460,7 +488,7 @@ describe('DeckDetail validation tab', () => {
     // Rule 4 at the last place it can be enforced. A tool-written rationale is
     // the empty justification the rule exists to prevent, so the button stays
     // disabled rather than the app inventing one.
-    renderDeck()
+    renderUnfolded()
     await screen.findByRole('button', { name: 'Validation' })
     openValidation()
     fireEvent.click(await screen.findByRole('button', { name: 'Use this card' }))
@@ -477,7 +505,7 @@ describe('DeckDetail validation tab', () => {
   })
 
   it('sends the swap the user composed, and refetches what it invalidated', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByRole('button', { name: 'Validation' })
     openValidation()
     fireEvent.click(await screen.findByRole('button', { name: 'Use this card' }))
@@ -498,7 +526,7 @@ describe('DeckDetail validation tab', () => {
   it('surfaces a refusal instead of pretending the swap worked', async () => {
     vi.mocked(api.swapCard).mockRejectedValue(
       new Error("'Rhystic Study' identity {U} is outside the commander's {G}"))
-    renderDeck()
+    renderUnfolded()
     await screen.findByRole('button', { name: 'Validation' })
     openValidation()
     fireEvent.click(await screen.findByRole('button', { name: 'Use this card' }))
@@ -512,7 +540,7 @@ describe('DeckDetail validation tab', () => {
   it('offers the full card on hover for a suggestion, not just the art', async () => {
     // Accepting a suggestion means reading its rules text, and the shortlist
     // shows only art and a score. Same affordance as the decklist rows.
-    renderDeck()
+    renderUnfolded()
     await screen.findByRole('button', { name: 'Validation' })
     openValidation()
     const art = await screen.findByAltText('Cultivator Colossus')
@@ -526,7 +554,7 @@ describe('DeckDetail validation tab', () => {
   // ------------------------------------------------------------- draft stage
 
   it('says nothing about drafts for a curated deck', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     expect(screen.queryByText(/still need a/)).toBeNull()
     expect(screen.queryByText('no rationale yet')).toBeNull()
@@ -541,7 +569,7 @@ describe('DeckDetail validation tab', () => {
       needs_rationale: 1,
       cards: [{ ...DECK.cards[0], why: '' }],
     } as unknown as Deck)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
 
     expect(screen.getByText(/1 of 1 cards still need/)).toBeTruthy()
@@ -581,8 +609,9 @@ describe('DeckDetail wheel of fortune', () => {
               image: 'https://example.test/harmonize-full.jpg',
               art_crop: 'https://example.test/harmonize.jpg' },
     })
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
+    unfoldWheel()
     fireEvent.click(screen.getByRole('button', { name: 'Spin the wheel' }))
     await waitFor(() => expect(vi.mocked(api.wheelSpin)).toHaveBeenCalled())
 
@@ -608,8 +637,9 @@ describe('DeckDetail wheel of fortune', () => {
       reason: 'The pool holds no legal card in these colours that answers '
             + 'to this fate.',
     })
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
+    unfoldWheel()
     fireEvent.click(screen.getByRole('button', { name: 'Spin the wheel' }))
     await waitFor(() => expect(vi.mocked(api.wheelSpin)).toHaveBeenCalled())
     fireEvent.transitionEnd(
@@ -618,9 +648,28 @@ describe('DeckDetail wheel of fortune', () => {
   })
 
   it('credits the painting', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
+    unfoldWheel()
     expect(screen.getByText(/Daniel Gelon, Limited Edition Alpha/)).toBeTruthy()
+  })
+
+  it('arrives folded, and does not remember being opened', async () => {
+    renderUnfolded()
+    await screen.findByText(DECK.name)
+    // Folded, the wheel is the card it came from: no clearing, no controls,
+    // and — the point of the fold — no rain, crickets or storm timers.
+    expect(screen.queryByRole('button', { name: 'Spin the wheel' })).toBeNull()
+
+    unfoldWheel()
+    expect(screen.getByRole('button', { name: 'Spin the wheel' })).toBeTruthy()
+
+    // Leaving and coming back shuts it again. It used to persist, which is
+    // the right shape for a preference and the wrong one for an amusement.
+    cleanup()
+    renderUnfolded()
+    await screen.findByText(DECK.name)
+    expect(screen.queryByRole('button', { name: 'Spin the wheel' })).toBeNull()
   })
 })
 
@@ -631,7 +680,7 @@ describe('DeckDetail wheel of fortune', () => {
  */
 describe('DeckDetail stats tab', () => {
   async function openStats() {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: 'Stats' }))
   }
@@ -680,7 +729,7 @@ describe('DeckDetail rationale editor', () => {
 
   /** The new interaction: arm the action on the bar, then pick the card. */
   async function openEditorFor(card: string) {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: 'Write why' }))
     fireEvent.click(screen.getByRole('button', { name: `Write why: ${card}` }))
@@ -701,7 +750,7 @@ describe('DeckDetail rationale editor', () => {
     // The two real clicks inside a double-click fire first and toggle the
     // editor open then closed; the dblclick must land it *open* and disarm.
     vi.mocked(api.deck).mockResolvedValue(DRAFT)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: 'Write why' }))
     const row = screen.getByRole('button', { name: 'Write why: Sol Ring' })
@@ -873,7 +922,7 @@ describe('DeckDetail rationale editor', () => {
 
   it('filters the list down to the cards a draft still owes', async () => {
     vi.mocked(api.deck).mockResolvedValue(DRAFT)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     expect(rowFor('Primeval Titan')).toBeTruthy()
 
@@ -890,7 +939,7 @@ describe('DeckDetail rationale editor', () => {
     // Entomb and picking a card only marks the row — naming the consequence
     // — and one stray click mutates nothing. This is the test for the bug
     // that killed a handful of Gyome's cards in one afternoon.
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: 'Entomb' }))
     const target = screen.getByRole('button', { name: 'Entomb: Primeval Titan' })
@@ -907,7 +956,7 @@ describe('DeckDetail rationale editor', () => {
 
   it('reports a refused entombment rather than silently doing nothing', async () => {
     vi.mocked(api.entombCard).mockRejectedValue(new Error('this deck is read-only'))
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: 'Entomb' }))
     const target = screen.getByRole('button', { name: 'Entomb: Primeval Titan' })
@@ -934,7 +983,7 @@ describe('DeckDetail graveyard', () => {
 
   it('lists the buried with their rationale, and both ways out', async () => {
     vi.mocked(api.deck).mockResolvedValue(BURIED)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(/graveyard/i)
     // Twice: once on the hover target, once as the row's name — same as a
     // living card's row.
@@ -948,7 +997,7 @@ describe('DeckDetail graveyard', () => {
 
   it('returns a card in one click — restoring is not destructive', async () => {
     vi.mocked(api.deck).mockResolvedValue(BURIED)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(/graveyard/i)
     fireEvent.click(screen.getByRole('button', { name: 'Return' }))
     await waitFor(() => expect(api.returnCard)
@@ -957,7 +1006,7 @@ describe('DeckDetail graveyard', () => {
 
   it('exile arms first, like every permanent thing here', async () => {
     vi.mocked(api.deck).mockResolvedValue(BURIED)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(/graveyard/i)
     const button = screen.getByRole('button', { name: 'Exile' })
     fireEvent.click(button)
@@ -968,13 +1017,13 @@ describe('DeckDetail graveyard', () => {
   })
 
   it('offers no graveyard section while it is empty', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     expect(screen.queryByText(/graveyard/i)).toBeNull()
   })
 
   it('sweeps the chosen cards in one all-or-nothing request', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     // Enter the mode, tick the card, then the armed two-step.
     fireEvent.click(screen.getByRole('button', { name: /bulk entomb/i }))
@@ -993,7 +1042,7 @@ describe('DeckDetail graveyard', () => {
   })
 
   it('keeps the checkboxes out of the way until the mode is entered', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     expect(screen.queryByRole('checkbox', { name: /choose/i })).toBeNull()
   })
@@ -1012,7 +1061,7 @@ describe('DeckDetail promotion', () => {
 
   it('offers no promotion while cards still owe a rationale', async () => {
     vi.mocked(api.deck).mockResolvedValue(DRAFT)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     expect(screen.queryByRole('button', { name: /promote/i })).toBeNull()
     expect(screen.getByText(/2 of 3 cards still need/)).toBeTruthy()
@@ -1020,7 +1069,7 @@ describe('DeckDetail promotion', () => {
 
   it('offers promotion once nothing is outstanding', async () => {
     vi.mocked(api.deck).mockResolvedValue(FINISHED)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     expect(screen.getByText(/every card carries a rationale/i)).toBeTruthy()
 
@@ -1037,7 +1086,7 @@ describe('DeckDetail promotion', () => {
     vi.mocked(api.deck).mockResolvedValue(FINISHED)
     vi.mocked(api.setDeckField).mockRejectedValue(
       new Error('1 card(s) still have no `why` (Sol Ring)'))
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: /promote to curated/i }))
 
@@ -1045,7 +1094,7 @@ describe('DeckDetail promotion', () => {
   })
 
   it('shows no draft banner at all on a curated deck', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     expect(screen.queryByRole('button', { name: /promote/i })).toBeNull()
     expect(screen.queryByText(/still need/)).toBeNull()
@@ -1073,7 +1122,7 @@ describe('DeckDetail hero', () => {
         art_crop: 'https://example.test/goreclaw-crop.jpg',
       },
     } as unknown as Deck)
-    renderDeck()
+    renderUnfolded()
 
     const card = await screen.findByAltText('Goreclaw, Terror of Qal Sisma')
     expect(card.getAttribute('src')).toBe('https://example.test/goreclaw-full.jpg')
@@ -1082,7 +1131,7 @@ describe('DeckDetail hero', () => {
   it('renders without a commander card when the pool has no art', async () => {
     // A fresh clone has no card pool, so `commander_card` is null and the hero
     // has nothing to lift out of the band. It must still render the deck.
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.queryByAltText('Goreclaw, Terror of Qal Sisma')).toBeNull()
   })
@@ -1098,20 +1147,20 @@ describe('DeckDetail hero', () => {
  */
 describe('DeckDetail commander facts', () => {
   it('renders the subtype counts it was given', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Bear')
     expect(screen.getByText(/26 legendary, 78 in all/)).toBeTruthy()
   })
 
   it('shows the first printing as a year and a set', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('2018')
     expect(screen.getByText(/in Core Set 2019/)).toBeTruthy()
     expect(screen.getByText(/12 printings/)).toBeTruthy()
   })
 
   it('offers the other cards carrying the name', async () => {
-    renderDeck()
+    renderUnfolded()
     expect(await screen.findByText('Surrak and Goreclaw')).toBeTruthy()
   })
 
@@ -1122,14 +1171,14 @@ describe('DeckDetail commander facts', () => {
       slug: 'goreclaw-stompy', card: null, supertypes: [], subtypes: [],
       other_cards: [], printings: { count: 0, first_released: null, first_set: null },
     })
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.queryByText(/about this commander/i)).toBeNull()
   })
 
   it('does not take the deck down when the dossier request fails', async () => {
     vi.mocked(api.commander).mockRejectedValue(new Error('boom'))
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.queryByText(/about this commander/i)).toBeNull()
   })
@@ -1146,7 +1195,7 @@ describe('DeckDetail commander facts', () => {
  */
 describe('DeckDetail commander dossier', () => {
   it('is collapsed by default so the page does not get busy', async () => {
-    renderDeck()
+    renderUnfolded()
     expect(await screen.findByText(/who is goreclaw\?/i)).toBeTruthy()
     // The heading is there; the prose is not, until asked for.
     expect(screen.queryByText(/bear god of qal sisma/i)).toBeNull()
@@ -1155,12 +1204,12 @@ describe('DeckDetail commander dossier', () => {
   it('says whose writing it is without being opened', async () => {
     // Somebody who never expands it should still know what is inside and who
     // wrote it. The label is outside the collapsed panel for that reason.
-    renderDeck()
+    renderUnfolded()
     expect(await screen.findByText(/claude, with sources/i)).toBeTruthy()
   })
 
   it('costs nothing to open when nothing is stored', async () => {
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     await screen.findByText(/nothing written yet/i)
     // The free GET may be called; the paid POST must not be.
@@ -1168,7 +1217,7 @@ describe('DeckDetail commander dossier', () => {
   })
 
   it('writes one on request and shows its prose', async () => {
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
     expect(await screen.findByText(/bear god of qal sisma/i)).toBeTruthy()
@@ -1179,7 +1228,7 @@ describe('DeckDetail commander dossier', () => {
   })
 
   it('keeps every web claim next to a real link', async () => {
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
     const source = await screen.findByText('Goreclaw | EDHREC')
@@ -1192,7 +1241,7 @@ describe('DeckDetail commander dossier', () => {
     // Competitors survived a card pool lookup server-side, so the name and
     // cost here are the pool's. A reader who doubts the sentence can hover
     // the card.
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
     expect(await screen.findByText('Ghalta, Primal Hunger')).toBeTruthy()
@@ -1202,7 +1251,7 @@ describe('DeckDetail commander dossier', () => {
     // The story's allies and rivals are prose, not cards (a plot line is not
     // a pool row), labelled apart from the competitors so the two kinds of
     // rival never blur again — and the friends get a section too.
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
     expect(await screen.findByText(/allies in the story/i)).toBeTruthy()
@@ -1221,7 +1270,7 @@ describe('DeckDetail commander dossier', () => {
       })),
       cancel: () => {},
     })
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
     expect(await screen.findByText(/discarded before you saw it/i)).toBeTruthy()
@@ -1238,7 +1287,7 @@ describe('DeckDetail commander dossier', () => {
       stance: { ...STANCE, axes: STANCE.axes.map(
         (a, i) => (i === 0 ? { ...a, level: 'off' } : a)) },
     })
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     expect(await screen.findByText(/claude is switched off here/i)).toBeTruthy()
     expect(screen.queryByText(/write the dossier/i)).toBeNull()
@@ -1255,7 +1304,7 @@ describe('DeckDetail commander dossier', () => {
       })),
       cancel: () => {},
     })
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
     expect(await screen.findByText(/no source survived checking/i)).toBeTruthy()
@@ -1271,7 +1320,7 @@ describe('DeckDetail commander dossier', () => {
       return { promise: Promise.resolve(job(WRITTEN_DOSSIER)), cancel: () => {} }
     })
 
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
     expect(await screen.findByText(/bear god of qal sisma/i)).toBeTruthy()
@@ -1289,7 +1338,7 @@ describe('DeckDetail commander dossier', () => {
     // submit a second one.
     localStorage.setItem(JOB_KEY, 'job-dossier')
 
-    renderDeck()
+    renderUnfolded()
     // No click anywhere: it finds the id on mount, follows it, and opens
     // itself when it settles — a run that finishes into a collapsed panel has
     // produced nothing anybody can see.
@@ -1307,7 +1356,7 @@ describe('DeckDetail commander dossier', () => {
     // to watch.
     vi.mocked(api.writeDossier).mockResolvedValue(job(WRITTEN_DOSSIER))
 
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/who is goreclaw\?/i))
     fireEvent.click(await screen.findByText(/write the dossier/i))
     expect(await screen.findByText(/bear god of qal sisma/i)).toBeTruthy()
@@ -1317,7 +1366,7 @@ describe('DeckDetail commander dossier', () => {
   it('keeps the counted strip and the written prose apart', async () => {
     // The whole point of ADR 19's UI half: the pool's counted facts and
     // Claude's prose are adjacent, never merged into one voice.
-    renderDeck()
+    renderUnfolded()
     expect(await screen.findByText(/about this commander/i)).toBeTruthy()
     expect(await screen.findByText(/claude, with sources/i)).toBeTruthy()
   })
@@ -1326,13 +1375,13 @@ describe('DeckDetail commander dossier', () => {
 describe('DeckDetail art picker', () => {
   it('does not fetch printings until it is opened', async () => {
     // Goreclaw has twelve and most visits never open this.
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(vi.mocked(api.printings)).not.toHaveBeenCalled()
   })
 
   it('lists the printings when opened', async () => {
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/change art/i))
     expect(await screen.findByText('BLC')).toBeTruthy()
     expect(screen.getByText('M19')).toBeTruthy()
@@ -1341,13 +1390,13 @@ describe('DeckDetail art picker', () => {
   it('says the choice lives in the deck file', async () => {
     // It is a deck property, not a viewer preference, and the copy has to say
     // so — otherwise it reads as a per-person display setting.
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/change art/i))
     expect(await screen.findByText(/travels with the deck/i)).toBeTruthy()
   })
 
   it('writes the pick through the ordinary deck-field edit', async () => {
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/change art/i))
     fireEvent.click(await screen.findByTitle(/Bloomburrow Commander/))
     await waitFor(() => {
@@ -1360,7 +1409,7 @@ describe('DeckDetail art picker', () => {
     // Punch list 2026-08-15 item 3. The two real clicks inside it schedule
     // and reschedule the single-click save; the dblclick cancels the pending
     // beat, applies once, and folds the picker away.
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/change art/i))
     const tile = await screen.findByTitle(/Bloomburrow Commander/)
     fireEvent.click(tile)
@@ -1385,7 +1434,7 @@ describe('DeckDetail art picker', () => {
         ...p, selected: p.id === 'p-blc',
       })),
     })
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/change art/i))
     fireEvent.click(await screen.findByTitle(/Bloomburrow Commander/))
     await waitFor(() => {
@@ -1397,7 +1446,7 @@ describe('DeckDetail art picker', () => {
   it('surfaces a refused pick instead of silently doing nothing', async () => {
     vi.mocked(api.setDeckField).mockRejectedValue(
       new Error('is not a printing of Goreclaw, Terror of Qal Sisma'))
-    renderDeck()
+    renderUnfolded()
     fireEvent.click(await screen.findByText(/change art/i))
     fireEvent.click(await screen.findByTitle(/Bloomburrow Commander/))
     expect(await screen.findByText(/is not a printing of/i)).toBeTruthy()
@@ -1412,7 +1461,7 @@ describe('DeckDetail art picker', () => {
 describe('DeckDetail card art', () => {
   it('opens a picker for any card and writes through the card field', async () => {
     vi.mocked(api.printings).mockResolvedValue(PRINTINGS as never)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: 'Card art' }))
     fireEvent.click(screen.getByRole('button', { name: 'Card art: Primeval Titan' }))
@@ -1430,7 +1479,7 @@ describe('DeckDetail card art', () => {
       ...DECK,
       cards: [{ ...DECK.cards[0]!, art: 'p-m19' }],
     } as unknown as Deck)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     expect(screen.getByText(/chosen art/i)).toBeTruthy()
   })
@@ -1447,20 +1496,20 @@ describe('DeckDetail card art', () => {
  */
 describe('DeckDetail rationale interview discoverability', () => {
   it('says the interview exists', async () => {
-    renderDeck()
+    renderUnfolded()
     expect(await screen.findByText(/stuck on a/i)).toBeTruthy()
   })
 
   it('says what the rule is in the same breath', async () => {
     // The first question anybody asks is whether it writes the answer, and
     // rule 4 is easier to keep when the UI states it unprompted.
-    renderDeck()
+    renderUnfolded()
     expect(await screen.findByText(/no setting lets it write the rationale for you/i))
       .toBeTruthy()
   })
 
   it('offers the interview from the action bar', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: 'Ask Claude' }))
     expect(screen.getByRole('button', { name: 'Ask Claude: Primeval Titan' }))
@@ -1468,7 +1517,7 @@ describe('DeckDetail rationale interview discoverability', () => {
   })
 
   it('asks straight away rather than revealing a second button', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: 'Ask Claude' }))
     fireEvent.click(screen.getByRole('button', { name: 'Ask Claude: Primeval Titan' }))
@@ -1480,7 +1529,7 @@ describe('DeckDetail rationale interview discoverability', () => {
   it('still opens the editor without spending anything', async () => {
     // "Write why" must stay free. A page where opening a text box costs a call
     // is a page nobody opens a text box on.
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: 'Write why' }))
     fireEvent.click(screen.getByRole('button', { name: 'Write why: Primeval Titan' }))
@@ -1497,7 +1546,7 @@ describe('DeckDetail rationale interview discoverability', () => {
                          STANCE.axes[1], STANCE.axes[2]] }
     vi.mocked(api.claudeStatus).mockResolvedValue(
       { ...CLAUDE_STATUS, stance: off } as never)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
 
     expect(screen.queryByRole('button', { name: /ask claude/i })).toBeNull()
@@ -1507,7 +1556,7 @@ describe('DeckDetail rationale interview discoverability', () => {
   it('is honestly absent when there is no key', async () => {
     vi.mocked(api.claudeStatus).mockResolvedValue(
       { ...CLAUDE_STATUS, configured: false } as never)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
 
     expect(screen.queryByRole('button', { name: /ask claude/i })).toBeNull()
@@ -1535,12 +1584,12 @@ describe('DeckDetail for a reader', () => {
   it('shows the deck', async () => {
     // The control. If this fails the gate has gone too far: the library is
     // meant to be readable by everyone, and only writing was taken away.
-    renderDeck()
+    renderUnfolded()
     expect(await screen.findByText('Goreclaw — Mono-Green Stompy')).toBeTruthy()
   })
 
   it('offers no way to edit or remove a card', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     // The action bar is the write surface now, so its absence is the whole
     // assertion: no bar, no Write why, no Entomb, nothing to arm.
@@ -1552,7 +1601,7 @@ describe('DeckDetail for a reader', () => {
   it('does not offer the rationale interview', async () => {
     // Gated with the writes although it only asks questions: its whole point
     // is helping somebody write a `why` they could not save.
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.queryByText('Ask Claude')).toBeNull()
   })
@@ -1560,7 +1609,7 @@ describe('DeckDetail for a reader', () => {
   it('still shows the notes it cannot edit', async () => {
     // The distinction worth pinning: a note is the deck's *thinking*, so it
     // renders for a reader. Only the Edit control goes.
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     fireEvent.click(screen.getByRole('button', { name: 'Notes' }))
     expect(screen.queryByText('Edit')).toBeNull()
@@ -1569,7 +1618,7 @@ describe('DeckDetail for a reader', () => {
   it('still shows the swap shortlist, without the swap', async () => {
     // Analysis stays; acting on it goes. Reading why a card is a candidate is
     // worth having without the power to make the change.
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     openValidation()
     expect(screen.queryByText('Use this card')).toBeNull()
@@ -1588,7 +1637,7 @@ describe('DeckDetail sharing', () => {
   it('offers to share a private deck, and says who can see it now', async () => {
     vi.mocked(api.deck).mockResolvedValue(
       { ...DECK, shared: false } as unknown as Deck)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.getByRole('button', { name: 'Share this deck' })).toBeTruthy()
     expect(screen.getByText('Only you can see it.')).toBeTruthy()
@@ -1598,7 +1647,7 @@ describe('DeckDetail sharing', () => {
     // The label is what the click will *do*, not what the deck currently is —
     // a button labelled with a state is the one people press expecting to
     // select it.
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.getByRole('button', { name: 'Make private' })).toBeTruthy()
     expect(screen.getByText('Anyone signed in here can read it.')).toBeTruthy()
@@ -1607,7 +1656,7 @@ describe('DeckDetail sharing', () => {
   it('sends the opposite of what the deck is, at the deck\'s own address', async () => {
     vi.mocked(api.deck).mockResolvedValue(
       { ...DECK, shared: false } as unknown as Deck)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     fireEvent.click(screen.getByRole('button', { name: 'Share this deck' }))
     await waitFor(() => expect(api.setShared).toHaveBeenCalledWith(REF, true))
@@ -1618,7 +1667,7 @@ describe('DeckDetail sharing', () => {
   it('reports a refusal rather than looking as though it worked', async () => {
     vi.mocked(api.setShared).mockRejectedValue(
       new Error('goreclaw-stompy is not yours to change'))
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     fireEvent.click(screen.getByRole('button', { name: 'Make private' }))
     expect(await screen.findByText(/not yours to change/)).toBeTruthy()
@@ -1627,7 +1676,7 @@ describe('DeckDetail sharing', () => {
   it('is absent for a reader, who is told whose deck this is instead', async () => {
     vi.mocked(api.deck).mockResolvedValue(
       { ...DECK, writable: false } as unknown as Deck)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.queryByRole('button', { name: /share this deck|make private/i }))
       .toBeNull()
@@ -1637,13 +1686,13 @@ describe('DeckDetail sharing', () => {
 
   it('says nothing about ownership on your own deck', async () => {
     // It would be a line telling you your own username.
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.queryByText(/you can read this deck, not change it/i)).toBeNull()
   })
 
   it('links the simulator at the deck, owner and all', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.getByText('Simulate this deck').getAttribute('href'))
       .toBe('/simulate?owner=aasquier&deck=goreclaw-stompy')
@@ -1671,7 +1720,7 @@ describe('DeckDetail slot argument', () => {
     // card owing a rationale is the one somebody is most likely to argue
     // about before deciding whether to write one.
     vi.mocked(api.deck).mockResolvedValue(DRAFT)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: 'Argue slot' }))
     fireEvent.click(screen.getByRole('button', { name: `Argue slot: ${card}` }))
@@ -1680,7 +1729,7 @@ describe('DeckDetail slot argument', () => {
 
   it('asks once when the panel is opened, not on page load', async () => {
     vi.mocked(api.deck).mockResolvedValue(DRAFT)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     // Rendering the deck must not spend money. The control says "argue"; the
     // pick is the consent.
@@ -1793,7 +1842,7 @@ describe('DeckDetail slot argument', () => {
     // somebody else's deck spends a call to reach a conclusion you cannot act
     // on.
     vi.mocked(api.deck).mockResolvedValue({ ...DRAFT, writable: false } as Deck)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     expect(screen.queryByRole('button', { name: /argue slot/i })).toBeNull()
   })
@@ -1819,7 +1868,7 @@ describe('DeckDetail deck review', () => {
   }
 
   async function openPanel() {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     fireEvent.click(screen.getByRole('button', { name: 'Review with Claude' }))
   }
@@ -1861,7 +1910,7 @@ describe('DeckDetail deck review', () => {
       promise: Promise.resolve(job(REVIEW)),
       cancel: () => {},
     })
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
 
     await waitFor(() => expect(vi.mocked(followJob)).toHaveBeenCalledWith(
@@ -1874,7 +1923,7 @@ describe('DeckDetail deck review', () => {
 
   it('is not offered on a deck you cannot edit', async () => {
     vi.mocked(api.deck).mockResolvedValue({ ...DECK, writable: false } as Deck)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     expect(screen.queryByRole('button', { name: 'Review with Claude' })).toBeNull()
   })
@@ -1895,7 +1944,7 @@ describe('deck history', () => {
   }
 
   it('is not fetched until the tab is opened', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     expect(api.deckLog).not.toHaveBeenCalled()
 
@@ -1904,7 +1953,7 @@ describe('deck history', () => {
   })
 
   it('shows the server’s sentence, the actor and the verb', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     openHistory()
 
@@ -1918,7 +1967,7 @@ describe('deck history', () => {
   })
 
   it('never shows a rationale, because it is never sent one', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     openHistory()
 
@@ -1932,7 +1981,7 @@ describe('deck history', () => {
     vi.mocked(api.deckLog).mockResolvedValue({
       slug: 'goreclaw-stompy', entries: [],
     })
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     openHistory()
 
@@ -1943,7 +1992,7 @@ describe('deck history', () => {
   })
 
   it('re-reads itself after an edit', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     openHistory()
     await waitFor(() => expect(api.deckLog).toHaveBeenCalledTimes(1))
@@ -1961,7 +2010,7 @@ describe('deck history', () => {
     // Reading a shared deck's history is reading the deck (ADR 28) — the
     // server gates it by the same source, so the client must not hide it.
     vi.mocked(api.deck).mockResolvedValue({ ...DECK, writable: false } as Deck)
-    renderDeck()
+    renderUnfolded()
     await screen.findByText(DECK.name)
     openHistory()
     await screen.findByText('entombed Primeval Titan')
@@ -1971,8 +2020,20 @@ describe('deck history', () => {
 describe('the 99 rolls up', () => {
   // Feature 2 of the 2026-08-18 batch: each category folds away behind its
   // header, and the fold survives leaving — the 99 is a place you arrange.
-  it('folds a category away behind its header', async () => {
+  // The 2026-08-18 punch list then flipped the *default*: it arrives folded.
+  // These are the tests that render bare, without `renderUnfolded`.
+  it('opens folded, so the page you land on is the deck\'s shape', async () => {
     renderDeck()
+    // The signs are there and the cards are not — this is the whole feature.
+    const header = await screen.findByRole('button', { name: /Ramp/ })
+    expect(header.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText('Primeval Titan')).toBeNull()
+    // And with everything shut, the one verb offers the other direction.
+    expect(screen.getByRole('button', { name: 'Unfold all' })).toBeTruthy()
+  })
+
+  it('folds a category away behind its header', async () => {
+    renderUnfolded()
     await screen.findByText('Primeval Titan')
     const header = screen.getByRole('button', { name: /Ramp/ })
     expect(header.getAttribute('aria-expanded')).toBe('true')
@@ -1985,8 +2046,21 @@ describe('the 99 rolls up', () => {
     expect(screen.getByText('Primeval Titan')).toBeTruthy()
   })
 
-  it('remembers the fold the way the wheel remembers its own', async () => {
+  it('remembers an unfolded shelf across a visit', async () => {
+    // The direction that matters now the default is closed: an *explicit*
+    // empty list is "I opened these", and must not be read back as the absent
+    // "never touched" and re-folded. Two `[]` that behave differently is
+    // exactly the bug this pins.
+    renderUnfolded()
+    await screen.findByText('Primeval Titan')
+    cleanup()
+
     renderDeck()
+    expect(await screen.findByText('Primeval Titan')).toBeTruthy()
+  })
+
+  it('remembers a fold the way the wheel used to remember its own', async () => {
+    renderUnfolded()
     await screen.findByText('Primeval Titan')
     fireEvent.click(screen.getByRole('button', { name: /Ramp/ }))
     cleanup()
@@ -1999,7 +2073,7 @@ describe('the 99 rolls up', () => {
   })
 
   it('folds and unfolds everything from one control', async () => {
-    renderDeck()
+    renderUnfolded()
     await screen.findByText('Primeval Titan')
     fireEvent.click(screen.getByRole('button', { name: 'Fold all' }))
     expect(screen.queryByText('Primeval Titan')).toBeNull()

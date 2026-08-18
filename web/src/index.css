@@ -285,14 +285,20 @@ body {
   filter: brightness(1.45) saturate(1.15);
 }
 
+/* Where the painting becomes the page. A fixed height rather than `inset: 0`
+ * with percentage stops: the blend is a constant number of pixels of fade at
+ * the band's foot, and expressing it as a fraction meant that making the band
+ * taller (punch list item 4) silently veiled more of the painting -- the exact
+ * thing that change was undoing. 165px is what the old 55%-of-300px came to. */
 .deck-hero-scrim {
   position: absolute;
-  inset: 0;
+  inset: auto 0 0 0;
+  height: 165px;
   background: linear-gradient(
     to top,
     var(--surface-1) 0%,
-    color-mix(in srgb, var(--surface-1) 45%, transparent) 22%,
-    transparent 55%
+    color-mix(in srgb, var(--surface-1) 45%, transparent) 40%,
+    transparent 100%
   );
 }
 
@@ -329,8 +335,40 @@ body {
  * change what is inside the box, never the layout around it. The theme
  * filters mirror `.deck-hero-band img` — a video or canvas is the same
  * painting and gets the same treatment per theme. */
+/* How much of the commander's painting the deck page shows (punch list
+ * 2026-08-18 item 4). It was a 4:1 band over a 1.37:1 crop, which kept about a
+ * third of the painting's height and read as a stripe of a picture rather than
+ * as the picture -- "too small", and the fix asked for was *more of the art*,
+ * not the same slice enlarged.
+ *
+ * So the frame's natural shape is now the crop's own, 626x457: given room, the
+ * band shows the whole painting, uncropped, the way `PageMasthead` does. What
+ * takes room away is the viewport, not a fixed ratio -- `max-height` in `vh`
+ * means a wide desktop, where 1.37:1 would be 900px of hero before a word of
+ * the deck, gives up its bottom and keeps around 60%, while a phone (where the
+ * whole painting is only ~270px tall) gives up nothing at all. One rule,
+ * continuous across every width, and the discontinuity a breakpoint would have
+ * put at 640px does not exist.
+ *
+ * Anchored to the top throughout, for the reason `CardArt.position` documents:
+ * card art is composed with its subject high, so height surrendered from the
+ * bottom is ground and robes and height surrendered from the top is a face.
+ *
+ * Both selectors, because they are the same box: `.deck-hero-frame` is the
+ * still, `.deck-hero-motion` is ADR 32's derivative over it, and a band that
+ * changed shape when a painting started breathing would be a bug. */
+.deck-hero-frame,
 .deck-hero-motion {
-  aspect-ratio: 1200 / 300;
+  /* `width: 100%` is load-bearing and was not obvious. With `width: auto` the
+   * box is block-level and ought to fill its 1230px parent, take its height
+   * from the ratio, and let `max-height` clip -- but a clamped height is
+   * instead transferred *back* through `aspect-ratio` into the width, and the
+   * band came out 641px wide in a 1230px panel: a picture floating in half a
+   * page. A definite width is what stops the transfer. Measured in a real
+   * browser, because nothing in jsdom has a size. */
+  width: 100%;
+  aspect-ratio: 626 / 457;
+  max-height: 52vh;
   overflow: hidden;
 }
 
@@ -4358,6 +4396,19 @@ button:hover .tarot-fan-card {
   opacity: 0.9;
   transform-origin: 50% 0;
   animation: canopy-grow 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    transform 380ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 260ms ease;
+}
+
+/* Scrolled: the growth withdraws into the header rather than hanging over the
+ * page's own heading. `canopy-grow` runs backwards, near enough -- same
+ * property, same origin -- so the vine retreats up its own stems instead of
+ * blinking out. `scaleY(0.04)` rather than 0 keeps a hairline of leaf along
+ * the header's edge, which is what a sticky bar wants under it anyway. */
+.header-canopy.is-retracted {
+  transform: scaleY(0.04);
+  opacity: 0;
 }
 
 .canopy-photo {
@@ -4873,6 +4924,11 @@ button:hover .tarot-fan-card {
   .whisper-sprout,
   .wordmark:hover .wordmark-tree {
     animation: none;
+  }
+  /* The vine still gets out of the page's way when scrolled -- that is a fix,
+   * not an ornament -- but it does it instantly rather than rolling up. */
+  .header-canopy {
+    transition: none;
   }
   .scene-mote {
     display: none;

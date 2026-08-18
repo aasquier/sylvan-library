@@ -137,11 +137,14 @@ function ShareToggle({ deck, deckRef, onChanged }: {
  * gave up the thing that made the page feel like a deck rather than a
  * spreadsheet.
  *
- * So: the band is back and it is the centrepiece, framed at `center 22%`
- * because card art is composed with its subject high far more often than low,
- * and tall enough (1200/300) to keep a real slice rather than a stripe. The
- * card itself is no longer *in* the band — it sits beside the text underneath,
- * whole and unclipped, which is what it was colliding with before.
+ * So: the band is back and it is the centrepiece. The card itself is no longer
+ * *in* it — it sits beside the text underneath, whole and unclipped, which is
+ * what it was colliding with before.
+ *
+ * A fourth shape (punch list 2026-08-18 item 4) answers "the art is too
+ * small": 1200/300 was still a third of the painting, so the frame now takes
+ * the crop's own 1.37:1 and surrenders height only to a short viewport. See
+ * `.deck-hero-frame` for why that is one `max-height` and not a breakpoint.
  *
  * The text is the other half. A page that named its commander and showed
  * nothing else made the reader hover a thumbnail to find out what the card
@@ -277,23 +280,24 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
           heading and the card's own alt text below. */}
       {card?.art_crop && (
         <div className="deck-hero-band relative" aria-hidden>
-          {/* `top`, not a percentage. The band is 4:1 over a 1.37:1 crop, so
-              it can only show about a third of the painting's height and the
-              only question is which third. Centring took it out of the
-              middle and decapitated head-up compositions; 22% still shaved
-              the tops of heads. Anchoring to the top cannot clip upward at
-              all — it gives up the bottom instead, which on card art is
-              ground, robes and negative space far more often than it is the
-              subject. */}
+          {/* `top`, not a percentage. The frame is the crop's own 1.37:1 and
+              gives up height only where the viewport is too short for it
+              (`.deck-hero-frame`), so the question is still which part goes.
+              Centring took it out of the middle and decapitated head-up
+              compositions; 22% still shaved the tops of heads. Anchoring to
+              the top cannot clip upward at all — it gives up the bottom
+              instead, which on card art is ground, robes and negative space
+              far more often than it is the subject. */}
           {/* The painting breathes when its derivative exists (ADR 32) and
               is exactly this still when it does not — the motion tier can
-              only ever add, never break the band. */}
+              only ever add, never break the band. Both wear the same frame,
+              so a painting that starts breathing does not change shape. */}
           <CommanderMotion
             oracleId={card.oracle_id}
             art={card.art_crop}
             className="deck-hero-motion"
             still={
-              <CardArt src={card.art_crop} alt="" ratio="aspect-[1200/300]"
+              <CardArt src={card.art_crop} alt="" ratio="deck-hero-frame"
                        className="rounded-none" position="center top" />
             } />
           <div className="deck-hero-scrim" />
@@ -560,7 +564,7 @@ export default function DeckDetail() {
   const [tab, setTab] = useState<Tab>('cards')
   const [groupBy, setGroupBy] = useState('category')
   // Which groups are rolled up, per deck and per grouping — a folded "Lands"
-  // says nothing about "MV 3". Persisted the way the wheel's fold is: the 99
+  // says nothing about "MV 3". Persisted the way the wheel's fold was: the 99
   // is a place you arrange and come back to, and it should be as you left it.
   const collapseKey = `mtglab-99-collapsed:${owner}/${slug}`
   const [collapsed, setCollapsed] = useState<Record<string, string[]>>(() => {
@@ -573,19 +577,6 @@ export default function DeckDetail() {
     } catch { /* a corrupted stash is just an unfolded page */ }
     return {}
   })
-  const folded = new Set(collapsed[groupBy] ?? [])
-  function setFolded(next: Set<string>) {
-    const record = { ...collapsed, [groupBy]: [...next] }
-    setCollapsed(record)
-    try { localStorage.setItem(collapseKey, JSON.stringify(record)) }
-    catch { /* storage full or absent — the fold still works this session */ }
-  }
-  function toggleFold(key: string) {
-    const next = new Set(folded)
-    if (next.has(key)) next.delete(key)
-    else next.add(key)
-    setFolded(next)
-  }
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null)
   // What has been done to this deck (ADR 28). `null` is "not asked yet", which
   // the panel renders as loading; an empty array is the real answer for a deck
@@ -916,6 +907,31 @@ export default function DeckDetail() {
     }
     return [...out.entries()].sort((a, b) => b[1].length - a[1].length)
   }, [deck, groupBy, onlyUnjustified])
+
+  // Absent means folded (punch list 2026-08-18 item 2). The 99 now opens as a
+  // list of signs rather than as a hundred cards, so the page you land on is
+  // the deck's shape and opening a category is a choice you make. That is why
+  // this reads `undefined` rather than a falsy check: an entry that is an
+  // *empty* array is the user having unfolded everything, and it must not be
+  // read as "never touched" and re-folded on the next visit. A grouping never
+  // touched has no entry at all, and every sign it has is shut.
+  //
+  // Derived here rather than beside the state because it needs `groups`, which
+  // needs the deck: before it loads there are no signs and nothing to fold.
+  const stored = collapsed[groupBy]
+  const folded = new Set(stored ?? groups.map(([key]) => key))
+  function setFolded(next: Set<string>) {
+    const record = { ...collapsed, [groupBy]: [...next] }
+    setCollapsed(record)
+    try { localStorage.setItem(collapseKey, JSON.stringify(record)) }
+    catch { /* storage full or absent — the fold still works this session */ }
+  }
+  function toggleFold(key: string) {
+    const next = new Set(folded)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    setFolded(next)
+  }
 
   if (error) {
     return (
