@@ -252,12 +252,14 @@ describe('the mana symbols', () => {
     expect(container.textContent).toBe('')
   })
 
-  it('draws a colour in a cost and leaves the generic part a numeral', () => {
+  it('draws every pip in a cost, the generic part included', () => {
     const { container } = render(<ManaCost cost="{2}{B}{G}" />)
-    // Three pips, two of them drawn. The numeral has to survive as a numeral
-    // or a cost stops being readable as a cost.
-    expect(container.querySelectorAll('svg')).toHaveLength(2)
-    expect(container.textContent).toBe('2')
+    // Three pips, three official images (ADR 33) — the numeral rides in its
+    // proper circle now rather than surviving as a character. jsdom loads
+    // none of them, which is exactly why the names below are load-bearing.
+    expect(container.querySelectorAll('img')).toHaveLength(3)
+    expect(container.textContent).toBe('')
+    expect(within(container).getByLabelText('Generic 2')).toBeTruthy()
     expect(within(container).getByLabelText('Black')).toBeTruthy()
     expect(within(container).getByLabelText('Green')).toBeTruthy()
   })

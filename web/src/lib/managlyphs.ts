@@ -1,35 +1,24 @@
 /**
- * The five mana symbols, drawn.
+ * The five mana symbols, drawn — the fallback ink since ADR 33.
  *
  * Magic's colours have had icons since Alpha — a sun, a drop of water, a
  * skull, a flame and a tree — and every player reads them faster than they
- * read a letter. The app spelled them `W`, `U`, `B`, `R`, `G` instead, which
- * is legible and completely characterless: a lettered disc is a placeholder
- * that had stopped looking like one.
+ * read a letter. These are our own drawings of that iconography, and for a
+ * while they were the only pips the app had: PR #61 chose drawing over
+ * fetching so that a pip inline in a sentence never waited on a third
+ * party, and so that no Scryfall asset was ever committed to a public
+ * repository (rule 5,
+ * [ADR 6](docs/adr/0006-never-redistribute-scryfall-bulk-data.md)).
  *
- * **Why these are drawn rather than fetched.** Scryfall serves the real
- * symbols as SVGs and the app already hotlinks its card art from the same
- * CDN, so that was the obvious move and it is the wrong one here, for three
- * reasons that all point the same way:
- *
- * - A pip is **inline in a sentence**. The deck files carry 174 of them across
- *   `why`, `strategy` and `notes`, and the gate's own errors are the densest
- *   of the lot — "identity {GW} includes {W}, outside the commander's {G}".
- *   Card art is decorative and lazy-loaded; prose is not, and a sentence that
- *   reflows or shows five broken images while a CDN answers is a regression on
- *   the app's most load-bearing text.
- * - `/api/colors` is the one deck-facing page that works on a fresh clone
- *   before `data refresh` has ever run — no card pool, no network. It renders
- *   taglines through `ManaText`. Pips that need a CDN would take that property
- *   away for decoration.
- * - Checking Scryfall's own path data into a public repository would be
- *   redistributing their asset rather than hotlinking it, which is the
- *   distinction rule 5 and [ADR 6](docs/adr/0006-never-redistribute-scryfall-bulk-data.md)
- *   are careful about. These are our drawings of the iconography.
- *
- * So this is the branch's own rule — everything that is not card art is drawn
- * in SVG/CSS — applied to the mark the app uses more than any other. Roughly
- * 2 kB in the bundle, no requests, and it works offline.
+ * [ADR 33](docs/adr/0033-official-symbols-fill-a-runtime-cache.md) keeps
+ * both halves of that argument and still puts the official art on screen:
+ * the real symbols are served from *this app's own origin* out of a runtime
+ * cache, and these drawings are what a pip falls back to when that cache is
+ * cold and the network is away. Two jobs remain theirs alone: the fallback,
+ * and the pentagram's vertices, which place `GLYPH_PATH` in their own
+ * coordinate space as part of one hand-drawn diagram. Roughly 2 kB in the
+ * bundle, no requests, and it works offline — which is exactly what a
+ * fallback is for.
  *
  * **Built for 13px.** That is the size in prose, and it is brutal: the whole
  * glyph is about nine pixels of ink. Every shape here is a bold silhouette

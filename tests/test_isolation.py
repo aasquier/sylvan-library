@@ -126,6 +126,11 @@ SHARED = {
                                             "card art; nothing per-account",
     "/api/art/motion/{oracle_id}/{effect}/{filename}": "one file of the "
                                                        "same shared cache",
+    # ADR 33. The official mana symbols out of the same kind of shared
+    # runtime cache: keyed on a public symbol code, identical for every
+    # session, nothing per-account to reach.
+    "/api/symbols/{code}.svg": "a shared cache of public mana-symbol art; "
+                               "nothing per-account",
 }
 
 # Belongs to one person. Each entry says how to make one as user A and where to
@@ -252,7 +257,8 @@ def concrete(path: str) -> str:
                 .replace("{username}", "alice")
                 .replace("{oracle_id}", "0aae2e33-0000-4000-8000-000000000000")
                 .replace("{effect}", "depth-drift")
-                .replace("{filename}", "loop.webm"))
+                .replace("{filename}", "loop.webm")
+                .replace("{code}", "W"))
 
 
 # ------------------------------------------------------- the generated sweep

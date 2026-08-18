@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { identityName, manaSymbols, money, percent, splitManaText } from './mtg'
+import { identityName, manaSymbols, money, percent, splitManaText, symbolName } from './mtg'
 
 describe('identityName', () => {
   it('names the colourless and mono cases', () => {
@@ -178,5 +178,31 @@ describe('splitManaText', () => {
 
   it('normalises case, since prose is written by hand', () => {
     expect(pips('costs {g}{w}')).toEqual(['G', 'W'])
+  })
+})
+
+describe('symbolName', () => {
+  // Since ADR 33 every pip is a drawing, so the name is the only way any
+  // symbol reads aloud — including the ones that used to be their own text.
+  it('names the whole vocabulary the prose regex recognises', () => {
+    expect(symbolName('G')).toBe('Green')
+    expect(symbolName('C')).toBe('Colorless')
+    expect(symbolName('T')).toBe('Tap')
+    expect(symbolName('Q')).toBe('Untap')
+    expect(symbolName('S')).toBe('Snow')
+    expect(symbolName('E')).toBe('Energy')
+    expect(symbolName('X')).toBe('X')
+    expect(symbolName('3')).toBe('Generic 3')
+    expect(symbolName('15')).toBe('Generic 15')
+  })
+
+  it('spells out hybrids the way a player would', () => {
+    expect(symbolName('W/U')).toBe('White or Blue')
+    expect(symbolName('2/W')).toBe('Two or White')
+    expect(symbolName('G/P')).toBe('Phyrexian Green')
+  })
+
+  it('falls back to the symbol as written rather than inventing a name', () => {
+    expect(symbolName('CHAOS')).toBe('CHAOS')
   })
 })

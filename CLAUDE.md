@@ -173,6 +173,12 @@ src/mtglab/
                           pushed to the volume over sftp, served by
                           two shared routes; nothing generates at request
                           time and git never holds a byte of it
+  symbols.py              the official mana symbols (ADR 33): filled from
+                          Scryfall into data/cache/symbols on first ask,
+                          served first-party by one shared route; the drawn
+                          glyphs in web/src/lib/managlyphs.ts are the
+                          client's offline fallback, and the pentagram's
+                          vertices
   mana.py                 cost parsing + castability solver
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema
