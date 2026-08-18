@@ -1,22 +1,38 @@
 import { useCallback, useEffect, useState } from 'react'
+// The five readout payload types are gone from this import on purpose: each
+// panel now gets its shape from `usePolled`'s inference over the client
+// function it was handed, so a renamed field is a type error at the tile
+// rather than at a hand-written annotation that had drifted. `AdminClaude`
+// stays because `ClaudePanel` takes one as a prop.
 import {
-  api, errorMessage, type Account, type AccountList, type AdminActivity,
-  type AdminClaude, type AdminFly, type AdminStorage, type AdminSystem,
-  type AdminTraffic,
+  api, errorMessage, type Account, type AccountList, type AdminClaude,
 } from '../lib/api'
 import { Badge, ErrorNote, PageMasthead, Spinner } from '../components/ui'
 import { EditsChart, TrafficChart } from '../components/charts'
 
 /**
- * Admin: the instance at a glance, and the account levers.
+ * Admin: the account levers, and the instance at a glance behind them.
  *
- * Two halves. The dashboard on top is four read-only views of the box —
- * system, storage, Claude's ledger, activity — refreshed every thirty
- * seconds, each one a fact the process can report without an external API
- * or a new secret (`api/adminstats.py` says what was deliberately left
- * out, the dollar figure first among them). The accounts table below is
- * `mtglab users` as a page, unchanged by the rename: who exists, who can
- * sign in, and the four levers.
+ * **Five tabs**, and the split is by the question a tab answers rather than by
+ * which endpoint fed it — Accounts (the levers), Claude (where the tokens
+ * went), Machine (is the box coping), Storage (will the volume fill up),
+ * Activity (who has been in, and what changed). It was one long scroll until
+ * the 2026-08-18 punch list: six panels and twelve tiles stacked in the order
+ * they happened to be built, so the accounts table — the only part with
+ * anything to *do* on it — sat below a screenful of numbers.
+ *
+ * The readouts are facts the process can report without an external API or a
+ * new secret (`api/adminstats.py` says what was deliberately left out, the
+ * dollar figure first among them); the far-seeing glass on Machine is the one
+ * exception and it is absent unless a token was set. The accounts table is
+ * `mtglab users` as a page, unchanged by the rename: who exists, who can sign
+ * in, and the four levers.
+ *
+ * Each readout tab **fetches only what it shows**, still on the thirty-second
+ * clock, so switching away from a tab is also what stops it asking. The old
+ * shape polled all six endpoints together because it displayed all six at
+ * once; behind tabs that would be asking the box five questions nobody is
+ * reading the answer to.
  *
  * The page is a page for the reason the deck editor is one — a hosted
  * app whose administration is SSH-only is one the maintainer can only run
@@ -196,43 +212,39 @@ function ClaudePanel({ claude }: { claude: AdminClaude }) {
 }
 
 /**
- * The dashboard: four views, fetched together, refreshed every thirty
- * seconds. `Promise.allSettled` rather than `all`, so one failing view
- * costs its own tiles and not the whole glance; a view that has never
- * answered renders em-dashes rather than zeros.
+ * One admin readout: asked for now, and again every thirty seconds.
+ *
+ * The dashboard used to fetch all six in one `Promise.allSettled` because it
+ * showed all six at once. Behind tabs it does not, and polling five endpoints
+ * to render the sixth is asking the box questions nobody is reading the
+ * answers to. Each panel now asks for its own, which means switching tabs is
+ * also what starts and stops the asking.
+ *
+ * A rejection is swallowed on purpose and leaves the last good value standing:
+ * a view that has never answered renders em-dashes rather than zeros, and one
+ * that answered a minute ago should not blank because the box was briefly
+ * busy. `alive` is the usual guard — a 30-second interval outlives a tab.
  */
-function Dashboard() {
-  const [system, setSystem] = useState<AdminSystem | null>(null)
-  const [storage, setStorage] = useState<AdminStorage | null>(null)
-  const [claude, setClaude] = useState<AdminClaude | null>(null)
-  const [activity, setActivity] = useState<AdminActivity | null>(null)
-  const [traffic, setTraffic] = useState<AdminTraffic | null>(null)
-  const [fly, setFly] = useState<AdminFly | null>(null)
-
-  const refresh = useCallback(async () => {
-    const [sys, sto, cla, act, tra, ffl] = await Promise.allSettled([
-      api.adminSystem(), api.adminStorage(),
-      api.adminClaude(), api.adminActivity(), api.adminTraffic(),
-      api.adminFly(),
-    ])
-    if (sys.status === 'fulfilled') setSystem(sys.value)
-    if (sto.status === 'fulfilled') setStorage(sto.value)
-    if (cla.status === 'fulfilled') setClaude(cla.value)
-    if (act.status === 'fulfilled') setActivity(act.value)
-    if (tra.status === 'fulfilled') setTraffic(tra.value)
-    if (ffl.status === 'fulfilled') setFly(ffl.value)
-  }, [])
-
+function usePolled<T>(fetcher: () => Promise<T>): T | null {
+  const [value, setValue] = useState<T | null>(null)
   useEffect(() => {
-    void refresh()
-    const id = window.setInterval(() => { void refresh() }, 30_000)
-    return () => window.clearInterval(id)
-  }, [refresh])
+    let alive = true
+    const ask = () => {
+      void fetcher()
+        .then((v) => { if (alive) setValue(v) })
+        .catch(() => { /* keep what we had; this is a glance, not a console */ })
+    }
+    ask()
+    const id = window.setInterval(ask, 30_000)
+    return () => { alive = false; window.clearInterval(id) }
+  }, [fetcher])
+  return value
+}
 
-  const jobsLine = activity && Object.keys(activity.jobs).length > 0
-    ? Object.entries(activity.jobs)
-        .map(([status, count]) => `${count} ${status}`).join(' · ')
-    : 'none right now'
+/** The box this instance runs on, and what the platform says about it. */
+function MachinePanel() {
+  const system = usePolled(api.adminSystem)
+  const fly = usePolled(api.adminFly)
 
   return (
     <section className="space-y-4">
@@ -264,45 +276,6 @@ function Dashboard() {
                   hint={system
                     ? `${fmtBytes(system.disk.free_bytes)} free of ${fmtBytes(system.disk.total_bytes)}`
                     : undefined} />
-        <StatTile label="Card pool"
-                  value={storage ? fmtBytes(storage.pool_bytes) : '—'}
-                  hint={storage
-                    ? `bulk files ${fmtBytes(storage.scryfall_bulk_bytes)}`
-                    : undefined} />
-        <StatTile label="Accounts db"
-                  value={storage ? fmtBytes(storage.app_db_bytes) : '—'}
-                  hint="users, sessions, caches and the ledgers" />
-        <StatTile label="Caches"
-                  value={storage ? fmtBytes(storage.cache_bytes) : '—'}
-                  hint={storage
-                    ? `motion ${fmtBytes(storage.cache.cardmotion_bytes)} · symbols ${fmtBytes(storage.cache.symbols_bytes)}`
-                    : undefined} />
-        <StatTile label="Decks on the volume"
-                  value={storage ? storage.decks.count : '—'}
-                  hint={storage
-                    ? `${fmtBytes(storage.decks.bytes)}${storage.decks.trashed > 0
-                        ? ` · ${storage.decks.trashed} in the trash` : ''}`
-                    : undefined} />
-        <StatTile label="Accounts"
-                  value={activity
-                    ? Object.values(activity.accounts)
-                        .reduce((a, b) => a + b, 0)
-                    : '—'}
-                  hint={activity
-                    ? Object.entries(activity.accounts)
-                        .map(([state, count]) => `${count} ${state}`)
-                        .join(' · ') || 'none yet'
-                    : undefined} />
-        <StatTile label="Sessions"
-                  value={activity ? activity.sessions.total : '—'}
-                  hint={activity
-                    ? `${activity.sessions.seen_day} seen today · ${activity.sessions.seen_week} this week`
-                    : undefined} />
-        <StatTile label="Memoised simulations"
-                  value={activity ? activity.sim_cache_rows : '—'}
-                  hint="Tier 1 results answered from cache" />
-        <StatTile label="Jobs" value={activity ? jobsLine : '—'}
-                  hint="the registry's census — counts, never labels" />
       </div>
 
       {/* What the platform sees. Absent entirely on an instance with no
@@ -342,9 +315,9 @@ function Dashboard() {
               </div>
               <p className="mt-3 text-[11px] leading-relaxed"
                  style={{ color: 'var(--text-muted)' }}>
-                The edge counts what reached the platform; the ledger above
-                counts what this app answered. The gap between them is the
-                requests the app never got to see.
+                The edge counts what reached the platform; the visitor ledger
+                under Activity counts what this app answered. The gap between
+                them is the requests the app never got to see.
               </p>
             </>
           ) : (
@@ -356,6 +329,77 @@ function Dashboard() {
           )}
         </div>
       )}
+    </section>
+  )
+}
+
+/** What the volume is holding: the pool, the databases, the caches, the decks.
+ *  Every figure here is bytes on disk, which is why they are one tab — the
+ *  question they answer together is "will this fill up". */
+function StoragePanel() {
+  const storage = usePolled(api.adminStorage)
+
+  return (
+    <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <StatTile label="Card pool"
+                value={storage ? fmtBytes(storage.pool_bytes) : '—'}
+                hint={storage
+                  ? `bulk files ${fmtBytes(storage.scryfall_bulk_bytes)}`
+                  : undefined} />
+      <StatTile label="Accounts db"
+                value={storage ? fmtBytes(storage.app_db_bytes) : '—'}
+                hint="users, sessions, caches and the ledgers" />
+      <StatTile label="Caches"
+                value={storage ? fmtBytes(storage.cache_bytes) : '—'}
+                hint={storage
+                  ? `motion ${fmtBytes(storage.cache.cardmotion_bytes)} · symbols ${fmtBytes(storage.cache.symbols_bytes)}`
+                  : undefined} />
+      <StatTile label="Decks on the volume"
+                value={storage ? storage.decks.count : '—'}
+                hint={storage
+                  ? `${fmtBytes(storage.decks.bytes)}${storage.decks.trashed > 0
+                      ? ` · ${storage.decks.trashed} in the trash` : ''}`
+                  : undefined} />
+    </section>
+  )
+}
+
+/** Who has been in and what they did — sessions, jobs, the visitor ledger and
+ *  the deck edits. The two charts live here because they are the same
+ *  question at two grains: what the library was asked for, and what changed. */
+function ActivityPanel() {
+  const activity = usePolled(api.adminActivity)
+  const traffic = usePolled(api.adminTraffic)
+
+  const jobsLine = activity && Object.keys(activity.jobs).length > 0
+    ? Object.entries(activity.jobs)
+        .map(([status, count]) => `${count} ${status}`).join(' · ')
+    : 'none right now'
+
+  return (
+    <section className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatTile label="Accounts"
+                  value={activity
+                    ? Object.values(activity.accounts)
+                        .reduce((a, b) => a + b, 0)
+                    : '—'}
+                  hint={activity
+                    ? Object.entries(activity.accounts)
+                        .map(([state, count]) => `${count} ${state}`)
+                        .join(' · ') || 'none yet'
+                    : undefined} />
+        <StatTile label="Sessions"
+                  value={activity ? activity.sessions.total : '—'}
+                  hint={activity
+                    ? `${activity.sessions.seen_day} seen today · ${activity.sessions.seen_week} this week`
+                    : undefined} />
+        <StatTile label="Memoised simulations"
+                  value={activity ? activity.sim_cache_rows : '—'}
+                  hint="Tier 1 results answered from cache" />
+        <StatTile label="Jobs" value={activity ? jobsLine : '—'}
+                  hint="the registry's census — counts, never labels" />
+      </div>
 
       {traffic && traffic.days.length > 0 && (
         <div className="card-surface rounded-xl p-5">
@@ -404,10 +448,17 @@ function Dashboard() {
           </div>
         </div>
       )}
-
-      {claude && <ClaudePanel claude={claude} />}
     </section>
   )
+}
+
+/** The ledger's own tab. `ClaudePanel` takes the payload rather than fetching
+ *  it, because it is the piece with the window chips and no business knowing
+ *  where its rows came from. */
+function ClaudeTab() {
+  const claude = usePolled(api.adminClaude)
+  if (!claude) return <Spinner label="Reading the ledger…" />
+  return <ClaudePanel claude={claude} />
 }
 
 /** A button that reports what happened where it happened.
@@ -721,7 +772,28 @@ function AccountRow({ account, lastAdmin, isSelf, onChanged, onNote, onError }: 
   )
 }
 
+/**
+ * The five wards, and the order is the answer to "why did you come here".
+ *
+ * Accounts leads because it is the only tab with levers on it — every other
+ * one is a readout, and a page that opened on a readout would make the
+ * maintainer click once before doing the thing they came to do. The four
+ * behind it are grouped by the question they answer together rather than by
+ * which endpoint they came from: Machine is "is the box coping", Storage is
+ * "will the volume fill up", Activity is "who has been in and what changed",
+ * Claude is "where the tokens went".
+ */
+const TABS = [
+  { id: 'accounts', label: 'Accounts' },
+  { id: 'claude', label: 'Claude' },
+  { id: 'machine', label: 'Machine' },
+  { id: 'storage', label: 'Storage' },
+  { id: 'activity', label: 'Activity' },
+] as const
+type AdminTab = (typeof TABS)[number]['id']
+
 export default function Admin() {
+  const [tab, setTab] = useState<AdminTab>('accounts')
   const [data, setData] = useState<AccountList | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -776,9 +848,9 @@ export default function Admin() {
           safe until the trouble passes.
         </>}>
         <p>
-          The instance at a glance — the box it runs on, what the volume
-          holds, where Claude’s tokens went, who has been in — and the
-          account levers below.
+          The account levers, and the instance at a glance behind them — the
+          box it runs on, what the volume holds, who has been in, and where
+          Claude’s tokens went.
         </p>
       </PageMasthead>
 
@@ -792,56 +864,79 @@ export default function Admin() {
         </div>
       )}
 
-      <Dashboard />
+      {/* The wards. Each readout tab fetches only what it shows, so switching
+          away from one is also what stops it asking. */}
+      <div className="flex flex-wrap gap-1 border-b"
+           style={{ borderColor: 'var(--hairline)' }}>
+        {TABS.map((t) => (
+          <button key={t.id} type="button" onClick={() => setTab(t.id)}
+                  aria-current={tab === t.id ? 'page' : undefined}
+                  className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm font-medium${
+                    tab === t.id ? ' is-active' : ''}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      <InviteForm onInvited={report} onError={complain} />
+      {tab === 'claude' && <ClaudeTab />}
+      {tab === 'machine' && <MachinePanel />}
+      {tab === 'storage' && <StoragePanel />}
+      {tab === 'activity' && <ActivityPanel />}
 
-      {data && (
-        <div className="card-surface overflow-x-auto rounded-xl p-5">
-          <div className="flex items-baseline justify-between gap-4">
-            <h2 className="text-sm font-semibold tracking-tight">
-              {data.users.length} account{data.users.length === 1 ? '' : 's'}
-            </h2>
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {data.admins} admin{data.admins === 1 ? '' : 's'} can sign in
-            </span>
-          </div>
-          <table className="mt-4 w-full min-w-[46rem] text-left text-sm">
-            <thead>
-              <tr className="text-[11px] uppercase tracking-wide"
-                  style={{ color: 'var(--text-muted)' }}>
-                <th className="pb-2 pr-4 font-medium">Username</th>
-                <th className="pb-2 pr-4 font-medium">Email</th>
-                <th className="pb-2 pr-4 font-medium">State</th>
-                <th className="pb-2 pr-4 font-medium">Sessions</th>
-                <th className="pb-2 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.users.map((account) => (
-                <AccountRow
-                  key={account.id}
-                  account={account}
-                  lastAdmin={data.admins === 1 && account.is_admin
-                    && account.state === 'active'}
-                  isSelf={me !== null && me === account.username}
-                  onChanged={load}
-                  onNote={report}
-                  onError={complain}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {tab === 'accounts' && (
+        <>
+          <InviteForm onInvited={report} onError={complain} />
+
+          {data && (
+            <div className="card-surface overflow-x-auto rounded-xl p-5">
+              <div className="flex items-baseline justify-between gap-4">
+                <h2 className="text-sm font-semibold tracking-tight">
+                  {data.users.length} account{data.users.length === 1 ? '' : 's'}
+                </h2>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {data.admins} admin{data.admins === 1 ? '' : 's'} can sign in
+                </span>
+              </div>
+              <table className="mt-4 w-full min-w-[46rem] text-left text-sm">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wide"
+                      style={{ color: 'var(--text-muted)' }}>
+                    <th className="pb-2 pr-4 font-medium">Username</th>
+                    <th className="pb-2 pr-4 font-medium">Email</th>
+                    <th className="pb-2 pr-4 font-medium">State</th>
+                    <th className="pb-2 pr-4 font-medium">Sessions</th>
+                    <th className="pb-2 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.users.map((account) => (
+                    <AccountRow
+                      key={account.id}
+                      account={account}
+                      lastAdmin={data.admins === 1 && account.is_admin
+                        && account.state === 'active'}
+                      isSelf={me !== null && me === account.username}
+                      onChanged={load}
+                      onNote={report}
+                      onError={complain}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <p className="text-xs leading-relaxed"
+             style={{ color: 'var(--text-muted)' }}>
+            There is no password field on this page, deliberately: nobody
+            chooses a password for anybody else. An account that has lost one
+            gets a reset link, and sets it themselves. Disabling revokes every
+            session and is reversible; the last admin who can sign in can be
+            neither demoted nor disabled, so hand an instance over by promoting
+            the successor first.
+          </p>
+        </>
       )}
-
-      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-        There is no password field on this page, deliberately: nobody chooses a
-        password for anybody else. An account that has lost one gets a reset
-        link, and sets it themselves. Disabling revokes every session and is
-        reversible; the last admin who can sign in can be neither demoted nor
-        disabled, so hand an instance over by promoting the successor first.
-      </p>
     </div>
   )
 }

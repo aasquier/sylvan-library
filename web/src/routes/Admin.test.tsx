@@ -67,6 +67,19 @@ function rowFor(username: string) {
   return screen.getByText(username).closest('tr') as HTMLElement
 }
 
+/**
+ * Walk to one of the four readout wards.
+ *
+ * The page opens on Accounts (punch list 2026-08-18 item 1), so every test
+ * about a number rather than a lever has to say which ward it is standing in.
+ * That is also the assertion nobody has to write twice: a tile only reachable
+ * from the wrong tab fails here rather than rendering into a scroll.
+ */
+async function openTab(label: string) {
+  await screen.findByText('root')
+  fireEvent.click(screen.getByRole('button', { name: label }))
+}
+
 beforeEach(() => {
   vi.mocked(api.accounts).mockResolvedValue(SOLO)
   // Signed in as `root`, which is what makes the self-delete guard testable.
@@ -76,8 +89,9 @@ beforeEach(() => {
     is_admin: true,
     user: { id: 4, username: 'root', is_admin: true },
   })
-  // The dashboard asks all four on mount. Answers with data in them so the
-  // tests below can also assert the tiles render what the box reported.
+  // Each readout ward asks for its own on mount — nothing is asked for until
+  // a tab is opened. Answered with data in them so the tests below can also
+  // assert the tiles render what the box reported.
   vi.mocked(api.adminSystem).mockResolvedValue({
     process: { bytes: 120 * 1024 * 1024, kind: 'current' },
     memory: { total_bytes: 1024 ** 3, available_bytes: 512 * 1024 ** 2 },
@@ -392,7 +406,7 @@ describe('the rule that does not bend', () => {
 })
 
 describe('the dashboard', () => {
-  it('wears the masthead and renders what the box reported', async () => {
+  it('wears the masthead and opens on the levers, not on a readout', async () => {
     render(<Admin />)
     await screen.findByText('root')
 
@@ -400,10 +414,31 @@ describe('the dashboard', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Admin' })).toBeTruthy()
     expect(screen.getByText(/Minttu Hynninen/)).toBeTruthy()
 
-    // A present store is sized, an absent one is an em-dash — never a zero.
+    // Accounts is the landing ward, because it is the only one with anything
+    // to do on it. Every readout is one click away and none of them is here.
+    expect(screen.getByText('friend')).toBeTruthy()
+    expect(screen.queryByText('Process memory')).toBeNull()
+    expect(screen.queryByText('Card pool')).toBeNull()
+    expect(screen.queryByText('Visitors, last thirty days')).toBeNull()
+    expect(screen.queryByText(/Where Claude/)).toBeNull()
+  })
+
+  it('renders what the box reported, under Machine', async () => {
+    render(<Admin />)
+    await openTab('Machine')
+
     expect(await screen.findByText('120 MB')).toBeTruthy()
-    const poolTile = screen.getByText('Card pool').closest('div') as HTMLElement
-    expect(within(poolTile).getByText('—')).toBeTruthy()
+    const load = screen.getByText('Load').closest('div') as HTMLElement
+    expect(within(load).getByText('0.12 · 0.20 · 0.25')).toBeTruthy()
+  })
+
+  it('sizes the stores under Storage, and never claims an absent one', async () => {
+    render(<Admin />)
+    await openTab('Storage')
+
+    // A present store is sized, an absent one is an em-dash — never a zero.
+    const poolTile = await screen.findByText('Card pool')
+    expect(within(poolTile.closest('div') as HTMLElement).getByText('—')).toBeTruthy()
     const decksTile = screen.getByText('Decks on the volume')
       .closest('div') as HTMLElement
     expect(within(decksTile).getByText('7')).toBeTruthy()
@@ -411,7 +446,7 @@ describe('the dashboard', () => {
 
   it('shows the ledger with its caveat riding along', async () => {
     render(<Admin />)
-    await screen.findByText('root')
+    await openTab('Claude')
 
     // The month window is the default and holds the one recorded mode.
     expect(await screen.findByText('dossier')).toBeTruthy()
@@ -426,16 +461,31 @@ describe('the dashboard', () => {
 
   it('reports the job registry as counts, never labels', async () => {
     render(<Admin />)
-    await screen.findByText('root')
+    await openTab('Activity')
 
     expect(await screen.findByText('1 running')).toBeTruthy()
+  })
+
+  it('asks only for what the ward it is standing in shows', async () => {
+    // The reason the tabs fetch separately: the old page polled six endpoints
+    // to render six panels, and behind tabs that is five questions nobody is
+    // reading the answer to. Accounts asks for none of them.
+    render(<Admin />)
+    await screen.findByText('root')
+    expect(vi.mocked(api.adminSystem)).not.toHaveBeenCalled()
+    expect(vi.mocked(api.adminClaude)).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Storage' }))
+    await waitFor(() => expect(vi.mocked(api.adminStorage)).toHaveBeenCalled())
+    expect(vi.mocked(api.adminSystem)).not.toHaveBeenCalled()
+    expect(vi.mocked(api.adminTraffic)).not.toHaveBeenCalled()
   })
 })
 
 describe('the visitor ledger', () => {
   it('renders templates and counts, with the privacy note beside them', async () => {
     render(<Admin />)
-    await screen.findByText('root')
+    await openTab('Activity')
 
     expect(await screen.findByText('Visitors, last thirty days')).toBeTruthy()
     // The top routes are templates — the payload's own shape — and the
@@ -449,7 +499,7 @@ describe('the visitor ledger', () => {
       days: [], top_routes: [], note: 'n/a',
     })
     render(<Admin />)
-    await screen.findByText('root')
+    await openTab('Activity')
 
     expect(screen.queryByText('Visitors, last thirty days')).toBeNull()
   })
@@ -458,7 +508,7 @@ describe('the visitor ledger', () => {
 describe('the far-seeing glass', () => {
   it('is absent entirely when no token is configured', async () => {
     render(<Admin />)
-    await screen.findByText('root')
+    await openTab('Machine')
 
     // A panel of em-dashes reads as breakage; absence reads as "not set
     // up", which is what an instance without the token actually is.
@@ -473,7 +523,7 @@ describe('the far-seeing glass', () => {
                 edge_2xx: 1240.4, edge_4xx: 12, edge_5xx: null },
     })
     render(<Admin />)
-    await screen.findByText('root')
+    await openTab('Machine')
 
     expect(await screen.findByText('The far-seeing glass')).toBeTruthy()
     expect(screen.getByText('256 MB')).toBeTruthy()
@@ -489,11 +539,11 @@ describe('the far-seeing glass', () => {
       configured: true, ok: false, error: 'Fly answered HTTP 401', values: {},
     })
     render(<Admin />)
-    await screen.findByText('root')
+    await openTab('Machine')
 
     expect(await screen.findByText(/glass is clouded/)).toBeTruthy()
     expect(screen.getByText(/HTTP 401/)).toBeTruthy()
-    // The rest of the dashboard is unaffected — the box's own numbers stay.
+    // The rest of the ward is unaffected — the box's own numbers stay.
     expect(screen.getByText('120 MB')).toBeTruthy()
   })
 })
