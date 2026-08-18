@@ -468,12 +468,6 @@ body {
 .tarot-slot {
   position: relative;
   width: 168px;
-  /* The arc. `margin-top` and not a transform, deliberately: `tarot-deal`
-     ends on `transform: none` and does not carry `forwards`, so a static
-     transform here would be flattened for the length of the deal and then
-     snap back — the card would land in a row and jump onto the curve. A
-     margin is outside that fight. */
-  margin-top: var(--arc-drop, 0px);
   /* The scans are 400x693-700 — a percent or so apart, because they are
      photographs of ninety-year-old cardboard rather than renders. A fixed box
      with `cover` on the image keeps the three the same size; the alternative,
@@ -502,26 +496,33 @@ body {
  * places before three pictures arrive in them, which is commandment 2 — the
  * table explains its own shape without a sentence of instruction.
  *
- * The place carries `--arc-rot` and the card carries `--arc-rot` **plus**
- * `--settle-rot`. That difference is the whole detail: the cloth was printed
- * square and the deal was a hand, so every card lies a degree or two off its
- * own place. Get it the other way round — rotate them together — and three
- * cards sit in three sockets like a form.
+ * Printed square, and the cards lie square in them (Aaron, 2026-08-18). The
+ * place used to be turned to face the ball and the card turned a further
+ * degree or two off it, so the cloth read as printed and the deal as a hand.
+ * Against a photographed table that came apart: the footage supplies the
+ * perspective, and three cards at three angles in front of it read as
+ * knocked rather than dealt.
  *
  * Gold at a hairline's weight and a wash of shadow inside, so it reads as
  * something stamped into baize rather than a border drawn on top of it. */
 .tarot-place {
   position: absolute;
-  top: -15px;
-  left: -15px;
-  width: calc(100% + 30px);
-  aspect-ratio: 400 / 695;
+  /* An even margin round the slot, not a box of its own (Aaron, 2026-08-18:
+     "clipped on the bottom of all of them"). It used to be sized by
+     `width: calc(100% + 30px)` and its own `aspect-ratio`, which is 30px
+     wider than the card and therefore *52px* taller — offset only 15px up,
+     so it hung 37px below. That went unseen while the captions sat in flow
+     underneath and gave the slot the height to hold it; the moment they
+     moved onto hover, the slot became exactly as tall as the card and the
+     overhang ran into the table panel's `overflow: hidden`.
+     `inset` derives both from the slot, so the frame cannot disagree with
+     the card it frames. */
+  inset: -15px;
   border-radius: 14px;
   border: 1px solid rgba(226, 194, 122, 0.38);
   box-shadow:
     inset 0 0 26px rgba(0, 0, 0, 0.34),
     inset 0 0 0 1px rgba(0, 0, 0, 0.16);
-  transform: rotate(var(--arc-rot, 0deg));
   pointer-events: none;
 }
 
@@ -545,7 +546,6 @@ body {
   /* The arc turns the place to face the ball; the settle is the hand that
      dealt. Composed rather than either one alone, so a card lies a degree or
      two off the position printed under it. */
-  transform: rotate(calc(var(--arc-rot, 0deg) + var(--settle-rot, 0deg)));
   transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -580,8 +580,7 @@ button.tarot-hinge {
    and keeps its rule below, where it belongs. */
 @media (hover: hover) {
   .tarot-hinge:has(.is-face-up):hover {
-    transform: rotate(calc(var(--arc-rot, 0deg) + var(--settle-rot, 0deg)))
-      scale(var(--tarot-zoom, 1.35));
+    transform: scale(var(--tarot-zoom, 1.35));
     z-index: 5;
   }
 
@@ -601,8 +600,7 @@ button.tarot-hinge {
 }
 
 .tarot-hinge:has(.is-face-up):focus-visible {
-  transform: rotate(calc(var(--arc-rot, 0deg) + var(--settle-rot, 0deg)))
-    scale(var(--tarot-zoom, 1.35));
+  transform: scale(var(--tarot-zoom, 1.35));
   z-index: 5;
 }
 
@@ -630,6 +628,22 @@ button.tarot-hinge {
 button.tarot-hinge:hover .tarot-card:not(.is-face-up),
 button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   transform: translateY(-8px) rotateZ(-1.2deg);
+}
+
+/* The painted back, filled rather than fitted. The plate is a Magic card's
+   proportions (0.70) and the 1909 faces are a tarot card's (0.577), so
+   something has to give: `contain` pays for it in black bands top and
+   bottom, which read as a picture displayed on a card rather than as a card,
+   and `cover` pays for it by cropping about a tenth off each side — which
+   costs the plate's outer black margin and a hair of its outermost gold
+   rule, and leaves a full-bleed back. The second bill is the cheaper one. */
+.tarot-back {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
 }
 
 .tarot-face {
@@ -817,6 +831,111 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
    own labels agree with the cards lying on it. */
 .tarot-caption {
   font-family: 'IM Fell English SC', 'IM Fell English', Georgia, serif;
+}
+
+/* The legend's three weights, in the stylesheet rather than inline on each
+   `<p>`, and that move was a bug fix. Inline `style` beats every selector
+   short of `!important`, so when the hover slip below re-inked itself for
+   parchment the lines kept the felt's light-on-dark tokens and the whole
+   thing rendered as white type on cream — present, correct, invisible.
+   A colour a component pins inline is a colour no context can answer. */
+.tarot-caption {
+  color: var(--text-muted);
+}
+
+.tarot-legend-name {
+  color: var(--text-secondary);
+}
+
+.tarot-legend-aside {
+  color: var(--text-muted);
+}
+
+/* The legend — place, name, which way up, and the crossover's credit — in
+ * one box, so it can be moved and dressed as one thing.
+ *
+ * On the ceremony's table it is HIDDEN until the card is pointed at
+ * (Aaron, 2026-08-18: "busy and sprawling"). Four stacked lines under each
+ * of three cards is twelve lines of type across the front of a photographed
+ * room, and the room is the thing.
+ *
+ * What it is when it appears is the second half, and it was a correction:
+ * the first pass moved the same loose lines onto hover and nothing read as
+ * *shown*, because a paragraph that fades in over a dark table is still a
+ * paragraph. It is a slip of the reader's own paper now — the same Met
+ * folio the scroll is printed on, a gold hairline, a torn-looking edge and
+ * a shadow — so it arrives as something laid on the table rather than as
+ * text that appeared.
+ *
+ * Two things keep the reveal from costing anybody the information. It is
+ * gated on `(hover: hover)`, so a touch screen — where there is no pointer
+ * to rest and `:hover` latches — keeps every line in flow exactly as
+ * before; that is commandment 2, and the alternative was a newcomer on a
+ * phone who cannot find out what the cards are. And the hinge's
+ * `aria-label` already speaks the position, the name and the reversal, so
+ * nothing here is a screen reader's only copy.
+ */
+@media (hover: hover) {
+  .tarot-ceremony .tarot-slot:not(.is-small) .tarot-legend {
+    position: absolute;
+    left: 50%;
+    /* ABOVE the card, and that is a bug fix rather than a preference. Below
+       it, the slip began at exactly the table panel's bottom edge — the
+       cards sit at the foot of the felt — and `.tarot-table-felt` clips to
+       `overflow: hidden` for its rounded corners, so the whole thing was
+       painted and then cut away. It rendered, it had opacity 1, and nobody
+       could see it. Over the table there is nothing to clip against, and
+       it lands where the eye already is. */
+    bottom: calc(100% + 0.5rem);
+    width: max-content;
+    min-width: 9rem;
+    max-width: 15rem;
+    padding: 0.5rem 0.9rem 0.6rem;
+    background:
+      radial-gradient(ellipse 120% 115% at 50% 46%,
+        transparent 52%, rgba(110, 78, 34, 0.2) 86%,
+        rgba(86, 58, 22, 0.34) 100%),
+      url('./assets/seance/seance-parchment.webp');
+    background-size: auto, cover;
+    border-radius: 2px;
+    box-shadow:
+      inset 0 0 18px rgba(96, 68, 28, 0.26),
+      0 10px 24px rgb(0 0 0 / 0.55),
+      0 0 0 1px rgba(226, 194, 122, 0.42);
+    /* Ink on paper, not muted text on a table: the tokens the felt
+       redefines are light-on-dark and would vanish here. */
+    color: #2e2116;
+    opacity: 0;
+    /* Rises as it fades, a hair, so it reads as being laid down. */
+    translate: -50% 4px;
+
+    transition: opacity 180ms ease, translate 180ms ease;
+    pointer-events: none;
+    /* Over the cards either side, which it overhangs when a name is long. */
+    z-index: 6;
+  }
+
+  /* Ink on paper. Set on the slip rather than on each line, because the
+     markup underneath is shared with the folded strip, which is still on
+     green baize and still wants the felt's tokens. */
+  .tarot-ceremony .tarot-slot:not(.is-small) .tarot-legend .tarot-legend-name {
+    color: #2b1e13;
+  }
+
+  .tarot-ceremony .tarot-slot:not(.is-small) .tarot-legend .tarot-legend-aside {
+    color: #6b4f2a;
+  }
+
+  .tarot-ceremony .tarot-slot:not(.is-small) .tarot-legend .tarot-caption {
+    margin-top: 0;
+    color: #6b4f2a;
+  }
+
+  .tarot-ceremony .tarot-slot:hover .tarot-legend,
+  .tarot-ceremony .tarot-slot:focus-within .tarot-legend {
+    opacity: 1;
+    translate: -50% 0;
+  }
 }
 
 /* The deck, while it is being shuffled. Three backs a couple of degrees
@@ -1049,6 +1168,35 @@ button:hover .tarot-fan-card {
   animation-delay: -1.7s;
 }
 
+/* The candlelight on the reader's scroll. The room's own flicker went with
+   the drawn room; this keyframe stayed because `.seance-scroll::after` is
+   the fortune-teller's PAPER, not her table, and it is lit by candles in
+   every persona room that has them. */
+@keyframes seance-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  17% {
+    opacity: 0.94;
+  }
+  23% {
+    opacity: 1;
+  }
+  46% {
+    opacity: 0.89;
+  }
+  52% {
+    opacity: 0.97;
+  }
+  71% {
+    opacity: 0.92;
+  }
+  84% {
+    opacity: 1;
+  }
+}
+
 .seance-scroll > * {
   position: relative;
 }
@@ -1251,426 +1399,217 @@ button:hover .tarot-fan-card {
 
 /* ── the séance room (`SeanceRoom` in components/tarot.tsx) ─────────────────
  *
- * Aaron's composition, 2026-08-17, and it reframes the table rather than
- * decorating it: **black above, green below, one horizontal line between
- * them, and that line is the back edge of the table.** A votive rack burns
- * along it on either side and the fish stands in the gap, bridging the two.
+ * The room is a photograph of a séance table, and this stylesheet's whole
+ * job is to not get in its way. What stood here before was a composite —
+ * a drawn gradient room, a mirrored candle plate, three smoke loops, a
+ * bronze carp holding a quartz sphere — roughly six hundred lines whose
+ * every number existed to hide a seam between two things that were never
+ * photographed together. None of those seams exist now, so neither do the
+ * numbers.
  *
- * The stage bleeds to the felt's own edges by cancelling its `px-4 py-8` with
- * matching negative margins, then putting the padding back — so the dark
- * reaches the rounded corners while the ball keeps the space it had.
- *
- * The horizon needs no number. The stage is a flex row whose only in-flow
- * child is `.crystal-ball`, so it is exactly as tall as the ball; and the
- * stand occupies 17.98%–100% of that box, which means the carp's foot lands
- * on the stage's bottom edge at every width. Put the dark on `inset: 0` and
- * the table's back edge is under the fish for free, at every clamp of the
- * ball's size, with nothing to keep in step.
+ * Four rules is the whole room. What is left to decide is only where the
+ * glass is, and that is written once, below.
  */
-.seance-stage {
-  /* Where the table's back edge falls, measured up from the carp's foot.
-     Not zero, and that is Aaron's note: with the horizon exactly at the foot
-     the fish stood ON the back edge, its own photographed cast shadow spilling
-     into the dark behind it, and it read as about to fall off the table.
-     Standing it a fifth of the ball's height forward of the edge puts the
-     shadow on green where a shadow belongs, and puts the candles behind the
-     fish rather than beside it — which is also the right perspective, since
-     the rack is at the back of the room and the fish is on the table with
-     you. One value, used by the dark and by both racks, so the line stays
-     one line. */
-  --seance-horizon: 20%;
-  position: relative;
-  display: flex;
-  justify-content: center;
-  margin: -2rem -1rem 1.5rem;
-  padding: 2rem 1rem 0;
-  isolation: isolate;
-}
 
-/* The dark half of the room. Not flat black: a scrying room is lit from
-   below by its own candles, so the ground warms toward the table's edge and
-   the top goes to the near-black the ivy hangs against.
-   The bottom 7% is a fade rather than a cut. A hard line where black meets
-   felt reads as two rectangles stacked; a fade reads as a table with a room
-   behind it, and the rack's own spill (below) crosses it in the other
-   direction. */
-.seance-dark {
-  position: absolute;
-  inset: 0 0 var(--seance-horizon) 0;
+/* The frame, and the ball's place in it. **Measured off the plate, and the
+   only numbers in this section that mean anything.** Re-measure all four
+   if the footage is ever recut: `--ball-x`/`--ball-y` are the sphere's
+   centre and `--ball-d` its diameter, each as a percentage of the room's
+   own box, which is why the vision lands inside the glass at every window
+   width instead of at one. */
+.seance-room {
+  --room-aspect: 16 / 9;
+  /* Nudged left off Aaron's eye on the rendered board, from the 50.8% a
+     silhouette measurement gave: the sphere's brightest reflection sits
+     right of its centre, so a number read off the glass lands the vision
+     a few pixels wide of where the eye puts the middle. */
+  --ball-x: 50.1%;
+  --ball-y: 26.2%;
+  --ball-d: 22.9%;
+  /* The same circle again, measured against the other axis. An absolutely
+     positioned box resolves a width percentage against its container's
+     width and a height percentage against its height, so one sphere needs
+     two numbers — this is `--ball-d` through the room's 16:9. */
+  --ball-dy: 40.7%;
+  position: relative;
+  aspect-ratio: var(--room-aspect);
   border-radius: 0.75rem 0.75rem 0 0;
   overflow: hidden;
-  pointer-events: none;
-  /* Twice the stops the first pass had, plus the dither below (Aaron's
-     item 8): a smooth ramp through near-blacks quantises into visible
-     terraces on an 8-bit screen — the "hard line that instantly changes
-     colour" — and the two fixes compound: closer stops make each step
-     smaller, and the grain breaks up what remains. */
-  background:
-    radial-gradient(ellipse 70% 42% at 50% 100%,
-      rgba(84, 52, 18, 0.38) 0%, rgba(66, 40, 14, 0.3) 22%,
-      rgba(48, 28, 11, 0.25) 46%, rgba(32, 18, 8, 0.14) 62%,
-      rgba(20, 11, 5, 0.06) 72%, transparent 82%),
-    linear-gradient(to bottom, #030305 0%, #040407 30%, #050408 48%,
-      #070508 68%, #0a0709 86%, #0c0909 94%, #0e0a0a 100%);
-  /* A short fade, not a long one. The first pass ran it over 7% of a
-     759px stage — a 53px brown smear where the table's back edge should be,
-     which is the opposite of the clean border this composition is built on.
-     Two per cent reads as an edge that is not a razor. */
-  -webkit-mask-image: linear-gradient(to bottom, #000 98%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 98%, transparent 100%);
-  animation: seance-flicker 7.3s ease-in-out infinite;
+  /* Both a stacking context for the two blended layers below — so they
+     blend against the plate rather than against whatever the page has
+     behind the table — and the clip that keeps the footage inside the
+     panel's rounded top corners. */
+  isolation: isolate;
+  /* Bleeds to the panel's edges by cancelling its `px-4`. The room is the
+     table, not a picture hung on one. */
+  margin: 0 -1rem;
+  width: calc(100% + 2rem);
 }
 
-/* The dither: the same browser-drawn turbulence grain the parchment uses,
-   at whisper opacity over the dark. Its one job is to break the gradient
-   terraces item 8 named — noise is how film avoids banding, and it costs
-   no bytes. */
-.seance-dark::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='19'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23d)'/%3E%3C/svg%3E");
-  mix-blend-mode: overlay;
-  opacity: 0.18;
+.seance-room.is-knockable {
+  cursor: pointer;
 }
 
-/* Smoke in the dark, screened so only its lit parts survive. Same loop as the
-   one inside the glass (seed 1848) at a different scale and opacity: it is
-   one room's air, so it ought to be one body of smoke. */
-.seance-haze {
-  position: absolute;
-  inset: -10% -6% 0;
-  width: 112%;
-  height: 110%;
-  object-fit: cover;
-  mix-blend-mode: screen;
-  opacity: 0.3;
-  filter: blur(3px);
-}
-
-/* The far body of air: the same file again, bigger, softer and dimmer, drawn
-   under the near one. Two layers moving at different apparent rates are the
-   only depth cue a flat black wall has — and because it is the same loop,
-   the second one costs no bytes at all. Slowed by playing a larger crop of
-   the same motion rather than by touching the video's rate, which nothing
-   here can do without dropping frames. */
-.seance-haze.is-far {
-  inset: -26% -22% -6%;
-  width: 144%;
-  height: 132%;
-  opacity: 0.17;
-  filter: blur(9px);
-}
-
-/* The swirl (item 9): the same air, gathered where a scrying room's smoke
-   actually goes — coiling around the glass. A tight crop of the loop runs
-   its features fastest of the three layers, nearly unblurred so the curls
-   read as SMOKE SWIRLING rather than haze, and the radial mask holds it
-   to the dark around the ball: brightest against the black, gone before
-   the racks. The ball sits centred in the stage, so the mask needs no
-   number the layout does not already own. */
-.seance-haze.is-swirl {
-  inset: -4% 18% 0;
-  width: 64%;
-  height: 104%;
-  left: 18%;
-  opacity: 0.5;
-  filter: blur(1.5px);
-  -webkit-mask-image: radial-gradient(ellipse 52% 58% at 50% 42%,
-    #000 28%, rgba(0, 0, 0, 0.55) 58%, transparent 82%);
-  mask-image: radial-gradient(ellipse 52% 58% at 50% 42%,
-    #000 28%, rgba(0, 0, 0, 0.55) 58%, transparent 82%);
-}
-
-/* The flicker, over the wax it belongs to (ADR 31, seed 1888). A photograph
-   of candles is a photograph of one instant, and the one thing it
-   structurally cannot say is that the light is different a second later.
-   `screen` so it only ever adds light, and masked to the upper half of the
-   rack — the wicks are up there, and light crawling over the puddled wax at
-   the bottom would read as water rather than as burning. */
-.seance-flame {
-  position: absolute;
-  inset: 0 0 auto 0;
-  width: 100%;
-  height: 62%;
-  object-fit: cover;
-  mix-blend-mode: screen;
-  opacity: 0.3;
-  filter: blur(5px) saturate(1.2);
-  pointer-events: none;
-  -webkit-mask-image: radial-gradient(ellipse 78% 88% at 42% 74%, #000 18%,
-    rgba(0, 0, 0, 0.5) 62%, transparent 100%);
-  mask-image: radial-gradient(ellipse 78% 88% at 42% 74%, #000 18%,
-    rgba(0, 0, 0, 0.5) 62%, transparent 100%);
-}
-
-/* The rack. Screened, because the plate's ground is black and black is
-   already transparent under `screen` — which is also what keeps every flame's
-   halo exactly as photographed instead of at whatever radius a matte's
-   tolerance happened to cut.
-   Anchored to the stage's bottom, so the wax stands ON the table's back edge;
-   `is-right` is the same file mirrored, and the two inner ends meet behind
-   the fish. */
-.seance-rack {
-  position: absolute;
-  bottom: var(--seance-horizon);
-  /* Close, which is Aaron's call: pulled back and shrunk they read as a
-     detail at the edge of a photograph rather than as the light in the room.
-     The number is larger than it looks because the crop grew to 0.53 to
-     dodge the sliced candle — same wax at the same scale, more of it. */
-  /* Half the room each (Aaron, 2026-08-17, third call: "if they almost
-     touch in the middle, they would backlight the crystal ball
-     perfect"). The plate reads as one bank of candles receding to the
-     right, so mirrored at half-width apiece the two banks run downhill
-     into the middle and all but meet -- the seam and its short dissolve
-     land behind the bronze, and the inner candles' glow becomes the
-     ball's backlight. */
-  width: 50%;
-  mix-blend-mode: screen;
-  pointer-events: none;
-  animation: seance-flicker 5.9s ease-in-out infinite;
-  /* The inner edge, and this is the fix for what Aaron called the weird
-     clipped candle. The first attempt was to *find* a clean cut — scan the
-     plate for a column with nothing lit in it and crop there. That was the
-     wrong instinct twice over: the trough it found still had lit wax at the
-     bottom of the frame, and even a perfect cut would only be perfect for
-     one crop of one photograph. **A candle sliced down its length has no
-     good column to be sliced at**, because wax has a round side. So the edge
-     dissolves instead: whatever the crop happens to catch, it is gone before
-     it can show a straight line. The outer edge needs nothing — it hangs off
-     the stage — and the top needs nothing, because the plate is already
-     black up there. */
-  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 76%,
-    rgba(0, 0, 0, 0.5) 90%, transparent 99%);
-  mask-image: linear-gradient(to right, #000 0%, #000 76%,
-    rgba(0, 0, 0, 0.5) 90%, transparent 99%);
-}
-
-/* The wax into the table. Its own element because this is the second mask,
-   and two masks on one box means `mask-composite`. */
-.seance-rack img {
-  display: block;
-  width: 100%;
-  height: auto;
-  -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent 99%);
-  mask-image: linear-gradient(to bottom, #000 78%, transparent 99%);
-}
-
-/* Far enough in that the inner ends fall behind the carp, which is what makes
-   the mirror a room rather than a mirror. */
-.seance-rack.is-left {
-  left: -1%;
-}
-
-/* `scaleX(-1)` and not a second crop: two crops of one photograph read as two
-   racks and invite the eye to compare them, while one rack from both ends of
-   a table is what a room looks like. The seam it would make in the middle is
-   behind the carp. */
-.seance-rack.is-right {
-  right: -1%;
-  transform: scaleX(-1);
-  animation-delay: -2.4s;
-  animation-duration: 6.7s;
-}
-
-/* What the rack throws back onto the felt: a warm wash crossing the table's
-   back edge downward, so the light does not stop where the dark does. */
-.seance-spill {
-  position: absolute;
-  inset: auto 0 calc(var(--seance-horizon) - 8%) 0;
-  height: 15%;
-  pointer-events: none;
-  /* Stops every ~15% rather than three across the run — same banding fix
-     as the dark's (item 8). */
-  background: radial-gradient(ellipse 78% 100% at 50% 0%,
-    rgba(226, 168, 92, 0.17) 0%, rgba(210, 150, 76, 0.13) 22%,
-    rgba(184, 126, 58, 0.08) 44%, rgba(150, 100, 46, 0.04) 60%,
-    rgba(120, 80, 36, 0.02) 68%, transparent 78%);
-  animation: seance-flicker 8.9s ease-in-out infinite;
-  animation-delay: -3.1s;
-}
-
-/* ── the dance (`FlameDance` in tarot.tsx) ─────────────────────────────────
- *
- * Per-flame motion, three layers deep. The clone below carries the
- * photographed tips through the animated turbulence; the halos are each
- * wick's own light breathing and swaying; the gutter wrapper throws one
- * flame at a time into a quick squash-and-dart. Everything is screened —
- * fire only ever adds light. */
-.flame-bend {
+/* `cover` on a box whose aspect ratio IS the footage's is deliberately a
+   no-op — it is here for the pixel of rounding at some widths, and for the
+   day somebody changes `--room-aspect` and needs the plate to crop rather
+   than to stretch. */
+.seance-room-plate {
   position: absolute;
   inset: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
   pointer-events: none;
-  filter: url(#seance-flame-bend) brightness(1.04);
-  mix-blend-mode: screen;
 }
 
-.flame-gutter {
+/* The dim, and it is the layer the whole effect turns on. The footage's
+   sphere is lit from inside, so screening a card onto it adds nothing an
+   eye can find — near-white plus anything is near-white. This multiplies
+   the interior down to a scrying dark first, ending well inside the glass
+   so the rim's own highlights survive at full strength and the ball still
+   reads as glass rather than as a hole. */
+.seance-glass-dim {
   position: absolute;
+  left: var(--ball-x);
+  top: var(--ball-y);
+  width: calc(var(--ball-d) * 1.03);
   aspect-ratio: 1;
   translate: -50% -50%;
   pointer-events: none;
-  animation: flame-gutter-cycle 9s linear infinite;
+  mix-blend-mode: multiply;
+  background: radial-gradient(circle closest-side,
+    rgba(26, 20, 34, 0.92) 0%, rgba(26, 20, 34, 0.86) 52%,
+    rgba(26, 20, 34, 0.5) 76%, transparent 92%);
 }
 
-.flame-halo {
+/* The fortune, inside the glass. Screened, so it is light in the sphere
+   rather than a picture stuck to it, and masked to end in the fog well
+   before the box edge — a rectangle with corners reads as a sticker, and
+   `closest-side` reaching zero exactly at the edge is a ramp you are
+   trusting the compositor to round off (it does not, on a layer that
+   animates). Ending at 88% puts the whole ramp inside the box. */
+.seance-vision {
   position: absolute;
-  inset: 0;
-  border-radius: 50%;
+  left: var(--ball-x);
+  top: var(--ball-y);
+  /* A SQUARE box the size of the sphere, with the card fitted inside it —
+     and the two halves of that are two different fixes.
+     Sized by width, a 0.577 card overflowed the glass top and bottom and
+     the mask cropped it to a band across its middle: the fortune arrived
+     zoomed in on the Wheel's hub. Sized by height it fitted, but the mask
+     follows the box, so a card-shaped box made a card-shaped oval of light
+     (Aaron: "more round, less oval").
+     A square box gives the mask a circle to be — the sphere's own shape —
+     and `object-fit: contain` keeps the whole picture inside it. What that
+     costs is that the card's straight left and right edges fall well
+     within the circle, which is what the ramp below is shaped around. */
+  width: calc(var(--ball-d) * 0.95);
+  height: calc(var(--ball-dy) * 0.95);
+  object-fit: contain;
+  translate: -50% -50%;
+  pointer-events: none;
   mix-blend-mode: screen;
-  background: radial-gradient(circle,
-    rgba(255, 240, 200, 0.42) 0%,
-    rgba(255, 196, 100, 0.22) 34%,
-    rgba(190, 100, 24, 0.08) 58%,
-    transparent 74%);
-  animation: flame-breathe 2s ease-in-out infinite;
+  opacity: 0;
+  /* The ripple first, then the grade. `url()` has to lead: a displacement
+     map moves pixels, and moving them after a blur smears the blur instead
+     of the picture. */
+  filter: url(#seance-ripple) saturate(1.05) brightness(1.12) blur(0.4px);
+  /* A circle, and a LONG ramp. The card fitted in a square box only reaches
+     57% of the circle's radius at its left and right edges, so a tight fade
+     would leave two straight sides showing inside a round glow. Starting to
+     fall at 20% and running to 90% puts those edges halfway down the ramp,
+     where they dissolve instead of ending — and the light that survives is
+     round, which is what the sphere around it is.
+     Ending at 90% rather than at the box edge keeps the whole ramp inside,
+     where a compositor cannot square it off. */
+  -webkit-mask-image: radial-gradient(circle closest-side at 50% 50%,
+    #000 20%, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.28) 70%,
+    transparent 90%);
+  mask-image: radial-gradient(circle closest-side at 50% 50%, #000 20%,
+    rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.28) 70%, transparent 90%);
+  animation:
+    seance-vision-appear 2.4s ease-out 0.5s forwards,
+    seance-vision-sway 9s ease-in-out 2.9s infinite;
 }
 
-/* Mostly steady, with quick unevenly-spaced dips and a visible SWAY — the
-   lateral drift is what reads as dancing rather than dimming. */
-@keyframes flame-breathe {
-  0%, 100% { opacity: 0.95; transform: scale(1) translate(0, 0); }
-  13% { opacity: 0.78; transform: scale(0.9, 1.06) translate(-3%, 1.5%); }
-  19% { opacity: 1; transform: scale(1.06, 0.97) translate(2%, -1%); }
-  37% { opacity: 0.92; transform: scale(0.97) translate(3%, 0.5%); }
-  52% { opacity: 1.0; transform: scale(1.1, 1.02) translate(-2%, -2.5%); }
-  61% { opacity: 0.8; transform: scale(0.92, 1.08) translate(1.5%, 1%); }
-  78% { opacity: 0.98; transform: scale(1.03, 0.98) translate(-1%, -0.5%); }
-  90% { opacity: 0.88; transform: scale(0.96) translate(2%, 0.8%); }
+/* `rotate` rather than a transform, so it composes with the `translate`
+   that centres it instead of replacing it. */
+.seance-vision.is-reversed {
+  rotate: 180deg;
 }
 
-/* The gutter: for most of its long cycle this wrapper does nothing, then
-   for one beat the flame squashes, flares, and darts — the irregular
-   event that reads as air moving through the room. On the wrapper so its
-   transform COMPOSES with the halo's breathe instead of fighting it over
-   the property. */
-@keyframes flame-gutter-cycle {
-  0%, 91% { transform: scale(1) translateX(0); }
-  93% { transform: scale(1.28, 0.72) translateX(4%); }
-  95% { transform: scale(0.8, 1.18) translateX(-4%); }
-  97% { transform: scale(1.12, 0.9) translateX(2%); }
-  100% { transform: scale(1) translateX(0); }
+@keyframes seance-vision-appear {
+  from {
+    opacity: 0;
+    scale: 1.16;
+  }
+  to {
+    opacity: 0.92;
+    scale: 1;
+  }
 }
 
-/* Candlelight, which is not a sine wave. Real flicker is mostly steady with
-   irregular dips, so the keyframes are uneven on purpose and the three layers
-   run at 5.9s / 7.3s / 8.9s — three periods with no common multiple worth
-   noticing, which is what stops the room breathing in time with itself. */
-@keyframes seance-flicker {
+@keyframes seance-vision-sway {
   0%,
   100% {
-    opacity: 1;
+    translate: -50% -50%;
   }
-  17% {
-    opacity: 0.94;
-  }
-  23% {
-    opacity: 1;
-  }
-  46% {
-    opacity: 0.89;
-  }
-  52% {
-    opacity: 0.97;
-  }
-  71% {
-    opacity: 0.92;
-  }
-  84% {
-    opacity: 1;
+  50% {
+    translate: -50% -52%;
   }
 }
 
-/* The reader's crystal ball (`CrystalBall` in components/tarot.tsx).
- *
- * Both halves are photographs now (ADR 29,
- * `assets/seance/crystal.recipe.yaml`): a CC0 smoky-quartz sphere for the
- * glass, and the Met's own crystal ball on a bronze stand in the shape of a
- * fish for what holds it. The composite is the whole design: the card has to
- * be *inside* the ball, so the stack is candle and smoke behind, the depths,
- * the vision, the sphere photograph twice — `.crystal-shell-body` laying the
- * glass over the card, `.crystal-shell-light` crushed to its highlights and
- * screened back so the specular arc sits above everything — and then the
- * bronze last of all, so the foam closes in FRONT of the ball.
- *
- * The blend modes are what make it read as glass rather than as a sticker
- * over a card, and they need a stacking context to blend *within*:
- * `.crystal-orb` isolates, or `mix-blend-mode: screen` reaches the felt and
- * the ball turns into a bright hole in the table.
- *
- * ── THE GEOMETRY, and it is the recipe's rather than this file's ──────────
- * In the 700×950 stand the bronze foam closes at y=290, its centre is x=529,
- * and the ball is drawn at r=265 with its centre 0.88 radii ABOVE that claw
- * line (Aaron's number, off a rendered board of 0.62/0.78/0.88/0.96 — at
- * 0.62 the claws crossed the ball's belly and it read as impaled). Every
- * percentage below is that arithmetic and nothing else, so re-measure the
- * recipe rather than nudging a number here:
- *
- *   ball spans x 264…794 and y −208.2…321.8 in the stand's own pixels, so
- *   the union box is 794 × 1158.2 — hence `aspect-ratio: 794 / 1158.2`;
- *   the stand is 700/794 = 88.1612% wide, sits at 208.2/1158.2 = 17.9761%
- *   down, and the orb is 530/794 = 66.7506% wide at 264/794 = 33.2494%.
- *
- * The ball overhangs that stand box on three sides, which costs nothing
- * because it is an absolutely positioned layer rather than a sibling.
- *
- * `translate: -16.6247%` is the last step and it answers Aaron's nit: the
- * ball's centre sits at 529/794 = 66.6247% of the union box, so left to
- * itself the *sphere* lands right of the spread it is supposed to stand
- * over. Shifting the whole assembly by the difference centres the ball
- * rather than the box — the fish then sweeps out to the left over empty
- * felt, which is where a leaping carp wants the room anyway. Doing it with
- * a translate rather than by padding the box keeps the reserved space
- * honest: no dead gutter, and the drop shadow still hugs the bronze.
- *
- * Central since PR 2, and that deleted a problem rather than managing one.
- * Pinned to the felt's right edge the old ball collided with the third card
- * below about a thousand pixels and had to be shrunk and then hidden below
- * `lg`; standing it above the centred spread means nothing is beside it.
- */
-/* The ceremony fits one screen (Aaron's item 6, third report). The stack
-   could never fit by shrinking alone — the board measured 1255px of felt
-   against a 900px viewport, and both levers together still missed by
-   ~380px — so the composition changes while the deal is the event: the
-   page's chrome steps aside (NewDeck hides its masthead), the heading
-   goes (the cloth's printed places are the explanation), the ball sizes
-   against the VIEWPORT'S HEIGHT as well as its width, and the spread
-   rides up over the stage's front felt band — the cards stand on the
-   table in front of the room, which is where a spread on a séance table
-   actually sits. Wide screens only: on a phone the cards wrap and the
-   overlap would stack them into the bronze. */
-@media (min-width: 900px) {
-  .tarot-ceremony {
-    --ballw: clamp(250px, min(38vw, 40vh), 520px);
-  }
-  .tarot-ceremony .crystal-ball {
-    width: var(--ballw);
-  }
-  .tarot-ceremony .tarot-spread {
-    position: relative;
-    z-index: 3;
-    margin-top: calc(var(--ballw) * -0.34);
-    /* The outer cards sit out on the wings (Aaron's call, off the first
-       fitted board): the middle card fronts the table and the bronze's
-       tail and head stay visible in the gaps. */
-    gap: 0 clamp(2.5rem, 13vw, 190px);
-  }
-  /* The cards give a notch of size back to the room; the hover-zoom on a
-     turned card still shows every detail. */
-  .tarot-ceremony .tarot-slot {
-    width: clamp(132px, calc(var(--ballw) * 0.42), 168px);
-  }
-  .tarot-ceremony .seance-stage {
-    margin-bottom: 0.5rem;
-  }
+/* The near half of the table, which the footage does not contain. Its top
+   edge has to be the colour the plate's bottom edge already is (the table's
+   own front, in shadow) or the two read as a picture on a table rather than
+   as one table — so this is sampled from the footage, not chosen.
+   Keyed on CONTAINING a room rather than on `.tarot-ceremony`, because the
+   shuffle screen shows the room too and is not the ceremony: keyed on the
+   class, the deck was cut on green baize and then dealt onto a dark table. */
+.tarot-table-felt:has(.seance-room) {
+  background: linear-gradient(to bottom,
+    #0f0d05 0%, #0d0c07 40%, #0a0a06 100%);
+  /* Room under the spread for the printed frame's 15px, which the panel
+     would otherwise clip: the cards ride up over the footage, so the felt
+     below them is the only place that overhang can live. */
+  padding-bottom: 1.75rem;
+}
+
+/* The deal, once the room stopped being as tall as a bronze carp. The spread
+   rides up over the plate's own felt so the cards lie ON the photographed
+   table rather than below a photograph of one — a percentage of the panel's
+   width, because the room's height is a fixed ratio of that same width, so
+   the overlap scales with it and needs no breakpoint of its own.
+   Unconditional, unlike the version this replaced. That one was wide-screens
+   only because the cards were 168px and three of them wrapped on a phone, so
+   an overlap would have stacked them into the bronze. At this size three fit
+   in a row at 375px, and a phone gets the same table everything else does. */
+.tarot-ceremony .tarot-spread {
+  position: relative;
+  z-index: 3;
+  margin-top: -18%;
+  /* Drawn in off the wings (Aaron, 2026-08-17). The old spacing was set
+     against a bronze carp whose head and tail had to stay visible between
+     the cards; with the sphere centred and nothing flanking it, three cards
+     flung to the table's corners read as three separate objects rather than
+     as one spread laid in front of the reader. */
+  gap: 0 clamp(1rem, 4.5vw, 64px);
+  flex-wrap: nowrap;
+}
+
+/* Small (Aaron, 2026-08-17). The old size was set against a drawn room the
+   cards had to compete with; in a photographed one they are objects lying on
+   a table, and a tarot card on a table is smaller than the crystal ball
+   behind it. Roughly two-thirds of the sphere's diameter, which is about
+   what a real spread looks like beside a real one — and the hover-zoom on a
+   turned card still shows every detail. */
+.tarot-ceremony .tarot-slot {
+  width: clamp(110px, 9.2vw, 136px);
 }
 
 /* The ceremony's controls, riding the dark upper corners of the room —
-   the one part of the composition with nothing in it. Above the racks
-   and under nothing. */
+   the one part of the composition with nothing in it. */
 .tarot-ceremony-controls {
   position: absolute;
   inset: 0.6rem 0.9rem auto;
@@ -1682,262 +1621,16 @@ button:hover .tarot-fan-card {
   z-index: 10;
 }
 
-.seance-stage.is-knockable {
-  cursor: pointer;
-}
-
-.crystal-ball {
-  position: relative;
-  /* Big, and deliberately so (Aaron, 2026-08-17): a museum bronze on a séance
-     table is the largest object in the room, and at the old 26vw the fish
-     read as an ornament beside the spread rather than as the thing the spread
-     is laid out beneath.
-     38vw is a measured ceiling, not a taste: at 1440×900 the assembly is
-     520×759, so the whole sculpture — glass, foam, stem, carp — fits in one
-     screen once the table is scrolled to. Past it the tail is cut off by the
-     viewport, and an object you cannot see the end of stops reading as an
-     object. The first board that said 46vw was fine had screenshotted the
-     *element*, which crops away the only thing that decides this. */
-  width: clamp(260px, 38vw, 520px);
-  aspect-ratio: 794 / 1158.2;
-  margin: 0 auto;
-  translate: -16.6247% 0;
-}
-
-/* The room behind the glass: our own candle, and our own smoke drifting
-   through its light. Centred on the BALL rather than on the box — the light
-   belongs to the glass, not to the bronze — and masked to a soft circle so
-   it falls off into the felt instead of ending at an edge. */
-.crystal-room {
-  position: absolute;
-  left: 66.6247%;
-  top: 22.8805%;
-  width: 104%;
-  aspect-ratio: 1;
-  translate: -50% -50%;
-  pointer-events: none;
-  -webkit-mask-image: radial-gradient(circle closest-side at 50% 50%, #000 30%,
-    transparent 70%);
-  mask-image: radial-gradient(circle closest-side at 50% 50%, #000 30%,
-    transparent 70%);
-}
-
-.crystal-candle,
-.crystal-smoke {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  mix-blend-mode: screen;
-}
-
-.crystal-candle {
-  opacity: 0.55;
-  filter: blur(16px) saturate(1.15);
-}
-
-.crystal-smoke {
-  opacity: 0.34;
-  filter: blur(7px);
-}
-
-/* The bronze, painted LAST so the foam closes in front of the glass. Its own
-   cast shadow is in the photograph — the matte's `soft` ramp was built to
-   keep it — so the drop shadow here only deepens what is already there, and
-   there is no drawn contact ellipse to disagree with the real one. */
-.crystal-stand {
-  position: absolute;
-  left: 0;
-  top: 17.9761%;
-  width: 88.1612%;
-  height: 82.0239%;
-  pointer-events: none;
-  filter: drop-shadow(0 10px 18px rgba(8, 4, 26, 0.5));
-}
-
-/* The glass, seated on the recipe's circle: left 264/794, width 530/794, and
-   the top of the box IS the top of the ball, so `top: 0`. */
-.crystal-orb {
-  position: absolute;
-  left: 33.2494%;
-  top: 0;
-  width: 66.7506%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  overflow: hidden;
-  /* No drop shadow here, and that is a finding rather than an omission: a
-     `filter: drop-shadow` follows the element's **clip**, not its content, so
-     the perfect circle of `border-radius: 50%` cast a perfect circle of
-     shadow — a faint hard ring standing a few pixels outside the glass, in
-     the exact place the navy rim had just been removed from. The ball's own
-     shading is in the photograph and the bronze's shadow is in its own; a
-     third, drawn one had nothing left to say. */
-  /* The isolation the blend modes need. Without it `screen` composites
-     against the felt instead of against the layers below it. */
-  isolation: isolate;
-}
-
-/* What is behind the glass, and the second of Aaron's two nits.
- *
- * The first layer is the fix. The depths used to end at `#06041b` — a cold
- * near-black — and against warm bronze that last ring read as a *drawn
- * stroke* around the sphere, which is the one thing a photographed ball must
- * not have. What a real ball has at that edge instead is the room coming
- * back at it: the candle, the felt and the bronze itself bounced into the
- * glass. So the outermost band is warm and slightly lifted, and the cold
- * navy is kept for the middle of the ball where it belongs. Painted here
- * rather than as another blended layer because the rim has to sit *under*
- * the vision — a light on the far side of the glass, not a ring on top of
- * the card. */
-.crystal-depths {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle closest-side at 50% 50%, transparent 46%,
-      rgba(150, 112, 64, 0.4) 78%, rgba(222, 180, 120, 0.58) 93%,
-      rgba(126, 92, 50, 0.5) 100%),
-    radial-gradient(circle at 42% 36%, #3f3358 0%, #2a2038 42%, #241a18 78%,
-      #2e1e0d 100%);
-  /* ── and this mask is the actual bug Aaron's eye caught ──────────────────
-     The shell photograph's sphere is `mask_circle: {r: 0.482}` of its file,
-     so the glass ends at 96.4% of this box while `border-radius: 50%` clips
-     at 100%. The 3.6% annulus in between was bare depths, hard-cut by the
-     radius — a ring of near-black with a crisp outer edge, which is a drawn
-     stroke by any other name, and against warm bronze it announced itself.
-     Warming the colour only made it a warmer stroke; what removes it is
-     ending the depths where the glass ends, so the ball's outer edge is the
-     photograph's own feathered silhouette and nothing else.
-     Re-derive 95.2/96.6 from the recipe's `r` if that number ever moves. */
-  -webkit-mask-image: radial-gradient(circle closest-side at 50% 50%, #000
-    95.2%, transparent 96.6%);
-  mask-image: radial-gradient(circle closest-side at 50% 50%, #000 95.2%,
-    transparent 96.6%);
-}
-
-.crystal-shell-body,
-.crystal-shell-light {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-/* The glass over the card: the photograph's own veils and internal cloud,
-   imprinted without lightening the interior. `soft-light` is the whole
-   choice here — `hard-light` at any useful opacity washed a scrying ball
-   into a white marble, because the quartz's mid-greys are brighter than
-   the depths they are supposed to be suspended in. Soft-light keeps the
-   dark and carries the texture. */
-.crystal-shell-body {
-  mix-blend-mode: soft-light;
-  opacity: 0.85;
-}
-
-/* The same file, crushed until only the specular arc and the rim highlight
-   survive, screened on top of everything. This is the layer that says
-   "glass" — a bright, hard, *unblurred* edge above a soft interior — and
-   the brightness goes DOWN before the contrast goes up, so the crush
-   discards the body of the photograph instead of blowing it out. */
-.crystal-shell-light {
-  mix-blend-mode: screen;
-  opacity: 0.9;
-  filter: brightness(0.52) contrast(4.2);
-}
-
-/* The fortune arriving: the card surfaces inside the glass rather than
-   being delivered to it — already there once the mist thins. Whole, not
-   cropped, and a reversed card hangs upside down; the ball does not
-   editorialise. */
-.crystal-vision {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 58%;
-  translate: -50% -50%;
-  opacity: 0;
-  filter: saturate(0.78) brightness(1.05) blur(0.4px);
-  /* The edges dissolve rather than stop. A rectangle with corners reads as
-     a picture stuck on the glass; the whole illusion is that the fortune is
-     *suspended in* it, which means the picture has to end in the fog and
-     not at a border.
-     `closest-side` is load-bearing and was the first half of the bug: a
-     radial-gradient sizes to `farthest-corner` by default, so on a landscape
-     art crop the ramp was still ~80% opaque where the image's top and bottom
-     edges fell, and the picture ended on a visible horizontal line.
-     The second half is why the line was still there afterwards, and it is
-     worth knowing: `closest-side` reaches zero *exactly at* the box edge,
-     and this element carries a permanent `scale` animation, so WebKit paints
-     it through a composited layer and the last ramp step lands on the clip
-     rather than inside it — flat cuts top and bottom, the very thing
-     `closest-side` was reached for. **A mask that ends at the edge is a mask
-     you are trusting the compositor to round off.** Ending it at 88% puts
-     the whole ramp inside the box, where nothing can square it off. */
-  -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%,
-    #000 8%, rgba(0, 0, 0, 0.55) 55%, transparent 88%);
-  mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 8%,
-    rgba(0, 0, 0, 0.55) 55%, transparent 88%);
-  animation:
-    crystal-vision-appear 2.4s ease-out 0.5s forwards,
-    crystal-vision-sway 9s ease-in-out 2.9s infinite;
-}
-
-/* `rotate` rather than a transform, so it composes with the `translate`
-   that centres it instead of replacing it. */
-.crystal-vision.is-reversed {
-  rotate: 180deg;
-}
-
-@keyframes crystal-vision-appear {
-  from {
-    opacity: 0;
-    scale: 1.16;
-  }
-  to {
-    opacity: 0.88;
-    scale: 1;
-  }
-}
-
-@keyframes crystal-vision-sway {
-  0%,
-  100% {
-    scale: 1;
-  }
-  50% {
-    scale: 1.03;
-  }
-}
-
-/* The light the ball puts on the felt, pooled where the fish lies rather
-   than under a pedestal — the bronze is a long sculpture and the glow has to
-   be the shape of what casts it. Warm now that the glass is sepia: a violet
-   pool under an amber ball was two rooms at once. A div rather than the old
-   `<ellipse>`, since the SVG it lived in is gone. */
-.crystal-aura {
-  position: absolute;
-  left: 42%;
-  bottom: -2%;
-  width: 96%;
-  height: 16%;
-  translate: -50% 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse closest-side at 50% 50%,
-    rgba(226, 176, 106, 0.5) 0%, rgba(178, 138, 214, 0.28) 52%,
-    transparent 100%);
-  opacity: 0.55;
-  animation: crystal-aura-swell 5.2s ease-in-out infinite;
-}
-
-@keyframes crystal-aura-swell {
-  0%,
-  100% {
-    opacity: 0.16;
-  }
-  50% {
-    opacity: 0.34;
+/* On a phone they stop riding it. The room is a fixed 16:9, so at 375px it
+   is 211px tall and three rows of wrapped buttons cover the candles, the
+   sphere and the reader's own invitation — the "dark upper corners with
+   nothing in them" are a fact about a wide window, not about the design.
+   Below the breakpoint the controls take their own space above the table. */
+@media (max-width: 899px) {
+  .tarot-ceremony-controls {
+    position: static;
+    inset: auto;
+    padding: 0.6rem 0 0.75rem;
   }
 }
 
@@ -1985,37 +1678,17 @@ button:hover .tarot-fan-card {
   button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
     transform: none;
   }
-  /* The ball's own weather. The candle and the smoke are `VideoBackdrop`
-     in `ambience` mode, so they remove themselves in JS and need no rule
-     here — what is left to arrest is the aura on the felt and the card
-     surfacing in the glass, and the vision must end up *visible* rather
-     than stuck at its opening keyframe's zero. */
-  .crystal-aura {
+  /* The room itself is a `VideoBackdrop` in `art` mode, so it swaps itself
+     for the still in JS and needs no rule here. What is left to arrest is
+     the card surfacing in the glass — and the vision's 0% keyframe is
+     invisible, so it needs the resting state
+     so it needs the resting state spelled out rather than merely stilled. */
+  .seance-vision {
     animation: none;
+    opacity: 0.92;
   }
-  .crystal-vision {
-    animation: none;
-    opacity: 0.88;
-  }
-  /* The room stays lit and still. `animation: none` on a flicker leaves the
-     0% keyframe, which is full brightness — the right resting state, unlike
-     the vision above, whose 0% is invisible. */
-  .seance-dark,
-  .seance-rack,
-  .seance-spill,
   .seance-scroll::after {
     animation: none;
-  }
-  /* The dance stands down: halos hold steady light, and the bending
-     clone is removed outright — SMIL cannot hear this media query, so
-     the element goes rather than the animation. */
-  .flame-halo,
-  .flame-gutter {
-    animation: none;
-    opacity: 0.85;
-  }
-  .flame-bend {
-    display: none;
   }
   .tarot-hinge {
     transition: none;

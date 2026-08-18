@@ -479,7 +479,7 @@ describe('the tarot door', () => {
     }
     await screen.findByRole(
       'button', { name: /begin the reading/i }, PAST_THE_SHUFFLE)
-    const stage = document.querySelector('.seance-stage.is-knockable')!
+    const stage = document.querySelector('.seance-room.is-knockable')!
     expect(stage).not.toBeNull()
     fireEvent.dblClick(stage)
     await waitFor(() => expect(api.themeAsk).toHaveBeenCalled(), PAST_THE_SHUFFLE)

@@ -1627,6 +1627,49 @@ arc; this is what the next few sessions actually do.
     self-clones) all failed Aaron's eye; the photographed frozen runs
     stand, and the motion budget went to the flicker instead.
 
+    **All of the above about the room was superseded on 2026-08-18**, and
+    the paragraphs stay because the reasoning is worth keeping, not because
+    the code is. Aaron generated a photo-real séance table (Seedance 2.0,
+    his own machine, second take against a written brief: 16:9, eight
+    seconds, clear felt in the near third, dark upper corners for the
+    controls) and it replaced **the whole composite** — the Met's bronze
+    carp and its quartz sphere, the mirrored candle plate and its
+    seventeen measured flames, the three smoke loops, the drawn gradient
+    room, the light-spill. Roughly 690 lines of CSS and 400 of TSX went
+    with them, plus six assets and the `crystal.recipe.yaml` that built
+    them.
+
+    The argument is that **every one of those numbers existed to hide a
+    seam between two things never photographed together** — the rack's
+    mirror line, the sphere against its stand, the horizon where black met
+    felt — and one photograph of one table has no such seams to hide. What
+    is left is four rules and four measured numbers: where the sphere sits
+    in the frame, as percentages of the room's own 16:9 box, so nothing is
+    cropped and nothing drifts as the window resizes.
+
+    The turned card now surfaces **inside the footage's own glass**: a dark
+    disc multiplies the interior down, the card is screened over it, and a
+    seeded turbulence filter ripples its edges. That order is forced —
+    the sphere is lit from within, and a picture screened onto a near-white
+    ball adds nothing an eye can find. The card backs are Magic's now, a
+    plate Aaron painted, and the cards themselves are small: in a
+    photographed room they are objects lying on a table rather than a
+    composition competing with a drawn one.
+
+    Three things came out of it worth keeping. **A duration measured for
+    one surface is a question to ask of every sibling** — the phone was
+    broken by this change and nothing said so, because the controls' "dark
+    upper corners with nothing in them" are a fact about a wide window,
+    not about the design; at 375px the room is 184px tall and three rows
+    of wrapped buttons covered the candles. **`mtglab animist verify` is
+    enforced by nothing**: it sweeps all eleven recipes and CI never runs
+    it, while `tests/test_animist_recipes_repo.py` pins only two of them —
+    so the nine broken outputs this change created passed the full suite
+    and were caught by hand. And **the three new assets sat outside the
+    gate**, because `sources.py` has no kind for a file the maintainer
+    authored; `web/src/assets/seance/PROVENANCE.md` says so in as many
+    words and names the `authored` source kind that is owed.
+
     **Still to come, in order:** the
     reader-as-artist proposal (the spread, flavor text and art crops as
     real evidence in the commander pick, pool-resolved as ever); an ADR
