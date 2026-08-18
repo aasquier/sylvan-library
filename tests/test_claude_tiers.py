@@ -82,6 +82,56 @@ def test_the_roster_carries_prose_and_never_a_model_id():
         assert entry["label"] and entry["blurb"]
 
 
+# --------------------------------------------------------------- the labels
+
+def test_every_tier_labels_as_itself():
+    """The drift guard for a table that is deliberately *not* derived.
+
+    `label_for` prefix-matches families rather than reading `TIERS`, because a
+    ledger row can hold a model that is no tier at all and resolving those
+    through `get` would name them with the default tier. The cost of that
+    independence is that the two can disagree — so this asserts they do not.
+    """
+    for tier in tiers.TIERS:
+        assert tiers.label_for(tier.model) == tier.label, tier.model
+
+
+def test_a_model_outside_every_tier_still_gets_its_family_name():
+    """A fallback or an A/B can put one of these in the ledger. Naming the
+    family is honest; naming the tier it is not would be a lie."""
+    assert tiers.label_for("claude-haiku-4-5") == "Haiku"
+    assert tiers.label_for("claude-opus-4-8") == "Opus"
+    assert tiers.label_for("claude-mythos-5") == "Mythos"
+
+
+def test_an_unrecognised_model_is_named_vaguely_rather_than_wrongly():
+    """"Another Claude" is deliberately uninformative.
+
+    It pairs with the unpriced counter beside it on the Admin page: both mean
+    "this build does not know that model". The maintainer who needs the id has
+    `mtglab claude usage`, which prints it to their own terminal — the same
+    carve-out `mtglab users list` gets for printing an address.
+    """
+    assert tiers.label_for("claude-archaeopteryx-9") == "Another Claude"
+    assert tiers.label_for("") == "Another Claude"
+
+
+def test_an_aggregated_row_says_several():
+    """`ledger.summary` writes `(various)` into the axis it grouped away."""
+    assert tiers.label_for(tiers.VARIOUS) == "Several"
+
+
+def test_no_label_is_a_model_id():
+    """Commandment 10, asserted rather than trusted: nothing this function
+    returns may contain a version number or the word `claude-`."""
+    seen = [tiers.label_for(m) for m in
+            (*(t.model for t in tiers.TIERS), "claude-haiku-4-5",
+             tiers.VARIOUS, "claude-archaeopteryx-9")]
+    for label in seen:
+        assert "claude-" not in label.lower()
+        assert not any(ch.isdigit() for ch in label), label
+
+
 # ------------------------------------------------------------- the precedence
 
 def test_a_tier_chooses_the_model():

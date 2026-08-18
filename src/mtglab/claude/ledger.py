@@ -59,16 +59,40 @@ def record(*, mode: str, model: str, stop_reason: str, requests: int,
                      type(exc).__name__, exc)
 
 
-def summary(*, since: str | None = None,
+#: The axes a roll-up may group on. A tuple rather than "whatever the caller
+#: passes", because these names are interpolated into SQL: they are column
+#: names, which cannot be bound as parameters, so the safety has to come from
+#: the value never being caller-controlled in the first place.
+AXES: tuple[str, ...] = ("mode", "model")
+
+
+def summary(*, since: str | None = None, by: str = "mode",
             path: Path | str | None = None) -> list[dict[str, Any]]:
-    """Per-mode totals, most expensive mode first.
+    """Totals per `by`, most expensive first.
 
     `since` is an ISO-8601 instant compared against `created_at`, which is
     itself ISO-8601 UTC — string comparison is date comparison for free.
     Raises on a broken database: unlike `record`, this runs when somebody
     asked a question and a wrong silent answer would be worse than an error.
+
+    `by` is `'mode'` (which surface spent it) or `'model'` (which Claude spent
+    it) — the second being what per-account tiers made worth asking, and what
+    `claude/prices.py` needs to put a figure in dollars next to it. The column
+    has been there since schema v7; only the grouping is new.
+
+    Both axes come back with the same keys, and every row carries **both**
+    `mode` and `model`: grouping by one aggregates the other, so the field that
+    was not grouped on holds `'(various)'` rather than an arbitrary winner
+    picked by SQLite. A caller pricing a per-mode roll-up therefore gets
+    `unpriced` rather than a number computed from whichever model happened to
+    sort first, which would be wrong and would look right.
     """
-    query = ("SELECT mode,"
+    if by not in AXES:
+        raise ValueError(f"cannot group by {by!r} -- one of {AXES}")
+    other = "model" if by == "mode" else "mode"
+
+    query = (f"SELECT {by},"
+             f" '(various)' AS {other},"
              " count(*) AS conversations,"
              " sum(requests) AS requests,"
              " sum(input_tokens) AS input_tokens,"
@@ -81,7 +105,7 @@ def summary(*, since: str | None = None,
     if since is not None:
         query += " WHERE created_at >= ?"
         args = (since,)
-    query += " GROUP BY mode ORDER BY sum(input_tokens + output_tokens) DESC"
+    query += f" GROUP BY {by} ORDER BY sum(input_tokens + output_tokens) DESC"
 
     from mtglab.auth import db
     with db.connection(path) as con:

@@ -1470,15 +1470,26 @@ def cmd_claude_research(args):
 
 
 def cmd_claude_usage(args):
-    """Where the Claude money went, per mode, from the ledger in app.db.
+    """Where the Claude money went, from the ledger in app.db.
 
-    Tokens and not dollars, deliberately: prices move (Sonnet 5's introductory
-    rate ends 2026-08-31) and a stale hardcoded price table would turn an
-    honest count into a wrong invoice. The cached column is the exception that
-    proves it — those tokens were billed at roughly a tenth of the input rate,
-    which is worth saying because it is the number that justifies the cache.
+    **This prints dollars now, and that reverses what this docstring used to
+    say.** The old wording was "tokens and not dollars, deliberately: prices
+    move (Sonnet 5's introductory rate ends 2026-08-31) and a stale hardcoded
+    price table would turn an honest count into a wrong invoice." The objection
+    was right and still is; what changed (2026-08-18, Aaron's call) is that an
+    app which is free forever is one whose bill somebody has to watch, and an
+    imperfect answer beats none. `claude/prices.py` is the table, and every
+    part of its design answers that sentence rather than ignoring it — dated
+    rates, a modelled changeover for the very rate the objection named, and an
+    unknown model counted rather than priced at zero.
+
+    Two roll-ups, because they answer different questions: per mode is which
+    surface spent it, per model is on which Claude — the axis per-account
+    tiers made worth asking. Only the second is priced; pricing the first
+    would mean guessing a rate for rows that span models, and the guess would
+    look like arithmetic.
     """
-    from mtglab.claude import ledger
+    from mtglab.claude import ledger, prices
 
     since = f"{args.since}T00:00:00+00:00" if args.since else None
     rows = ledger.summary(since=since)
@@ -1487,25 +1498,48 @@ def cmd_claude_usage(args):
               + (f" since {args.since}" if args.since else "") + ".")
         return
 
-    print(f"\n  {'mode':<22} {'conv':>5} {'req':>5} "
-          f"{'tokens in':>11} {'tokens out':>11} {'cached':>11}")
-    for row in rows:
-        print(f"  {row['mode']:<22} {row['conversations']:>5} "
-              f"{row['requests']:>5} {row['input_tokens']:>11} "
-              f"{row['output_tokens']:>11} {row['cache_read_tokens']:>11}")
-    total_in = sum(r["input_tokens"] for r in rows)
-    total_out = sum(r["output_tokens"] for r in rows)
-    total_cached = sum(r["cache_read_tokens"] for r in rows)
-    print(f"  {'total':<22} {sum(r['conversations'] for r in rows):>5} "
-          f"{sum(r['requests'] for r in rows):>5} {total_in:>11} "
-          f"{total_out:>11} {total_cached:>11}")
+    def table(title: str, key: str, data):
+        # 34 wide: `theme-conversation:fortune-teller` is 32 characters, and a
+        # mode name carrying a persona is the longest thing this column holds.
+        # At 22 the numbers no longer lined up under their headings, which on
+        # a table whose whole job is comparison is not a cosmetic complaint.
+        print(f"\n  {title:<34} {'conv':>5} {'req':>5} "
+              f"{'tokens in':>11} {'tokens out':>11} {'cached':>11}")
+        for row in data:
+            print(f"  {row[key]:<34} {row['conversations']:>5} "
+                  f"{row['requests']:>5} {row['input_tokens']:>11} "
+                  f"{row['output_tokens']:>11} {row['cache_read_tokens']:>11}")
+        print(f"  {'total':<34} {sum(r['conversations'] for r in data):>5} "
+              f"{sum(r['requests'] for r in data):>5} "
+              f"{sum(r['input_tokens'] for r in data):>11} "
+              f"{sum(r['output_tokens'] for r in data):>11} "
+              f"{sum(r['cache_read_tokens'] for r in data):>11}")
+
+    table("mode", "mode", rows)
+
+    by_model = ledger.summary(since=since, by="model")
+    table("answered by", "model", by_model)
+
+    spend = prices.estimate(by_model)
+    print(f"\n  estimated {prices.render(spend.usd)} at list rates read "
+          f"{prices.CHECKED.isoformat()}.")
+    if not spend.complete:
+        # Said out loud rather than folded into the figure. A model with no
+        # rate contributes nothing, so a total printed without this is wrong
+        # downward and reads as reassuring.
+        unknown = ", ".join(spend.unpriced_models)
+        print(f"  {spend.unpriced} conversation(s) could not be priced -- no "
+              f"rate for {unknown}.\n  The figure above excludes them; add "
+              f"the rate in claude/prices.py.")
+
     print("\n  'cached' counts prompt cache reads, at ~a tenth of the input "
           "price. They sit\n  *beside* 'tokens in' rather than inside it -- "
           "the API reports 'tokens in' as\n  the uncached remainder only, so "
           "a conversation's whole prompt is the two\n  added together.")
     print("  Prompt cache *writes* bill at 1.25x input and are not recorded "
-          "at all, so\n  this table is a floor on the bill rather than the "
-          "bill.")
+          "at all, so\n  the figure is a floor on the bill rather than the "
+          "bill. It is an estimate from\n  list rates, not an invoice: "
+          f"{prices.SOURCE}")
     first = min(r["first_at"] for r in rows)
     last = max(r["last_at"] for r in rows)
     print(f"  counting {first[:10]} to {last[:10]}.\n")
@@ -2098,8 +2132,8 @@ def main(argv=None):
                          "derive one from)")
     cr.set_defaults(func=cmd_claude_research)
     cu = claude.add_parser("usage",
-                           help="what every mode has spent -- tokens, "
-                                "requests, and how much the cache saved")
+                           help="what every mode and model has spent -- "
+                                "tokens, requests, and an estimate in dollars")
     cu.add_argument("--since", metavar="YYYY-MM-DD",
                     help="count only conversations on or after this date")
     cu.set_defaults(func=cmd_claude_usage)

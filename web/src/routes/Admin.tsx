@@ -136,11 +136,36 @@ const WINDOWS = [
 ] as const
 type WindowKey = (typeof WINDOWS)[number]['key']
 
+/** The two axes of the ledger. Which surface spent it, and on which Claude —
+ *  the second being the question per-account tiers made worth asking. */
+const AXES = [
+  { key: 'by_mode', label: 'By mode', column: 'Mode' },
+  { key: 'by_model', label: 'By model', column: 'Answered by' },
+] as const
+type AxisKey = (typeof AXES)[number]['key']
+
+/** A dollar figure a person can read.
+ *
+ *  Sub-cent totals are the ordinary case on an instance this size, and `$0.00`
+ *  beside real conversations reads as "nothing happened" rather than as "not
+ *  very much" — the wrong lesson to draw from a bill that is working. Mirrors
+ *  `prices.render` in Python; the two are small enough that a shared
+ *  formatter would cost more than it saved, and a test pins the boundary. */
+function money(usd: number): string {
+  if (usd && Math.abs(usd) < 0.01) return `$${usd.toFixed(4)}`
+  return `$${usd.toLocaleString(undefined, { minimumFractionDigits: 2,
+                                             maximumFractionDigits: 2 })}`
+}
+
 function ClaudePanel({ claude }: { claude: AdminClaude }) {
   // `span`, not `window`: shadowing the global in a file that also calls
   // `window.setInterval` is a bug that reads as a typo.
   const [span, setSpan] = useState<WindowKey>('month')
-  const rows = claude.windows[span]
+  const [axis, setAxis] = useState<AxisKey>('by_mode')
+  const pane = claude.windows[span]
+  const rows = pane[axis]
+  const spend = pane.estimated_usd
+  const column = AXES.find((a) => a.key === axis)?.column ?? 'Mode'
   return (
     <div className="card-surface rounded-xl p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -158,6 +183,45 @@ function ClaudePanel({ claude }: { claude: AdminClaude }) {
           ))}
         </div>
       </div>
+
+      {/* The figure, and its two honesty clauses. Estimated from list rates a
+          person read on a date, never from an invoice — and a conversation
+          whose model carries no rate is counted here rather than quietly
+          contributing nothing, which is what would make the total read low
+          and reassuring. */}
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-2xl font-semibold tabular-nums">
+          {money(spend.usd)}
+        </span>
+        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          estimated, at list rates read {spend.checked}
+        </span>
+      </div>
+      {/* The ids that could not be priced are deliberately *not* named here.
+          They are model ids, which this page does not render — and the
+          maintainer who needs one has `mtglab claude usage`, which prints it
+          to their own terminal. That is the same carve-out `mtglab users list`
+          gets for printing an address: a terminal is not a screen. */}
+      {!spend.complete && (
+        <p className="mt-1 text-[11px]" style={{ color: 'var(--status-warning)' }}>
+          {spend.unpriced.toLocaleString()} conversation
+          {spend.unpriced === 1 ? '' : 's'} could not be priced — the figure
+          above excludes them. Run <code>mtglab claude usage</code> to see
+          which Claude answered them.
+        </p>
+      )}
+
+      <div className="mt-3 flex gap-1">
+        {AXES.map((a) => (
+          <button key={a.key} type="button"
+                  onClick={() => setAxis(a.key)}
+                  className={`chip-toggle rounded-md px-2.5 py-1 text-xs font-medium${
+                    axis === a.key ? ' is-on' : ''}`}>
+            {a.label}
+          </button>
+        ))}
+      </div>
+
       {rows.length === 0 ? (
         <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
           No conversations recorded in this window.
@@ -168,7 +232,7 @@ function ClaudePanel({ claude }: { claude: AdminClaude }) {
             <thead>
               <tr className="text-[11px] uppercase tracking-wide"
                   style={{ color: 'var(--text-muted)' }}>
-                <th className="pb-2 pr-4 font-medium">Mode</th>
+                <th className="pb-2 pr-4 font-medium">{column}</th>
                 <th className="pb-2 pr-4 font-medium">Conversations</th>
                 <th className="pb-2 pr-4 font-medium">Requests</th>
                 <th className="pb-2 pr-4 font-medium">Tokens in</th>
@@ -177,9 +241,15 @@ function ClaudePanel({ claude }: { claude: AdminClaude }) {
               </tr>
             </thead>
             <tbody>
+              {/* Keyed on the id, rendered as the label: two ids that share a
+                  name are still two rows, and React needs the distinction even
+                  where the reader does not. */}
               {rows.map((row) => (
-                <tr key={row.mode} style={{ borderTop: '1px solid var(--hairline)' }}>
-                  <td className="py-1.5 pr-4 font-medium">{row.mode}</td>
+                <tr key={axis === 'by_mode' ? row.mode : row.model}
+                    style={{ borderTop: '1px solid var(--hairline)' }}>
+                  <td className="py-1.5 pr-4 font-medium">
+                    {axis === 'by_mode' ? row.mode : row.model_label}
+                  </td>
                   <td className="py-1.5 pr-4 tabular-nums">{row.conversations.toLocaleString()}</td>
                   <td className="py-1.5 pr-4 tabular-nums">{row.requests.toLocaleString()}</td>
                   <td className="py-1.5 pr-4 tabular-nums">{row.input_tokens.toLocaleString()}</td>
@@ -193,7 +263,7 @@ function ClaudePanel({ claude }: { claude: AdminClaude }) {
       )}
       <p className="mt-3 text-[11px] leading-relaxed"
          style={{ color: 'var(--text-muted)' }}>
-        {claude.caveat}{' '}
+        {claude.caveat}{' '}{claude.prices.note}{' '}
         The{' '}
         <a href="https://console.anthropic.com/settings/usage"
            target="_blank" rel="noreferrer"
