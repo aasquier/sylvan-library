@@ -62,8 +62,9 @@ const NAV = [
 // Appended for admins only. Hiding it is a courtesy — every route the page
 // calls is refused to anybody else by the middleware, before routing (ADR 17),
 // so this decides what is offered and never what is allowed.
-const ADMIN_NAV = { to: '/admin', label: 'Accounts', end: false,
-                    hint: 'Invites, accounts, and the instance’s levers' }
+const ADMIN_NAV = { to: '/admin', label: 'Admin', end: false,
+                    hint: 'The instance at a glance — and invites, accounts, '
+                        + 'and the levers' }
 
 // The two doors that create a deck, and they are shown to everybody.
 //
@@ -191,7 +192,7 @@ export default function App() {
   }, [refreshAuth])
 
   // A 401 anywhere means the session ended under us — expired, revoked from the
-  // Accounts page, or signed out in another tab. Re-ask rather than assume:
+  // Admin page, or signed out in another tab. Re-ask rather than assume:
   // `me` is public, so it answers when nothing else will, and it distinguishes
   // "logged out" from "this instance stopped requiring a login".
   useEffect(() => onSessionLost(() => { void refreshAuth() }), [refreshAuth])
@@ -238,7 +239,7 @@ export default function App() {
   }
 
   // Library first, then the authoring doors — everybody has somewhere to put a
-  // deck now — then the rest, then Accounts for an admin.
+  // deck now — then the rest, then Admin for an admin.
   // `NAV.slice(0, 1)` and not `NAV[0]`: a slice of a known array is still
   // `NavItem[]`, whereas indexing one is `NavItem | undefined`, which spreads
   // that `undefined` into the element type and makes every field read in the

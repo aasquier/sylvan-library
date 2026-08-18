@@ -31,6 +31,10 @@ vi.mock('../lib/api', async () => {
       revokeSessions: vi.fn(),
       deleteAccount: vi.fn(),
       me: vi.fn(),
+      adminSystem: vi.fn(),
+      adminStorage: vi.fn(),
+      adminClaude: vi.fn(),
+      adminActivity: vi.fn(),
     },
   }
 })
@@ -69,6 +73,43 @@ beforeEach(() => {
     authenticated: true,
     is_admin: true,
     user: { id: 4, username: 'root', is_admin: true },
+  })
+  // The dashboard asks all four on mount. Answers with data in them so the
+  // tests below can also assert the tiles render what the box reported.
+  vi.mocked(api.adminSystem).mockResolvedValue({
+    process: { bytes: 120 * 1024 * 1024, kind: 'current' },
+    memory: { total_bytes: 1024 ** 3, available_bytes: 512 * 1024 ** 2 },
+    load: [0.12, 0.2, 0.25],
+    cpus: 1,
+    disk: { path: '/data', total_bytes: 10 * 1024 ** 3,
+            used_bytes: 4 * 1024 ** 3, free_bytes: 6 * 1024 ** 3 },
+  })
+  vi.mocked(api.adminStorage).mockResolvedValue({
+    app_db_bytes: 2 * 1024 ** 2,
+    pool_bytes: null,
+    scryfall_bulk_bytes: null,
+    cache_bytes: 3 * 1024 ** 2,
+    cache: { symbols_bytes: 1024, cardmotion_bytes: null },
+    decks: { count: 7, bytes: 90 * 1024, trashed: 1 },
+  })
+  vi.mocked(api.adminClaude).mockResolvedValue({
+    windows: {
+      week: [],
+      month: [{ mode: 'dossier', conversations: 2, requests: 6,
+                input_tokens: 2000, output_tokens: 400,
+                cache_read_tokens: 800,
+                first_at: '2026-08-10T00:00:00+00:00',
+                last_at: '2026-08-17T00:00:00+00:00' }],
+      all: [],
+    },
+    caveat: 'Token counts are a floor on the bill, not the bill.',
+  })
+  vi.mocked(api.adminActivity).mockResolvedValue({
+    accounts: { active: 2 },
+    sessions: { total: 3, seen_day: 1, seen_week: 2 },
+    deck_edits_by_day: [{ day: '2026-08-17', edits: 4 }],
+    sim_cache_rows: 12,
+    jobs: { running: 1 },
   })
 })
 
@@ -333,5 +374,46 @@ describe('the rule that does not bend', () => {
       const described = `${input.name} ${input.placeholder} ${input.getAttribute('aria-label') ?? ''}`
       expect(described.toLowerCase()).not.toContain('password')
     }
+  })
+})
+
+describe('the dashboard', () => {
+  it('wears the masthead and renders what the box reported', async () => {
+    render(<Admin />)
+    await screen.findByText('root')
+
+    // The rename: the page is Admin now, and the masthead owns the h1.
+    expect(screen.getByRole('heading', { level: 1, name: 'Admin' })).toBeTruthy()
+    expect(screen.getByText(/Minttu Hynninen/)).toBeTruthy()
+
+    // A present store is sized, an absent one is an em-dash — never a zero.
+    expect(await screen.findByText('120 MB')).toBeTruthy()
+    const poolTile = screen.getByText('Card pool').closest('div') as HTMLElement
+    expect(within(poolTile).getByText('—')).toBeTruthy()
+    const decksTile = screen.getByText('Decks on the volume')
+      .closest('div') as HTMLElement
+    expect(within(decksTile).getByText('7')).toBeTruthy()
+  })
+
+  it('shows the ledger with its caveat riding along', async () => {
+    render(<Admin />)
+    await screen.findByText('root')
+
+    // The month window is the default and holds the one recorded mode.
+    expect(await screen.findByText('dossier')).toBeTruthy()
+    expect(screen.getByText('2,000')).toBeTruthy()
+    // The caveat is the server's sentence, rendered, not paraphrased away.
+    expect(screen.getByText(/floor on the bill/)).toBeTruthy()
+
+    // Switching windows re-reads the same payload — an empty one says so.
+    fireEvent.click(screen.getByText('7 days'))
+    expect(await screen.findByText(/No conversations recorded/)).toBeTruthy()
+  })
+
+  it('reports the job registry as counts, never labels', async () => {
+    render(<Admin />)
+    await screen.findByText('root')
+
+    expect(await screen.findByText('1 running')).toBeTruthy()
   })
 })

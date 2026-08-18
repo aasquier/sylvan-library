@@ -545,6 +545,63 @@ export interface AccountList {
   admins: number
 }
 
+/** `GET /api/admin/stats/system` — the process and the box, self-reported.
+ *
+ * `process.kind` is the honesty flag: `current` comes from the kernel's own
+ * per-process accounting (the deployed case), `peak` from the high-water
+ * mark that is all the dev Mac can report — a peak shown as a level would
+ * read as a leak. */
+export interface AdminSystem {
+  process: { bytes: number; kind: 'current' | 'peak' }
+  memory: { total_bytes: number | null; available_bytes: number | null }
+  load: number[]
+  cpus: number | null
+  disk: { path: string; total_bytes: number; used_bytes: number
+          free_bytes: number }
+}
+
+/** `GET /api/admin/stats/storage`. Null means "nothing there yet" — a fresh
+ *  instance has no pool, and that is different from a present, empty one. */
+export interface AdminStorage {
+  app_db_bytes: number | null
+  pool_bytes: number | null
+  scryfall_bulk_bytes: number | null
+  cache_bytes: number | null
+  cache: { symbols_bytes: number | null; cardmotion_bytes: number | null }
+  decks: { count: number; bytes: number | null; trashed: number }
+}
+
+/** One mode's ledger roll-up (`claude/ledger.py`): counters, a mode name,
+ *  and nothing that could name a person, a deck or a question. */
+export interface ClaudeUsageRow {
+  mode: string
+  conversations: number
+  requests: number
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  first_at: string
+  last_at: string
+}
+
+/** `GET /api/admin/stats/claude`. The caveat rides with the numbers because
+ *  they are a floor on the bill, and any surface that shows one without the
+ *  other is quoting a cached number as fresh, one abstraction over. */
+export interface AdminClaude {
+  windows: { week: ClaudeUsageRow[]; month: ClaudeUsageRow[]
+             all: ClaudeUsageRow[] }
+  caveat: string
+}
+
+/** `GET /api/admin/stats/activity`. Counts all the way down. */
+export interface AdminActivity {
+  accounts: Record<string, number>
+  sessions: { total: number; seen_day: number; seen_week: number }
+  deck_edits_by_day: { day: string; edits: number }[]
+  sim_cache_rows: number
+  jobs: Record<string, number>
+}
+
 /** `POST /api/auth/login`. The session is the cookie; this is who it belongs to. */
 export interface LoginResult {
   user: { id: number; username: string; is_admin: boolean }
@@ -597,7 +654,7 @@ export class ApiError extends Error {
 
 /**
  * A 401 from anywhere means the session ended under us — expired, revoked from
- * the Accounts page, or signed out in another tab.
+ * the Admin page, or signed out in another tab.
  *
  * Handled here rather than in each route, and that is the same argument
  * `api/auth.py` makes for a middleware over a per-route dependency: eleven
@@ -1680,6 +1737,10 @@ export const api = {
   // routing (ADR 17). Hiding the nav entry is a courtesy to the person using
   // the app, never the protection — a 403 is what actually stops anybody.
   accounts: () => get<AccountList>('/api/admin/users'),
+  adminSystem: () => get<AdminSystem>('/api/admin/stats/system'),
+  adminStorage: () => get<AdminStorage>('/api/admin/stats/storage'),
+  adminClaude: () => get<AdminClaude>('/api/admin/stats/claude'),
+  adminActivity: () => get<AdminActivity>('/api/admin/stats/activity'),
   inviteAccount: (body: { email: string; username?: string; is_admin?: boolean }) =>
     post<Account>('/api/admin/users', body),
   // One route for both levers, and both refusals come from the server: the

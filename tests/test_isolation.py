@@ -192,6 +192,10 @@ ADMIN = {
                                    "and deletes an account outright",
     "/api/admin/users/{username}/reset": "mails somebody a password link",
     "/api/admin/users/{username}/sessions": "signs an account out everywhere",
+    "/api/admin/stats/system": "the process, memory and volume of the box",
+    "/api/admin/stats/storage": "what every store on the volume weighs",
+    "/api/admin/stats/claude": "where the instance's Claude tokens went",
+    "/api/admin/stats/activity": "accounts, sessions and edits across time",
 }
 
 # The one place `include_email=True` is allowed to appear, now that ADR 17 has

@@ -339,3 +339,26 @@ export function DataTable<Row extends object>({
   )
 }
 
+
+/* ---------------------------------------------------------- deck edits */
+
+/** The admin dashboard's one chart: edits to decks per day, last thirty.
+ *  Counts of events over days — a bar per day, one hue, no legend. */
+export function EditsChart({ rows }: { rows: { day: string; edits: number }[] }) {
+  // "08-18" is enough on an axis whose window is thirty days.
+  const data = rows.map((r) => ({ day: r.day.slice(5), edits: r.edits }))
+  return (
+    <ResponsiveContainer width="100%" height={160}>
+      <BarChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: -18 }}>
+        <CartesianGrid stroke={GRID} vertical={false} />
+        <XAxis dataKey="day" tick={AXIS} axisLine={{ stroke: 'var(--baseline)' }}
+               tickLine={false} />
+        <YAxis tick={AXIS} axisLine={false} tickLine={false} allowDecimals={false} />
+        <Tooltip content={<TooltipBox />}
+                 cursor={{ fill: 'var(--gridline)', opacity: 0.4 }} />
+        <Bar dataKey="edits" name="Edits" fill="var(--seq-450)"
+             radius={[4, 4, 0, 0]} maxBarSize={28} />
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
