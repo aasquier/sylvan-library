@@ -1,0 +1,67 @@
+# The skull's dead, made of real smoke (Aaron, 2026-08-17 round three:
+# "the ghosts need work, can we find any photos or something more
+# real?"). Drawn ghost silhouettes read as decoration; these are
+# photographs of actual smoke on true black — the one subject that
+# needs no matte at all, because the render composites them in screen
+# blend and black simply vanishes. A duotone lays the grave's green on
+# them so all three rise in the skull's own palette.
+animist: 1
+
+why_committed:
+  Both plates are CC0 by rawpixel's dedication, so the graded crops are
+  clean to commit; and the dead should not fail to rise because a CDN
+  moved.
+
+sources:
+  breath:
+    provider: openverse
+    identifier: 574287c9-2573-477c-a4f0-e3731d8a200d
+    title: "Smoke black background"
+    landing: https://www.rawpixel.com/search?page=1&q=smoke%20black%20background
+    found_via: >
+      Openverse with a license=cc0 filter, searching `smoke black
+      background`; a single rising column that folds at its crown like
+      a veiled figure
+    licence: CC0-1.0
+
+  shade:
+    provider: openverse
+    identifier: 20180b64-1a6e-4fdb-8d74-50c10bc8aacd
+    title: "Smoke black background"
+    landing: https://www.rawpixel.com/search?page=1&q=smoke%20black%20background
+    found_via: >
+      the same Openverse search; dense smoke whose central swirl reads
+      as a head over a trailing body, which is as much ghost as any
+      photograph honestly holds
+    licence: CC0-1.0
+
+outputs:
+  # The tall one: a single column, folded crown.
+  - file: wheel-shade-1.webp
+    from: breath
+    ops:
+      - crop: {frac_box: [0.35, 0.02, 0.75, 0.98]}
+      - duotone: {shadow: "#000000", mid: "#4d7a58", light: "#d8f0dc"}
+      - resize: {width: 160}
+    encode: {format: webp, quality: 82}
+    expect: {width: 160, height: 256, budget_kb: 30, metadata: none}
+
+  # The one with the head.
+  - file: wheel-shade-2.webp
+    from: shade
+    ops:
+      - crop: {frac_box: [0.30, 0.0, 0.78, 0.95]}
+      - duotone: {shadow: "#000000", mid: "#4d7a58", light: "#d8f0dc"}
+      - resize: {width: 180}
+    encode: {format: webp, quality: 82}
+    expect: {width: 180, height: 237, budget_kb: 30, metadata: none}
+
+  # The thin trailing one off the same plate's left edge.
+  - file: wheel-shade-3.webp
+    from: shade
+    ops:
+      - crop: {frac_box: [0.0, 0.12, 0.32, 1.0]}
+      - duotone: {shadow: "#000000", mid: "#4d7a58", light: "#d8f0dc"}
+      - resize: {width: 150}
+    encode: {format: webp, quality: 82}
+    expect: {width: 150, height: 274, budget_kb: 30, metadata: none}

@@ -276,6 +276,14 @@ export interface WheelSpin {
   symbol: 'cup' | 'heart' | 'sword' | 'skull' | null
   label?: string
   meaning?: string
+  /** The cup's second landing: which way the coin fell. */
+  coin?: 'heads' | 'tails'
+  /** The heart's second landing: whole, or broken. */
+  heart_face?: 'whole' | 'broken'
+  /** The sword's second landing: which way the winning blade presents. */
+  sword_face?: 'edge' | 'hilt'
+  /** The skull's second landing: the grave takes, or gives back. */
+  skull_face?: 'buried' | 'risen'
   seed?: number
   answered_by?: string
   caveat?: string

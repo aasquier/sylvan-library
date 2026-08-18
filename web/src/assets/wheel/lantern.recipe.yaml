@@ -1,0 +1,46 @@
+# The fortune-teller's lantern (Aaron, 2026-08-17: "what if the robed
+# figure just had it in their left hand that isn't doing anything...
+# then it could cast some light" -- "think old school, like a candle lit
+# lantern. Like what the Hermit is holding on the tarot card").
+#
+# The Hermit's lantern is the brief, and this plate is nearly it: a
+# candle burning in a star-pierced metal lantern, photographed at night
+# -- the RWS Hermit holds a lantern with a star shining inside it, and
+# this one wears its stars on every pane. The handle bars run off the
+# top of the photograph, which is exactly right for a held lantern:
+# they vanish into the painted hand that holds it. The stained-glass
+# light Aaron asked for lives in the render -- the CSS glow pools in
+# jewel tones, the way candlelight through coloured panes lands.
+# (A true stained-glass candle lantern was hunted for and CC0 holds
+# none; the star-pierced one is the more Hermit-accurate shape anyway.)
+animist: 1
+
+why_committed: >
+  CC0 by rawpixel's dedication, so the cutout is clean to commit, and
+  the beetle's rule holds again: a lantern that goes dark when a CDN
+  moves would be the wrong kind of omen.
+
+sources:
+  lantern:
+    provider: openverse
+    identifier: 8a07d68a-7c7c-4e9b-a19e-e6b6691f1a42
+    title: "Burning candle lantern night"
+    landing: https://www.rawpixel.com/image/6039984/photo-image-light-public-domain-free
+    found_via: >
+      Openverse with a license=cc0 filter, searching `candle lantern`;
+      the one plate in the results that is a real candle burning in a
+      real hand-lantern rather than an electric fixture, and the
+      star-pierced panes answer the Hermit's own star
+    licence: CC0-1.0
+
+outputs:
+  # The lantern whole, chimney to foot, with the handle bars running
+  # off the top edge. Edges are feathered at render time by a CSS mask
+  # so the night around it melts into the cloak's shadow.
+  - file: wheel-lantern.webp
+    from: lantern
+    ops:
+      - crop: {frac_box: [0.10, 0.0, 0.545, 0.95]}
+      - resize: {width: 150}
+    encode: {format: webp, quality: 84}
+    expect: {width: 150, height: 213, budget_kb: 30, metadata: none}

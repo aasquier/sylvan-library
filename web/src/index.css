@@ -2335,12 +2335,89 @@ button:hover .tarot-fan-card {
 .wheel-rim {
   border-radius: 9999px;
   pointer-events: none;
-  box-shadow:
-    inset 0 0 0 3px rgba(44, 29, 12, 0.66),
-    inset 0 0 0 4.5px rgba(198, 156, 78, 0.36),
-    inset 6px 6px 18px rgba(0, 0, 0, 0.34),
-    inset -3px -3px 12px rgba(255, 226, 168, 0.12),
-    0 1px 7px rgba(0, 0, 0, 0.34);
+  /* Third cut (Aaron, three rulings): flat box-shadow rings read as
+     vector work, and a textured iron band "clashes" — the rim must not
+     be an OBJECT at all. So it is now only what the painting implies:
+     the wheel's edge falling into the recess it is mounted in — a soft
+     dark band, deeper toward the outside, kissed by the scene's own
+     upper-left light, with no line anywhere a pen could have drawn.
+     Still opaque across the cutout's whole feather, which was the
+     band's original job. */
+  background:
+    /* the recess itself: concentric, soft, deeper toward the outside —
+       and opaque enough past 93% to keep doing the seam's work */
+    radial-gradient(circle closest-side,
+      transparent 87%, rgba(42, 30, 18, 0.4) 90.5%,
+      rgba(28, 20, 12, 0.78) 94%, rgba(20, 14, 8, 0.92) 98%,
+      rgba(20, 14, 8, 0.85) 99.5%, transparent 100%),
+    /* the scene's light lying unevenly on it — a conic, because moving
+       a radial's centre bends the band into a crescent */
+    conic-gradient(from 300deg,
+      rgba(255, 226, 168, 0.06) 0deg, transparent 70deg,
+      transparent 150deg, rgba(0, 0, 0, 0.12) 205deg,
+      transparent 300deg, rgba(255, 226, 168, 0.06) 360deg);
+  mask-image: radial-gradient(circle closest-side,
+    transparent 87%, #000 90.5%, #000 99.5%, transparent 100%);
+  -webkit-mask-image: radial-gradient(circle closest-side,
+    transparent 87%, #000 90.5%, #000 99.5%, transparent 100%);
+}
+
+/* Light walks the rim: one warm highlight strolling the ring on a slow
+   cycle, and hurrying while the planks turn — the same lap the pawl's
+   clicks take. A conic gradient masked to the band, turned with the
+   `rotate` property so the mask itself never moves. */
+.wheel-rim::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(255, 216, 150, 0.04) 30deg,
+    rgba(255, 226, 168, 0.22) 52deg,
+    rgba(255, 216, 150, 0.04) 74deg,
+    transparent 104deg 360deg
+  );
+  mask-image: radial-gradient(circle closest-side,
+    transparent 88%, #000 92%, #000 99%, transparent 100%);
+  -webkit-mask-image: radial-gradient(circle closest-side,
+    transparent 88%, #000 92%, #000 99%, transparent 100%);
+  /* Barely there at rest (Aaron's ruling): the walk is felt more than
+     seen, and only the spin brightens it. */
+  opacity: 0.45;
+  animation: wheel-rim-glint 23s linear infinite;
+}
+
+.wheel-rim.is-spinning::after {
+  opacity: 1;
+  animation-duration: 3.8s;
+  animation-timing-function: cubic-bezier(0.12, 0.55, 0.08, 1);
+}
+
+@keyframes wheel-rim-glint {
+  from { rotate: 0deg; }
+  to { rotate: 360deg; }
+}
+
+/* (The visible studs were tried and ditched -- the pawl still
+   clicks over them in the sound; the eye takes the painter's word
+   for it.) */
+/* The idle nudge (Aaron: the arm "could pivot a little and spin the
+   wheel so to speak"). Every twenty-one seconds the hand draws back and
+   gives the rim a push; the wheel takes a few degrees, the pawl holds,
+   and it rocks back into its notch. Animated on the `rotate` property
+   so it composes with the landing rotation the inline transform holds —
+   and gated off while a real spin runs. */
+.wheel-disc:not(.is-spinning) {
+  animation: wheel-disc-nudge 21s ease-in-out infinite;
+}
+
+@keyframes wheel-disc-nudge {
+  0%, 90% { rotate: 0deg; }
+  93.5% { rotate: 3.4deg; }
+  96% { rotate: 2.7deg; }
+  100% { rotate: 0deg; }
 }
 
 /* ── the wheel lives (Aaron, 2026-08-17) ──────────────────────────────────
@@ -2387,6 +2464,564 @@ button:hover .tarot-fan-card {
   animation-delay: -13s;
 }
 
+/* Moonlight from the corner (Aaron, 2026-08-17): one silver shaft out
+   of the upper right, crossing the trunk toward the figure, guttering
+   as clouds cross a moon the frame never shows. Colder and bluer than
+   the green-grey rays — two lights from two skies. */
+.wheel-moon {
+  position: absolute;
+  top: -14%;
+  right: -8%;
+  width: 40%;
+  height: 125%;
+  pointer-events: none;
+  transform: rotate(-19deg);
+  transform-origin: 100% 0;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    255deg,
+    rgba(196, 214, 246, 0) 6%,
+    rgba(196, 214, 246, 0.22) 30%,
+    rgba(214, 228, 252, 0.32) 46%,
+    rgba(196, 214, 246, 0.18) 64%,
+    rgba(196, 214, 246, 0) 88%
+  );
+  filter: blur(7px);
+  animation: moon-gutter 13s ease-in-out infinite;
+}
+
+/* The glow the shaft falls from: a cold pool in the very corner. */
+.wheel-moonglow {
+  position: absolute;
+  top: -6%;
+  right: -5%;
+  width: 34%;
+  height: 30%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    ellipse 60% 70% at 82% 12%,
+    rgba(224, 234, 255, 0.5) 0%,
+    rgba(200, 216, 248, 0.22) 45%,
+    transparent 78%
+  );
+  filter: blur(4px);
+  animation: moon-gutter 13s ease-in-out infinite;
+}
+
+/* Clouds cross the moon: long steadiness, a slow dim, one quick
+   flicker as a ragged edge clears, back to steady. */
+@keyframes moon-gutter {
+  0%, 34%, 100% { opacity: 0.9; }
+  46% { opacity: 0.45; }
+  55% { opacity: 0.68; }
+  58% { opacity: 0.38; }
+  62% { opacity: 0.85; }
+  78% { opacity: 0.62; }
+}
+
+/* The dead wood stirs: the whole pale curtain leans a breath together,
+   planted at the roots — under everything that lives in front of it. */
+.wheel-forest {
+  animation: wheel-forest-stir 23s ease-in-out infinite;
+}
+
+@keyframes wheel-forest-stir {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  30% { transform: rotate(0.28deg) scale(1.002); }
+  55% { transform: rotate(-0.16deg) scale(1); }
+  80% { transform: rotate(0.1deg) scale(1.001); }
+}
+
+/* The pool breathes: the blue-grey wash under the roots slides a pixel
+   and settles, the way standing water answers moving air. */
+.wheel-pool {
+  animation: wheel-pool-breathe 9s ease-in-out infinite;
+}
+
+@keyframes wheel-pool-breathe {
+  0%, 100% { transform: translateX(0) scaleY(1); }
+  28% { transform: translateX(0.35%) scaleY(1.012); }
+  52% { transform: translateX(-0.2%) scaleY(0.995); }
+  76% { transform: translateX(0.25%) scaleY(1.008); }
+}
+
+/* And a glint walks it: one soft streak of the moon's silver crossing
+   the water on a slow lap. */
+.wheel-pool-glint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 88%;
+  bottom: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    97deg,
+    transparent 20%,
+    rgba(210, 224, 248, 0.28) 46%,
+    rgba(226, 236, 252, 0.4) 50%,
+    rgba(210, 224, 248, 0.28) 54%,
+    transparent 80%
+  );
+  background-size: 300% 100%;
+  filter: blur(3px);
+  animation: pool-glint-walk 17s ease-in-out infinite;
+}
+
+@keyframes pool-glint-walk {
+  0%, 12% { background-position: 130% 0; opacity: 0; }
+  22% { opacity: 0.75; }
+  50% { background-position: 20% 0; opacity: 0.55; }
+  74% { opacity: 0.8; }
+  88%, 100% { background-position: -60% 0; opacity: 0; }
+}
+
+/* The Hermit's lantern in the idle hand (lantern.recipe.yaml): hung
+   from the cloak's near side, swinging a few degrees on the figure's
+   own breath — the pivot sits above the frame, where the painted hand
+   would hold it. */
+/* The anchor is scene-sized and breathes exactly as the figure's copy
+   does — same keyframes, same origin, same clock — which is what makes
+   the lantern part of the figure instead of a sticker in front of one. */
+.wheel-lantern-anchor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform-origin: 16% 84%;
+  animation: wheel-figure-breathe 12.4s ease-in-out infinite;
+}
+
+.wheel-lantern-rig {
+  position: absolute;
+  /* Position settled with Aaron's eye live, 2026-08-17: the rig's TOP
+     is the painted hand below the cowl's opening, and everything hangs
+     from there — chain first, lantern under it, swinging as one
+     pendulum about the grip. */
+  left: 21.8%;
+  top: 45%;
+  width: 8.2%;
+  height: 22.5%;
+  pointer-events: none;
+  transform-origin: 36% 0;
+  animation: lantern-sway 5.9s ease-in-out infinite;
+}
+
+/* The chain: alternating light-catching and shadowed links, two beats
+   per link, from the grip to the loop. At this size the eye reads
+   "chain" from the rhythm alone. */
+.wheel-chain {
+  position: absolute;
+  left: 34.5%;
+  top: -2%;
+  width: 3.5%;
+  height: 38%;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(224, 200, 156, 0.95) 0px, rgba(224, 200, 156, 0.95) 1.5px,
+    rgba(52, 38, 20, 0.95) 1.5px, rgba(52, 38, 20, 0.95) 3.5px
+  );
+  border-radius: 2px;
+  filter: drop-shadow(1px 1px 1px rgba(20, 12, 6, 0.6));
+}
+
+@keyframes lantern-sway {
+  0%, 100% { transform: rotate(0deg); }
+  26% { transform: rotate(1.7deg); }
+  50% { transform: rotate(-0.3deg); }
+  74% { transform: rotate(-1.5deg); }
+}
+
+.wheel-lantern {
+  display: block;
+  position: absolute;
+  top: 35%;
+  width: 100%;
+  /* The photo's lantern leans a couple of degrees, and its body sits
+     right of its own chimney; the rotate squares it and the skew
+     slides the body back under the hang point. Slightly faded so it
+     sits IN the painting's light rather than on top of it. */
+  rotate: -2.5deg;
+  transform: skewX(-6.5deg);
+  opacity: 0.8;
+  /* An OBJECT, not a glow: the mask keeps the lantern's whole metal
+     frame and the handle line running up toward the unseen hand, and
+     feathers only the last edge of night around it. */
+  /* The mask experiments are over: every ellipse either amputated the
+     roof or dragged night onto the robe. The lantern is a simple
+     geometric object, so its silhouette is a polygon — chimney, roof
+     plateau, both eaves, tapered body — and clip-path cuts exactly
+     that, crisp as a held thing should be, with nothing left to
+     interact with the robe at all. */
+  clip-path: polygon(
+    27% 1%, 46% 1%, 46% 13%, 57% 16%, 97% 29.5%, 91% 34%,
+    88.5% 90%, 84% 97%, 20% 97%, 15.5% 90%, 11% 34%, 2% 31%,
+    19% 16%, 27% 13%
+  );
+  /* Separation from the robe: the candle rims its own housing, so a
+     thin warm edge-light runs the silhouette and lifts the iron off
+     the red — values were so close the object kept sinking in. */
+  filter: brightness(1.1)
+    drop-shadow(0 0 1.5px rgba(255, 214, 130, 0.9))
+    drop-shadow(2px 3px 3px rgba(30, 10, 6, 0.6));
+}
+
+/* What the candle throws: an amber pool with jewel tones bedded in it —
+   candlelight through coloured panes — guttering the way a flame does,
+   quick small failures and recoveries, never a metronome. */
+.wheel-lantern-light {
+  position: absolute;
+  /* Centred on the lantern (a quarter down the rig, under the chain),
+     biased DOWNWARD: a candle throws its light below itself, so the
+     pool falls past the hem toward the roots instead of sitting on
+     the robe like a pinned glow. */
+  inset: 0% -190% -115%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(ellipse 38% 30% at 50% 34%,
+      rgba(255, 210, 126, 0.85) 0%, rgba(255, 186, 96, 0.44) 48%,
+      transparent 80%),
+    radial-gradient(ellipse 56% 42% at 50% 62%,
+      rgba(255, 194, 108, 0.55) 0%, transparent 78%),
+    radial-gradient(ellipse 16% 13% at 36% 52%,
+      rgba(214, 88, 74, 0.34) 0%, transparent 70%),
+    radial-gradient(ellipse 14% 12% at 64% 56%,
+      rgba(96, 178, 128, 0.3) 0%, transparent 70%),
+    radial-gradient(ellipse 14% 11% at 52% 72%,
+      rgba(96, 128, 208, 0.28) 0%, transparent 70%);
+  filter: blur(4px);
+  animation: lantern-gutter 2.3s ease-in-out infinite;
+}
+
+@keyframes lantern-gutter {
+  0%, 100% { opacity: 0.95; }
+  17% { opacity: 0.78; }
+  26% { opacity: 0.99; }
+  43% { opacity: 0.85; }
+  58% { opacity: 1; }
+  71% { opacity: 0.72; }
+  82% { opacity: 0.93; }
+}
+
+/* The knot-hole and its tenant (Aaron: "a good hole in the tree on the
+   upper right for some creature to poke out of"). The hollow clips at
+   its own lip; the python inside spends most of the cycle home in the
+   dark — eyes catching the moonlight — then leans out, tastes the air,
+   and pours back in. Both animations run the same forty seconds, which
+   is the whole synchronisation mechanism: the eyes go dark exactly as
+   the head comes out. */
+.wheel-hollow {
+  position: absolute;
+  /* Sits over the knot Gelon actually painted into the right trunk —
+     the pocket below deepens HIS hole rather than digging a second
+     one beside it. */
+  left: 86.5%;
+  top: 0.5%;
+  width: 11.5%;
+  height: 19.5%;
+  pointer-events: none;
+  overflow: hidden;
+  /* Feather the clip itself: whatever the wrapper cuts fades into the
+     trunk instead of ending on a straight edge. */
+  mask-image: radial-gradient(ellipse 52% 52% at 52% 52%,
+    #000 58%, transparent 94%);
+  -webkit-mask-image: radial-gradient(ellipse 52% 52% at 52% 52%,
+    #000 58%, transparent 94%);
+}
+
+/* The hole itself, deepened: a pocket of true dark at the wrapper's
+   foot for the head to rise out of and the eyes to burn in. */
+.wheel-hollow::before {
+  content: '';
+  position: absolute;
+  left: 26%;
+  right: 4%;
+  top: 50%;
+  bottom: 4%;
+  border-radius: 50% 50% 42% 46% / 60% 55% 40% 45%;
+  background: radial-gradient(ellipse 60% 55% at 50% 60%,
+    rgba(8, 9, 6, 0.85) 0%, rgba(12, 13, 9, 0.55) 60%, transparent 95%);
+}
+
+/* Three watchers take turns at the hole, on one shared minute: small
+   amber eyes low in the dark, wide-set green ones higher, and a narrow
+   cold-blue pair that barely blinks. Different heights, spacings and
+   rhythms — whatever lives in there, it is not one thing. */
+.wheel-hollow-eyes {
+  position: absolute;
+  opacity: 0;
+  filter: blur(0.4px) drop-shadow(0 0 3px var(--hollow-glow));
+  background:
+    radial-gradient(ellipse 13% 46% at 24% 50%,
+      var(--hollow-glow) 0%, var(--hollow-dim) 55%, transparent 100%),
+    radial-gradient(ellipse 13% 46% at 76% 50%,
+      var(--hollow-glow) 0%, var(--hollow-dim) 55%, transparent 100%);
+}
+
+.wheel-hollow-eyes.is-first {
+  left: 44%;
+  top: 70%;
+  width: 30%;
+  height: 8%;
+  --hollow-glow: rgba(255, 196, 92, 0.95);
+  --hollow-dim: rgba(255, 168, 60, 0.4);
+  animation: hollow-first 57s linear infinite;
+}
+
+.wheel-hollow-eyes.is-second {
+  left: 38%;
+  top: 62%;
+  width: 42%;
+  height: 10%;
+  --hollow-glow: rgba(158, 240, 134, 1);
+  --hollow-dim: rgba(104, 200, 86, 0.5);
+  animation: hollow-second 57s linear infinite;
+}
+
+.wheel-hollow-eyes.is-third {
+  left: 45%;
+  top: 66%;
+  width: 28%;
+  height: 8%;
+  --hollow-glow: rgba(200, 222, 255, 1);
+  --hollow-dim: rgba(150, 178, 240, 0.5);
+  animation: hollow-third 57s linear infinite;
+}
+
+/* The amber one blinks often — something small and nervous. */
+@keyframes hollow-first {
+  0%, 3% { opacity: 0; }
+  6%, 11% { opacity: 0.9; }
+  11.5%, 12.5% { opacity: 0.05; }
+  13%, 19% { opacity: 0.95; }
+  19.5%, 20.5% { opacity: 0.05; }
+  21%, 26% { opacity: 0.9; }
+  29%, 100% { opacity: 0; }
+}
+
+/* The green one stares, one slow blink in its whole watch. */
+@keyframes hollow-second {
+  0%, 36% { opacity: 0; }
+  40%, 52% { opacity: 0.92; }
+  52.5%, 53.5% { opacity: 0.05; }
+  54%, 62% { opacity: 0.92; }
+  66%, 100% { opacity: 0; }
+}
+
+/* The pale one appears late, briefly, and never blinks at all —
+   which is somehow the worst of the three. */
+@keyframes hollow-third {
+  0%, 74% { opacity: 0; }
+  78%, 90% { opacity: 0.88; }
+  94%, 100% { opacity: 0; }
+}
+
+/* The barn owl on the limb (Aaron: "a realistic owl perched on the
+   branch up and to the left of the robed figure"). Owls hold still for
+   a living, which is the same honest gift the beetle's park-and-dart
+   was: she breathes, resettles her weight once a minute, and her eyes
+   catch the light on a slow calendar. Mirrored to face the clearing. */
+.wheel-owl {
+  position: absolute;
+  /* Big enough to matter (round three: "a lot bigger"), feet ON the
+     great limb — the tight recrop bought the height that lets her
+     stand there without her crown leaving the frame. */
+  left: 8.5%;
+  top: 5.2%;
+  width: 12%;
+  pointer-events: none;
+}
+
+.wheel-owl-body {
+  display: block;
+  width: 100%;
+  transform: scaleX(-1);
+  filter: brightness(0.82) saturate(0.85)
+    drop-shadow(1px 2px 3px rgba(10, 12, 10, 0.5));
+  transform-origin: 50% 92%;
+  animation: owl-keep 61s ease-in-out infinite;
+}
+
+/* (The head-turn was built three ways and never moved on Aaron's own
+   screen; ditched by his ruling. She holds still, which owls also do
+   superbly.) */
+
+/* Her eyes, catching the moon on their own slow calendar — placed on
+   the MIRRORED face, which sits right of the span's centre. */
+.wheel-owl-eyes {
+  position: absolute;
+  left: 46%;
+  top: 15%;
+  width: 36%;
+  height: 9%;
+  background:
+    radial-gradient(ellipse 14% 46% at 30% 50%,
+      rgba(255, 214, 130, 0.9) 0%, rgba(255, 190, 90, 0.35) 55%,
+      transparent 100%),
+    radial-gradient(ellipse 14% 46% at 70% 50%,
+      rgba(255, 214, 130, 0.9) 0%, rgba(255, 190, 90, 0.35) 55%,
+      transparent 100%);
+  filter: blur(0.5px);
+  opacity: 0;
+  animation: owl-eyes 61s linear infinite;
+}
+
+@keyframes owl-eyes {
+  0%, 30% { opacity: 0; }
+  34%, 44% { opacity: 0.75; }
+  45%, 46% { opacity: 0.05; }
+  47%, 54% { opacity: 0.7; }
+  58%, 100% { opacity: 0; }
+}
+
+/* Lightning past the trees (Aaron): one bolt's double-flash — strike,
+   dark, the brighter return stroke, then a guttering afterglow. Cold
+   as the moon it briefly embarrasses. The component schedules it and
+   the thunder together, so the rumble always arrives late. */
+.wheel-lightning {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  /* Warmed on round three ("could stand to be more yellow") — storm
+     light, not moonlight. */
+  background:
+    radial-gradient(ellipse 80% 60% at 70% -10%,
+      rgba(255, 246, 208, 0.95) 0%, rgba(252, 236, 178, 0.5) 45%,
+      transparent 80%),
+    linear-gradient(180deg,
+      rgba(255, 242, 196, 0.5) 0%, rgba(250, 232, 174, 0.2) 55%,
+      transparent 100%);
+  opacity: 0;
+  animation: lightning-flash 1.15s ease-out both;
+}
+
+@keyframes lightning-flash {
+  0% { opacity: 0; }
+  3% { opacity: 0.95; }
+  7% { opacity: 0.1; }
+  11% { opacity: 1; }
+  16% { opacity: 0.25; }
+  22% { opacity: 0.45; }
+  34% { opacity: 0.08; }
+  46% { opacity: 0.14; }
+  100% { opacity: 0; }
+}
+
+/* (The free-floating eye pairs that used to watch from the birch gaps
+   were removed on Aaron's round-three ruling — eyes belong to
+   creatures, and the wood now has three real ones to do the
+   watching: the owl, the hollow's shifting tenants, and the
+   crocodile.) */
+
+/* The pool's tenant (menagerie.recipe.yaml): the crocodile surfaces by
+   inches in the lower left, watches a long while, drifts a little, and
+   sinks without a sound. The rig's overflow is the waterline. */
+.wheel-croc-rig {
+  position: absolute;
+  /* Round three: "way too small, and a little higher". A real presence
+     now — a quarter of the pool's width, riding higher in the water. */
+  left: 0%;
+  top: 86%;
+  width: 29%;
+  height: 14%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* A true silhouette this time — matted off seamless white, so what
+   breaks the waterline is croc and only croc. The BODY wrapper rides
+   the surface cycle; the img inside only mirrors and grades, and the
+   eye-glint rides the wrapper so it tracks the animal for free. Most
+   of the cycle only the brow and eye ride above the water; once per
+   lap he rises far enough to show the teeth, then goes under whole. */
+.wheel-croc-body {
+  position: absolute;
+  /* Shifted toward the pool's far edge (round seven) — the snout can
+     leave the frame; a lurker half out of the picture is more lurker,
+     not less. The eye rides this wrapper, so it travels with him. */
+  inset: 0 6% 0 -6%;
+  transform: translateY(58%);
+  animation: croc-surface 53s ease-in-out infinite;
+}
+
+.wheel-croc {
+  display: block;
+  width: 100%;
+  max-width: none;
+  transform: scaleX(-1);
+  filter: brightness(0.7) saturate(0.55) hue-rotate(-12deg)
+    drop-shadow(0 1px 2px rgba(8, 12, 18, 0.6));
+}
+
+@keyframes croc-surface {
+  0%, 10% { transform: translateY(100%) translateX(0); }
+  16% { transform: translateY(56%) translateX(0.5%); }
+  30% { transform: translateY(52%) translateX(2%); }
+  40% { transform: translateY(55%) translateX(3%); }
+  /* the one deep rise: the jaw above the waterline, briefly */
+  48% { transform: translateY(22%) translateX(3.5%); }
+  56% { transform: translateY(26%) translateX(4%); }
+  64% { transform: translateY(54%) translateX(4.5%); }
+  74%, 100% { transform: translateY(100%) translateX(0); }
+}
+
+/* The eye, lit: a small amber coal on the mirrored head, pulsing on a
+   slow breath — brighter is hungrier, and he is always a little
+   hungry. */
+.wheel-croc-eye {
+  position: absolute;
+  left: 40.6%;
+  top: 27%;
+  width: 4.5%;
+  height: 11%;
+  /* A white-hot pinpoint inside the amber: the GLEAM, not a glow. */
+  background:
+    radial-gradient(ellipse 16% 22% at 52% 46%,
+      rgba(255, 252, 240, 1) 0%, transparent 70%),
+    radial-gradient(ellipse 42% 46% at 50% 50%,
+      rgba(255, 178, 72, 0.95) 0%, rgba(230, 120, 40, 0.45) 55%,
+      transparent 100%);
+  filter: blur(0.3px) drop-shadow(0 0 4px rgba(255, 170, 60, 0.9));
+  animation: croc-eye-glow 7s ease-in-out infinite;
+}
+
+/* Steady coal, then twice a lap the light CATCHES it — a sharp flash
+   up and instantly back, the way a real eye takes a moving light. */
+@keyframes croc-eye-glow {
+  0%, 40%, 100% { opacity: 0.5; }
+  43% { opacity: 1; }
+  45.5% { opacity: 0.55; }
+  67% { opacity: 0.5; }
+  70% { opacity: 1; }
+  73% { opacity: 0.55; }
+}
+
+/* The water answers him: a soft ring of the moon's silver where the
+   brow breaks the surface, breathing on the same calendar. */
+.wheel-croc-rig::after {
+  content: '';
+  position: absolute;
+  left: 18%;
+  right: 30%;
+  top: 42%;
+  height: 34%;
+  border-radius: 9999px;
+  border: 1px solid rgba(214, 228, 248, 0.35);
+  border-top-color: transparent;
+  filter: blur(1.5px);
+  opacity: 0;
+  animation: croc-ripple 53s ease-in-out infinite;
+}
+
+@keyframes croc-ripple {
+  0%, 12% { opacity: 0; transform: scale(0.6); }
+  18%, 62% { opacity: 0.55; transform: scale(1); }
+  68% { opacity: 0.2; transform: scale(1.15); }
+  76%, 100% { opacity: 0; transform: scale(0.6); }
+}
+
 /* The figure breathes. Two breaths per cycle, the second deeper and with
    a hair of lean toward the wheel it keeps spinning — from the feet, the
    way a standing watcher actually moves. The amplitudes are tiny because
@@ -2418,9 +3053,17 @@ button:hover .tarot-fan-card {
 }
 
 /* The hand at the rim: a small tremor at rest — an old hand held mid-air
-   trembles, it does not float. */
+   trembles, it does not float — and, once per twenty-one seconds, the
+   draw-back-and-push that gives `.wheel-disc`'s idle nudge its cause.
+   The tremor rides `transform`, the nudge rides `rotate`, so the two
+   compose instead of fighting; the nudge's keyframes lead the disc's by
+   a beat and a half, because the hand moves first and the wheel answers.
+   Both restart together when a real spin hands back to idle, which is
+   what keeps them in step forever. */
 .wheel-arm {
-  animation: wheel-arm-tremor 3.7s ease-in-out infinite;
+  animation:
+    wheel-arm-tremor 3.7s ease-in-out infinite,
+    wheel-arm-nudge 21s ease-in-out infinite;
 }
 
 @keyframes wheel-arm-tremor {
@@ -2429,6 +3072,14 @@ button:hover .tarot-fan-card {
   41% { transform: rotate(0.4deg) translateY(-0.1%); }
   67% { transform: rotate(-0.3deg) translateY(0.1%); }
   84% { transform: rotate(0.55deg) translateY(-0.15%); }
+}
+
+@keyframes wheel-arm-nudge {
+  0%, 87% { rotate: 0deg; }
+  90% { rotate: -2.6deg; }
+  93% { rotate: 3.4deg; }
+  96% { rotate: 1deg; }
+  100% { rotate: 0deg; }
 }
 
 /* The push: when the wheel is thrown, the hand throws it — a quick swing
@@ -2489,32 +3140,38 @@ button:hover .tarot-fan-card {
   top: 84%;
   width: 5.5%;
   pointer-events: none;
-  animation: critter-walk 43s linear infinite;
+  animation: critter-walk 56s linear infinite;
 }
 
 .wheel-critter img {
   display: block;
   width: 100%;
   filter: drop-shadow(0 1px 1px rgba(10, 14, 20, 0.55)) brightness(0.82);
-  animation: critter-heading 43s linear infinite;
+  animation: critter-heading 56s linear infinite;
 }
 
+/* Five stops now (Aaron, 2026-08-17: "a couple more points... maybe the
+   robed figures feet") — the old circuit plus a long call at the hem of
+   the cloak, which gets the longest park of the walk because a beetle
+   that close to a fortune-teller has the most to think about. */
 @keyframes critter-walk {
-  0%, 18% { left: 32%; top: 84%; }
-  21%, 42% { left: 52%; top: 88%; }
-  45%, 66% { left: 70%; top: 82%; }
-  69%, 90% { left: 46%; top: 79%; }
-  93%, 100% { left: 32%; top: 84%; }
+  0%, 14% { left: 32%; top: 84%; }
+  16%, 30% { left: 52%; top: 88%; }
+  32%, 46% { left: 70%; top: 82%; }
+  48%, 62% { left: 46%; top: 79%; }
+  64%, 84% { left: 16%; top: 82%; }
+  86%, 100% { left: 32%; top: 84%; }
 }
 
 @keyframes critter-heading {
   /* Arrives home still facing its last run, and turns only when it is
      about to go again. */
-  0%, 16.5% { transform: rotate(245deg); }
-  18%, 40.5% { transform: rotate(115deg); }
-  42%, 64.5% { transform: rotate(72deg); }
-  66%, 88.5% { transform: rotate(280deg); }
-  90%, 100% { transform: rotate(245deg); }
+  0%, 12.5% { transform: rotate(108deg); }
+  14%, 28.5% { transform: rotate(115deg); }
+  30.5%, 44.5% { transform: rotate(72deg); }
+  46.5%, 60.5% { transform: rotate(280deg); }
+  62.5%, 82.5% { transform: rotate(265deg); }
+  84.5%, 100% { transform: rotate(108deg); }
 }
 
 /* What the landed fate does to the clearing — once, at the reveal, each
@@ -2545,6 +3202,28 @@ button:hover .tarot-fan-card {
   18% { opacity: 1; transform: translateY(0); }
   55% { opacity: 0.7; }
   100% { opacity: 0; transform: translateY(-3%); }
+}
+
+/* Tails: the cup spills into the water instead — the shimmer runs cold
+   blue-violet, mill's own colour, down toward the pool. */
+.wheel-fatefx.is-cup.is-tails {
+  background:
+    radial-gradient(ellipse 20% 16% at 65.5% 17%,
+      rgba(150, 170, 255, 0.9) 0%, rgba(110, 130, 230, 0.4) 46%,
+      transparent 75%),
+    radial-gradient(ellipse 50% 40% at 50% 90%,
+      rgba(120, 140, 240, 0.3) 0%, transparent 70%);
+}
+
+/* Broken: the heart's wash sours toward violet, and the vignette
+   presses closer. */
+.wheel-fatefx.is-heart.is-broken {
+  background:
+    radial-gradient(ellipse 18% 14% at 65.5% 17%,
+      rgba(220, 100, 200, 0.8) 0%, rgba(160, 50, 130, 0.4) 50%,
+      transparent 78%),
+    radial-gradient(ellipse 110% 110% at 50% 50%,
+      transparent 46%, rgba(120, 20, 70, 0.42) 100%);
 }
 
 /* The heart beats twice — lub-dub, rest, lub-dub — as a blood-warm
@@ -2615,11 +3294,779 @@ button:hover .tarot-fan-card {
   100% { opacity: 0; transform: translateY(-4%); }
 }
 
+/* ── the fates, thought big (Aaron, 2026-08-17) ──────────────────────────
+ *
+ * Each wash above keeps setting the light; these are the centrepieces
+ * that land in it. Real photographs where a photograph exists to be had
+ * (fates.recipe.yaml), and the one lesson of the wax prototypes applied
+ * throughout: screen blend can only ADD LIGHT, so anything that is
+ * matter — a coin, a heart, blood — renders in normal blend and casts
+ * shadow, and only light itself gets to glow. */
+
+/* The cup's answer: one gold noble out of the Fishpool Hoard, thrown
+   spinning from the cup's landed place. Two real faces — the king's
+   ship one side, the great cross the other — on a 3D flip, so the coin
+   the fate pays is a coin, not a disc with one picture. */
+.wheel-coinspin {
+  position: absolute;
+  left: 58%;
+  top: 6%;
+  width: 15%;
+  aspect-ratio: 1;
+  pointer-events: none;
+  perspective: 560px;
+  /* The shadow lives HERE and not on the 3D stage below: a filter
+     forces its own compositing group, which silently flattens
+     `transform-style: preserve-3d` — with it there, the back face
+     could never win the flip and the coin showed heads forever. */
+  filter: drop-shadow(0 2px 5px rgba(20, 12, 2, 0.55))
+    drop-shadow(0 0 10px rgba(255, 216, 130, 0.45));
+  animation: coinspin-arc 5.2s cubic-bezier(0.3, 0.1, 0.45, 1) both;
+}
+
+/* Bigger and slower than the first cut (Aaron: "I can hardly tell it
+   is a coin"): it rises, HANGS at the top of the toss while the turn
+   decelerates enough to read both faces, and only then fades. */
+@keyframes coinspin-arc {
+  0% { transform: translateY(40%) scale(0.45); opacity: 0; }
+  10% { transform: translateY(-18%) scale(0.85); opacity: 1; }
+  32% { transform: translateY(-68%) scale(1.08); }
+  70% { transform: translateY(-56%) scale(1.04); }
+  90% { transform: translateY(-62%) scale(1.05); opacity: 1; }
+  100% { transform: translateY(-58%) scale(1); opacity: 0; }
+}
+
+.wheel-coin3d {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  animation: coinspin-turn 5.2s cubic-bezier(0.16, 0.5, 0.3, 1) both;
+}
+
+/* Two turns, front-loaded: a blur out of the cup, then slow enough by
+   the hang that each face gets a clean, readable moment (round three:
+   "I can barely tell that is a coin"). The dice say which face is up
+   when it stops: full turns end on Athena, the extra half-turn ends on
+   her owl. */
+@keyframes coinspin-turn {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(720deg); }
+}
+
+.wheel-coin3d.is-tails {
+  animation-name: coinspin-turn-tails;
+}
+
+@keyframes coinspin-turn-tails {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(900deg); }
+}
+
+.wheel-coin-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 9999px;
+  /* No filter here, ever: a filter on anything inside the 3D stage is
+     how the flip silently broke the first time. The gold lives in the
+     asset (the recipe's duotone), where it cannot flatten anything. */
+}
+
+.wheel-coin-face.is-back {
+  transform: rotateY(180deg);
+}
+
+/* (No drawn rim: an ancient flan's irregular silhouette IS its rim,
+   and the matte keeps it.) */
+
+/* The heart's answer: Pinson's wax heart, beating in a pocket of gloom.
+   The span is the gloom — the museum's darkness gathered over the wheel
+   — and the wax inside pumps lub-dub on the same bar the thumps play. */
+.wheel-heartfx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 46% 42% at 60% 34%,
+    rgba(10, 4, 6, 0.82) 0%,
+    rgba(10, 4, 6, 0.55) 55%,
+    transparent 100%
+  );
+  animation: heartfx-gloom 6.4s ease-in-out both;
+}
+
+@keyframes heartfx-gloom {
+  0% { opacity: 0; }
+  12%, 72% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Gelon's own heart, blown up luminous: the span's background is the
+   art crop zoomed so the painted heart fills the window — background
+   arithmetic, no derivative anywhere, the wheel cutout's argument a
+   third time. Stylised because the painter already stylised it; the
+   wax anatomical model this replaces was ruled "a little less real,
+   a little more stylized" by Aaron's eye, and the painting had the
+   answer on it the whole time. */
+.wheel-heart-bloom {
+  position: absolute;
+  left: 58.5%;
+  top: 8.5%;
+  width: 15%;
+  aspect-ratio: 1;
+  background-size: 850%;
+  background-position: 89.2% 28.7%;
+  border-radius: 9999px;
+  /* Gelon painted the heart lying on its side; a quarter-turn
+     counterclockwise stands it up, and ten degrees back clockwise
+     (Aaron, live) gives it the painter's own slight tilt. The `rotate`
+     property composes with the beat animation's transform. */
+  rotate: -65deg;
+  mask-image: radial-gradient(circle,
+    #000 34%, rgba(0, 0, 0, 0.5) 52%, transparent 72%);
+  -webkit-mask-image: radial-gradient(circle,
+    #000 34%, rgba(0, 0, 0, 0.5) 52%, transparent 72%);
+  filter: saturate(1.7) brightness(1.3) contrast(1.08)
+    drop-shadow(0 0 16px rgba(210, 40, 60, 0.75))
+    drop-shadow(0 0 34px rgba(160, 20, 40, 0.5));
+  transform-origin: 50% 55%;
+  animation: heartfx-beat 6.4s ease-in-out both;
+}
+
+/* The broken landing: the same bloom twice, each clipped to one side of
+   a jagged tear, beating as they drift apart — the fracture line is a
+   lightning-shaped polygon down the middle, offset per half so the tear
+   shows dark between them. */
+.wheel-heart-bloom.is-half.is-left {
+  clip-path: polygon(
+    0% 0%, 54% 0%, 44% 18%, 56% 34%, 46% 52%, 58% 68%, 48% 84%,
+    54% 100%, 0% 100%
+  );
+  animation: heartfx-break-left 6.4s ease-in-out both;
+}
+
+.wheel-heart-bloom.is-half.is-right {
+  clip-path: polygon(
+    58% 0%, 100% 0%, 100% 100%, 58% 100%, 52% 84%, 62% 68%, 50% 52%,
+    60% 34%, 48% 18%
+  );
+  animation: heartfx-break-right 6.4s ease-in-out both;
+}
+
+/* Each half keeps the lub-dub, weaker, while sliding away and tipping —
+   a heart that still tries to beat in two pieces. */
+@keyframes heartfx-break-left {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.92); }
+  8% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  11% { transform: translate(-1%, 0) rotate(-1deg) scale(1.06); }
+  15.5% { transform: translate(-2%, 1%) rotate(-2deg) scale(1.02); }
+  26.5% { transform: translate(-4%, 2%) rotate(-3.5deg) scale(1.05); }
+  33.5% { transform: translate(-5.5%, 3%) rotate(-4.5deg) scale(1); }
+  42% { transform: translate(-7%, 4%) rotate(-5.5deg) scale(1.03); }
+  49% { transform: translate(-8.5%, 5%) rotate(-6.5deg) scale(0.99); }
+  74% { opacity: 0.85; transform: translate(-11%, 7%) rotate(-8deg) scale(0.97); }
+  100% { opacity: 0; transform: translate(-14%, 9%) rotate(-9deg) scale(0.93); }
+}
+
+@keyframes heartfx-break-right {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.92); }
+  8% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  11% { transform: translate(1%, 0.5%) rotate(1.2deg) scale(1.06); }
+  15.5% { transform: translate(2%, 1.5%) rotate(2.2deg) scale(1.02); }
+  26.5% { transform: translate(4%, 3%) rotate(4deg) scale(1.05); }
+  33.5% { transform: translate(5.5%, 4%) rotate(5deg) scale(1); }
+  42% { transform: translate(7%, 5.5%) rotate(6deg) scale(1.03); }
+  49% { transform: translate(8.5%, 6.5%) rotate(7deg) scale(0.99); }
+  74% { opacity: 0.85; transform: translate(11%, 9%) rotate(8.5deg) scale(0.97); }
+  100% { opacity: 0; transform: translate(14%, 11%) rotate(10deg) scale(0.93); }
+}
+
+/* Three bars of lub-dub matching `fateLand`'s thumps: sharp systole,
+   softer second sound, long quiet diastole. */
+@keyframes heartfx-beat {
+  0% { opacity: 0; transform: scale(0.92); }
+  8% { opacity: 1; transform: scale(1); }
+  11% { transform: scale(1.075); }
+  13.5% { transform: scale(0.99); }
+  15.5% { transform: scale(1.05); }
+  18% { transform: scale(1); }
+  26.5% { transform: scale(1.075); }
+  29% { transform: scale(0.99); }
+  31% { transform: scale(1.05); }
+  33.5% { transform: scale(1); }
+  42% { transform: scale(1.075); }
+  44.5% { transform: scale(0.99); }
+  46.5% { transform: scale(1.05); }
+  49% { transform: scale(1); }
+  74% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.95); }
+}
+
+/* The skull's answer: the dead get up — or go down. Risen, five pale
+   forms rise from every side of the clearing; buried, the same smoke
+   pours downward into the roots, the grave inhaling instead of
+   exhaling. Light only, so screen blend is honest either way. */
+.wheel-ghosts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.wheel-ghosts.is-buried .wheel-ghost {
+  animation-name: ghost-sink;
+}
+
+@keyframes ghost-sink {
+  0% { opacity: 0; transform: translateY(-160%) rotate(0deg) skewX(0deg) scaleY(1.3); }
+  14% { opacity: 0.9; transform: translateY(-120%) rotate(3deg) skewX(-4deg) scaleY(1.2); }
+  38% { opacity: 0.8; transform: translateY(-64%) rotate(-4deg) skewX(5deg) scaleY(1.08); }
+  64% { opacity: 0.6; transform: translateY(-14%) rotate(4deg) skewX(-5deg) scaleY(0.9); }
+  86% { opacity: 0.3; transform: translateY(16%) rotate(-3deg) skewX(4deg) scaleY(0.7); }
+  100% { opacity: 0; transform: translateY(30%) rotate(0deg) skewX(0deg) scaleY(0.55); }
+}
+
+/* A ghost is real smoke now (round three: "photos or something more
+   real") — each an img from shades.recipe.yaml, photographed smoke
+   graded grave-green on true black, composited in screen blend so the
+   black vanishes and only the smoke rises. Two are mirrored with the
+   `scale` property, which composes with the rise's transform, so five
+   risers come off three plates without reading as copies. */
+.wheel-ghost {
+  position: absolute;
+  width: 13%;
+  mix-blend-mode: screen;
+  filter: blur(0.5px) brightness(1.7) contrast(1.1);
+  opacity: 0;
+  animation: ghost-rise 8s ease-out both;
+}
+
+.wheel-ghost.is-g1 { left: 5%; bottom: 6%; }
+.wheel-ghost.is-g2 { left: 26%; bottom: 0%; animation-delay: 0.7s; width: 13%; }
+.wheel-ghost.is-g3 { left: 57%; bottom: 4%; animation-delay: 1.3s; width: 9%; }
+.wheel-ghost.is-g4 {
+  left: 78%;
+  bottom: 8%;
+  animation-delay: 1.9s;
+  width: 10%;
+  scale: -1 1;
+}
+.wheel-ghost.is-g5 {
+  left: 41%;
+  bottom: 10%;
+  animation-delay: 2.7s;
+  width: 12%;
+  scale: -1 1;
+}
+
+/* Rises like grave-air: up, wavering side to side, thinning — the
+   skew is what makes the trailing hem drift. */
+@keyframes ghost-rise {
+  0% { opacity: 0; transform: translateY(26%) rotate(0deg) skewX(0deg) scaleY(0.85); }
+  12% { opacity: 1; transform: translateY(-10%) rotate(-3deg) skewX(4deg) scaleY(1); }
+  34% { opacity: 0.95; transform: translateY(-64%) rotate(4deg) skewX(-6deg) scaleY(1.08); }
+  58% { opacity: 0.75; transform: translateY(-128%) rotate(-5deg) skewX(5deg) scaleY(1.16); }
+  80% { opacity: 0.45; transform: translateY(-190%) rotate(4deg) skewX(-4deg) scaleY(1.24); }
+  100% { opacity: 0; transform: translateY(-250%) rotate(-3deg) skewX(3deg) scaleY(1.34); }
+}
+
+/* The sword's answer: the strike. A flash at the blade's landed place, a
+   shower of sparks that fly out and drop the way hot metal drops — and
+   then the wheel bleeds: three dark trickles running down the planks in
+   normal blend, because blood is matter, not light. The wax prototypes
+   taught that lesson five times; it is not being learned again. */
+.wheel-strike {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The hilt landing: one sword descends slowly, pommel up — offered,
+   not swung. It settles over the wheel's crown, a warm gleam crosses
+   the blade, and it fades like a thing accepted. */
+.wheel-offer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.wheel-offer-blade {
+  position: absolute;
+  left: 59%;
+  top: -4%;
+  width: 14%;
+  max-width: none;
+  filter: brightness(1.2) contrast(1.12)
+    drop-shadow(0 3px 8px rgba(4, 6, 10, 0.55));
+  opacity: 0;
+  animation: offer-descend 4.6s ease-in-out both;
+}
+
+@keyframes offer-descend {
+  0% { opacity: 0; transform: translateY(-30%) rotate(2deg); }
+  18% { opacity: 1; transform: translateY(-6%) rotate(-1deg); }
+  30% { transform: translateY(0) rotate(0.5deg); }
+  38% { transform: translateY(-1%) rotate(0deg); }
+  76% { opacity: 1; transform: translateY(-0.5%) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(1%) rotate(0deg); }
+}
+
+/* The gleam: one warm pass down the offered steel. */
+.wheel-offer-gleam {
+  position: absolute;
+  left: 59%;
+  top: -4%;
+  width: 14%;
+  height: 40%;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    170deg,
+    transparent 30%,
+    rgba(255, 236, 190, 0.55) 47%,
+    rgba(255, 246, 214, 0.8) 51%,
+    rgba(255, 236, 190, 0.55) 55%,
+    transparent 72%
+  );
+  background-size: 100% 300%;
+  background-position: 0 120%;
+  opacity: 0;
+  animation: offer-gleam 4.6s ease-in-out both;
+}
+
+@keyframes offer-gleam {
+  0%, 30% { opacity: 0; background-position: 0 120%; }
+  40% { opacity: 0.9; }
+  62% { opacity: 0.7; background-position: 0 -20%; }
+  70%, 100% { opacity: 0; background-position: 0 -30%; }
+}
+
+/* The pair of two-handers, swinging in from the wings. Each pivots at
+   its own grip; they meet at the bind over the wheel's crown at half a
+   second — which is when the flash fires, the sparks fly and the
+   strike lands in the sound. They hold the bind a breath, shiver from
+   the impact, and fade with the sparks' afterglow. */
+.wheel-clash-blade {
+  position: absolute;
+  max-width: none;
+  opacity: 0;
+}
+
+/* Both blades share one box centred on the bind, so the X crosses at
+   mid-blade the way a real bind does — tips up and outward, hilts
+   down: the image is pommel-up, so 180 plus the lean turns it over.
+   The swing carries motion blur in its own keyframes (a swung blade is
+   a smear until it stops), and the whole scene takes the jolt below. */
+.wheel-clash-blade.is-left,
+.wheel-clash-blade.is-right {
+  left: 55%;
+  top: -14%;
+  width: 21%;
+  transform-origin: 50% 50%;
+}
+
+.wheel-clash-blade.is-left {
+  animation: clash-left 3s cubic-bezier(0.6, 0, 0.15, 1) both;
+}
+
+.wheel-clash-blade.is-right {
+  animation: clash-right 3s cubic-bezier(0.6, 0, 0.15, 1) both;
+}
+
+@keyframes clash-left {
+  0% {
+    opacity: 0;
+    transform: translate(-75%, 30%) rotate(140deg);
+    filter: blur(5px) brightness(1.18) contrast(1.15) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+  6% { opacity: 1; }
+  12.5% {
+    transform: translate(0.5%, -0.2%) rotate(212deg);
+    filter: blur(4px) brightness(1.3) contrast(1.15) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+  14% {
+    transform: translate(0, 0) rotate(210deg);
+    filter: blur(0px) brightness(1.75) contrast(1.2) drop-shadow(0 0 8px rgba(220, 232, 255, 0.8));
+  }
+  17% {
+    transform: translate(-2.5%, 0.8%) rotate(205deg);
+    filter: blur(0.5px) brightness(1.2) contrast(1.15) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+  21% {
+    transform: translate(0, 0) rotate(210deg);
+    filter: blur(0px) brightness(1.18) contrast(1.15) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+  58% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(210deg);
+    filter: blur(0px) brightness(1.18) contrast(1.15) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+  78%, 100% {
+    opacity: 0;
+    transform: translate(-5%, 3%) rotate(207deg);
+    filter: blur(1px) brightness(1.1) contrast(1.12) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+}
+
+@keyframes clash-right {
+  0% {
+    opacity: 0;
+    transform: translate(75%, 30%) rotate(220deg) scaleX(-1);
+    filter: blur(5px) brightness(1.18) contrast(1.15) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+  6% { opacity: 1; }
+  12.5% {
+    transform: translate(-0.5%, -0.2%) rotate(148deg) scaleX(-1);
+    filter: blur(4px) brightness(1.3) contrast(1.15) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+  14% {
+    transform: translate(0, 0) rotate(150deg) scaleX(-1);
+    filter: blur(0px) brightness(1.75) contrast(1.2) drop-shadow(0 0 8px rgba(220, 232, 255, 0.8));
+  }
+  17% {
+    transform: translate(2.5%, 0.8%) rotate(155deg) scaleX(-1);
+    filter: blur(0.5px) brightness(1.2) contrast(1.15) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+  21% {
+    transform: translate(0, 0) rotate(150deg) scaleX(-1);
+    filter: blur(0px) brightness(1.18) contrast(1.15) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+  58% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(150deg) scaleX(-1);
+    filter: blur(0px) brightness(1.18) contrast(1.15) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+  78%, 100% {
+    opacity: 0;
+    transform: translate(5%, 3%) rotate(153deg) scaleX(-1);
+    filter: blur(1px) brightness(1.1) contrast(1.12) drop-shadow(0 2px 6px rgba(4, 6, 10, 0.6));
+  }
+}
+
+/* The impact shakes the clearing itself: a hard little jolt when the
+   blades meet, decaying in three knocks. `:has` keys it to the strike
+   overlay being mounted, so nothing else has to know. */
+.wheel-scene:has(.wheel-strike) {
+  animation: scene-jolt 0.55s linear 0.5s 1;
+}
+
+@keyframes scene-jolt {
+  0%, 100% { translate: 0 0; }
+  12% { translate: -0.7% 0.4%; }
+  28% { translate: 0.55% -0.3%; }
+  48% { translate: -0.3% 0.15%; }
+  70% { translate: 0.15% -0.1%; }
+}
+
+.wheel-strike-flash {
+  position: absolute;
+  left: 58%;
+  top: 6%;
+  width: 16%;
+  aspect-ratio: 1;
+  mix-blend-mode: screen;
+  background: radial-gradient(circle,
+    rgba(255, 255, 250, 0.95) 0%, rgba(226, 238, 255, 0.5) 34%,
+    transparent 70%);
+  opacity: 0;
+  animation: strike-flash 0.7s ease-out both;
+  animation-delay: 0.48s;
+}
+
+/* The real fire: the photographed shower, twice over the bind — one
+   blooming with the impact, one mirrored a blink later as the embers
+   scatter. Screen blend leaves only what burns. */
+.wheel-sparkburst {
+  position: absolute;
+  left: 57%;
+  top: 4%;
+  width: 19%;
+  max-width: none;
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform-origin: 50% 50%;
+  animation: sparkburst 1.1s ease-out both;
+  animation-delay: 0.5s;
+}
+
+.wheel-sparkburst.is-b {
+  left: 59%;
+  top: 7%;
+  width: 16%;
+  scale: -1 1;
+  animation-delay: 0.62s;
+  animation-duration: 1.3s;
+  filter: blur(0.6px);
+}
+
+@keyframes sparkburst {
+  0% { opacity: 0; transform: scale(0.35) rotate(-8deg); }
+  10% { opacity: 1; transform: scale(0.9) rotate(-2deg); }
+  38% { opacity: 0.95; transform: scale(1.12) rotate(3deg); }
+  70% { opacity: 0.5; transform: scale(1.28) rotate(6deg) translateY(6%); }
+  100% { opacity: 0; transform: scale(1.4) rotate(8deg) translateY(14%); }
+}
+
+@keyframes strike-flash {
+  0% { opacity: 0; transform: scale(0.3); }
+  18% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+
+.wheel-spark {
+  position: absolute;
+  left: 65.5%;
+  top: 13%;
+  width: 0.7%;
+  height: 3%;
+  border-radius: 2px;
+  mix-blend-mode: screen;
+  background: linear-gradient(180deg,
+    rgba(255, 255, 245, 0.95) 0%, rgba(255, 214, 130, 0.85) 55%,
+    rgba(255, 150, 60, 0) 100%);
+  opacity: 0;
+  transform-origin: 50% 0;
+  animation: spark-fly 0.95s cubic-bezier(0.2, 0.5, 0.6, 1) both;
+  animation-delay: 0.52s;
+}
+
+.wheel-spark.is-s1 { --sx: -340%; --sy: -260%; --sr: -48deg; }
+.wheel-spark.is-s2 { --sx: 360%; --sy: -300%; --sr: 44deg; animation-delay: 0.55s; }
+.wheel-spark.is-s3 { --sx: 560%; --sy: 60%; --sr: 84deg; animation-delay: 0.6s; }
+.wheel-spark.is-s4 { --sx: -520%; --sy: 140%; --sr: -82deg; animation-delay: 0.57s; }
+.wheel-spark.is-s5 { --sx: 140%; --sy: -420%; --sr: 16deg; animation-delay: 0.62s; }
+/* The second shower: smaller, later, falling shorter — the embers that
+   follow the first flash out of a real bind. */
+.wheel-spark.is-s6 { --sx: -220%; --sy: -380%; --sr: -28deg; animation-delay: 0.65s; height: 2.2%; }
+.wheel-spark.is-s7 { --sx: 460%; --sy: -160%; --sr: 66deg; animation-delay: 0.68s; height: 2.4%; }
+.wheel-spark.is-s8 { --sx: -640%; --sy: -40%; --sr: -86deg; animation-delay: 0.63s; height: 2.6%; }
+.wheel-spark.is-s9 { --sx: 240%; --sy: 200%; --sr: 40deg; animation-delay: 0.7s; height: 2%; }
+.wheel-spark.is-s10 { --sx: -120%; --sy: -540%; --sr: -10deg; animation-delay: 0.72s; height: 2.2%; }
+.wheel-spark.is-s11 { --sx: 620%; --sy: -260%; --sr: 74deg; animation-delay: 0.75s; height: 1.8%; }
+.wheel-spark.is-s12 { --sx: -420%; --sy: 260%; --sr: -60deg; animation-delay: 0.78s; height: 2%; }
+
+@keyframes spark-fly {
+  0% { opacity: 0; transform: translate(0, 0) rotate(var(--sr)) scaleY(0.4); }
+  12% { opacity: 1; }
+  55% {
+    opacity: 0.9;
+    transform: translate(var(--sx), var(--sy)) rotate(var(--sr)) scaleY(1);
+  }
+  100% {
+    opacity: 0;
+    transform:
+      translate(calc(var(--sx) * 1.15), calc(var(--sy) * 1.15 + 260%))
+      rotate(var(--sr)) scaleY(0.7);
+  }
+}
+
+.wheel-blood {
+  position: absolute;
+  top: 17.5%;
+  width: 0.55%;
+  height: 0;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(180deg,
+    rgba(80, 12, 16, 0.92) 0%, rgba(109, 15, 20, 0.9) 55%,
+    rgba(63, 10, 13, 0.95) 100%);
+  animation: blood-run 5.2s ease-in both;
+  /* The wound takes a long beat to open (Aaron, live, twice): the
+     blades bind at half a second, hold, and only then does the wheel
+     understand it was cut. */
+  animation-delay: 2.3s;
+}
+
+.wheel-blood.is-b1 { left: 65%; --run: 14%; }
+.wheel-blood.is-b2 { left: 66.4%; --run: 9%; animation-delay: 2.7s; }
+.wheel-blood.is-b3 { left: 67.6%; --run: 17%; animation-delay: 3.1s; }
+
+/* A trickle does not fall smoothly: it runs, beads up, stalls, and runs
+   again — then dries where it stopped. */
+@keyframes blood-run {
+  0% { height: 0; opacity: 0; }
+  6% { opacity: 0.95; }
+  22% { height: calc(var(--run) * 0.45); }
+  34% { height: calc(var(--run) * 0.5); }
+  56% { height: calc(var(--run) * 0.92); }
+  64% { height: var(--run); }
+  82% { height: var(--run); opacity: 0.85; }
+  100% { height: var(--run); opacity: 0; }
+}
+
+/* The wheel's own frame and its call to action — the section is dressed
+   to match the iron-and-brass rim it houses, because this feature will
+   travel (Aaron: "we will re-use it in places"). The frame is a brass
+   hairline and four corner studs on the card surface; the button is
+   forge-work: dark iron, a brass ring, a glint that crosses on hover,
+   and a little wheel of its own that turns while the big one does. */
+.wheel-frame {
+  position: relative;
+  box-shadow:
+    inset 0 0 0 1px rgba(198, 156, 78, 0.34),
+    inset 0 1px 0 rgba(255, 226, 168, 0.12),
+    0 4px 18px rgba(0, 0, 0, 0.22);
+  background-image:
+    radial-gradient(circle 4px at 13px 13px,
+      rgba(214, 176, 104, 0.9) 0%, rgba(120, 88, 36, 0.5) 55%,
+      transparent 75%),
+    radial-gradient(circle 4px at calc(100% - 13px) 13px,
+      rgba(214, 176, 104, 0.9) 0%, rgba(120, 88, 36, 0.5) 55%,
+      transparent 75%),
+    radial-gradient(circle 4px at 13px calc(100% - 13px),
+      rgba(214, 176, 104, 0.9) 0%, rgba(120, 88, 36, 0.5) 55%,
+      transparent 75%),
+    radial-gradient(circle 4px at calc(100% - 13px) calc(100% - 13px),
+      rgba(214, 176, 104, 0.9) 0%, rgba(120, 88, 36, 0.5) 55%,
+      transparent 75%);
+  background-repeat: no-repeat;
+}
+
+/* Folded, the wheel is its own Magic card (Aaron: "maybe the card
+   itself from mtg?") — a small Alpha Wheel of Fortune, lifted a touch
+   on hover, that unfolds the clearing when clicked. */
+.wheel-folded {
+  display: block;
+  width: 136px;
+  border-radius: 7px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(198, 156, 78, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.wheel-folded:hover {
+  transform: translateY(-3px) rotate(-1.2deg);
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.45),
+    0 0 14px rgba(255, 214, 120, 0.35),
+    0 0 0 1px rgba(214, 176, 104, 0.5);
+}
+
+.wheel-folded img {
+  display: block;
+  width: 100%;
+}
+
+/* The fold control: quiet text in the header, brass on hover. */
+.wheel-fold-btn {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.wheel-fold-btn:hover {
+  color: #e8d5a3;
+  background: rgba(120, 90, 40, 0.25);
+}
+
+.wheel-spin-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: 0.6rem;
+  overflow: hidden;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #f3e2b8;
+  background: linear-gradient(180deg, #40311c 0%, #2b1d0e 55%, #1f1408 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(198, 156, 78, 0.55),
+    inset 0 1px 0 rgba(255, 226, 168, 0.22),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wheel-spin-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 176, 104, 0.8),
+    inset 0 1px 0 rgba(255, 226, 168, 0.3),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.3),
+    0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.wheel-spin-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow:
+    inset 0 0 0 1px rgba(198, 156, 78, 0.55),
+    inset 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.wheel-spin-btn:disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+
+/* The glint: one pass of light across the face on hover, the way the
+   rim's own highlight walks. */
+.wheel-spin-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 226, 168, 0.28) 48%,
+    rgba(255, 240, 200, 0.4) 52%,
+    rgba(255, 226, 168, 0.28) 56%,
+    transparent 74%
+  );
+  transform: translateX(-110%);
+}
+
+.wheel-spin-btn:hover:not(:disabled)::after {
+  transition: transform 0.7s ease;
+  transform: translateX(110%);
+}
+
+/* The button's own little wheel: brass rim, four spokes, still at rest.
+   While the big wheel turns it turns too, on the same long deceleration,
+   which is the button telling the truth about what it did. */
+.wheel-spin-btn-glyph {
+  width: 15px;
+  height: 15px;
+  border-radius: 9999px;
+  flex: none;
+  border: 1.5px solid rgba(214, 176, 104, 0.85);
+  background:
+    radial-gradient(circle 2px at 50% 50%,
+      rgba(214, 176, 104, 0.9) 0%, transparent 80%),
+    repeating-conic-gradient(
+      rgba(214, 176, 104, 0.7) 0deg 7deg,
+      transparent 7deg 90deg
+    );
+  box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.5);
+}
+
+.wheel-spin-btn.is-turning .wheel-spin-btn-glyph {
+  animation: glyph-turn 3.8s cubic-bezier(0.12, 0.55, 0.08, 1) both;
+}
+
+@keyframes glyph-turn {
+  from { rotate: 0deg; }
+  to { rotate: 1440deg; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .wheel-disc {
+  .wheel-disc,
+  .wheel-disc:not(.is-spinning) {
     transition: none;
+    animation: none;
   }
   .wheel-ray,
+  .wheel-moon,
+  .wheel-moonglow,
+  .wheel-forest,
+  .wheel-pool,
+  .wheel-pool-glint,
   .wheel-figure,
   .wheel-branch,
   .wheel-arm,
@@ -2627,11 +4074,35 @@ button:hover .tarot-fan-card {
   .wheel-clicker,
   .wheel-clicker.is-flapping,
   .wheel-critter,
-  .wheel-critter img {
+  .wheel-critter img,
+  .wheel-lantern-anchor,
+  .wheel-lantern-rig,
+  .wheel-lantern-light,
+  .wheel-hollow-eyes,
+  .wheel-owl-body,
+  .wheel-owl-eyes,
+  .wheel-croc-body,
+  .wheel-croc-eye,
+  .wheel-croc-rig::after,
+  .wheel-rim::after,
+  .wheel-scene:has(.wheel-strike),
+  .wheel-spin-btn.is-turning .wheel-spin-btn-glyph {
     animation: none;
   }
-  /* The fate flash is pure decoration; stillness means none at all. */
-  .wheel-fatefx {
+  /* The component never schedules a bolt under reduced motion; this is
+     the belt to that suspender. */
+  .wheel-lightning {
+    display: none;
+  }
+  /* The fate effects are pure decoration; stillness means none at all.
+     Every still default is the quiet one: the hollow stays dark, the
+     crocodile stays under, the eyes stay dark. */
+  .wheel-fatefx,
+  .wheel-coinspin,
+  .wheel-heartfx,
+  .wheel-ghosts,
+  .wheel-strike,
+  .wheel-offer {
     display: none;
   }
 }
