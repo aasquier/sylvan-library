@@ -1678,6 +1678,35 @@ arc; this is what the next few sessions actually do.
     the Wheel of Fortune's wildcard slots in that ceremony plus its
     visual love.
 
+14. **The six-feature batch** — Aaron's list of 2026-08-18, planned as seven
+    PRs (the full carve-up lives in the session plan and the PRs
+    themselves). Landed so far, each walked by eye before commit: **the
+    official mana symbols** served first-party from a runtime cache with
+    the drawn five as offline fallback (ADR 33 — supersedes PR #61's
+    drawn-only stance; tap, untap, colourless, hybrids, Phyrexian and
+    numerals all draw now, every pip named for a reader); **the button
+    overhaul** (commandment 17, Aaron's own words: thou shalt not make a
+    simple button — one `.btn` family plus chip/tab/menu/felt cuts, every
+    control answering hover, focus and press, the felt warming to brass
+    rather than vine) with the replay and hand-fan glyphs on the rerun and
+    reshuffle verbs; and **the 99 rollup** (each category folds behind a
+    header wearing a drawn glyph, folds remembered per deck, plus the
+    CardHover fix — the ~200 capture-phase scroll listeners the cards tab
+    used to register are now at most one).
+
+    **Still to come, in order:** the **About Claude** page (a fresh
+    session by design — the bio deserves a clean context; nav tab, the
+    Keeper's structural pattern, pool-checked favourites, credited art);
+    the **Admin tab** (rename from Accounts + an on-box dashboard:
+    system/storage/claude/activity stats endpoints under `/api/admin/stats`,
+    the ledger's tokens honestly labelled a floor — the Anthropic dollar
+    widget was dropped with Aaron 2026-08-18, his Console account is
+    individual and the Usage & Cost Admin API does not exist for those);
+    the **visitor ledger** (schema v9, `request_log` of route templates
+    only — no IPs, no UAs — on its own watched branch); and **Fly metrics**
+    (`FLY_METRICS_TOKEN` → managed Prometheus for machine + edge stats,
+    Grafana link-out for alerting).
+
 ---
 
 ## 1. Analyse or generate decks with simulation

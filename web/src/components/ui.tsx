@@ -548,11 +548,19 @@ export function CardHover({
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const ref = useRef<HTMLSpanElement>(null)
 
+  // The scroll listener exists to clear a preview the wheel scrolled out from
+  // under, so it is registered only while a preview is showing. Registered on
+  // mount it was ~200 capture-phase listeners on a deck's cards tab — two per
+  // row — every one of them run on every scroll frame, which is a measurable
+  // slice of why that tab dragged. At most one instance shows a preview at a
+  // time, so this is now at most one listener.
+  const showing = pos !== null
   useEffect(() => {
+    if (!showing) return
     const clear = () => setPos(null)
     window.addEventListener('scroll', clear, true)
     return () => window.removeEventListener('scroll', clear, true)
-  }, [])
+  }, [showing])
 
   return (
     <span

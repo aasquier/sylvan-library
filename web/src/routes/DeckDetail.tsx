@@ -32,6 +32,7 @@ import {
   AddCardForm, AddNoteForm, NoteEditor, RationaleEditor, SlotArgumentPanel,
 } from '../components/deckedit'
 import { ArtPicker, CardArtPicker } from '../components/artpicker'
+import { CategoryGlyph } from '../components/categoryglyphs'
 import { CommanderDossierPanel } from '../components/dossier'
 import { DeckReviewPanel } from '../components/review'
 import { SwapComposer } from '../components/swap'
@@ -558,6 +559,33 @@ export default function DeckDetail() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('cards')
   const [groupBy, setGroupBy] = useState('category')
+  // Which groups are rolled up, per deck and per grouping — a folded "Lands"
+  // says nothing about "MV 3". Persisted the way the wheel's fold is: the 99
+  // is a place you arrange and come back to, and it should be as you left it.
+  const collapseKey = `mtglab-99-collapsed:${owner}/${slug}`
+  const [collapsed, setCollapsed] = useState<Record<string, string[]>>(() => {
+    try {
+      const raw = localStorage.getItem(`mtglab-99-collapsed:${owner}/${slug}`)
+      const parsed: unknown = raw ? JSON.parse(raw) : null
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, string[]>
+      }
+    } catch { /* a corrupted stash is just an unfolded page */ }
+    return {}
+  })
+  const folded = new Set(collapsed[groupBy] ?? [])
+  function setFolded(next: Set<string>) {
+    const record = { ...collapsed, [groupBy]: [...next] }
+    setCollapsed(record)
+    try { localStorage.setItem(collapseKey, JSON.stringify(record)) }
+    catch { /* storage full or absent — the fold still works this session */ }
+  }
+  function toggleFold(key: string) {
+    const next = new Set(folded)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    setFolded(next)
+  }
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null)
   // What has been done to this deck (ADR 28). `null` is "not asked yet", which
   // the panel renders as loading; an empty array is the real answer for a deck
@@ -1034,6 +1062,18 @@ export default function DeckDetail() {
                   Only the {deck.needs_rationale} needing a rationale
                 </label>
               )}
+              {/* One verb, whichever direction has work to do: rolled mostly
+                  shut it opens everything, otherwise it folds everything. */}
+              <button type="button"
+                      onClick={() => setFolded(
+                        folded.size >= groups.length && groups.length > 0
+                          ? new Set()
+                          : new Set(groups.map(([key]) => key)))}
+                      className="btn btn-ghost btn-xs pb-2">
+                {folded.size >= groups.length && groups.length > 0
+                  ? 'Unfold all'
+                  : 'Fold all'}
+              </button>
             </div>
             {!deck.pool_available && (
               <span className="text-xs" style={{ color: 'var(--status-warning)' }}>
@@ -1150,13 +1190,31 @@ export default function DeckDetail() {
 
           {groups.map(([key, cards]) => (
             <section key={key} className="space-y-2">
-              <h3 className="flex items-baseline gap-2 text-sm font-semibold">
-                {groupBy === 'category' ? categoryLabel(key) : key}
-                <span className="tabular text-xs font-normal"
-                      style={{ color: 'var(--text-muted)' }}>
-                  {cards.reduce((n, c) => n + c.qty, 0)}
-                </span>
+              {/* The header is the fold. A rolled-up group unmounts its rows
+                  entirely — with two hover targets and a dozen-odd elements
+                  per row, folding is also where the busy page gets quiet. */}
+              <h3 className="text-sm font-semibold">
+                <button type="button"
+                        onClick={() => toggleFold(key)}
+                        aria-expanded={!folded.has(key)}
+                        className="disclosure-toggle flex w-full items-center gap-2 text-left">
+                  <span aria-hidden className="text-[10px]"
+                        style={{
+                          display: 'inline-block',
+                          transition: 'transform 150ms',
+                          transform: folded.has(key) ? 'rotate(-90deg)' : 'none',
+                        }}>▾</span>
+                  {groupBy === 'category' && <CategoryGlyph category={key} />}
+                  <span style={{ color: 'var(--text-primary)' }}>
+                    {groupBy === 'category' ? categoryLabel(key) : key}
+                  </span>
+                  <span className="tabular text-xs font-normal"
+                        style={{ color: 'var(--text-muted)' }}>
+                    {cards.reduce((n, c) => n + c.qty, 0)}
+                  </span>
+                </button>
               </h3>
+              {folded.has(key) ? null : (
               <ul className="space-y-1">
                 {cards.map((card) => (
                   <li key={card.name}
@@ -1274,6 +1332,7 @@ export default function DeckDetail() {
                   </li>
                 ))}
               </ul>
+              )}
             </section>
           ))}
 
