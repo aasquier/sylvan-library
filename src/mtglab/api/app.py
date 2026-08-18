@@ -754,7 +754,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         try:
             plan = plan_research(
                 question=payload.get("question"),
-                requested=payload.get("stance") or None)
+                requested=payload.get("stance") or None,
+                tier=caller.model_tier)
         except (QuestionRejected, ValueError) as exc:
             # `QuestionRejected` is a ValueError, which is why it is named
             # first; the second catch is a malformed stance.
@@ -809,7 +810,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 # so "never give the same fact twice" is enforceable rather
                 # than aspirational. `check_told` refuses a malformed list
                 # as a 422 like everything else about the request.
-                facts=payload.get("facts"))
+                facts=payload.get("facts"),
+                tier=caller.model_tier)
         except (TranscriptRejected, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ClaudeUnavailable as exc:
@@ -848,7 +850,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 budget=float(budget) if budget else None,
                 avoid=str(payload.get("avoid") or ""),
                 persona=payload.get("persona") or None,
-                seed=payload.get("seed"))
+                seed=payload.get("seed"),
+                tier=caller.model_tier)
         except NotReady as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except (TranscriptRejected, ValueError) as exc:
@@ -859,7 +862,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
     @app.post("/api/decks/{owner}/{slug}/interview")
     def claude_interview(owner: str, slug: str, payload: dict[str, Any],
-                         lib: Lib) -> dict[str, Any]:
+                         lib: Lib, caller: Scope) -> dict[str, Any]:
         """Ask the rationale interview about one card. Returns questions.
 
         A POST because it costs money and makes a network call, not because it
@@ -883,7 +886,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 slug=slug, card=card,
                 requested=payload.get("stance") or None,
                 focus=str(payload.get("focus") or ""),
-                source=lib.source_for(owner))
+                source=lib.source_for(owner),
+                tier=caller.model_tier)
         except CardNotInDeck as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ValueError as exc:
@@ -897,7 +901,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
     @app.post("/api/decks/{owner}/{slug}/argue")
     def claude_argue(owner: str, slug: str, payload: dict[str, Any],
-                     lib: Lib) -> dict[str, Any]:
+                     lib: Lib, caller: Scope) -> dict[str, Any]:
         """The case against one card's slot (ADR 25). Returns charges.
 
         Deliberately the interview's twin, down to the status codes: the two
@@ -925,7 +929,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 slug=slug, card=card,
                 requested=payload.get("stance") or None,
                 focus=str(payload.get("focus") or ""),
-                source=lib.source_for(owner))
+                source=lib.source_for(owner),
+                tier=caller.model_tier)
         except CardNotInDeck as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ValueError as exc:
@@ -962,7 +967,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             plan = plan_review(
                 slug=slug, cards=payload.get("cards"),
                 requested=payload.get("stance") or None,
-                source=lib.source_for(owner))
+                source=lib.source_for(owner),
+                tier=caller.model_tier)
         except ValueError as exc:
             # `CardNotInDeck` is a ValueError and names the missing cards.
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -1015,7 +1021,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 slug=slug,
                 requested=payload.get("stance") or None,
                 refresh=bool(payload.get("refresh")),
-                source=lib.source_for(owner))
+                source=lib.source_for(owner),
+                tier=caller.model_tier)
         except NoCommander as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ValueError as exc:

@@ -360,7 +360,8 @@ def _report(turn: Turn | None, *, slug: str, card: str,
 
 
 def ask(slug: str, card: str, *, requested: Any = None, focus: str = "",
-        source: DeckSource | None = None) -> dict[str, Any]:
+        source: DeckSource | None = None,
+        tier: str | None = None) -> dict[str, Any]:
     """Interview the user about one card's slot.
 
     `requested` is the stance, in any form `stance.resolve` accepts. It is
@@ -403,6 +404,7 @@ def ask(slug: str, card: str, *, requested: Any = None, focus: str = "",
         messages=[{"role": "user", "content": "\n".join(ask_for)}],
         stance=effective,
         source=source,
+        tier=tier,
     )
 
     if turn.refused:

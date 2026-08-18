@@ -4148,6 +4148,50 @@ button:hover .tarot-fan-card {
   border-color: var(--baseline);
 }
 
+/* Which Claude answers one account (Admin → Accounts). A `select` rather than
+ * a button family, because it is a choice among named things rather than an
+ * action — the same carve-out `.chip-toggle` and `.strip-tab` sit under. It
+ * still owes the hand a reply (commandment 17), so it borrows the chip's
+ * three: muted at rest, ink and a lit edge on hover, the vine on focus.
+ *
+ * `appearance: none` because the platform control brings its own font and its
+ * own background, both of which read as a hole in a dark table. The arrow is
+ * drawn here instead — a chevron in `--text-muted`, sized in `em` so it tracks
+ * the text rather than the theme. */
+.tier-select {
+  appearance: none;
+  color: var(--text-muted);
+  background-color: transparent;
+  border: 1px solid var(--hairline);
+  font: inherit;
+  padding-right: 1.6em;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 0.75em top 55%, right 0.45em top 55%;
+  background-size: 0.3em 0.3em, 0.3em 0.3em;
+  background-repeat: no-repeat;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.tier-select:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+.tier-select:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+.tier-select:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+/* The dropdown itself is painted by the platform, not by this stylesheet —
+ * an option inheriting `transparent` is unreadable on every OS that renders
+ * the list on its own surface. Give it real colours. */
+.tier-select option {
+  color: var(--text-primary);
+  background: var(--surface-1);
+}
+
 /* Quiet disclosure headers (the dossier's drawer) — muted until the hand
  * arrives, ink when it does. The colour lives here so :hover outranks it. */
 .disclosure-toggle {

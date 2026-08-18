@@ -3584,7 +3584,7 @@ def test_a_sweep_is_one_job_in_the_net_lane_reporting_progress(
     monkeypatch.setattr(cc, "sdk_installed", lambda: True)
     monkeypatch.setattr(
         service_mod, "claude_argue",
-        lambda *, slug, card, requested=None, focus="", source=None:
+        lambda *, slug, card, requested=None, focus="", source=None, tier=None:
             {"card": card, "asked": True})
 
     lanes = []
@@ -3617,7 +3617,7 @@ def test_one_failed_card_does_not_cost_the_rest_of_the_sweep(
     from mtglab.api import service as service_mod
     from mtglab.api.service import ClaudeFailed
 
-    def flaky(*, slug, card, requested=None, focus="", source=None):
+    def flaky(*, slug, card, requested=None, focus="", source=None, tier=None):
         if card == "Sol Ring":
             raise ClaudeFailed("the model was rate limited")
         return {"card": card, "asked": True}
@@ -3647,7 +3647,7 @@ def test_the_same_selection_twice_in_flight_is_one_sweep(in_memory_client,
 
     started = []
 
-    def slow(*, slug, card, requested=None, focus="", source=None):
+    def slow(*, slug, card, requested=None, focus="", source=None, tier=None):
         started.append(card)
         time.sleep(0.3)
         return {"card": card, "asked": True}

@@ -925,6 +925,7 @@ def cmd_users_invite(args):
 def cmd_users_list(args):
     _db, _, sessions, users = _auth()
     from mtglab.auth import tokens
+    from mtglab.claude import tiers
 
     con = _connect()
     try:
@@ -933,7 +934,8 @@ def cmd_users_list(args):
             print(f"  no accounts in {config.APP_DB_PATH}")
             print("  create one with `mtglab users add <name>`")
             return
-        print(f"  {'username':<20} {'email':<28} {'state':<12} sessions")
+        print(f"  {'username':<20} {'email':<28} {'state':<12} "
+              f"{'answered by':<12} sessions")
         for user in everyone:
             state = "disabled" if user.disabled else (
                 "active" if users.has_password(con, user.id)
@@ -942,8 +944,9 @@ def cmd_users_list(args):
                       else "no password"))
             live = sessions.count_for_user(con, user.id)
             admin = "*" if user.is_admin else " "
+            answered = tiers.get(user.model_tier).label
             print(f" {admin}{user.username:<20} {user.email or '-':<28} "
-                  f"{state:<12} {live}")
+                  f"{state:<12} {answered:<12} {live}")
         print("\n  * admin")
     finally:
         con.close()
@@ -1085,6 +1088,37 @@ def _set_admin(username: str, is_admin: bool):
         # account is not a step towards being allowed to demote the real one.
         print("  they have no password yet, so they cannot sign in to use it.")
     print(f"  {remaining} admin(s) can sign in.")
+
+
+def cmd_users_tier(args):
+    """Choose which Claude answers an account. The break-glass twin of the
+    Admin page's control, and the only one that works on a fresh volume.
+
+    `--tier default` clears the grant rather than naming the default tier, so
+    "nobody has chosen anything" has one spelling in the column whichever door
+    it came through (`users.set_model_tier` stores NULL either way).
+    """
+    from mtglab.claude import tiers
+
+    _db, _, _, users = _auth()
+    wanted = None if args.tier == "default" else args.tier
+
+    con = _connect()
+    try:
+        user = users.get(con, args.username)
+        if user is None:
+            sys.exit(f"refused: no account {args.username!r}")
+        try:
+            users.set_model_tier(con, user.id, wanted)
+        except users.UnknownTier:
+            offered = ", ".join(t["key"] for t in tiers.roster())
+            sys.exit(f"refused: no such tier {args.tier!r} -- "
+                     f"one of: default, {offered}")
+        chosen = tiers.get(wanted)
+        print(f"  {user.username} is answered by {chosen.label}")
+        print(f"  {chosen.blurb}")
+    finally:
+        con.close()
 
 
 def cmd_users_promote(args):
@@ -2003,6 +2037,14 @@ def main(argv=None):
     upr.add_argument("username"); upr.set_defaults(func=cmd_users_promote)
     ude = us.add_parser("demote", help="take admin away")
     ude.add_argument("username"); ude.set_defaults(func=cmd_users_demote)
+    # Which Claude answers this seat. `default` clears the grant; every other
+    # value is checked against `claude/tiers.py` rather than listed here, so
+    # adding a tier is one table and not two.
+    ut = us.add_parser("tier", help="which Claude answers this account")
+    ut.add_argument("username")
+    ut.add_argument("--tier", required=True,
+                    help="default | sonnet | opus | fable")
+    ut.set_defaults(func=cmd_users_tier)
     # The only irreversible one. `disable` is what you almost always want; this
     # is for releasing a username or an address so it can be invited again.
     udel = us.add_parser("delete", help="remove an account for good")

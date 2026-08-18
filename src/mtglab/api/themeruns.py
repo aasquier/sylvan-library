@@ -65,7 +65,8 @@ ASK_KIND = "claude.theme.ask"
 
 def plan_ask(*, transcript: Any = None, slots: Any = None,
              requested: Any = None, persona: Any = None,
-             seed: Any = None, facts: Any = None) -> Plan:
+             seed: Any = None, facts: Any = None,
+             tier: str | None = None) -> Plan:
     """One conversation turn, planned in the request and called in a job.
 
     **Why this is a job at all**, given the docstring below spent two years'
@@ -94,7 +95,7 @@ def plan_ask(*, transcript: Any = None, slots: Any = None,
     from mtglab.claude import theme
     from mtglab.claude.modes import ModeExhausted
 
-    request = theme.check_ask(transcript, slots, requested=requested,
+    request = theme.check_ask(transcript, slots, requested=requested, tier=tier,
                               persona=persona, seed=seed, facts=facts)
 
     label = (f"theme: a question, from {len(request.carried)} thing"
@@ -128,7 +129,8 @@ def plan_ask(*, transcript: Any = None, slots: Any = None,
 def plan_proposal(*, transcript: Any = None, slots: Any = None,
                   requested: Any = None, budget: float | None = None,
                   avoid: str = "", persona: Any = None,
-                  seed: Any = None) -> Plan:
+                  seed: Any = None,
+                  tier: str | None = None) -> Plan:
     """Refuse now if it is refusable; otherwise hand back the work.
 
     Raises `TranscriptRejected`, `NotReady` and `ClaudeUnavailable` to the
@@ -141,6 +143,7 @@ def plan_proposal(*, transcript: Any = None, slots: Any = None,
     from mtglab.claude.modes import ModeExhausted
 
     request = theme.check_proposal(transcript, slots, requested=requested,
+                                   tier=tier,
                                    budget=budget, avoid=avoid,
                                    persona=persona, seed=seed)
 

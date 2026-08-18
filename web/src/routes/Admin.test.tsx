@@ -52,13 +52,25 @@ function account(overrides: Partial<Account> & { username: string }): Account {
     created_at: '2026-08-12T00:00:00+00:00',
     state: 'active',
     sessions: 0,
+    model_tier: 'sonnet',
     ...overrides,
   }
 }
 
+/** The tiers a server serves. Written out here rather than imported from
+ *  `claude/tiers.py`'s roster because TypeScript cannot read it — the seam is
+ *  the payload, and what these cases pin is that the page renders whatever
+ *  arrives rather than a list of its own. */
+const TIERS = [
+  { key: 'sonnet', label: 'Sonnet', blurb: 'The house answer.' },
+  { key: 'opus', label: 'Opus', blurb: 'Deeper reasoning.' },
+  { key: 'fable', label: 'Fable', blurb: 'The most capable there is.' },
+]
+
 /** One admin and one ordinary account — the shape of this deployment. */
 const SOLO: AccountList = {
   admins: 1,
+  tiers: TIERS,
   users: [account({ username: 'root', is_admin: true, sessions: 2 }),
           account({ username: 'friend' })],
 }
@@ -170,6 +182,66 @@ describe('the account list', () => {
   })
 })
 
+describe('which Claude answers an account', () => {
+  it('offers exactly the tiers the server sent', async () => {
+    // Not a list written in TypeScript. A second roster here would drift the
+    // day one is added, and the drift would present as a control that 422s.
+    render(<Admin />)
+    await screen.findByText('root')
+
+    const picker = within(rowFor('friend'))
+      .getByLabelText('Which Claude answers friend') as HTMLSelectElement
+    expect([...picker.options].map((o) => o.textContent))
+      .toEqual(['Sonnet', 'Opus', 'Fable'])
+    expect(picker.value).toBe('sonnet')
+  })
+
+  it('sends the key and reports the label back', async () => {
+    vi.mocked(api.updateAccount).mockResolvedValue(
+      account({ username: 'friend', model_tier: 'opus' }))
+    render(<Admin />)
+    await screen.findByText('root')
+
+    fireEvent.change(
+      within(rowFor('friend')).getByLabelText('Which Claude answers friend'),
+      { target: { value: 'opus' } })
+
+    await waitFor(() => expect(vi.mocked(api.updateAccount))
+      .toHaveBeenCalledWith('friend', { model_tier: 'opus' }))
+    // The label, not the key: 'opus' is a wire token and commandment 10 keeps
+    // those off the page. `lib/claudecopy.ts` is the same rule for stances.
+    expect(await screen.findByText(/answered by Opus/)).toBeTruthy()
+  })
+
+  it('shows the tier the server settled on, not the one that was clicked', async () => {
+    // A row holding a tier this build has forgotten is answered by the
+    // default, and the server says so in its reply. Echoing the click instead
+    // would leave the page claiming a grant that is not in force.
+    vi.mocked(api.updateAccount).mockResolvedValue(
+      account({ username: 'friend', model_tier: 'sonnet' }))
+    render(<Admin />)
+    await screen.findByText('root')
+
+    fireEvent.change(
+      within(rowFor('friend')).getByLabelText('Which Claude answers friend'),
+      { target: { value: 'fable' } })
+
+    expect(await screen.findByText(/answered by Sonnet/)).toBeTruthy()
+  })
+
+  it('reports a refusal against the row it was about', async () => {
+    vi.mocked(api.updateAccount).mockRejectedValue(new Error('no such tier'))
+    render(<Admin />)
+    await screen.findByText('root')
+
+    fireEvent.change(
+      within(rowFor('friend')).getByLabelText('Which Claude answers friend'),
+      { target: { value: 'opus' } })
+
+    expect(await screen.findByText('no such tier')).toBeTruthy()
+  })
+})
+
 describe('the last admin', () => {
   it('is offered neither Demote nor Disable', async () => {
     render(<Admin />)
@@ -192,6 +264,7 @@ describe('the last admin', () => {
 
   it('stops being the last one when a second admin exists', async () => {
     vi.mocked(api.accounts).mockResolvedValue({
+      tiers: TIERS,
       admins: 2,
       users: [account({ username: 'root', is_admin: true }),
               account({ username: 'heir', is_admin: true })],
@@ -207,6 +280,7 @@ describe('the last admin', () => {
     // The buttons are a courtesy; the 409 is the rule. A page that swallowed it
     // would leave somebody believing a demotion had happened.
     vi.mocked(api.accounts).mockResolvedValue({
+      tiers: TIERS,
       admins: 2,
       users: [account({ username: 'root', is_admin: true }),
               account({ username: 'heir', is_admin: true })],
@@ -251,6 +325,7 @@ describe('the levers', () => {
 
   it('does not offer a reset link to a disabled account', async () => {
     vi.mocked(api.accounts).mockResolvedValue({
+      tiers: TIERS,
       admins: 1,
       users: [account({ username: 'root', is_admin: true }),
               account({ username: 'friend', disabled: true, state: 'disabled' })],

@@ -53,7 +53,8 @@ KIND = "claude.argue.deck"
 
 
 def plan_review(*, slug: str, cards: Any = None, requested: Any = None,
-                source: DeckSource | None = None) -> Plan:
+                source: DeckSource | None = None,
+                tier: str | None = None) -> Plan:
     """Refuse now if it is refusable; otherwise hand back the sweep.
 
     Raises `ValueError` (bad selection or bad stance -- `CardNotInDeck` is a
@@ -120,7 +121,8 @@ def plan_review(*, slug: str, cards: Any = None, requested: Any = None,
         for done, name in enumerate(ordered, start=1):
             try:
                 reports.append(service.claude_argue(
-                    slug=slug, card=name, requested=requested, source=source))
+                    slug=slug, card=name, requested=requested, source=source,
+                    tier=tier))
             except claude_client.ClaudeUnavailable as exc:
                 # The key vanished mid-sweep. Every remaining card fails the
                 # same way, so say so once each and stop spending time on it.

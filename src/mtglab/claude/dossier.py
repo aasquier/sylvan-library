@@ -535,6 +535,8 @@ class DossierRequest:
     #: connection, which is exactly what makes it safe for a job to hold one
     #: after the request that made it has gone.
     source: DeckSource | None = None
+    #: The asking account's model grant, carried for the same reason.
+    tier: str | None = None
     path: Path | str | None = None
     answer: dict[str, Any] | None = None
 
@@ -546,6 +548,7 @@ class DossierRequest:
 
 def check_dossier(slug: str, *, requested: Any = None, refresh: bool = False,
                   source: DeckSource | None = None,
+                  tier: str | None = None,
                   path: Path | str | None = None) -> DossierRequest:
     """Everything that can be decided without spending anything.
 
@@ -563,7 +566,8 @@ def check_dossier(slug: str, *, requested: Any = None, refresh: bool = False,
 
     request = DossierRequest(
         slug=slug, facts=facts, commander=name, oracle_id=oracle_id,
-        key=cache_key(oracle_id), effective=effective, source=source, path=path)
+        key=cache_key(oracle_id, tier), effective=effective, source=source,
+        tier=tier, path=path)
 
     if not refresh:
         hit = get(request.key, path=path)
@@ -613,6 +617,7 @@ def run_dossier(request: DossierRequest, *,
         # The interview's six is tight once a paused turn can spend one.
         max_turns=8,
         on_turn=on_turn,
+        tier=request.tier,
     )
 
     if turn.refused:
@@ -707,23 +712,32 @@ def ask(slug: str, *, requested: Any = None, refresh: bool = False,
 DOSSIER_VERSION = 3
 
 
-def _fingerprint() -> str:
+def _fingerprint(tier: str | None = None) -> str:
     """A hash of what would change the answer's shape or content.
 
     The prompt, the schema and the model id. Editing the instructions or adding
     a section therefore misses every stored row, which costs one call per
     commander and buys the property that no prompt change can serve text
     written under a different one.
+
+    The model id is what makes per-account tiers safe here, and it was already
+    in the digest before they existed. A seat granted Opus resolves a different
+    id and therefore a different key, so it neither reads a dossier Sonnet
+    wrote nor overwrites one -- the cache fragments per tier, which is the
+    correct behaviour and the reason the tier has to reach this function rather
+    than only `converse`. Fragmenting costs one call per commander per tier in
+    use; serving a cheaper model's text to a seat that was granted a dearer one
+    would cost the grant its meaning.
     """
     digest = hashlib.sha256()
     digest.update(str(DOSSIER_VERSION).encode())
     digest.update(INSTRUCTIONS.encode())
     digest.update(json.dumps(RESPONSE_SCHEMA, sort_keys=True).encode())
-    digest.update(client.model().encode())
+    digest.update(client.model(tier).encode())
     return digest.hexdigest()[:16]
 
 
-def cache_key(oracle_id: str) -> str:
+def cache_key(oracle_id: str, tier: str | None = None) -> str:
     """The key for one commander's dossier, or `''` when there is no oracle id.
 
     Keyed on the **character**, not the deck: two decks led by Gyome are two
@@ -731,7 +745,7 @@ def cache_key(oracle_id: str) -> str:
     the other. An empty oracle id disables caching for that deck rather than
     colliding every uncatalogued commander onto one row.
     """
-    return f"{oracle_id}:{_fingerprint()}" if oracle_id else ""
+    return f"{oracle_id}:{_fingerprint(tier)}" if oracle_id else ""
 
 
 def _now() -> str:

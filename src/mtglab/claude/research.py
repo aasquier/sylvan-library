@@ -514,6 +514,11 @@ class ResearchRequest:
     question: str
     key: str
     effective: stance_mod.Stance
+    #: The asking account's model grant, captured here for the same reason the
+    #: other requests capture a `DeckSource`: a job outlives the request that
+    #: knew who was asking, and re-deriving it in the worker would mean the
+    #: worker had a way to ask, which it must not.
+    tier: str | None = None
     answer: dict[str, Any] | None = None
 
     @property
@@ -522,7 +527,8 @@ class ResearchRequest:
         return self.answer is None
 
 
-def check_research(question: Any, *, requested: Any = None) -> ResearchRequest:
+def check_research(question: Any, *, requested: Any = None,
+                   tier: str | None = None) -> ResearchRequest:
     """Everything that can be decided without spending anything.
 
     Raises `QuestionRejected` to the caller, which is what keeps its 422 rather
@@ -536,7 +542,7 @@ def check_research(question: Any, *, requested: Any = None) -> ResearchRequest:
     text = check_question(question)
     effective = stance_for(requested)
     request = ResearchRequest(question=text, key=question_key(text),
-                              effective=effective)
+                              effective=effective, tier=tier)
     if not effective.allows_calls:
         request.answer = _report(
             None, question=text, effective=effective, asked=False,
@@ -572,6 +578,7 @@ def run_research(request: ResearchRequest, *,
         # not take one; every tool that would have needed one is absent from
         # this mode's tool set.
         source=None,
+        tier=request.tier,
         # A search, a look at what came back, a lookup of the cards named, a
         # second search, and the write-up. The dossier's eight, and for the
         # same reason: a paused turn can spend one.

@@ -1076,6 +1076,11 @@ class AskRequest:
     #: "never give the same fact twice", and checked by `repeats` because a
     #: rule enforced by nothing drifts.
     told: tuple[str, ...] = field(default=())
+    #: The asking account's model grant, captured at plan time for the same
+    #: reason a `DeckSource` is: a job outlives the request that knew who was
+    #: asking, and a worker with a way to re-derive it would be a worker with
+    #: a way to reach the database.
+    tier: str | None = None
 
     @property
     def exchanges(self) -> int:
@@ -1100,7 +1105,8 @@ class AskRequest:
 
 def check_ask(transcript: Any = None, slots: Any = None, *,
               requested: Any = None, persona: Any = None,
-              seed: Any = None, facts: Any = None) -> AskRequest:
+              seed: Any = None, facts: Any = None,
+              tier: str | None = None) -> AskRequest:
     """Everything that can refuse a turn, done before anything is spent.
 
     Unlike `check_proposal` there is no floor to fail: a conversation with
@@ -1119,7 +1125,7 @@ def check_ask(transcript: Any = None, slots: Any = None, *,
                       persona=who.key,
                       seed=int(seed) if who.deals and seed is not None
                       else None,
-                      told=check_told(facts))
+                      told=check_told(facts), tier=tier)
 
 
 def ask(transcript: Any = None, slots: Any = None, *,
@@ -1182,6 +1188,7 @@ def run_ask(req: AskRequest, *,
                     # No client tools at all, so the only reason to go round
                     # again is the one search resuming after a pause_turn.
                     max_turns=4,
+                    tier=req.tier,
                     on_turn=on_turn)
 
     if turn.refused:
@@ -1353,6 +1360,11 @@ class ProposalRequest:
     #: The spread's seed, or None. Re-dealt rather than carried whole, for the
     #: reason `_reading_for` gives.
     seed: int | None = None
+    #: The asking account's model grant, captured at plan time for the same
+    #: reason a `DeckSource` is: a job outlives the request that knew who was
+    #: asking, and a worker with a way to re-derive it would be a worker with
+    #: a way to reach the database.
+    tier: str | None = None
 
     @property
     def needs_call(self) -> bool:
@@ -1369,7 +1381,8 @@ class ProposalRequest:
 def check_proposal(transcript: Any = None, slots: Any = None, *,
                    requested: Any = None, budget: float | None = None,
                    avoid: str = "", persona: Any = None,
-                   seed: Any = None) -> ProposalRequest:
+                   seed: Any = None,
+                   tier: str | None = None) -> ProposalRequest:
     """Everything that can refuse a proposal, done before anything is spent.
 
     Refuses below the floor rather than proposing anyway. The button is dark in
@@ -1396,7 +1409,8 @@ def check_proposal(transcript: Any = None, slots: Any = None, *,
                            effective=effective, budget=budget, avoid=avoid,
                            persona=who.key,
                            seed=int(seed) if who.deals and seed is not None
-                           else None)
+                           else None,
+                           tier=tier)
 
 
 def propose(transcript: Any = None, slots: Any = None, *,
@@ -1446,6 +1460,7 @@ def run_proposal(req: ProposalRequest, *,
                     # get_cards to confirm, and the write-up -- with a paused
                     # turn able to spend one.
                     max_turns=8,
+                    tier=req.tier,
                     on_turn=on_turn)
 
     if turn.refused:

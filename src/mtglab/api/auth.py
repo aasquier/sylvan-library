@@ -228,7 +228,8 @@ def scope_for_token(con: sqlite3.Connection, token: str) -> UserScope:
     if user is None or user.disabled:
         return ANONYMOUS
     return UserScope(user_id=user.id, username=user.username,
-                     is_admin=user.is_admin, authenticated=True)
+                     is_admin=user.is_admin, authenticated=True,
+                     model_tier=user.model_tier)
 
 
 def install(app: FastAPI, *, require: bool, secure_cookies: bool,

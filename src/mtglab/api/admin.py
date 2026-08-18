@@ -49,6 +49,7 @@ from fastapi import FastAPI, HTTPException
 from mtglab.api import jobs
 from mtglab.api.deps import Admin
 from mtglab.auth import db, invites, mail, sessions, tokens, users
+from mtglab.claude import tiers
 
 _LOG = logging.getLogger("mtglab.auth")
 
@@ -120,6 +121,11 @@ def install(app: FastAPI, *,
             return {
                 "users": [_account(con, user) for user in everyone],
                 "admins": len(users.usable_admin_ids(con)),
+                # The tiers this build knows, so the page offers exactly what
+                # the server will accept. One list, serialised — a second one
+                # written in TypeScript would drift the day a tier is added,
+                # and the drift would present as a control that 422s.
+                "tiers": tiers.roster(),
             }
 
     @app.post("/api/admin/users", status_code=201)
@@ -194,13 +200,15 @@ def install(app: FastAPI, *,
     @app.patch("/api/admin/users/{username}")
     def update_account(username: str, payload: dict[str, Any],
                        caller: Admin) -> dict[str, Any]:
-        """Grant or revoke admin, disable or re-enable. Either, or both.
+        """Grant or revoke admin, disable or re-enable, set a model tier.
 
-        Both refusals come from `auth/users.py` rather than from here, which is
-        ADR 17's point: the rule that an instance may not be left without an
+        Every refusal comes from `auth/users.py` rather than from here, which
+        is ADR 17's point: the rule that an instance may not be left without an
         admin belongs in the core, so the CLI and this route cannot disagree
         about it. A `LastAdmin` is a 409 — the request is well-formed and
-        understood, and it conflicts with the state of the world.
+        understood, and it conflicts with the state of the world. An
+        `UnknownTier` is a 422: that one is a malformed request, not a
+        conflicting one, and it comes from the same place for the same reason.
         """
         del caller
         with db.connection() as con:
@@ -217,12 +225,30 @@ def install(app: FastAPI, *,
                     if wanted != user.disabled:
                         users.set_disabled(con, user.id, wanted)
                         changed.append("disabled" if wanted else "enabled")
+                # Compared through `tiers.get` on both sides so that an account
+                # holding a stale key and one holding NULL — which resolve to
+                # the same tier and are answered by the same model — do not
+                # read as a change worth logging or a 422 worth raising.
+                if "model_tier" in payload:
+                    asked = payload["model_tier"]
+                    # Its own name rather than reusing `wanted` above: that one
+                    # is a bool and this is a tier key, and mypy is right that
+                    # a variable holding both is a variable holding neither.
+                    tier = None if asked is None else str(asked)
+                    if tiers.get(tier).key != tiers.get(user.model_tier).key:
+                        users.set_model_tier(con, user.id, tier)
+                        changed.append(f"answered by {tiers.get(tier).label}")
             except users.LastAdmin as exc:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
+            except users.UnknownTier as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"no such tier: {exc}") from exc
             if not changed:
                 raise HTTPException(
                     status_code=422,
-                    detail="nothing to change -- send is_admin or disabled")
+                    detail="nothing to change -- send is_admin, disabled "
+                           "or model_tier")
             fetched = _find(con, user.username)
             body = _account(con, fetched)
 

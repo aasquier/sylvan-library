@@ -39,7 +39,7 @@ from mtglab import config
 
 # Bumped when `_MIGRATIONS` grows. Stored in SQLite's own `user_version`, which
 # costs no table and cannot be forgotten in a schema dump.
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 # One entry per version, applied in order to whatever the file is at. A fresh
 # database runs all of them; an existing one runs the tail. The invite and
@@ -417,6 +417,25 @@ _MIGRATIONS: tuple[str, ...] = (
         count        INTEGER NOT NULL,
         PRIMARY KEY (day, route, status_class)
     );
+    """,
+    # -- 10 -----------------------------------------------------------------
+    # Per-account model tiers (2026-08-18, Aaron's call). Every Claude surface
+    # has answered on one model since ADR 14; a handful of seats may now reach
+    # for a more capable one, and everybody else keeps the house answer.
+    #
+    # An `ALTER TABLE ... ADD COLUMN`, not a rebuild: it is a new nullable
+    # column with no constraint to add and nothing to backfill, which is the
+    # one shape SQLite can do in place. Migration 5's rebuild machinery is
+    # still above and still needed by whatever wants a constraint next.
+    #
+    # NULL means "the default tier", and is what every existing row gets --
+    # so this migration cannot change what any account is answered by. It
+    # holds a tier **key** (`'opus'`), never a model id: see `claude/tiers.py`
+    # for why a column full of model ids would be a migration a year from now.
+    # An unknown key resolves to the default rather than raising, which is what
+    # makes a rolled-back deploy survivable.
+    """
+    ALTER TABLE users ADD COLUMN model_tier TEXT;
     """,
 )
 
