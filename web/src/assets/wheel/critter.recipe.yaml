@@ -1,0 +1,47 @@
+# The Wheel of Fortune's ground beetle (Aaron, 2026-08-17: "bugs or
+# snakes on the ground -- make them as real as possible").
+#
+# "As real as possible" means a photograph, and the beetle was chosen
+# over the snake for an honest reason: a still photograph cannot
+# undulate, and a snake that slides without undulating is a sticker. A
+# ground beetle's real gait IS the sticker's -- long parked stillness,
+# then a quick dart to the next dark spot -- so a photographed specimen
+# moved in bursts by CSS is telling the truth about how the animal moves.
+#
+# The specimen is imaged top-down on a flat green ground, which is what
+# lets `matte_backdrop` take the ground cleanly: the green touches the
+# frame edge everywhere and the beetle nowhere. (`matte_green` runs the
+# other way -- it KEEPS green dominance; that op is the ivy's.)
+animist: 1
+
+why_committed: >
+  CC0 from the University of Texas "Insects Unlocked" project, so the
+  matted cutout is clean to commit -- and a critter that vanishes when a
+  CDN moves is a haunting nobody asked for. A few kilobytes of beetle.
+
+sources:
+  beetle:
+    provider: openverse
+    identifier: 84c11bb5-2a0e-4558-96d7-8dcf85b63ad8
+    title: "Ground Beetle (Carabidae, Carabus finitimus (Haldeman))"
+    landing: https://www.flickr.com/photos/131104726@N02/33310032166
+    found_via: >
+      Openverse with a license=cc0 filter, searching `ground beetle`;
+      the plate is the Insects Unlocked project's specimen photograph
+      (University of Texas at Austin), public domain by their own
+      dedication
+    licence: CC0-1.0
+
+outputs:
+  # The whole animal, head up, caption band cropped away before the
+  # matte floods from the borders. 160 wide is generous: on the page the
+  # beetle walks at ~5% of a 384px scene, so every one of these pixels
+  # is real at retina density.
+  - file: wheel-beetle.webp
+    from: beetle
+    ops:
+      - crop: {frac_box: [0.08, 0.005, 0.92, 0.9]}
+      - matte_backdrop: {tolerance: 24, soft: 22, border: 2, enclosed: drop}
+      - resize: {width: 160}
+    encode: {format: webp, quality: 86}
+    expect: {width: 160, height: 282, budget_kb: 40, metadata: none}

@@ -38,6 +38,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, errorMessage, type DeckRef, type WheelSpin } from '../lib/api'
 import { wheelTurn } from '../lib/tablesounds'
+import beetleUrl from '../assets/wheel/wheel-beetle.webp'
 import { CardArt, CardHover, ManaCost } from './ui'
 
 const WHEEL_ART =
@@ -69,6 +70,58 @@ const ANGLES: Record<string, number> = {
 /** How long the CSS deceleration runs (`.wheel-disc` in index.css). The
  *  ratchet in `tablesounds` is scheduled against the same figure. */
 const SPIN_MS = 3800
+
+/** The red-cloaked figure's home in the crop (fractions of the scene) —
+ *  the ellipse the living-copy mask feathers around, and the feet the
+ *  breathe pivots on. Measured off the painting, like everything else
+ *  in this file. */
+const FIGURE = { cx: 0.16, cy: 0.55, rx: 0.155, ry: 0.33, feet: '16% 84%' }
+
+/** The crowned skull in the treetop — the wheel's clicker. Pivots where
+ *  the bone meets the branch. */
+const CLICKER = { cx: 0.645, cy: 0.055, rx: 0.075, ry: 0.085 }
+
+/** The figure's outstretched arm, shoulder to fingertips. Its tip grazes
+ *  the disc's edge, so this copy renders BELOW the wheel cutout — during
+ *  a spin the moving planks paint over the overlap, and a frozen smudge
+ *  of wheel never rides the hand. Pivot at the shoulder. */
+const ARM = { cx: 0.315, cy: 0.5, rx: 0.105, ry: 0.07 }
+
+/** The great branch arcing over the figure's head. A tree this old does
+ *  not sway; it CREAKS — a fraction of a degree on a long cycle, pivoted
+ *  where the limb leaves the trunk. Below the figure copy, because the
+ *  painter put the hood in front of the limb. */
+const BRANCH = { cx: 0.22, cy: 0.13, rx: 0.3, ry: 0.17 }
+
+const ellipseMask = (f: { cx: number; cy: number; rx: number; ry: number }) =>
+  `radial-gradient(ellipse ${f.rx * 100}% ${f.ry * 100}% at `
+  + `${f.cx * 100}% ${f.cy * 100}%, #000 55%, rgba(0,0,0,0.6) 78%, `
+  + 'transparent 98%)'
+
+/**
+ * A living copy: the same hotlinked crop, masked to one painted thing, so
+ * a CSS transform moves that thing and nothing else. The mask feathers
+ * wide and the motion is small, which is what keeps the seam invisible —
+ * the copy's edges land on pixels that barely move. Same argument as the
+ * wheel cutout: no derivative exists anywhere, the "edit" is CSS at
+ * render time.
+ */
+function LivingCopy({ region, className, style }: {
+  region: { cx: number; cy: number; rx: number; ry: number }
+  className: string
+  style?: React.CSSProperties
+}) {
+  const mask = ellipseMask(region)
+  return (
+    <img src={WHEEL_ART} alt="" aria-hidden
+         className={`absolute inset-0 w-full ${className}`}
+         style={{
+           WebkitMaskImage: mask,
+           maskImage: mask,
+           ...style,
+         } as React.CSSProperties} />
+  )
+}
 
 /**
  * The painted wheel, cut loose: the full crop absolutely positioned inside a
@@ -197,8 +250,53 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
                     Edition Alpha: a red-cloaked figure spins a plank wheel
                     mounted on a great tree."
                className="block w-full" />
+          {/* The light through the trees: two cold shafts falling from the
+              upper left across the pale forest curtain, swelling and dying
+              on long uneven cycles — sun through a dead wood on a moving
+              sky. Under the living copies, so the figure and the clicker
+              catch it. */}
+          <span className="wheel-ray" aria-hidden="true" />
+          <span className="wheel-ray is-second" aria-hidden="true" />
+          {/* The tree creaks: the limb over the figure's head leans a
+              fraction of a degree on a seventeen-second cycle, pivoted
+              where it leaves the trunk. */}
+          <LivingCopy region={BRANCH} className="wheel-branch"
+                      style={{ transformOrigin: '46% 8%' }} />
+          {/* The figure lives: breath from the feet up, and on a long cycle
+              a slow lean toward the wheel it keeps spinning. */}
+          <LivingCopy region={FIGURE} className="wheel-figure"
+                      style={{ transformOrigin: FIGURE.feet }} />
+          {/* The hand hovers at the rim — a small tremor at rest, and the
+              PUSH when the wheel is thrown. Below the cutout on purpose;
+              see ARM. */}
+          <LivingCopy region={ARM}
+                      className={`wheel-arm${spinning ? ' is-pushing' : ''}`}
+                      style={{ transformOrigin: '24% 50%' }} />
           <PaintedWheelCutout rotation={rotation} spinning={spinning}
                               onDone={reveal} />
+          {/* The clicker, above the disc: the crowned skull rocks on its
+              branch — a slow watchful tilt at rest, a decaying flap while
+              the planks rattle under it. */}
+          <LivingCopy region={CLICKER}
+                      className={`wheel-clicker${spinning ? ' is-flapping' : ''}`}
+                      style={{ transformOrigin: '64.5% 2%' }} />
+          {/* Something lives among the roots (critter.recipe.yaml): a
+              photographed Carabus, CC0 and matted through the animist,
+              moving the way a ground beetle actually moves — parked for
+              long stretches, then a quick dart to the next dark spot.
+              The wrapper walks the ground; the img inside turns to face
+              each run. */}
+          <span className="wheel-critter" aria-hidden="true">
+            <img src={beetleUrl} alt="" />
+          </span>
+          {/* What the landed fate does to the room, once, at the reveal:
+              the cup shimmers gold, the heart beats twice, the sword's
+              steel sweeps, the skull breathes up a green gloom. */}
+          {revealed && spin?.symbol && (
+            <span key={`${spin.seed}-${spin.symbol}`}
+                  className={`wheel-fatefx is-${spin.symbol}`}
+                  aria-hidden="true" />
+          )}
         </div>
 
         <div className="min-w-0 flex-1 space-y-2">

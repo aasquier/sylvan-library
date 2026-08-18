@@ -2343,9 +2343,296 @@ button:hover .tarot-fan-card {
     0 1px 7px rgba(0, 0, 0, 0.34);
 }
 
+/* ── the wheel lives (Aaron, 2026-08-17) ──────────────────────────────────
+ *
+ * Four motions over Gelon's painting, all of them CSS on the same
+ * hotlinked crop — nothing derived, nothing committed, the same argument
+ * as the wheel cutout. The figure and the clicker are `LivingCopy`
+ * masked duplicates in wheel.tsx; the rays and the fate effects are
+ * their own layers. */
+
+/* Cold light through the dead wood: two shafts falling from the upper
+   left across the pale forest curtain, swelling and dying on long uneven
+   cycles. Spectral green-grey, not the séance's amber — this clearing is
+   creepy on purpose. */
+.wheel-ray {
+  position: absolute;
+  top: -18%;
+  left: -4%;
+  width: 34%;
+  height: 130%;
+  pointer-events: none;
+  --beam-rot: 16deg;
+  transform: rotate(var(--beam-rot));
+  transform-origin: 0 0;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    100deg,
+    rgba(198, 226, 196, 0) 8%,
+    rgba(198, 226, 196, 0.24) 32%,
+    rgba(214, 236, 208, 0.34) 48%,
+    rgba(198, 226, 196, 0.22) 64%,
+    rgba(198, 226, 196, 0) 90%
+  );
+  filter: blur(6px);
+  animation: sunbeam-clouds 31s ease-in-out infinite;
+}
+
+.wheel-ray.is-second {
+  left: 20%;
+  width: 22%;
+  --beam-rot: 22deg;
+  opacity: 0.8;
+  animation-duration: 47s;
+  animation-delay: -13s;
+}
+
+/* The figure breathes. Two breaths per cycle, the second deeper and with
+   a hair of lean toward the wheel it keeps spinning — from the feet, the
+   way a standing watcher actually moves. The amplitudes are tiny because
+   the mask's feather has to land on pixels that barely move. */
+.wheel-figure {
+  animation: wheel-figure-breathe 12.4s ease-in-out infinite;
+}
+
+@keyframes wheel-figure-breathe {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  22% { transform: scale(1.008, 1.014) rotate(0.1deg); }
+  46% { transform: scale(1); }
+  64% { transform: scale(1.012, 1.022) rotate(0.45deg); }
+  82% { transform: scale(1.004, 1.006) rotate(0.15deg); }
+}
+
+/* The tree creaks. Not a sway — an oak this old moves the way a door
+   settles, a third of a degree and back over seventeen seconds, with the
+   barest swell as if the whole limb drew a breath. */
+.wheel-branch {
+  animation: wheel-branch-creak 17s ease-in-out infinite;
+}
+
+@keyframes wheel-branch-creak {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  32% { transform: rotate(-0.35deg) scale(1.003); }
+  58% { transform: rotate(0.15deg) scale(1); }
+  79% { transform: rotate(-0.1deg) scale(1.002); }
+}
+
+/* The hand at the rim: a small tremor at rest — an old hand held mid-air
+   trembles, it does not float. */
+.wheel-arm {
+  animation: wheel-arm-tremor 3.7s ease-in-out infinite;
+}
+
+@keyframes wheel-arm-tremor {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  23% { transform: rotate(-0.5deg) translateY(0.15%); }
+  41% { transform: rotate(0.4deg) translateY(-0.1%); }
+  67% { transform: rotate(-0.3deg) translateY(0.1%); }
+  84% { transform: rotate(0.55deg) translateY(-0.15%); }
+}
+
+/* The push: when the wheel is thrown, the hand throws it — a quick swing
+   into the rim and a slower recovery, then back to the tremor when
+   `is-pushing` lifts. */
+.wheel-arm.is-pushing {
+  animation: wheel-arm-push 1.1s cubic-bezier(0.3, 0, 0.4, 1) both;
+}
+
+@keyframes wheel-arm-push {
+  0% { transform: rotate(0deg); }
+  22% { transform: rotate(3.2deg) translateX(0.5%); }
+  55% { transform: rotate(1.2deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* The clicker: at rest the crowned skull tilts on its branch, slow and
+   watchful. */
+.wheel-clicker {
+  animation: wheel-clicker-idle 5.1s ease-in-out infinite alternate;
+}
+
+@keyframes wheel-clicker-idle {
+  from { transform: rotate(-1.1deg); }
+  to { transform: rotate(1.3deg); }
+}
+
+/* While the planks rattle under it, it FLAPS — hard at the spin's start,
+   decaying with the same deceleration the disc and the pawl share, and
+   handed back to the idle when `is-flapping` lifts. */
+.wheel-clicker.is-flapping {
+  animation: wheel-clicker-flap 3.8s ease-out both;
+}
+
+@keyframes wheel-clicker-flap {
+  0% { transform: rotate(-5deg); }
+  8% { transform: rotate(4.6deg); }
+  16% { transform: rotate(-4.4deg); }
+  25% { transform: rotate(4deg); }
+  35% { transform: rotate(-3.4deg); }
+  46% { transform: rotate(2.8deg); }
+  58% { transform: rotate(-2.1deg); }
+  70% { transform: rotate(1.4deg); }
+  81% { transform: rotate(-0.8deg); }
+  91% { transform: rotate(0.4deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* The beetle among the roots. A ground beetle's gait is the honest gift
+   to CSS: parked stillness for long stretches, then a dart — so the
+   wrapper holds a position for seconds at a time and crosses to the next
+   in about a second, while the img inside snaps its heading just before
+   each run, the way the animal turns and THEN goes. Positions are
+   percentages of the scene, so the walk survives every viewport. */
+.wheel-critter {
+  position: absolute;
+  left: 32%;
+  top: 84%;
+  width: 5.5%;
+  pointer-events: none;
+  animation: critter-walk 43s linear infinite;
+}
+
+.wheel-critter img {
+  display: block;
+  width: 100%;
+  filter: drop-shadow(0 1px 1px rgba(10, 14, 20, 0.55)) brightness(0.82);
+  animation: critter-heading 43s linear infinite;
+}
+
+@keyframes critter-walk {
+  0%, 18% { left: 32%; top: 84%; }
+  21%, 42% { left: 52%; top: 88%; }
+  45%, 66% { left: 70%; top: 82%; }
+  69%, 90% { left: 46%; top: 79%; }
+  93%, 100% { left: 32%; top: 84%; }
+}
+
+@keyframes critter-heading {
+  /* Arrives home still facing its last run, and turns only when it is
+     about to go again. */
+  0%, 16.5% { transform: rotate(245deg); }
+  18%, 40.5% { transform: rotate(115deg); }
+  42%, 64.5% { transform: rotate(72deg); }
+  66%, 88.5% { transform: rotate(280deg); }
+  90%, 100% { transform: rotate(245deg); }
+}
+
+/* What the landed fate does to the clearing — once, at the reveal, each
+   in its element's own light, all fading to nothing so the painting is
+   the resting state. The landed symbol sits at the top of the disc,
+   under the clicker, which is where the cup's gold and the heart's blood
+   centre themselves. */
+.wheel-fatefx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0;
+}
+
+.wheel-fatefx.is-cup {
+  background:
+    radial-gradient(ellipse 20% 16% at 65.5% 17%,
+      rgba(255, 224, 120, 0.9) 0%, rgba(255, 196, 80, 0.4) 46%,
+      transparent 75%),
+    radial-gradient(ellipse 45% 60% at 65.5% 30%,
+      rgba(255, 208, 100, 0.25) 0%, transparent 70%);
+  animation: fate-cup 2.6s ease-out both;
+}
+
+@keyframes fate-cup {
+  0% { opacity: 0; transform: translateY(4%); }
+  18% { opacity: 1; transform: translateY(0); }
+  55% { opacity: 0.7; }
+  100% { opacity: 0; transform: translateY(-3%); }
+}
+
+/* The heart beats twice — lub-dub, rest, lub-dub — as a blood-warm
+   vignette breathing in from the edges. */
+.wheel-fatefx.is-heart {
+  background:
+    radial-gradient(ellipse 18% 14% at 65.5% 17%,
+      rgba(255, 120, 110, 0.85) 0%, rgba(220, 60, 60, 0.4) 50%,
+      transparent 78%),
+    radial-gradient(ellipse 120% 120% at 50% 50%,
+      transparent 52%, rgba(190, 30, 30, 0.35) 100%);
+  animation: fate-heart 3.2s ease-in-out both;
+}
+
+@keyframes fate-heart {
+  0%, 100% { opacity: 0; }
+  8% { opacity: 1; }
+  14% { opacity: 0.35; }
+  22% { opacity: 0.95; }
+  30% { opacity: 0.2; }
+  52% { opacity: 0.15; }
+  60% { opacity: 0.9; }
+  66% { opacity: 0.3; }
+  74% { opacity: 0.85; }
+  86% { opacity: 0.1; }
+}
+
+/* The sword is one stroke: a cold steel glint sweeping the clearing,
+   then gone before the eye finishes finding it. */
+.wheel-fatefx.is-sword {
+  background: linear-gradient(
+    115deg,
+    transparent 42%,
+    rgba(210, 228, 255, 0.1) 47%,
+    rgba(240, 248, 255, 0.9) 50%,
+    rgba(210, 228, 255, 0.1) 53%,
+    transparent 58%
+  );
+  background-size: 260% 260%;
+  background-position: 120% 120%;
+  animation: fate-sword 0.9s cubic-bezier(0.6, 0, 0.3, 1) both;
+}
+
+@keyframes fate-sword {
+  0% { opacity: 0; background-position: 120% 120%; }
+  15% { opacity: 1; }
+  85% { opacity: 1; background-position: -20% -20%; }
+  100% { opacity: 0; background-position: -22% -22%; }
+}
+
+/* The skull breathes a gloom up from the roots: grave-green, slow, and
+   it takes its time leaving. */
+.wheel-fatefx.is-skull {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 105%,
+      rgba(110, 190, 120, 0.5) 0%, rgba(70, 140, 90, 0.28) 45%,
+      transparent 78%),
+    radial-gradient(ellipse 30% 22% at 65.5% 17%,
+      rgba(140, 220, 150, 0.55) 0%, transparent 72%);
+  filter: blur(3px);
+  animation: fate-skull 4.6s ease-in-out both;
+}
+
+@keyframes fate-skull {
+  0% { opacity: 0; transform: translateY(6%); }
+  25% { opacity: 1; transform: translateY(1%); }
+  62% { opacity: 0.8; transform: translateY(-1.5%); }
+  100% { opacity: 0; transform: translateY(-4%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wheel-disc {
     transition: none;
+  }
+  .wheel-ray,
+  .wheel-figure,
+  .wheel-branch,
+  .wheel-arm,
+  .wheel-arm.is-pushing,
+  .wheel-clicker,
+  .wheel-clicker.is-flapping,
+  .wheel-critter,
+  .wheel-critter img {
+    animation: none;
+  }
+  /* The fate flash is pure decoration; stillness means none at all. */
+  .wheel-fatefx {
+    display: none;
   }
 }
 
