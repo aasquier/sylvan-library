@@ -84,25 +84,35 @@ CACHE_SECONDS = 300
 #: query would be a chart, and the chart this dashboard has is the app's own
 #: request ledger (schema v9), which needs no token and no network.
 QUERIES: dict[str, str] = {
-    # Resident memory as the platform accounts for it, which is the number
-    # that decides whether this machine gets OOM-killed — not the process's
-    # own view of itself.
+    # Memory as the platform accounts for it, which is the number that decides
+    # whether this machine gets OOM-killed -- not the process's own view of
+    # itself. **Derived, because Fly publishes no "resident" series**: what
+    # exists is `mem_total` and `mem_available`, so used is the subtraction.
+    # The first draft asked for `fly_instance_memory_resident`, which has never
+    # existed and returned an empty vector -- an em-dash on the tile, forever.
     "memory_bytes":
-        f'sum(fly_instance_memory_resident{{app="{APP_NAME}"}})',
+        f'sum(fly_instance_memory_mem_total{{app="{APP_NAME}"}}) '
+        f'- sum(fly_instance_memory_mem_available{{app="{APP_NAME}"}})',
     "memory_total_bytes":
-        f'sum(fly_instance_memory_total{{app="{APP_NAME}"}})',
-    # Edge traffic over a day, by status class. The visitor ledger counts
-    # what the app answered; this counts what the edge saw, and the gap
-    # between them is exactly the requests the app never got to answer.
+        f'sum(fly_instance_memory_mem_total{{app="{APP_NAME}"}})',
+    # Edge traffic over a day, by status class. The visitor ledger counts what
+    # the app answered; this counts what the edge saw, and the gap between them
+    # is exactly the requests the app never got to answer.
+    #
+    # **`status` is the full code, not the class.** The series carry `200`,
+    # `206`, `301`, `401` -- so the first draft's `status="2xx"` matched
+    # nothing and every edge tile was an em-dash. `=~"2.."` is the class, and
+    # the two-dot form rather than `2.*` because a status is exactly three
+    # characters and an anchored-by-length pattern cannot catch `2000`.
     "edge_2xx":
         f'sum(increase(fly_edge_http_responses_count{{app="{APP_NAME}",'
-        f'status="2xx"}}[24h]))',
+        f'status=~"2.."}}[24h]))',
     "edge_4xx":
         f'sum(increase(fly_edge_http_responses_count{{app="{APP_NAME}",'
-        f'status="4xx"}}[24h]))',
+        f'status=~"4.."}}[24h]))',
     "edge_5xx":
         f'sum(increase(fly_edge_http_responses_count{{app="{APP_NAME}",'
-        f'status="5xx"}}[24h]))',
+        f'status=~"5.."}}[24h]))',
 }
 
 #: `(url, headers) -> (status, body)`. The seam a test injects.

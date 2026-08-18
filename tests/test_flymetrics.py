@@ -229,3 +229,48 @@ def test_the_live_header_shape_reaches_the_transport(monkeypatch):
 
     flymetrics.fetch(transport=transport)
     assert seen[0][1]["Authorization"] == "FlyV1 fm2_abc123"
+
+
+# ------------------------------------------- the queries, against real labels
+
+def test_the_edge_queries_match_a_status_class_not_a_literal_2xx():
+    """The bug that made every edge tile an em-dash.
+
+    Fly's `fly_edge_http_responses_count` carries the **full status code** in
+    its `status` label — `200`, `206`, `301`, `401` — so `status="2xx"` matched
+    no series at all. Confirmed by listing the live label sets from inside the
+    container, which is the only place the truth was available: the panel had
+    never authenticated, so nobody had ever seen a populated response.
+    """
+    for name in ("edge_2xx", "edge_4xx", "edge_5xx"):
+        query = flymetrics.QUERIES[name]
+        digit = name[len("edge_")]
+        assert f'status=~"{digit}.."' in query, query
+        assert f'status="{digit}xx"' not in query
+
+
+def test_memory_is_derived_because_fly_publishes_no_resident_series():
+    """`fly_instance_memory_resident` does not exist and never did.
+
+    What Fly publishes is `mem_total` and `mem_available`; used is the
+    subtraction. Asserted by name because the failure is silent — a query for
+    a metric nobody exports returns an empty vector, which this module
+    correctly reports as `None`, which the page correctly renders as an
+    em-dash. Three correct behaviours in a row hiding one wrong string.
+    """
+    blob = " ".join(flymetrics.QUERIES.values())
+    assert "fly_instance_memory_resident" not in blob
+    assert "fly_instance_memory_mem_total" in flymetrics.QUERIES["memory_bytes"]
+    assert ("fly_instance_memory_mem_available"
+            in flymetrics.QUERIES["memory_bytes"])
+    assert (flymetrics.QUERIES["memory_total_bytes"]
+            == 'sum(fly_instance_memory_mem_total{app="'
+               + flymetrics.APP_NAME + '"})')
+
+
+def test_every_query_scopes_itself_to_this_app():
+    """Prometheus is per *organisation*. A query with no `app` label would
+    silently total every app in the org — which on a personal account is one
+    app today and a wrong number the day it is two."""
+    for name, query in flymetrics.QUERIES.items():
+        assert f'app="{flymetrics.APP_NAME}"' in query, name
