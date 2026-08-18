@@ -210,6 +210,26 @@ def install(app: FastAPI) -> None:
                       "kept here to go stale.",
         }
 
+    @app.get("/api/admin/stats/fly")
+    async def fly_stats(caller: Admin) -> dict[str, Any]:
+        """What the platform sees: Fly's managed Prometheus, if configured.
+
+        The one view here that leaves the box, and the only one that can
+        be switched off — `FLY_METRICS_TOKEN` is the maintainer's to mint,
+        and unset means `configured: false` and a widget that hides rather
+        than a dashboard that looks broken.
+
+        `run_in_threadpool` because `flymetrics.fetch` is blocking stdlib
+        `urllib` and this handler is `async`: called directly it would
+        stall the event loop for every other request for as long as Fly
+        takes to answer.
+        """
+        del caller
+        from starlette.concurrency import run_in_threadpool
+
+        from mtglab.api import flymetrics
+        return await run_in_threadpool(flymetrics.fetch)
+
     @app.get("/api/admin/stats/traffic")
     def traffic_stats(caller: Admin) -> dict[str, Any]:
         """The visitor ledger: requests per day by status class, top routes.

@@ -1325,6 +1325,50 @@ Memory is the number to watch. If you see OOM kills, the likely causes in order
 are: a 25,000-game sweep, Argon2 memory during a login burst, or `data refresh`
 holding the bulk file. Bump to 2 GB (~$11/mo) before you start optimising.
 
+### The Admin page, and what it can tell you without SSH
+
+Most of what those three commands answer is on **`/admin`** now, signed in as
+an admin, and none of it needs a terminal or a token:
+
+- **the box's own account of itself** — process memory, machine memory, load,
+  the volume's free space, and what every store on it weighs (pool, `app.db`,
+  the caches, the decks);
+- **the visitor ledger** (schema v9) — requests per day by status class and the
+  most-asked-for **route templates**. Never a concrete path, an address or an
+  agent; it is a census, not surveillance;
+- **Claude's ledger** — tokens per mode, honestly labelled a floor on the bill.
+
+**The far-seeing glass is the one part that needs a secret**, and it stays
+absent until it has one. Mint a read-only token and set it:
+
+```bash
+fly tokens create readonly
+```
+
+```bash
+fly secrets set FLY_METRICS_TOKEN=<the token>
+```
+
+That switches on the platform's own view — instance memory as Fly accounts for
+it, and **edge** responses by status class over 24 hours. The edge counts what
+reached the platform; the visitor ledger counts what the app answered, and the
+gap between the two is the requests the app never saw (a proxy refusal, a TLS
+failure, an outage). Answers are cached five minutes, and a token that stops
+working clouds the panel rather than breaking the page.
+
+**Alerting lives in Grafana, not in this app.** Fly auto-provisions managed
+Grafana per organisation at <https://fly-metrics.net>, which is where alert
+rules belong — it can notify when nobody is looking at a dashboard, which is
+the entire point of an alert and something a page cannot do. The two rules
+worth having first:
+
+- **instance memory above ~85% of the machine's total**, sustained a few
+  minutes — the OOM warning the paragraph above describes, arriving before the
+  kill rather than after;
+- **a 5xx rate above a handful per minute at the edge**, which catches a
+  deploy that booted broken (including a schema migration that failed on boot
+  — those apply unwatched, see §5's deploy notes).
+
 ---
 
 ## 6. Build order

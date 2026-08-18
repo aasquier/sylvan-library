@@ -469,12 +469,14 @@ describe('admin stats URLs', () => {
     await api.adminClaude()
     await api.adminActivity()
     await api.adminTraffic()
+    await api.adminFly()
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
       '/api/admin/stats/system',
       '/api/admin/stats/storage',
       '/api/admin/stats/claude',
       '/api/admin/stats/activity',
       '/api/admin/stats/traffic',
+      '/api/admin/stats/fly',
     ])
   })
 })

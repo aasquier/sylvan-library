@@ -197,6 +197,7 @@ ADMIN = {
     "/api/admin/stats/claude": "where the instance's Claude tokens went",
     "/api/admin/stats/activity": "accounts, sessions and edits across time",
     "/api/admin/stats/traffic": "requests per day by route template",
+    "/api/admin/stats/fly": "the platform's own view of this instance",
 }
 
 # The one place `include_email=True` is allowed to appear, now that ADR 17 has

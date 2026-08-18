@@ -1722,9 +1722,65 @@ arc; this is what the next few sessions actually do.
     chart and top-routes list. Landed on its own watched branch, the
     rule for anything that migrates on boot).
 
-    **Still to come:** **Fly metrics**
+    **Still to come — the seventh and last of the batch: Fly metrics**
     (`FLY_METRICS_TOKEN` → managed Prometheus for machine + edge stats,
-    Grafana link-out for alerting).
+    Grafana link-out for alerting). The org slug is `personal` and the app
+    is `sylvan-library`, so the query URL is already determined; the one
+    thing code cannot conjure is the read-only token, which Aaron mints
+    (`fly tokens create readonly`) because a credential is a human act.
+    Consumers read `os.environ` directly (the `RESEND_API_KEY` pattern —
+    a public config name may not contain KEY/TOKEN/SECRET, which
+    `tests/test_config.py` pins), stdlib `urllib` behind a seam, a
+    five-minute TTL cache, and the widget hides itself when unconfigured.
+
+    **And one more thing, parked here so it is not lost: photographing a
+    deck into the library.** Researched 2026-08-18 at Aaron's ask,
+    alongside the batch rather than inside it. The gap is real: every
+    import path we have is **text**, and a deck that exists only as a
+    stack of cards on a table — the newcomer's deck, the one commandment
+    2 is about — has nowhere to be typed from.
+
+    *What already works, with no code from us.* The free scanner apps
+    export the very format `decks/decklist.py` already parses (`1 Sol
+    Ring (LTC) 284` — quantity, set code, collector number):
+    **Dragon Shield MTG Scanner** (free, any language, text/CSV out) is
+    the cleanest, **ManaBox** exports the Arena format (its free tier
+    caps decks stored *in their app*, which scan-then-export does not
+    touch), and **Delver Lens** leads on accuracy on Android but caps
+    free exports at 100 cards a session — one Commander deck exactly. So
+    the whole feature, in its cheapest form, is **one sentence on the
+    Import page** telling somebody with a paper-only deck to scan it and
+    paste the export; that sentence rides along with the next branch
+    that touches Import.
+
+    *If we build our own* — a camera door on the Import page, one card
+    at a time (the rhythm those apps use; a 99 goes quickly).
+    `getUserMedia` viewfinder with a card-shaped guide, and the capture
+    crops the **bottom-left corner rather than the title**: reading the
+    **collector number and set code** is the load-bearing trick, learnt
+    from `GrimbiXcode/mtgscan` — a tiny alphabet in a fixed position,
+    language-independent where title OCR is neither. **Tesseract.js**
+    client-side, lazy-loaded only when the camera opens so the entry
+    chunk pays nothing, and **Apache-2.0**, which is why it is that and
+    not the GPL-3.0 prior art we may read and must not vendor into an
+    MIT repo. **No image ever leaves the browser** — what crosses the
+    wire is a short string, resolved against our own pool (set code plus
+    collector number is in `printings`), with the existing fuzzy name
+    search as the fallback a misread lands in. Confirmed cards feed the
+    **existing import path**, so it becomes a draft with counted
+    warnings and rule 4 stays intact (ADR 13 does the rest); nothing new
+    is owed to the gate.
+
+    Policy is clean on every count: Apache-2.0 tooling, the user
+    photographs cards they own (Fan Content Policy), nothing of Wizards'
+    is redistributed, no scraping, and no cloud OCR bill ever — which is
+    what rules out `fortierq/mtgscan`, MIT but Azure-only. The honest
+    risk is OCR accuracy on foils and old frames, which is what the
+    corner trick is for, and why the fallback is a feature we already
+    ship. **It wants its own session rather than a ride-along**: a
+    viewfinder is exactly the surface commandment 16 exists for, and it
+    needs Aaron's eye on real cards in real light rather than a green
+    suite's word.
 
 ---
 

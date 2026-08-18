@@ -602,6 +602,28 @@ export interface AdminActivity {
   jobs: Record<string, number>
 }
 
+/** `GET /api/admin/stats/fly` — what the platform sees, when it is asked.
+ *
+ * The only admin view that can be switched off: `configured` is false on an
+ * instance with no `FLY_METRICS_TOKEN` (every laptop), and the widget hides
+ * rather than showing a broken panel. `ok: false` is the other state worth
+ * rendering — configured but unreachable, which is a clouded glass, not an
+ * absent one. A value may be null: an empty series is not a zero. */
+export interface AdminFly {
+  configured: boolean
+  ok: boolean
+  error?: string
+  app?: string
+  org?: string
+  values: {
+    memory_bytes?: number | null
+    memory_total_bytes?: number | null
+    edge_2xx?: number | null
+    edge_4xx?: number | null
+    edge_5xx?: number | null
+  }
+}
+
 /** One day of the visitor ledger: a total and whichever status classes the
  *  day actually saw (`2xx`…`5xx` arrive as optional keys). */
 export interface TrafficDay {
@@ -1762,6 +1784,7 @@ export const api = {
   adminClaude: () => get<AdminClaude>('/api/admin/stats/claude'),
   adminActivity: () => get<AdminActivity>('/api/admin/stats/activity'),
   adminTraffic: () => get<AdminTraffic>('/api/admin/stats/traffic'),
+  adminFly: () => get<AdminFly>('/api/admin/stats/fly'),
   inviteAccount: (body: { email: string; username?: string; is_admin?: boolean }) =>
     post<Account>('/api/admin/users', body),
   // One route for both levers, and both refusals come from the server: the
