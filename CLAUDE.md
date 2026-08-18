@@ -641,6 +641,26 @@ the old "Read my cards" door went, dealing exactly as before. The grid, the
 table and the resume-from-stash logic all live in `components/tarot.tsx`,
 and a stashed `{persona, seed, turned}` walks back to its table past the grid.
 
+**The readiness count may not go backwards, and the conversation may not end
+in a wall** (2026-08-18, after Aaron and his sister sat down at the table).
+`_closing_for` asks the model to re-state every slot it is confident of each
+turn and nothing checked that it did, so a turn that spoke to one kind deleted
+the others: driven with the short answers a first-timer actually gives, the
+count went 0, 1, 0, 1, 0 and never reached three. `theme.carry` is the
+enforcement — the previous reading is the floor a turn builds on, a kind this
+turn spoke to replaces what was there, and both halves have been through
+`ground` so this widens what is *remembered*, never what counts as evidence.
+Then the ceiling: at `MAX_EXCHANGES` with the floor unmet the screen was a
+live answer box returning the same closing sentence forever beside a disabled
+proposal button, and only "start over" worked. `finished` in
+`components/theme.tsx` closes the box and opens the guided door instead —
+commandment 2, because the alternative tells a newcomer they answered wrong.
+Two related fixes went with them: `followJob` now rides out a handful of
+dropped polls (a 226-second proposal used to die on one blip while the server
+finished work nobody was listening for), and the proposal's clock renders in
+the conversation column as well as the sidebar, which stacks *below* it on
+anything narrower than a laptop.
+
 **The tarot table is the theme interview wearing a costume.**
 `tarot.py` is stdlib, holds all 78 cards and
 **no card's meaning** — Python shuffles, the reader reads. The load-bearing

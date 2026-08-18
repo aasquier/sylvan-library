@@ -672,6 +672,51 @@ def test_a_conversation_turn_keeps_a_question_and_grounds_its_slots(
     assert report["may_propose"] is True
 
 
+def test_a_turn_that_forgets_a_slot_does_not_un_know_it(monkeypatch, no_network):
+    """The readiness count may not go backwards.
+
+    `_closing_for` asks for every slot back each turn and nothing checked that
+    it got them, so a model that answered one kind and forgot the other two
+    used to delete them from the report. Driven with the short answers a
+    first-timer gives, the count went 0, 1, 0, 1, 0 and the reading never
+    became ready -- which reads to the person as their own answers failing.
+    """
+    monkeypatch.setattr(theme, "converse", lambda *a, **kw: _turn({
+        "question": "What did the last thing you built look like?",
+        # One kind, where the client carried three.
+        "slots": [GROUNDED[1]],
+    }))
+    report = theme.run_ask(theme.check_ask(TRANSCRIPT, GROUNDED))
+    assert [s["kind"] for s in report["slots"]] == ["taste", "temperament",
+                                                    "posture"]
+    assert report["grounded"] == 3
+    assert report["may_propose"] is True
+
+
+def test_a_restated_slot_replaces_the_one_it_refines(monkeypatch, no_network):
+    """Carrying forward must not freeze a slot: last reading of a kind wins."""
+    sharper = {"kind": "taste", "value": "desert science fiction, reread",
+               "quote": "I reread it every couple of years"}
+    monkeypatch.setattr(theme, "converse", lambda *a, **kw: _turn({
+        "question": "Which reread got you the most?", "slots": [sharper]}))
+    report = theme.run_ask(theme.check_ask(TRANSCRIPT, GROUNDED))
+    taste = next(s for s in report["slots"] if s["kind"] == "taste")
+    assert taste["value"] == "desert science fiction, reread"
+
+
+def test_carrying_forward_never_widens_what_counts_as_evidence(
+        monkeypatch, no_network):
+    """An ungrounded slot the client sent is dropped on the way in, and
+    carrying the rest forward must not smuggle it back."""
+    invented = {"kind": "anchor", "value": "wants Atraxa",
+                "quote": "I have always wanted to build Atraxa"}
+    monkeypatch.setattr(theme, "converse", lambda *a, **kw: _turn({
+        "question": "And what would you never build?", "slots": []}))
+    report = theme.run_ask(theme.check_ask(TRANSCRIPT, [*GROUNDED, invented]))
+    assert [s["kind"] for s in report["slots"]] == ["taste", "temperament",
+                                                    "posture"]
+
+
 def test_a_declarative_answer_is_deleted_not_rendered(monkeypatch, no_network):
     """The interview's own predicate: everything it returns ends in a question
     mark, so a model telling somebody what they think comes back empty."""

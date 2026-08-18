@@ -155,6 +155,30 @@ describe('a turn that produced no question', () => {
   })
 })
 
+describe('while the proposal runs', () => {
+  /* The clock lived only in the sidebar, and the sidebar stacks *below* the
+     conversation on anything narrower than a laptop. Pressing the button made
+     it disappear and left nothing on screen for the two-to-four minutes that
+     followed — a working feature that looks exactly like a broken one. */
+  it('says so in the column the button was in', async () => {
+    answersWith(report({
+      question: 'And at the table?', may_propose: true, grounded: 3,
+      slots: [
+        { kind: 'taste', value: 'fog', quote: 'fog' },
+        { kind: 'temperament', value: 'planner', quote: 'planner' },
+        { kind: 'posture', value: 'organiser', quote: 'organiser' },
+      ],
+    }))
+    // Never resolves: the point is what shows while it is in flight.
+    vi.mocked(api.themePropose).mockReturnValue(new Promise(() => {}) as never)
+    renderRoom()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Get my colours' }))
+    // Two now — one where the button was, one in the sidebar it always had.
+    expect(await screen.findAllByText(/Reading around…/)).toHaveLength(2)
+  })
+})
+
 describe('a turn that finished on purpose', () => {
   it('offers no retry when the stance is off', async () => {
     answersWith(report({
@@ -178,5 +202,44 @@ describe('a turn that finished on purpose', () => {
 
     await screen.findByText(/as long as this conversation goes/)
     expect(screen.queryByRole('button', { name: 'Try that again' })).toBeNull()
+  })
+
+  /* The dead end Aaron and his sister walked into: ten shy answers, nothing
+     grounded, and a screen whose only working controls threw the evening
+     away. The conversation ending is fine; ending it with a live answer box
+     that returns the same sentence forever, and a disabled button beside it,
+     is the part that reads as "you answered wrong". */
+  it('closes the answer box and opens a door when the floor was never met',
+     async () => {
+    const leave = vi.fn()
+    answersWith(report({
+      asked: false, question: '', exchanges: 10, may_propose: false,
+      reason: 'That is 10 exchanges, which is as long as this conversation goes.',
+    }))
+    render(<ThemeInterview onPick={() => {}} onLeave={leave} />)
+
+    await screen.findByText(/as long as this conversation goes/)
+    expect(screen.queryByPlaceholderText(/However much or little/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Answer' })).toBeNull()
+
+    const out = screen.getByRole('button', { name: /Pick colours with me/ })
+    fireEvent.click(out)
+    expect(leave).toHaveBeenCalled()
+  })
+
+  it('keeps the proposal in reach when the ceiling arrives already ready',
+     async () => {
+    answersWith(report({
+      asked: false, question: '', exchanges: 10, may_propose: true, grounded: 3,
+      reason: 'That is 10 exchanges, which is as long as this conversation goes.',
+    }))
+    renderRoom()
+
+    await screen.findByText(/as long as this conversation goes/)
+    // The way out is for the case with nothing to read from; with three
+    // grounded answers the reading is the way out.
+    expect(screen.queryByRole('button', { name: /Pick colours with me/ })).toBeNull()
+    expect((screen.getByRole('button', { name: 'Suggest my colours' }) as
+      HTMLButtonElement).disabled).toBe(false)
   })
 })

@@ -666,6 +666,44 @@ def ground(slots: list[Any], transcript: list[dict[str, str]]
     return [kept[k] for k in SLOT_KINDS if k in kept], dropped
 
 
+def carry(previous: list[dict[str, str]],
+          fresh: list[dict[str, str]]) -> list[dict[str, str]]:
+    """What is known after a turn: what was known before, updated by this one.
+
+    `_closing_for` ends every mid-conversation instruction with "re-state
+    every slot you are confident of, including ones from earlier turns", and
+    for a long time that sentence was the only thing holding the readiness
+    count up. It is a rule enforced by nothing, and it drifts: run the
+    interview with the short, shy answers a first-timer actually gives and the
+    count goes 0, 1, 0, 1, 0 -- a model that mentioned `taste` on turn four and
+    reached for `temperament` on turn five silently *un-knew* the first one,
+    because the report was built from this turn's reading alone.
+
+    Downstream that is not a cosmetic wobble. `may_propose` counts distinct
+    kinds, so a count that can fall is a floor that can be walked away from,
+    and the person answering sees a reading that never becomes ready no matter
+    how much they say. It is commandment 2's failure exactly: the newcomer
+    concludes they are answering wrong.
+
+    So the previous reading is the floor a turn builds on, and a kind this
+    turn *did* speak to replaces what was there -- "last reading of a kind
+    wins" (`ground`) still holds, and refining "likes cats" into "likes big
+    cats, specifically" still lands. Both halves have been through `ground`
+    against the same transcript, so nothing gets carried that the person did
+    not say: this widens what is remembered, never what counts as evidence.
+
+    A model genuinely retracting a slot is the case this does not serve, and
+    it is the right thing to lose. The schema asks for the whole set every
+    turn, so an omission is overwhelmingly a lapse rather than a retraction --
+    and the two failures are not the same size. Carrying a stale slot forward
+    offers colours from something the person really did say a minute earlier;
+    dropping it offers nothing at all, forever.
+    """
+    kept = {s["kind"]: s for s in previous}
+    kept.update({s["kind"]: s for s in fresh})
+    return [kept[k] for k in SLOT_KINDS if k in kept]
+
+
 def may_propose(grounded: list[dict[str, str]]) -> bool:
     """Whether there is enough to propose from. Counted, never declared.
 
@@ -1174,7 +1212,11 @@ def run_ask(req: AskRequest, *,
     # they think instead of asking.
     if not question.endswith("?"):
         question = ""
-    grounded, dropped = ground(payload.get("slots") or [], history)
+    fresh, dropped = ground(payload.get("slots") or [], history)
+    # What the turn heard, on top of what was already known -- never instead
+    # of it. See `carry`: the prompt asks for every slot back each turn, and
+    # until this was here nothing checked that it got them.
+    grounded = carry(carried, fresh)
 
     # The backstop behind "never give the same fact twice": a fact the person
     # has already been told is dropped and counted, the same fate an
