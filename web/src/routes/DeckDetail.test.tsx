@@ -1967,3 +1967,44 @@ describe('deck history', () => {
     await screen.findByText('entombed Primeval Titan')
   })
 })
+
+describe('the 99 rolls up', () => {
+  // Feature 2 of the 2026-08-18 batch: each category folds away behind its
+  // header, and the fold survives leaving — the 99 is a place you arrange.
+  it('folds a category away behind its header', async () => {
+    renderDeck()
+    await screen.findByText('Primeval Titan')
+    const header = screen.getByRole('button', { name: /Ramp/ })
+    expect(header.getAttribute('aria-expanded')).toBe('true')
+
+    fireEvent.click(header)
+    expect(screen.queryByText('Primeval Titan')).toBeNull()
+    expect(header.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(header)
+    expect(screen.getByText('Primeval Titan')).toBeTruthy()
+  })
+
+  it('remembers the fold the way the wheel remembers its own', async () => {
+    renderDeck()
+    await screen.findByText('Primeval Titan')
+    fireEvent.click(screen.getByRole('button', { name: /Ramp/ }))
+    cleanup()
+
+    renderDeck()
+    await screen.findByRole('button', { name: /Ramp/ })
+    // The row list is unmounted, not hidden — the header still names the
+    // group and its count, so nothing is lost, only quiet.
+    expect(screen.queryByText('Primeval Titan')).toBeNull()
+  })
+
+  it('folds and unfolds everything from one control', async () => {
+    renderDeck()
+    await screen.findByText('Primeval Titan')
+    fireEvent.click(screen.getByRole('button', { name: 'Fold all' }))
+    expect(screen.queryByText('Primeval Titan')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unfold all' }))
+    expect(screen.getByText('Primeval Titan')).toBeTruthy()
+  })
+})
