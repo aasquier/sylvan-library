@@ -53,9 +53,32 @@ def test_deck_facts_belong_to_no_card() -> None:
 
 
 def test_every_major_arcanum_has_facts() -> None:
-    """The tier this pass promised. The 56 minors are owed theirs."""
     for key, name in tarot.MAJOR_ARCANA:
         assert tarotlore.for_card(key), f"{name} has nothing to say"
+
+
+def test_every_minor_has_at_least_five(minimum: int = 5) -> None:
+    """Aaron's number, 2026-08-18: at least five facts for every minor.
+
+    Pinned rather than trusted because the corpus was written suit by suit
+    and a card quietly left on four would be invisible — the reading would
+    still work, it would just be thinner at that one card forever.
+    """
+    thin = {card.key: len(tarotlore.for_card(card.key))
+            for card in tarot.DECK if card.arcana == "minor"
+            and len(tarotlore.for_card(card.key)) < minimum}
+    assert not thin, thin
+
+
+def test_no_card_in_the_deck_is_silent() -> None:
+    """All 78, including the Magic crossovers, which have no facts of their
+    own and are not supposed to — they are real cards wearing a trump, and
+    what they get is the deck tier plus whatever their trump carries."""
+    natural = [c for c in tarot.DECK if c.arcana in ("major", "minor")
+               and c.after is None]
+    assert len(natural) == 78
+    for card in natural:
+        assert tarotlore.for_card(card.key), card.key
 
 
 def test_no_fact_exceeds_the_wire_cap() -> None:

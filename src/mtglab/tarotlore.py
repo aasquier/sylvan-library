@@ -1726,6 +1726,358 @@ MINOR_FACTS: tuple[Fact, ...] = (
          "He is seated on bare earth and grass with no dais, in the open air. "
          "The King of Cups gets a slab in the sea and this one gets a field.",
          PLATE, "swords-14"),
+
+    # --------------------------------------------------------- pentacles
+    Fact("pentacles-01-garden",
+         "Under this Ace is a walled garden with an arched gateway cut "
+         "through the hedge, lilies in flower and mountains beyond. It is the "
+         "only Ace whose landscape has a door in it.",
+         PLATE, "pentacles-01"),
+    Fact("pentacles-01-star",
+         "The coin carries a five-pointed star drawn point-up inside a "
+         "circle. The Devil, six cards into the trumps, wears the same star "
+         "upside down over his head — the same symbol, turned over.",
+         PLATE, "pentacles-01"),
+    Fact("pentacles-01-flat",
+         "The hand holds the disc flat on an open palm rather than gripping "
+         "it. Of the four Aces this is the only one being offered rather than "
+         "held.",
+         PLATE, "pentacles-01"),
+    Fact("pentacles-01-suit",
+         "Pentacles were coins in the old Italian packs and became diamonds "
+         "in the French one. Waite's occult renaming turned money into a "
+         "talisman, which is a decision this suit's pictures keep arguing "
+         "with — half of them are about work and rent.",
+         "Michael Dummett, The Game of Tarot (1980)", "pentacles-01"),
+    Fact("pentacles-01-largest",
+         "It is the biggest single object on any Ace: the disc is wider than "
+         "the hand holding it. The earth suit gets the heaviest thing to "
+         "carry.",
+         PLATE, "pentacles-01"),
+
+    Fact("pentacles-02-lemniscate",
+         "The green ribbon looping between the two coins is a figure eight on "
+         "its side — the infinity sign, the same one over the Magician and "
+         "Strength. Here it is a real object he is actually holding.",
+         PLATE, "pentacles-02"),
+    Fact("pentacles-02-ships",
+         "Two ships ride heavy waves in the background, one lifting and one "
+         "dropping. He is juggling on the shore while the sea does the same "
+         "thing behind him.",
+         PLATE, "pentacles-02"),
+    Fact("pentacles-02-hat",
+         "His hat is an absurd tall orange cone, the silliest thing anybody "
+         "wears in the deck. Smith drew one joke costume in 78 cards and gave "
+         "it to the juggler.",
+         PLATE, "pentacles-02"),
+    Fact("pentacles-02-dance",
+         "He is up on one toe with the other leg crossed behind — a dance "
+         "step, not a stance. He and the children on the Ten of Cups are the "
+         "only figures in the deck actually moving their feet.",
+         PLATE, "pentacles-02"),
+    Fact("pentacles-02-juggler",
+         "The Magician was a juggler in the older decks before Waite promoted "
+         "him, and here is the juggler, still doing the job, down in the "
+         "suit of coins.",
+         f"{PLATE}; Michael Dummett, The Game of Tarot (1980)",
+         "pentacles-02"),
+
+    Fact("pentacles-03-mason",
+         "A sculptor stands on a bench with a mallet, working on the stone of "
+         "a church, while a monk and a hooded figure hold up the plans. It is "
+         "the only card in the deck about a job being done properly.",
+         PLATE, "pentacles-03"),
+    Fact("pentacles-03-three",
+         "The three coins are not objects here at all — they are worked into "
+         "the tracery of the arch above, as if carved. Smith let the suit "
+         "become architecture.",
+         PLATE, "pentacles-03"),
+    Fact("pentacles-03-plans",
+         "The plans in their hands are drawn as a real sheet with lines on "
+         "it. The design is being discussed in front of the man who has to "
+         "cut it.",
+         PLATE, "pentacles-03"),
+    Fact("pentacles-03-cloak",
+         "The hooded figure's cloak is patterned all over in pink and green "
+         "flowers, against a card that is otherwise nearly black. It is the "
+         "single brightest garment in the suit.",
+         PLATE, "pentacles-03"),
+    Fact("pentacles-03-dark",
+         "The interior is inked almost solid black around the three of them. "
+         "Smith drew a cathedral by drawing the dark and leaving the arch.",
+         PLATE, "pentacles-03"),
+
+    Fact("pentacles-04-four",
+         "He has one coin balanced on his crown, one clutched to his chest, "
+         "and one under each foot. All four are touching him and none of them "
+         "is anywhere else.",
+         PLATE, "pentacles-04"),
+    Fact("pentacles-04-city",
+         "A whole city is drawn behind him, towers and roofs across the "
+         "bottom of the card, and he has his back to every bit of it.",
+         PLATE, "pentacles-04"),
+    Fact("pentacles-04-outside",
+         "He is sitting outdoors on a low stool in the open, not indoors and "
+         "not on a throne. Smith put the deck's most possessive man in the "
+         "least secure place in it.",
+         PLATE, "pentacles-04"),
+    Fact("pentacles-04-arms",
+         "His arms are wrapped right round the coin at his chest with both "
+         "hands locked. It is the tightest grip on anything in the 78.",
+         PLATE, "pentacles-04"),
+    Fact("pentacles-04-balance",
+         "The coin on his head is balanced, not fixed — if he moves, he loses "
+         "it. The picture makes holding on look like a posture he cannot get "
+         "out of.",
+         PLATE, "pentacles-04"),
+
+    Fact("pentacles-05-window",
+         "The five coins are in a lit stained-glass window above the two "
+         "figures in the snow, and neither of them looks up at it. Help is "
+         "drawn directly over their heads.",
+         PLATE, "pentacles-05"),
+    Fact("pentacles-05-bell",
+         "The man on crutches has a bell hanging at his throat. That is a "
+         "leper's bell, which he is required to ring to warn people he is "
+         "coming.",
+         PLATE, "pentacles-05"),
+    Fact("pentacles-05-snow",
+         "It is snowing, and the snow is drawn as hundreds of separate white "
+         "flecks over a dark wall. It is the only weather like it in the deck.",
+         PLATE, "pentacles-05"),
+    Fact("pentacles-05-barefoot",
+         "The woman beside him is barefoot in the snow with her shawl over "
+         "her head. Smith drew the feet clearly enough that you cannot miss "
+         "it.",
+         PLATE, "pentacles-05"),
+    Fact("pentacles-05-outside",
+         "They are walking past the church rather than into it, and the door "
+         "is not in the picture. Whether they could go in is a question the "
+         "card refuses to answer.",
+         PLATE, "pentacles-05"),
+
+    Fact("pentacles-06-scales",
+         "The merchant holds a pair of scales in one hand and drops coins "
+         "into a beggar's palm with the other. He is weighing the charity "
+         "while he gives it.",
+         PLATE, "pentacles-06"),
+    Fact("pentacles-06-two",
+         "There are two beggars kneeling, one on each side, and he is giving "
+         "to only one of them. The other is still waiting with both hands out.",
+         PLATE, "pentacles-06"),
+    Fact("pentacles-06-standing",
+         "He is the only person standing. Smith arranged the three of them so "
+         "that the giving happens downward, which is the card's whole "
+         "argument with itself.",
+         PLATE, "pentacles-06"),
+    Fact("pentacles-06-coins",
+         "You can see the individual coins in mid-air between his fingers and "
+         "the beggar's hands, drawn as small circles. The transaction is "
+         "caught halfway.",
+         PLATE, "pentacles-06"),
+    Fact("pentacles-06-six",
+         "The six coins hang in the air in two columns of three, framing him "
+         "like a window. They are not in the scene, they are on the card.",
+         PLATE, "pentacles-06"),
+
+    Fact("pentacles-07-vine",
+         "Six coins hang in a leafy vine like fruit and the seventh lies on "
+         "the ground at his feet. He grew them, which no other card in the "
+         "suit claims.",
+         PLATE, "pentacles-07"),
+    Fact("pentacles-07-hoe",
+         "He is leaning on a long-handled tool with both hands folded over "
+         "the top of it and his chin nearly on his hands. It is the deck's "
+         "clearest picture of a pause in work.",
+         PLATE, "pentacles-07"),
+    Fact("pentacles-07-looking",
+         "His eyes are on the crop and his body is turned away from it. Smith "
+         "drew someone deciding whether it was worth it.",
+         PLATE, "pentacles-07"),
+    Fact("pentacles-07-boots",
+         "He is in heavy work boots and a plain smock, the most ordinarily "
+         "dressed figure in the 78 — no crown, no armour, no costume.",
+         PLATE, "pentacles-07"),
+    Fact("pentacles-07-one",
+         "The seventh coin is on the soil, apart from the others, drawn "
+         "slightly larger. Whatever the card is about, it is about that one.",
+         PLATE, "pentacles-07"),
+
+    Fact("pentacles-08-hammer",
+         "He is carving a coin with a hammer and chisel, and six finished "
+         "ones are nailed up on the post beside him. The eighth is on the "
+         "ground, waiting.",
+         PLATE, "pentacles-08"),
+    Fact("pentacles-08-post",
+         "The finished work is displayed in a vertical column up the right "
+         "edge of the card, like a signboard. He is making stock.",
+         PLATE, "pentacles-08"),
+    Fact("pentacles-08-town",
+         "There is a town in the distance on the left with a church tower, "
+         "and he is sitting outside it on a bench. He works apart from where "
+         "the work goes.",
+         PLATE, "pentacles-08"),
+    Fact("pentacles-08-smith",
+         "A working illustrator drawing a craftsman turning out identical "
+         "pieces to order is not nothing: Smith produced all 78 of these in "
+         "about six months, for a flat fee.",
+         f"{PLATE}; {UNTOLD_STORY}", "pentacles-08"),
+    Fact("pentacles-08-eyes",
+         "He is looking straight down at the chisel and nothing else, and his "
+         "face is entirely calm. It is the only card in the deck about "
+         "concentration.",
+         PLATE, "pentacles-08"),
+
+    Fact("pentacles-09-falcon",
+         "There is a hooded falcon sitting on her gloved left hand. Hooded "
+         "means trained — she is the only figure in the deck with a working "
+         "animal.",
+         PLATE, "pentacles-09"),
+    Fact("pentacles-09-snail",
+         "A snail is crawling across the ground in the bottom left corner, "
+         "small enough that most people never see it. It is the slowest thing "
+         "in the deck, in a garden that took years to grow.",
+         PLATE, "pentacles-09"),
+    Fact("pentacles-09-grapes",
+         "The vines behind her are heavy with grapes and enclosed by a wall, "
+         "with a manor house visible past it. Everything in the picture is "
+         "hers and the card is careful to show the boundary.",
+         PLATE, "pentacles-09"),
+    Fact("pentacles-09-alone",
+         "There is no other person anywhere in the picture. In a suit full of "
+         "employers, beggars and families, this one is deliberately by "
+         "herself and looks perfectly content.",
+         PLATE, "pentacles-09"),
+    Fact("pentacles-09-robe",
+         "Her robe is patterned all over with a small repeated flower device, "
+         "drawn individually across the whole garment. It is the most "
+         "laboured piece of cloth in the deck.",
+         PLATE, "pentacles-09"),
+
+    Fact("pentacles-10-tree",
+         "The ten coins are arranged in the pattern of the Kabbalistic Tree "
+         "of Life, laid over an ordinary family scene. It is the deck's most "
+         "openly occult diagram and it is hiding in a picture of a courtyard.",
+         f"{PLATE}; {PICTORIAL_KEY}", "pentacles-10"),
+    Fact("pentacles-10-dogs",
+         "Two white dogs stand at the old man's knee and one is being "
+         "touched. They are the only dogs in the deck besides the Fool's and "
+         "the one howling on The Moon.",
+         PLATE, "pentacles-10"),
+    Fact("pentacles-10-three",
+         "Three generations are in the frame: an old man seated, a couple "
+         "standing, and a child holding on to the woman. Nobody in the deck "
+         "else gets a family.",
+         PLATE, "pentacles-10"),
+    Fact("pentacles-10-ignored",
+         "The old man is the only one facing us and nobody in the picture is "
+         "looking at him. Smith drew the wealthiest card in the suit as a man "
+         "nobody is talking to.",
+         PLATE, "pentacles-10"),
+    Fact("pentacles-10-cloak",
+         "His robe is covered in grapes and vines, the same pattern the King "
+         "of this suit wears. The card puts the family's oldest man in the "
+         "king's clothes.",
+         PLATE, "pentacles-10"),
+
+    Fact("pentacles-11-holding",
+         "The Page holds the coin up in both hands at eye height and gazes "
+         "straight into it. All four Pages are doing something with the suit; "
+         "this one is simply looking.",
+         PLATE, "pentacles-11"),
+    Fact("pentacles-11-field",
+         "He is standing in a ploughed field with flowers at the edge of it "
+         "and trees behind. The earth suit's Page is the only court figure "
+         "standing on worked ground.",
+         PLATE, "pentacles-11"),
+    Fact("pentacles-11-yellow",
+         "The sky behind him is flat yellow with no cloud at all, which is "
+         "exactly what the Swords court cards never get. Each suit's weather "
+         "is consistent across its four royals.",
+         PLATE, "pentacles-11"),
+    Fact("pentacles-11-red",
+         "His head is wrapped in a long red cloth that falls down his back — "
+         "the same red as the Page of Wands' feather and nothing else in his "
+         "costume.",
+         PLATE, "pentacles-11"),
+    Fact("pentacles-11-float",
+         "The coin is not resting in his hands. It floats a little above "
+         "them, and Smith drew the gap.",
+         PLATE, "pentacles-11"),
+
+    Fact("pentacles-12-still",
+         "His horse is standing completely still with all four feet on the "
+         "ground, head down. Set beside the Knight of Swords at full gallop, "
+         "it is the deck's clearest joke about temperament.",
+         PLATE, "pentacles-12"),
+    Fact("pentacles-12-black",
+         "It is the only black horse in the deck, and a heavy one — a plough "
+         "horse rather than a charger.",
+         PLATE, "pentacles-12"),
+    Fact("pentacles-12-oak",
+         "There is a sprig of oak leaves in his helmet crest and another in "
+         "the horse's bridle. Smith gave the earth knight a plant instead of "
+         "a plume.",
+         PLATE, "pentacles-12"),
+    Fact("pentacles-12-field",
+         "The ground below is a ploughed field drawn in furrows right across "
+         "the bottom of the card. He is sitting at the edge of work that has "
+         "already been done.",
+         PLATE, "pentacles-12"),
+    Fact("pentacles-12-holds",
+         "He holds the coin out flat on his palm and looks at it rather than "
+         "ahead. Of the four knights he is the only one not going anywhere.",
+         PLATE, "pentacles-12"),
+
+    Fact("pentacles-13-rabbit",
+         "There is a rabbit in the bottom right corner of her bower. The "
+         "Queen of Wands has the deck's only cat and the Queen of Pentacles "
+         "has its only rabbit, both drawn small and easy to miss.",
+         PLATE, "pentacles-13"),
+    Fact("pentacles-13-roses",
+         "Roses arch right over her head on a trellis, making a bower she is "
+         "sitting inside. She is the only figure in the deck under a roof "
+         "made of flowers.",
+         PLATE, "pentacles-13"),
+    Fact("pentacles-13-lap",
+         "She holds the coin in her lap with both hands and looks down into "
+         "it. Compare the Queen of Cups gazing into her closed cup — Smith "
+         "gave the two earth-and-water queens the same absorbed posture.",
+         PLATE, "pentacles-13"),
+    Fact("pentacles-13-throne",
+         "Her stone throne is carved with fruit, goats' heads and a winged "
+         "cherub. The goat is Capricorn, an earth sign, worked into the "
+         "furniture.",
+         PLATE, "pentacles-13"),
+    Fact("pentacles-13-garden",
+         "Flowers grow right up to her feet and there is no floor, no dais "
+         "and no step. The earth queen is sitting on the ground she rules.",
+         PLATE, "pentacles-13"),
+
+    Fact("pentacles-14-bulls",
+         "Four bulls' heads are carved into his throne, two at the top and "
+         "two below. The bull is Taurus, and it is the earth suit's creature "
+         "the way salamanders belong to Wands and fish to Cups.",
+         PLATE, "pentacles-14"),
+    Fact("pentacles-14-vines",
+         "His whole robe is covered in grapevines with the fruit drawn on, "
+         "and more vines climb the throne behind him. He is the most heavily "
+         "patterned figure in the deck.",
+         PLATE, "pentacles-14"),
+    Fact("pentacles-14-castle",
+         "There is a castle behind him on the right with towers and a red "
+         "roof, and it is his. Of the four kings he is the only one with "
+         "property in the picture.",
+         PLATE, "pentacles-14"),
+    Fact("pentacles-14-armour",
+         "Look at his feet: there is armour showing under the vines. The "
+         "gardener king is dressed for a fight underneath.",
+         PLATE, "pentacles-14"),
+    Fact("pentacles-14-lap",
+         "The coin rests on his left knee under a loose hand rather than "
+         "being held up. He is the only royal in the deck not really holding "
+         "the suit at all.",
+         PLATE, "pentacles-14"),
 )
 
 

@@ -1834,7 +1834,7 @@ arc; this is what the next few sessions actually do.
     shipped as decoration (it matched line-by-line, and this codebase wraps
     its comments).
 
-    **Item 6 is begun** — `tarotlore.py`, the fourth reference-prose module.
+    **Item 6 is done** — `tarotlore.py`, the fourth reference-prose module.
     Aaron picked the well from four (2026-08-18): **Pamela Colman Smith and
     the 1909 deck** — who drew it, what she was paid, whose photographs of a
     fifteenth-century deck she had seen two years earlier, and what is
@@ -1851,17 +1851,28 @@ arc; this is what the next few sessions actually do.
     commandment 15's table getting the careful version.
 
     **Two tiers, and the deck tier is why no reading is ever empty.**
-    18 facts are about the deck and its makers and are true of every
-    spread — which matters because the sampler can deal three minors.
-    79 more are per-card, covering all 22 trumps.
+    18 facts are about the deck and its makers and are true
+    of every spread — which matters because the sampler can deal three
+    minors. 359 more are per-card, and **all 78 cards are
+    covered**: the 22 trumps, and every minor at Aaron's asked-for five
+    apiece or better. 377 facts in all.
 
-    **Still owed: the 56 minors, at Aaron's asked-for five facts apiece** —
-    roughly 280 more, in the same well. The mechanism, the dedup, the
-    rendering and the tests are done and do not change when they land; what
-    is left is the writing and the sourcing. One more finding came out of the
-    wiring: `FactNote` captioned every source-less fact "From this tool's own
-    colour reference data", so a fact about Pixie Smith would have been
-    credited to a table of Magic colours.
+    **None of the picture facts was written from memory.** Every one was
+    checked against the committed 1909 plate in `assets/tarot/` — rule 1's
+    habit applied to a deck instead of a pool — and the looking is what
+    produced the corpus's best material. The Aces and the sixteen court cards
+    carry printed title banners while the pips two to ten carry only a Roman
+    numeral. The Seven of Wands is wearing two different shoes. The Eight of
+    Wands and the Three of Swords have no person on them at all. There is
+    exactly one cat in the deck and one rabbit, both at a Queen's feet, and
+    the cat is the only animal looking straight out of a card. Each suit gave
+    its four royals a creature: salamanders to Wands, fish to Cups, birds and
+    butterflies to Swords, bulls to Pentacles. The Ten of Pentacles hides the
+    Tree of Life in a picture of a family in a courtyard.
+
+    One more finding came out of the wiring: `FactNote` captioned every
+    source-less fact "From this tool's own colour reference data", so a fact
+    about Pixie Smith would have been credited to a table of Magic colours.
 
 ---
 

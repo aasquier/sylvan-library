@@ -689,8 +689,10 @@ what she may say while she reads: a checked-in corpus about the 1909 deck and
 the woman who painted it (Aaron's choice of well, 2026-08-18), offered in the
 frame message and **cited by id**, so `theme.keep_fact` renders the corpus's
 own sentence and a paraphrase is discarded. The deck tier is true of every
-spread, which is why a reading of three minors is never empty; the 22 trumps
-have their own facts and the 56 minors are still owed theirs. The load-bearing
+spread, which is why a reading of three minors is never empty. **All 78 cards
+carry their own facts** (377 in total), every minor at five or better,
+and every picture fact was checked against the committed 1909 plate rather than
+recalled. The load-bearing
 decision is that `tarot.SPREAD`'s three positions **are** `SLOT_KINDS[:3]`
 (taste, temperament, posture) with `len(SPREAD) == FLOOR`: a card is dealt
 *for* a slot, so ADR 20's grounded-quote readiness works untouched and **the
