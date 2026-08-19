@@ -58,6 +58,12 @@ UNTOLD_STORY = ("Kaplan, Greer, O'Connor & Parsons, "
                 "Pamela Colman Smith: The Untold Story (U.S. Games, 2018)")
 PICTORIAL_KEY = "A. E. Waite, The Pictorial Key to the Tarot (1911)"
 
+#: For a fact about what is actually in the picture. The strongest citation
+#: this file has, because the reader is holding the evidence: every one of
+#: these was checked against the committed plate in `assets/tarot/` rather
+#: than recalled, which is rule 1's habit applied to a deck instead of a pool.
+PLATE = "The 1909 Rider plate itself — look at the card"
+
 
 @dataclass(frozen=True)
 class Fact:
@@ -635,7 +641,746 @@ CARD_FACTS: tuple[Fact, ...] = (
 )
 
 
-ALL: tuple[Fact, ...] = DECK_FACTS + CARD_FACTS
+#: The minor arcana. Aaron asked for five apiece (2026-08-18); the well is the
+#: same one the trumps draw from, and the richest seam in it turns out to be
+#: what Smith actually drew, because Waite's instructions ran out at card 22
+#: and these 56 are hers. Every picture fact here was checked against the
+#: committed plate rather than recalled.
+MINOR_FACTS: tuple[Fact, ...] = (
+
+    # ------------------------------------------------------------- wands
+    Fact("wands-01-hand",
+         "A hand comes out of a cloud holding a living branch — you can see "
+         "where the leaves are still sprouting off it, and several have "
+         "shaken loose and hang in the air. All four Aces in this deck are "
+         "that same disembodied hand offering you the suit.",
+         PLATE, "wands-01"),
+    Fact("wands-01-titled",
+         "Look at the bottom of an Ace and there is a printed banner: ACE of "
+         "WANDS. The numbered cards from two to ten have no title at all, "
+         "just a Roman numeral at the top — so the deck names its Aces and "
+         "its court cards and leaves the middle of each suit to the picture.",
+         PLATE, "wands-01"),
+    Fact("wands-01-castle",
+         "There is a castle on a crag in the bottom left, small enough to "
+         "miss, with a river running past it. Smith put scenery under almost "
+         "every Ace rather than leaving them floating.",
+         PLATE, "wands-01"),
+    Fact("wands-01-suits",
+         "Wands are the batons or staves of the old Italian packs, and they "
+         "are the ancestor of clubs in an ordinary deck of cards. Cups became "
+         "hearts, swords became spades, and coins became diamonds.",
+         "Michael Dummett, The Game of Tarot (1980)", "wands-01"),
+    Fact("wands-01-sprouting",
+         "Every wand in this suit is drawn as a rough cut branch still "
+         "putting out leaves, all 14 cards of it. Smith made the suit's "
+         "material alive, which is a decision no earlier deck had to make "
+         "because no earlier deck drew scenes on the pips.",
+         PLATE, "wands-01"),
+
+    Fact("wands-02-globe",
+         "The man is holding a globe of the world in his right hand, small "
+         "enough to sit in his palm, and looking out over a harbour. It is "
+         "the only globe in the deck.",
+         PLATE, "wands-02"),
+    Fact("wands-02-fixed",
+         "One of his two wands is strapped to the wall beside him and the "
+         "other is in his hand. He owns one and holds one, and the picture "
+         "makes you notice which is which.",
+         PLATE, "wands-02"),
+    Fact("wands-02-emblem",
+         "Carved into the wall on the left is a saltire of white lilies and "
+         "red roses — the same two flowers printed on the backs of this "
+         "deck, which collectors named the edition after.",
+         PLATE, "wands-02"),
+    Fact("wands-02-back",
+         "He is turned away from us, and so is the figure on the Three. Smith "
+         "used the back of a person far more than earlier decks did, which is "
+         "a theatre habit: it points your eye where the figure is looking.",
+         PLATE, "wands-02"),
+    Fact("wands-02-two-lands",
+         "The view splits down the middle — grey sea and a rocky shore on the "
+         "left, green fields and hills on the right. He is standing between "
+         "two different futures and the picture puts one under each hand.",
+         PLATE, "wands-02"),
+
+    Fact("wands-03-back",
+         "This is the clearest back-view in the deck: a figure on a headland "
+         "in a red robe and a green cloak, one hand on a staff, watching the "
+         "water. You never see his face, so you are made to look where he is "
+         "looking.",
+         PLATE, "wands-03"),
+    Fact("wands-03-water",
+         "Ships are out on the yellow water below him — the small marks in "
+         "the bay. Wands is the fire suit and this is one of the few cards in "
+         "it that is mostly about the sea.",
+         PLATE, "wands-03"),
+    Fact("wands-03-third",
+         "Two staves stand planted and he holds the third. Smith kept that "
+         "arrangement from the Two and added one, so the suit reads as a "
+         "sequence rather than as ten separate pictures.",
+         PLATE, "wands-03"),
+    Fact("wands-03-scarf",
+         "His cloak is patterned in a green and yellow check that appears "
+         "nowhere else in the deck. Smith had been designing and making "
+         "costumes for the London stage for years before this commission.",
+         f"{PLATE}; {UNTOLD_STORY}", "wands-03"),
+    Fact("wands-03-height",
+         "He is standing on a cliff edge with the ground falling away, which "
+         "is the same footing the Fool has on card zero. Smith liked putting "
+         "people where the next step matters.",
+         PLATE, "wands-03"),
+
+    Fact("wands-04-garland",
+         "A swag of flowers and fruit is slung between the tops of the four "
+         "staves, with ribbons tied at the outer two. It is the only card in "
+         "the deck where the suit's objects have been decorated.",
+         PLATE, "wands-04"),
+    Fact("wands-04-castle",
+         "There is a walled castle behind, with a red-roofed turret and small "
+         "figures gathered at the foot of the wall — a whole village party "
+         "going on in the background of a four of anything.",
+         PLATE, "wands-04"),
+    Fact("wands-04-bouquets",
+         "Two figures under the garland are holding bouquets up over their "
+         "heads. Nobody in the picture is looking at the wands, which are "
+         "simply the frame the celebration is happening inside.",
+         PLATE, "wands-04"),
+    Fact("wands-04-front",
+         "The four staves stand in front of everything, cutting across the "
+         "scene like the posts of a canopy you are standing under. Smith put "
+         "the viewer inside the card rather than in front of it.",
+         PLATE, "wands-04"),
+    Fact("wands-04-yellow",
+         "The sky is flat yellow, the same yellow as the Three and the "
+         "Seven's ground. The 1909 printing had a limited palette, and its "
+         "yellows carry an enormous amount of the deck's weather.",
+         PLATE, "wands-04"),
+
+    Fact("wands-05-brawl",
+         "Five young men are swinging staves at each other on broken ground, "
+         "and not one of them is looking at the same thing. It is the "
+         "busiest fight in the deck and nobody appears to be winning.",
+         PLATE, "wands-05"),
+    Fact("wands-05-clothes",
+         "Every one of the five is dressed differently — a green tunic, a red "
+         "one, a checked shirt, a blue jerkin, striped hose. Smith kept them "
+         "individual rather than drawing one boy five times.",
+         PLATE, "wands-05"),
+    Fact("wands-05-noharm",
+         "Nobody is hurt, nobody is bleeding, and no staff has landed. Read "
+         "beside the Nine, where a man stands bandaged, it is a picture of a "
+         "scuffle rather than a battle.",
+         PLATE, "wands-05"),
+    Fact("wands-05-mine",
+         "Waite's instructions ran out after the 22 trumps, so scenes like "
+         "this one are Smith's invention. The 56 minors are the half of the "
+         "deck nobody told her what to draw, and they are the half that made "
+         "it famous.",
+         f"{PICTORIAL_KEY}; {UNTOLD_STORY}", "wands-05"),
+    Fact("wands-05-sky",
+         "The sky behind them is empty pale blue with no horizon line at all "
+         "— the ground simply stops. Smith left out the landscape on the one "
+         "card where the people are too busy to see it.",
+         PLATE, "wands-05"),
+
+    Fact("wands-06-laurel",
+         "The rider wears a laurel wreath and there is a second one tied to "
+         "his staff with a red ribbon. Two crowns for one man, and the deck "
+         "does not do that anywhere else.",
+         PLATE, "wands-06"),
+    Fact("wands-06-heads",
+         "Look behind him and there are other heads and other staves at the "
+         "edge of the frame, walking. The card is a procession, and he is the "
+         "only one on a horse.",
+         PLATE, "wands-06"),
+    Fact("wands-06-cloth",
+         "The horse is draped in a green and white cloth with a fringe, and "
+         "you can see the harness is decorated. Smith dressed the animal as "
+         "carefully as the man.",
+         PLATE, "wands-06"),
+    Fact("wands-06-horses",
+         "White horses turn up on the Sun, on Death and here, and each rider "
+         "means something different by one. It is the deck's most reused "
+         "animal.",
+         PLATE, "wands-06"),
+    Fact("wands-06-faces",
+         "His face is in profile and calm, and none of the followers' faces "
+         "are finished. In a card about being cheered, only the man being "
+         "cheered has features.",
+         PLATE, "wands-06"),
+
+    Fact("wands-07-boots",
+         "He is wearing two different shoes. One foot has a boot and the "
+         "other something lower and lighter, and it has been argued about for "
+         "a century — a slip, a joke, or a man who dressed in a hurry to "
+         "defend the hill.",
+         PLATE, "wands-07"),
+    Fact("wands-07-highground",
+         "He is above the six staves coming at him from below the frame, so "
+         "you never see who is holding them. Smith kept the attackers out of "
+         "the picture entirely.",
+         PLATE, "wands-07"),
+    Fact("wands-07-six",
+         "Count them: six staves rising, and the seventh is in his hands. The "
+         "card's number includes his own weapon, which is not how the other "
+         "cards in the suit count.",
+         PLATE, "wands-07"),
+    Fact("wands-07-edge",
+         "There is water at the bottom left corner, so the ground he is "
+         "standing on runs out behind him. He has nowhere to retreat to and "
+         "the picture says so quietly.",
+         PLATE, "wands-07"),
+    Fact("wands-07-face",
+         "His expression is the most directly worried face in the suit, and "
+         "he is looking slightly past the viewer rather than at us. Smith "
+         "almost never draws a figure looking straight out.",
+         PLATE, "wands-07"),
+
+    Fact("wands-08-empty",
+         "There is no person on this card at all. Eight staves fly across the "
+         "sky over a river and a hill, and that is the whole picture — one of "
+         "the very few cards in the deck with nobody in it.",
+         PLATE, "wands-08"),
+    Fact("wands-08-angle",
+         "All eight run parallel on the same diagonal, dropping left to "
+         "right, with their leaves streaming behind them. Smith drew speed "
+         "with nothing but repetition and a slope.",
+         PLATE, "wands-08"),
+    Fact("wands-08-landing",
+         "They are angled down toward the bottom right, not up. Whatever was "
+         "thrown is coming in to land rather than setting out.",
+         PLATE, "wands-08"),
+    Fact("wands-08-house",
+         "There is a small hill with a building on it at the bottom left and "
+         "a river across the foot of the card, drawn in about a dozen strokes "
+         "— the only settled thing in a card about things in flight.",
+         PLATE, "wands-08"),
+    Fact("wands-08-plain",
+         "This is the plainest design in the suit, and it is the one that "
+         "reproduces best at a small size. Smith was a working illustrator "
+         "who knew what survives shrinking.",
+         f"{PLATE}; {UNTOLD_STORY}", "wands-08"),
+
+    Fact("wands-09-bandage",
+         "The man has a bandage wrapped round his head. He is the only "
+         "visibly wounded person in the whole deck, on a card where nothing "
+         "is currently happening to him.",
+         PLATE, "wands-09"),
+    Fact("wands-09-fence",
+         "Eight staves stand behind him in a line like a palisade, and the "
+         "ninth is in his hands. He has built a fence out of the suit and is "
+         "standing in front of it.",
+         PLATE, "wands-09"),
+    Fact("wands-09-looking",
+         "He is turned to the side and looking off past the edge of the card, "
+         "not at the wands and not at us. Whatever he is watching for is "
+         "outside the picture.",
+         PLATE, "wands-09"),
+    Fact("wands-09-hills",
+         "Behind the palisade there is a low range of hills and nothing "
+         "else — no army, no attacker, no smoke. The threat this card is "
+         "about is not in it.",
+         PLATE, "wands-09"),
+    Fact("wands-09-grip",
+         "His hands are wrapped round the staff at chest height, holding it "
+         "upright rather than levelled. It is a guard, not an attack, and "
+         "Smith drew the difference.",
+         PLATE, "wands-09"),
+
+    Fact("wands-10-face",
+         "You cannot see his face. He is bent forward under all ten staves "
+         "with the bundle in front of his head, and Smith hid the one thing "
+         "the rest of the deck always shows you.",
+         PLATE, "wands-10"),
+    Fact("wands-10-town",
+         "There is a house with a red roof and some trees ahead of him on the "
+         "right. He is nearly there, which is either a comfort or the joke, "
+         "depending on the reading.",
+         PLATE, "wands-10"),
+    Fact("wands-10-splay",
+         "The ten staves splay out at the top like a fan, so the load is much "
+         "wider than the man. Smith made the burden look awkward rather than "
+         "just heavy.",
+         PLATE, "wands-10"),
+    Fact("wands-10-grip",
+         "He is carrying all ten in his two arms with none over a shoulder "
+         "and none dropped. Whatever else is true, he has not put any of it "
+         "down.",
+         PLATE, "wands-10"),
+    Fact("wands-10-last",
+         "The tens are the last of the numbered cards, and in this suit the "
+         "sequence runs from one branch offered by a hand to ten of them "
+         "carried by one man. Smith gave the suit an arc.",
+         PLATE, "wands-10"),
+
+    Fact("wands-11-salamander",
+         "The Page's yellow tunic is covered in salamanders — the creature "
+         "that was believed to live in fire. They run through all four Wands "
+         "court cards, which is how the suit says it is the fire suit "
+         "without a single flame.",
+         PLATE, "wands-11"),
+    Fact("wands-11-pyramids",
+         "There are pyramids in the desert behind him, and behind the Knight "
+         "as well. The Golden Dawn's Egypt shows up in the scenery of this "
+         "suit more than anywhere else in the deck.",
+         f"{PLATE}; {UNTOLD_STORY}", "wands-11"),
+    Fact("wands-11-court",
+         "Page, Knight, Queen, King — four court cards per suit where an "
+         "ordinary pack has three. The Knight is the extra one, and it is "
+         "what makes a tarot deck 78 cards instead of 56.",
+         "Michael Dummett, The Game of Tarot (1980)", "wands-11"),
+    Fact("wands-11-hat",
+         "His hat has a red feather standing straight up out of it, drawn "
+         "like a small flame. Smith put the suit's element on his head "
+         "without drawing fire.",
+         PLATE, "wands-11"),
+    Fact("wands-11-looking-up",
+         "He is holding the staff at arm's length and looking up its length "
+         "at the leaves. Every court card in this suit is doing something "
+         "with the wand; nobody is simply holding it.",
+         PLATE, "wands-11"),
+
+    Fact("wands-12-rearing",
+         "The horse is up on its hind legs with both front hooves off the "
+         "ground. It is the only horse in the deck that is not standing "
+         "still or walking.",
+         PLATE, "wands-12"),
+    Fact("wands-12-plume",
+         "A long orange plume streams off the back of his helmet, and more "
+         "orange shows at his elbows. Smith gave the fire suit its colour in "
+         "the trim rather than the ground.",
+         PLATE, "wands-12"),
+    Fact("wands-12-salamanders",
+         "His surcoat carries the same salamanders as the Page's tunic — and "
+         "if you look closely, some of them are drawn with their tails in "
+         "their mouths and some are not, which is the old sign for a thing "
+         "completed or not yet.",
+         PLATE, "wands-12"),
+    Fact("wands-12-armour",
+         "He is in full plate under the surcoat, the only Wands court figure "
+         "in armour. The other three are in cloth.",
+         PLATE, "wands-12"),
+    Fact("wands-12-pyramids",
+         "The same three pyramids from the Page's card sit on the horizon "
+         "behind him. The two of them are in the same place, at different "
+         "speeds.",
+         PLATE, "wands-12"),
+
+    Fact("wands-13-cat",
+         "There is a black cat sitting at the Queen's feet, facing straight "
+         "out of the card. It is the only cat in all 78, and the only animal "
+         "in the deck looking directly at the reader.",
+         PLATE, "wands-13"),
+    Fact("wands-13-sunflower",
+         "She is holding a staff in one hand and a sunflower in the other, "
+         "and there is another sunflower worked into her throne. She is the "
+         "only figure in the deck holding a flower that is not a rose or a "
+         "lily.",
+         PLATE, "wands-13"),
+    Fact("wands-13-lions",
+         "Lions are carved on both arms of her throne and on the cloth "
+         "hanging behind it, facing outward. The same lion turns up on "
+         "Strength, being closed rather than displayed.",
+         PLATE, "wands-13"),
+    Fact("wands-13-open",
+         "She is the only court figure in this suit sitting square to the "
+         "viewer with her knees apart under the robe. Every other seated "
+         "royal in the deck is angled.",
+         PLATE, "wands-13"),
+    Fact("wands-13-crown",
+         "Her crown is worked with leaves rather than points, matching the "
+         "sprouting staff beside her. Smith kept the suit's living wood on "
+         "her head.",
+         PLATE, "wands-13"),
+
+    Fact("wands-14-salamander",
+         "There is a live salamander on the ground beside the King's foot, "
+         "small and easy to miss, drawn in a few strokes. His throne and "
+         "cloak are covered in them; that one is real.",
+         PLATE, "wands-14"),
+    Fact("wands-14-profile",
+         "He is seated in profile, turned away, mid-movement — the least "
+         "settled king in the deck. The other three sit square and face you.",
+         PLATE, "wands-14"),
+    Fact("wands-14-lions",
+         "The cloth behind his throne carries both lions and salamanders "
+         "together, which no other court card does. The Queen has lions "
+         "alone; he has both.",
+         PLATE, "wands-14"),
+    Fact("wands-14-staff",
+         "His staff rests on the ground and leans away from him rather than "
+         "standing upright, held loosely near the top. He is the only royal "
+         "not gripping the suit.",
+         PLATE, "wands-14"),
+    Fact("wands-14-nothrone",
+         "There is almost no background at all — a bare grey step, a hanging, "
+         "and empty sky. Smith gave the fire suit's king less scenery than "
+         "she gave its Page.",
+         PLATE, "wands-14"),
+
+    # -------------------------------------------------------------- cups
+    Fact("cups-01-dove",
+         "A dove is coming down into the cup with a disc in its beak marked "
+         "with a cross — a communion wafer. It is the most openly Christian "
+         "image in the deck, sitting in a pack an occult society published.",
+         PLATE, "cups-01"),
+    Fact("cups-01-letter",
+         "There is a large letter on the front of the chalice. Read one way "
+         "up it is a W, and turned over it is an M, and nobody has ever "
+         "settled which Smith meant.",
+         PLATE, "cups-01"),
+    Fact("cups-01-five",
+         "Five streams pour out of a cup with four spouts, and the water "
+         "falls in separate drops all the way down. Smith drew about "
+         "twenty-six of them, individually.",
+         PLATE, "cups-01"),
+    Fact("cups-01-pond",
+         "Underneath is a pond crowded with lily pads and open water lilies. "
+         "The suit's element is not just implied here — the card's whole "
+         "bottom edge is water.",
+         PLATE, "cups-01"),
+    Fact("cups-01-suit",
+         "Cups are the ancestor of hearts in an ordinary pack, and in the "
+         "oldest Italian decks they were literally drinking vessels stacked "
+         "in a row. Giving them scenes instead is the innovation this deck is "
+         "famous for.",
+         "Michael Dummett, The Game of Tarot (1980)", "cups-01"),
+
+    Fact("cups-02-caduceus",
+         "Above the couple floats a caduceus — two snakes twined round a rod "
+         "— topped with a winged lion's head. It is the strangest object in "
+         "the minor arcana and Waite specified it exactly.",
+         f"{PLATE}; {PICTORIAL_KEY}", "cups-02"),
+    Fact("cups-02-exchange",
+         "They are each holding a cup and reaching toward the other's. The "
+         "card is the moment before the exchange rather than after it.",
+         PLATE, "cups-02"),
+    Fact("cups-02-wreaths",
+         "She wears a wreath of leaves and he a wreath of red flowers, and "
+         "his tunic is scattered with the same flowers. Smith dressed them as "
+         "a matched pair without making them look alike.",
+         PLATE, "cups-02"),
+    Fact("cups-02-house",
+         "There is a small house with a red roof on a green rise behind them, "
+         "drawn tiny. Almost every happy card in this suit has a house in the "
+         "background somewhere.",
+         PLATE, "cups-02"),
+    Fact("cups-02-ground",
+         "The ground under them is bare and level, with no path and no "
+         "furniture. Smith cleared the stage so the only thing happening is "
+         "the two of them.",
+         PLATE, "cups-02"),
+
+    Fact("cups-03-dance",
+         "Three women are dancing in a ring with their cups raised until the "
+         "rims nearly touch overhead. It is the only round dance in the deck.",
+         PLATE, "cups-03"),
+    Fact("cups-03-harvest",
+         "At their feet are pumpkins, grapes and apples lying loose on the "
+         "ground. This is the harvest card of the suit and Smith paid the "
+         "fruit as much attention as the faces.",
+         PLATE, "cups-03"),
+    Fact("cups-03-three-robes",
+         "One is in white, one in orange over deep red, one in cream. Their "
+         "robes are three different weights of cloth, which is a costume "
+         "designer's distinction rather than an illustrator's.",
+         f"{PLATE}; {UNTOLD_STORY}", "cups-03"),
+    Fact("cups-03-middle",
+         "The woman in the middle has her back to us and the other two are "
+         "turned in. You are standing outside a circle that has already "
+         "closed.",
+         PLATE, "cups-03"),
+    Fact("cups-03-feet",
+         "Look at the feet: bare, sandalled and shod, one of each. Smith kept "
+         "the three of them individual right down to the ground.",
+         PLATE, "cups-03"),
+
+    Fact("cups-04-arms",
+         "He is sitting under a tree with his arms folded and his legs "
+         "crossed — closed at both ends. Smith made refusal a posture rather "
+         "than an expression.",
+         PLATE, "cups-04"),
+    Fact("cups-04-fourth",
+         "A hand comes out of a cloud offering a fourth cup, exactly like the "
+         "hand on the Ace. Three already stand in the grass in front of him "
+         "and he is not looking at any of them.",
+         PLATE, "cups-04"),
+    Fact("cups-04-tree",
+         "The tree he is leaning against grows straight up the middle of the "
+         "card and out of the top of the frame. It splits the picture into "
+         "the offer and the man refusing it.",
+         PLATE, "cups-04"),
+    Fact("cups-04-eyes",
+         "His eyes are open and aimed at the ground in front of him — he is "
+         "not asleep, which is the reading the posture invites. Smith drew "
+         "the pupils.",
+         PLATE, "cups-04"),
+    Fact("cups-04-cloud",
+         "The cloud that hands him the cup is the only thing in the sky. In a "
+         "suit full of scenery, this card has almost none.",
+         PLATE, "cups-04"),
+
+    Fact("cups-05-black",
+         "The figure is a solid black column from shoulder to ankle — the "
+         "largest single area of flat black in the deck. Smith turned "
+         "mourning into a shape.",
+         PLATE, "cups-05"),
+    Fact("cups-05-three-two",
+         "Three cups lie spilled in front of him and two still stand upright "
+         "behind him. He is looking at the three, and the picture makes very "
+         "sure you can see the two.",
+         PLATE, "cups-05"),
+    Fact("cups-05-bridge",
+         "There is a river with a bridge over it leading to a castle on the "
+         "far bank. The way out of the card is drawn in, behind his back.",
+         PLATE, "cups-05"),
+    Fact("cups-05-sky",
+         "The sky is flat grey and takes up over half the card, with no "
+         "horizon feature at all. It is the bleakest surface in the deck and "
+         "it was made by leaving the paper nearly bare.",
+         PLATE, "cups-05"),
+    Fact("cups-05-spill",
+         "The spilled wine is drawn as small red and blue pools around the "
+         "fallen cups. Two different liquids came out of three cups, and "
+         "nobody has explained it.",
+         PLATE, "cups-05"),
+
+    Fact("cups-06-flowers",
+         "Every one of the six cups has a white five-petalled flower growing "
+         "out of it. Nothing is being drunk on this card; the cups have "
+         "become planters.",
+         PLATE, "cups-06"),
+    Fact("cups-06-children",
+         "Two children stand among them, the taller in a red hood handing a "
+         "cup down to the smaller. It is the only card in the deck where one "
+         "person gives another something without ceremony.",
+         PLATE, "cups-06"),
+    Fact("cups-06-guard",
+         "In the background a figure with a halberd is walking away up a "
+         "path, out of the picture. Smith put an adult in the scene and sent "
+         "him off.",
+         PLATE, "cups-06"),
+    Fact("cups-06-shield",
+         "There is a stone plinth on the left carrying a shield with a saltire "
+         "— a diagonal cross — on it. The same X shape turns up on the "
+         "heraldry of the Two of Wands' wall.",
+         PLATE, "cups-06"),
+    Fact("cups-06-yellow",
+         "The whole courtyard is washed in the deck's warm yellow, walls and "
+         "ground alike, with the sky the only cool thing in it. It is the "
+         "most golden card in the suit.",
+         PLATE, "cups-06"),
+
+    Fact("cups-07-seven",
+         "Seven cups float in cloud, and each holds something different: a "
+         "head, a veiled figure with light coming off it, a snake, a castle, "
+         "a heap of jewels, a laurel wreath and a dragon. It is the most "
+         "crowded minor card in the deck.",
+         PLATE, "cups-07"),
+    Fact("cups-07-skull",
+         "The cup under the laurel wreath has a skull drawn on the bowl "
+         "itself. The prize and the warning are on the same object.",
+         PLATE, "cups-07"),
+    Fact("cups-07-silhouette",
+         "The man looking up at them is a flat black silhouette with no face "
+         "and no detail — the only figure in the deck drawn that way. You "
+         "cannot tell anything about who is choosing.",
+         PLATE, "cups-07"),
+    Fact("cups-07-veiled",
+         "The shrouded shape in the middle cup is drawn glowing, with rays "
+         "coming off the cloth, and its face is covered. Smith left the best "
+         "thing on offer unidentifiable.",
+         PLATE, "cups-07"),
+    Fact("cups-07-reach",
+         "His arm is out and his hand is open, but it is not near any of "
+         "them. The card catches him before the choice.",
+         PLATE, "cups-07"),
+
+    Fact("cups-08-moon",
+         "The moon in the sky is a crescent drawn inside a full disc with a "
+         "face in profile — the exact device from The Moon trump. Smith reused "
+         "her own moon rather than drawing a new one.",
+         PLATE, "cups-08"),
+    Fact("cups-08-gap",
+         "The eight cups are stacked five along the bottom and three on top, "
+         "with a deliberate gap in the upper row. Something has been taken "
+         "out of the arrangement and the hole is the point.",
+         PLATE, "cups-08"),
+    Fact("cups-08-away",
+         "He is walking away from us into the hills with a staff, and we see "
+         "only his back and one turned cheek. He leaves by the top of the "
+         "card, which is the least usual exit in the deck.",
+         PLATE, "cups-08"),
+    Fact("cups-08-red",
+         "His cloak and boots are the only strong red on the card, against "
+         "green hills and grey water. Smith made the one moving thing the one "
+         "warm thing.",
+         PLATE, "cups-08"),
+    Fact("cups-08-water",
+         "He is walking along a shoreline, so the whole journey runs beside "
+         "water. In the suit of cups, leaving is drawn as going up out of it.",
+         PLATE, "cups-08"),
+
+    Fact("cups-09-counter",
+         "The nine cups stand on a curved counter draped in blue cloth, "
+         "arranged in an arc behind him. It reads like a shop display or a "
+         "bar, and he is sitting in front of it.",
+         PLATE, "cups-09"),
+    Fact("cups-09-arms",
+         "His arms are folded exactly like the man on the Four of Cups, and "
+         "his face is the opposite. Same posture, completely different card.",
+         PLATE, "cups-09"),
+    Fact("cups-09-bench",
+         "He is on a small low wooden bench, much too plain for the display "
+         "behind him. Smith seated the deck's most satisfied man on almost "
+         "nothing.",
+         PLATE, "cups-09"),
+    Fact("cups-09-yellow",
+         "The background is flat unbroken yellow, top to bottom, with no "
+         "scenery at all. It is the boldest colour field in the deck.",
+         PLATE, "cups-09"),
+    Fact("cups-09-hat",
+         "He wears a red cap with a long tail hanging down the back, and the "
+         "same hat shape turns up on the Two of Wands. Smith had a small "
+         "wardrobe and reused it.",
+         PLATE, "cups-09"),
+
+    Fact("cups-10-rainbow",
+         "The ten cups sit inside a rainbow arching right across the sky. It "
+         "is the only rainbow in the deck.",
+         PLATE, "cups-10"),
+    Fact("cups-10-four",
+         "There are four people: a couple with their arms round each other "
+         "and their free arms flung up, and two children dancing hand in hand "
+         "beside them. Nobody is looking at the cups.",
+         PLATE, "cups-10"),
+    Fact("cups-10-backs",
+         "All four have their backs to us. In the deck's happiest card you "
+         "cannot see a single face.",
+         PLATE, "cups-10"),
+    Fact("cups-10-house",
+         "A house with a red roof stands among trees on the right, and a "
+         "river runs across the field. It is the same red roof from the Two "
+         "and the Ten of Wands.",
+         PLATE, "cups-10"),
+    Fact("cups-10-children",
+         "The two children are drawn mid-step with their feet off the ground, "
+         "which almost nothing else in the deck is. Smith could draw "
+         "movement and mostly chose not to.",
+         PLATE, "cups-10"),
+
+    Fact("cups-11-fish",
+         "A fish is rising out of the Page's cup and looking him in the face. "
+         "It is the only card in the deck where an animal comes out of an "
+         "object.",
+         PLATE, "cups-11"),
+    Fact("cups-11-hat",
+         "His hat is a soft rolled cap with a long tail of cloth hanging off "
+         "it, and it is the most elaborate headgear on any Page. Smith had "
+         "made hats for the stage.",
+         f"{PLATE}; {UNTOLD_STORY}", "cups-11"),
+    Fact("cups-11-lotus",
+         "His tunic is patterned all over with lotus flowers, and the sea is "
+         "drawn behind him in flat wavy bands. Every Cups court card has "
+         "water in it somewhere.",
+         PLATE, "cups-11"),
+    Fact("cups-11-calm",
+         "He is holding the cup out at arm's length and looking at the fish "
+         "quite calmly, with his other hand on his hip. Nobody in this deck "
+         "is startled by anything.",
+         PLATE, "cups-11"),
+    Fact("cups-11-pink",
+         "The pink and blue of his costume appear together nowhere else in "
+         "the 78. The 1909 printing had a narrow palette and Smith spent an "
+         "unusual amount of it here.",
+         PLATE, "cups-11"),
+
+    Fact("cups-12-wings",
+         "There are wings on his helmet and wings on his heels. The Knight of "
+         "Cups is dressed as Hermes, and he is the only winged human figure "
+         "in the deck.",
+         PLATE, "cups-12"),
+    Fact("cups-12-walking",
+         "His horse is walking, one hoof lifted, with its head down. Set it "
+         "beside the Knight of Wands rearing on the other side of the deck "
+         "and the two suits introduce themselves.",
+         PLATE, "cups-12"),
+    Fact("cups-12-level",
+         "He carries the cup out in front of him, perfectly level, like "
+         "something he has been asked not to spill. No other court figure "
+         "holds the suit that carefully.",
+         PLATE, "cups-12"),
+    Fact("cups-12-fish",
+         "His surcoat is covered in fish, the way the Wands courts are "
+         "covered in salamanders. Each suit gave its royals a creature.",
+         PLATE, "cups-12"),
+    Fact("cups-12-stream",
+         "A stream runs across the bottom right of the card and he is riding "
+         "toward it. The Cups knight is always drawn approaching water rather "
+         "than in it.",
+         PLATE, "cups-12"),
+
+    Fact("cups-13-closed",
+         "Her cup has a lid on it, with handles shaped like angels and a "
+         "little tower on top. It is the only closed cup in the suit, and she "
+         "is the only person in the deck holding something she cannot drink "
+         "from.",
+         PLATE, "cups-13"),
+    Fact("cups-13-throne",
+         "Her stone throne is carved with cherubs at the top and a small "
+         "child-like figure at the base, and it is standing at the water's "
+         "edge. The sea comes right up to her feet.",
+         PLATE, "cups-13"),
+    Fact("cups-13-pebbles",
+         "The shore under her is drawn as a spread of coloured pebbles, each "
+         "one individually shaded. It is one of the most patiently drawn "
+         "square inches in the deck.",
+         PLATE, "cups-13"),
+    Fact("cups-13-looking",
+         "She is gazing straight into the closed cup and nowhere else. Every "
+         "other royal in the deck is looking out at something.",
+         PLATE, "cups-13"),
+    Fact("cups-13-profile",
+         "She is drawn in full profile with her feet together — the most "
+         "still figure in the 78. Smith gave the water suit's queen no "
+         "movement at all.",
+         PLATE, "cups-13"),
+
+    Fact("cups-14-sea",
+         "His throne is a stone block sitting in open water, with waves "
+         "breaking round the base. The King of Cups is the only figure in the "
+         "deck enthroned at sea.",
+         PLATE, "cups-14"),
+    Fact("cups-14-fish",
+         "A fish leaps out of the water on his left and a ship sails on his "
+         "right, both small and easy to miss. He has the suit's creature and "
+         "the suit's traffic on either side of him.",
+         PLATE, "cups-14"),
+    Fact("cups-14-two-hands",
+         "He holds a cup in one hand and a short sceptre in the other, and "
+         "neither is raised. He is the only king carrying two things.",
+         PLATE, "cups-14"),
+    Fact("cups-14-fish-pendant",
+         "There is a fish worked into the pendant at his throat as well as "
+         "swimming beside him. Smith put the emblem on the man and the animal "
+         "in the water.",
+         PLATE, "cups-14"),
+    Fact("cups-14-dry",
+         "His throne is wet to the base and his feet are dry on the slab. "
+         "Whatever else the card says, the king of the water suit is not in "
+         "it.",
+         PLATE, "cups-14"),
+)
+
+
+#: Every per-card fact, trumps and minors together. `CARD_FACTS` and
+#: `MINOR_FACTS` stay separate above only because they were written and
+#: reviewed in two passes; nothing downstream cares which tier a card
+#: sits in, and `for_card` must never have to.
+ALL_CARD_FACTS: tuple[Fact, ...] = CARD_FACTS + MINOR_FACTS
+
+ALL: tuple[Fact, ...] = DECK_FACTS + ALL_CARD_FACTS
 
 _BY_ID: dict[str, Fact] = {f.id.casefold(): f for f in ALL}
 
@@ -656,8 +1401,8 @@ def by_id(fact_id: str) -> Fact | None:
 
 
 def for_card(key: str) -> tuple[Fact, ...]:
-    """Everything known about one card. Empty for the 56 minors, so far."""
-    return tuple(f for f in CARD_FACTS if f.card == key)
+    """Everything known about one card, whichever tier it belongs to."""
+    return tuple(f for f in ALL_CARD_FACTS if f.card == key)
 
 
 def for_reading(keys: tuple[str, ...] | list[str]) -> tuple[Fact, ...]:
@@ -704,3 +1449,4 @@ def offer(keys: tuple[str, ...] | list[str], told: tuple[str, ...] = ()) -> str:
             "so choose the one that belongs and let your question carry the "
             "connection. Never retell one, and never write your own.\n"
             + "\n".join(lines))
+

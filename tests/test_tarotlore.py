@@ -69,13 +69,21 @@ def test_no_fact_exceeds_the_wire_cap() -> None:
         assert len(fact.text) <= theme.MAX_FACT_CHARS, fact.id
 
 
-def test_a_reading_of_three_minors_still_has_something_to_say() -> None:
-    """Why the deck tier exists. The sampler can deal three minors, and a
-    fortune-teller with nothing to say while the model thinks is the failure
-    this corpus was written against."""
-    offered = tarotlore.for_reading(["cups-04", "wands-07", "swords-02"])
-    assert len(offered) == len(tarotlore.DECK_FACTS)
-    assert offered
+def test_every_card_in_the_deck_brings_the_whole_deck_tier() -> None:
+    """Why the deck tier exists, stated as the invariant rather than a case.
+
+    The sampler can deal any three of the 78, and a fortune-teller with
+    nothing to say while the model thinks is the failure this corpus was
+    written against. An earlier version of this test asserted that three
+    named minors yielded *exactly* the deck tier — which quietly stopped
+    testing anything the moment those minors got facts of their own. What
+    must hold for ever is that no card can subtract from the deck tier.
+    """
+    deck_ids = {f.id for f in tarotlore.DECK_FACTS}
+    assert deck_ids
+    for card in tarot.DECK:
+        offered = {f.id for f in tarotlore.for_reading([card.key])}
+        assert deck_ids <= offered, card.key
 
 
 def test_a_reading_offers_the_deck_and_its_own_cards() -> None:
