@@ -127,8 +127,31 @@ def test_every_response_carries_the_security_headers(client):
         assert r.headers["X-Frame-Options"] == "DENY"
         assert r.headers["Referrer-Policy"] == "same-origin"
         assert r.headers["Permissions-Policy"] == (
-            "camera=(), microphone=(), geolocation=()")
+            "camera=(self), microphone=(), geolocation=()")
         assert "Strict-Transport-Security" not in r.headers
+
+
+def test_the_camera_door_is_the_one_sensor_the_policy_allows(client):
+    """Asserted as a truth table rather than as the literal string above,
+    because the literal is what let this ship broken.
+
+    `camera=()` denies the origin itself, so the camera import (ADR 34) could
+    not open a camera on the deployed instance at all -- `getUserMedia`
+    rejects and the door reports a refusal the reader never made. The string
+    assertion passed the whole time, being an exact match for the bug. What
+    matters is which capability each entry grants and to whom, so that is
+    what is checked: the camera door works, and nothing else is reachable.
+    """
+    policy = client.get("/api/health").headers["Permissions-Policy"]
+    entries = dict(
+        part.strip().split("=", 1) for part in policy.split(",") if part.strip()
+    )
+    # The one sensor with a door: allowed to this origin, and only this one.
+    # `()` here would break the feature; `*` would hand it to any frame.
+    assert entries["camera"] == "(self)"
+    # The two the app has no use for: denied to everyone, self included.
+    assert entries["microphone"] == "()"
+    assert entries["geolocation"] == "()"
 
 
 def test_large_responses_are_gzipped(client):
