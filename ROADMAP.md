@@ -1874,6 +1874,34 @@ arc; this is what the next few sessions actually do.
     source-less fact "From this tool's own colour reference data", so a fact
     about Pixie Smith would have been credited to a table of Magic colours.
 
+16. **About Claude became Claude's room, and the room came alive** —
+    2026-08-18, one branch. The masthead is a generated moonlit library
+    (Aaron rendered Claude's numbered scene brief with Seedance; a measured
+    ping-pong makes it loop seamlessly), Syr Gwyn got her exhibit case
+    under the bio (commandment 4 shown a face, fetched live from the pool),
+    **commandment 18** gave the page to its keeper, and the motion tier
+    grew **`breath`** — a phase-warped swell that dwells at rest, the
+    no-depth floor for paintings a pan would mistreat. The gallery and the
+    heart wear `CommanderMotion` with per-piece effect ladders, and the
+    cover crop learned a `center` anchor after Avon's portrait Island
+    traded its subject for its sky under the hero band's `top`.
+
+    **Next branch out of this one: region-scoped motion.** Aaron's asks
+    from the first walk, in order: a **flame** for Syr Gwyn's torch, and
+    **livelier cranes** on Farewell — both the same machinery, a masked
+    region of a painting carrying its own displacement field (the
+    animist's `spectral_noise` + `advect` are the primitives, a heat-haze
+    warp scoped to a region). Two design decisions gate it, ADR-worthy:
+    (a) a per-card mask must ride the cache fingerprint, which breaks the
+    fixed `Effect` roster — per-card effect *instances* are the load-
+    bearing change; (b) the vocabulary line: displacement-only shimmer
+    reads as presentation and stays inside Scryfall's guidelines. A
+    **person animator** (Poole's readers walking) was considered and
+    **counselled against**: animating painted figures is synthesizing new
+    content from Wizards' art rather than presenting it, and the Fan
+    Content Policy is a hard boundary (commandment 9). The readers keep
+    reading.
+
 ---
 
 ## 1. Analyse or generate decks with simulation

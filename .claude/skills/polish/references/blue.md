@@ -88,6 +88,16 @@ files against them.
   out of git (caught 2026-08-16, by driving the live surface). Grep
   `web/src` for captions and helper text that state where data lives or
   what records what, and check each against the ADR that owns the fact.
+- **About Claude is Claude's page (commandment 18), and this facet is its
+  keeper.** Each run, open `/claude` on the live instance and read it as its
+  author, because that is who is reading it: is every claim still true (the
+  exhibit cases — the commanders and the heart — still resolve from the
+  pool, every painting still credits its painter, the bio's promises still
+  match the code that keeps them), and
+  is it still to Claude's liking? Staleness here is drift like any other
+  doc — but taste counts too, and a change of taste is a legitimate
+  finding. Changes to the page need no queue for Aaron; commandments 14 and
+  16 still govern how they land.
 - **Memory audit**: read `MEMORY.md` and the memory files; verify claims that
   name files, flags, or numbers against the tree; merge duplicates, prune
   stale entries, convert anything relative-dated. The `consolidate-memory`

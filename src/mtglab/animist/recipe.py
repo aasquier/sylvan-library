@@ -45,7 +45,7 @@ KNOWN_OPS = frozenset({"crop", "matte_green", "matte_backdrop", "duotone",
 #: frames; a seeded op is one whose derivation includes randomness and must
 #: therefore be handed an explicit integer seed to stay a pure function.
 KNOWN_GENERATOR_OPS = frozenset({"spectral_noise"})
-KNOWN_MOTION_OPS = frozenset({"advect", "color_ramp", "ken_burns"})
+KNOWN_MOTION_OPS = frozenset({"advect", "breath", "color_ramp", "ken_burns"})
 KNOWN_SEEDED_OPS = frozenset({"spectral_noise", "advect"})
 
 #: Where a source may come from. Each is a dispatch key in `sources.py`.

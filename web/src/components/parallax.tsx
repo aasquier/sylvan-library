@@ -97,6 +97,7 @@ export function ParallaxArt({
   depthSrc,
   className = '',
   amplitude = 0.014,
+  anchor = 'top',
   fallback = null,
 }: {
   artSrc: string
@@ -104,6 +105,10 @@ export function ParallaxArt({
   className?: string
   /** Max UV displacement at full tilt — texture-space, not pixels. */
   amplitude?: number
+  /** Which band of a painting taller than the box survives the cover
+   *  crop: `top` is the hero band's contract (heads sit high), `center`
+   *  is the gallery's (it replaces a centre-cropped still). */
+  anchor?: 'top' | 'center'
   fallback?: React.ReactNode
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -196,7 +201,7 @@ export function ParallaxArt({
         canvas.height = Math.max(1, Math.round(canvas.clientHeight * dpr))
         gl.viewport(0, 0, canvas.width, canvas.height)
         const window_ = coverTopWindow(art.naturalWidth, art.naturalHeight,
-                                       canvas.width, canvas.height)
+                                       canvas.width, canvas.height, anchor)
         gl.uniform2f(uvScaleLoc, window_.scale[0], window_.scale[1])
         gl.uniform2f(uvOffsetLoc, window_.offset[0], window_.offset[1])
       }
@@ -237,7 +242,7 @@ export function ParallaxArt({
       canvas.removeEventListener('pointermove', onMove)
       canvas.removeEventListener('pointerleave', onLeave)
     }
-  }, [artSrc, depthSrc, amplitude, unwelcome, failed])
+  }, [artSrc, depthSrc, amplitude, anchor, unwelcome, failed])
 
   if (unwelcome || failed) return <>{fallback}</>
   return (

@@ -382,6 +382,14 @@ body {
   filter: saturate(1.08);
 }
 
+/* The gallery's anchor: a loop replacing a centre-cropped still keeps the
+   centre band, or a portrait painting trades its subject for its sky
+   (CommanderMotion's `position` prop; the GL path gets the same answer
+   through coverTopWindow's anchor). */
+.deck-hero-video.motion-art-center {
+  object-position: center;
+}
+
 :root[data-theme='dark'] .deck-hero-motion video,
 :root[data-theme='dark'] .deck-hero-motion canvas,
 :root:where(:not([data-theme='light'])) .deck-hero-motion video,

@@ -373,6 +373,61 @@ def _ken_burns(sequence: FrameSequence,
     return FrameSequence(frames=tuple(out_frames), fps=fps)
 
 
+def _breath(sequence: FrameSequence,
+            params: dict[str, Any]) -> FrameSequence:
+    """A still painting breathes: a slow swell held at rest, no travel.
+
+    Ken Burns is a camera move; this is a body. The waveform is a
+    phase-warped cosine — theta = 2·pi·t − skew·sin(2·pi·t) — whose warp
+    makes the painting dwell near rest and swell briefly, the way a sleeper
+    breathes, rather than metronoming up and down. `lift` raises the crop
+    window with the swell (the chest rising), expressed as a fraction of
+    the margin the zoom itself opens, so the rise always fits without
+    clamping and inherits the waveform's smoothness. Phase is sampled at
+    k/N with the endpoint excluded, so frame N−1 sits one step before the
+    wrap instead of duplicating frame 0. The crop box stays fractional —
+    at this amplitude a rounded box would turn a three-pixel rise into
+    visible stepping. Deterministic — a breath has no dice to roll.
+    """
+    import numpy as np
+    from PIL.Image import Resampling
+
+    if not sequence.is_still:
+        raise OpError("breath takes a still (one frame); it creates the "
+                      "timeline itself")
+    frames = _require_int(params, "frames", "breath", minimum=2)
+    fps = _require_int(params, "fps", "breath")
+    amplitude = float(params.get("amplitude", 0.035))
+    lift = float(params.get("lift", 0.4))
+    skew = float(params.get("skew", 0.45))
+    if amplitude <= 0.0:
+        raise OpError("breath amplitude must be positive -- at zero the "
+                      "result is a still wearing a video's cost")
+    if not 0.0 <= skew < 1.0:
+        raise OpError("breath skew must sit in [0, 1) -- at 1 the phase "
+                      "stalls and the clip holds its breath forever")
+    if not 0.0 <= lift <= 1.0:
+        raise OpError("breath lift is a fraction of the zoom margin -- "
+                      "beyond 1 the window would leave the canvas")
+
+    image = sequence.frames[0]
+    width, height = image.size
+    t = np.arange(frames, dtype=np.float32) / np.float32(frames)
+    theta = 2.0 * np.pi * t - skew * np.sin(2.0 * np.pi * t)
+    swell = (0.5 * (1.0 - np.cos(theta))).astype(np.float32)
+
+    out_frames = []
+    for k in range(frames):
+        zoom = 1.0 + amplitude * float(swell[k])
+        view_w, view_h = width / zoom, height / zoom
+        left = (width - view_w) / 2.0
+        top = ((height - view_h) / 2.0) * (1.0 - lift)
+        box = (left, top, left + view_w, top + view_h)
+        out_frames.append(
+            image.resize((width, height), Resampling.LANCZOS, box=box))
+    return FrameSequence(frames=tuple(out_frames), fps=fps)
+
+
 def parallax_frames(art: Image, depth: Image, *, frames: int, fps: int,
                     amplitude: float = 6.0, zoom: float = 1.06) -> FrameSequence:
     """2.5D drift: a still painting plus its depth map become a loop.
@@ -441,6 +496,7 @@ GENERATOR_OPS: dict[str, GeneratorOpFn] = {
 
 MOTION_OPS: dict[str, MotionOpFn] = {
     "advect": _advect,
+    "breath": _breath,
     "color_ramp": _color_ramp,
     "ken_burns": _ken_burns,
 }

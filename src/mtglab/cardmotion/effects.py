@@ -70,6 +70,16 @@ EFFECTS: dict[str, Effect] = {
                        seconds=8.0,
                        params={"zoom_to": 1.09, "pan_from": [0.5, 0.42],
                                "pan_to": [0.5, 0.58]}),
+    # The living portrait: a body rather than a camera. A phase-warped
+    # swell that dwells at rest and rises from the chest — for paintings
+    # whose depth estimate disappoints (flat watercolour, art nouveau) and
+    # anywhere a pan would survey a composition that should simply live.
+    # 6.5 seconds is a calm resting breath, about nine to the minute.
+    # 2.2% at peak, not more: on an edge-to-edge composition the eye
+    # tracks the border, and 3.5% read as a zoom rather than a breath
+    # (Aaron's eye, first walk, 2026-08-18).
+    "breath": Effect(key="breath", needs_depth=False, fps=24, seconds=6.5,
+                     params={"amplitude": 0.022, "lift": 0.3, "skew": 0.45}),
 }
 
 
@@ -97,5 +107,9 @@ def derive(art: Image, depth: Image | None, effect: Effect) -> FrameSequence:
             FrameSequence.still(art), "ken_burns",
             {"frames": effect.frames, "fps": effect.fps, "bounce": True,
              **effect.params})
+    if effect.key == "breath":
+        return apply_motion(
+            FrameSequence.still(art), "breath",
+            {"frames": effect.frames, "fps": effect.fps, **effect.params})
     raise EffectError(f"unknown effect {effect.key!r} "
                       f"(one of: {', '.join(sorted(EFFECTS))})")
