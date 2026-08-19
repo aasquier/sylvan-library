@@ -340,8 +340,19 @@ def converse(mode: Mode, *, messages: list[dict[str, Any]], stance: Stance,
             # cut. It pays twice: across the turns of one tool loop, and across
             # consecutive calls of the same mode, which is the shape of
             # interviewing a draft's 99 owed rationales one card at a time.
-            # The interview mode's prefix measures ~1.5k tokens, above the
-            # model's minimum cacheable size; below it the marker is inert.
+            #
+            # Below the model's minimum cacheable prefix the marker is inert,
+            # and one mode is. Measured 2026-08-19 with `count_tokens`, which
+            # is free -- every earlier figure here was characters over four
+            # and read ~40% low. The six conversational modes run 2,062
+            # (research) to 6,587 (theme proposal), interview 2,373, all
+            # clear of Sonnet 5's 1,024. **`scan` is 478** and clears
+            # nothing -- not Sonnet's 1,024, not the 512 an Opus or Fable
+            # seat gets -- which five back-to-back scans confirm by reading
+            # zero cached tokens between them. That is the prompt being
+            # short rather than a bug, and padding it to reach the floor
+            # would buy a tenth of 478 tokens with 546 wasted ones.
+
             system=[{"type": "text", "text": mode.system(stance),
                      "cache_control": {"type": "ephemeral"}}],
             tools=schemas,

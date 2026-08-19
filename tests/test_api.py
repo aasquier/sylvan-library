@@ -3501,6 +3501,67 @@ def test_suggestions_without_a_pool_say_so_instead_of_guessing(tmp_path):
     assert body["targets"] == []
 
 
+def test_the_shelf_asks_for_every_pinned_printing_at_once(pool, monkeypatch):
+    """Three decks flying pinned art, one `printings` query.
+
+    The shelf batches the gate and the pool lookup already; the commander's
+    chosen printing was the one thing left asking per deck. Counted rather
+    than timed, for the reason `test_challenge_progress_asks_the_pool_once`
+    gives below: on a shared machine the wall clock is noise and the query
+    count is what moved.
+    """
+    seen: list[str] = []
+    real = service._connect
+
+    class Counting:
+        def __init__(self, con):
+            self._con = con
+
+        def execute(self, sql, *args, **kwargs):
+            if "FROM printings" in sql:
+                seen.append(sql)
+            return self._con.execute(sql, *args, **kwargs)
+
+        def __getattr__(self, name):
+            return getattr(self._con, name)
+
+    def counting():
+        con = real()
+        return Counting(con) if con is not None else None
+
+    monkeypatch.setattr(service, "_connect", counting)
+
+    # Two decks pinning a printing, one leaving the default, and one pinning
+    # an id the pool has never held -- the stale case, which must drop out of
+    # the batch rather than blanking a tile.
+    pins = {
+        "goreclaw": ("Goreclaw, Terror of Qal Sisma",
+                     "080a5356-61d9-46cf-9095-d59c048f9d77"),
+        "gyome": ("Gyome, Master Chef",
+                  "5dd7dd1a-6dd1-43c3-8298-7db703d384a1"),
+        "plain": ("Craterhoof Behemoth", ""),
+        "stale": ("Sol Ring", "00000000-0000-0000-0000-000000000000"),
+    }
+    decks = [
+        Deck.from_text(
+            f"slug: {slug}\nname: {slug}\ncommander:\n  - {name}\n"
+            + (f"commander_art: {art}\n" if art else "")
+            + "cards: []",
+            slug=slug)
+        for slug, (name, art) in pins.items()
+    ]
+    tiles = service.list_decks(source=MemoryDeckSource(decks))
+
+    assert len(seen) == 1, f"one printings query for the shelf, got {len(seen)}"
+    by_slug = {t["slug"]: t for t in tiles}
+    # The two real pins show their chosen printing; the unpinned and the stale
+    # both fall back to the pool's own art rather than to nothing.
+    assert "080a5356" in by_slug["goreclaw"]["art_crop"]
+    assert "5dd7dd1a" in by_slug["gyome"]["art_crop"]
+    assert by_slug["plain"]["art_crop"]
+    assert by_slug["stale"]["art_crop"]
+
+
 def test_challenge_progress_asks_the_pool_once(pool, monkeypatch):
     """Three decks, one `get_cards`.
 

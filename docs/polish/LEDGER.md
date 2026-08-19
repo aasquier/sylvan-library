@@ -960,7 +960,242 @@ applies to each. Ordered by cost:
 
 *Claude API spend · static assets · performance*
 
-- **Last run:** 2026-08-16 (rainbow)
+- **Last run:** 2026-08-19 (rainbow). Previous: 2026-08-16 (rainbow), plus two
+  un-run entries from the same week — the targeted performance pass and the
+  measuring shelf — both kept below.
+- **Fixed this run (2026-08-19, rainbow):**
+  1. **The shelf asked for one printing per pinned deck.** `_tiles` batches
+     the gate, the pool lookup and (one layer down) each deck's *card* art —
+     `_card_art_overrides` refuses the N+1 in its own docstring — and then
+     called `_chosen_art` inside the per-deck loop, which is one
+     `SELECT … FROM printings WHERE id = ?` per deck that pinned a commander
+     printing. Three of the seven local decks pin one, so the shelf issued
+     **3 queries where 1 does**; a library aimed at 32 slots would issue 32.
+     Now `_chosen_arts` takes the run of ids and `_chosen_art` is one deck's
+     worth of it, so the deck page keeps the single-row form and there is
+     still only one SQL string. **`/api/decks`: 3 statements → 1, database
+     2.13ms → 0.98ms, warm p50 17.4ms → 16.5ms, cold p50 138.9ms → 134.2ms.**
+     Mutation-verified test counts the `printings` queries rather than the
+     milliseconds (`test_the_shelf_asks_for_every_pinned_printing_at_once`),
+     the same instrument `challenge_progress` got, and covers the stale-id
+     case: an id the pool no longer holds drops out of the batch and its tile
+     falls back to the default art rather than blanking.
+  2. **The one CDN left in the bundle was held off by a comment.**
+     `cdn.jsdelivr.net` appears in `assets/reader.js` — it is tesseract.js's
+     *default* `workerPath`, and `reader.ts` overrides it along with
+     `corePath` and `langPath` so every byte comes from `/api/ocr`. That is
+     right, and `reader.ts` says why in a comment. But a comment is not a
+     guard, and the failure it prevents is the quiet kind: a `createWorker`
+     call missing one option fetches **unpinned WebAssembly from a third
+     party**, bypassing the SHA-256 pin `ocr.py` exists to enforce, leaking
+     every visitor's IP, and still working. `reader.test.ts` now mocks
+     `tesseract.js` and asserts all three paths are set and first-party.
+     Mutation-verified by deleting `corePath`. (White's rule holds
+     throughout: the engine files stay uncommitted and unhotlinked, served
+     first-party out of the runtime cache. Nothing about that arrangement
+     moved.)
+  3. **Two comments named a cause nobody had measured**, which is the exact
+     failure this facet was rebuilt around. `bench/profile.py` attributed the
+     ~900 cold import calls to "a fresh DuckDB connect does real path work" —
+     checkable, and wrong: cold `db.oracle_columns` connects and reports
+     **1**. Traced by recording every `__import__` during a cold
+     `/api/decks`: **912 calls, 892 of them `import pandas`** from `db.py`'s
+     parameter binding, still asked twice per bound value and now answered by
+     the `sys.modules` sentinel. Timed: **892 defused probes cost 0.96ms
+     against 86.7ms undefused** — so a cold ~900 is #181's fix *holding*, and
+     a warm one is the alarm. Separately, `modes.py` claimed the interview's
+     cached prefix is "~1.5k tokens"; measured with `count_tokens` it is
+     **2,373**, and every prefix figure in this ledger was chars/4 and read
+     ~40% low. Both comments now carry the measurement and the date.
+- **Queued for Aaron (both carried from 2026-08-16, re-checked this run):**
+  1. **Cache-write tokens are still invisible, and they are still the priciest
+     class.** Unchanged in code: `modes.converse` records `input_tokens`,
+     `output_tokens` and `cache_read_input_tokens`, and drops
+     `cache_creation_input_tokens`. Writes bill at **1.25× input**, so
+     `mtglab claude usage`'s **$1.64** is a floor on the bill, not the bill —
+     and `prices.py`'s own docstring says so. Two things changed around it.
+     The migration is now **v11, not v9**: schema v9 and v10 both landed for
+     other work since this was queued, which is evidence the "own branch,
+     merged while somebody is watching" cost is one this repo already pays
+     routinely. And the instrument matters more than it did, because the
+     Sonnet 5 introductory rate ends **2026-08-31** and every figure this
+     table produces rises 50% on 2026-09-01.
+  2. **The theme conversation's second cache breakpoint — payoff now bounded.**
+     The mechanism finding is unchanged and not re-litigated: `theme._messages`
+     still marks the *closing instruction*, which is stripped and re-appended
+     each turn, and the previous run verified deterministically that turn N's
+     marked region is not a byte-prefix of turn N+1's request. What this run
+     adds is what it is worth. Across **77 real theme-conversation turns** in
+     the local ledger, uncached input totals 9,815 against 1,252,433 cache
+     reads — **99.2% of the prompt is already served from cache**, with the
+     per-turn uncached remainder running 2–1,455 tokens and including the
+     querent's new answer, which can never be cached. So the proposed fix
+     (move the marker to the last settled transcript block) is worth at most
+     ~0.8% of this mode's input. Still queued rather than fixed — it changes
+     what a paid path caches and only spending confirms it — but it is a
+     small item, not a large one, and (1) remains the prerequisite instrument.
+- **Deferred (re-checked, both still deferred):**
+  - **Interview and single-card argue have neither a cache nor an in-flight
+    dedupe key.** The trigger named last time was "either endpoint becoming a
+    background job". It half-arrived and resolved itself: the *deck sweep*
+    became a job (`api/argueruns.py`) and it carries
+    `key=f"{slug}:{fingerprint}"`; the single-card endpoints stayed
+    synchronous on a measured seconds-scale claim written into
+    `app.py`'s docstring. Every other paid surface is now covered — scan by
+    `key=f"scan:{digest}"`, research by `request.key`, dossier by key *and*
+    the `oracle_id` cache, theme deliberately by neither with the argument
+    written down. Trigger unchanged: either single-card endpoint becoming a
+    job, or gaining a caller that is not the deck page.
+  - **Long max-age for the immutable media** (219KB `ivy-canopy.webp`, 126KB
+    `bookworm-still.webp`, 78KB `tarot-back.webp`, the 78 tarot PNGs).
+    Unchanged and still blocked on the same thing: `assetFileNames:
+    'assets/[name].[ext]'` means an animist rebuild reuses the filename, so a
+    long max-age would serve a stale asset. Trigger: media bytes growing
+    enough that per-navigation revalidation matters — the fix is
+    content-hashing *media* names only, which need not stay diff-legible the
+    way JS chunk names do.
+- **Measurements (2026-08-19, rainbow — this Mac, quiet, full pool):**
+  - **Claude spend to date** (local ledger, 2026-08-16 → 2026-08-19): 86
+    conversations / 95 requests / 17,133 input / 124,765 output / 1,804,679
+    cache reads = **≈$1.64** at list rates, up from ≈$0.35 three days ago.
+    Per mode: `theme-conversation:fortune-teller` 74 conv (9,815 / 92,990 /
+    1,252,433), `theme-proposal:fortune-teller` 3 conv / 11 req (30 / 21,892
+    / 321,797), `commander-dossier` 1 conv / 2 req, `scan` 5 conv (6,450 /
+    199 / **0**), one conv each for the therapist, chef and storyteller
+    voices. Every row is `claude-sonnet-5`; no tiered seat has spent yet.
+  - **Prompt cache ratio 105:1**, down from 211:1 — and the whole drop is
+    `scan`, which reads nothing. Excluding it the ratio is 169:1.
+  - **Per-mode cached prefix, measured rather than estimated.** `count_tokens`
+    is free and replaces the chars/4 figures, which read ~40% low: research
+    2,062 · dossier 2,298 · interview 2,373 · slot-argument 3,298 ·
+    theme-conversation 5,234 (personas 5,716 barkeep → 5,849 fortune-teller)
+    · theme-proposal 6,587 · **scan 478**. Server-tool schemas are excluded
+    (the endpoint refuses them), so the four searching modes are a floor.
+  - **`scan`'s cache marker is inert, and that is correct.** 478 tokens clears
+    neither Sonnet 5's 1,024-token minimum nor the 512 an Opus or Fable seat
+    gets, and the ledger proves it empirically: **five identical scans three
+    seconds apart, 1,290 input tokens each, zero cache reads on every one.**
+    Not a bug and not worth padding — buying a tenth of 478 tokens with 546
+    wasted ones is a loss. It is the first mode below the floor, which is why
+    the 2026-08-16 claim "all above Sonnet 5's minimum" needed this note.
+    Cost of the residue: ~$0.001 a scan, ~$0.10 for a 100-card camera import.
+  - **What a camera deck import costs, since Green will want it.** Measured at
+    1,290 input and ~40 output tokens a card, a 100-card import is 129,000 in
+    / 4,000 out = **≈$0.30 today, ≈$0.45 from 2026-09-01**, on the paid tier.
+    It is the first surface whose cost scales with *how much a person does*
+    rather than how many times they ask a question, which is what makes it
+    the one worth a quota conversation. The free tier exists beside it (local
+    OCR, ~24s a card against Claude's ~3.1s) and is the reason this is a
+    choice rather than a bill — but see the cross-color note below.
+  - **Spend knobs, seven modes now.** Model `claude-sonnet-5` for everybody by
+    default; `tiers.py` grants `opus` (`claude-opus-5`) or `fable`
+    (`claude-fable-5`) per account, resolved **once per conversation** in
+    `converse` so a turn cannot change model and throw its cache away.
+    `max_tokens` 8,192 (interview, argue, theme conversation) / 16,384
+    (dossier, research, theme proposal) / **2,048 (scan)**. `effort: high`
+    everywhere except **scan, which is `low` — and argued as accuracy, not
+    thrift**: higher levels make a transcriber infer, which is the one
+    behaviour ADR 34 forbids. Web search `max_uses`: dossier 4, research 4,
+    theme proposal 3, theme conversation 1; scan has no tools at all.
+    `MAX_TOOL_TURNS` 6.
+  - **`prices.py` verified against the `claude-api` skill's pricing table**,
+    rate by rate: Fable/Mythos $10/$50, Opus 5 and 4.6–4.8 $5/$25, Sonnet 5
+    $2/$10 introductory **through 2026-08-31** then $3/$15, Sonnet 4.6 $3/$15,
+    Haiku 4.5 $1/$5, cache reads at 0.1×. Every one matches, the intro window
+    is modelled rather than flattened, and `CHECKED = 2026-08-18` renders
+    beside every figure. **Consequence for Green's quota work: on 2026-09-01
+    the same traffic costs 50% more** — today's $1.64 becomes ≈$2.46.
+  - **Refusable-before-the-call still holds on every paid surface**, scan
+    included: `scan._payload` refuses an unknown media type or bad base64
+    before a request is built, so no mode errors *after* spending.
+  - **Warm suite** (`bench run --runs 15`, post-fix). Compare next quarter
+    against these:
+
+| target | warm median | p95 | database |
+|---|---:|---:|---:|
+| `GET /api/health` | 7.3ms | 8.2ms | — |
+| `GET /api/decks` | **16.5ms** | 18.0ms | — |
+| `GET /api/lore` | 5.9ms | 7.2ms | — |
+| `GET /api/colors` | 6.1ms | 7.2ms | — |
+| `GET /api/glossary` | 4.5ms | 4.9ms | — |
+| `GET /api/cards/search?q=goblin` | 43.8ms | 49.0ms | **37.9ms, 1 statement** |
+| deck detail | 7.1ms | 8.0ms | — |
+| deck validate | 6.0ms | 6.7ms | — |
+| `db.get_cards` (100 names) | 0.2ms | 0.3ms | — |
+| `db.oracle_columns` | 0.2ms | 0.2ms | — |
+| `db.connect_readonly` | 0.2ms | 0.3ms | — |
+| `Deck.load` | 0.0ms | 0.1ms | — |
+
+  - **Cold suite** (`--cold`, every registered cache emptied between samples):
+    `/api/decks` **134.2ms** (3 statements, was 138.9/5) · `db.get_cards`
+    83.2ms · `/api/lore` 80.4ms · deck detail 80.0ms · deck validate 77.7ms ·
+    search 67.1ms · `/api/health` 38.1ms · `db.oracle_columns` 29.1ms ·
+    `db.connect_readonly` 15.5ms · `/api/colors` 6.3ms. The shelf is still
+    **8× slower cold** and the memo is still the whole difference.
+  - **Search is unchanged and the tool still says why**: 37.9ms of a 43.8ms
+    wall inside one DuckDB statement — a text scan over 35,390 rows that never
+    goes through `get_cards`, so no memo can help it. The lever is the query
+    or an index, and both are ingest-shaped; nothing to do here surgically.
+  - **Cache hit rates** (`bench caches --runs 5`), unchanged and healthy:
+    `deck.parsed` 60/0 (100%) · `pool.columns` 15/0 (100%) · `pool.keeper`
+    36/0 (100%) · `pool.cards` 27/3 (90%). `auth.hasher`,
+    `auth.dummy-hash` and `sets.upcoming` read *never asked*, which is the
+    suite not logging in rather than a dead cache. **No cache has been added
+    since the register landed**, and nothing in it is dead weight.
+  - **Live instance** (5 samples each, p50 time-to-first-byte from this Mac):
+    `/` 237ms · `/assets/app.js` 222ms · `/assets/charts.js` 216ms ·
+    `/api/health` 213ms. Within noise of 2026-08-16 (240 / 192 / 177 / 211)
+    and dominated by RTT to `sjc`.
+  - **⚠️ The header check needs a GET, not a HEAD — this nearly became a false
+    regression.** `curl -I` against the instance returns *no*
+    `content-encoding` and the raw `content-length`, which reads exactly like
+    compression having been switched off. A real GET shows the truth:
+    `content-encoding: gzip`, `vary: Accept-Encoding`, and `app.js` arriving
+    in **90,824 bytes** against 291,488 raw — matching the local `gzip -9`
+    figure to five bytes. Still no brotli. Every asset is `cache-control:
+    no-cache` with a strong `etag`, and a conditional request returns **304**,
+    so the cost stays one revalidation RTT per navigation. (A HEAD of `/` also
+    answers `application/json`, 31 bytes — the SPA catch-all only handles GET.
+    No browser HEADs the document root; noted so the next run does not chase
+    it.)
+  - **Static assets over hotlinks**: the served app still references exactly
+    one external host at runtime — `cards.scryfall.io`, for Wizards' art,
+    which White's licensing verdict keeps as a hotlink, with a
+    `<link rel="preconnect">` warming it. **No CDN for code, fonts, CSS or
+    scripts.** The `cdn.jsdelivr.net` string now in `assets/reader.js` is
+    tesseract.js's inert default, overridden at the one call site and pinned
+    by a test as of this run (fix 2). Everything else external in the bundle
+    is inert: the SVG namespace, `bit.ly` inside Immer's minified-error
+    message, and repository/funding URLs in vendored package metadata.
+    `edhrec.com`, `console.anthropic.com`, `platform.claude.com` and
+    `fly-metrics.net` are links a person clicks, not fetches. Nothing in
+    category (c): no dead or replaceable external URL found.
+  - **Cross-color, for Red or Green: an auth question with a spend answer.**
+    `/api/ocr` is not in `PUBLIC_PATHS`, and memory records it answering 401
+    on the instance with the worker's own fetches *unverified*. Not re-derived
+    here and not Black's to settle — but the consequence is: if the free
+    reader cannot load its engine deployed, **every camera scan falls through
+    to the paid tier**, and the number above stops being a choice. Settling it
+    needs a signed-in pass on the real instance (commandment 14), which is
+    Green's ground.
+  - **`mtglab animist verify`: every committed asset held to its recipe.**
+  - **Bundle** (committed `web_dist`, gzip -9): `charts.js` 399,398 /
+    **111,241** · `app.js` 291,488 / **90,829** · `ivy-canopy.webp` 219,330 ·
+    `bookworm-still.webp` 125,892 · `index.css` 99,824 / 21,844 ·
+    `DeckDetail.js` 95,860 / 26,743 · `tarot-back.webp` 77,818 ·
+    `NewDeck.js` 52,855 / 15,203 · `reader.js` 17,231 / 7,190. **The
+    `charts.js` deferral holds**: `recharts` is imported only by
+    `components/charts.tsx`, and the three heavy routes import
+    `components/lazycharts.tsx` instead — re-checked over the import graph,
+    not the size table, which is the distinction that cost 113kB last time.
+  - **Tier 1 / `SIM_VERSION`**: not touched. No engine change, so the ADR 18
+    cache is intact and the determinism digest did not move.
+
+### The 2026-08-16 run
+
+Superseded by the block above; kept for its numbers and its
+reasoning. Its queued and deferred items are carried forward there.
+
 - **Fixed and landed:**
   1. **The challenge board asked the pool once per deck.**
      `service.challenge_progress` (`/api/colors/progress`) ran `get_cards`
@@ -980,7 +1215,7 @@ applies to each. Ordered by cost:
      slice and correct as a sibling: the prompt cache is doing almost all the
      work. Copy corrected in all three places, and it now says out loud that
      cache *writes* are recorded nowhere.
-- **Queued for Aaron:**
+- **Queued then, and carried forward above — do not act on this copy:**
   1. **Cache-write tokens are invisible, and they are the priciest class.**
      `modes.converse` records `input_tokens`, `output_tokens` and
      `cache_read_input_tokens`, and drops `cache_creation_input_tokens`
@@ -1005,7 +1240,7 @@ applies to each. Ordered by cost:
      rather than fixed because it changes what a paid path caches and the
      payoff can only be confirmed by spending; pairs naturally with (1), which
      is the instrument that would show it working.
-- **Deferred:**
+- **Deferred then, both re-checked above:**
   - **Interview and single-card argue have neither a cache nor an in-flight
     dedupe key** — the only two paid modes with neither, and no written
     argument for it. In practice both are guarded client-side
@@ -1021,7 +1256,7 @@ applies to each. Ordered by cost:
     media bytes growing enough that per-navigation revalidation matters — the
     fix would be content-hashing *media* names only, which do not need to stay
     diff-legible the way JS chunk names do.
-- **Checklist corrected this run:** `references/black.md` said committed assets
+- **Checklist corrected that run:** `references/black.md` said committed assets
   "should be aggressively cacheable (hashed filenames from Vite get long
   max-age)". This repo deliberately does the opposite and is right to: Vite is
   configured for stable filenames because the bundle is committed, and

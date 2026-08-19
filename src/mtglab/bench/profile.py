@@ -48,9 +48,19 @@ from mtglab.cards import db
 
 #: Calls into `importlib` above which a target is asking a question rather
 #: than reporting a datum. Measured rather than picked: the warm suite runs
-#: 0-31, a cold one ~900 (a fresh DuckDB connect does real path work, which is
-#: exactly what #181 acted on), and the pandas storm 92,057. So 200 separates
+#: 0-31, a cold one ~900, and the pandas storm 92,057. So 200 separates
 #: warm-healthy from anything worth reading, and the storm clears it 400x over.
+#:
+#: **What the cold ~900 is, since this line used to guess.** It said "a fresh
+#: DuckDB connect does real path work", which is wrong and was checkable: cold
+#: `db.oracle_columns` connects and reports **1** call. Traced 2026-08-19 by
+#: recording every `__import__` during a cold `/api/decks`: 912 calls, 892 of
+#: them `import pandas` from `db.py`'s parameter binding -- the same probe #181
+#: acted on, still asked twice per bound value and now answered by the
+#: `sys.modules` sentinel instead of by a walk of `sys.path`. Timed: 892
+#: defused probes cost **0.96ms**, against 86.7ms undefused. So a cold figure
+#: near 900 on a pool-reading target is the storm *staying* defused, and the
+#: number to be alarmed by is a warm one.
 IMPORT_CALLS_SUSPECT = 200
 
 
