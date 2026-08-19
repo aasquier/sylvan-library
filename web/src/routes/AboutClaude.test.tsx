@@ -15,7 +15,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Card } from '../lib/api'
-import { COMMANDERS, GALLERY } from '../lib/claudefavorites'
+import { COMMANDERS, GALLERY, HEART } from '../lib/claudefavorites'
 import AboutClaude from './AboutClaude'
 
 vi.mock('../lib/api', async () => {
@@ -44,6 +44,17 @@ const TATYOVA: Card = {
 /** A near-miss the case must not exhibit as the real card. */
 const IMPOSTOR: Card = { ...KWAIN, name: 'Kwain the Builder' }
 
+/** The heart of the house — fields read from the pool, never recalled. */
+const SYR_GWYN: Card = {
+  name: 'Syr Gwyn, Hero of Ashvale', category: '', why: '', qty: 1,
+  known: true, mana_cost: '{3}{R}{W}{B}',
+  type_line: 'Legendary Creature — Human Knight',
+  oracle_text: 'Vigilance, menace\nWhenever an equipped creature you '
+    + 'control attacks, you draw a card and you lose 1 life.\nEquipment '
+    + 'you control have equip Knight {0}.',
+  color_identity: ['B', 'R', 'W'], image: null, art_crop: null,
+}
+
 function renderPage() {
   return render(<MemoryRouter><AboutClaude /></MemoryRouter>)
 }
@@ -51,7 +62,9 @@ function renderPage() {
 beforeEach(() => {
   vi.mocked(api.searchCards).mockImplementation(({ q }) =>
     Promise.resolve({
-      cards: q === 'Kwain' ? [IMPOSTOR, KWAIN] : [TATYOVA],
+      cards: q === 'Kwain' ? [IMPOSTOR, KWAIN]
+        : q === 'Syr Gwyn' ? [SYR_GWYN]
+        : [TATYOVA],
       total: 2,
     }))
 })
@@ -63,9 +76,18 @@ afterEach(() => {
 
 describe('the page', () => {
   it('renders the masthead, the bio, and the colour pair', async () => {
-    renderPage()
+    const { container } = renderPage()
     expect(screen.getByRole('heading', { level: 1, name: 'About Claude' }))
       .toBeTruthy()
+    // The living masthead: the loop is wired (webm first, so the smaller
+    // file wins where both are understood), and the room's description
+    // still reaches a screen reader even though the video is decoration.
+    const video = container.querySelector('video')
+    expect(video, 'the masthead loop is missing').toBeTruthy()
+    const sources = [...video!.querySelectorAll('source')]
+      .map((s) => s.getAttribute('type'))
+    expect(sources).toEqual(['video/webm', 'video/mp4'])
+    expect(screen.getByText(/Claude’s mark, made real/)).toBeTruthy()
     expect(screen.getByText(/I’m Claude\./)).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Simic' })).toBeTruthy()
     // The deep link goes to the guild's own page, not a copy of its story.
@@ -101,14 +123,26 @@ describe('the exhibit cases', () => {
     }
   })
 
+  it('shows the heart of the house her own card, from the pool', async () => {
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText(SYR_GWYN.name)).toBeTruthy())
+    // The pool's type line, beside the north-star paragraph — commandment 4
+    // rendered as a face rather than only a mention.
+    expect(screen.getByText('Legendary Creature — Human Knight')).toBeTruthy()
+    expect(screen.getByText(/panache and martial prowess/)).toBeTruthy()
+  })
+
   it('say so honestly when the pool cannot answer', async () => {
     vi.mocked(api.searchCards).mockRejectedValue(new Error('no pool'))
     renderPage()
+    // Every case says so — the two commanders and the heart alike.
     await waitFor(() => expect(
       screen.getAllByText(/The pool has no record to show here/).length,
-    ).toBe(COMMANDERS.length))
+    ).toBe(COMMANDERS.length + 1))
     // The names still render — it is the rules text that is never recalled.
     expect(screen.getByText('Kwain, Itinerant Meddler')).toBeTruthy()
     expect(screen.getByText('Tatyova, Benthic Druid')).toBeTruthy()
+    expect(screen.getByText(HEART.name)).toBeTruthy()
   })
 })

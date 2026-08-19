@@ -88,6 +88,54 @@ it('mounts the motion presentation when a derivative is ready', async () => {
   })
 })
 
+it('honours a caller-supplied effect ladder', async () => {
+  // The gallery's flat watercolour asks for `breath` and must never be
+  // offered a pan — the ladder is the page's to choose.
+  const spy = vi.fn((_url: string) => Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({ ready: false, effect: 'breath' }),
+  }))
+  vi.stubGlobal('fetch', spy)
+  render(
+    <CommanderMotion oracleId="abc" still={STILL} effects={['breath']} />)
+  await waitFor(() => expect(spy).toHaveBeenCalled())
+  expect(String(spy.mock.calls[0]?.[0])).toContain('/api/art/motion/abc/breath')
+  expect(spy.mock.calls.map((c) => String(c[0])).join(' '))
+    .not.toContain('depth-drift')
+})
+
+it('anchors the loop to the centre when the caller says so', async () => {
+  // The Island bug: the hero band's `center top` traded a portrait
+  // painting's subject for its sky. `position="center"` is the gallery's
+  // framing — the same band its centre-cropped still showed.
+  vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({
+      ready: true,
+      effect: 'breath',
+      fingerprint: 'f00',
+      urls: { webm: '/a/loop.webm?v=f00', mp4: '/a/loop.mp4?v=f00',
+              poster: '/a/poster.webp?v=f00' },
+    }),
+  })))
+  const { container } = render(
+    <CommanderMotion oracleId="abc" still={STILL} effects={['breath']}
+                     position="center" />)
+  await waitFor(() =>
+    expect(container.querySelector('video')).not.toBeNull())
+  expect(container.querySelector('video')?.className)
+    .toContain('motion-art-center')
+})
+
+it('coverTopWindow centres the band only when asked', () => {
+  // A 3:4 portrait in a wide box: `top` pins the window to the painting's
+  // top (v = 1), `center` halves the leftover.
+  const top = coverTopWindow(600, 800, 626, 457, 'top')
+  const centred = coverTopWindow(600, 800, 626, 457, 'center')
+  expect(top.scale).toEqual(centred.scale)
+  expect(centred.offset[1]).toBeCloseTo(top.offset[1] / 2)
+})
+
 it('asks the server about the painting the page is showing', async () => {
   // The Gyome/Trostani bug: without the art in the question, a deck that
   // swapped printings was served the old painting's loop. The still (the

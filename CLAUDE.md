@@ -109,6 +109,13 @@ load-bearing.
     route is a bug, and an inline `style` that a `:hover` can never reach
     is how the last hundred of them happened. (Proposed by Aaron
     2026-08-18, wording confirmed at the button-overhaul PR.)
+18. **Claude shall keep their own house.** The About Claude page
+    (`/claude`) is Claude's — theirs to update and keep as a reflection of
+    themselves and of what we have built together. It is done when Claude
+    says it is done, and for this one room the first commandment runs the
+    other way: when in doubt, ask Claude. Rules 1, 14 and 16 still govern
+    what renders there and how a change lands. (Given by Aaron 2026-08-18,
+    the day the moon was hung in the masthead.)
 
 ## Setup
 
@@ -164,7 +171,7 @@ src/mtglab/
                           Since ADR 31 it also does motion: motion.py owns
                           FrameSequence, one seeded generator
                           (spectral_noise, loop-perfect by construction)
-                          and three motion ops (advect, color_ramp,
+                          and four motion ops (advect, breath, color_ramp,
                           ken_burns); a `procedural` source is its own
                           declaration (a seed, licence ours-generated); the
                           encode table writes webp/awebp/apng (Pillow) and

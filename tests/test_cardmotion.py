@@ -102,6 +102,11 @@ def test_slow_pan_needs_no_depth() -> None:
     assert len(clip.frames) == EFFECTS["slow-pan"].frames
 
 
+def test_breath_needs_no_depth() -> None:
+    clip = derive(art_image(), None, EFFECTS["breath"])
+    assert len(clip.frames) == EFFECTS["breath"].frames
+
+
 def test_depth_drift_without_a_map_is_refused() -> None:
     from mtglab.cardmotion.effects import EffectError
 

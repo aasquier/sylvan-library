@@ -80,12 +80,21 @@ export function useCardMotion(oracleId: string | null | undefined,
 export function coverTopWindow(
   texWidth: number, texHeight: number,
   boxWidth: number, boxHeight: number,
+  anchor: 'top' | 'center' = 'top',
 ): { scale: [number, number]; offset: [number, number] } {
   const texAspect = texWidth / texHeight
   const boxAspect = boxWidth / boxHeight
   if (boxAspect >= texAspect) {
     const sliceHeight = texAspect / boxAspect
-    return { scale: [1, sliceHeight], offset: [0, 1 - sliceHeight] }
+    // `center` keeps the middle band instead of the top one — the gallery's
+    // contract, where the still it replaces cropped from the centre and a
+    // portrait painting's subject sits mid-frame (Avon's island, not its
+    // sky). v = 1 is the painting's top, so `top` pushes the window all the
+    // way up and `center` halves the leftover.
+    const offsetY = anchor === 'top'
+      ? 1 - sliceHeight
+      : (1 - sliceHeight) / 2
+    return { scale: [1, sliceHeight], offset: [0, offsetY] }
   }
   const sliceWidth = boxAspect / texAspect
   return { scale: [sliceWidth, 1], offset: [(1 - sliceWidth) / 2, 0] }

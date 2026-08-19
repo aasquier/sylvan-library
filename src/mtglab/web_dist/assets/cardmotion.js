@@ -1,0 +1,23 @@
+import{A as e,D as t,E as n,O as r,X as i,ft as a,k as o,lt as s}from"./app.js";var c=a(s(),1),l=i(),u=`
+attribute vec2 pos;
+varying vec2 uv;
+void main() {
+  uv = pos * 0.5 + 0.5;
+  gl_Position = vec4(pos, 0.0, 1.0);
+}
+`,d=`
+precision mediump float;
+varying vec2 uv;
+uniform sampler2D art;
+uniform sampler2D depth;
+uniform vec2 offset;
+uniform vec2 uvScale;
+uniform vec2 uvOffset;
+void main() {
+  vec2 centred = (uv - 0.5) / 1.06 + 0.5;
+  vec2 base = centred * uvScale + uvOffset;
+  float d = texture2D(depth, base).r - 0.5;
+  vec2 shifted = (centred + d * offset) * uvScale + uvOffset;
+  gl_FragColor = texture2D(art, clamp(shifted, 0.0, 1.0));
+}
+`;function f(e,t,n){let r=e.createShader(t);return r?(e.shaderSource(r,n),e.compileShader(r),e.getShaderParameter(r,e.COMPILE_STATUS)?r:null):null}function p(e,t,n){let r=e.createTexture();e.activeTexture(e.TEXTURE0+t),e.bindTexture(e.TEXTURE_2D,r),e.pixelStorei(e.UNPACK_FLIP_Y_WEBGL,!0),e.texParameteri(e.TEXTURE_2D,e.TEXTURE_WRAP_S,e.CLAMP_TO_EDGE),e.texParameteri(e.TEXTURE_2D,e.TEXTURE_WRAP_T,e.CLAMP_TO_EDGE),e.texParameteri(e.TEXTURE_2D,e.TEXTURE_MIN_FILTER,e.LINEAR),e.texParameteri(e.TEXTURE_2D,e.TEXTURE_MAG_FILTER,e.LINEAR),e.texImage2D(e.TEXTURE_2D,0,e.RGBA,e.RGBA,e.UNSIGNED_BYTE,n)}function m(e){return new Promise((t,n)=>{let r=new Image;r.onload=()=>t(r),r.onerror=()=>n(Error(`texture failed: ${e}`)),r.src=e})}function h({artSrc:n,depthSrc:i,className:a=``,amplitude:o=.014,anchor:s=`top`,fallback:h=null}){let g=(0,c.useRef)(null),[_,v]=(0,c.useState)(!1),[y]=e(),[b]=(0,c.useState)(()=>r()),x=b||!y;return(0,c.useEffect)(()=>{if(x||_)return;let e=g.current;if(!e)return;let r=e.getContext(`webgl`);if(!r){v(!0);return}let a=0,c=!1,l=null,h={x:0,y:0,active:!1},y={x:0,y:0},b=window.matchMedia?.(`(pointer: fine)`).matches??!1,S=t=>{let n=e.getBoundingClientRect();n.width!==0&&n.height!==0&&(h.x=(t.clientX-n.left)/n.width*2-1,h.y=(t.clientY-n.top)/n.height*2-1,h.active=!0)},C=()=>{h.active=!1};return(async()=>{let g,_;try{[g,_]=await Promise.all([m(n),m(i)])}catch{c||v(!0);return}if(c)return;let x=f(r,r.VERTEX_SHADER,u),w=f(r,r.FRAGMENT_SHADER,d),T=r.createProgram();if(!x||!w||!T){v(!0);return}if(r.attachShader(T,x),r.attachShader(T,w),r.linkProgram(T),!r.getProgramParameter(T,r.LINK_STATUS)){v(!0);return}r.useProgram(T);let E=r.createBuffer();r.bindBuffer(r.ARRAY_BUFFER,E),r.bufferData(r.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),r.STATIC_DRAW);let D=r.getAttribLocation(T,`pos`);r.enableVertexAttribArray(D),r.vertexAttribPointer(D,2,r.FLOAT,!1,0,0),p(r,0,g),p(r,1,_),r.uniform1i(r.getUniformLocation(T,`art`),0),r.uniform1i(r.getUniformLocation(T,`depth`),1);let O=r.getUniformLocation(T,`offset`),k=r.getUniformLocation(T,`uvScale`),A=r.getUniformLocation(T,`uvOffset`),j=()=>{let n=Math.min(window.devicePixelRatio||1,2);e.width=Math.max(1,Math.round(e.clientWidth*n)),e.height=Math.max(1,Math.round(e.clientHeight*n)),r.viewport(0,0,e.width,e.height);let i=t(g.naturalWidth,g.naturalHeight,e.width,e.height,s);r.uniform2f(k,i.scale[0],i.scale[1]),r.uniform2f(A,i.offset[0],i.offset[1])};j(),typeof ResizeObserver<`u`&&(l=new ResizeObserver(j),l.observe(e)),b&&(e.addEventListener(`pointermove`,S),e.addEventListener(`pointerleave`,C));let M=performance.now(),N=e=>{if(c)return;let t=(e-M)/1e3,n=Math.cos(t*.45),i=.6*Math.sin(t*.45),s=h.active?h.x:n,l=h.active?h.y:i;y.x+=(s-y.x)*.06,y.y+=(l-y.y)*.06,r.uniform2f(O,y.x*o,y.y*o),r.drawArrays(r.TRIANGLES,0,3),a=requestAnimationFrame(N)};a=requestAnimationFrame(N)})(),()=>{c=!0,cancelAnimationFrame(a),l?.disconnect(),e.removeEventListener(`pointermove`,S),e.removeEventListener(`pointerleave`,C)}},[n,i,o,s,x,_]),x||_?(0,l.jsx)(l.Fragment,{children:h}):(0,l.jsx)(`canvas`,{ref:g,className:a,"aria-hidden":!0,style:{pointerEvents:`auto`,display:`block`,width:`100%`,height:`100%`}})}var g=[`depth-drift`,`slow-pan`];function _({oracleId:e,art:t,still:r,className:i=``,effects:a=g,position:s=`top`}){let c=o(e,a,t);if(!c?.ready||!c.urls)return(0,l.jsx)(l.Fragment,{children:r});let{webm:u,mp4:d,poster:f,depth:p}=c.urls,m=s===`center`?`deck-hero-video motion-art-center`:`deck-hero-video`;return p&&f?(0,l.jsx)(`div`,{className:i,children:(0,l.jsx)(h,{artSrc:f,depthSrc:p,anchor:s,fallback:(0,l.jsx)(n,{webmSrc:u,mp4Src:d,poster:f,mode:`art`,className:m,fallback:r})})}):(0,l.jsx)(`div`,{className:i,children:(0,l.jsx)(n,{webmSrc:u,mp4Src:d,poster:f,mode:`art`,className:m,fallback:r})})}export{_ as t};

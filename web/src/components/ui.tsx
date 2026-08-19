@@ -3,6 +3,7 @@ import { COLOR_NAMES, COLOR_VAR, manaSymbols, splitManaText, symbolName } from '
 import { ManaGlyph, OfficialSymbol } from './manasymbol'
 import { hasGlyph } from '../lib/managlyphs'
 import { SceneBackdrop, type RoomMood } from './forest'
+import { VideoBackdrop } from './videofx'
 
 /* ------------------------------------------------------------------ pips */
 
@@ -430,7 +431,7 @@ export function Caveat({ children }: { children: React.ReactNode }) {
  *
  * The `h1` lives here, so a page that uses this must not render another.
  */
-export function PageMasthead({ art, alt, title, credit, children, mood }: {
+export function PageMasthead({ art, alt, title, credit, children, mood, video }: {
   art: string
   alt: string
   title: React.ReactNode
@@ -440,15 +441,32 @@ export function PageMasthead({ art, alt, title, credit, children, mood }: {
   /** What drifts along this room's floor — see `RoomMood`. Absent means
    *  the forest mist, which is every room's default weather. */
   mood?: RoomMood
+  /** The painting brought to life (`videofx`'s `art` mode): a loop whose
+   *  still IS `art`, so the poster, the reduced-motion floor and the room's
+   *  backdrop wash all show the same world the video moves in. */
+  video?: { webm: string; mp4: string }
 }) {
+  const artClass = 'masthead-art w-full object-cover sm:w-[260px]'
   return (
     <section className="card-surface overflow-hidden rounded-xl">
       <div className="flex flex-col sm:flex-row">
         {/* No ratio and no crop: the container takes the image's own shape,
             so there is nothing to anchor and nothing to lose. Eager, not
-            lazy — the masthead is above the fold on every page that has one. */}
-        <img src={art} alt={alt}
-             className="masthead-art w-full object-cover sm:w-[260px]" />
+            lazy — the masthead is above the fold on every page that has one.
+            With a `video`, the loop wears the same box and the still is its
+            poster and its reduced-motion fallback; the `<video>` is
+            aria-hidden, so the sr-only line keeps the alt where a screen
+            reader will meet it. */}
+        {video ? (
+          <>
+            <span className="sr-only">{alt}</span>
+            <VideoBackdrop webmSrc={video.webm} mp4Src={video.mp4}
+                           poster={art} mode="art" className={artClass}
+                           fallback={<img src={art} alt="" className={artClass} />} />
+          </>
+        ) : (
+          <img src={art} alt={alt} className={artClass} />
+        )}
         <div className="flex min-w-0 flex-col justify-center gap-1 px-5 py-4 sm:px-6">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>

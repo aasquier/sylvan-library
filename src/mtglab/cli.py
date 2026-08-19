@@ -1563,6 +1563,9 @@ def cmd_cardmotion_build(args):
                  "or --card")
     art_id = None
     if args.deck:
+        if getattr(args, "art", None):
+            sys.exit("refused: --art rides with --card; a deck names its "
+                     "own printing")
         deck = _load(args.deck)
         if not deck.commander:
             sys.exit(f"refused: {args.deck} has no commander to animate")
@@ -1573,6 +1576,10 @@ def cmd_cardmotion_build(args):
         art_id = getattr(deck, "commander_art", "") or None
     else:
         card = args.card
+        # A page that pins a particular painting (the About gallery) needs
+        # the derivative built from that printing, for the same reason a
+        # deck does.
+        art_id = getattr(args, "art", None) or None
 
     model = None
     from mtglab.cardmotion.effects import EFFECTS
@@ -2150,8 +2157,12 @@ def main(argv=None):
                                      "dual-format loop")
     cb.add_argument("--deck", help="a deck slug; its commander's art")
     cb.add_argument("--card", help="or a card by name")
+    cb.add_argument("--art", help="with --card: a printing id (the UUID in "
+                                  "a Scryfall image URL), when the painting "
+                                  "wanted is not the pool's default")
     cb.add_argument("--effect", default="depth-drift",
-                    help="depth-drift (needs the depth extra) or slow-pan")
+                    help="depth-drift (needs the depth extra), slow-pan, "
+                         "or breath")
     cb.set_defaults(func=cmd_cardmotion_build)
     cy = cm.add_parser("sync", help="every deck's commander vs the cache: "
                                     "build what is missing, from the "

@@ -197,6 +197,74 @@ def test_ken_burns_bounce_returns_home() -> None:
     assert np.abs(first - last).mean() < np.abs(first - middle).mean()
 
 
+def test_breath_builds_the_timeline_from_a_still() -> None:
+    still = FrameSequence.still(Image.new("RGB", (64, 40), (10, 90, 40)))
+    clip = apply_motion(still, "breath",
+                        {"frames": 12, "fps": 12, "amplitude": 0.25})
+    assert len(clip.frames) == 12
+    assert clip.fps == 12
+    assert clip.size == (64, 40)
+
+
+def test_breath_loops_without_a_duplicated_beat() -> None:
+    """Phase is sampled at k/N with the endpoint excluded: the last frame
+    sits *beside* the first — close enough to loop, but never the same
+    frame twice, which would read as a held beat at every wrap."""
+    rng = np.random.default_rng(7)
+    art = Image.fromarray(rng.integers(0, 255, (40, 64, 3), dtype=np.uint8))
+    clip = apply_motion(FrameSequence.still(art), "breath",
+                        {"frames": 12, "fps": 12, "amplitude": 0.25})
+    first = np.asarray(clip.frames[0]).astype(float)
+    last = np.asarray(clip.frames[-1]).astype(float)
+    middle = np.asarray(clip.frames[6]).astype(float)
+    assert np.abs(first - last).mean() < np.abs(first - middle).mean()
+    # Inclusive endpoints would make the wrap a byte-identical duplicate.
+    assert not np.array_equal(first, last)
+
+
+def test_breath_dwells_at_rest() -> None:
+    """The phase warp is the whole point: motion near rest is slower than
+    motion mid-swell, or the breath is just a metronome wearing a new
+    name."""
+    rng = np.random.default_rng(9)
+    art = Image.fromarray(rng.integers(0, 255, (40, 64, 3), dtype=np.uint8))
+    clip = apply_motion(FrameSequence.still(art), "breath",
+                        {"frames": 12, "fps": 12, "amplitude": 0.25,
+                         "skew": 0.45})
+    frames = [np.asarray(f).astype(float) for f in clip.frames]
+    at_rest = np.abs(frames[1] - frames[0]).mean()
+    mid_swell = np.abs(frames[4] - frames[3]).mean()
+    assert at_rest < mid_swell
+
+
+def test_breath_is_deterministic() -> None:
+    art = Image.new("RGB", (48, 32), (30, 60, 120))
+    params = {"frames": 8, "fps": 12, "amplitude": 0.1, "lift": 0.4}
+    first = apply_motion(FrameSequence.still(art), "breath", dict(params))
+    second = apply_motion(FrameSequence.still(art), "breath", dict(params))
+    for a, b in zip(as_arrays(first), as_arrays(second), strict=True):
+        assert np.array_equal(a, b)
+
+
+def test_breath_refuses_a_sequence() -> None:
+    noise = generate("spectral_noise", dict(NOISE))
+    with pytest.raises(OpError, match="still"):
+        apply_motion(noise, "breath", {"frames": 4, "fps": 8})
+
+
+def test_breath_refuses_a_stalling_skew() -> None:
+    still = FrameSequence.still(Image.new("RGB", (8, 8)))
+    with pytest.raises(OpError, match="holds its breath"):
+        apply_motion(still, "breath", {"frames": 4, "fps": 8, "skew": 1.0})
+
+
+def test_breath_refuses_a_zero_amplitude() -> None:
+    still = FrameSequence.still(Image.new("RGB", (8, 8)))
+    with pytest.raises(OpError, match="still wearing a video"):
+        apply_motion(still, "breath",
+                     {"frames": 4, "fps": 8, "amplitude": 0.0})
+
+
 def test_ken_burns_refuses_a_sequence() -> None:
     noise = generate("spectral_noise", dict(NOISE))
     with pytest.raises(OpError, match="still"):
