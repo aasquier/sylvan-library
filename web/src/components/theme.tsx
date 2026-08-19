@@ -27,7 +27,8 @@
  * same truth: the deck is made by the person whose deck it is.
  */
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState,
+         type CSSProperties, type ReactNode } from 'react'
 import {
   ApiError,
   api,
@@ -420,6 +421,32 @@ function Chip({ slot }: { slot: ThemeSlot }) {
   )
 }
 
+/** Who to credit under a fun fact.
+ *
+ * Three origins reach here and they are credited differently. A fact read off
+ * a page carries its URL and gets a link. A fact from the colour reference
+ * data carries the literal source `taxonomy`, and saying so plainly is the
+ * whole point — it is this tool talking about itself.
+ *
+ * The third is the trap this function exists for. When the fortune-teller
+ * cites the deck's own history the server sends a real citation (a book, a
+ * year) and **no URL**, and the old code keyed on the URL alone: anything
+ * without one was captioned "From this tool’s own colour reference data",
+ * so a fact about Pamela Colman Smith would have been credited to a table of
+ * Magic colours. Key on the source, not on the absence of a link.
+ */
+function factCredit(fact: NonNullable<ThemeReport['fact']>): ReactNode {
+  if (fact.url) {
+    return <a href={fact.url} target="_blank" rel="noreferrer noopener"
+              className="underline">{fact.source}</a>
+  }
+  if (!fact.source || fact.source === 'taxonomy') {
+    return 'From this tool’s own colour reference data.'
+  }
+  return fact.source
+}
+
+
 function FactNote({ fact, seance }: {
   fact: NonNullable<ThemeReport['fact']>
   seance?: boolean
@@ -434,10 +461,7 @@ function FactNote({ fact, seance }: {
       <p className="mt-1 text-sm leading-relaxed"
          style={{ color: 'var(--text-secondary)' }}>{fact.text}</p>
       <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-        {fact.url
-          ? <a href={fact.url} target="_blank" rel="noreferrer noopener"
-               className="underline">{fact.source}</a>
-          : 'From this tool’s own colour reference data.'}
+        {factCredit(fact)}
       </p>
     </aside>
   )
