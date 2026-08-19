@@ -99,6 +99,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from mtglab import caches
+
 if TYPE_CHECKING:
     from mtglab.sim.tier1.engine import KeepRule, SimCard
 
@@ -135,6 +137,17 @@ _fingerprint_cache: str | None = None
 _fingerprint_done = False
 
 
+def _clear_fingerprint() -> None:
+    global _fingerprint_cache, _fingerprint_done
+    _fingerprint_cache, _fingerprint_done = None, False
+
+
+_FINGERPRINT_STATS = caches.register(
+    "sim.fingerprint", clear=_clear_fingerprint,
+    size=lambda: 1 if _fingerprint_done else 0,
+    note="a hash of engine.py and mana.py, computed once per process")
+
+
 def fingerprint() -> str | None:
     """A hash of the code that turns SimCards into numbers.
 
@@ -149,7 +162,9 @@ def fingerprint() -> str | None:
     """
     global _fingerprint_cache, _fingerprint_done
     if _fingerprint_done:
+        _FINGERPRINT_STATS.hit()
         return _fingerprint_cache
+    _FINGERPRINT_STATS.miss()
     _fingerprint_done = True
     digest = hashlib.sha256()
     try:

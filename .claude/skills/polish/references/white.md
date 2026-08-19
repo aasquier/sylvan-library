@@ -149,6 +149,10 @@ tests never feels expensive.
   and helpers stay import-safe.
 - The skip gate is pinned at 2 (`needs_full_pool`), and `-ra` prints every
   skip. Any drift in the skip count is a finding even when CI is green.
+- Measure the suite with the tool rather than by feel: `pytest -q
+  --durations=25` for the slow tail, and `mtglab bench run` for anything the
+  suite exercises that a *user* also waits on — a test that got slower and an
+  endpoint that got slower are the same regression seen twice.
 - Parallelism (`pytest-xdist`) is a new dev dependency → **queued, not
   applied**. What a run *can* do: measure whether the suite is
   parallel-safe (shared `data/` state, `config.use_paths` discipline) so the
@@ -159,19 +163,36 @@ tests never feels expensive.
 - Verify new guard tests by mutation, not by greenness: a test written to
   hold a boundary gets the boundary broken locally once to prove it fires
   (the conftest-hides-the-deployed-branch lesson).
-- **Random mutation sampling, every run of this facet** (Aaron's ask,
-  2026-08-16): the bullet above checks tests you just wrote; this one checks
-  the suite nobody is watching. Pick a handful of mutations at random across
-  load-bearing modules (`mana.py`, `decks/validate.py`, `sim/`, `auth/`) —
-  flip a comparison, off-by-one a boundary, drop a guard clause, swap
-  `and`/`or` — apply one at a time, run the affected tests, and **count the
-  survivors**. A mutation the suite never catches is a finding naming the
-  exact weak spot, worth more than a coverage percentage. Record the
-  sample size and kill rate in the ledger so the number can trend. Do it
-  by hand with `git diff`/`git checkout --` as the harness — `mutmut` or
-  `cosmic-ray` would automate it but are new dev dependencies, so the
-  tooling decision stays queued with the manual protocol as the evidence
-  for it. Leave the tree clean; a surviving mutant never gets committed.
+- **Mutation sampling, every run of this facet** (Aaron's ask, 2026-08-16;
+  tooled 2026-08-19). The bullet above checks tests you just wrote; this one
+  checks the suite nobody is watching. It is no longer a hand protocol:
+
+  ```bash
+  mtglab mutate list                        # 1,231 sites across 16 modules
+  mtglab mutate run --sample 12 --seed 0    # a reproducible draw
+  mtglab mutate run --sample 6 --full       # judged by the whole suite
+  ```
+
+  Every mutation is applied to a **throwaway copy** of the package and pytest
+  is pointed at the copy, so the working tree cannot be reached at all — the
+  hand version edited the real file and restored it, and an interrupted run
+  left a mutation in the tree with `git status` as the only thing between that
+  and a commit.
+
+  Three things to hold on to when reading the output. **Record the seed** —
+  a kill rate nobody can reproduce is a number that can only be quoted, and
+  the ledger wants a figure that trends. **A survivor is a question, not a
+  verdict**: some mutations are semantically equivalent and no test could ever
+  kill them, and telling those apart is reading work the tool does not do.
+  And **note what ran**: by default each mutation is judged by the test files
+  mapped to its module in `mutate/harness.py`, so a survivor of six files is a
+  weaker claim than a survivor of `--full`. A module with no mapping is a
+  finding of its own — add it there, and `tests/test_mutate.py` fails if a
+  mapping names a file that does not exist.
+
+  `mutmut`/`cosmic-ray` stay **queued** as the escalation for an exhaustive
+  run over one module; the harness covers the routine sampling, and the
+  comparison is in the ledger.
 - After the suite, **`git status data/` proves nothing** — `app.db` is
   gitignored, so a test that writes the developer's real database leaves the
   status clean. That check was in this file for one run and was blind the whole

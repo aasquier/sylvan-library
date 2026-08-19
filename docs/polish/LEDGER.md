@@ -1,8 +1,10 @@
 # The Polish Ledger
 
 The memory of the recurring polish pass (`.claude/skills/polish/`). One
-section per color; each run updates its color's section **on the branch that
-did the work**. Queued findings wait on Aaron and are not re-litigated;
+section per color, plus **Colorless** — the artifacts run that audits this
+file, the skill and the developer tooling, and goes last in a rainbow. Each
+run updates its own section **on the branch that did the work**; Colorless is
+the one allowed to correct another section, which is its job. Queued findings wait on Aaron and are not re-litigated;
 deferred items name the trigger that revives them; measurements are recorded
 even when healthy, because today's healthy number is next quarter's baseline.
 
@@ -174,6 +176,88 @@ state, never checklists.
     (2 sanctioned callers); SQL parameterized.
   - Testing: full suite ~1920 passed / 2 skipped in ~155s locally; skip gate
     at 2; `data/` not dirtied.
+
+### Mutation testing is tooled — 2026-08-19
+
+The facet has asked for random mutation sampling every run since 2026-08-16,
+by hand, with `git checkout --` as the harness. `mtglab mutate` is that
+protocol automated, and the automation fixed two things about it.
+
+**The working tree is now unreachable.** Every mutation is applied to a
+throwaway copy of the package and pytest is pointed at the copy with
+`-o pythonpath=`. The hand version edited the real file and restored it, so an
+interrupted run left a mutation in the tree with `git status` as the only
+thing between that and a commit. `tests/test_mutate.py` proves the isolation
+by content rather than by trusting the flag.
+
+**The sample is seeded**, so a kill rate can be checked rather than only
+quoted, and the number below can trend.
+
+**Catalogue:** 1,231 sites across 16 modules — 340 boundary, 319 comparison,
+180 arithmetic, 157 guard-drop, 154 boolean, 81 constant.
+
+**Two bugs found in the harness by its own tests**, both of the shape this
+pass keeps finding:
+
+- **A mapping is a narrowing, and a typo widened it silently.** `TARGETS`
+  named `tests/test_sim.py`, a file that has never existed, so every mutation
+  of the simulator ran the *entire* suite instead of two files — correct,
+  forty times slower, and invisible in a report that only says "killed".
+  `missing_tests()` now pins every entry against the tree.
+- **A custom target map narrowed the catalogue and not the tests.** One map
+  now decides both.
+
+**A third was a design flaw, not a typo.** The default timeout was 900
+seconds, and the first sample ever drawn wedged for ten minutes: **a mutation
+is a good way to write an infinite loop** — widen a `<` to a `<=` at a loop
+bound and the condition stops being reachable. A timeout is a kill, so a
+generous limit buys nothing but a run nobody can sit through. Now 180s.
+
+**First baseline: kill rate 76%** — 19 of 25, seed 0, drawn from 1,231 sites,
+judged by each module's mapped tests rather than the whole suite. Record the
+seed with the rate; without it the number can only be quoted.
+
+Six survivors, read rather than counted, because that is the work the tool
+does not do:
+
+- **`decks/validate.py:158`, `and` → `or`. A real gap, now closed.**
+  `if drafting and pending` had neither half pinned: widening it to `or` left
+  the whole suite green while opening two wrong reports — a finished draft
+  told "0 of 99 cards still need a `why`", and a *curated* deck handed a
+  draft's counted warning on top of the 99 blocking errors ADR 13 says it
+  should get instead. The existing test covered only the case where both
+  halves are true, which is exactly the case the mutation leaves alone.
+  `test_a_complete_draft_is_told_nothing_about_rationales` closes it, and was
+  mutation-verified against this same mutant.
+- **`decks/edit.py:661`, `<` → `<=`.** Real but cosmetic: blank-line ownership
+  when the entry being moved is the *last* in its list. No test covers that
+  edge. Left as a finding rather than fixed — the surgical cap, and a
+  formatting edge is not worth a run's diff.
+- **`decks/analyze.py:33` and `decks/companion.py:139`, boundary constants.**
+  Both are numbers in a table; the tests exercise the table's behaviour rather
+  than its edges. Worth a look next White run, not this one.
+- **`sim/cache.py:243` (`ensure_ascii`) and `:356` (`row["b"] or 0`).** Both
+  effectively equivalent on any input this app produces — the cache key holds
+  numbers and an ASCII keep_rule, and `row["b"]` is falsy only for an empty
+  row. **Equivalent mutants are the expected cost of the method**, not a
+  failure of it, and recording them here is what stops the next run
+  re-investigating the same two.
+
+**Finding for the next White run: the coverage floor has no headroom left.**
+Measured while adding these tests — the tree *without* the new modules sits at
+**95.0% against a `fail_under` of 95**, so the floor is not a floor any more,
+it is a tripwire one uncovered branch from red. The `fail_under` comment says
+the point of the number is "a percent of headroom", and that headroom is gone;
+the suite was ~96% when it was written. Either the floor moves down
+deliberately or the gap gets closed deliberately — drifting into it is the one
+option that was never chosen. Not fixed here: this branch is the tooling, and
+raising a coverage floor is a decision with its own argument.
+
+**`mutmut` / `cosmic-ray` stay queued** rather than being dropped: the
+in-repo harness covers the routine per-run sampling with no new dependency,
+and the escalation worth Aaron's yes is an *exhaustive* run over one module,
+which is what those tools do that this one does not. Ask again when a module's
+kill rate is bad enough to want every mutant rather than a sample.
 
 ## Blue — Craft & Knowledge
 
@@ -605,6 +689,81 @@ memo does nothing for a *cold* cache — the first request after a deploy or a
 the common case) but it means Green's concurrency probe should be re-run
 against both states rather than one.
 
+
+### The measuring shelf — 2026-08-19
+
+Not a run: the tooling the run above proved was missing. `mtglab bench` and
+`mtglab mutate` landed with the skill refinement, and Black's facet now says
+to use them rather than to hand-time. Baselines below are this Mac against the
+full pool, and they replace nothing above — they are the first numbers taken
+with an instrument instead of a stopwatch.
+
+**Warm** (`mtglab bench run --runs 15`). Warm is the common case on a live
+instance and these are the numbers to compare next quarter against.
+
+| target | warm median | p95 | database |
+|---|---:|---:|---:|
+| `GET /api/health` | 7.1ms | 8.8ms | — |
+| `GET /api/decks` | 18.9ms | 23.0ms | — |
+| `GET /api/lore` | 6.3ms | 29.1ms | — |
+| `GET /api/colors` | 6.3ms | 7.2ms | — |
+| `GET /api/glossary` | 5.3ms | 6.4ms | — |
+| `GET /api/cards/search?q=goblin` | 46.1ms | 56.1ms | **37.3ms, 1 statement** |
+| deck detail | 7.4ms | 8.3ms | — |
+| deck validate | 6.2ms | 6.9ms | — |
+| `db.get_cards` (100 names) | 0.2ms | 0.4ms | — |
+| `Deck.load` | 0.0ms | 0.1ms | — |
+
+**Cold** (`--cold`, every registered cache emptied between samples). This is
+the row the old ledger format had no slot for, and the reason it needed one is
+visible at a glance: the shelf is **7.3× slower cold**, and the memo is the
+whole difference.
+
+| target | cold median | database |
+|---|---:|---:|
+| `GET /api/decks` | **138.7ms** | 2.0ms, 3 statements |
+| `GET /api/lore` | 83.5ms | 0.0ms |
+| deck detail | 80.3ms | 0.9ms |
+| deck validate | 74.8ms | 55.0ms, 2 statements |
+| `GET /api/cards/search?q=goblin` | 69.4ms | 37.6ms |
+| `db.get_cards` (100 names) | 83.2ms | 0.0ms |
+| `db.connect_readonly` | **17.8ms** | — |
+| `GET /api/colors` | 6.0ms | — |
+
+`db.connect_readonly` at 17.8ms cold against 0.2ms warm is #181's keeper
+measured independently — the entry above claimed 17.5ms → 0.7ms, and an
+instrument that knew nothing about that claim reproduced it.
+
+**Search is the one endpoint the memo cannot help, and now the tool says why
+rather than a run inferring it:** 37.3ms of a 46.1ms wall is inside a single
+DuckDB statement, measured at the query probe. It is a text scan, so it never
+goes through `get_cards`. The lever is the query or an index; there is no
+Python here to rewrite. That sentence used to require somebody to reason
+carefully — it is now the second line of `bench profile`.
+
+**Cache hit rates** (`mtglab bench caches --runs 5`), the instrument gap #5
+asked for:
+
+| cache | hits | misses | rate |
+|---|---:|---:|---:|
+| `deck.parsed` | 60 | 0 | 100% |
+| `pool.columns` | 15 | 0 | 100% |
+| `pool.keeper` | 36 | 0 | 100% |
+| `pool.cards` | 27 | 3 | 90% |
+| `auth.hasher`, `auth.dummy-hash`, `sets.upcoming` | 0 | 0 | *never asked* |
+
+Three caches read **never asked** rather than 0%, which is deliberate: this
+suite does not log in or fetch Scryfall's set list, and a report rendering
+"nobody consulted it" identically to "it missed every time" would hide the
+more interesting finding. Every registered cache that the suite *does*
+exercise hits, so nothing here is currently dead weight.
+
+**One bug the tools found in themselves, worth keeping.** The first cold run
+printed a table saying `/api/health` cost 38.3ms cold and a profile beneath it
+saying 7.2ms — the profiler was handed the bare callable while the sampler
+wrapped it. A warm breakdown under a cold heading is read as the explanation
+of the number above it. Fixed, with a test that fails if any profiled call
+runs against a cache nobody emptied.
 
 ## Red — Speed & Alarum
 
@@ -1061,3 +1220,64 @@ against both states rather than one.
   - **Local suite note:** this worktree symlinks the real pool, so pytest
     reported **1932 passed / 0 skipped**. CI has no pool and will still show
     its pinned 2 skips — the 0 is a property of the worktree, not a change.
+
+
+## Colorless — The Artifacts
+
+*The pass auditing itself: last cycle's findings · are the checklists still
+finding things · the developer tooling · cross-color leftovers*
+
+- **Last run:** 2026-08-19 (the run that created this section). Previous: none
+  — colorless was the name of the merged-survey mode until this session, and
+  that mode is now `converge`.
+- **What changed in the skill this run** (Aaron's ask, in a clean session
+  after the targeted performance pass exposed seven structural gaps):
+  1. **Black's performance facet was rewritten around profiling.** It used to
+     say "record the response time", which a run did — 224ms for `/api/decks`
+     — while the largest performance bug in the codebase sat inside that
+     number. It now says a large number is a *question*, names cold and warm
+     as two measurements, and hands the work to `mtglab bench`.
+  2. **Green stops naming causes.** A load probe finds *which* endpoint; only
+     a profile finds *why*. Green's 2026-08-16 entry guessed "pure-Python YAML
+     under the GIL" — right shape, wrong culprit — and the guess sat here as a
+     finding for three days. The facet now hands the endpoint to Black's
+     profiler.
+  3. **White's mutation bullet became a command.** See White's own section.
+  4. **Blue's spirit-of-Magic facet grew a second half.** It only ever asked
+     what plain English had crept *in*; it now also asks what lore and
+     iconography is **absent** — the enrichment half, with five places the
+     cheap wins live and three hard bounds (White's licence law, "enrichment
+     is not decoration", commandment 15 first).
+  5. **Colorless became its own run and moved last**; the merged five-color
+     survey is now `converge`.
+- **The tooling paid for itself on its first run.** `mtglab mutate` found a
+  real hole in the gate's draft warning (White's section has the detail), and
+  `mtglab bench`'s first cold run found a bug in `mtglab bench` — a warm
+  profile printed under a cold heading. Both are the shape this pass exists
+  for: *the instrument disagreeing with the story*.
+- **Queued for Aaron:** nothing new. `mutmut`/`cosmic-ray` remain queued in
+  White's section as the exhaustive-run escalation.
+- **Deferred:**
+  - **Blue is four facets and the longest reference; Red is two and the
+     shortest.** Not obviously wrong — Blue's facets are cheap to sweep and
+     Red's are expensive to probe — but worth re-checking once the enrichment
+     half has run twice. *Trigger:* a Blue run that cannot finish its four
+     facets in one session.
+  - **The bench suite is in-process and cannot see the proxy, TLS, or the
+     machine.** Live-instance numbers are still hand-taken. *Trigger:* a
+     deployed regression the local bench could not reproduce.
+- **Standing questions for the next colorless run**, so it starts with
+  evidence rather than a blank page:
+  - Did the enrichment half actually produce shortlists, or did it collapse
+    back into the sweep? (The failure mode is predictable: the sweep has
+    concrete greps and the enrichment needs taste.)
+  - Is `mtglab bench run`'s target list still resolving everything? A row
+    reading `skipped` is the finding, not the footnote.
+  - Has the mutation kill rate moved, and is the cause named?
+  - Are any survivors from a previous run still unread?
+- **Staleness, honestly stated** for the next bare `/polish`: all five colors
+  were last swept 2026-08-16 (rainbow); Black additionally had a targeted
+  performance pass 2026-08-19 and now carries the freshest numbers in the
+  file. **Blue is the stalest in substance** — its docs-and-memory audit
+  predates six merged PRs and the whole camera-import feature — and it also
+  owns the new enrichment half, which has never run. Blue next.

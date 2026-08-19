@@ -28,6 +28,8 @@ from argon2.exceptions import (
     VerifyMismatchError,
 )
 
+from mtglab import caches
+
 # OWASP minimum profile. `memory_cost` is in KiB: 19456 KiB == 19 MiB.
 MEMORY_COST_KIB = 19_456
 TIME_COST = 2
@@ -125,3 +127,15 @@ def needs_rehash(stored_hash: str) -> bool:
         return _hasher().check_needs_rehash(stored_hash)
     except InvalidHashError:
         return False
+
+
+#: Both of these are `functools.cache`, which counts itself -- so the register
+#: only has to be told they exist. `_dummy_hash`'s docstring makes a claim
+#: worth checking rather than trusting ("computed once and reused"): a hit rate
+#: below ~100% across a run of failed logins would mean the timing defence is
+#: paying for two hashes where it budgeted for one.
+caches.register_lru("auth.hasher", _hasher,
+                    note="the Argon2 hasher, built once per process")
+caches.register_lru("auth.dummy-hash", _dummy_hash,
+                    note="the throwaway hash an unknown account is verified "
+                         "against, so login costs the same either way")

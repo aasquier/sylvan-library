@@ -1726,3 +1726,106 @@ def test_cardmotion_build_derives_a_decks_commander(tmp_path, capsys,
             built[0]).attribution()["oracle_id"]
         entry = cardmotion_cache.find_ready(oracle_id, EFFECTS["slow-pan"])
         assert entry is not None and entry.ready
+
+
+# ------------------------------------------------------------ the measuring shelf
+
+def test_bench_list_names_every_target_and_why_each_is_unavailable(
+        tmp_path, capsys):
+    """With no pool and no decks, `bench list` must still be a full page.
+
+    The whole design point: a suite that quietly shrank still prints a table,
+    so the skipped rows are the finding rather than the footnote.
+    """
+    with config.use_paths(data_dir=tmp_path, decks_dir=tmp_path / "decks"):
+        main(["bench", "list"])
+    out = capsys.readouterr().out
+    assert "GET /api/decks" in out
+    assert "db.get_cards" in out
+    assert "unavailable:" in out
+
+
+def test_bench_run_reports_the_skipped_rows(tmp_path, capsys):
+    with config.use_paths(data_dir=tmp_path, decks_dir=tmp_path / "decks"):
+        main(["bench", "run", "--runs", "2"])
+    out = capsys.readouterr().out
+    assert "| target |" in out and "warm median" in out
+    assert "not measured here:" in out
+
+
+def test_bench_run_says_so_rather_than_measuring_nothing(tmp_path):
+    with config.use_paths(data_dir=tmp_path, decks_dir=tmp_path / "decks"), \
+            pytest.raises(SystemExit) as exc:
+        main(["bench", "run", "--only", "no-such-target"])
+    assert "no-such-target" in str(exc.value)
+
+
+def test_bench_profile_refuses_a_target_it_cannot_run(tmp_path):
+    with config.use_paths(data_dir=tmp_path, decks_dir=tmp_path / "decks"), \
+            pytest.raises(SystemExit) as exc:
+        main(["bench", "profile", "get_cards"])
+    assert "no card pool" in str(exc.value)
+
+
+def test_bench_profile_runs_a_target_that_needs_nothing(capsys):
+    main(["bench", "profile", "glossary", "--repeat", "2", "--top", "3"])
+    out = capsys.readouterr().out
+    assert "database" in out and "import machinery" in out
+    assert "a RANKING, not a budget" in out, \
+        "the frame table must say what it is, or it gets read as a budget"
+
+
+def test_bench_caches_reports_a_rate_per_registered_cache(capsys):
+    main(["bench", "caches", "--runs", "2"])
+    out = capsys.readouterr().out
+    assert "deck.parsed" in out and "pool.cards" in out
+    assert "never" in out or "%" in out
+
+
+def test_mutate_list_maps_every_module_to_the_tests_that_defend_it(capsys):
+    main(["mutate", "list"])
+    out = capsys.readouterr().out
+    assert "mtglab/mana.py" in out
+    assert "tests/test_mana.py" in out
+    assert "sites in total" in out
+    assert "(the whole suite)" not in out, \
+        "every declared target should name its own tests"
+
+
+def test_bench_run_prints_the_profile_and_not_only_the_millisecond(capsys):
+    """Gap 1 of the 2026-08-19 refinement is that a large number is a
+    question. The tool asking it is worth nothing if the answer is not
+    printed."""
+    main(["bench", "run", "--runs", "2", "--only", "colors",
+          "--profile-over", "0"])
+    out = capsys.readouterr().out
+    assert "is a question" in out
+    assert "database" in out and "imports:" in out
+
+
+def test_mutate_run_reports_the_seed_the_survivors_and_the_safety(
+        monkeypatch, capsys):
+    """The three things the output must always carry: a seed (so the rate can
+    be checked rather than quoted), what each survivor is, and that the
+    working tree was never in play."""
+    from mtglab import mutate
+
+    site = mutate.catalogue(Path(__file__).resolve().parents[1] / "src")[0]
+    report = mutate.Report(sites=1231, seed=42)
+    report.results.append(mutate.Result(mutation=site, killed=False,
+                                        tests=("tests/test_mana.py",),
+                                        seconds=1.0))
+    def fake_run(**kwargs):
+        # The CLI announces each result as it lands; a fake that ignored the
+        # callback would leave that half of the output untested.
+        kwargs["on_result"](report.results[0])
+        return report
+
+    monkeypatch.setattr(mutate, "run", fake_run)
+
+    main(["mutate", "run", "--sample", "1", "--seed", "42"])
+    out = capsys.readouterr().out
+    assert "seed 42" in out
+    assert "SURVIVED" in out and "Survivors" in out
+    assert "tests/test_mana.py" in out
+    assert "working tree was never touched" in out

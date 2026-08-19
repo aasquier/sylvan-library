@@ -32,7 +32,7 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from mtglab import config
+from mtglab import caches, config
 from mtglab.decks.model import Deck
 
 CARDSFOLDER = Path("res") / "cardsfolder" / "cardsfolder.zip"
@@ -58,6 +58,9 @@ def cardsfolder_path(forge_home: Path | None = None) -> Path:
 
 
 _INDEX_CACHE: dict[tuple[str, int, int], frozenset[str]] = {}
+_INDEX_STATS = caches.register(
+    "forge.index", clear=_INDEX_CACHE.clear, size=lambda: len(_INDEX_CACHE),
+    note="every card name Forge implements, per cardsfolder archive")
 
 
 def implemented_names(forge_home: Path | None = None) -> frozenset[str]:
@@ -73,7 +76,9 @@ def implemented_names(forge_home: Path | None = None) -> frozenset[str]:
     key = (str(path), int(stat.st_mtime), stat.st_size)
     cached = _INDEX_CACHE.get(key)
     if cached is not None:
+        _INDEX_STATS.hit()
         return cached
+    _INDEX_STATS.miss()
 
     names: set[str] = set()
     with zipfile.ZipFile(path) as archive:

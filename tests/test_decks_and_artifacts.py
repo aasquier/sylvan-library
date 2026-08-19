@@ -287,6 +287,26 @@ def test_a_draft_warns_about_a_missing_why_and_a_curated_deck_blocks():
         assert rep.ok == (stage == "draft"), stage
 
 
+def test_a_complete_draft_is_told_nothing_about_rationales():
+    """`drafting and pending` — both halves, and a mutation proved neither was
+    pinned.
+
+    `mtglab mutate` widened that `and` to an `or` on 2026-08-19 and the whole
+    suite passed. Two wrong reports live in that gap: a finished draft told
+    "0 of 99 cards still need a `why`", and a curated deck handed a draft's
+    counted warning on top of the 99 blocking errors ADR 13 says it should get
+    instead. The test above pins the case where *both* halves are true, which
+    is the one case the mutation leaves alone.
+    """
+    complete = make_deck(99, stage="draft")
+    assert not validate(complete, pool_for(complete)).warnings
+
+    curated = make_deck(99, stage="curated")
+    curated.cards[3].why = ""
+    rep = validate(curated, pool_for(curated))
+    assert "draft-incomplete" not in {i.code for i in rep.warnings}
+
+
 def test_a_draft_reports_one_counted_issue_rather_than_ninety_nine():
     """ADR 13's actual argument: a number is a better prompt than a wall, and
     ADR 8 needs warnings rare enough that the one that matters is readable."""

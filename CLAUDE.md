@@ -218,6 +218,28 @@ src/mtglab/
                           glyphs in web/src/lib/managlyphs.ts are the
                           client's offline fallback, and the pentagram's
                           vertices
+  caches.py               the register of what this process memoises: a
+                          name, a way to empty it, and hit/miss counters.
+                          Exists because a cache can be correct, tested and
+                          **never once hit** -- only a counter can say so.
+                          `tests/test_caches.py` sweeps for module-level
+                          state that never registered, so the next one
+                          cannot be written the same way
+  bench/                  the measuring shelf (dev only; the app never
+                          imports it): a declared target suite, a sampler
+                          with cold and warm as separate runs, and a
+                          profiler that reports the **database budget
+                          exactly** -- measured at a query probe in
+                          `cards/db.py`, because cProfile raises no event
+                          for an extension call and folds DuckDB's time
+                          into the Python frame that called it. Also counts
+                          calls into `importlib`, which is what names an
+                          import storm on sight
+  mutate/                 mutation testing (dev only): a catalogue of small
+                          wrongnesses applied to a **throwaway copy** of the
+                          package, judged by the tests mapped to each
+                          module. Seeded, so a kill rate can be checked
+                          rather than only quoted
   mana.py                 cost parsing + castability solver
   cards/db.py             Scryfall bulk -> DuckDB, price history
   decks/model.py          deck.yaml schema
@@ -558,6 +580,25 @@ mtglab decks delete <slug>        # confirm by typing the slug; moves to decks/.
 mtglab decks log <slug>           what has been done to it, and by whom
 mtglab decks build <slug>         # diffs against the last build's snapshot
 ```
+
+Measuring, before optimising or before trusting the suite:
+
+```bash
+mtglab bench run [--cold]         # the declared suite; medians and p95, never
+                                  # a mean, and cold/warm are two numbers
+mtglab bench profile <target>     # database budget, import calls, hot frames
+mtglab bench caches               # hit rates; a dead cache is visible as dead
+mtglab mutate run --sample N --seed S   # does the suite hold what it claims?
+mtglab mutate list                # every site, and which tests defend it
+```
+
+Two rules these encode, both bought the hard way. **A large number is a
+question, not a datum** -- `bench run` profiles anything over 25ms unasked,
+because a run once recorded `/api/decks` at 224ms and moved on while 162ms of
+failed `import pandas` sat inside it. And **a probe finds *which*, only a
+profile finds *why*** -- the same episode was misattributed to YAML for three
+days by a plausible guess. Record the numbers in `docs/polish/LEDGER.md`; the
+polish skill's Black and White facets say when.
 
 `swaps.md` diffs the deck against `artifacts/deck.last-built.yaml`, which
 every build stashes (ADR 30 — decks are not in git, so there is no revision

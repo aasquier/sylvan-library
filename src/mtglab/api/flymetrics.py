@@ -59,6 +59,8 @@ import urllib.request
 from collections.abc import Callable
 from typing import Any
 
+from mtglab import caches
+
 _LOG = logging.getLogger("mtglab.api.flymetrics")
 
 #: The org slug, not the app name. Fly's managed Prometheus is per
@@ -119,6 +121,17 @@ QUERIES: dict[str, str] = {
 Transport = Callable[[str, dict[str, str]], tuple[int, bytes]]
 
 _cache: tuple[float, dict[str, Any]] | None = None
+
+
+def _clear_metrics() -> None:
+    global _cache
+    _cache = None
+
+
+_METRICS_STATS = caches.register(
+    "fly.metrics", clear=_clear_metrics,
+    size=lambda: 0 if _cache is None else 1,
+    note="the admin panel's Fly figures, held CACHE_SECONDS")
 
 
 def _urllib_get(url: str, headers: dict[str, str]) -> tuple[int, bytes]:
@@ -194,7 +207,9 @@ def fetch(*, transport: Transport | None = None,
     global _cache
     stamp = time.monotonic() if now is None else now
     if _cache is not None and stamp - _cache[0] < CACHE_SECONDS:
+        _METRICS_STATS.hit()
         return _cache[1]
+    _METRICS_STATS.miss()
 
     secret = token()
     if not secret:

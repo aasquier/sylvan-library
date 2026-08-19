@@ -129,45 +129,99 @@ files against them.
   these memories, pick up the work without asking Aaron anything already
   answered?* Every "no" is a finding.
 
-## Facet: The spirit of Magic
+## Facet: The spirit of Magic — the authenticity pass
 
 Commandment 3 made operational, the way ROADMAP item 12 operationalised
-commandment 5. The other facets keep the copy true; this one keeps it Magic.
-The sweep asks one question of every rendered sentence and surface: *is the
-game's own vocabulary and iconography doing the talking, or has plain
-conversational English crept in where a Magic word would serve?*
+commandment 5. The other facets keep the copy *true*; this one keeps it
+*Magic*. It has two halves and they pull in opposite directions, which is why
+they are named separately: **the sweep** removes plain English that crept in,
+and **the enrichment** adds lore and iconography that was never there. A run
+that only does the first will keep finding less each cycle and conclude the
+job is done, while the site quietly stays as bare as it was.
+
+### Half one — the sweep: has plain English crept in?
+
+The question of every rendered sentence: *is the game's own vocabulary doing
+the talking, or has conversational English taken its place?*
 
 - **Prefer Magic's word over the conversational one wherever a real term
   fits.** The app at its best already speaks this way — cards are *entombed*
   in a graveyard and *returned* from it, removal is *exile*, the Wheel deals
-  fates — and it drifts at the edges: a generic "Delete", "Error",
-  "Loading…" or "No results" where the game has a truer word. Grep
-  `web/src` for rendered strings — labels, buttons, empty states, error and
-  loading copy, placeholders, tooltips, toasts — and walk the live surface
-  reading each line with the question above. CLI output and artifact prose
-  are surfaces too.
+  fates — and it drifts at the edges: a generic "Delete", "Error", "Loading…"
+  or "No results" where the game has a truer word. Grep `web/src` for
+  rendered strings — labels, buttons, empty states, error and loading copy,
+  placeholders, tooltips, toasts — and walk the live surface reading each line
+  with the question above. CLI output and artifact prose are surfaces too.
 - **"Within reason" is a real boundary, and commandment 2 draws it.** A term
   qualifies only if a newcomer can still act on the sentence — flavour that
-  obscures what a control does is a regression wearing a costume. The
-  glossary (`glossary.py`) is what squares the two commandments: a Magic
-  term the UI teaches on hover is beginner-safe in a way a bare one is not,
-  so "use the term *and* glossary it" beats both the plain word and the
-  unexplained term. A flavour fix that needs a new glossary entry is still a
-  safe fix; the entry rides along.
-- **Iconography counts as vocabulary.** Where a color, cost, or identity
-  renders as prose or a plain swatch, the official symbols (`symbols.py`,
-  `managlyphs.ts` offline) are the Magic-speaking alternative; likewise the
-  app's own materials — the felt, the brass, the vine. Commandment 5 bounds
-  the palette (real card art, real materials, never clip art) and White's
-  law binds every asset: this facet may *propose* imagery, but the animist
-  and its licence gate decide whether it exists.
+  obscures what a control does is a regression wearing a costume. The glossary
+  (`glossary.py`) is what squares the two commandments: a Magic term the UI
+  teaches on hover is beginner-safe in a way a bare one is not, so "use the
+  term *and* glossary it" beats both the plain word and the unexplained term.
+  A flavour fix that needs a new glossary entry is still a safe fix; the entry
+  rides along.
 - **Some words are load-bearing; renaming them is not a safe fix.** Wire
-  tokens, `glossary.py` keys (`SIMULATOR_KEYS` pins them), YAML fields, and
-  CLI verbs are API. The pattern is flavouring the *rendered label* over an
+  tokens, `glossary.py` keys (`SIMULATOR_KEYS` pins them), YAML fields and CLI
+  verbs are API. The pattern is flavouring the *rendered label* over an
   unchanged token — `lib/claudecopy.ts` is exactly that seam — and renaming
   the token underneath is a queued item. Commandment 10 still governs: a
-  flavourful sentence that names a seed, model, or database has made things
+  flavourful sentence that names a seed, model or database has made things
   worse, not better.
-- Record in the ledger which surfaces were swept and what was flavoured, so
-  the next run starts where this one stopped instead of re-reading the
-  whole app.
+
+### Half two — the enrichment: what is missing that could be there?
+
+The sweep can only find what is wrong. This half asks what is **absent**, and
+it is the half Aaron asked for by name: *easy wins that make the site feel as
+rich with Magic's lore and iconography as it can be.* Bring back a shortlist
+each run rather than a rewrite — this is the facet most able to sprawl, and
+the surgical cap binds it hardest.
+
+Where the easy wins live, roughly in order of cost:
+
+- **A bare number or word that has a symbol.** Mana costs, colour identity,
+  card types and rarities all have official marks (`symbols.py`, with
+  `managlyphs.ts` as the offline fallback). Anywhere identity renders as the
+  letters `WUBRG`, a coloured dot, or the word "green", the pip is the Magic
+  way to say it. Sweep for `color_identity`, `mana_cost` and `type_line` in
+  `web/src` and look at what each one draws.
+- **A place with no name.** Magic names its zones and its objects — library,
+  graveyard, exile, battlefield, command zone, sideboard, stack. A panel
+  called "Removed cards" is a graveyard; a list called "Options" may be a
+  sideboard. Record which surfaces have been renamed so the next run starts
+  where this one stopped.
+- **A card that could speak for itself.** Oracle text and flavour text are
+  already in the pool, free, licensed to render, and better written than
+  anything a checklist will produce. An empty state, a loading line or a
+  section header can carry a real card's words — `lore.py`, `colors.py` and
+  `tarotlore.py` are the checked-in prose shelves, and rule 1 still binds:
+  **card facts come from the pool, never from recall.** A flavour line quoted
+  from memory is exactly the error the first non-negotiable exists to stop,
+  and it is worse here because it will be *rendered*.
+- **A moment with no motion.** Commandment 6 wants the page alive, and the
+  materials are already built: the felt, the brass, the vine, the glint, the
+  `.btn` family in `web/src/index.css` (commandment 17). A control that does
+  not answer the hand reaching for it is both a flavour finding and a bug.
+- **A stretch of history nobody is telling.** The lore shelves know which
+  painter, which set, which rule changed and when. A card already on screen
+  can carry its painter's name; a colour pair can carry its guild. These are
+  the cheapest wins of all, because the sentence is already written and
+  checked in — it is only not being shown.
+
+Three bounds, all of them hard:
+
+- **White's law binds every asset.** This facet may *propose* imagery; the
+  animist and its licence gate decide whether it exists. Wizards' art stays
+  runtime-only and credited, no matter how much better the page would look
+  with it committed. Commandment 5 bounds the palette besides: real card art,
+  real materials, real photography — never clip art, never vector cartoon.
+- **Enrichment is not decoration.** The test is whether a Magic player would
+  recognise the thing as *the game's own*, not whether it is prettier. A
+  fantasy flourish that is not Magic's has made the site less authentic while
+  looking like it did the opposite.
+- **Commandment 15 outranks the shortlist.** When effort has to be rationed,
+  the fortune-teller's table is rationed last. If a run has one enrichment in
+  it, it goes there.
+
+Record in the ledger which surfaces were swept, what was flavoured, and — the
+part that makes the next run cheaper — **what was considered and rejected**,
+so the same idea is not re-litigated every cycle.

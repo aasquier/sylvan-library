@@ -40,6 +40,12 @@ import sys
 from pathlib import Path
 
 from mtglab import config
+
+# The one thing from the measuring shelf that is needed at parser-build time,
+# so `--help` can print the threshold rather than a bare number. Cheap:
+# `bench.targets` reaches the API and the pool inside `suite()`, never at
+# import, so a plain `mtglab decks list` pays nothing for it.
+from mtglab.bench.targets import PROFILE_OVER_MS
 from mtglab.decks.model import CATEGORIES, DECK_STAGES, DECK_STATUSES, Deck
 from mtglab.sim.compile import (
     PoolRequired,
@@ -1899,6 +1905,182 @@ def cmd_animist_measure(args):
           "look at the result before trusting it")
 
 
+# ------------------------------------------------------------------- bench
+
+def cmd_bench_run(args):
+    """Time the declared suite, cold or warm, and print a ledger-ready table."""
+    from mtglab.bench import run as benchrun
+    from mtglab.bench import targets as benchtargets
+
+    picked = benchtargets.suite()
+    if args.only:
+        picked = [t for t in picked if args.only.lower() in t.name.lower()]
+        if not picked:
+            sys.exit(f"nothing in the suite matches {args.only!r}")
+
+    state = "cold" if args.cold else "warm"
+    print(f"timing {len(picked)} targets, {args.runs} runs each, {state}\n")
+    samples = benchrun.run_suite(picked, runs=args.runs, cold=args.cold,
+                                 profile_over_ms=args.profile_over)
+    print(benchrun.as_markdown(samples, cold=args.cold))
+
+    slow = [s for s in samples if s.profile is not None]
+    if slow:
+        print("\nAnything over "
+              f"{args.profile_over:.0f}ms is profiled, because a number this "
+              "size is a question:")
+        for s in slow:
+            prof = s.profile
+            if prof is None:                       # unreachable; narrows Profile | None
+                continue
+            print(f"\n  {s.target.name}")
+            print(f"    wall {prof.wall_s * 1000:.1f}ms  ="
+                  f"  database {prof.db_s * 1000:.1f}ms"
+                  f" ({prof.queries.count} statements)"
+                  f"  +  everything else {prof.other_s * 1000:.1f}ms")
+            print(f"    imports: {prof.import_calls} calls into importlib")
+            print(f"    {prof.verdict()}")
+            for frame in prof.frames[:5]:
+                print(f"      {frame.tottime * 1000:7.2f}ms  {frame.where}")
+
+    missing = [s for s in samples if s.skipped]
+    if missing:
+        print("\nnot measured here:")
+        for s in missing:
+            print(f"  {s.target.name}: {s.skipped}")
+
+
+def cmd_bench_profile(args):
+    """One target, profiled in full."""
+    from mtglab.bench import profile as benchprofile
+    from mtglab.bench import targets as benchtargets
+
+    matches = [t for t in benchtargets.suite()
+               if args.target.lower() in t.name.lower()]
+    if not matches:
+        sys.exit(f"no target matches {args.target!r} -- "
+                 f"`mtglab bench list` shows them all")
+    target = matches[0]
+    if target.unavailable:
+        sys.exit(f"{target.name}: {target.unavailable}")
+
+    prof = benchprofile.profile_target(target.name, target.call,
+                                       repeat=args.repeat, top=args.top)
+    print(f"{target.name}  ({args.repeat} runs)\n")
+    print(f"  wall              {prof.wall_s * 1000:8.2f}ms")
+    print(f"  database          {prof.db_s * 1000:8.2f}ms  "
+          f"({prof.queries.count} statements, "
+          f"{prof.db_share:.0%} of the wall)")
+    print(f"  everything else   {prof.other_s * 1000:8.2f}ms")
+    print(f"  import machinery  {prof.import_calls:8d} calls "
+          f"({prof.import_share:.1%} of the traced run)")
+    repeat = prof.queries.worst_repeat()
+    if repeat is not None:
+        print(f"\n  most-repeated statement, {repeat[1]}x:\n    {repeat[0]}")
+    if prof.queries.slowest_sql:
+        print(f"\n  slowest statement, {prof.queries.slowest_s * 1000:.1f}ms:"
+              f"\n    {prof.queries.slowest_sql}")
+    print(f"\n  {prof.verdict()}")
+    print("\n  hottest frames -- a RANKING, not a budget: cProfile's clock is "
+          "inflated\n  per call, so read which line rather than how many ms.")
+    for frame in prof.frames:
+        print(f"    {frame.tottime * 1000:8.2f}ms  {frame.calls:7d}x  "
+              f"{frame.where}")
+
+
+def cmd_bench_caches(args):
+    """What this process memoises, and whether any of it is earning its keep."""
+    from mtglab import caches
+    from mtglab.bench import run as benchrun
+    from mtglab.bench import targets as benchtargets
+
+    # Import the app so every cache has registered before anything is asked.
+    picked = [t for t in benchtargets.suite() if not t.unavailable]
+    caches.reset_stats()
+    benchrun.run_suite(picked, runs=args.runs, cold=False,
+                       profile_over_ms=float("inf"))
+
+    print(f"after {args.runs} runs of {len(picked)} targets:\n")
+    print(f"  {'cache':18} {'hits':>7} {'misses':>7} {'rate':>7} {'held':>6}")
+    for row in caches.report():
+        rate = "never" if row.rate is None else f"{row.rate:.0%}"
+        held = "-" if row.size is None else str(row.size)
+        print(f"  {row.name:18} {row.hits:7d} {row.misses:7d} {rate:>7} "
+              f"{held:>6}")
+        if row.note:
+            print(f"    {row.note}")
+    dead = [r for r in caches.report() if r.rate is not None and r.rate == 0.0]
+    if dead:
+        print("\n  A cache that never hits is complexity wearing a win's "
+              "clothes:")
+        for row in dead:
+            print(f"    {row.name}")
+
+
+def cmd_bench_list(args):
+    """The declared suite, and what each target needs in order to run."""
+    from mtglab.bench import targets as benchtargets
+    for target in benchtargets.suite():
+        mark = f"unavailable: {target.unavailable}" if target.unavailable \
+            else target.note
+        print(f"  [{target.kind:8}] {target.name}")
+        if mark:
+            print(f"             {mark}")
+
+
+# ------------------------------------------------------------------ mutate
+
+def cmd_mutate_run(args):
+    """Break the code on purpose and count what the suite never noticed."""
+    from mtglab import mutate as mutaterun
+
+    src = Path(__file__).resolve().parents[1]
+    available = mutaterun.catalogue(src)
+    print(f"{len(available)} mutation sites across "
+          f"{len(mutaterun.TARGETS)} modules; sampling {args.sample} "
+          f"at seed {args.seed}\n")
+
+    def announce(result):
+        verdict = "killed  " if result.killed else "SURVIVED"
+        print(f"  {verdict} {result.seconds:5.1f}s  "
+              f"{result.mutation.describe()}")
+
+    report = mutaterun.run(sample=args.sample, seed=args.seed, full=args.full,
+                           src=src, on_result=announce)
+    rate = report.kill_rate
+    print(f"\nkill rate {rate:.0%} -- {report.killed} of "
+          f"{len(report.results)}, drawn from {report.sites} sites, "
+          f"seed {report.seed}")
+    if report.survivors:
+        print("\nSurvivors. Each is a question rather than a verdict: some "
+              "are\nequivalent mutants no test could ever kill, and telling "
+              "those apart\nis reading work this tool does not do for you.")
+        for result in report.survivors:
+            print(f"\n  {result.mutation.describe()}")
+            print(f"    ran: {' '.join(result.tests)}")
+    print("\nThe working tree was never touched -- every mutation was applied "
+          "to a\nthrowaway copy of the package. Nothing to restore.")
+
+
+def cmd_mutate_list(args):
+    """Every mutation the catalogue can make, by module and kind."""
+    from collections import Counter
+
+    from mtglab import mutate as mutaterun
+
+    src = Path(__file__).resolve().parents[1]
+    available = mutaterun.catalogue(src)
+    by_module = Counter(m.relpath for m in available)
+    by_kind = Counter(m.operator for m in available)
+    for relpath, count in sorted(by_module.items()):
+        tests = " ".join(mutaterun.TARGETS.get(relpath, ()))
+        print(f"  {count:5d}  {relpath}")
+        print(f"         defended by: {tests or '(the whole suite)'}")
+    print(f"\n  {len(available)} sites in total")
+    for kind, count in by_kind.most_common():
+        print(f"    {kind:12} {count}")
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="mtglab", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -2202,6 +2384,58 @@ def main(argv=None):
                     help="the sweep for a video output, where the axis is "
                          "crf rather than width")
     am.set_defaults(func=cmd_animist_measure)
+
+    # The measuring shelf. Developer tooling, like `animist` above: the app
+    # never imports it and the container never ships a benchmark.
+    bench = sub.add_parser(
+        "bench", help="what the app costs, and where the cost actually is"
+    ).add_subparsers(dest="cmd", required=True)
+    br = bench.add_parser("run", help="time the declared suite and profile "
+                                      "anything slow enough to be a question")
+    br.add_argument("--runs", type=int, default=12,
+                    help="samples per target; the report is a median and a "
+                         "p95, never a mean")
+    br.add_argument("--cold", action="store_true",
+                    help="empty every registered cache between samples -- the "
+                         "first-request price, which is a different number "
+                         "and needs its own ledger row")
+    br.add_argument("--only", help="substring of a target name")
+    br.add_argument("--profile-over", type=float, metavar="MS",
+                    default=PROFILE_OVER_MS,
+                    help="profile any target slower than this")
+    br.set_defaults(func=cmd_bench_run)
+    bp = bench.add_parser("profile", help="one target, in full: the database "
+                                          "budget, the imports, the frames")
+    bp.add_argument("target", help="substring of a target name")
+    bp.add_argument("--repeat", type=int, default=5)
+    bp.add_argument("--top", type=int, default=15)
+    bp.set_defaults(func=cmd_bench_profile)
+    bc = bench.add_parser("caches", help="hit rates -- a cache that never "
+                                         "hits is complexity, not a win")
+    bc.add_argument("--runs", type=int, default=6)
+    bc.set_defaults(func=cmd_bench_caches)
+    bench.add_parser("list", help="the declared suite").set_defaults(
+        func=cmd_bench_list)
+
+    # Ikoria's keyword, and the operation is the same one: something is
+    # merged into what is already there, and the board has to answer it.
+    mutate = sub.add_parser(
+        "mutate", help="break the code on purpose; count what nobody noticed"
+    ).add_subparsers(dest="cmd", required=True)
+    mr = mutate.add_parser("run", help="a seeded sample of mutations, applied "
+                                       "to a throwaway copy of the package")
+    mr.add_argument("--sample", type=int, default=12,
+                    help="how many mutations to draw")
+    mr.add_argument("--seed", type=int, default=0,
+                    help="the same seed draws the same sample, so a kill rate "
+                         "can be checked rather than only quoted")
+    mr.add_argument("--full", action="store_true",
+                    help="run the whole suite against each mutation instead "
+                         "of the tests that ought to defend it -- slower, and "
+                         "the only way a survivor is a claim about the suite")
+    mr.set_defaults(func=cmd_mutate_run)
+    mutate.add_parser("list", help="every site the catalogue can reach"
+                      ).set_defaults(func=cmd_mutate_list)
 
     args = p.parse_args(argv)
     args.func(args)

@@ -68,8 +68,11 @@ trend is read.
 - Snapshots: retention and recency — is the newest snapshot newer than the
   newest schema migration?
 - Response times from outside, cold and warm (Black measures for speed; this
-  facet watches for *degradation* — same numbers, different question, so
-  share the measurement and record it once).
+  facet watches for *degradation* — same numbers, different question, so share
+  the measurement and record it once). Cold means the caches are cold, not
+  merely that the machine woke up: `mtglab bench caches` is what makes the two
+  distinguishable, and a "cold" figure taken by asking twice is a warm figure
+  with a misleading label.
 - Fly free-tier/plan posture: what the project is on, what it is near the
   edge of (machine count, volume GB, bandwidth). A limit within one growth
   step is a queued finding with the price of the next tier attached.
@@ -110,10 +113,26 @@ archaeology dig.
   propose Postgres; do check the pragmas serve concurrent reads (WAL mode,
   busy timeout) and that write paths hold transactions briefly.
 - Find the actual first bottleneck, with evidence: is it the single CPU sim
-  worker queueing under concurrent sim requests? SQLite writes? The
-  machine's memory? A cheap local load probe (a dozen concurrent requests
-  against a local instance) tells more than speculation; record what breaks
-  first and at what N.
+  worker queueing under concurrent sim requests? SQLite writes? The machine's
+  memory? A cheap local load probe (a dozen concurrent requests against a
+  local instance) tells more than speculation; record what breaks first and
+  at what N.
+- **A load probe finds *which* endpoint. Only a profile finds *why* — so hand
+  the endpoint to Black's profiler and do not name a cause here.** This is the
+  correction the 2026-08-19 pass earned. The probe correctly found
+  near-perfect serialisation on the library shelf and this facet then wrote
+  down the reason: "the shelf's pure-Python YAML and aggregation under the
+  GIL". Right that it was pure Python under the GIL, wrong about *which* pure
+  Python — YAML was second at 18ms, and the first was 162ms of failed
+  `import pandas` inside DuckDB's parameter binding. The guess was plausible,
+  specific, and sat in the ledger as a finding for three days. **Run `mtglab
+  bench profile <endpoint>` and paste what it says**; a sentence beginning
+  "presumably" is not a finding.
+- **Probe warm *and* cold, and record them as two numbers.** The shelf went
+  201ms → 16ms warm and is unchanged cold, because the win is a memo. One
+  number per row cannot hold that, and a run reading a single figure next
+  quarter will not know which state it describes. `mtglab bench run --cold`
+  is the cold half.
 - Growth levers, kept documented rather than pulled: second Fly machine
   (blocked by single-volume design — say so honestly), bigger machine,
   NET/CPU pool widening, per-user quotas on expensive surfaces (Claude
