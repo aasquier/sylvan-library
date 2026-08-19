@@ -143,9 +143,12 @@ SHARED = {
                                "nothing per-account",
     # The reading engine, same runtime-cache shape again: a fixed table of
     # Apache-2.0 files, byte-identical for every session, fetched by the
-    # camera door and by nothing else.
-    "/api/ocr/{name}": "a shared cache of the Apache-2.0 OCR engine; the "
-                       "same three files for everyone, nothing per-account",
+    # camera door and by nothing else -- plus the worker's own licence
+    # notice, which is served so the pointer inside the worker resolves
+    # (NOTICE.md, "Tesseract").
+    "/api/ocr/{name}": "a shared cache of the Apache-2.0 OCR engine and its "
+                       "notice; the same files for everyone, nothing "
+                       "per-account",
 }
 
 # Belongs to one person. Each entry says how to make one as user A and where to

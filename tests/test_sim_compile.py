@@ -85,6 +85,39 @@ def test_blank_text_scores_zero():
     assert fetches_lands("") == 0
 
 
+def test_a_fetchland_compiles_to_no_ramp_at_all():
+    """`compile_one` zeroes the count for anything that *is* a land, and the
+    reason is in its comment: a fetchland sacrifices itself, so it is net-zero
+    lands. Nothing pinned it. Mutating that `0` to `1` -- every land in the
+    deck fetching another -- left `test_sim_compile`, `test_sim_tier1`,
+    `test_determinism` and `test_sim_cache` all green, while the engine
+    counted every land as ramp (`SimCard.is_ramp`) and drew an extra land for
+    each one played. Found by `mtglab mutate run --sample 25 --seed 1`,
+    2026-08-19; the sentence above is exactly the shape of the survivor the
+    previous run found in `decks/validate.py`.
+
+    The heuristic itself is checked directly, one section up. What this pins
+    is the *land* branch, which the oracle text alone can never reach.
+    """
+    from mtglab.decks.model import CardEntry, Deck
+
+    text = ("{T}, Pay 1 life, Sacrifice this land: Search your library for a "
+            "Forest or Plains card, put it onto the battlefield, then shuffle.")
+    assert fetches_lands(text) == 1, "the text really does read as a fetch"
+
+    deck = Deck(slug="t", name="T", commander=["Cmd"], cards=[
+        CardEntry(name="Windswept Heath", category="land", why="x"),
+    ])
+    pool = {
+        "Cmd": _Rec("Cmd"),
+        "Windswept Heath": _Rec("Windswept Heath", "Land", None, text),
+    }
+    library, _commander = compile_deck(deck, pool)
+    fetchland, = [c for c in library if c.name == "Windswept Heath"]
+    assert fetchland.fetches_lands == 0
+    assert not fetchland.is_ramp
+
+
 # ------------------------------------------------------------ qty expansion
 
 class _Rec:

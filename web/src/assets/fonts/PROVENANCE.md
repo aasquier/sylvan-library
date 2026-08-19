@@ -4,6 +4,14 @@ The tarot reading's letterforms (commandment 15). Every file in this
 directory carries its licence argument here, the tarot deck's rule applied
 to type.
 
+Every face here is under the **SIL Open Font License 1.1**, whose text is at
+`licenses/OFL-1.1.txt` with both copyright statements at its head. The OFL's
+second condition asks that the copyright notice and the licence travel with
+each copy; the notice travels *inside* each file — checked, not assumed, by
+reading the `name` table of every woff2 here (nameID 0 carries the copyright
+and reserved font name, nameID 14 the OFL's URL) — and the licence text
+travels beside them. `NOTICE.md` records that check.
+
 ## IM Fell English, IM Fell English SC
 
 - `im-fell-english-regular.woff2`

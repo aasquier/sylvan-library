@@ -70,6 +70,13 @@ TARGETS: dict[str, tuple[str, ...]] = {
     "mtglab/auth/tokens.py": ("tests/test_auth_tokens.py",),
     "mtglab/auth/ratelimit.py": ("tests/test_auth.py",),
     "mtglab/cards/identify.py": ("tests/test_identify.py",),
+    # The two runtime shelves. Added 2026-08-19 by the White run that noticed
+    # the map had no entry for the module deciding whether somebody else's
+    # WebAssembly runs in a browser: `ocr.py`'s digest check, size cap and
+    # sticky refusal set are exactly the kind of guard this tool exists to
+    # break on purpose, and none of them was ever sampled.
+    "mtglab/ocr.py": ("tests/test_ocr.py",),
+    "mtglab/symbols.py": ("tests/test_symbols.py",),
 }
 
 

@@ -1,5 +1,17 @@
 # Notices and attribution
 
+Third-party licence texts live in `licenses/`. Everything below either points
+at one of them or explains why none is needed.
+
+**Read the distinction this file turns on before adding a section.** Almost
+nothing here is redistributed by this project: Forge is a separate process you
+install yourself, ffmpeg is a build-time subprocess that never reaches the
+image, Depth-Anything's weights are never served, and Scryfall's bulk data is
+downloaded at runtime into a gitignored directory. The one exception is the
+card reader — Tesseract — whose bytes this app serves to every browser that
+opens the camera, and whose licences therefore have to travel with them. That
+section, and the fonts', are the two that carry an actual obligation.
+
 ## Wizards of the Coast
 
 mtg-lab is unofficial Fan Content permitted under the Wizards of the Coast Fan
@@ -29,6 +41,71 @@ their guidelines:
 
 Card images are hotlinked or cached locally at runtime and are never committed.
 Artwork remains the property of its artists and Wizards of the Coast.
+
+## Tesseract — the card reader, and the only code this project redistributes
+
+The camera door reads a card in the browser. `src/mtglab/ocr.py` downloads the
+engine once, pins every file by SHA-256, and serves it from `/api/ocr` (ADR 33's
+arrangement applied to somebody else's compiler output). Nothing is hotlinked
+and nothing enters git — but the bytes do reach every visitor, and *that* is
+distribution in the ordinary way, unlike every other section in this file.
+
+Verified 2026-08-19 from the packages themselves rather than from a summary:
+
+| Served as | From | Licence |
+|---|---|---|
+| `tesseract-core-simd-lstm.wasm.js` | `tesseract.js-core@6.1.2` | Apache-2.0 (`LICENSE` in the package) |
+| `worker.min.js` | `tesseract.js@7.0.0` | Apache-2.0 (`LICENSE.md` in the package) |
+| `eng.traineddata.gz` | `tessdata_fast` 4.0.0 | Apache-2.0 |
+
+The trained data was checked by its bytes and not by its URL: it is fetched
+from a mirror, and gunzipped it hashes to the same git blob as
+`tesseract-ocr/tessdata_fast@4.0.0`'s own `eng.traineddata`
+(`bbef4675053b5b468cdb477053e28b1c698ba08e`, 4,113,088 bytes).
+
+Three consequences, each with its discharge:
+
+1. **`worker.min.js` names a notice file, and we now serve it.** Its first
+   line is `/*! For license information please see worker.min.js.LICENSE.txt */`
+   — a pointer *relative to wherever the script is served from*. Served from
+   our origin without that file beside it, the pointer was a 404 for every
+   recipient. It is now a fourth row on the shelf, answering at
+   `/api/ocr/worker.min.js.LICENSE.txt`, and it holds the MIT and BSD-3-Clause
+   notices for the buffer, ieee754, regenerator-runtime and zlib.js code
+   bundled inside the worker — licences whose single condition is that the
+   copyright notice travels with the copy.
+2. **The Apache-2.0 text is at `licenses/Apache-2.0.txt`.** It covers the three
+   files above and one more that is easy to miss: Vite bundles the
+   main-thread half of `tesseract.js` into
+   `src/mtglab/web_dist/assets/reader.js`, which *is* committed, and the
+   minifier drops the legal comments on the way. The licence has to be carried
+   here because it is no longer carried there.
+3. **Nothing about the reader renders, and that is correct rather than a
+   dodge.** Apache-2.0 §4(d) — the clause that would require attribution
+   *inside a display* — attaches only when the upstream work ships a `NOTICE`
+   file. Neither package does: both `tesseract.js@7.0.0/NOTICE` and
+   `tesseract.js-core@6.1.2/NOTICE` were requested and both 404. So §4(a) (a
+   copy of the licence reaches recipients) and §4(b)-(c) (notices are retained
+   in the copies) are the whole obligation, and commandment 10 is untouched.
+   If a future version of either package gains a `NOTICE` file, this paragraph
+   stops being true and the two commandments have to be squared. Re-check on
+   any version bump rather than inheriting this.
+
+## Fonts
+
+Four woff2 faces are committed under `web/src/assets/fonts/`, all under the
+**SIL Open Font License 1.1**, whose text is at `licenses/OFL-1.1.txt` with
+both copyright statements at its head.
+`web/src/assets/fonts/PROVENANCE.md` argues the choice of each face.
+
+Verified 2026-08-19, three ways: against Google Fonts' own `OFL.txt` and
+`METADATA.pb` for each family; against the licence bodies being identical
+across the two foundries; and — the one that actually decides it — against the
+binaries. Each woff2 carries its copyright and reserved font name in the
+`name` table (nameID 0) and the OFL's URL beside it (nameID 14), which is the
+"machine-readable metadata fields within binary files" the OFL's second
+condition names. The notice therefore travels inside the font; the licence
+text now travels beside it.
 
 ## Forge
 
