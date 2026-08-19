@@ -160,15 +160,20 @@ state, never checklists.
      parser. Suggested direction unchanged: a max-length bound on the pasted
      decklist *before* the regex runs, whose value is Aaron's call. Wants a
      per-pattern test.
-  2. **Package licence undeclared in `pyproject.toml`.** `[project]` has no
-     `license` key, so the wheel metadata reads as UNKNOWN despite the MIT
-     `LICENSE`. One-line change, but the correct form is
-     setuptools-version-sensitive and only the `image` CI job can fully verify
-     it — so it is queued (land it alone on a watchable branch), not bundled.
-     *Confirmed still true 2026-08-16 (rainbow), and now from the primary
-     source rather than from pyproject: a licence sweep of the installed
-     metadata reports `mtg-lab  UNKNOWN` while every one of its 44 dependencies
-     reports a real licence.*
+  2. ~~**Package licence undeclared in `pyproject.toml`.**~~ **Landed in
+     [#135](https://github.com/aasquier/sylvan-library/pull/135), 2026-08-16**
+     — `license = "MIT"`, `license-files = ["LICENSE"]`, `setuptools>=77`.
+     Verified 2026-08-19 by *building* the metadata rather than reading it:
+     `License-Expression: MIT`, `License-File: LICENSE`.
+     **The lesson is worth more than the item.** The 2026-08-16 entry said
+     "confirmed still true… now from the primary source rather than from
+     pyproject", and it was wrong in exactly the way it was congratulating
+     itself for avoiding: for an **editable** install, `importlib.metadata`
+     reports what was recorded when `pip install -e` last ran, not what
+     `pyproject.toml` says now. The same sweep re-run today still says
+     `mtg-lab UNKNOWN` off this laptop's `.dist-info`, three days after the
+     fix merged. *Installed metadata is a cache, and the primary source for a
+     packaging question is a build.*
   3. ~~**Widen CI's card-data filename scan to catch a `.duckdb` anywhere.**~~
      **Landed** — Red closed it 2026-08-16. Kept as a line rather than deleted
      so the next run does not re-find it.
@@ -283,9 +288,32 @@ state, never checklists.
     MIT-CMU/MIT-0/CC0/Zlib/0BSD/CNRI-Python; **180 npm packages** (was 163) —
     140 MIT, 15 ISC, 10 Apache-2.0, 4 MPL-2.0, 3 each BSD-3-Clause and
     BSD-2-Clause, 2 MIT-0, 1 each BlueOak-1.0.0/CC0-1.0/"MIT AND ISC".
-    **Zero AGPL/GPL/SSPL/UNLICENSED on either side.** Only `UNKNOWN` is the
-    package itself (queued item 2, still true). npm's Apache-2.0 count rose
-    6 → 10, which is the Tesseract arrival showing up in the numbers.
+    **Zero AGPL/GPL/SSPL/UNLICENSED on either side.** npm's Apache-2.0 count
+    rose 6 → 10, which is the Tesseract arrival showing up in the numbers.
+    The one `UNKNOWN` — the package itself — is **stale metadata, not a
+    finding**; see queued item 2. A build says `License-Expression: MIT`.
+  - **What the fix does *not* reach, recorded so it is a decision rather than
+    an oversight:** `licenses/` is repo-level, and the `Dockerfile` copies only
+    `pyproject.toml` and `src/`, so neither the image nor the wheel carries the
+    Apache text beside the `reader.js` it ships. Neither is published — the
+    image is built in CI and deployed, the wheel is not released — and the
+    people who actually receive `reader.js` receive it from the repository or
+    from the site, both of which now carry it. Widening `license-files` to
+    glob `licenses/*` would close it, and that is a **packaging** change only
+    the `image` job can fully verify, which is the case the skill says to
+    queue rather than bundle. Trigger: publishing the image or the wheel
+    anywhere.
+  - **Live instance, pre-auth posture re-probed 2026-08-19** (before this
+    branch deployed): `/api/health` 200 and **everything else 401** —
+    `/api/decks`, `/api/symbols/W.svg`, `/api/ocr/worker.min.js`,
+    `/api/admin/users`, and `/api/nope`, which is the proof the middleware
+    refuses *before routing* rather than the router 404ing. Headers all
+    present: HSTS `max-age=31536000`, `nosniff`, `X-Frame-Options: DENY`,
+    `Referrer-Policy: same-origin`, and #184's
+    `Permissions-Policy: camera=(self), microphone=(), geolocation=()`.
+    Note the symmetry this run cares about: `/api/ocr/*` is behind auth, so
+    the licence notice is **exactly as reachable as the code it explains** —
+    only signed-in accounts receive either.
   - **`animist verify`: 12 recipes, all held** (was 2 — the wheel, séance,
     learn and ambience recipes all landed since). The video outputs are
     genuinely decoded here rather than skipped: `_decode_video` returning
