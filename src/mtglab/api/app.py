@@ -785,6 +785,50 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         return _job_for(plan, caller).as_dict()
 
+    @app.post("/api/claude/scan")
+    def claude_scan(payload: dict[str, Any],
+                    caller: Scope) -> dict[str, Any]:
+        """Read a photographed card with Claude (ADR 34). Returns a **job**.
+
+        The fallback tier of the camera door, for the cards the browser's own
+        reader cannot do — chiefly **anything printed before mid-2015, which
+        carries no collector number on its face at all** and is most of the
+        deep cuts this library is full of.
+
+        **This is the one route in the app that receives a photograph**, and
+        it never receives one by accident: the local tier sends nothing but
+        two short strings, and a capture arrives here only because somebody
+        pressed a button on that specific card. The image is passed to
+        Anthropic, is not written to disk, and is not logged.
+
+        What comes back is not a card. The mode transcribes what is printed
+        and `identify` decides what it is, so a corner resolves only against
+        the pool's real set codes and a title still only ever offers a
+        shortlist — the same scrutiny the WebAssembly reader's output gets,
+        which is what keeps ADR 14 intact with a model in the loop.
+
+        A job from the first commit, and its duration is **unmeasured** — the
+        reason it is a job rather than an argument that it needs to be one.
+        Refusals stay here: 422 for a capture that is not an image this reads,
+        is empty, or is over the size cap; 503 for no key. Two presses on one
+        photograph are one paid call.
+        """
+        from mtglab.api.scanruns import plan_scan
+        from mtglab.claude.client import ClaudeUnavailable
+        from mtglab.claude.scan import ScanRefused
+
+        try:
+            plan = plan_scan(
+                image=payload.get("image") or b"",
+                media_type=str(payload.get("media_type") or "image/jpeg"),
+                requested=payload.get("stance") or None,
+                tier=caller.model_tier)
+        except (ScanRefused, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ClaudeUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return _job_for(plan, caller).as_dict()
+
     @app.post("/api/claude/theme")
     def claude_theme(payload: dict[str, Any],
                      caller: Scope) -> dict[str, Any]:

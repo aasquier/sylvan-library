@@ -195,6 +195,23 @@ src/mtglab/
                           pushed to the volume over sftp, served by
                           two shared routes; nothing generates at request
                           time and git never holds a byte of it
+  ocr.py                  the reading engine for the camera door: ~6MB of
+                          Apache-2.0 WebAssembly and trained data, fetched
+                          once into data/cache/ocr and served first-party --
+                          symbols.py's arrangement (ADR 33) applied to
+                          somebody else's compiler output. Two additions,
+                          because this is executable code: every file is
+                          pinned by SHA-256, and the cache path carries the
+                          pinned versions
+  cards/identify.py       what the camera saw, read against the pool: a set
+                          code plus a collector number is a lookup and
+                          resolves; a title is a similarity and only ever
+                          offers five names. The scores of right and wrong
+                          answers overlap, so there is no threshold -- the
+                          measurement is in the docstring. `from_corner`
+                          reads the raw corner block against the pool's real
+                          986 set codes, because a browser cannot know what
+                          a set code is
   symbols.py              the official mana symbols (ADR 33): filled from
                           Scryfall into data/cache/symbols on first ask,
                           served first-party by one shared route; the drawn
@@ -222,12 +239,20 @@ src/mtglab/
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
   artifacts/generate.py   the five deliverables
-  claude/                 client, tools, stance, persona, and six modes across
-                          five features: interview.py (a card's `why`),
+  claude/                 client, tools, stance, persona, and seven modes
+                          across six features: interview.py (a card's `why`),
                           argue.py (the case against a slot), dossier.py (the
                           commander), research.py (a question about Magic, and
                           it cannot see a deck), theme.py (two — a
                           conversation about you, then a proposal)
+  claude/scan.py          the seventh mode, and the smallest: Claude reads a
+                          photographed card and **does not name it** (ADR
+                          34). It returns the title and the bottom-left
+                          block as printed, filling the same `Sighting` the
+                          browser's own reader fills, and `identify` decides
+                          what card that is. The response schema has no
+                          field for a card name, which is ADR 25's technique
+                          reused: a better camera, never a better judge
   claude/persona.py       who a mode sounds like; a voice, never a stance
   auth/                   app.db, Argon2id, accounts, sessions, rate limit,
                           invite/reset tokens, the EmailSender seam
@@ -237,6 +262,10 @@ src/mtglab/
   api/simruns.py          Tier 1 planned in the request, run in a job
   api/themeruns.py        both theme halves, same shape (226s / 134s, ADR 20)
   api/dossierruns.py      the commander dossier, same shape (236s, ADR 19)
+  api/scanruns.py         one photographed card read by Claude, same shape
+                          (ADR 34) — and the first whose duration is
+                          **unmeasured**, which is the reason it is a job
+                          rather than an argument that it needs to be
   api/researchruns.py     research, same shape (265s, ADR 26) — and the first
                           one that was a job before it was a failure
   api/argueruns.py        the slot argument swept across a selection, same
@@ -544,8 +573,8 @@ research.**
 
 **Started, not finished.** `src/mtglab/claude/` is the pipe — a client on
 `ANTHROPIC_API_KEY` and seven read-only tool schemas over `api/service.py` —
-plus the stance (`stance.py`, three axes, off by default) and **six** modes
-across five features. The **rationale interview** (`interview.py`) asks about
+plus the stance (`stance.py`, three axes, off by default) and **seven** modes
+across six features. The **rationale interview** (`interview.py`) asks about
 a card's slot so you can write its `why`. The **slot argument** (`argue.py`,
 [ADR 25](docs/adr/0025-argue-a-slot-argues-one-direction.md)) makes the case
 against that slot. **Research** (`research.py`,

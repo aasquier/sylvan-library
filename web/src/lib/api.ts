@@ -426,6 +426,21 @@ export interface DeckLog {
   entries: DeckLogEntry[]
 }
 
+/** What Claude made of one photographed card (ADR 34).
+ *
+ * `transcribed` is what it actually read off the card — carried beside the
+ * reading so the page can show both. A wrong match next to the words it came
+ * from is a mistake somebody can catch; a wrong match alone is one they
+ * cannot. `reading` is the same shape the browser's own reader produces,
+ * because it went through the same `identify` door.
+ */
+export interface ScanResult {
+  reading: Reading | null
+  transcribed: { title?: string; corner?: string }
+  refused: boolean
+  model: string
+}
+
 /** One card as the camera's review list renders it. Narrower than a search
  *  result on purpose: this list can hold forty entries with pictures on a
  *  phone, and oracle text is what a card's own page is for. */
@@ -1691,6 +1706,12 @@ export const api = {
   // free-text titles do not belong in an access log.
   identifyCards: (sightings: { corner?: string; title?: string }[]) =>
     post<IdentifyResult>('/api/cards/identify', { sightings }),
+  // **The one call that sends a photograph** (ADR 34). Never automatic: it
+  // happens because somebody pressed a button on one card, having been told
+  // what pressing it does. Returns a job — the duration is unmeasured, which
+  // is the reason it is a job rather than an argument that it needs to be.
+  scanCard: (image: string, mediaType = 'image/jpeg') =>
+    post<Job>('/api/claude/scan', { image, media_type: mediaType }),
   // The 32 combinations and their history. No card pool, no decks, no network —
   // so the first screen of the create flow renders on a fresh clone.
   // Separate from `deck()` on purpose: it runs several extra pool queries
