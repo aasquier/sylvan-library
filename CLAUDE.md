@@ -143,16 +143,14 @@ both directions. A base install has the gate, the mana solver and Tier 1, and
 needs neither a network nor an account. `claude check` needs
 `ANTHROPIC_API_KEY`; see `.env.example`.
 
-**That paragraph has now been wrong twice, in two different ways.** Until
-2026-08-16 "includes all of it" was false — `dev` carried every other extra's
-packages except `fastapi` and `uvicorn`, and the omission cost 474 tests,
-silently. Until 2026-08-19 the *list* was false: it named four extras where
-`pyproject.toml` declared five, so the one deliberate exception to the rule
-above went unmentioned in the file that states the rule. Both are the same
-lesson, which is why it is stated here rather than in either fix: **a sentence
-in this file asserting completeness is a claim to re-check against the code,
-not a fact to inherit.** Twice was enough — `test_packaging.py` now fails when
-an extra exists that this section does not name.
+**That paragraph has been wrong twice.** "Includes all of it" was false until
+2026-08-16 (`dev` lacked `fastapi` and `uvicorn`; the omission cost 474 tests,
+silently), and the *list* was false until 2026-08-19 — four extras named where
+five were declared, the missing one being the deliberate exception the same
+sentence relies on. One lesson, and it is general: **a sentence in this file
+asserting completeness is a claim to re-check against the code, not a fact to
+inherit.** Twice was enough; `test_packaging.py` now fails when an extra exists
+that this section does not name.
 
 `data refresh` needs network access to `api.scryfall.com` and
 `data.scryfall.io`. In a cloud session with default Trusted network access
