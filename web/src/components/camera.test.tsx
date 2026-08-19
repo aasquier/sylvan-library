@@ -88,3 +88,24 @@ describe('opening the lens', () => {
     })
   })
 })
+
+describe('asking Claude to read one (ADR 34)', () => {
+  /* The fallback tier exists for the cards the browser cannot do — chiefly
+     anything printed before mid-2015, which has no collector number on its
+     face at all. What is pinned here is the consent: it is per-card, it is
+     never automatic, and the page says what pressing it does before it is
+     pressed. */
+
+  it('says what the button does before it is pressed', () => {
+    // The promise the local tier makes and this one does not.
+    render(<CameraDoor onCards={vi.fn()} />)
+    expect(screen.getByText(/never leaves this browser/)).toBeTruthy()
+  })
+
+  it('offers no such door before anything has been photographed', () => {
+    // Never automatic: with nothing captured there is nothing to send, and
+    // the control does not exist to be pressed by accident.
+    render(<CameraDoor onCards={vi.fn()} />)
+    expect(screen.queryByText('Ask Claude to read it')).toBeNull()
+  })
+})

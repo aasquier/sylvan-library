@@ -17,6 +17,7 @@ CI (ADR 6), so the fixture is a real DuckDB pool of 21 real cards with a
 legal 99 built out of them.
 """
 
+import base64
 import hashlib
 import sys
 import time
@@ -3811,3 +3812,70 @@ def test_wheel_route_rolls_its_own_seed_when_unseeded(pool, client):
 def test_wheel_on_a_missing_deck_is_404(pool, client):
     assert client.post("/api/decks/local/nope/wheel",
                        json={}).status_code == 404
+
+# ------------------------------------------------------------ claude scan
+
+def test_the_scan_route_reaches_no_deck(client):
+    """ADR 34 rides on ADR 26's shape: the camera's fallback has no deck to
+    critique, and it is mounted where that stays visible."""
+    paths = {r.path for r in client.app.routes}
+    assert "/api/claude/scan" in paths
+    assert not any("scan" in p and "decks" in p for p in paths)
+
+
+@pytest.mark.parametrize("payload, expected", [
+    ({}, "empty"),
+    ({"image": ""}, "empty"),
+    ({"image": "///", "media_type": "image/tiff"}, "not an image"),
+    ({"image": "not base64 at all!!"}, "base64"),
+])
+def test_an_unusable_capture_is_a_422_and_not_a_job(client, payload, expected):
+    """Refused in the request. Delivered as a job in state `error` these would
+    be four cases sharing one string and no status code."""
+    jobs.clear()
+    r = client.post("/api/claude/scan", json=payload)
+    assert r.status_code == 422
+    assert expected in r.json()["detail"]
+    assert jobs.all_jobs() == [], "nothing should have been queued"
+
+
+def test_an_oversized_capture_says_what_to_do_about_it(client):
+    """'photograph one card, closer' is actionable; a platform 400 is not."""
+    from mtglab.claude import scan
+
+    jobs.clear()
+    huge = base64.b64encode(b"x" * (scan.MAX_BYTES + 1)).decode()
+    r = client.post("/api/claude/scan", json={"image": huge})
+    assert r.status_code == 422
+    assert "closer" in r.json()["detail"]
+    assert jobs.all_jobs() == []
+
+
+def test_scanning_with_no_key_is_a_503_before_anything_is_queued(client,
+                                                                monkeypatch):
+    """Not the same answer as a call that came back unusable."""
+    import mtglab.claude.client as cc
+
+    jobs.clear()
+    monkeypatch.setattr(cc, "credential_present", lambda: False)
+    r = client.post("/api/claude/scan",
+                    json={"image": base64.b64encode(b"\xff\xd8\xff").decode()})
+    assert r.status_code == 503
+    assert jobs.all_jobs() == []
+
+
+def test_two_presses_on_one_photograph_are_one_job(client, no_worker,
+                                                   monkeypatch):
+    """A digest of the image is the dedupe key, so a double click does not pay
+    twice. The `key` is what carries this — see `api/scanruns.py`."""
+    import mtglab.claude.client as cc
+    from mtglab.api.scanruns import plan_scan
+
+    monkeypatch.setattr(cc, "require", lambda: None)
+    shot = base64.b64encode(b"\xff\xd8\xff\xe0 a card").decode()
+    first = plan_scan(image=shot)
+    again = plan_scan(image=shot)
+    other = plan_scan(image=base64.b64encode(b"\xff\xd8\xff\xe0 another").decode())
+    assert first.key == again.key
+    assert first.key != other.key
+

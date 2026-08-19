@@ -29,7 +29,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, errorMessage, type IdentifiedCard, type Reading } from '../lib/api'
+import {
+  api, errorMessage, followJob, type IdentifiedCard, type Reading,
+  type ScanResult,
+} from '../lib/api'
 import { CARD_ASPECT } from '../lib/cardframe'
 import { decklistLines } from '../lib/decklist'
 import { read, rest, warm, type Sighting } from '../lib/reader'
@@ -55,6 +58,11 @@ interface Shot {
    *  by a person for everything else. */
   chosen?: IdentifiedCard
   error?: string
+  /** Claude is looking at this one (ADR 34). */
+  scanning?: boolean
+  /** What Claude read off the card, shown beside whatever it resolved to.
+   *  A wrong match next to the words it came from can be caught. */
+  transcribed?: { title?: string; corner?: string }
 }
 
 export default function CameraDoor({ onCards }: {
@@ -141,8 +149,11 @@ export default function CameraDoor({ onCards }: {
 
     counter.current += 1
     const id = counter.current
+    // One encode, used twice: rendered at 54px in the review list, and sent
+    // whole if the fallback is ever asked for. 0.8 rather than 0.5 because
+    // the second use is a reader, and JPEG mush is what it would be reading.
     const shot: Shot = {
-      id, state: 'reading', thumb: canvas.toDataURL('image/jpeg', 0.5),
+      id, state: 'reading', thumb: canvas.toDataURL('image/jpeg', 0.8),
     }
     setShots((all) => [...all, shot])
 
@@ -163,6 +174,39 @@ export default function CameraDoor({ onCards }: {
         ? { ...s, state: 'failed', error: errorMessage(e) } : s))
     } finally {
       setBusy(false)
+    }
+  }
+
+  /**
+   * Ask Claude to read this one (ADR 34).
+   *
+   * Deliberately per-card and never automatic. This is the only path in the
+   * app that sends a photograph anywhere, so it happens because somebody
+   * pressed a button on one specific card — the sentence beside the button
+   * says so before it is pressed, not after.
+   */
+  async function askClaude(shot: Shot) {
+    setShots((all) => all.map((s) =>
+      s.id === shot.id ? { ...s, scanning: true, error: undefined } : s))
+    try {
+      // The data URL's prefix is not part of the image.
+      const base64 = shot.thumb.slice(shot.thumb.indexOf(',') + 1)
+      const job = await api.scanCard(base64)
+      const done = await followJob(job.id, () => { /* no per-tick UI */ },
+                                   400, job).promise
+      const result = done.result as ScanResult | undefined
+      setShots((all) => all.map((s) => s.id === shot.id ? {
+        ...s,
+        scanning: false,
+        transcribed: result?.transcribed ?? {},
+        reading: result?.reading ?? s.reading,
+        // A corner Claude read still only resolves if the pool agrees, so
+        // this is the same rule the local tier follows, not a shortcut.
+        ...(result?.reading?.resolved ? { chosen: result.reading.resolved } : {}),
+      } : s))
+    } catch (e) {
+      setShots((all) => all.map((s) => s.id === shot.id
+        ? { ...s, scanning: false, error: errorMessage(e) } : s))
     }
   }
 
@@ -245,6 +289,7 @@ export default function CameraDoor({ onCards }: {
           {shots.map((shot) => (
             <ShotRow key={shot.id} shot={shot}
                      onChoose={(card) => { choose(shot.id, card) }}
+                     onAskClaude={() => { void askClaude(shot) }}
                      onDiscard={() => { discard(shot.id) }} />
           ))}
         </ul>
@@ -269,9 +314,10 @@ export default function CameraDoor({ onCards }: {
 }
 
 /** One photographed card and what the pool made of it. */
-function ShotRow({ shot, onChoose, onDiscard }: {
+function ShotRow({ shot, onChoose, onAskClaude, onDiscard }: {
   shot: Shot
   onChoose: (card: IdentifiedCard) => void
+  onAskClaude: () => void
   onDiscard: () => void
 }) {
   return (
@@ -319,11 +365,37 @@ function ShotRow({ shot, onChoose, onDiscard }: {
         )}
 
         {shot.state === 'read' && !shot.chosen
-          && !shot.reading?.candidates.length && (
+          && !shot.reading?.candidates.length && !shot.scanning && (
           <p className="text-xs" style={{ color: 'var(--status-warning)' }}>
             Nothing legible. Photograph it again, or type this one into the
             list yourself.
           </p>
+        )}
+
+        {/* What Claude read, shown beside what it resolved to. A wrong match
+            next to the words it came from is one somebody can catch. */}
+        {shot.transcribed && (shot.transcribed.title ?? shot.transcribed.corner) && (
+          <p className="font-mono text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            read: {[shot.transcribed.title, shot.transcribed.corner]
+              .filter(Boolean).join(' · ')}
+          </p>
+        )}
+
+        {shot.scanning && <Spinner label="Claude is looking at this one…" />}
+
+        {/* The fallback door (ADR 34). Offered only where the local reader
+            fell short — most often a card printed before 2015, which has no
+            collector number on its face at all. */}
+        {shot.state === 'read' && !shot.chosen && !shot.scanning
+          && !shot.transcribed && (
+          <div className="space-y-1">
+            <button onClick={onAskClaude} className="btn btn-quiet btn-xs">
+              Ask Claude to read it
+            </button>
+            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              This one photograph is sent to Claude, and nothing else is.
+            </p>
+          </div>
         )}
       </div>
 

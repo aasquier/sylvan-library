@@ -119,6 +119,14 @@ SHARED = {
     # two accounts asking the same question get two jobs.
     "/api/claude/research": "submits a job; the question is the caller's and "
                             "no deck is reachable, and the job is scoped",
+    # ADR 34. The one route that receives a photograph. Shared for the same
+    # reason research is: no deck is reachable, the capture belongs to whoever
+    # sent it and is never stored, and the resulting job is scoped by
+    # `jobs.get` like every other. The dedupe key is a digest of the image and
+    # is matched per owner, so two accounts photographing the same card get
+    # two jobs.
+    "/api/claude/scan": "submits a job; the capture is the caller's, no deck "
+                        "is reachable, and the job is scoped",
     # ADR 32. A derivative is keyed on a public painting's oracle_id and a
     # fixed effect name -- the same class of thing as `/api/colors/{key}`:
     # nothing here belongs to an account, and every session sees the same
