@@ -7,8 +7,11 @@ behind both the CLI and the app.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
+import threading
+import time
 import urllib.request
 from datetime import date
 from pathlib import Path
@@ -61,6 +64,130 @@ def _source(source: DeckSource | None) -> DeckSource:
 
 # ------------------------------------------------------------------- pool
 
+#: One read-only handle held open for as long as the pool file is unchanged,
+#: and never queried. See `_pin`.
+_KEEPER: DuckDBPyConnection | None = None
+#: What the pool file looked like when `_KEEPER` was opened: (mtime_ns, size).
+_KEEPER_STAMP: tuple[int, int] | None = None
+#: Sync endpoints run in Starlette's threadpool and jobs run in their own
+#: workers, so two requests can be in `_pin` at once.
+_KEEPER_LOCK = threading.Lock()
+#: `time.monotonic()` when the keeper was last wanted. See `_reap_keeper`.
+_KEEPER_USED = 0.0
+#: How long the keeper may go unwanted before it lets the pool go.
+#:
+#: Long enough that it spans a person reading a page and clicking the next
+#: one, short enough that nobody waits on it: a `data refresh` started while
+#: the app is idle blocks for at most this.
+_KEEPER_IDLE = 30.0
+_REAPER: threading.Thread | None = None
+
+
+def _reap_keeper() -> None:
+    """Let go of the pool once nobody has asked for it in `_KEEPER_IDLE`.
+
+    **A held handle is a held lock.** DuckDB gives a read-only connection a
+    shared lock on the file, and `mtglab data refresh` wants an exclusive one
+    -- so a keeper held for the life of the process would mean that a running
+    `mtglab ui` refuses every refresh, on Aaron's own laptop, with an error
+    about a lock rather than about a server. That is a worse bug than the
+    17.5ms `_pin` exists to save, and it is the exact inversion of the promise
+    `cards.db.connect_readonly` makes: the app opens the pool read-only *so
+    that* a refresh degrades it rather than locking it out. It must not repay
+    that by locking the refresh out.
+
+    So the keeper is a lease rather than a claim. Requests arrive in bursts --
+    a page load is four of them -- and the lease covers the burst; half a
+    minute after the last one the pool is free again, and a refresh started
+    against an idle app waits `_KEEPER_IDLE` at worst. A daemon thread, so it
+    never keeps the process alive, and one per process: the reaper is started
+    under the same lock that owns the keeper it reaps.
+    """
+    while True:
+        time.sleep(_KEEPER_IDLE / 3)
+        _reap_once()
+
+
+def _reap_once() -> bool:
+    """One pass of the lease check. True when the pool was handed back.
+
+    Split out of the loop so the *decision* is testable without waiting on a
+    sleep -- a reaper tested only through its thread is a reaper tested by
+    whether the test was patient enough, which is how a lease that never
+    fires goes green.
+    """
+    with _KEEPER_LOCK:
+        if (_KEEPER is not None
+                and time.monotonic() - _KEEPER_USED > _KEEPER_IDLE):
+            _release_keeper()
+            return True
+    return False
+
+
+def _release_keeper() -> None:
+    """Drop the keeper. Callers hold `_KEEPER_LOCK`."""
+    global _KEEPER, _KEEPER_STAMP
+    if _KEEPER is not None:
+        # A handle that will not close is a handle already gone; the only
+        # thing this function owes anybody is that the reference is dropped.
+        with contextlib.suppress(Exception):
+            _KEEPER.close()
+    _KEEPER, _KEEPER_STAMP = None, None
+
+
+def _pin(path: Path) -> None:
+    """Keep DuckDB's database instance alive between requests.
+
+    **Opening a DuckDB file is only cheap while something already has it
+    open.** The Python client caches the loaded database instance per path and
+    frees it when the last connection closes -- so an app that opens a handle,
+    answers, and closes it pays the full load again on the very next request:
+    17.5ms of nothing, on every endpoint that touches the pool. Hold one
+    connection that is never used for anything, and the same open costs 0.7ms
+    (measured 2026-08-19, this laptop, the full 78MB pool).
+
+    This is deliberately *not* a shared connection. Every caller still opens
+    its own handle and still closes it in a `finally`, exactly as before --
+    the contract does not change, only the price. A shared connection would
+    serialise every query in the app behind one lock and make a caller's
+    `close()` a bug affecting every other request.
+
+    The stamp is what keeps it honest. A cached instance is a snapshot: with
+    the keeper held forever, a `mtglab data refresh` that rewrites the file
+    would be invisible to a running app until it was restarted -- and Aaron
+    runs exactly that, on this laptop, with the UI open. So the file's
+    mtime and size are checked on the way past (a `stat`, microseconds) and a
+    pool that moved drops the keeper, which frees the instance once the last
+    live handle closes and lets the next connection read the new file.
+    """
+    global _KEEPER, _KEEPER_STAMP, _KEEPER_USED, _REAPER
+    try:
+        st = path.stat()
+    except OSError:
+        return
+    stamp = (st.st_mtime_ns, st.st_size)
+    _KEEPER_USED = time.monotonic()
+    if _KEEPER is not None and stamp == _KEEPER_STAMP:
+        return
+    with _KEEPER_LOCK:
+        if _KEEPER is not None and stamp == _KEEPER_STAMP:
+            return
+        _release_keeper()
+        try:
+            _KEEPER = cast("DuckDBPyConnection",
+                           db.connect_readonly(config.DB_PATH))
+            _KEEPER_STAMP = stamp
+        except Exception:                                           # noqa: BLE001
+            # A `data refresh` mid-write, or a pool that is not readable yet.
+            # The keeper is an optimisation and nothing else: without it every
+            # request simply pays the old price.
+            _KEEPER, _KEEPER_STAMP = None, None
+        if _REAPER is None and _KEEPER is not None:
+            _REAPER = threading.Thread(target=_reap_keeper, daemon=True,
+                                       name="mtglab-pool-keeper")
+            _REAPER.start()
+
+
 def _connect() -> DuckDBPyConnection | None:
     """A read-only handle, or None when the pool has not been built yet.
 
@@ -73,8 +200,10 @@ def _connect() -> DuckDBPyConnection | None:
     service at a scratch pool. `deck_paths` and `FileDeckSource` already
     resolve at call time; this was the last place that did not.
     """
-    if not Path(config.DB_PATH).exists():
+    path = Path(config.DB_PATH)
+    if not path.exists():
         return None
+    _pin(path)
     try:
         # `cards.db.Connection` is `Any` -- duckdb ships no stubs -- so the
         # cast is what keeps this function's own return type meaningful.
@@ -2382,12 +2511,22 @@ def search_cards(*, q: str = "", identity: str = "", type_line: str = "",
                 # Subset plus the right size is set equality, and it lets the
                 # colourless slot work: an empty identity with length 0.
                 where.append(f"len(color_identity) = {len(allowed)}")
+        # `contains(lower(col), ?)` rather than `col ILIKE '%?%'`, which is the
+        # same question asked cheaply: ILIKE runs a pattern matcher with case
+        # folding over every row of `oracle_text`, and this walks the string
+        # once. **67.1ms -> 18.6ms** on the full pool for `goblin`, the same
+        # 431 cards back; checked against ILIKE over eight queries including
+        # accents and `//`, byte-identical every time (2026-08-19).
+        #
+        # It also stops `%` and `_` in a search box from behaving as wildcards
+        # nobody typed on purpose -- a search for "50%" now looks for "50%".
         if q:
-            where.append("(name ILIKE ? OR oracle_text ILIKE ?)")
-            params += [f"%{q}%", f"%{q}%"]
+            where.append("(contains(lower(name), ?) "
+                         "OR contains(lower(oracle_text), ?))")
+            params += [q.lower(), q.lower()]
         if type_line:
-            where.append("type_line ILIKE ?")
-            params.append(f"%{type_line}%")
+            where.append("contains(lower(type_line), ?)")
+            params.append(type_line.lower())
         if commanders_only:
             # A *superset* of `partners.can_be_commander`, pushed into SQL so
             # that LIMIT counts candidates rather than counting spells that are
@@ -2399,7 +2538,8 @@ def search_cards(*, q: str = "", identity: str = "", type_line: str = "",
             # is deliberately loose (a card whose *back* face is a legendary
             # creature matches here and is rejected there).
             where.append("(type_line ILIKE '%Legendary%Creature%'"
-                         " OR oracle_text ILIKE '%can be your commander%')")
+                         " OR contains(lower(oracle_text),"
+                         " 'can be your commander'))")
         if cmc_max is not None:
             where.append("cmc <= ?")
             params.append(cmc_max)

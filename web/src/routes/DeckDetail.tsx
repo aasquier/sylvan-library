@@ -26,8 +26,9 @@ import {
   Select, Spinner, StatTile,
 } from '../components/ui'
 import {
-  CategoryCoverage, ColorNeedsChart, CurveChart, DataTable,
-} from '../components/charts'
+  CategoryCoverage, ColorNeedsChart, CurveChart,
+} from '../components/lazycharts'
+import { DataTable } from '../components/datatable'
 import {
   AddCardForm, AddNoteForm, NoteEditor, RationaleEditor, SlotArgumentPanel,
 } from '../components/deckedit'

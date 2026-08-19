@@ -701,3 +701,145 @@ def test_download_bulk_refuses_an_unknown_kind(monkeypatch):
     monkeypatch.setattr(db, "_fetch_json", lambda url: {"data": []})
     with pytest.raises(ValueError, match="unknown bulk type"):
         db.download_bulk("no_such_kind")
+
+
+# --------------------------------------------------------------- the keeper
+
+
+def test_the_keeper_makes_repeat_connections_cheap_and_lets_go(tmp_path,
+                                                               monkeypatch):
+    """`service._pin` holds the pool open, and stops holding it when idle.
+
+    Both halves matter and only the first is an optimisation. DuckDB frees a
+    database instance when the last connection to it closes, so an app that
+    opens and closes per request reloads the pool every time -- but a keeper
+    held forever takes a shared lock that `mtglab data refresh` can never get
+    past. The lease is what makes the speed safe, so the release is pinned
+    here rather than left to be noticed by a refresh that will not start.
+    """
+    import time
+
+    import tiny_pool
+    from mtglab import config
+    from mtglab.api import service
+    from mtglab.cards import db
+
+    pool = tmp_path / "mtg.duckdb"
+    tiny_pool.build(pool)
+    with config.use_paths(data_dir=tmp_path, decks_dir=tmp_path / "decks"):
+        # A read-write connection is available before anything has pinned.
+        db.connect(pool).close()
+
+        con = service._connect()
+        assert con is not None
+        con.close()
+        assert service._KEEPER is not None, "a request should leave a keeper"
+
+        # The keeper is what a second connection is cheap against; it is also
+        # a claim on the file, so the read-write open a refresh needs is
+        # refused while it is held. DuckDB words that refusal differently
+        # depending on where the other handle is -- a lock message across
+        # processes (`mtglab data refresh` beside a running `mtglab ui`), a
+        # configuration-mismatch message within one -- so this matches the
+        # fact rather than the sentence.
+        with pytest.raises(Exception) as refused:
+            db.connect(pool)
+        assert "lock" in str(refused.value).lower() or \
+               "configuration" in str(refused.value).lower()
+
+        # A keeper still inside its lease is left alone -- the reaper must not
+        # be handing the pool back between the four requests of one page load.
+        assert service._reap_once() is False
+        assert service._KEEPER is not None
+
+        # Idle past the lease, and the reaper is what hands the pool back.
+        # Driven through `_reap_once` rather than by calling the release
+        # directly, so this fails if the lease stops firing and not merely if
+        # the release stops working.
+        monkeypatch.setattr(service, "_KEEPER_USED",
+                            time.monotonic() - service._KEEPER_IDLE - 1)
+        assert service._reap_once() is True
+        assert service._KEEPER is None
+        db.connect(pool).close()          # the refresh can proceed again
+
+
+def test_the_keeper_is_dropped_when_the_pool_file_changes(tmp_path):
+    """A re-ingested pool must not be served from a stale cached instance."""
+    import tiny_pool
+    from mtglab import config
+    from mtglab.api import service
+
+    pool = tmp_path / "mtg.duckdb"
+    tiny_pool.build(pool)
+    with config.use_paths(data_dir=tmp_path, decks_dir=tmp_path / "decks"):
+        service._connect().close()
+        first = service._KEEPER_STAMP
+        assert first is not None
+
+        with service._KEEPER_LOCK:        # release so the file can be rebuilt
+            service._release_keeper()
+        pool.unlink()
+        tiny_pool.build(pool)
+
+        service._connect().close()
+        assert first != service._KEEPER_STAMP, "a rebuilt pool needs a new keeper"
+
+
+def test_the_column_cache_survives_a_closed_connection(tmp_path):
+    """`oracle_columns` asks the catalogue once per pool, not once per request.
+
+    The first version of this cache was keyed on the connection object. It was
+    correct and it never once hit: every endpoint in this app opens a handle,
+    asks its card question and closes it, so the entry was written and then
+    thrown away with the connection that owned it. Keyed on the pool file, the
+    answer outlives the handle -- which is the only way a cache helps a
+    per-request connection at all.
+
+    Asserted by **identity**: a connection that re-read the catalogue would
+    build a fresh `set`, so the same object coming back three times over three
+    separate handles is the cache being used rather than merely present.
+    """
+    import tiny_pool
+    from mtglab.cards import db
+
+    pool = tmp_path / "mtg.duckdb"
+    tiny_pool.build(pool)
+    db._COLUMN_CACHE.clear()
+
+    answers = []
+    for _ in range(3):
+        con = db.connect_readonly(pool)
+        answers.append(db.oracle_columns(con))
+        con.close()
+
+    assert answers[0] is answers[1] is answers[2], (
+        "each request re-read the catalogue; the cache is keyed on something "
+        "that dies with the connection")
+    assert len(db._COLUMN_CACHE) == 1
+
+
+def test_a_rebuilt_pool_gets_its_columns_read_again(tmp_path):
+    """The stamp is what makes caching the file safe. A `data refresh` adds
+    columns, and a cache that answered from the old file would report a schema
+    the database no longer has."""
+    import tiny_pool
+    from mtglab.cards import db
+
+    pool = tmp_path / "mtg.duckdb"
+    tiny_pool.build(pool)
+    db._COLUMN_CACHE.clear()
+
+    con = db.connect_readonly(pool)
+    db.oracle_columns(con)
+    con.close()
+    assert len(db._COLUMN_CACHE) == 1
+
+    pool.unlink()
+    tiny_pool.build(pool)
+    import os
+    os.utime(pool, ns=(0, 0))
+
+    con = db.connect_readonly(pool)
+    db.oracle_columns(con)
+    con.close()
+    assert len(db._COLUMN_CACHE) == 2, "a rebuilt pool reused the old answer"

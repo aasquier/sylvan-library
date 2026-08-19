@@ -18,11 +18,14 @@ from __future__ import annotations
 
 import gzip
 import json
+import sys
 import urllib.request
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, MutableMapping, Sequence
 from dataclasses import dataclass
+from importlib import util
 from pathlib import Path
 from typing import Any, TextIO, TypeAlias
+from weakref import WeakKeyDictionary
 
 from mtglab import config
 
@@ -127,8 +130,41 @@ _ADDED_COLUMNS = (
 )
 
 
+def _duckdb() -> Any:
+    """`import duckdb`, with the pandas probe defused first.
+
+    DuckDB's Python client asks `import pandas` **twice per bound parameter**
+    on its way in, to decide whether a value is a DataFrame. Pandas is not a
+    dependency of this project and never will be -- so every one of those
+    asks is an `ImportError`, and an `ImportError` is not free: it walks the
+    whole of `sys.path` and stats every entry before giving up.
+
+    `get_cards` binds one parameter per card name, so the library shelf's
+    single query bound ~884 of them and paid ~1,768 failed imports for it:
+    **162ms of the 200ms that endpoint took, spent entirely in the import
+    machinery.** Measured 2026-08-19, on this laptop, against the full pool.
+
+    A `None` in `sys.modules` is the documented way to say "this module is
+    not here, stop looking" (CPython raises `ImportError` on the sentinel
+    without touching the path). The probe still fails, so DuckDB takes
+    exactly the same branch it always took -- it just stops paying for the
+    answer. The same 900-parameter query goes 162ms -> 20ms.
+
+    `find_spec` asks whether pandas is installed without importing it, so a
+    machine that *does* have it is left completely alone -- the sentinel is
+    only planted where the answer is already no, and the guard on
+    `sys.modules` means a real import that got in first is never overwritten.
+    """
+    if "pandas" not in sys.modules and util.find_spec("pandas") is None:
+        sys.modules["pandas"] = None  # type: ignore[assignment]
+
+    import duckdb
+
+    return duckdb
+
+
 def connect(db_path: str | Path = "data/mtg.duckdb") -> Connection:
-    import duckdb  # imported lazily so the sim core stays dependency-free
+    duckdb = _duckdb()  # lazy, so the sim core stays dependency-free
 
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -159,9 +195,35 @@ def connect_readonly(db_path: str | Path = "data/mtg.duckdb") -> Connection:
     degraded form, the CLI does not -- and a helper that swallowed the
     difference would make both of them guess.
     """
-    import duckdb  # lazy, exactly as in `connect`
+    duckdb = _duckdb()  # lazy, exactly as in `connect`
 
-    return duckdb.connect(str(Path(db_path)), read_only=True)
+    path = Path(db_path)
+    con = duckdb.connect(str(path), read_only=True)
+    # Remember which file this handle reads, so `oracle_columns` can key its
+    # answer on the pool rather than on the handle. Weak, so noting it here
+    # never keeps a connection alive.
+    _CONNECTION_POOL_PATH[con] = path
+    return con
+
+
+#: Which pool file each read-only handle was opened on. Weak in both
+#: directions is unnecessary -- a `Path` holds nothing open -- but the key must
+#: not keep a connection alive, so the keys are weak.
+_CONNECTION_POOL_PATH: MutableMapping[Connection, Path] = WeakKeyDictionary()
+
+#: `oracle_columns` answers, keyed by the pool file and its stamp.
+#:
+#: Keyed on the **file**, not on the connection, and that was the second
+#: attempt. Keyed on the handle it was correct and useless: every endpoint in
+#: this app opens one connection, asks one card question and closes it, so the
+#: entry was written once and read never. Measured before believing it -- six
+#: endpoints, one `oracle_columns` call per connection each.
+#:
+#: The columns are a property of the database file, and the stamp is what
+#: keeps that honest: a `data refresh` that adds a column rewrites the file,
+#: which changes `mtime_ns` and size, which is a different key. Bounded by the
+#: number of pool files a process ever opens -- one, outside the tests.
+_COLUMN_CACHE: dict[tuple[str, int, int], set[str]] = {}
 
 
 def oracle_columns(con: Connection) -> set[str]:
@@ -172,11 +234,33 @@ def oracle_columns(con: Connection) -> set[str]:
     and `ALTER TABLE` on a read-only handle fails. Without this, pulling a
     schema change would break every card query for anyone with an existing
     database — not on their next ingest, immediately.
+
+    Cached, because `_select` calls it on **every card query** and the answer
+    costs a real catalogue scan -- 2.4ms a request, on a question whose answer
+    changes only when the pool is rebuilt (measured 2026-08-19, full pool).
+    A connection this module did not open is simply not cached; correctness
+    never depends on the cache being there.
     """
+    path = _CONNECTION_POOL_PATH.get(con)
+    key: tuple[str, int, int] | None = None
+    if path is not None:
+        try:
+            st = path.stat()
+        except OSError:
+            key = None
+        else:
+            key = (str(path), st.st_mtime_ns, st.st_size)
+            cached = _COLUMN_CACHE.get(key)
+            if cached is not None:
+                return cached
+
     rows = con.execute(
         "SELECT column_name FROM information_schema.columns "
         "WHERE table_name = 'oracle_cards'").fetchall()
-    return {r[0] for r in rows}
+    cols = {r[0] for r in rows}
+    if key is not None:
+        _COLUMN_CACHE[key] = cols
+    return cols
 
 
 def pool_is_stale(con: Connection) -> bool:
@@ -631,13 +715,23 @@ def get_cards(con: Connection, names: Iterable[str]) -> dict[str, CardRecord]:
     # 86-card deck was 258 string comparisons against each of 35k rows, and
     # the lookup cost 108ms; this form probes three hashes per row and costs
     # 62ms. Same rows back, measured 2026-08-14 against the full pool.
-    placeholders = ",".join("(?)" for _ in wanted)
+    # One list parameter rather than one placeholder per name, and the face
+    # split gated on the cards that actually have a face to split.
+    #
+    # The `VALUES (?),(?),...` form this replaces built a *different* SQL
+    # string for every distinct number of names, so no two shelves could ever
+    # share a plan; this text is constant. And `split_part` ran twice over all
+    # 35,390 rows to serve the ~1% that carry a ` // ` -- `contains` is the
+    # cheap question that lets the rest skip both. **62.4ms -> 51.7ms** for the
+    # library shelf's 441 names, the same 443 rows back (measured 2026-08-19,
+    # full pool).
     rows = con.execute(
-        f"""WITH wanted(w) AS (VALUES {placeholders})
+        f"""WITH wanted(w) AS (SELECT unnest(?::VARCHAR[]))
             {_select(con)} WHERE lower(name) IN (SELECT w FROM wanted)
-               OR lower(split_part(name, ' // ', 1)) IN (SELECT w FROM wanted)
-               OR lower(split_part(name, ' // ', 2)) IN (SELECT w FROM wanted)""",
-        lowered,
+               OR (contains(name, ' // ') AND (
+                      lower(split_part(name, ' // ', 1)) IN (SELECT w FROM wanted)
+                   OR lower(split_part(name, ' // ', 2)) IN (SELECT w FROM wanted)))""",
+        [lowered],
     ).fetchall()
 
     # Exact full-name matches win; a face-name match only fills a gap. Without

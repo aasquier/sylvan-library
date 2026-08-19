@@ -9,7 +9,7 @@ import {
   type ModelTier,
 } from '../lib/api'
 import { Badge, ErrorNote, PageMasthead, Spinner } from '../components/ui'
-import { EditsChart, TrafficChart } from '../components/charts'
+import { EditsChart, TrafficChart } from '../components/lazycharts'
 
 /**
  * Admin: the account levers, and the instance at a glance behind them.
