@@ -409,6 +409,69 @@ def test_the_deploy_job_deploys_main_and_nothing_else(event, ref, expected, why)
         f"Condition is: {deploy_condition()}")
 
 
+# ------------------------------------------ what the deploy job waits for
+
+def ci_jobs() -> list[str]:
+    """Every job id in `ci.yml`, in file order.
+
+    Text again, and the indentation is the whole grammar: a job id is the only
+    thing in this file that is a bare key two spaces deep *inside the `jobs:`
+    block*. Everything a job declares sits at four, and the two-space keys
+    above `jobs:` belong to `on:`, `permissions:` and `concurrency:`, which is
+    why the split comes first rather than scanning the file whole.
+    """
+    text = CI_YML.read_text(encoding="utf-8")
+    block = text.split("\njobs:\n", 1)
+    assert len(block) == 2, "no `jobs:` block in ci.yml"
+    return re.findall(r"^  ([a-z][a-z0-9_-]*):\s*$", block[1], re.MULTILINE)
+
+
+def deploy_needs() -> set[str]:
+    """The `needs:` list on `ci.yml`'s deploy job."""
+    text = CI_YML.read_text(encoding="utf-8")
+    job = text.split("\n  deploy:\n", 1)
+    assert len(job) == 2, "no `deploy` job in ci.yml"
+    found = re.search(r"^    needs: \[([^\]]*)\]\s*$", job[1], re.MULTILINE)
+    assert found, "the deploy job has no `needs:` list at all"
+    return {part.strip() for part in found.group(1).split(",") if part.strip()}
+
+
+def test_the_deploy_job_waits_for_every_other_job_in_the_file():
+    """A green merge deploys itself (ADR 23), so `needs` is what "green" means.
+
+    The deploy job's own comment calls this "the whole safety argument": it
+    cannot start until the checks above it pass, so it is *structurally*
+    unable to ship something that failed one. Branch protection is not a
+    second copy of that -- protection governs merging, and ADR 23's manual
+    button is a `workflow_dispatch` on main that no protection rule touches.
+    For that path `needs` is the only guard there is.
+
+    Nothing checked it. Adding a job to this file is already known to be two
+    steps -- the `image` job's own comment says so about the required-checks
+    setting -- and it is really three, because the third is this list. Miss it
+    and the new job runs, goes red, and the instance is replaced anyway; the
+    Actions page shows one red job beside a successful deploy, which reads
+    like a flaky check rather than an unguarded release.
+
+    Expected is **derived from the file** rather than restated here, which is
+    the point and is the lesson `deploys()` above was written for: a list
+    spelled out in this module would be a second copy to keep in step, and a
+    substring check would pass against the bug. Adding a job to `ci.yml`
+    fails this until somebody decides, in the same change, whether a deploy
+    should wait for it.
+    """
+    jobs = ci_jobs()
+    assert "deploy" in jobs, "no `deploy` job in ci.yml"
+    expected = {job for job in jobs if job != "deploy"}
+    needs = deploy_needs()
+    assert needs == expected, (
+        f"ci.yml's deploy job waits for {sorted(needs)}, but the file "
+        f"declares {sorted(expected)} ahead of it. "
+        f"Unwatched: {sorted(expected - needs)}; "
+        f"named but absent: {sorted(needs - expected)}. "
+        "A green main deploys itself, so every check has to be in `needs`.")
+
+
 def test_no_deck_is_tracked_by_git():
     """ADR 30: decks are live app data, not repository content.
 
