@@ -55,7 +55,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from mtglab import tarot
+from mtglab import tarot, tarotlore
 from mtglab.api import service
 from mtglab.claude import persona as persona_mod
 from mtglab.claude import stance as stance_mod
@@ -104,6 +104,10 @@ MAX_TURN_CHARS = 2000
 #: client-held and resent, so its size is the client's to inflate and the
 #: bill is not — the same argument `MAX_TURN_CHARS` makes about the turns.
 MAX_FACT_CHARS = 600
+
+#: How a reader cites `tarotlore`. Lowercase, because `keep_fact` folds case
+#: before matching and the id itself is folded with it.
+TAROT_SOURCE = "tarot:"
 
 
 class TranscriptRejected(ValueError):
@@ -224,8 +228,9 @@ CONVERSATION_SCHEMA: dict[str, Any] = {
         "fact": {
             "type": "object",
             "description": (
-                "Optional. One genuinely interesting thing about Magic that "
-                "connects to what they just said -- the hook that makes them "
+                "Optional. One genuinely interesting thing -- about Magic, or "
+                "about the deck on the table if cards have been dealt -- that "
+                "connects to what they just said. The hook that makes them "
                 "curious. Omit it rather than reaching for a dull one."),
             "properties": {
                 "text": {"type": "string",
@@ -233,10 +238,13 @@ CONVERSATION_SCHEMA: dict[str, Any] = {
                 "source": {
                     "type": "string",
                     "description": (
-                        "Either the exact URL of a page you actually read, or "
-                        "the literal string 'taxonomy' when it came from the "
-                        "colour reference data you were given. Anything else "
-                        "is discarded."),
+                        "One of three. `tarot:<id>` for a fact from the list "
+                        "of true things about this deck you were given -- use "
+                        "the id exactly, and its wording is what gets read, "
+                        "so `text` may be a rough copy. Or the literal string "
+                        "'taxonomy' when it came from the colour reference "
+                        "data. Or the exact URL of a page you actually read. "
+                        "Anything else is discarded."),
                 },
             },
             "required": ["text", "source"],
@@ -310,9 +318,20 @@ connects to what they just told you -- include it. You may use the web_search
 tool **once**, and the best moment is right after they tell you what they love,
 to find the specific thing that connects it to Magic. A fact from a page you
 read carries that page's URL. A fact from the colour reference data you were
-given carries the string 'taxonomy'. Do not include a fact you cannot source
-either way, and do not pad with a mediocre one -- a question with no fact is
-better than a question with a boring one.
+given carries the string 'taxonomy'.
+
+**And when there are cards face up on this table, you have been handed a list
+of true things about them** -- who painted this deck, what she was paid, what
+is actually in the picture they are looking at. Tell one by its id, as
+`tarot:<id>`. Those are the best facts you have, because they are about the
+object in front of them: a querent can look down at the card and see the thing
+you just described. Prefer them to a search. **The wording you were given is
+what they read**, so choose the fact rather than compose it, and let your
+question carry the reason it belongs here.
+
+Do not include a fact you cannot source one of those three ways, and do not
+pad with a mediocre one -- a question with no fact is better than a question
+with a boring one.
 
 Never give the same fact twice. The facts you have already told this person
 ride along with the final instruction each turn, quoted back to you exactly as
@@ -816,6 +835,18 @@ def keep_fact(raw: Any, searched: list[dict[str, Any]]) -> dict[str, str] | None
     source = prose(raw.get("source"))
     if not text or not source:
         return None
+    if source.casefold().startswith(TAROT_SOURCE):
+        entry = tarotlore.by_id(source[len(TAROT_SOURCE):])
+        if entry is None:
+            return None
+        # **The corpus's words, not the model's.** The id was the whole ask;
+        # `text` came back only because the schema requires it, and a fun fact
+        # paraphrased at a fortune-teller's table is the one thing at that
+        # table that would be a lie. Stricter than `taxonomy` below, which
+        # trusts the sentence because the colour data is small and sits in the
+        # prompt -- here there are a hundred entries and a verbatim rule costs
+        # nothing.
+        return {"text": entry.text, "source": entry.source, "url": ""}
     if source.casefold() == "taxonomy":
         return {"text": text, "source": "taxonomy", "url": ""}
     from mtglab.claude.dossier import canonical_url
@@ -899,20 +930,34 @@ _FRAME = ("Somebody has opened the deckbuilder and does not know what to "
           "build. Interview them.")
 
 
-def _frame_for(reading: tarot.Reading | None) -> str:
-    """The opening frame, plus the spread when there is one.
+def _frame_for(reading: tarot.Reading | None,
+               told: tuple[str, ...] | None = None) -> str:
+    """The opening frame, the spread when there is one, and what is known.
 
     **Here rather than in the system prompt, and that is a caching decision.**
     A mode's instructions are byte-stable so `converse` can cache them; a
     spread is different every reading, so putting it there would make every
     first turn a cache miss for the whole block. As a message it sits after the
     breakpoint and costs one short paragraph.
+
+    `tarotlore` rides along for the same reason and one more: the corpus it
+    offers is narrowed by `told`, so it is not byte-stable *within* a
+    conversation either.
+
+    **`told=None` means no corpus at all**, and that is why the parameter is
+    not simply an empty tuple. Only the turn can tell a fact; the proposal's
+    schema has no `fact` field, so offering it a hundred entries would be
+    seven kilobytes of prompt with nowhere to go. An empty tuple still means
+    "offer everything, nothing told yet", which is a real first turn.
     """
     if reading is None:
         return _FRAME
-    return (f"{_FRAME}\n\nYou have already dealt three cards, face up, in this "
-            f"order. These are the cards on the table and there are no others:\n"
-            f"{reading.describe()}")
+    frame = (f"{_FRAME}\n\nYou have already dealt three cards, face up, in "
+             f"this order. These are the cards on the table and there are no "
+             f"others:\n{reading.describe()}")
+    if told is None:
+        return frame
+    return frame + tarotlore.offer([d.card.key for d in reading.cards], told)
 
 
 def _messages(transcript: list[dict[str, str]], *, closing: str,
@@ -1183,7 +1228,7 @@ def run_ask(req: AskRequest, *,
     closing = _closing_for(carried, history, req.told)
     turn = converse(mode,
                     messages=_messages(history, closing=closing,
-                                       frame=_frame_for(reading)),
+                                       frame=_frame_for(reading, req.told)),
                     stance=effective,
                     # No client tools at all, so the only reason to go round
                     # again is the one search resuming after a pause_turn.

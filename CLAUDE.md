@@ -147,9 +147,14 @@ src/mtglab/
   colors.py               the 32 combinations, and the teaching depth
   glossary.py             the vocabulary, Magic's and this tool's own
   lore.py                 the shelves: history, rules that changed, the
-                          painters; reference prose, the third of its kind
+                          painters; reference prose, the third of four
   tarot.py                the 78-card deck, the shuffle, and the three-card
                           spread; stdlib, and no card's meaning
+  tarotlore.py            what is true about that deck: Pamela Colman Smith,
+                          Waite, and the 1909 printing. Reference prose, the
+                          fourth of its kind, and still no card's meaning.
+                          Cited by id (`tarot:pixie-fee`) so `keep_fact`
+                          renders the file's own words, never the model's
   assets/tarot/           the 78 pictures, package-data; PROVENANCE.md argues
                           the licence and is not optional reading
   animist/                the asset pipeline (ADR 29): recipe -> fetch ->
@@ -367,9 +372,9 @@ it back. Creation, import and deletion are outside it because they are outside
 `_commit` — adding them means a second call site, which is a decision to take
 deliberately rather than by drift.
 
-**`colors.py`, `glossary.py` and `lore.py` are reference prose, and that was
-argued rather than assumed.** They are the three modules that deliberately know
-things Scryfall did not say — what a guild is, what happened to it, what a
+**`colors.py`, `glossary.py`, `lore.py` and `tarotlore.py` are reference prose,
+and that was argued rather than assumed.** They are the four modules that
+deliberately know things Scryfall did not say — what a guild is, what happened to it, what a
 mulligan is, whose brush painted the card — and the alternative was a Claude
 surface. It lost on four counts, written
 out in `colors.py`'s docstring and ROADMAP item 3 branch 4: `/api/colors`,
@@ -679,7 +684,13 @@ anything narrower than a laptop.
 
 **The tarot table is the theme interview wearing a costume.**
 `tarot.py` is stdlib, holds all 78 cards and
-**no card's meaning** — Python shuffles, the reader reads. The load-bearing
+**no card's meaning** — Python shuffles, the reader reads. `tarotlore.py` is
+what she may say while she reads: a checked-in corpus about the 1909 deck and
+the woman who painted it (Aaron's choice of well, 2026-08-18), offered in the
+frame message and **cited by id**, so `theme.keep_fact` renders the corpus's
+own sentence and a paraphrase is discarded. The deck tier is true of every
+spread, which is why a reading of three minors is never empty; the 22 trumps
+have their own facts and the 56 minors are still owed theirs. The load-bearing
 decision is that `tarot.SPREAD`'s three positions **are** `SLOT_KINDS[:3]`
 (taste, temperament, posture) with `len(SPREAD) == FLOOR`: a card is dealt
 *for* a slot, so ADR 20's grounded-quote readiness works untouched and **the

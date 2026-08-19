@@ -243,3 +243,50 @@ describe('a turn that finished on purpose', () => {
       HTMLButtonElement).disabled).toBe(false)
   })
 })
+
+
+describe('who a fun fact is credited to', () => {
+  /**
+   * Three origins reach `FactNote` and the old code could only tell two
+   * apart. It keyed on `url`, so anything without one was captioned "From
+   * this tool's own colour reference data" — true of a taxonomy fact and
+   * flatly false of the fortune-teller's deck history, which arrives with a
+   * real book citation and no link. Adding the tarot corpus would have
+   * credited Pamela Colman Smith to a table of Magic colours.
+   */
+  const withFact = (fact: ThemeReport['fact']) =>
+    report({ question: 'What draws you in?', fact })
+
+  it('links a fact that came from a page', async () => {
+    answersWith(withFact({
+      text: 'A thing a page said.', source: 'A Page',
+      url: 'https://example.test/a',
+    } as NonNullable<ThemeReport['fact']>))
+    renderRoom()
+
+    const link = await screen.findByRole('link', { name: 'A Page' })
+    expect(link.getAttribute('href')).toBe('https://example.test/a')
+  })
+
+  it('names the colour data when that is what it was', async () => {
+    answersWith(withFact({
+      text: 'Selesnya is white-green.', source: 'taxonomy', url: '',
+    } as NonNullable<ThemeReport['fact']>))
+    renderRoom()
+
+    expect(await screen.findByText(/colour reference data/)).toBeTruthy()
+  })
+
+  it('prints a real citation instead, and never calls it colour data',
+     async () => {
+    answersWith(withFact({
+      text: 'Pamela Colman Smith drew all 78 cards and was paid a flat fee.',
+      source: 'Kaplan and others, Pamela Colman Smith: The Untold Story',
+      url: '',
+    } as NonNullable<ThemeReport['fact']>))
+    renderRoom()
+
+    expect(await screen.findByText(/Kaplan and others/)).toBeTruthy()
+    expect(screen.queryByText(/colour reference data/)).toBeNull()
+  })
+})

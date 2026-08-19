@@ -1834,12 +1834,34 @@ arc; this is what the next few sessions actually do.
     shipped as decoration (it matched line-by-line, and this codebase wraps
     its comments).
 
-    **Still open: item 6** — a checked-in corpus of 10–20 facts for each of
-    the 78 tarot cards, woven into the reading and never repeating within a
-    session. **It extends the `theme.py` fact mechanism rather than
-    rebuilding it** (the schema, the `'taxonomy'`-or-real-URL sourcing rule
-    and the `told`/`repeats` dedup all exist), and at 780–1560 sourced facts
-    it wants its own session.
+    **Item 6 is begun** — `tarotlore.py`, the fourth reference-prose module.
+    Aaron picked the well from four (2026-08-18): **Pamela Colman Smith and
+    the 1909 deck** — who drew it, what she was paid, whose photographs of a
+    fifteenth-century deck she had seen two years earlier, and what is
+    actually in the picture the querent is looking at. Not what a card
+    portends, which has no right answer and is the reader's half.
+
+    It extends `theme.py`'s fact mechanism rather than rebuilding it, and
+    tightens it in one place. A fact is cited **by id** (`tarot:pixie-fee`)
+    rather than by sentence, and `keep_fact` renders **the corpus's own
+    words**; a reader that paraphrases or embellishes has the embellishment
+    discarded. That is deliberately stricter than the `'taxonomy'` source
+    beside it, because a fun fact invented at a fortune-teller's table is the
+    one thing at that table that would be a lie — ADR 14 in miniature, and
+    commandment 15's table getting the careful version.
+
+    **Two tiers, and the deck tier is why no reading is ever empty.**
+    18 facts are about the deck and its makers and are true of every
+    spread — which matters because the sampler can deal three minors.
+    79 more are per-card, covering all 22 trumps.
+
+    **Still owed: the 56 minors, at Aaron's asked-for five facts apiece** —
+    roughly 280 more, in the same well. The mechanism, the dedup, the
+    rendering and the tests are done and do not change when they land; what
+    is left is the writing and the sourcing. One more finding came out of the
+    wiring: `FactNote` captioned every source-less fact "From this tool's own
+    colour reference data", so a fact about Pixie Smith would have been
+    credited to a table of Magic colours.
 
 ---
 
