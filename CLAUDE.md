@@ -120,25 +120,39 @@ load-bearing.
 ## Setup
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python3.12 -m venv .venv && source .venv/bin/activate   # any 3.11+ will do
 pip install -e ".[dev]"
 mtglab data refresh          # ~500MB from Scryfall, several minutes
 pytest -q
 mtglab claude check          # optional: is the API key live?
 ```
 
-Extras: `api` (FastAPI + the app), `claude` (the Anthropic SDK), `animist`
-(Pillow + imageio-ffmpeg, for the asset pipeline and its video encoders),
-`dev` (which includes all of it plus the test tooling). A base install has the gate, the mana
-solver and Tier 1, and needs neither a network nor an account. `claude check`
-needs `ANTHROPIC_API_KEY`; see `.env.example`.
+**The interpreter is named on purpose.** That line said `python -m venv` until
+2026-08-19, and on this Mac there is no `python` at all — `python3` is 3.7.3
+and `/usr/bin/python3` is 3.8.2, both under the `requires-python` floor. The
+3.11 and 3.12 on `PATH` are uv-managed (`uv python install 3.12`) and either
+satisfies it; CI tests both.
 
-That parenthesis was **false until 2026-08-16** — `dev` carried every other
-extra's packages except `fastapi` and `uvicorn` — and the omission cost 474
-tests, silently. `pyproject.toml` now vendors them with the reason written
-out; the rule the episode argues for is the general one: **a sentence in this
-file asserting completeness is a claim to re-check against the code, not a
-fact to inherit.**
+Five extras. `api` (FastAPI + the app), `claude` (the Anthropic SDK),
+`animist` (Pillow + imageio-ffmpeg, for the asset pipeline and its video
+encoders), `depth` (CPU torch and the depth-model loader, ADR 32), and `dev`
+(which vendors the first three plus the test tooling). **`dev` leaves `depth`
+out deliberately** — ~800MB of wheels per environment for a loader no test may
+import — which `pyproject.toml` argues and `tests/test_packaging.py` pins in
+both directions. A base install has the gate, the mana solver and Tier 1, and
+needs neither a network nor an account. `claude check` needs
+`ANTHROPIC_API_KEY`; see `.env.example`.
+
+**That paragraph has now been wrong twice, in two different ways.** Until
+2026-08-16 "includes all of it" was false — `dev` carried every other extra's
+packages except `fastapi` and `uvicorn`, and the omission cost 474 tests,
+silently. Until 2026-08-19 the *list* was false: it named four extras where
+`pyproject.toml` declared five, so the one deliberate exception to the rule
+above went unmentioned in the file that states the rule. Both are the same
+lesson, which is why it is stated here rather than in either fix: **a sentence
+in this file asserting completeness is a claim to re-check against the code,
+not a fact to inherit.** Twice was enough — `test_packaging.py` now fails when
+an extra exists that this section does not name.
 
 `data refresh` needs network access to `api.scryfall.com` and
 `data.scryfall.io`. In a cloud session with default Trusted network access

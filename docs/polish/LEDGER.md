@@ -503,15 +503,75 @@ kill rate is bad enough to want every mutant rather than a sample.
 *Python craft · TypeScript/React craft · Claude-first docs & memory · the
 spirit of Magic*
 
-- **New facet, never yet run:** *the spirit of Magic* (added 2026-08-19 at
-  Aaron's ask — commandment 3 as a sweep: prefer the game's terminology and
-  iconography over plain conversational English, within commandment 2's
-  bounds). No baseline exists; the next Blue run owes it a first full sweep
-  of the rendered surfaces, and Blue is staler than its date suggests until
-  that happens.
-- **Last run:** 2026-08-18 (punch-list item 5, Blue + Red in one session —
-  Aaron's ask was API hygiene and dev-cycle relics, which is Blue, and alerts
-  and instability signals, which is Red). Previous: 2026-08-16 (rainbow).
+- **Last run:** 2026-08-19 (rainbow) — the *spirit of Magic* facet's first
+  outing, so its section below is a baseline rather than a delta. Previous:
+  2026-08-18 (punch-list item 5, Blue + Red in one session).
+- **Fixed this run (2026-08-19, rainbow):**
+  1. **The one paragraph in CLAUDE.md that states the re-check-completeness
+     rule had drifted again, in the other direction.** It says *"a sentence in
+     this file asserting completeness is a claim to re-check against the code,
+     not a fact to inherit"* — a rule written after 2026-08-16 found `dev
+     (which includes all of it)` false. What nobody re-checked was the
+     enumeration in front of it: **it named four extras where `pyproject.toml`
+     declares five**, and the missing one is `depth`, the single deliberate
+     exception to the very claim the sentence makes. The code has known this
+     all along — `tests/test_packaging.py` pins `depth`-out-of-`dev` in *both*
+     directions with ADR 32's argument written out — so the file that a fresh
+     session actually reads was the only place the exception did not exist.
+     Corrected, and `test_the_setup_section_names_every_extra` now derives the
+     set from `pyproject.toml` (parsed with `tomllib`, not matched: the regex
+     form of `declared_extras` read every `name = [` to the end of the file and
+     also collected `markers`, `select` and eleven other tool keys — harmless
+     while the only question was "are these two present", wrong the moment
+     anything asked what the whole set is). Mutation-verified both ways: an
+     undocumented extra fails it, and un-naming `depth` throughout the section
+     fails it. **Deliberately one-directional** — an extra must be named, the
+     section may say anything else it likes, because prose is not a table.
+  2. **White's queued interpreter item, closed — and its premise was wrong.**
+     White found `python -m venv .venv` unrunnable here (no `python` at all;
+     `python3` 3.7.3, `/usr/bin/python3` 3.8.2, both under the 3.11 floor) and
+     queued it as a *choice* on the grounds that "the only interpreter that
+     satisfies it is the uv-managed 3.12 already inside `.venv`". Re-verified
+     rather than inherited: **`python3.11` and `python3.12` are both on `PATH`**
+     (`~/.local/bin`, uv-managed CPython 3.11.15 / 3.12.13), and
+     `python3.12 -m venv` produces a working venv *with pip*. So there was no
+     choice to make — the documented command names an interpreter that is not
+     there while a working one is, which is a correction. Now
+     `python3.12 -m venv .venv   # any 3.11+ will do`, with the three
+     interpreter facts recorded beneath it. (The repo's own `.venv` has **no
+     pip**, because `uv venv` does not install one; that is a fact about this
+     tree, not about the bootstrap, and it is recorded in the environment
+     memory so nobody "fixes" the doc to match it.)
+  3. **The deck History tab told a reader their earlier edits were "in git".**
+     Rendered, on the empty state, and false twice over: ADR 30 took decks out
+     of git, so there is no revision holding them, and ADR 28 made the activity
+     log the only record there is. It is also **commandment 10** — a
+     technology named to a user — which is the half that makes the sentence
+     wrong even where it might have been true. Two things let it live. The
+     Vitest assertion beside it read `expect(getByText(/in git, not here/))`:
+     **a test written against a claim cannot tell you the claim is wrong**,
+     which is the [[guards-outlive-their-reason]] shape a third time. And
+     `tests/test_deck_location_drift.py` — the tripwire written for exactly
+     this class on 2026-08-18 — missed it, because its affirmative list bans
+     *verbs* (`tracked`, `held`, `committed`, `diffed`) and this sentence used
+     none: it put the **edits** in git rather than the deck. Copy replaced
+     ("anything earlier left no trace but the deck itself"), the assertion
+     re-pointed, and the tripwire given a subject-anchored pattern —
+     `(edits|changes|swaps|history|revisions|records) … (is|are|was|were) in
+     git`. Anchoring on the subject rather than on the word *deck* is what
+     makes a bare copula safe here: the file's own corrections read "no deck is
+     in git" and "none of them is in git", and a deck-anchored pattern flags
+     both. Mutation-verified by re-injecting the original sentence.
+- **Also landed this run, outside the repo:** two memory corrections.
+  `gh-cli-is-in-local-bin` told every session to wrap `gh`, `npm`, `node`,
+  `uv` and `fly` in `bash -lc` — **no longer true**: a plain Bash call resolves
+  all six (the tool's shell is initialised from the profile now), so the
+  wrapper is pure noise on every command. The traps it carries are kept (a
+  `|| echo '[]'` fallback turning a missing command into an empty result; check
+  `command -v` before declaring a tool absent), and Monitor is marked
+  *unverified* rather than assumed. And `MEMORY.md`'s index still listed the
+  `camera=()` bug as open, which #184 closed on 2026-08-19 — the entry it
+  points at had already been corrected, so only the index was lying.
 - **Fixed this run (2026-08-18):**
   1. **ADR 30 superseded half of ADR 1 and eighteen code comments never heard.**
      Decks came out of git on 2026-08-16; `docs/adr/README.md` records the
@@ -603,16 +663,47 @@ spirit of Magic*
      its own docstring). `user_decks.yaml` in HOSTING.md read as a filename and
      is a column.
 - **Queued for Aaron:**
-  1. **`cli.py` is the last strict-mypy exception and it has grown: 79 → 109.**
-     59 `no-untyped-def` and 48 `no-untyped-call` (the argparse handlers calling
-     each other), so it is annotations rather than a rewrite — just a lot of
-     them, touching one 1900-line file. Too big to ride along with a polish
-     fix set; it wants its own branch. The decision is whether that branch is
-     worth an afternoon, given the module is exercised end-to-end by the suite
-     and the list has been "meant to shrink" since it was written. **The number
-     going up is the argument for doing it**: a module on the list absorbs
-     every new untyped function without a word.
-  2. **Adopt Claude Code hooks for the two traps that have already cost hours.**
+  0. **The simulator renders a raw seed, and commandment 10 names seeds
+     explicitly.** `routes/Simulator.tsx` draws `<Badge>seed {seed}</Badge>`
+     beside every result and a `NumberField label="Seed"` in the controls. The
+     commandment's own parenthesis says it was sharpened on 2026-08-17 "after
+     'Python rolls' and **a seed rendered on the Wheel**" — the Wheel's was
+     taken out and this one was never asked about, which is the
+     duration-measured-for-one-surface lesson wearing a different hat. It is
+     queued rather than fixed because the *whether* is settled and the *what*
+     is not, and two readings of the commandment give different answers:
+     (a) **rename the rendered label only** — the glossary's own entry already
+     says "the number the shuffler starts from", so `Seed` → `Shuffle` and
+     `seed 7` → `shuffle 7` is Magic's word for the thing, strictly clearer to
+     a newcomer (commandment 2), and leaves the wire field `seed`, the key
+     `sim.seed` and `SIMULATOR_KEYS` untouched — exactly the flavour-the-label
+     pattern `lib/claudecopy.ts` is; or (b) **stop showing the number at all**,
+     on the reading that a rendered integer *is* the technology however it is
+     labelled, keeping "New sample" as the only control. (a) preserves ADR 18's
+     reproducibility surface, which is a real feature and the reason runs are
+     seeded by default; (b) is the stricter reading of the commandment. Aaron's
+     call, and it is a UI change either way, so commandment 16 applies.
+  1. **`cli.py` is the last strict-mypy exception and it keeps growing:
+     79 → 109 → 126.** Re-measured 2026-08-19 by removing the override block:
+     73 `no-untyped-def`, 52 `no-untyped-call`, 1 `no-any-return`. Still
+     annotations rather than a rewrite, just more of them, in one 2,400-line
+     file — so it wants its own branch rather than a ride-along. **The third
+     consecutive rise is the argument**: a module on the list absorbs every new
+     untyped function without a word, and at the current rate the cost of
+     clearing it grows faster than anyone will choose to pay it.
+  2. **`numpy` is a core dependency and only the `animist` extra uses it.**
+     `pyproject.toml` declares `numpy>=1.26` under `[project] dependencies`;
+     the only importers in the whole package are `animist/{ops,encode,motion}.py`,
+     which the extra's own comment describes as build-time tooling ("the app
+     and the container never transform an image"). So every base install and
+     the deployed image carry it for code that never runs there, and CLAUDE.md's
+     "Keep `mana.py` and `sim/` dependency-light (stdlib + numpy)" is a
+     permission nothing takes up — `sim/` is pure stdlib today. Moving it into
+     `animist` (and into `dev`, which vendors that extra) is a **packaging**
+     change only the `image` job can fully verify, which is the case the skill
+     says to queue rather than bundle. Worth pairing with White's deferred
+     `license-files` widening, which is the same job's feedback loop.
+  3. **Adopt Claude Code hooks for the two traps that have already cost hours.**
      `.claude/` holds `launch.json` and `skills/` and **no `settings.json`**, so
      the harness enforces nothing. Two of this project's most expensive rules
      are prose-only — *never `git add -A`* (`decks/` is the app's live data
@@ -625,22 +716,98 @@ spirit of Magic*
      every session behaves and that is Aaron's call, not a polish run's.
      A third candidate, weaker: a `PostToolUse` hook reminding that `web_dist/`
      needs rebuilding after an edit under `web/src`.
-  3. **`api/service.py` reaches past `cards/db.py` to `duckdb` directly**
-     (`import duckdb; duckdb.connect(..., read_only=True)`), which is the one
-     live exception to CLAUDE.md's "DuckDB stays behind `cards/db.py`". It is
-     justified — `db.connect` creates the file, runs DDL and `ALTER`s, none of
-     which a read-only app handle may do — but the rule now has an undocumented
-     hole. Two ways out: add `db.connect_readonly()` and move the call, or write
-     the exception into CLAUDE.md. Not done here because the read-only path is a
-     deployed degradation path and getting it wrong is an outage, not a lint.
+  4. ~~**`api/service.py` reaches past `cards/db.py` to `duckdb` directly.**~~
+     **Closed.** #181's performance pass took the first of the two proposed
+     ways out: `cards/db.py::connect_readonly` exists and `api/service.py`
+     calls it, with the only remaining `duckdb` name in that file a
+     `TYPE_CHECKING` import of `DuckDBPyConnection` for the cast. Re-grepped
+     2026-08-19 across the whole package: **no `duckdb.connect` outside
+     `cards/db.py`**, so CLAUDE.md's rule now holds without an exception.
+     Kept as a line so the next run does not re-find it.
+  5. **`ROADMAP.md` has become a narrative log, and is 3,109 lines.** CLAUDE.md
+     describes it as "goals vs reality, open decisions"; a great deal of it is
+     now a per-PR account of work already landed, with its own supersession
+     markers (the crystal-ball sections are correctly marked superseded by the
+     séance photograph, and still there in full). The four planning documents
+     total **7,073 lines**, which is the per-session cost the scrub facet
+     exists to watch. Not scrubbed here because deciding what a roadmap is for
+     is Aaron's, and because a diff that large is the opposite of a polish run.
+     A concrete proposal to say yes or no to: keep ROADMAP as goals, open
+     decisions and the next two or three items, and move the landed narratives
+     to a `docs/HISTORY.md` that nothing reads at session start.
 - **Deferred:**
-  - **Adopting ruff's `N` group (39 in `src`, 1 in `tests`).** The only excluded
+  - **Adopting ruff's `N` group (43 in `src`, 1 in `tests`).** The only excluded
     group whose cost is now plausibly payable, but naming rules rename things,
     which is a wide diff for no behaviour change. Trigger: a session already
     renaming in the same modules.
   - **`ARG`, `PT`, `SLF` stay out** and the re-measure says why (below) — all
     three are overwhelmingly *test* findings, and the fixture/override idiom
     they fire on is correct here.
+  - **Three dead public functions, left rather than deleted**, following the
+    precedent White set with `ocr.installed()` this cycle. Found by walking the
+    package's syntax tree for module-level public defs and counting references
+    across `src`, `tests` and `web`. (a) `cardmotion.depth_available()` —
+    docstring says "entry points ask this before touching the heavy modules"
+    and none do; the mechanism it duplicates is *better*, since
+    `depth.load_model()` catches the `ImportError` and raises a `DepthError`
+    carrying the install line, which `cli.py` already prints. (b)
+    `decks/validate.py::reserved_list()` — the deck-level Reserved List rollup.
+    CLAUDE.md's working style says "Reserved List is allowed or forbidden **per
+    deck** — check the deck file", and no deck field toggles it, no gate rule
+    reads it, nothing calls the function; what *does* ship is the per-card
+    `reserved` flag and a badge in `CardSearch.tsx`. So the per-deck half of
+    that sentence is aspiration, not code. (c) `src/mtglab/prices/` is an empty
+    package created in the first commit (`f49c94f`, Phase 1) and never filled,
+    imported or referenced — it ships in the wheel as a namespace with nothing
+    in it. Trigger for all three: the next session working in that area, or a
+    colorless run willing to take a delete-only diff.
+- **Measurements (2026-08-19, rainbow — quiet machine, serial run):**
+  - **mypy:** clean over **107** source files (was 82 on 2026-08-16 — the
+    camera door, the bench and the mutate harness). Strict-exception list is
+    still one module: `cli.py` **126**, re-measured by removing the override
+    block rather than estimated (73 `no-untyped-def`, 52 `no-untyped-call`,
+    1 `no-any-return`). Trend 79 → 109 → 126.
+  - **ruff:** clean. Excluded groups re-measured src/tests, against
+    2026-08-16: `ARG` **720** (20 src / 700 tests, was 16/604) · `PT` **149**
+    (0 / 149, was 0/112) · `SLF` **121** (0 / 121, was 0/67) · `N` **44**
+    (43 / 1, was 39/1). The shape is unchanged and is the finding: everything
+    but `N` is still ~100% test-side, so the headline numbers overstate what
+    adopting them would cost `src` by two orders of magnitude. **A note for
+    whoever re-measures next**: `ruff check --select X | tail -1` is *not* the
+    count — the last line is "No fixes available…" and the total sits above it.
+    That mistake read `PT` as 0 here before it was caught.
+  - **pytest:** **2419 passed, 0 skipped in 176.1s**, three of which are this
+    run's. The zero is correct here and different from CI — the two
+    `needs_full_pool` tests find the real pool on this machine — and `data/`
+    was clean afterwards (`app.db` mtime unmoved, checked with `ls -la` rather
+    than `git status`, which is blind to it).
+  - **frontend:** `npm --prefix web run check` green — **537 Vitest tests
+    across 31 files in ~26s** (was 499 / 28 / ~37s on 2026-08-18). Bundle
+    rebuilt; only `DeckDetail.js` moved, which is fix 3.
+  - **Layering, grepped not trusted:** `api/` imports `cli.py` **nowhere**;
+    **no `duckdb.connect` outside `cards/db.py`** (queued item 4, now closed);
+    `mana.py` and `sim/` are stdlib-only — note *not* stdlib+numpy, since
+    **numpy appears in no module outside `animist/`** (queued item 2); no
+    module-level `anthropic`, `PIL`, `dotenv`, `torch` or `numpy` anywhere in
+    `src/`; no 3.12-only syntax, so the `>=3.11` floor holds.
+  - **Frontend compatibility:** **zero regex lookbehind** under `web/src`
+    (Safari 15 is the dev machine); no `structuredClone`, `findLast`,
+    `toSorted`, `toReversed` or `Object.hasOwn`; the one `.at(-1)` is in a
+    `.test.tsx`, which runs under Node and never ships. No `forwardRef`,
+    `React.memo`, `defaultProps` or `propTypes` — React 19 idiom throughout.
+    No non-null assertion outside tests, now that oxlint holds it.
+  - **Doc/tree consistency, counted rather than read.** Every source path named
+    in CLAUDE.md, ROADMAP.md, `web/README.md`, ENGINEERING.md, HOSTING.md and
+    the two skills resolves against `git ls-files`. Every *number* CLAUDE.md
+    asserts was evaluated against the code and **all of them hold**: 7
+    read-only tool schemas, 7 personas, 78 tarot cards, 377 `tarotlore` facts
+    (359 of them card facts), 986 set codes in the pool, 41 glossary terms,
+    32 colour combinations. The two that had drifted were the two nobody
+    counts — the extras enumeration (fix 1) and `cli.py`'s error count.
+    Architecture block gaps, recorded rather than filled because the block is
+    selective by design: `prices/`, `decks/library.py`, `decks/sqlsource.py`
+    and four `api/` modules (`admin`, `adminstats`, `traffic`, `flymetrics`)
+    are named nowhere in it.
 - **Measurements (2026-08-16, uncontended unless noted):**
   - **mypy:** clean over 82 source files. Strict-exception list: `cards/db.py`
     24 → **graduated**; `cli.py` **109** (was 79 when the checker landed —
@@ -681,6 +848,73 @@ spirit of Magic*
     required checks (`test (3.11)`, `test (3.12)`, `frontend`,
     `no-secrets-or-card-data`, `image`, `dependency-review`) — CLAUDE.md's "all
     six" is correct; CodeQL runs but is **not** a required context.
+
+### The spirit of Magic — first sweep, 2026-08-19
+
+The facet's baseline. Nothing here is a delta; the point of this section is
+that the next run starts where this one stopped rather than re-reading the
+same 24,712 lines of `web/src`.
+
+**Swept:** every rendered string reachable by grep across `web/src/routes`,
+`web/src/components` and `web/src/lib` — labels, buttons, empty states, error
+and loading copy, placeholders, `aria-label`s and short JSX text nodes — plus
+a technology-name sweep for `git`, `YAML`, `Python`, `DuckDB`, `SQLite`,
+`SQL`, `React`, `FastAPI`, `JSON`, `HTTP`, `database`, `server`,
+`localStorage`, `seed` and `token`.
+
+**The headline, and it is not a flavour finding:** the vast majority of those
+hits are in *comments*, which commandment 10 does not reach. Exactly **two**
+render. One is fixed above (the History tab's "in git"); the other is the
+simulator's seed, queued as item 0 because the wording is a decision. That is
+a good result for a first sweep and worth writing down as the baseline —
+this app is not leaking its machinery, it leaked twice.
+
+**Considered and rejected, so the next run does not re-litigate it:**
+
+- **`deck.yaml`, rendered in four places** (`Import.tsx` twice, `DeckDetail.tsx`
+  twice). Left alone. It reads as a technology name and is not one *here*:
+  this is a local-first tool whose CLAUDE.md calls the file the source of
+  truth, `Import.tsx` shows you the file it is about to write, and the deck
+  page's rationale tab says the words live there rather than in a database
+  nobody can open. Taking the name away would make the sentences vaguer, not
+  more immersive. Revisit only if the hosted instance ever gets users who have
+  no shell.
+- **The admin dashboard's "Tokens in / Tokens out / Cache reads"**
+  (`routes/Admin.tsx`). Maintainer-facing behind `/api/admin`, and the units
+  *are* the subject of the page. Not a commandment 10 surface.
+- **"Cancel", "Close", "Username", "Email", "Submit".** Generic, and correctly
+  so — commandment 2 draws the line and none of these has a Magic word that
+  leaves a newcomer better off. A "Cancel" button that says "Fizzle" is a
+  regression wearing a costume.
+
+**The enrichment shortlist — what is absent that could be there.** Nothing
+from this list was built this run; the run's diff was already at its surgical
+cap with three fixes, and every item below is user-visible, so commandment 16
+applies to each. Ordered by cost:
+
+1. **Rarity has a symbol and renders nowhere.** `lib/api.ts:180` carries
+   `rarity` on every card and no surface draws it — `CardSearch.tsx` finds room
+   for a "reserved list" badge and not for the one mark every Magic player
+   reads first. The expansion symbol's colour *is* the rarity (black, silver,
+   gold, orange), which makes this `symbols.py`'s kind of problem rather than a
+   new asset: check whether Scryfall's set-symbol endpoint is on the same
+   licence footing the mana symbols are (ADR 33) before proposing anything.
+2. **The fortune-teller's table is where commandment 15 says an enrichment
+   goes first**, and the corpus is already checked in: 377 facts across all 78
+   cards, of which only the reader's cited ones are ever seen. A dealt card's
+   own picture facts could carry the plate's detail on hover, without a model
+   in the loop and without a new asset.
+3. **Empty states could carry a card's own words.** `lore.py`, `colors.py` and
+   `tarotlore.py` are checked-in prose, and the pool holds flavour text that is
+   free, licensed to render and better written than any copy a checklist
+   produces. "Nothing on the shelf yet." (`Library.tsx:229`) is the obvious
+   first candidate. Rule 1 binds hard here: the line must come *from the pool*,
+   never from recall, because it will be rendered.
+4. **Zones that are not named as zones.** Checked this run and mostly already
+   right — the graveyard, exile, entomb and return are all in use. The
+   remaining generic ones are the simulator's "Wasted"/"No land" table columns,
+   which are Magic concepts (mana burn's descendant, the missed land drop)
+   wearing spreadsheet labels.
 
 ## Black — Ruthless Efficiency
 

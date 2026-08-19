@@ -25,6 +25,7 @@ check that gives feedback too late to be worth having.
 
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -35,6 +36,7 @@ sys.path.insert(0, str(ROOT / "src"))
 DOCKERFILE = ROOT / "Dockerfile"
 FLY_TOML = ROOT / "fly.toml"
 CI_YML = ROOT / ".github" / "workflows" / "ci.yml"
+CLAUDE_MD = ROOT / "CLAUDE.md"
 
 # Extras the runtime image must install, and the surface each one is there for.
 # An entry is a promise the UI already makes: a control the app renders whose
@@ -71,15 +73,26 @@ def test_the_image_does_not_ship_the_dev_extra():
         "the runtime image should not carry the test toolchain"
 
 
+def declared_extras() -> set[str]:
+    """Every name in pyproject's `[project.optional-dependencies]` table.
+
+    Parsed rather than matched. The regex form of this read every `name = [`
+    from the table header to the end of the file, so it also collected
+    `markers`, `select` and eleven other tool settings -- harmless while the
+    only question asked was whether two known names were present, and wrong
+    the moment anything asked what the whole set is.
+    """
+    parsed = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    extras = parsed["project"].get("optional-dependencies")
+    assert extras, "no optional-dependencies table in pyproject.toml"
+    return set(extras)
+
+
 def test_every_required_extra_is_declared_in_pyproject():
     """A Dockerfile naming an extra that does not exist fails the build, which
     is late. `pip` treats an unknown extra as a warning in some versions, which
     is worse."""
-    declared = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    block = declared.split("[project.optional-dependencies]", 1)
-    assert len(block) == 2, "no optional-dependencies table in pyproject.toml"
-    names = set(re.findall(r"^(\w+) = \[", block[1], flags=re.MULTILINE))
-    missing = set(REQUIRED_EXTRAS) - names
+    missing = set(REQUIRED_EXTRAS) - declared_extras()
     assert not missing, f"the Dockerfile would install undeclared extras: {missing}"
 
 
@@ -195,6 +208,42 @@ def test_the_depth_extra_is_deliberately_not_in_dev():
         f"`dev` now installs {sorted(overlap)} from the `depth` extra -- "
         "that is 800MB per environment for a function no test imports; "
         "re-read ADR 32 before doing this deliberately."
+    )
+
+
+def setup_section() -> str:
+    """CLAUDE.md's `## Setup` section, which is the documented bootstrap."""
+    text = CLAUDE_MD.read_text(encoding="utf-8")
+    start = text.index("\n## Setup\n")
+    end = text.index("\n## ", start + 1)
+    return text[start:end]
+
+
+def test_the_setup_section_names_every_extra():
+    """The last seam in this file, and the one that had nothing holding it.
+
+    Everything above pins `pyproject.toml` against the `Dockerfile` and against
+    `ci.yml`. Nothing pinned it against CLAUDE.md -- which is the document a
+    fresh session actually reads, and which is therefore the one place a wrong
+    sentence gets believed rather than checked.
+
+    It had drifted, in the same paragraph twice. The 2026-08-16 run found
+    "`dev` (which includes all of it)" false; the 2026-08-19 run found the
+    *list* false -- four extras named where five were declared, and the missing
+    one was `depth`, the single deliberate exception to the rule the sentence
+    was stating. An enumeration nobody counts stops being an enumeration.
+
+    Deliberately one-directional: an extra must be named, but the section may
+    name other things freely. Prose is not a table, and a check that forbade
+    the word `dev` appearing twice would be a check nobody could satisfy.
+    """
+    section = setup_section()
+    unmentioned = {extra for extra in declared_extras()
+                   if f"`{extra}`" not in section}
+    assert not unmentioned, (
+        f"pyproject declares {sorted(unmentioned)} and CLAUDE.md's Setup "
+        "section never names it. That section is what a fresh session is "
+        "handed; an extra it omits is an extra nobody installs."
     )
 
 
