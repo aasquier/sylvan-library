@@ -640,6 +640,27 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
     # ------------------------------------------------------------ cards
 
+    @app.post("/api/cards/identify")
+    def identify_cards(payload: dict[str, Any]) -> dict[str, Any]:
+        """Read what a camera thought it saw against the pool.
+
+        A POST because a fanned spread is forty sightings and a title is
+        free text, neither of which belongs in a query string -- and because
+        what somebody is holding is not a thing to leave in an access log.
+
+        No image is ever sent here. The body is a list of
+        `{set, number, title}`, all optional, and the answer is a card per
+        sighting or a shortlist per sighting. Which of the two, and why it is
+        never both, is argued in `cards/identify.py`.
+        """
+        raw = payload.get("sightings")
+        if not isinstance(raw, list):
+            raise HTTPException(
+                status_code=422,
+                detail="sightings must be a list of {set, number, title}")
+        sightings = [s for s in raw if isinstance(s, dict)]
+        return service.identify_cards(sightings)
+
     @app.get("/api/cards/search")
     def search_cards(
         q: str = "",
@@ -1171,6 +1192,30 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         return FileResponse(
             path, media_type="image/svg+xml",
             headers={"Cache-Control": "public, max-age=604800"})
+
+    @app.get("/api/ocr/{name}")
+    def ocr_asset(name: str) -> FileResponse:
+        """One file of the reading engine, off the shelf `ocr.py` fills.
+
+        Six megabytes of WebAssembly and trained data that git never holds
+        and no page ever hotlinks -- the mana-symbol arrangement (ADR 33)
+        applied to somebody else's compiler output. The name must be a key
+        of `ocr.ASSETS`, which is the whole path-traversal story: there is
+        no pattern to get wrong, only a table to be absent from.
+
+        Immutable, unlike the symbols beside it, and that is the digest's
+        doing: the cache path carries the pinned versions, so these bytes
+        can never mean anything else.
+        """
+        from mtglab import ocr as ocrshelf
+
+        path = ocrshelf.ensure(name)
+        if path is None:
+            raise HTTPException(status_code=404, detail="no such reader file")
+        asset = ocrshelf.ASSETS[name]
+        return FileResponse(
+            path, media_type=asset.media_type,
+            headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
     # -------------------------------------------------------------- sim
 

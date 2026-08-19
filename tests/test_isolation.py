@@ -84,6 +84,7 @@ SHARED = {
                      "owner is resolved through Library and the job is scoped",
     "/api/sim/lands": "submits a job too, same resolution, and the job is scoped",
     "/api/cards/search": "the public Scryfall pool",
+    "/api/cards/identify": "the same pool, asked the other way round -- a set\n                            code and a collector number in, a card name out. It\n                            reads no deck and writes nothing, and the photograph\n                            it came from never leaves the browser",
     "/api/sets/upcoming": "Scryfall's own release calendar",
     "/api/colors": "a fixed taxonomy, no data at all",
     "/api/colors/progress": "scored over the shared library",
@@ -132,6 +133,11 @@ SHARED = {
     # session, nothing per-account to reach.
     "/api/symbols/{code}.svg": "a shared cache of public mana-symbol art; "
                                "nothing per-account",
+    # The reading engine, same runtime-cache shape again: a fixed table of
+    # Apache-2.0 files, byte-identical for every session, fetched by the
+    # camera door and by nothing else.
+    "/api/ocr/{name}": "a shared cache of the Apache-2.0 OCR engine; the "
+                       "same three files for everyone, nothing per-account",
 }
 
 # Belongs to one person. Each entry says how to make one as user A and where to

@@ -17,6 +17,7 @@ CI (ADR 6), so the fixture is a real DuckDB pool of 21 real cards with a
 legal 99 built out of them.
 """
 
+import hashlib
 import sys
 import time
 from dataclasses import replace
@@ -1195,6 +1196,109 @@ def test_search_limit_is_clamped_not_rejected(client):
     assert client.get("/api/cards/search", params={"limit": 9999}).status_code == 422
 
 
+def test_identify_resolves_a_corner_outright(pool, client):
+    """A set code and a collector number are a lookup, so they land."""
+    body = client.post("/api/cards/identify", json={"sightings": [
+        {"set": "LTC", "number": "284/281"},
+    ]}).json()
+    reading = body["readings"][0]
+    assert reading["via"] == "printing"
+    assert reading["resolved"]["name"] == "Sol Ring"
+    assert reading["candidates"] == []
+    assert (body["resolved"], body["offered"], body["unread"]) == (1, 0, 0)
+
+
+def test_identify_only_ever_offers_a_title(pool, client):
+    """The whole design in one assertion: a perfect title still resolves
+    nothing, because the scores of right and wrong answers overlap. See
+    `cards/identify.py` for the measurement."""
+    body = client.post("/api/cards/identify", json={"sightings": [
+        {"title": "Craterhoof Behemoth"},
+    ]}).json()
+    reading = body["readings"][0]
+    assert reading["via"] == "title"
+    assert reading["resolved"] is None
+    assert reading["candidates"][0]["name"] == "Craterhoof Behemoth"
+    assert reading["candidates"][0]["score"] == pytest.approx(1.0)
+    assert (body["resolved"], body["offered"], body["unread"]) == (0, 1, 0)
+
+
+def test_identify_counts_the_three_outcomes_apart(pool, client):
+    """Resolved, offered and unread are never added together: two of them
+    are still work somebody has to do."""
+    body = client.post("/api/cards/identify", json={"sightings": [
+        {"set": "ltc", "number": "284"},
+        {"title": "Sol Rlng"},
+        {},
+    ]}).json()
+    assert [r["via"] for r in body["readings"]] == ["printing", "title", "nothing"]
+    assert (body["resolved"], body["offered"], body["unread"]) == (1, 1, 1)
+
+
+def test_identify_renders_enough_to_show_the_card(pool, client):
+    """A review list is pictures; a name alone cannot be checked by eye."""
+    body = client.post("/api/cards/identify", json={"sightings": [
+        {"set": "ltc", "number": "284"},
+    ]}).json()
+    card = body["readings"][0]["resolved"]
+    assert set(card) == {"name", "mana_cost", "type_line", "color_identity",
+                         "image", "art_crop"}
+
+
+def test_identify_refuses_a_body_that_is_not_a_list(client):
+    assert client.post("/api/cards/identify",
+                       json={"sightings": "Sol Ring"}).status_code == 422
+    assert client.post("/api/cards/identify", json={}).status_code == 422
+
+
+def test_identify_of_nothing_is_not_an_error(pool, client):
+    body = client.post("/api/cards/identify", json={"sightings": []}).json()
+    assert body["readings"] == []
+    assert body["resolved"] == 0
+
+
+def test_identify_without_a_pool_says_so(client, tmp_path):
+    """A fresh clone has no pool, and the camera must say that rather than
+    500 -- the same rule every other card endpoint here follows.
+
+    The empty `data_dir` is not decoration. The `client` fixture redirects
+    only `decks_dir`, so `config.DB_PATH` still points at the repository's
+    real `data/mtg.duckdb` -- which exists on the maintainer's laptop and
+    never in CI. Written the obvious way, this test asserted the no-pool
+    behaviour in CI and asserted the *opposite* here, where it found
+    `Solarion` in the 35,000-card pool. A test whose subject is the absence
+    of a file has to arrange that absence itself.
+    """
+    with config.use_paths(data_dir=tmp_path / "no-pool-here"):
+        body = client.post("/api/cards/identify", json={"sightings": [
+            {"title": "Sol Ring"},
+        ]}).json()
+    assert body["readings"] == []
+    assert "data refresh" in body["message"]
+
+def test_the_reader_shelf_refuses_a_name_it_does_not_hold(client):
+    """`ocr.ASSETS` is the guard: there is no pattern to get wrong."""
+    assert client.get("/api/ocr/worker.js").status_code == 404
+    assert client.get("/api/ocr/eng.traineddata").status_code == 404
+
+
+def test_the_reader_shelf_serves_a_cached_file(client, tmp_path, monkeypatch):
+    """Served first-party and immutable, because the cache path carries the
+    pinned versions -- these bytes can never come to mean anything else."""
+    from mtglab import ocr
+
+    monkeypatch.setattr(ocr, "_download", lambda url: b"console.log(1)")
+    monkeypatch.setitem(
+        ocr.ASSETS, "worker.min.js",
+        ocr.Asset(url="https://example.invalid/w.js",
+                  digest=hashlib.sha256(b"console.log(1)").hexdigest(),
+                  size=14, media_type="text/javascript"))
+    with config.use_paths(data_dir=tmp_path / "shelf"):
+        response = client.get("/api/ocr/worker.min.js")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == (
+        "public, max-age=31536000, immutable")
+
 # --------------------------------------------------------------------- sim
 
 def test_sim_requires_a_slug(client):
@@ -2141,9 +2245,18 @@ def test_commander_dossier_is_empty_rather_than_a_404_without_a_pool(
 
 def test_commander_dossier_survives_a_pool_with_no_printings(
         pool, in_memory_client):
-    """`tiny_pool` loads oracle rows and no printings, which is also what a
-    partially-built pool looks like. Zero printings is a fact to report, not
-    a crash."""
+    """A partially-built pool has oracle rows and no printings. Zero
+    printings is a fact to report, not a crash.
+
+    The table is emptied here rather than assumed empty: `tiny_pool` carries
+    twelve real printings now, for the camera's corner tier, and a test whose
+    subject is an absence has to arrange that absence itself.
+    """
+    con = db.connect(pool)
+    try:
+        con.execute("DELETE FROM printings")
+    finally:
+        con.close()
     with in_memory_client([tiny_pool.mono_green_deck()]) as client:
         body = client.get("/api/decks/local/mono-green/commander").json()
     assert body["printings"]["count"] == 0

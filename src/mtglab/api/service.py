@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from mtglab import colors, config, lore
 from mtglab import glossary as gloss
-from mtglab.cards import db
+from mtglab.cards import db, identify
 from mtglab.cards.db import art_crop_from
 from mtglab.decks import decklist, edit, importer, log, partners, suggest, wheel
 from mtglab.decks.analyze import deck_stats
@@ -2241,6 +2241,103 @@ def cards_named(*, names: list[str]) -> dict[str, Any]:
             "cards": cards,
             "not_found": [n for n in wanted if n not in found],
             "pool_available": True,
+        }
+    finally:
+        con.close()
+
+
+def _identified_card(rec: CardRecord) -> dict[str, Any]:
+    """The compact card a camera review list renders.
+
+    Narrower than `search_cards`' shape on purpose: this list can hold forty
+    entries, each with a picture, on a phone. Oracle text and price are what
+    the card's own page is for.
+    """
+    return {
+        "name": rec.name,
+        "mana_cost": rec.mana_cost,
+        "type_line": rec.type_line,
+        "color_identity": sorted(rec.color_identity),
+        "image": rec.image_normal,
+        "art_crop": rec.image_art_crop or art_crop_from(rec.image_normal),
+    }
+
+
+def identify_cards(sightings: list[dict[str, Any]]) -> dict[str, Any]:
+    """Read a batch of camera captures against the pool.
+
+    The serving half of `cards/identify.py`; the argument for the two tiers
+    is in that module's docstring and is not repeated here. What this layer
+    adds is hydration -- a reading names cards, and a review list has to show
+    them -- and the counts, which are what the page says out loud.
+
+    **`resolved` and `offered` are counted apart, and that is the point.**
+    Only a corner lookup resolves; a title is a shortlist somebody still has
+    to choose from. A page that added the two together would be reporting
+    work as finished that nobody has done, which is the same mistake the
+    import preview refuses when it counts the rationales still owed.
+
+    A name that no longer resolves is dropped and counted, the instrument
+    ADR 19 built for the dossier's rivals -- here it can only mean the pool
+    moved under a reading, which a `data refresh` mid-session can do.
+    """
+    con = _connect()
+    if con is None:
+        return {"readings": [], "resolved": 0, "offered": 0, "unread": 0,
+                "dropped": 0,
+                "message": "no card pool yet -- run `mtglab data refresh`"}
+    try:
+        seen = [
+            identify.Sighting(
+                set_code=(s.get("set") or None),
+                collector_number=(s.get("number") or None),
+                title=(s.get("title") or None),
+                # The bottom-left block as the reader saw it. Preferred over
+                # the two fields above, because finding a set code inside
+                # `LTCENLIK` needs the pool's own 986 -- see `from_corner`.
+                corner=(s.get("corner") or None),
+            )
+            for s in sightings[:identify.MAX_SIGHTINGS]
+        ]
+        readings = identify.read(con, seen)
+
+        wanted = {r.resolved for r in readings if r.resolved}
+        wanted |= {c.name for r in readings for c in r.candidates}
+        records = db.get_cards(con, sorted(wanted)) if wanted else {}
+
+        out: list[dict[str, Any]] = []
+        dropped = 0
+        for reading in readings:
+            resolved = records.get(reading.resolved or "")
+            if reading.resolved and resolved is None:
+                dropped += 1
+            candidates = []
+            for candidate in reading.candidates:
+                rec = records.get(candidate.name)
+                if rec is None:
+                    dropped += 1
+                    continue
+                candidates.append({**_identified_card(rec),
+                                   "score": round(candidate.score, 4)})
+            # Recomputed rather than passed through: a reading whose names
+            # all dropped is a reading of nothing, whichever tier found them.
+            via = ("printing" if resolved
+                   else "title" if candidates
+                   else "nothing")
+            out.append({
+                "via": via,
+                "resolved": _identified_card(resolved) if resolved else None,
+                "candidates": candidates,
+            })
+
+        return {
+            "readings": out,
+            "resolved": sum(1 for r in out if r["resolved"]),
+            "offered": sum(1 for r in out
+                           if not r["resolved"] and r["candidates"]),
+            "unread": sum(1 for r in out
+                          if not r["resolved"] and not r["candidates"]),
+            "dropped": dropped,
         }
     finally:
         con.close()

@@ -69,6 +69,13 @@ What each card is here for:
   inside the identity within +/-2 of the target's cost and of the same primary
   type, so these are what makes a *real* shortlist for Primeval Titan's slot
   rather than an empty list that asserts nothing.
+* **Ajani Steadfast Emblem** -- the one thing here that is not a card. It
+  shares a first word with the Ajani above, so the camera reader's
+  "emblems are not cards" filter has something that can actually rank
+  highly when it breaks. See the comment on the row itself.
+
+`PRINTINGS`, further down, is the same idea for the `printings` table: real
+rows, chosen for the cases the camera's corner tier has to survive.
 """
 
 from __future__ import annotations
@@ -644,6 +651,31 @@ CARDS = [
           "power": "11", "toughness": "11", "artist": "Ryan Pancoast",
           "flavor_text": "The contagion spreads and the Multiverse quakes."},
      ]},
+    # A non-card, and the only one here. `cards/identify.py` filters on
+    # commander legality `IN ('legal', 'banned')`, which is what keeps
+    # emblems, schemes, planes and vanguards out of a reading -- none of them
+    # can be in a deck, and every one of them is in `oracle_cards`. This one
+    # is chosen so that the test can fail: it shares a first word with
+    # `Ajani, Nacatl Pariah` above, so a title read as "Ajani" ranks it
+    # highly the moment the filter regresses to `= 'legal'`.
+    {'oracle_id': '28ca9176-6d8a-41fa-8be5-4b12fc73f1a2',
+     'name': 'Ajani Steadfast Emblem',
+     'mana_cost': '',
+     'cmc': 0.0,
+     'type_line': 'Emblem — Ajani',
+     'oracle_text': 'If a source would deal damage to you or a '
+                    'planeswalker you control, prevent all but 1 of that '
+                    'damage.',
+     'colors': [],
+     'color_identity': [],
+     'keywords': [],
+     'produced_mana': [],
+     'legalities': {'commander': 'not_legal'},
+     'layout': 'emblem',
+     'reserved': False,
+     'edhrec_rank': None,
+     'released_at': '2023-08-04',
+     'set': 'tcmm'},
 ]
 
 
@@ -656,6 +688,190 @@ CARDS = [
 #: but its own.
 _CACHE_DIR: tempfile.TemporaryDirectory[str] | None = None
 
+
+# ------------------------------------------------------------- printings
+#
+# The corner tier of `cards/identify.py` reads a set code and a collector
+# number off the bottom-left of a photographed card and looks the pair up
+# here, so these rows are what make it testable without the real table's
+# 107,338. Same rule as `CARDS` above: **every value was read out of the
+# real pool**, this time straight from `printings`, and pasted verbatim.
+#
+# Chosen for the cases rather than for coverage:
+#
+# * **Sol Ring in two sets** (`ltc` 284 -- the very line `decklist.py`'s
+#   docstring uses as its example -- and `lea` 269), because one card with
+#   two printings is the normal situation and both pairs must resolve to
+#   the same name.
+# * **Goreclaw twice in one set** (`mul` 157 and `mul` 157z): a
+#   letter-suffixed collector number beside its plain sibling. Both are the
+#   same card, which is why `by_printing`'s `DISTINCT name` resolves rather
+#   than refusing -- a real ambiguity is two *names*, not two rows.
+# * **Two double-faced cards** (`mom` 137 Etali, `mh3` 237 Ajani), whose
+#   printings carry their image on the faces rather than at the top level.
+# * **Two banned cards** (`m12` 188 Primeval Titan, `roe` 4 Emrakul),
+#   because the reader must be able to name a card the gate will then
+#   refuse -- this library's own decks run both.
+# * **`lea` 232 Black Lotus and `lea` 294 Forest**, an old frame that
+#   prints no collector number on the card at all. The pool holds numbers
+#   for them; a camera pointed at one will not, which is the entire reason
+#   the title tier exists beside this one.
+PRINTINGS = [{'id': '5805f64c-dd88-4e94-8f0a-a01dae67e3ba',
+  'oracle_id': '6ad8011d-3471-4369-9d68-b264cc027487',
+  'name': 'Sol Ring',
+  'set': 'ltc',
+  'set_name': 'Tales of Middle-earth Commander',
+  'collector_number': '284',
+  'rarity': 'uncommon',
+  'released_at': '2023-06-23',
+  'digital': False,
+  'promo': False,
+  'finishes': ['nonfoil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/5/8/5805f64c-dd88-4e94-8f0a-a01dae67e3ba.jpg?1783915895'},
+  'prices': {'usd': '2.51', 'usd_foil': None, 'eur': '1.77'}},
+ {'id': 'c4300d24-1cae-4dd5-be7e-38cc677cf5bd',
+  'oracle_id': '6ad8011d-3471-4369-9d68-b264cc027487',
+  'name': 'Sol Ring',
+  'set': 'lea',
+  'set_name': 'Limited Edition Alpha',
+  'collector_number': '269',
+  'rarity': 'uncommon',
+  'released_at': '1993-08-05',
+  'digital': False,
+  'promo': False,
+  'finishes': ['nonfoil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/c/4/c4300d24-1cae-4dd5-be7e-38cc677cf5bd.jpg?1783948661'},
+  'prices': {'usd': None, 'usd_foil': None, 'eur': '1126.22'}},
+ {'id': '95c14c4d-6c16-4826-8d93-d89ad04aee09',
+  'oracle_id': '7514e401-7aa1-405d-9f7a-312b4e630cc2',
+  'name': 'Etali, Primal Conqueror // Etali, Primal Sickness',
+  'set': 'mom',
+  'set_name': 'March of the Machine',
+  'collector_number': '137',
+  'rarity': 'rare',
+  'released_at': '2023-04-21',
+  'digital': False,
+  'promo': False,
+  'finishes': ['nonfoil', 'foil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/9/5/95c14c4d-6c16-4826-8d93-d89ad04aee09.jpg?1783916997'},
+  'prices': {'usd': '32.74', 'usd_foil': '37.64', 'eur': '20.92'}},
+ {'id': '0d16e8e0-31b2-4389-afd6-783c501f6fa0',
+  'oracle_id': '2588f348-d7a3-46c8-9ace-dca53ed5ef99',
+  'name': 'Ajani, Nacatl Pariah // Ajani, Nacatl Avenger',
+  'set': 'mh3',
+  'set_name': 'Modern Horizons 3',
+  'collector_number': '237',
+  'rarity': 'mythic',
+  'released_at': '2024-06-14',
+  'digital': False,
+  'promo': False,
+  'finishes': ['nonfoil', 'foil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238'},
+  'prices': {'usd': '10.38', 'usd_foil': '10.8', 'eur': '10.76'}},
+ {'id': 'fd6ddbca-b943-49d6-b341-509bb72dd5a6',
+  'oracle_id': 'ae83ef2c-960f-4c5b-97cc-52465c687c18',
+  'name': 'Primeval Titan',
+  'set': 'm12',
+  'set_name': 'Magic 2012',
+  'collector_number': '188',
+  'rarity': 'mythic',
+  'released_at': '2011-07-15',
+  'digital': False,
+  'promo': False,
+  'finishes': ['nonfoil', 'foil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/f/d/fd6ddbca-b943-49d6-b341-509bb72dd5a6.jpg?1783941057'},
+  'prices': {'usd': '8.71', 'usd_foil': '28.54', 'eur': '4.68'}},
+ {'id': '080a5356-61d9-46cf-9095-d59c048f9d77',
+  'oracle_id': 'befb211f-37ca-4083-98d4-9ff1f28be3f2',
+  'name': 'Goreclaw, Terror of Qal Sisma',
+  'set': 'mul',
+  'set_name': 'Multiverse Legends',
+  'collector_number': '157',
+  'rarity': 'rare',
+  'released_at': '2023-04-21',
+  'digital': False,
+  'promo': False,
+  'finishes': ['foil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/0/8/080a5356-61d9-46cf-9095-d59c048f9d77.jpg?1783916808'},
+  'prices': {'usd': None, 'usd_foil': '19.75', 'eur': None}},
+ {'id': 'f4d18240-d843-4573-b490-5ee72ceb4c1e',
+  'oracle_id': 'befb211f-37ca-4083-98d4-9ff1f28be3f2',
+  'name': 'Goreclaw, Terror of Qal Sisma',
+  'set': 'mul',
+  'set_name': 'Multiverse Legends',
+  'collector_number': '157z',
+  'rarity': 'rare',
+  'released_at': '2023-04-21',
+  'digital': False,
+  'promo': False,
+  'finishes': ['foil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/f/4/f4d18240-d843-4573-b490-5ee72ceb4c1e.jpg?1783916806'},
+  'prices': {'usd': None, 'usd_foil': '499.95', 'eur': None}},
+ {'id': '5dd7dd1a-6dd1-43c3-8298-7db703d384a1',
+  'oracle_id': '0f1b5cea-2035-444c-9f63-87dcb9782c74',
+  'name': 'Gyome, Master Chef',
+  'set': 'c21',
+  'set_name': 'Commander 2021',
+  'collector_number': '5',
+  'rarity': 'mythic',
+  'released_at': '2021-04-23',
+  'digital': False,
+  'promo': False,
+  'finishes': ['foil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/5/d/5dd7dd1a-6dd1-43c3-8298-7db703d384a1.jpg?1783927614'},
+  'prices': {'usd': None, 'usd_foil': '5.64', 'eur': None}},
+ {'id': '67600383-bbb8-411c-b8e6-2296650bc747',
+  'oracle_id': '900ca697-ad38-4b2b-bc74-2ff7eb6ea951',
+  'name': 'Emrakul, the Aeons Torn',
+  'set': 'roe',
+  'set_name': 'Rise of the Eldrazi',
+  'collector_number': '4',
+  'rarity': 'mythic',
+  'released_at': '2010-04-23',
+  'digital': False,
+  'promo': False,
+  'finishes': ['nonfoil', 'foil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/6/7/67600383-bbb8-411c-b8e6-2296650bc747.jpg?1783942013'},
+  'prices': {'usd': '27.93', 'usd_foil': '194.7', 'eur': '24.0'}},
+ {'id': 'c34d66f5-e782-425c-9260-e8989a9cf50b',
+  'oracle_id': '8c52bd39-0586-48ca-b263-17210cf9feb6',
+  'name': 'Craterhoof Behemoth',
+  'set': 'mm3',
+  'set_name': 'Modern Masters 2017',
+  'collector_number': '122',
+  'rarity': 'mythic',
+  'released_at': '2017-03-17',
+  'digital': False,
+  'promo': False,
+  'finishes': ['nonfoil', 'foil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/c/3/c34d66f5-e782-425c-9260-e8989a9cf50b.jpg?1783936635'},
+  'prices': {'usd': '24.38', 'usd_foil': '20.41', 'eur': '16.57'}},
+ {'id': 'b0faa7f2-b547-42c4-a810-839da50dadfe',
+  'oracle_id': '5089ec1a-f881-4d55-af14-5d996171203b',
+  'name': 'Black Lotus',
+  'set': 'lea',
+  'set_name': 'Limited Edition Alpha',
+  'collector_number': '232',
+  'rarity': 'rare',
+  'released_at': '1993-08-05',
+  'digital': False,
+  'promo': False,
+  'finishes': ['nonfoil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/b/0/b0faa7f2-b547-42c4-a810-839da50dadfe.jpg?1783948669'},
+  'prices': {'usd': None, 'usd_foil': None, 'eur': '38719.86'}},
+ {'id': '6f1c8cb0-38eb-408b-94e8-16db83999b3b',
+  'oracle_id': 'b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6',
+  'name': 'Forest',
+  'set': 'lea',
+  'set_name': 'Limited Edition Alpha',
+  'collector_number': '294',
+  'rarity': 'common',
+  'released_at': '1993-08-05',
+  'digital': False,
+  'promo': False,
+  'finishes': ['nonfoil'],
+  'image_uris': {'normal': 'https://cards.scryfall.io/normal/front/6/f/6f1c8cb0-38eb-408b-94e8-16db83999b3b.jpg?1783948656'},
+  'prices': {'usd': '32.25', 'usd_foil': None, 'eur': '30.83'}}]
 
 def build(db_path: Path) -> Path:
     """Create a card pool at `db_path`. Returns it, so callers can chain.
@@ -675,15 +891,20 @@ def build(db_path: Path) -> Path:
 
 
 def _build_into(db_path: Path) -> None:
-    from mtglab.cards.db import connect, load_oracle
+    from mtglab.cards.db import connect, load_oracle, load_printings
 
     jsonl = Path(db_path).parent / "tiny-oracle.jsonl"
     jsonl.parent.mkdir(parents=True, exist_ok=True)
     jsonl.write_text("\n".join(json.dumps(c) for c in CARDS), encoding="utf-8")
 
+    printings = Path(db_path).parent / "tiny-printings.jsonl"
+    printings.write_text("\n".join(json.dumps(p) for p in PRINTINGS),
+                         encoding="utf-8")
+
     con = connect(db_path)
     try:
         load_oracle(con, jsonl)
+        load_printings(con, printings)
     finally:
         con.close()
 

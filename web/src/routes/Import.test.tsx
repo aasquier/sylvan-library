@@ -231,3 +231,25 @@ describe('Import', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 })
+
+describe('the deck that exists nowhere online', () => {
+  /* Every import path is text, so a deck that only exists as a stack of
+     cards has nothing to paste — and that is the newcomer's deck. Until the
+     camera lands (ROADMAP item 14) this paragraph is the whole feature, so
+     it is pinned: it names the apps, and it states the one cap that bites
+     at card ninety rather than at card one. */
+
+  beforeEach(() => { cleanup() })
+
+  it('tells someone holding the cards where to start', () => {
+    render(<MemoryRouter><Import /></MemoryRouter>)
+    expect(screen.getByText(/Only have the cards\?/)).toBeTruthy()
+    expect(screen.getByText('Dragon Shield MTG Scanner')).toBeTruthy()
+    expect(screen.getByText('ManaBox')).toBeTruthy()
+  })
+
+  it('states the export cap rather than letting it be discovered', () => {
+    render(<MemoryRouter><Import /></MemoryRouter>)
+    expect(screen.getByText(/100 cards a session/)).toBeTruthy()
+  })
+})
