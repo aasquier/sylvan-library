@@ -412,6 +412,11 @@ def _tiles(decks: list[Deck], con: Any, *, writable: bool,
             all_names.add(deck.companion)
     cards = (db.get_cards(con, sorted(all_names))
              if con is not None and all_names else {})
+    # And one query for every pinned printing on the shelf, for the same
+    # reason -- see `_chosen_arts`. Keyed on the art id rather than the slug,
+    # so two decks flying the same commander printing share a row.
+    arts = _chosen_arts([deck.commander_art for deck in decks
+                         if deck.commander_art], con)
 
     out = []
     for deck in decks:
@@ -429,7 +434,7 @@ def _tiles(decks: list[Deck], con: Any, *, writable: bool,
             # is where somebody notices they picked one, and a tile that
             # kept the default while the deck page showed a Secret Lair
             # would read as a bug in one of the two.
-            chosen = _chosen_art(deck, con)
+            chosen = arts.get(deck.commander_art)
             if chosen:
                 art = chosen["art_crop"] or chosen["image"] or art
         out.append({
@@ -721,6 +726,29 @@ def commander_printings(slug: str, *, card: str | None = None,
     }
 
 
+def _chosen_arts(art_ids: list[str], con: Any) -> dict[str, dict[str, Any]]:
+    """The printings behind a run of chosen art ids, keyed by id. One query.
+
+    The shelf asks this question once per deck and used to ask it *as* one
+    query per deck -- the same N+1 `_card_art_overrides` refuses one layer
+    down for a deck's own cards, and the one `challenge_progress` refused
+    before that. Three of six decks pin a printing today, so it was three
+    queries a shelf; a library aimed at thirty-two slots would be thirty-two.
+
+    An id the pool no longer has simply does not come back, which is what
+    makes the single-deck wrapper below able to return None for it.
+    """
+    if not art_ids or con is None:
+        return {}
+    rows = con.execute(
+        f"SELECT id, image_normal, set_name, set_code FROM printings "
+        f"WHERE id IN ({','.join('?' * len(art_ids))})",
+        art_ids).fetchall()
+    return {r[0]: {"image": r[1], "art_crop": art_crop_from(r[1]),
+                   "set_name": r[2], "set_code": (r[3] or "").upper()}
+            for r in rows if r[1]}
+
+
 def _chosen_art(deck: Any, con: Any) -> dict[str, Any] | None:
     """The printing this deck picked for its commander, if it picked one.
 
@@ -729,17 +757,14 @@ def _chosen_art(deck: Any, con: Any) -> dict[str, Any] | None:
     a printing that no longer exists also returns None rather than blanking
     the art: a stale id is a deck showing its default, not a deck with no
     commander picture.
+
+    One deck's worth of `_chosen_arts`, and right for the deck page, which
+    only ever has one. The shelf calls the batched form directly.
     """
     art_id = getattr(deck, "commander_art", "")
-    if not art_id or con is None:
+    if not art_id:
         return None
-    row = con.execute(
-        "SELECT image_normal, set_name, set_code FROM printings WHERE id = ?",
-        [art_id]).fetchone()
-    if row is None or not row[0]:
-        return None
-    return {"image": row[0], "art_crop": art_crop_from(row[0]),
-            "set_name": row[1], "set_code": (row[2] or "").upper()}
+    return _chosen_arts([art_id], con).get(art_id)
 
 
 def _card_art_overrides(deck: Deck,
