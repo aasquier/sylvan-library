@@ -1797,8 +1797,8 @@ function DeckHistory({ entries }: { entries: DeckLogEntry[] | null }) {
         </Caveat>
         <p className="card-surface rounded-xl px-4 py-6 text-sm"
            style={{ color: 'var(--text-muted)' }}>
-          Nothing recorded yet. Edits made before this log existed are in git,
-          not here.
+          Nothing recorded yet. Only what has been done since this log opened
+          appears here — anything earlier left no trace but the deck itself.
         </p>
       </div>
     )

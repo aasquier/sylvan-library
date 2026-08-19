@@ -1987,8 +1987,12 @@ describe('deck history', () => {
 
     await screen.findByText(/Nothing recorded yet/)
     // The sentence that stops an empty panel reading as a lost history: these
-    // decks were edited for months before the log existed.
-    expect(screen.getByText(/in git, not here/)).toBeTruthy()
+    // decks were edited for months before the log existed. It used to say
+    // those edits were "in git", which ADR 30 had already made false and
+    // Commandment 10 forbids naming to a reader either way — and this
+    // assertion pinned the wrong words, which is the whole trap: a test
+    // written against a claim cannot tell you the claim is wrong.
+    expect(screen.getByText(/left no trace but the deck itself/)).toBeTruthy()
   })
 
   it('re-reads itself after an edit', async () => {

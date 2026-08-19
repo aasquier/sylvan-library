@@ -101,6 +101,22 @@ FORBIDDEN = (
      "no git command reads or restores a deck (ADR 27, ADR 30)"),
     (re.compile(r"file-backed in git", re.I),
      "the curated decks are file-backed on disk, not in git (ADR 30)"),
+    # Added 2026-08-19, after the sweep above missed a live one. The History
+    # tab's empty state read "Edits made before this log existed are in git,
+    # not here" -- **rendered**, not a comment, and pinned by a Vitest
+    # assertion on its own wrong words. It slipped through because the
+    # affirmative list bans verbs (`tracked`, `held`, `committed`) and this
+    # sentence used none of them: it put the *edits* in git rather than the
+    # deck, which is the one thing ADR 28 says lives somewhere else entirely.
+    #
+    # Subject-anchored rather than deck-anchored, and that is what makes a
+    # bare copula safe here. `about_a_deck` cannot be used -- "no deck is in
+    # git" and "none of them is in git" are the file's own corrections, and a
+    # `deck ... is in git` pattern flags both. Requiring an edit-word first
+    # excludes them: neither sentence has one.
+    (re.compile(r"\b(?:edits?|changes?|swaps?|history|revisions?|records?)"
+                r"\b[^.]{0,80}?\b(?:is|are|was|were) in git\b", re.I),
+     "what was done to a deck is the activity log, never git (ADR 28, ADR 30)"),
 )
 
 

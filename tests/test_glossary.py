@@ -3,12 +3,17 @@
 Structural, and every test here runs everywhere -- there is nothing in this
 module that needs a card pool, which is the property the Learn page depends on.
 
-The one test worth reading twice is the last: the simulator's controls look
-their help text up by key, so a renamed key would empty a tooltip silently.
-Pinning the keys here is what turns that into a failure.
+The two worth reading twice are the seam: the client looks its help text up by
+key, and a renamed key empties a tooltip in silence -- TypeScript cannot check
+a string against a Python table, and neither can Vitest. `SIMULATOR_KEYS` pins
+one screen's controls by hand; the derived sweep below reads every key the
+client names, so the two together cover both directions of the drift.
 """
 
 from __future__ import annotations
+
+import re
+from pathlib import Path
 
 import pytest
 
@@ -101,3 +106,73 @@ def test_get_returns_none_rather_than_raising():
     """The UI asks for a key and renders nothing when there is no answer; a
     KeyError here would be a blank screen instead of a missing tooltip."""
     assert glossary.get("no-such-term") is None
+
+
+# --------------------------------------------- the other direction, derived
+
+WEB_SRC = Path(__file__).resolve().parents[1] / "web" / "src"
+
+#: Where a glossary key can appear in the client.
+#:
+#: Two shapes, because there are two. `<Term name="goldfish">` marks up a word
+#: inline; `Simulator.tsx` funnels its seventeen through a one-line `help()`
+#: alias, so the key is a bare string by the time it is written down. The
+#: prefix pattern is the same rule `test_simulator_terms_are_prefixed_by_what_
+#: _they_are` enforces on the table's own side, used here as a way to
+#: recognise a key on sight rather than as a second definition of one.
+KEY_SITES = (
+    re.compile(r"<(?:Term|HelpTip)\b[^>]*?\bname=\{?[\"']([^\"']+)[\"']\}?",
+               re.DOTALL),
+    re.compile(r"[\"']((?:sim|stat)\.[a-z0-9_]+|tier-\d)[\"']"),
+)
+
+
+def keys_named_in_the_client() -> dict[str, str]:
+    """Every glossary key the client names, and the file that names it."""
+    found: dict[str, str] = {}
+    for path in sorted(WEB_SRC.rglob("*.ts*")):
+        if ".test." in path.name:
+            continue
+        text = path.read_text(encoding="utf-8")
+        for pattern in KEY_SITES:
+            for key in pattern.findall(text):
+                found.setdefault(key, path.name)
+    return found
+
+
+def test_the_sweep_finds_the_keys_it_is_meant_to_check():
+    """A sweep that matches nothing passes forever and measures nothing.
+
+    Floored well under the current count rather than pinned to it -- the point
+    is to catch the day a refactor moves the call shape and this file starts
+    silently checking an empty set, not to fail whenever a tooltip is added.
+    """
+    assert len(keys_named_in_the_client()) >= 15
+
+
+def test_every_key_the_client_names_resolves():
+    """`web/README.md` states that `Term`/`HelpTip` names must exist in
+    `glossary.py`. Until now the only thing enforcing that was `SIMULATOR_KEYS`
+    above -- a list kept by hand, covering one screen.
+
+    That is the same shape as the animist recipes (2 of 12 pinned by name until
+    2026-08-18) and the no-non-null-assertion rule (prose for months, four
+    violations): **a convention this repo states absolutely and enforces with
+    nothing will drift.** Derived from the client rather than restated, so a
+    tooltip added tomorrow is covered the day it lands.
+
+    One-directional on purpose, and `SIMULATOR_KEYS` stays for the other way
+    round. This asks "does every key named resolve"; that asks "is every
+    control still offering its help", which no sweep of the client can see --
+    a deleted `HelpTip` simply stops being found. `stat.missed_drop` is why
+    both are needed: it is a real reported figure with a real entry, rendered
+    as a table column that carries no affordance, so it appears in the hand-
+    kept list and can never appear here.
+    """
+    unresolved = {key: where for key, where in keys_named_in_the_client().items()
+                  if glossary.get(key) is None}
+    assert not unresolved, (
+        f"the client names glossary keys that do not exist: {unresolved}. "
+        "Each one renders as a word with no affordance, or a control whose "
+        "help quietly does not open -- neither of which fails a Vitest run."
+    )
