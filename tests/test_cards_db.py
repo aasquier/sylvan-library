@@ -843,3 +843,154 @@ def test_a_rebuilt_pool_gets_its_columns_read_again(tmp_path):
     db.oracle_columns(con)
     con.close()
     assert len(db._COLUMN_CACHE) == 2, "a rebuilt pool reused the old answer"
+
+
+# ------------------------------------------------------- the lookup memo
+
+
+def test_the_same_names_against_the_same_pool_are_asked_once(tmp_path):
+    """`get_cards` memoises on the pool's stamp and the exact names.
+
+    Asserted by identity of the records rather than by wall clock: a second
+    query would build fresh `CardRecord`s, so the same objects coming back is
+    the cache being used. The dict itself must *not* be the same object -- see
+    the isolation test below.
+    """
+    import tiny_pool
+    from mtglab.cards import db
+
+    pool = tmp_path / "mtg.duckdb"
+    tiny_pool.build(pool)
+    db.cache_clear()
+
+    con = db.connect_readonly(pool)
+    first = db.get_cards(con, ["Sol Ring", "Llanowar Elves"])
+    second = db.get_cards(con, ["Sol Ring", "Llanowar Elves"])
+
+    assert first == second
+    assert first["Sol Ring"] is second["Sol Ring"], "the pool was asked twice"
+    # Two results that were *both* served from the cache still must not be the
+    # same dict, which is the comparison that catches handing the entry out.
+    third = db.get_cards(con, ["Sol Ring", "Llanowar Elves"])
+    assert second is not third, "callers must not share one dict"
+    con.close()
+
+
+def test_a_caller_cannot_corrupt_the_memo_through_its_own_result(tmp_path):
+    """The dict is copied out; the records are frozen. Both halves matter."""
+    import dataclasses
+
+    import tiny_pool
+    from mtglab.cards import db
+
+    pool = tmp_path / "mtg.duckdb"
+    tiny_pool.build(pool)
+    db.cache_clear()
+
+    con = db.connect_readonly(pool)
+    names = ["Sol Ring", "Llanowar Elves"]
+
+    # The **second** call is the one served from the cache, and it is the one
+    # that has to be a copy. Popping from the first proves nothing: that result
+    # was built by the query and was never the cached object. (Written the
+    # weak way first, and a mutation that returned the cached dict straight out
+    # passed it.)
+    db.get_cards(con, names)
+    served = db.get_cards(con, names)
+    served.pop("Sol Ring")
+
+    assert "Sol Ring" in db.get_cards(con, names)
+
+    # And the record itself cannot be written to at all, which is what makes
+    # handing the same object to two requests safe.
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        db.get_cards(con, ["Sol Ring"])["Sol Ring"].name = "Not Sol Ring"
+    con.close()
+
+
+def test_a_rebuilt_pool_is_not_answered_from_the_old_one(tmp_path):
+    """The stamp is the whole safety argument. A `data refresh` rewrites the
+    file, and an answer cached against the old one must not survive it."""
+    import tiny_pool
+    from mtglab.cards import db
+
+    pool = tmp_path / "mtg.duckdb"
+    tiny_pool.build(pool)
+    db.cache_clear()
+
+    con = db.connect_readonly(pool)
+    before = db.get_cards(con, ["Sol Ring"])
+    con.close()
+
+    pool.unlink()
+    tiny_pool.build(pool)
+    import os
+    os.utime(pool, ns=(0, 0))
+
+    con = db.connect_readonly(pool)
+    after = db.get_cards(con, ["Sol Ring"])
+    con.close()
+
+    assert after == before
+    assert after["Sol Ring"] is not before["Sol Ring"], \
+        "a rebuilt pool was answered from the previous file's cache"
+
+
+def test_different_names_are_different_entries(tmp_path):
+    import tiny_pool
+    from mtglab.cards import db
+
+    pool = tmp_path / "mtg.duckdb"
+    tiny_pool.build(pool)
+    db.cache_clear()
+
+    con = db.connect_readonly(pool)
+    db.get_cards(con, ["Sol Ring"])
+    db.get_cards(con, ["Sol Ring", "Llanowar Elves"])
+    assert len(db._CARD_CACHE) == 2
+    con.close()
+
+
+def test_the_memo_is_bounded_and_evicts_the_least_recently_used(tmp_path):
+    """A cache on a long-running instance has to have a ceiling."""
+    import tiny_pool
+    from mtglab.cards import db
+
+    pool = tmp_path / "mtg.duckdb"
+    tiny_pool.build(pool)
+    db.cache_clear()
+
+    con = db.connect_readonly(pool)
+    # One distinct name set per ask, more of them than the cache may hold.
+    for i in range(db._CARD_CACHE_MAX + 6):
+        db.get_cards(con, ["Sol Ring"] * (i + 1))
+    assert len(db._CARD_CACHE) == db._CARD_CACHE_MAX
+
+    # The most recent survives; the first is long gone.
+    keys = list(db._CARD_CACHE)
+    assert keys[-1][-1] == ("Sol Ring",) * (db._CARD_CACHE_MAX + 6)
+    assert ("Sol Ring",) not in [k[-1] for k in keys]
+    con.close()
+
+
+def test_a_write_handle_is_never_memoised(tmp_path):
+    """Only read-only handles carry a stamp.
+
+    A stamp claims the file's contents follow from its mtime and size, which
+    holds only for a handle that cannot write: an ingest inserts rows for as
+    long as its transaction runs while the file on disk still looks untouched.
+    Caching against a writer would serve rows from before its own inserts.
+    """
+    import tiny_pool
+    from mtglab.cards import db
+
+    pool = tmp_path / "mtg.duckdb"
+    tiny_pool.build(pool)
+    db.cache_clear()
+
+    writer = db.connect(pool)
+    db.get_cards(writer, ["Sol Ring"])
+    db.get_cards(writer, ["Sol Ring"])
+    assert len(db._CARD_CACHE) == 0, "a read-write handle was memoised"
+    assert db._pool_stamp(writer) is None
+    writer.close()

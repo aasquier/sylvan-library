@@ -19,7 +19,9 @@ from __future__ import annotations
 import gzip
 import json
 import sys
+import threading
 import urllib.request
+from collections import OrderedDict
 from collections.abc import Iterable, Iterator, MutableMapping, Sequence
 from dataclasses import dataclass
 from importlib import util
@@ -199,9 +201,18 @@ def connect_readonly(db_path: str | Path = "data/mtg.duckdb") -> Connection:
 
     path = Path(db_path)
     con = duckdb.connect(str(path), read_only=True)
-    # Remember which file this handle reads, so `oracle_columns` can key its
-    # answer on the pool rather than on the handle. Weak, so noting it here
-    # never keeps a connection alive.
+    # Remember which file this handle reads, so `oracle_columns` and
+    # `get_cards` can key their answers on the pool rather than on the handle.
+    # Weak, so noting it here never keeps a connection alive.
+    #
+    # **Only read-only handles are registered, and `connect()`'s are
+    # deliberately not.** A stamp is a claim that the file's contents follow
+    # from its mtime and size, and that is only true of a handle that cannot
+    # write: an ingest inserts rows for as long as its transaction runs, while
+    # the file on disk still looks exactly as it did when the caller opened it.
+    # Caching against a writer would serve rows from before its own inserts.
+    # The consequence is that `mtglab data refresh` and the CLI's write paths
+    # simply pay the old price, which is the right trade for a batch job.
     _CONNECTION_POOL_PATH[con] = path
     return con
 
@@ -569,8 +580,18 @@ def snapshot_prices(con: Connection, *, on_date: str | None = None) -> int:
 
 # ------------------------------------------------------------------ queries
 
-@dataclass
+@dataclass(frozen=True)
 class CardRecord:
+    """One card, as the pool knows it.
+
+    **Frozen**, and that is what lets `get_cards` hand the same record to two
+    requests (see `_CARD_CACHE`). Nothing in the app ever wrote to one -- the
+    whole package was swept for an assignment to any of these fields and there
+    was not one -- so this costs nothing today and makes the sharing safe by
+    construction rather than by everybody continuing not to. Use
+    `dataclasses.replace` if a variant is ever genuinely wanted.
+    """
+
     name: str
     mana_cost: str | None
     cmc: float
@@ -691,6 +712,64 @@ def _select(con: Connection) -> str:
     return f"SELECT {cols} FROM oracle_cards"
 
 
+#: Card lookups, keyed by the pool file, its stamp, and the exact names asked.
+#:
+#: The pool is read-only and rebuilt only by `mtglab data refresh`, so the
+#: answer to "what are these cards" cannot change while the file does not --
+#: which is what makes this cacheable at all, and the stamp is what makes it
+#: honest. A refresh rewrites the file, changes `mtime_ns` and size, and every
+#: entry keyed on the old stamp becomes unreachable.
+#:
+#: It pays because the questions repeat exactly. The library shelf asks the
+#: same 441 names on every page load until a deck is edited; the lore shelf
+#: asks the same ~120 names forever; a deck page asks that deck's 100. Each of
+#: those was a full scan of 35,390 rows -- `lower(name)` cannot use
+#: `idx_oracle_name`, so there is no cheaper query to write. **55.7ms -> 0.003ms**
+#: on the shelf's own name set (measured 2026-08-19, full pool).
+#:
+#: Bounded, and the bound is arithmetic rather than a round number. One shelf
+#: entry is 415 records at ~639kB; a deck's is a quarter of that. Sixteen is
+#: ~10MB if every entry were shelf-sized and 2--3MB for the real working set
+#: (one shelf, seven decks, lore, the colour combinations), against a 1GB
+#: machine. Least-recently-used goes first, so the pages somebody is actually
+#: on stay warm.
+#:
+#: Safe to share because `CardRecord` is frozen. The **dict** is copied on the
+#: way out -- shallow, 0.003ms -- so a caller that pops from its own result
+#: cannot reach in here.
+_CARD_CACHE: OrderedDict[tuple[Any, ...], dict[str, CardRecord]] = OrderedDict()
+_CARD_CACHE_MAX = 16
+#: `get_cards` runs in Starlette's threadpool and in job workers at once, and
+#: an `OrderedDict` reorder plus an eviction is not one atomic step.
+_CARD_CACHE_LOCK = threading.Lock()
+
+
+def _pool_stamp(con: Connection) -> tuple[str, int, int] | None:
+    """How the pool file looked to the handle that opened it, or None.
+
+    None for a write handle, a connection this module did not open, or a file
+    that has gone -- in every case the caller simply does not cache, which is
+    why each cache keyed on this degrades to the old behaviour rather than to a
+    wrong answer. See `connect_readonly` for why writers are excluded.
+    """
+    path = _CONNECTION_POOL_PATH.get(con)
+    if path is None:
+        return None
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (str(path), st.st_mtime_ns, st.st_size)
+
+
+def cache_clear() -> None:
+    """Forget every memoised lookup. For tests, and for a process that has just
+    rebuilt the pool in place and does not want to wait for a stat to notice."""
+    with _CARD_CACHE_LOCK:
+        _CARD_CACHE.clear()
+    _COLUMN_CACHE.clear()
+
+
 def get_cards(con: Connection, names: Iterable[str]) -> dict[str, CardRecord]:
     """Look up many cards at once, case-insensitively. Missing names are simply
     absent from the result -- callers must handle that, loudly.
@@ -709,6 +788,16 @@ def get_cards(con: Connection, names: Iterable[str]) -> dict[str, CardRecord]:
     wanted = list(names)
     if not wanted:
         return {}
+
+    stamp = _pool_stamp(con)
+    key = (*stamp, tuple(wanted)) if stamp is not None else None
+    if key is not None:
+        with _CARD_CACHE_LOCK:
+            hit = _CARD_CACHE.get(key)
+            if hit is not None:
+                _CARD_CACHE.move_to_end(key)
+                return dict(hit)
+
     lowered = [n.lower() for n in wanted]
     # A CTE the planner turns into three hash semi-joins, not three IN lists.
     # The IN-list form expanded to one comparison per name per form -- an
@@ -754,7 +843,14 @@ def get_cards(con: Connection, names: Iterable[str]) -> dict[str, CardRecord]:
         found = by_lower.get(low) or faces.get(low)
         if found is not None:
             out[name] = found
-    return out
+
+    if key is not None:
+        with _CARD_CACHE_LOCK:
+            _CARD_CACHE[key] = out
+            _CARD_CACHE.move_to_end(key)
+            while len(_CARD_CACHE) > _CARD_CACHE_MAX:
+                _CARD_CACHE.popitem(last=False)
+    return dict(out)
 
 
 def search(con: Connection, where: str, params: Sequence[Any] = (), limit: int = 100,

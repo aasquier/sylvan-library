@@ -540,13 +540,40 @@ was. Every number below is a median on this Mac against the full pool.
   A queue of one, deleted the moment it settles — not a cache, so nothing is
   ever read after the network answered.
 
-| endpoint | before | after |
-|---|---|---|
-| `/api/health` | 37ms | **6ms** |
-| `/api/decks` | 201ms | **75ms** |
-| deck detail | 80ms | **43ms** |
-| deck validate | 79ms | **43ms** |
-| `/api/cards/search?q=goblin` | 111ms | **43ms** |
+- **Card lookups memoised on the pool stamp.** The last item, and the one that
+  needed the other six first: `get_cards` was still ~50ms because
+  `lower(name)` cannot use `idx_oracle_name`, so every lookup was a full scan
+  of 35,390 rows and there is no cheaper query to write. The questions repeat
+  exactly, though -- the shelf asks the same 441 names until a deck is edited,
+  the lore shelf the same ~120 forever -- so the answer is to stop asking.
+  Keyed on `(pool path, mtime_ns, size, names)`, LRU-bounded at 16 entries
+  (arithmetic: one shelf entry is 415 records at ~639kB, so 16 is ~10MB worst
+  case and 2--3MB for the real working set, against a 1GB machine).
+  **55.7ms → 0.003ms** on the shelf's own name set.
+  Three things make it safe. `CardRecord` is now **frozen**, so two requests
+  may hold the same record -- the package was swept for an assignment to any
+  of its fields and there was not one, so this cost nothing. The **dict** is
+  copied out, shallow, so a caller that pops from its result cannot reach the
+  entry. And **write handles are never memoised**: a stamp claims the contents
+  follow from mtime and size, which is only true of a handle that cannot
+  write, since an ingest inserts rows while the file on disk still looks
+  untouched.
+
+| endpoint | before | after five fixes | after the memo |
+|---|---|---|---|
+| `/api/health` | 37ms | 6ms | **6ms** |
+| `/api/decks` | 201ms | 75ms | **16ms** |
+| deck detail | 80ms | 43ms | **6ms** |
+| deck validate | 79ms | 43ms | **5ms** |
+| `/api/lore` | 52ms | 43ms | **3ms** |
+| `/api/cards/search?q=goblin` | 111ms | 43ms | **43ms** |
+
+Search is unchanged by the memo and that is correct: it is a text scan rather
+than a name lookup, so it never goes through `get_cards` at all.
+
+Verified end to end rather than by the cache's own tests: a card added to a
+deck through `service.add_card` moves the shelf's count 99 → 100 and appears
+in the deck's 99, through both the deck-parse cache and this one.
 
 **Correction to the bundle note above.** "`charts.js` … already its own chunk,
 loaded only where a chart renders" was true of the chunk and false of the
@@ -567,11 +594,16 @@ storm, not YAML. YAML was real but second, and both are now addressed. The
 serialization finding stands and should be re-measured, since the shelf's
 serial cost moved 201ms → 75ms.
 
-**Not done, deliberately.** `get_cards` is now ~50ms and near its floor:
-`lower(name)` defeats `idx_oracle_name`, and an exact-match fast path measured
-as a *net loss* (15 of 441 names still needed the scan, so it paid for both).
-Getting past it means memoising card lookups on the pool stamp — a design
-decision, not a tweak.
+**Rejected on measurement:** an exact-name fast path (`name IN (…)`, which is
+index-eligible) to avoid the scan. It resolved 426 of 441 names and the
+remaining 15 still needed the full scan, so it paid for both — a net loss. The
+memo above is what replaced it.
+
+**Still open.** The shelf's remaining ~16ms is YAML and aggregation, and the
+memo does nothing for a *cold* cache — the first request after a deploy or a
+`data refresh` pays the old price. That is the right trade (a warm instance is
+the common case) but it means Green's concurrency probe should be re-run
+against both states rather than one.
 
 
 ## Red — Speed & Alarum
