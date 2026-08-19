@@ -1517,10 +1517,32 @@ runs against a cache nobody emptied.
 
 *CI/CD · alerting & self-healing*
 
-- **Last run:** 2026-08-18 (punch-list item 5, with Blue). Previous:
-  2026-08-16 (rainbow), which was the first Red run and the baseline the
-  numbers below are now a trend against.
-- **Fixed this run (2026-08-18): the alarm tile could not tell "all clear"
+- **Last run:** 2026-08-19 (rainbow). Previous: 2026-08-18 (punch-list item 5,
+  with Blue), and 2026-08-16 (rainbow), which was the first Red run and the
+  baseline the numbers below are a trend against.
+- **Fixed this run (2026-08-19, rainbow): the deploy job's `needs` list is
+  the whole safety argument and nothing checked it.** `deploy` cannot start
+  until the four jobs above it are green, which is what makes it
+  *structurally* unable to ship a red suite — and, for ADR 23's manual button,
+  it is the **only** guard there is: branch protection governs merging and has
+  nothing to say about a `workflow_dispatch` on `main`. Adding a job to
+  `ci.yml` is already known to be two steps (the `image` job's own comment
+  says so about the required-checks setting); it is really three, and the
+  third was unenforced. Miss it and the new job runs, goes red, and the
+  instance is replaced anyway — presenting as one red check beside a
+  successful deploy, which reads like flakiness rather than an unguarded
+  release. `test_the_deploy_job_waits_for_every_other_job_in_the_file` in
+  `tests/test_packaging.py` **derives** the expected set from the file's own
+  job list rather than restating it, which is the #86 lesson applied to the
+  other half of the same job: the sibling test right above it exists because
+  a substring check passed against the exact bug it was written for. Same
+  module, same text-not-YAML idiom, no new dependency. **Mutation-verified
+  three ways** — drop `image` from `needs`, add a job nobody wired in, name a
+  job that does not exist — each fails it, and the message names which
+  direction. The most useful consequence is forward-looking: queued item 7
+  below proposes splitting `image` in two, and this is the test that catches
+  the split forgetting to update `needs`.
+- **Fixed (2026-08-18): the alarm tile could not tell "all clear"
   from "I could not ask".** "Edge failed" renders `fmtCount(edge_5xx)`, and
   `—` was the answer both when the edge served zero 5xx *and* when the query
   was broken. That is not hypothetical: #172 had found two Fly queries wrong
@@ -1604,6 +1626,24 @@ runs against a cache nobody emptied.
      a phone number to maintain. Pushover is a push, not a text — it lands on
      the lock screen the same way without a carrier in the path. **Total cost
      $5, once.**
+
+     *Sharpened 2026-08-19, and it does not replace the above.*
+     `docs/HOSTING.md` §5 already says alerting belongs in **Fly's managed
+     Grafana**, auto-provisioned per organisation at `fly-metrics.net` and
+     free, and names the two rules worth having first (memory above ~85%, a
+     5xx rate at the edge). That substrate is closer to reachable than this
+     item implied: `FLY_METRICS_TOKEN` **is set** as a secret, so Fly's
+     Prometheus is live and the admin page already reads it. Whether any alert
+     *rule* exists there is unverified — it is behind Aaron's Fly login and
+     this run did not drive it. The reason it does not close this item is
+     fate-sharing: managed Grafana runs on Fly, reads Fly's own Prometheus,
+     and would be alerting about Fly — the same objection that ruled out
+     self-hosting ntfy. So the honest recommendation is **both, and they are
+     not redundant**: Grafana for *symptom* rules it is genuinely good at and
+     already paid for (memory, 5xx rate, migration-failed-on-boot), and an
+     off-platform probe for *liveness*, which by definition cannot live on the
+     platform it watches. Cheapest first step is therefore free, not $5: ask
+     Aaron whether fly-metrics.net has any rule at all.
   2. **Whatever monitor is chosen must be configured for GET, not HEAD.**
      Measured today: `HEAD /` and `HEAD /api/health` both answer **405**,
      while GET answers 200. `fly.toml` already sets `method = "GET"`, which is
@@ -1649,23 +1689,77 @@ runs against a cache nobody emptied.
      step in the `deploy` job that snapshots before `flyctl deploy` — but that
      needs a `FLY_API_TOKEN` scope check and a decision about failing the
      deploy when the snapshot fails, so it is Aaron's call, not a safe fix.
+  7. **The `image` job spends 60% of itself emulating an architecture nothing
+     deploys to — three options, and Aaron picks.** Profiled this run (run
+     `32312916793`, `image` 302s): setup 23s, amd64 build 63s, the eight
+     container assertions 8s, Trivy 16s, and the multi-arch build **182s** —
+     which is arm64 and nothing else, because every amd64 layer is already
+     cached by then. Inside it, `RUN pip install` **101.5s** and
+     `RUN python -m venv` **32.8s**, both running an emulated interpreter
+     under QEMU. Then the fact that reframes it: `uname -m` on the live
+     machine answers **`x86_64`**. The instance is amd64, `flyctl deploy
+     --local-only` builds amd64 on an amd64 runner, and nothing publishes the
+     arm64 manifest (`push: false`) — so this leg is a portability check for a
+     host that does not exist yet. The Dockerfile's own comment ("anything
+     this would deploy to is arm64") is the decision it was added under, which
+     is exactly why changing it is Aaron's and not a safe fix. The options:
+     **(a) drop the arm64 build** — settles the critical-path tie outright,
+     `image` falls to roughly 120s, and the cost is losing a claim nobody
+     currently relies on; **(b) move it to a native runner** —
+     `ubuntu-24.04-arm` went GA and **free for public repositories** on
+     2025-08-07, so the same check runs unemulated at roughly amd64 speed,
+     either as a second job in parallel or as a matrix leg; **(c) keep it.**
+     If (b), three things move together: each build needs its own buildx
+     `scope=` so the architectures stop sharing one gha entry, the native leg
+     no longer needs `docker/setup-qemu-action`, and **a second job must be
+     added to `deploy`'s `needs`** — which this run's new test now forces
+     rather than trusting. Either (a) or (b) is the first thing in six runs
+     that would actually move the wall clock, because it is the only lever
+     that acts on the job that is the critical path half the time.
+  8. **Secret scanning and push protection are off, and both are free on a
+     public repository.** Confirmed rather than assumed: the API answers
+     `404 Secret scanning is disabled on this repository`. What the repo has
+     instead is `no-secrets-or-card-data`'s `git grep` for `sk-ant-…`, and
+     that guard is **post-hoc by construction** — it runs after the push, on a
+     public repository, so when it fails the key is already published, which
+     is precisely why its own failure message says "REVOKE IT in the console
+     first". Push protection refuses the push at the client, before the bytes
+     leave the laptop. And the self-healing half is the part that belongs to
+     this facet: Anthropic has been a GitHub secret-scanning **partner** since
+     2024-08-20, so a key that does leak from a public repo is forwarded to
+     Anthropic, revoked, and the owner notified — detection *and* remediation,
+     with nobody in the loop. Repository settings, so Aaron's to flip
+     alongside #4. The CI grep stays either way: it also enforces the
+     card-data half of rule 5, and a repo-specific belt costs six seconds.
 - **Deferred:**
-  - **Speeding up the `image` job — deferred because it would not help.**
-    Its 292s median is 214s of arm64-under-QEMU, and that 214s is 142s of
-    `pip install` plus 46s of `python -m venv`, neither of which caches:
-    `RUN python -m venv` sits *below* `COPY src ./src` in the Dockerfile so
-    every commit invalidates it, and the two buildx `type=gha` caches share
-    one scope, so each run's amd64-only build overwrites the arm64 layers the
-    previous run wrote. Both are fixable (move the venv above the COPYs; give
-    each build its own `scope=`), and neither is provable on this Mac, which
-    has no container runtime at all — so it would have to land alone and be
-    watched. **The reason not to bother yet is stronger than "small win":**
-    across ten runs the critical path was `image` six times and `test (3.12)`
-    four, at medians of 292s and 284s. They are close enough that which one is
-    the bottleneck *flips run to run*, so fixing either alone buys almost
-    nothing. Trigger to revive: the test job gets materially faster (White's
-    deferred `pytest-xdist` would do it), which would make `image` the
-    bottleneck properly and worth the branch.
+  - **Speeding up the `image` job in place — still deferred, and half of the
+    2026-08-16 reasoning behind it is now disproven.** The trigger this item
+    named ("the test job gets materially faster") **has not arrived and moved
+    further away**: `test (3.12)` went 284s → 300s → **317s** while `image`
+    sat at 292s → 304s → **302s**, and across n=20 today the critical path was
+    `test (3.12)` **11 times** and `image` **9**. It is still a coin flip, so
+    fixing either alone still buys almost nothing. (Blue's leg reported
+    `image` 6m0s against `test (3.12)` 3m36s from **its own PR run** and read
+    that as the trigger firing; over twenty runs it is a single-run artifact —
+    that 216s is the fastest `test (3.12)` in the whole window. One PR's
+    medians are a lead, not a baseline.)
+    Two corrections to the mechanism, both from the run log rather than from
+    reasoning. **The cache-scope claim was wrong**: arm64 layers *do* survive
+    between runs — `#9 WORKDIR`, `#21 COPY pyproject.toml`, `#25 apt upgrade`
+    and `#26 useradd` all came back `CACHED` on the arm64 side, so the
+    amd64-only build is not overwriting them and there is nothing to fix
+    there. What misses is exactly what should: everything below
+    `COPY src ./src`, because src changed. **And the numbers shrank**: the
+    QEMU leg is 182s now, not 214s, of which `pip install` is 101.5s (not
+    142s), `venv` 32.8s (not 46s) and the export 32.5s. So the only piece
+    recoverable *without* changing architecture is the 32.8s venv, by moving
+    `RUN python -m venv /opt/venv` above `COPY src ./src` — it depends on
+    nothing but the base image and today every commit invalidates it. ~33s off
+    a 302s job, unprovable on this Mac, and pointless while the path is a tie.
+    **Queued item 7 supersedes this as the thing actually worth doing**: drop
+    the arm64 leg or run it native, either of which takes ~180s rather than
+    ~33s. Trigger to revive *this* item: Aaron rules "keep it as is" on 7, and
+    the venv move then becomes the only lever left.
   - **A Fly volume-snapshot restore has never been performed.** Snapshots are
     current and daily, but the restore path is a *new* volume plus a machine
     re-attach, which is downtime and steps nobody has walked. Documented as
@@ -1677,6 +1771,108 @@ runs against a cache nobody emptied.
     fails; the Fly cert covers the apex only). Harmless until a friend types
     it. Trigger: anyone reports the site not loading and turns out to have
     typed `www.`.
+- **Measurements (2026-08-19, rainbow):**
+  - **CI per-job medians, n=20** — every successful `ci.yml` run of the day,
+    13:41Z to 23:21Z, which is #179–#187 and their pushes. Against 2026-08-18
+    and the 2026-08-16 baseline:
+    `test (3.11)` **186s** (154–201, was 186, 158) · `test (3.12)` **317s**
+    (216–339, was 300, 284) · `frontend` **45s** (36–49, was 44, 36) ·
+    `no-secrets-or-card-data` **6s** (4–10, was 6, 5) · `image` **302s**
+    (273–364, was 304, 292) · `deploy` **81s** (74–91, n=9, was 78).
+    Full-run wall clock **301–364s, median 329s** (was ~307s). Separate
+    workflows: `codeql` **48–60s per language** on a PR and **84–96s** on a
+    push; `dependency-review` **5–9s**. Everything is a few percent up on a
+    day that added ~1,400 lines of tests; nothing is a step change. **Critical
+    path: `test (3.12)` 11 of 20, `image` 9 of 20** — still the tie the
+    deferred item is built on, at 317s vs 302s.
+  - **`image` internal profile** (run `32312916793`), because a 302s job is a
+    question: setup+checkout+qemu+buildx 23s · **amd64 build 63s** · the eight
+    container assertions 8s · Trivy 16s · **multi-arch build 182s** · post 5s.
+    The 182s is arm64 alone (every amd64 layer is cached by then):
+    `COPY src` 6.6s, **`python -m venv` 32.8s**, **`pip install` 101.5s**,
+    export 32.5s, everything else `CACHED`. See queued item 7 — the live
+    machine is `x86_64`, so this is emulation for a host nobody deploys to.
+  - **Cache health: all green, read from run `32312916793`'s log.** pip hit
+    (~119 MB, keyed on `pyproject.toml`), npm hit (~65 MB), QEMU binfmt hit,
+    Trivy binary hit, Trivy vulnerability DB hit on the date-keyed
+    `cache-trivy-2026-08-19`, buildx amd64 layers `CACHED` — **and, correcting
+    2026-08-16, arm64 layers too.**
+  - **Concurrency verified by observation, including a null result that is
+    not a fault.** Three `ci.yml` PR runs were cancelled today as designed
+    (white, blue, black). CodeQL's superseded Black run was *not* cancelled
+    and that is correct: it finished at 23:21:39, **seven seconds before** the
+    superseding push at 23:21:46, so there was nothing to cancel.
+    `dependency-review` at 5–9s is never slow enough to be caught at all. A
+    group with no cancellations is not evidence of a broken group.
+  - **Actions hygiene:** **18 `uses:` references across 11 distinct actions**,
+    every one a 40-char SHA with a version comment. (The 2026-08-16 entry's
+    "all 11 action references" was the distinct-action count; both numbers are
+    recorded now so the next run does not read a mismatch as drift.) No
+    `pull_request_target`; workflow-level `permissions: contents: read` on all
+    three files with `security-events: write` scoped to CodeQL's job alone;
+    default workflow permissions `read`; `can_approve_pull_request_reviews`
+    false. Repository still `allowed_actions: "all"` and
+    `sha_pinning_required: false` (queued item 4).
+  - **Pinned invariants, read rather than assumed.** Required contexts from
+    the protection setting are the same six: `test (3.11)`, `test (3.12)`,
+    `frontend`, `image`, `no-secrets-or-card-data`, `dependency-review`;
+    `strict` true, `enforce_admins` true, linear history true, zero required
+    reviews. Skip gate still `expected=2` (`addopts = "-ra"` is what makes
+    `grep -c '^SKIPPED'` work, and a change there fails loud rather than
+    quiet) — **correcting the 2026-08-16 entry's parenthetical**, the *local*
+    suite skips **0**, not 2: this Mac has `data/mtg.duckdb`, so both
+    `needs_full_pool` tests run rather than skip, and 2 is the CI number by
+    construction. 2,421 passed locally this run. `image` still the only place
+    the Dockerfile is *checked* — the
+    `deploy` job builds it a second time with `flyctl deploy --local-only`,
+    which ci.yml already says out loud. `deploy` still `needs` all four, and
+    **as of this run a test says so.**
+  - **Live probe (2026-08-19 23:33Z, before the day's last deploy).**
+    `GET /` **200** in 389ms (TTFB 388ms, 1,897 bytes) · `GET /api/health`
+    **200** in 258ms · `GET /api/decks` **401** in 233ms.
+    `HEAD /` and `HEAD /api/health` still **405** — queued item 2 unchanged.
+    Headers on a **GET** (Black's leg nearly filed a false regression off
+    `curl -I`, so: GET): HSTS 31536000, `X-Content-Type-Options`,
+    `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, and
+    `Permissions-Policy: camera=(self), microphone=(), geolocation=()` — #184
+    is live. Health body: pool true, 35,390 oracle cards, 107,338 printings,
+    7 decks, `pool_stale` false, bulk file still
+    `oracle_cards-2026-08-13.jsonl.gz` — **six days old, and `pool_stale` is a
+    schema check, not an age check** (unchanged note from 2026-08-18).
+  - **Instance:** machine `84e19ef25041e8`, **version 120** (was 108 on
+    2026-08-18 — 12 machine versions in a day, all deploys), `iad`,
+    `shared-cpu-1x`/1 GB, 1/1 checks passing, `uname -m` **`x86_64`**. Black's
+    deploy was watched live at 23:35: image pulled in 6.7s, machine created
+    and started in 10.8s, health check failed at 23:35:21 and passed at
+    23:35:29 — **the 8-second window is reproducible**, and Fly logs it as
+    "Services exposed on ports [80, 443] will have intermittent failures",
+    which is the per-merge downtime ADR 23 accepts, named by the platform.
+    **No OOM, no unexplained restart, no 5xx in the log.**
+  - **Volume:** 115 MB used of 2.9 GB (**5%**, 2.6 GB free) — `mtg.duckdb`
+    76M, `scryfall` 24M, **`cache` 16M (was 4.4M** — the OCR shelf, the mana
+    symbols and the card-motion derivatives), `decks` 304K, `app.db` 244K.
+    **5 snapshots**, one per day, newest 9 hours old, 5-day retention, 447 MiB
+    stored (was 370). Still no snapshot tied to a deploy (queued item 6).
+  - **TLS expiry 2026-11-11** unchanged (Let's Encrypt, issued 2026-08-13,
+    ~84 days remaining, apex-only SAN). `www.sylvan-libraries.com` still fails
+    to connect — deferred item, trigger has not fired.
+  - **`FLY_API_TOKEN` expires 2027-08-14 18:22Z**, which is exactly what
+    `ci.yml`'s failure-path message prints. Checked because a runbook that
+    names a date is a runbook that can drift off it; it has not.
+  - **Alerting posture — unchanged from 2026-08-18 in every line that
+    matters.** Fly HTTP check GET `/api/health`, passing, **does not restart
+    on failure** · machine restart policy `on-failure`/10, fires only on
+    process exit · Dockerfile `HEALTHCHECK` present but inert on Fly Machines
+    · GitHub deploy-job failure email to the actor · **external uptime
+    monitoring: none · phone alerting: none.** One delta:
+    `FLY_METRICS_TOKEN` is set, so Fly's Prometheus is live — see the
+    sharpening note on queued item 1.
+  - **Scanner backlog, recorded here because an advisory scanner nobody is
+    alerted about is an alerting fact.** 4 open CodeQL alerts, all
+    `py/polynomial-redos` in `src/mtglab/decks/decklist.py`, **unchanged since
+    2026-08-15** — that is White's item and is tracked in White's section; no
+    channel exists that would have told anybody. 9 open Dependabot alerts (the
+    torch pin cluster, unchanged). Secret scanning: off — queued item 8.
 - **Measurements (2026-08-18):**
   - **CI per-job medians, n=10** (the ten most recent `ci.yml` runs, #168–#173
     and their pushes), against the 2026-08-16 baseline:
