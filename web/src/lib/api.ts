@@ -155,7 +155,7 @@ export interface DeckDetail extends DeckSummary {
   pool_available: boolean
   /** The Scryfall printing id whose art this deck shows, or '' for the
    *  default. A deck property rather than a viewer preference: it lives in
-   *  `deck.yaml` and travels with the deck through git. */
+   *  `deck.yaml` and travels with the deck. */
   commander_art: string
   /** Whether this viewer may change this deck.
    *

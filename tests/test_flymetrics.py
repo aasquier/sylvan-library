@@ -106,6 +106,70 @@ def test_an_empty_series_is_none_rather_than_zero(monkeypatch):
     assert answer["values"]["edge_5xx"] is None
 
 
+def quiet_edge(url: str, headers: dict[str, str]) -> tuple[int, bytes]:
+    """A healthy day: the edge answered, and nothing failed.
+
+    2xx is populated; 4xx and 5xx match no samples, which is what Prometheus
+    does with a class that did not occur. The URL is matched after
+    `urllib.parse.quote`, where `status=~"5.."` reads `status%3D~%225..%22`.
+    """
+    if "%222..%22" in url:
+        return 200, vector(3581)
+    if "status%3D~" in url:
+        return 200, EMPTY
+    return 200, vector(1)
+
+
+def test_a_quiet_alarm_reads_zero_and_not_an_em_dash(monkeypatch):
+    """The tile that matters must not render "all clear" as "I could not ask".
+
+    An empty 5xx vector is the *good* answer and looks identical to the two
+    broken queries #172 fixed. `edge_2xx` is the witness that tells them
+    apart: the metric answered, so nothing failing is a real zero.
+    """
+    monkeypatch.setenv("FLY_METRICS_TOKEN", "fo1_readonly")
+
+    answer = flymetrics.fetch(transport=quiet_edge)
+
+    assert answer["values"]["edge_2xx"] == 3581
+    assert answer["values"]["edge_4xx"] == 0
+    assert answer["values"]["edge_5xx"] == 0
+
+
+def test_without_the_witness_nothing_is_claimed(monkeypatch):
+    """The other half, and the reason this is not `or vector(0)`.
+
+    With `edge_2xx` empty too, the series may not exist at all — so every
+    counter stays `None` and the page keeps saying so. Collapsing these to
+    zero would report a healthy edge for a query that never worked, which is
+    the exact failure this module was built after.
+    """
+    monkeypatch.setenv("FLY_METRICS_TOKEN", "fo1_readonly")
+
+    answer = flymetrics.fetch(transport=lambda url, headers: (200, EMPTY))
+
+    assert answer["values"]["edge_2xx"] is None
+    assert answer["values"]["edge_4xx"] is None
+    assert answer["values"]["edge_5xx"] is None
+
+
+def test_memory_is_never_settled_by_the_edge_witness(monkeypatch):
+    """The witness speaks only for its own series.
+
+    Memory is a different metric on a different subsystem, so a live edge says
+    nothing about whether it is being scraped — reporting zero bytes of memory
+    for a running machine would be a worse lie than the em-dash.
+    """
+    monkeypatch.setenv("FLY_METRICS_TOKEN", "fo1_readonly")
+
+    answer = flymetrics.fetch(transport=quiet_edge)
+
+    # The subtraction is inside the query, so the transport answers it whole.
+    assert answer["values"]["memory_bytes"] == 1
+    assert set(flymetrics.EDGE_SILENT) == {"edge_4xx", "edge_5xx"}
+    assert "memory_bytes" not in flymetrics.EDGE_SILENT
+
+
 @pytest.mark.parametrize("failure", [
     lambda url, headers: (500, b"upstream is unwell"),
     lambda url, headers: (200, b"<html>a WAF page</html>"),

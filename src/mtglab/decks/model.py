@@ -1,9 +1,10 @@
 """The deck file is the source of truth. Everything else is derived.
 
-A deck lives at `decks/<slug>/deck.yaml` and is tracked in git. The five
-deliverables (quick primer, advanced primer, annotated 99, Moxfield TXT,
-swap list) are *generated* from it, never hand-maintained. Deck history is
-git history: `git log -p decks/gyome-food/deck.yaml` is the swap record.
+A deck lives at `decks/<slug>/deck.yaml`, which is the app's own data
+directory and **not in git** (ADR 30). The five deliverables (quick primer,
+advanced primer, annotated 99, Moxfield TXT, swap list) are *generated* from
+it, never hand-maintained. Deck history is the activity log (ADR 28) --
+`mtglab decks log <slug>`, or the deck page's History tab.
 
 Design note: every card carries its own `why`. That field is the reason this
 project exists -- it is the thing that decays when decklists live in a web app.
@@ -58,8 +59,8 @@ class _Dumper(yaml.SafeDumper):
     """pyyaml with sequences indented under their key.
 
     Its default puts `- name: Sol Ring` hard against the left margin, which is
-    legal YAML and unlike every hand-written deck in the repository. Since a
-    generated deck file is then hand-edited and diffed in git, matching the
+    legal YAML and unlike every hand-written deck in the library. Since a
+    generated deck file is then hand-edited and read beside them, matching the
     house style is worth five lines.
     """
 
@@ -169,9 +170,9 @@ class Deck:
     # printing id, or empty for "whatever the pool considers the default".
     #
     # A deck property rather than a per-viewer setting, deliberately.
-    # `deck.yaml` is the source of truth (ADR 1) and the choice should travel
-    # with the deck through git the way every other decision about it does --
-    # a Secret Lair Goreclaw is a fact about that deck, not a preference of
+    # `deck.yaml` is the source of truth (ADR 1's surviving half) and the
+    # choice travels with the deck the way every other decision about it does
+    # -- a Secret Lair Goreclaw is a fact about that deck, not a preference of
     # whoever is looking at it.
     commander_art: str = ""
     companion: str | None = None

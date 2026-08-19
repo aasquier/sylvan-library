@@ -41,7 +41,15 @@ jdk-*/
 # the volume at /data/decks. Tracking it meant two diverging copies and a
 # working tree the app dirtied by being used. `deck.yaml` is still the source
 # of truth; git is just not where it lives.
-decks/
+#
+# **Leading slash, and it is load-bearing.** Bare `decks/` matches a directory
+# of that name at *any* depth, so it also swallowed `src/mtglab/decks/` — the
+# deck source package, thirteen modules. Those stayed tracked (an ignore rule
+# cannot untrack a tracked file), so nothing broke and nothing said anything;
+# what it cost was the *next* module, which `git add` would have refused and
+# `git add -A` would have skipped in silence. Anchored, this matches only the
+# app's data directory, which is all the paragraph above ever claimed.
+/decks/
 
 # --- Never commit: anything that identifies what you physically own ---------
 # A public inventory of expensive cards tied to a real identity is a

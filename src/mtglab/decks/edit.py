@@ -1,9 +1,10 @@
 """Surgical edits to a deck.yaml, preserving every byte it does not change.
 
-`deck.yaml` is the source of truth and its history is git history (ADR 1), so
-`swaps.md` is literally a diff. That makes the *size* of an edit part of its
-correctness: a one-card swap has to be a one-card diff, or the swap record it
-produces is unreadable.
+`deck.yaml` is the source of truth (ADR 1) and `swaps.md` is literally a diff
+of it -- against the last build's own snapshot, `artifacts/deck.last-built.yaml`,
+since ADR 30 took decks out of git and left no revision to diff. That makes the
+*size* of an edit part of its correctness: a one-card swap has to be a one-card
+diff, or the swap record it produces is unreadable.
 
 Load-and-dump cannot do that, and this was measured rather than assumed:
 

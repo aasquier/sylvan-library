@@ -208,9 +208,10 @@ def swap_list(deck: Deck, previous: Deck, cards: dict[str, CardRecord] | None = 
               prices: dict[str, float] | None = None) -> str:
     """Diff two versions of a deck into an out/in list plus a shopping list.
 
-    `previous` is normally the deck as of the last git commit, which is why the
-    deck file being in git matters -- the swap document is a computed diff, not
-    a hand-kept changelog.
+    `previous` is normally the deck as of its last build, stashed at
+    `artifacts/deck.last-built.yaml` -- decks are not in git (ADR 30), so the
+    baseline is one the build keeps for itself. Either way the swap document is
+    a computed diff, not a hand-kept changelog.
     """
     old = {c.name for c in previous.cards}
     new = {c.name for c in deck.cards}

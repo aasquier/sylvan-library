@@ -1814,19 +1814,32 @@ arc; this is what the next few sessions actually do.
     neither visible until the credential worked. Verified live: 244 MB of
     962 MB, 3,581 edge 2xx, 20 4xx, 5xx honestly absent.
 
-    **Still open: items 5 and 6.** *Item 5* is a polish-skill pass for API
-    hygiene — do routes match the button names, what relics survive from
-    previous dev cycles, and a sweep for stale build/Claude artifacts and
-    admin warning signs of instability. Two findings are already banked for
-    it: `mtglab animist verify` runs in the suite but pins only **2 of the
-    12** committed recipes, so the other ten pass by not being looked at;
-    and the import ring #171 fixed was invisible to a 2,100-test suite
-    because nothing imported a module first. *Item 6* is a checked-in
-    corpus of 10–20 facts for each of the 78 tarot cards, woven into the
-    reading and never repeating within a session — **it extends the
-    `theme.py` fact mechanism rather than rebuilding it** (the schema, the
-    `'taxonomy'`-or-real-URL sourcing rule and the `told`/`repeats` dedup
-    all exist), and at 780–1560 sourced facts it wants its own session.
+    **Item 5 landed 2026-08-18** as a Blue + Red polish run — API hygiene
+    and dev-cycle relics being Blue, alerts and instability signals being
+    Red. The API surface came back **clean**: every one of the 60 routes is
+    called or deliberately unclient-facing, every deck sub-route is reached
+    from the app, no unimported frontend module, no dead Python module, and
+    not a single TODO/FIXME/legacy marker in `src/mtglab` or `web/src`. The
+    relics were not in the code but in what the code *says* about itself.
+    **ADR 30 took decks out of git and eighteen comments never heard** —
+    `deck.yaml` "tracked in git", `git log -p` offered as the swap record,
+    `git checkout` named as a deck's undo four times, and one line printed
+    to the terminal by `mtglab decks log`. The banked animist finding was
+    real and is fixed: `verify` now runs over all twelve recipes in the
+    suite instead of two. And Red found the sharpest one — **"Edge failed"
+    rendered an em-dash both for a day with no 5xx and for a query that had
+    never worked**, which is the punch list's own trap one turn on: a
+    readout that cannot succeed differently from failing is not a readout.
+    Both fixes carry mutation evidence, and the drift tripwire nearly
+    shipped as decoration (it matched line-by-line, and this codebase wraps
+    its comments).
+
+    **Still open: item 6** — a checked-in corpus of 10–20 facts for each of
+    the 78 tarot cards, woven into the reading and never repeating within a
+    session. **It extends the `theme.py` fact mechanism rather than
+    rebuilding it** (the schema, the `'taxonomy'`-or-real-URL sourcing rule
+    and the `told`/`repeats` dedup all exist), and at 780–1560 sourced facts
+    it wants its own session.
 
 ---
 

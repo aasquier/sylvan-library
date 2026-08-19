@@ -171,10 +171,11 @@ export function CardArtPicker({ deck, card, onPicked, onClose }: {
  * Choose which printing's art a deck shows for its commander.
  *
  * The choice is a **deck** property, not a viewer preference — it lives in
- * `deck.yaml` and travels with the deck through git, the same as every other
- * decision about it (ADR 1). So this writes through the ordinary deck-field
- * edit, the server refuses an id that is not a printing of *this* commander,
- * and the change shows up in `git diff` as one line.
+ * `deck.yaml` and travels with the deck, the same as every other decision
+ * about it (ADR 1). So this writes through the ordinary deck-field edit, the
+ * server refuses an id that is not a printing of *this* commander, and the
+ * change shows up in the deck's History as one entry (ADR 28 — decks are not
+ * in git, so there is no diff to read it in).
  *
  * Only non-digital printings are offered. An Arena-only painting is not
  * something you can put in a sleeve, and offering one would be offering
