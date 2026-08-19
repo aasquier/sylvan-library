@@ -1,12 +1,12 @@
 ---
 name: polish
-description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Python or TypeScript best practices, testing (including mutation testing), performance, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, infrastructure efficiency/upgrades/cost, browser/mobile compatibility, scalability, or the repo's Claude-facing docs (including trimming stale or verbose context). Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' or 'polish all' (all five in one merged report), on 'polish rainbow' (all five as separate runs, one color at a time), on 'run the polish pass', and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears."
+description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Python or TypeScript best practices, testing (including mutation testing), performance, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, infrastructure efficiency/upgrades/cost, browser/mobile compatibility, scalability, the repo's Claude-facing docs (including trimming stale or verbose context), or the spirit of Magic — sweeping copy and UI for chances to prefer Magic: the Gathering terminology and iconography over plain conversational English. Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' or 'polish all' (all five in one merged report), on 'polish rainbow' (all five as separate runs, one color at a time), on 'run the polish pass', and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears."
 ---
 
 # The Polish Pass
 
 A recurring, ledger-driven quality pass over this codebase and its
-infrastructure. Aaron's fourteen quality facets are organised as the five
+infrastructure. Aaron's fifteen quality facets are organised as the five
 colors of Magic; one invocation runs **one color, deeply**. The point is not a
 skim of everything — it is that over a cycle of five runs, every facet gets a
 real audit, and the ledger makes the next run smarter than the last.
@@ -26,7 +26,7 @@ ledger so the checklist gets fixed.
 | Color | Theme | Facets |
 |---|---|---|
 | **White** | Law & Protection | Free-use/licensing compliance (triple-checked); security & user isolation; testing discipline |
-| **Blue** | Craft & Knowledge | Python best practices; TypeScript/React best practices; Claude-first docs & memory audit |
+| **Blue** | Craft & Knowledge | Python best practices; TypeScript/React best practices; Claude-first docs & memory audit; the spirit of Magic (the game's terminology and iconography over plain English, commandment 3) |
 | **Black** | Ruthless Efficiency | Claude API spend; static assets over hotlinks; performance & efficiency |
 | **Red** | Speed & Alarum | CI/CD pipeline; alerting & self-healing |
 | **Green** | Growth & Resilience | Browser & mobile compatibility; cloud resource watch; scalability & user adaptability |

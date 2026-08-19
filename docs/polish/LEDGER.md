@@ -177,8 +177,15 @@ state, never checklists.
 
 ## Blue — Craft & Knowledge
 
-*Python craft · TypeScript/React craft · Claude-first docs & memory*
+*Python craft · TypeScript/React craft · Claude-first docs & memory · the
+spirit of Magic*
 
+- **New facet, never yet run:** *the spirit of Magic* (added 2026-08-19 at
+  Aaron's ask — commandment 3 as a sweep: prefer the game's terminology and
+  iconography over plain conversational English, within commandment 2's
+  bounds). No baseline exists; the next Blue run owes it a first full sweep
+  of the rendered surfaces, and Blue is staler than its date suggests until
+  that happens.
 - **Last run:** 2026-08-18 (punch-list item 5, Blue + Red in one session —
   Aaron's ask was API hygiene and dev-cycle relics, which is Blue, and alerts
   and instability signals, which is Red). Previous: 2026-08-16 (rainbow).
