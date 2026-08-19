@@ -102,6 +102,22 @@ ASSETS: dict[str, Asset] = {
         size=1_984_273,
         media_type="application/gzip",
     ),
+    # Not part of the engine, and here for a reason worth reading. The worker
+    # above opens with `/*! For license information please see
+    # worker.min.js.LICENSE.txt */` -- a pointer **relative to wherever the
+    # script is served from**. Serving the worker first-party without this
+    # beside it aimed every recipient at a 404, and what it holds are the MIT
+    # and BSD-3-Clause notices for the code bundled inside the worker, whose
+    # one condition is that the copyright travels with the copy. Nothing
+    # fetches it in the ordinary course; it exists so that following the
+    # pointer works. NOTICE.md carries the rest of the argument.
+    "worker.min.js.LICENSE.txt": Asset(
+        url=(f"https://cdn.jsdelivr.net/npm/tesseract.js@{WORKER_VERSION}"
+             "/dist/worker.min.js.LICENSE.txt"),
+        digest="45f54171aeaa1d10c0c1a66f374b7bba1f02472b1487fbe892eec04f840002ac",
+        size=466,
+        media_type="text/plain",
+    ),
 }
 
 #: Headroom over the largest pinned asset. The digest is what actually
@@ -185,5 +201,11 @@ def ensure(name: str) -> Path | None:
 
 def installed() -> dict[str, bool]:
     """Which assets are on the shelf right now. For the health endpoint and
-    for a client that would rather not open a viewfinder it cannot use."""
+    for a client that would rather not open a viewfinder it cannot use.
+
+    Reports the whole table, `worker.min.js.LICENSE.txt` included -- and that
+    row is `False` on a working camera, because nothing fetches it unless
+    somebody follows the worker's pointer. A caller gating a viewfinder wants
+    the three engine files, not every key here.
+    """
     return {name: (cache_dir() / name).exists() for name in ASSETS}

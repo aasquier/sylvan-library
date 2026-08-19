@@ -154,6 +154,21 @@ def test_every_pinned_asset_is_described_completely():
         assert asset.size < ocr._MAX_BYTES, name
 
 
+def test_the_worker_notice_is_the_sibling_of_the_worker_it_explains():
+    """The worker's first line points at `worker.min.js.LICENSE.txt`,
+    *relative to wherever it is served from* -- so first-party serving turns
+    that pointer into a 404 unless the notice is on the shelf too. Derived
+    from the worker's own row rather than restated as a literal, because the
+    drift this has to catch is a `WORKER_VERSION` bump that moves one URL and
+    not the other, which would serve one release's notice with another
+    release's code.
+    """
+    worker = ocr.ASSETS["worker.min.js"]
+    notice = ocr.ASSETS["worker.min.js.LICENSE.txt"]
+    assert notice.url == f"{worker.url}.LICENSE.txt"
+    assert notice.media_type == "text/plain"
+
+
 def test_the_trained_data_is_the_small_one():
     """2.0MB against 10.9MB, for a job that reads a card name and a
     three-digit number. The larger file buys accuracy on prose."""

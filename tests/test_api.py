@@ -1323,6 +1323,33 @@ def test_the_reader_shelf_serves_a_cached_file(client, tmp_path, monkeypatch):
     assert response.headers["cache-control"] == (
         "public, max-age=31536000, immutable")
 
+
+def test_the_worker_licence_notice_is_reachable(client, tmp_path, monkeypatch):
+    """The worker is served byte-identical, so it still says `For license
+    information please see worker.min.js.LICENSE.txt` -- and that pointer is
+    relative to *our* origin. It has to answer here or every recipient of the
+    worker is pointed at a 404 (NOTICE.md, "Tesseract").
+
+    The name is taken off the shelf rather than written out, so deleting the
+    row fails this test rather than leaving it green against a table it
+    supplied itself.
+    """
+    from mtglab import ocr
+
+    name, = [n for n in ocr.ASSETS if n.endswith(".LICENSE.txt")]
+    notice = b"/*! ieee754. BSD-3-Clause License. */"
+    monkeypatch.setattr(ocr, "_download", lambda url: notice)
+    monkeypatch.setitem(
+        ocr.ASSETS, name,
+        ocr.Asset(url="https://example.invalid/w.js.LICENSE.txt",
+                  digest=hashlib.sha256(notice).hexdigest(),
+                  size=len(notice), media_type="text/plain"))
+    with config.use_paths(data_dir=tmp_path / "shelf"):
+        response = client.get(f"/api/ocr/{name}")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    assert b"BSD-3-Clause" in response.content
+
 # --------------------------------------------------------------------- sim
 
 def test_sim_requires_a_slug(client):

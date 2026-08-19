@@ -17,7 +17,87 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-08-16 (rainbow). Previous: 2026-08-16 (the skill's eval).
+- **Last run:** 2026-08-19 (rainbow). Previous: 2026-08-16 (rainbow).
+- **Fixed this run (2026-08-19, rainbow):**
+  1. **The project distributes other people's code and type, and none of the
+     notices travelled with it.** The camera door (#179/#180, three days old)
+     made `ocr.py` the **only third-party code this project actually
+     redistributes** — every other section of `NOTICE.md` is an argument for
+     why something is *not* redistributed (Forge is a separate process,
+     ffmpeg never reaches the image, Depth-Anything is never served). These
+     bytes go to every browser that opens a viewfinder, and `NOTICE.md` had no
+     Tesseract section at all; the Apache-2.0 claim existed only as an
+     adjective, in `CLAUDE.md` and in a comment in `tests/test_isolation.py`.
+     The sharpest part is self-evidencing: **`worker.min.js` opens with
+     `/*! For license information please see worker.min.js.LICENSE.txt */`**,
+     a pointer *relative to whatever origin serves the script* — so serving it
+     first-party aimed every recipient at a 404, and what that file holds is
+     the MIT and BSD-3-Clause notices for buffer, ieee754,
+     regenerator-runtime and zlib.js, licences whose one condition is that the
+     copyright travels with the copy. Fixed three ways: the notice is a fourth
+     row on the shelf (pinned by digest like the rest, answering at
+     `/api/ocr/worker.min.js.LICENSE.txt`); `licenses/Apache-2.0.txt` and
+     `licenses/OFL-1.1.txt` carry the texts, the first also covering the
+     minified `tesseract.js` Vite bundles into the **committed**
+     `web_dist/assets/reader.js`, where the minifier drops the legal comments;
+     and `NOTICE.md` gains the two sections with the verification written out.
+     **Both tests mutation-verified** — the row deleted, watched to fail,
+     restored — and the route test takes the name *off the shelf*
+     (`name, = [n for n in ocr.ASSETS if n.endswith(".LICENSE.txt")]`) rather
+     than restating it, because the first draft supplied its own table entry
+     and stayed green against the bug.
+  2. **The newest paid surface's job body had no tests at all.**
+     `api/scanruns.py` sat at **61%**, the least-covered module in the app,
+     and the missing lines were the whole closure: the `ModeExhausted` and
+     SDK-failure translations, and — the part that matters — the hand-off to
+     `identify_cards` that *is* ADR 34. The 42-tests-that-all-asked-about-a-deck
+     shape, again: `tests/test_claude_scan.py` has 15 tests and every one is
+     about the mode. Four tests added against `tiny_pool`'s real printings
+     (not a faked `identify`, which would agree with any wrong answer), all
+     mutation-verified: bypassing the pool, letting `ModeExhausted` escape,
+     and raising on an unreadable capture each fail exactly one of them.
+  3. **`mutate`'s target map had no entry for either runtime shelf.**
+     `ocr.py` — the module deciding whether somebody else's WebAssembly runs
+     in a browser — and `symbols.py` were absent, so the digest check, the
+     size cap and the sticky refusal set had never been sampled. Added;
+     catalogue **1,231 → 1,279 sites across 18 modules**.
+  4. **A survivor closed: `sim/compile.py:102`, `0` → `1`.** The line's own
+     comment states the rule ("a fetchland sacrifices itself, so it is
+     net-zero lands and must not count here") and nothing pinned it. Widened,
+     every land in the deck fetches another — `SimCard.is_ramp` turns true for
+     all of them and the engine draws an extra land per land played — and
+     `test_sim_compile`, `test_sim_tier1`, `test_determinism` and
+     `test_sim_cache` were **all still green**, checked by hand rather than
+     inferred from the mapped-test caveat. `test_a_fetchland_compiles_to_no_ramp_at_all`
+     closes it, mutation-verified against that same mutant. Same shape as the
+     `decks/validate.py:158` survivor the previous run closed: a stated rule
+     with no pin.
+- **Verified this run (2026-08-19, rainbow):**
+  - **The trained data is what it says it is, by its bytes.** It is fetched
+    from a *mirror* (`tessdata.projectnaptha.com`), not from the project that
+    licences it, so the URL proves nothing. Gunzipped it hashes to the same
+    git blob as `tesseract-ocr/tessdata_fast@4.0.0`'s own `eng.traineddata`
+    (`bbef4675053b5b468cdb477053e28b1c698ba08e`, 4,113,088 bytes), and that
+    repository's `LICENSE` is Apache-2.0, read rather than recalled.
+  - **No UI credit is owed, and that is checked rather than assumed** — which
+    matters because commandment 10 would have made it a genuine conflict.
+    Apache-2.0 §4(d), the clause requiring attribution *inside a display*,
+    attaches only when the upstream work ships a `NOTICE` file.
+    `tesseract.js@7.0.0/NOTICE` and `tesseract.js-core@6.1.2/NOTICE` were both
+    requested and both 404. §4(a) and §4(b)-(c) are the whole obligation, and
+    the fix above discharges them. **Re-check on any version bump** rather than
+    inheriting this — it is a fact about two packages, not about the licence.
+  - **The isolation sweep is live**, confirmed by mutation: an unclassified
+    `/api/unclassified/probe` failed `test_every_route_is_classified`, then
+    removed.
+  - **The suite does not touch the real `app.db`** — two consecutive full runs,
+    hash, size and mtime byte-identical across both. (A mid-audit scare: the
+    file's mtime moved during the first run. The second run is what settled
+    it; `ls -la` alone could not.)
+  - Queued item 3 from the last run — **widening CI's card-data filename scan
+    — has landed.** Red closed it on 2026-08-16; `ci.yml` now matches
+    `.duckdb`, `.jsonl.gz` and `.json.gz` anywhere in the tree, with the
+    argument for which extensions may go global written out beside it.
 - **Fixed this run (2026-08-16, rainbow):**
   1. **`.[dev]` could not run a third of the suite, or the type checker.**
      `pip install -e ".[dev]"` — what CLAUDE.md's Setup section documents, and
@@ -69,15 +149,17 @@ state, never checklists.
   [#126](https://github.com/aasquier/sylvan-library/pull/126). The CodeQL
   fight (four commits) is written up in `references/white.md`.
 - **Queued for Aaron:**
-  1. **ReDoS cluster — 6 open CodeQL `py/polynomial-redos` warnings.**
-     `auth/users.py` (`EMAIL_RE`, on the unauthenticated claim path) and five
-     in `decks/decklist.py` (`_MARKER`, `_BRACKET`, `_PRINTING`, `_QTY`,
-     `_HEADER`). Polynomial, low-impact; worst case is slow parsing on a long
-     crafted input, never a wrong answer. Not fixed because anchoring six
-     patterns is behaviour-sensitive on a load-bearing parser. Suggested
-     direction: a max-length bound on the pasted decklist and the email
-     *before* the regex runs, whose value is Aaron's call — cheaper and safer
-     than rewriting the patterns. Wants a per-pattern test.
+  1. **ReDoS cluster — now 4 open CodeQL `py/polynomial-redos` warnings, and
+     the pre-auth half is gone.** Re-read 2026-08-19: `auth/users.py:153`
+     (`EMAIL_RE`, the one reachable *without a session*, on the claim path) no
+     longer appears, and one of the five decklist patterns has also cleared.
+     What remains is four in `decks/decklist.py` (lines 166, 171, 184, 254),
+     all behind auth on the import path. **The urgency dropped with the
+     unauthenticated one; the question did not change.** Still not fixed
+     because anchoring the patterns is behaviour-sensitive on a load-bearing
+     parser. Suggested direction unchanged: a max-length bound on the pasted
+     decklist *before* the regex runs, whose value is Aaron's call. Wants a
+     per-pattern test.
   2. **Package licence undeclared in `pyproject.toml`.** `[project]` has no
      `license` key, so the wheel metadata reads as UNKNOWN despite the MIT
      `LICENSE`. One-line change, but the correct form is
@@ -87,17 +169,36 @@ state, never checklists.
      source rather than from pyproject: a licence sweep of the installed
      metadata reports `mtg-lab  UNKNOWN` while every one of its 44 dependencies
      reports a real licence.*
-  3. **Widen CI's card-data filename scan to catch a `.duckdb` anywhere.**
-     `no-secrets-or-card-data` anchors that rule to `^data/.*\.(json|duckdb)$`,
-     so a pool committed outside `data/` — the likely accident, since
-     `MTGLAB_DATA_DIR` is env-overridable and somebody points it at a scratch
-     dir inside the repo — passes the tracked-tree scan. The image job's
-     `find / -name "*.duckdb"` is the backstop, but only for what ships. One
-     added alternative (`|\.duckdb(\.wal)?$`) closes it; it cannot false-positive
-     (no tracked file matches). **Not done this run only because `ci.yml` is
-     Red's file and Red was running concurrently** — a deliberate concurrency
-     call, not a doubt about the fix. Wants an evaluating test (the #86 lesson:
-     assert the pattern against a truth table, never grep the workflow).
+  3. ~~**Widen CI's card-data filename scan to catch a `.duckdb` anywhere.**~~
+     **Landed** — Red closed it 2026-08-16. Kept as a line rather than deleted
+     so the next run does not re-find it.
+  4. **The coverage floor is a tripwire, not a floor, and the decision is
+     still open.** Carried from #182's tooling run and re-measured today:
+     **95.136% against `fail_under = 95`**, which is ~16 statements of
+     headroom on 11,512. The comment beside the number says its point is "a
+     percent of headroom: the suite runs about 96" — that has not been true
+     for two runs. It moved the *right* way this cycle (95.0 → 95.136, and
+     this run's tests add more), but the margin is still inside ordinary
+     churn, so the next uncovered branch turns CI red for no reason anybody
+     will recognise. **Two honest options and drifting is neither**: move
+     `fail_under` to 94 and say why, or spend a session on the four modules
+     carrying the gap — `api/adminstats.py` 76%, `api/admin.py` 85%,
+     `api/argueruns.py` 86%, `animist/fetch.py` 81%. (`api/scanruns.py` was
+     the worst at 61% and is fixed above; `cardmotion/depth.py` reads 0% by
+     design — it is the `depth` extra's loader and never runs in CI.) Aaron's
+     call because a coverage floor is a policy, not a bug.
+  5. **CLAUDE.md's Setup block cannot bootstrap this machine, and nothing
+     says so.** Found by this cycle's clean-checkout install (below). It opens
+     `python -m venv .venv` — there is **no `python` on this PATH at all**;
+     `python3` is 3.7.3 and `/usr/bin/python3` is 3.8.2, both under the
+     documented 3.11 floor. The only interpreter that satisfies it is the
+     uv-managed 3.12 already inside `.venv`, and **`uv` appears nowhere in
+     the file**. So the one document a new contributor is handed describes a
+     bootstrap that cannot run where it was written, and the real one is
+     undocumented. Not fixed here because the fix is a *choice* — document
+     `uv`, name `python3.12`, or state a floor and let people solve it —
+     and it is Blue's facet (Claude-first docs) as much as this one.
+     **Flagged to Blue.**
 - **Deferred:**
   - `pytest-xdist` for parallel tests — a new dev dependency, so Aaron's call.
     **Evidence gathered this run, and it is favourable.** xdist is
@@ -118,7 +219,117 @@ state, never checklists.
     route, a scheduled job argument, or anything a user can influence.
     (Audited alongside it and *fine*: the other three f-string `execute` sites
     interpolate module constants only — `SCHEMA_VERSION`, `_ADDED_COLUMNS`, and
-    two hardcoded table names.)
+    two hardcoded table names. Re-swept 2026-08-19 over everything added
+    since: `claude/ledger.py::summary` interpolates a **column name**, which
+    cannot be bound as a parameter, and guards it with an `AXES` tuple and an
+    explicit raise; `decks/sqlsource.py` and `decks/wheel.py` build a `where`
+    clause from fixed literals and bind every value. `snapshot_prices` is
+    still the only one.)
+  - **`ocr.installed()` has no caller.** Its docstring says it is "for the
+    health endpoint and for a client that would rather not open a viewfinder
+    it cannot use", and neither exists — the client asks for its three files
+    by name. The shape `caches.py` was built for: a function can be correct,
+    tested and never once called. Left rather than deleted because the
+    camera-readiness use is plausibly coming, and a docstring note now records
+    that the row added this run reads `False` on a working camera. Trigger:
+    the next session that touches the camera door either wires it up or
+    removes it.
+  - **No request-body size limit before FastAPI parses JSON.** `claude/scan.py`
+    caps the *decoded* capture at 4MB, but that runs after the whole body has
+    been buffered and base64-decoded — and every `payload: dict[str, Any]`
+    route shares the property, so it is neither new nor scan-specific. The
+    mitigating fact is that all of them are behind auth, so the caller is
+    somebody Aaron invited. Trigger: a public POST route, or memory pressure
+    on the instance.
+- **Measurements (2026-08-19, rainbow):**
+  - Full suite: **2409 passed / 0 skipped in 175.0s** on this laptop, run
+    twice. Zero skips is *correct here and different from CI*: the two
+    `needs_full_pool` tests find the real pool on this machine and run, where
+    CI's gate pins them at 2 skipped. **The count is what moved** — 1926 →
+    2409 in three days, which is the camera door, the bench and the mutate
+    harness arriving. Slow tail unchanged in shape and slightly faster:
+    `test_sim_tier1` land sweep 5.60s, `test_wheel` 4.29s, then
+    `test_sim_tier1` 2.47/2.27s. Nothing new in the top 25.
+  - **Coverage 95.136%** (11,512 statements, 560 missed) against
+    `fail_under = 95`. Up from #182's 95.0 and still inside churn — queued
+    item 4.
+  - **Mutation sample: kill rate 72% — 18 of 25, seed 1, drawn from 1,279
+    sites**, judged by each module's mapped tests. Prior baseline 76% (19/25,
+    seed 0, 1,231 sites); the two are different draws over a catalogue that
+    grew by 48 sites, so read them as two samples rather than a trend.
+    All seven survivors read, which is the work the tool does not do:
+    - `sim/compile.py:102` (`0` → `1`) — **a real gap, closed above.**
+    - `decks/suggest.py:183` (`<=` → `<`) — real and cosmetic: the "mana value
+      3 vs 4" *sentence* disappears for an exactly-one-away pair. The score is
+      untouched. Not worth a run's diff.
+    - `sim/tier1/engine.py:400` (`1` → `2`) — the text report's row loop; drops
+      turn 1 from a printed table. Real, cosmetic, untested.
+    - `auth/ratelimit.py:48` and `colors.py:904`, both `True` → `False` — and
+      both are **`@dataclass(frozen=True)`**. Nothing mutates a `Limit` or an
+      `Era`, so no test could see it. **Worth passing to Colorless as a
+      catalogue observation**: `constant` mutations landing on decorator
+      keyword arguments are structural rather than behavioural and will
+      survive forever, which quietly depresses every kill rate. Two of seven
+      survivors here.
+    - `ocr.py:147` (`30` → `31`) — the `urlopen` timeout. Equivalent by
+      design: `tests/test_ocr.py` opens by saying no test sends a request.
+    - `cards/identify.py:200` (`6` → `7`) — the longest set-code prefix tried
+      against the corner. Equivalent *given the pool*: no real set code is
+      seven characters, so the extra iteration can never match. Equivalent
+      because of a fact about Scryfall, not about the code — worth knowing if
+      that ever changes.
+  - **Licences swept 2026-08-19 from installed metadata, not summaries:**
+    **75 Python distributions** (was 45) — MIT/BSD/Apache/MPL/PSF/ISC/
+    MIT-CMU/MIT-0/CC0/Zlib/0BSD/CNRI-Python; **180 npm packages** (was 163) —
+    140 MIT, 15 ISC, 10 Apache-2.0, 4 MPL-2.0, 3 each BSD-3-Clause and
+    BSD-2-Clause, 2 MIT-0, 1 each BlueOak-1.0.0/CC0-1.0/"MIT AND ISC".
+    **Zero AGPL/GPL/SSPL/UNLICENSED on either side.** Only `UNKNOWN` is the
+    package itself (queued item 2, still true). npm's Apache-2.0 count rose
+    6 → 10, which is the Tesseract arrival showing up in the numbers.
+  - **`animist verify`: 12 recipes, all held** (was 2 — the wheel, séance,
+    learn and ambience recipes all landed since). The video outputs are
+    genuinely decoded here rather than skipped: `_decode_video` returning
+    `None` produces a *failure*, not a pass, so a missing `imageio_ffmpeg`
+    cannot read as green.
+  - **Committed-binary sweep: 150 tracked media files, every directory
+    accounted for.** 78 tarot + 11 ambience + 11 wheel + 6 séance + 3 learn +
+    3 claude, each with a recipe or a `PROVENANCE.md`; plus 4 woff2 fonts and
+    their `PROVENANCE.md`; the rest are the build's copies under `web_dist`.
+    **No hand-placed binary, no Wizards art under `git ls-files`, no
+    monetization surface anywhere** (swept `web/src` and `src/mtglab` for
+    donation/sponsor/payment/ad wording — the only hits are Magic flavour text
+    and the word "checkout" meaning a git checkout).
+  - **Fonts, verified three ways** and recorded because it is a *new* surface
+    since the last White run: Google Fonts' `OFL.txt` and `METADATA.pb` per
+    family; the two foundries' licence bodies compared and found identical;
+    and — the one that decides it — the binaries themselves, whose `name`
+    tables carry the copyright with the reserved font name (nameID 0) and the
+    OFL's URL (nameID 14). nameID 13, the full licence text, is absent from
+    all four, which is Google Fonts' universal subsetting behaviour; that is
+    why `licenses/OFL-1.1.txt` now exists.
+  - **CodeQL: 4 open alerts, all `py/polynomial-redos`, down from 6.** The
+    `auth/users.py` one — the only pre-auth reachable pattern — has cleared.
+    Nothing dismissed. `dependency-review` green on the last three runs.
+  - **The clean-checkout install, done deliberately this cycle** (the item
+    that found the `.[dev]` gap in 2026-08-16, by accident, and that nothing
+    reproduces on purpose any more). A detached worktree at `origin/main`, a
+    fresh venv, `pip install -e ".[dev]"` verbatim: **2407 passed / 2 skipped
+    in 185.6s**, and the two skips are exactly CI's pinned pair
+    (`test_api.py:1846` and `test_colors.py:153`, both `needs_full_pool`).
+    `mypy` clean over 107 source files. 2407 + 2 == the main tree's 2409, so
+    **it is the same suite** — the 2026-08-16 gap stays closed and
+    `tests/test_packaging.py` is holding it. The one thing it did find is
+    queued item 5: the interpreter the documented command names does not
+    exist here.
+  - **Security spot-checks all still hold**: cookies `HttpOnly; Secure;
+    SameSite=Lax`; Argon2id at the OWASP minimum (m=19456 KiB, t=2, p=1);
+    `MAX_PASSWORD_BYTES = 1024` bounds the hash input; no query-string token
+    anywhere under `web/src`; `include_email=True` still has exactly one
+    caller (`api/admin.py`) beside `mtglab users list`; `.env` gitignored and
+    `fly.toml` carries no secret. **57 routes classified** in
+    `tests/test_isolation.py`, the four newest (`/api/claude/scan`,
+    `/api/symbols/{code}.svg`, `/api/ocr/{name}`, the two motion routes) all
+    filed SHARED with the argument written beside each.
 - **Measurements (2026-08-16, rainbow):**
   - Full suite: **1926 passed / 2 skipped in 148.0s**, skip gate on 2, `data/`
     clean afterwards. *Measured under concurrent load — four sibling polish
