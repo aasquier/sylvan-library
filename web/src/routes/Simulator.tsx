@@ -11,9 +11,9 @@ import {
   StatTile,
 } from '../components/ui'
 import {
-  ByTurnChart, CommanderCurve, DataTable, LandSweepChart, LandTradeoffChart,
-  WastedManaChart,
-} from '../components/charts'
+  ByTurnChart, CommanderCurve, LandSweepChart, LandTradeoffChart, WastedManaChart,
+} from '../components/lazycharts'
+import { DataTable } from '../components/datatable'
 import { HelpTip, Term } from '../components/term'
 
 type Mode = 'mana' | 'lands'

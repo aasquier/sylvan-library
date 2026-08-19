@@ -480,3 +480,66 @@ describe('admin stats URLs', () => {
     ])
   })
 })
+
+describe('concurrent identical GETs', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('asks once when two callers want the same path at the same time', async () => {
+    // The shape that made this worth writing: the shell and the Library both
+    // want `/api/health` in the same tick on every visit to the front page.
+    let resolve!: (v: unknown) => void
+    const fetchMock = vi.fn(() => new Promise((r) => { resolve = r }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const both = Promise.all([api.health(), api.health()])
+    resolve({ ok: true, json: () => Promise.resolve({ pool: true }) })
+    const [a, b] = await both
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(a).toEqual({ pool: true })
+    expect(b).toEqual(a)
+  })
+
+  it('is a queue of one and not a cache: the next ask hits the network', async () => {
+    // The property that makes it safe. If an entry outlived its request this
+    // would answer the second call from the first call's body, and a screen
+    // could render a pool state that had already changed.
+    const fetchMock = vi.fn(() => Promise.resolve({
+      ok: true, json: () => Promise.resolve({ pool: true }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await api.health()
+    await api.health()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not coalesce different paths', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({
+      ok: true, json: () => Promise.resolve([]),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await Promise.all([api.health(), api.decks()])
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('shares a failure with both callers, and recovers afterwards', async () => {
+    // Both asked at the same instant, so both hear the same answer -- and the
+    // failure must not leave the path poisoned for the retry.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 500, url: '/api/health',
+                               json: () => Promise.resolve({ detail: 'boom' }) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ pool: true }) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const results = await Promise.allSettled([api.health(), api.health()])
+    expect(results.map((r) => r.status)).toEqual(['rejected', 'rejected'])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await expect(api.health()).resolves.toEqual({ pool: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})

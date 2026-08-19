@@ -13,6 +13,7 @@ Validation refuses to emit artifacts when a card is missing one.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -138,6 +139,27 @@ DECK_STATUSES = ("built", "theoretical")
 DECK_STAGES = ("draft", "curated")
 
 
+#: Parsed decks: path -> (mtime_ns, size, deck).
+#:
+#: The deck file is the source of truth and every request re-read it: seven
+#: decks cost 18.0ms of YAML on **every** call to the library shelf, for files
+#: that had not changed since the last one (measured 2026-08-19).
+#:
+#: Keyed on the **path**, with the filesystem's stamp in the value rather than
+#: in the key, and that is the whole design. A deck the app just wrote -- or
+#: one edited by hand, or restored from a backup -- has a stamp that no longer
+#: matches, so it is re-parsed and its entry replaced. One entry per deck file
+#: is therefore the ceiling, and an instance that has been edited ten thousand
+#: times holds exactly as much as one that has never been edited at all.
+#:
+#: (Putting the stamp in the key instead reads as the more obvious cache and
+#: is a slow leak: every edit strands an entry that can never be hit again.)
+#:
+#: `mtime_ns` **and** size, because mtime alone can repeat within a
+#: filesystem's granularity.
+_PARSED: dict[str, tuple[int, int, Deck]] = {}
+
+
 @dataclass
 class Deck:
     slug: str
@@ -236,8 +258,27 @@ class Deck:
         path = Path(path)
         if path.is_dir():
             path = path / "deck.yaml"
-        return cls.from_text(path.read_text(encoding="utf-8"),
-                             slug=path.parent.name, source_path=path)
+        try:
+            st = path.stat()
+        except OSError:
+            # Let `read_text` raise the real error, with the real message.
+            return cls.from_text(path.read_text(encoding="utf-8"),
+                                 slug=path.parent.name, source_path=path)
+
+        stamp = (st.st_mtime_ns, st.st_size)
+        cached = _PARSED.get(str(path))
+        if cached is not None and cached[:2] == stamp:
+            hit = cached[2]
+        else:
+            hit = cls.from_text(path.read_text(encoding="utf-8"),
+                                slug=path.parent.name, source_path=path)
+            _PARSED[str(path)] = (*stamp, hit)
+        # A **copy**, never the cached object. `Deck` is a mutable dataclass and
+        # callers do write to it -- `source.py` sets `shared` on the way out of
+        # a read -- so handing out the cached instance would let one request's
+        # edit be the next request's answer. Copying is 5.2ms where parsing is
+        # 18.0ms for the library's seven decks, so the win survives the safety.
+        return copy.deepcopy(hit)
 
     @classmethod
     def from_text(cls, text: str, *, slug: str | None = None,

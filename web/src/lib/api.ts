@@ -895,10 +895,42 @@ export function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
+/**
+ * GETs that are already in the air, by path.
+ *
+ * **Not a cache — a queue of one.** An entry lives only while its request is
+ * unresolved and is deleted the moment it settles, so nothing here is ever
+ * read after the network has answered and no screen can be handed a stale
+ * body. What it removes is the *duplicate* ask: two components that mount
+ * together and want the same thing make one request instead of two.
+ *
+ * `/api/health` is the one that made this worth writing — the shell asks for
+ * it to show the pool's state and the Library asks for it again in the same
+ * tick, so every visit to the front page opened two identical connections to
+ * a one-machine server. It is the client's half of what `jobs.submit(key=…)`
+ * already does on the server: asking twice at once is one question.
+ *
+ * Failures are shared too, deliberately. Both callers asked at the same
+ * instant; answering one with an error and the other with a retry would make
+ * the screen disagree with itself about whether the server is up.
+ */
+const inFlight = new Map<string, Promise<unknown>>()
+
 async function get<T>(path: string): Promise<T> {
-  const resp = await fetch(path)
-  if (!resp.ok) await refuse(resp, path)
-  return resp.json() as Promise<T>
+  const waiting = inFlight.get(path)
+  if (waiting) return waiting as Promise<T>
+
+  const request = (async () => {
+    const resp = await fetch(path)
+    if (!resp.ok) await refuse(resp, path)
+    return resp.json() as Promise<T>
+  })()
+  inFlight.set(path, request)
+  try {
+    return await request
+  } finally {
+    inFlight.delete(path)
+  }
 }
 
 async function send<T>(method: string, path: string, body?: unknown): Promise<T> {

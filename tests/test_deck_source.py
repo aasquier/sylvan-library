@@ -529,3 +529,80 @@ def test_library_resolution_edges(tmp_path):
                          authenticated=True)
         assert keeper.my_owner == "gyome"
         assert keeper.mine().writable is True
+
+
+# ------------------------------------------------------- the parse cache
+
+
+def _write(path: Path, name: str = "Cache Test") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"name: {name}\ncommander: [Sol Ring]\nstage: draft\n"
+        "cards:\n  - name: Forest\n    category: land\n    qty: 1\n",
+        encoding="utf-8")
+
+
+def test_a_deck_file_is_parsed_once_until_it_changes(tmp_path, monkeypatch):
+    """`Deck.load` re-reads the file; it must not re-parse an unchanged one."""
+    from mtglab.decks import model
+
+    path = tmp_path / "cachey" / "deck.yaml"
+    _write(path)
+
+    parses = []
+    real = model.load_yaml
+    monkeypatch.setattr(model, "load_yaml",
+                        lambda text: parses.append(1) or real(text))
+
+    assert Deck.load(path).name == "Cache Test"
+    assert Deck.load(path).name == "Cache Test"
+    assert len(parses) == 1, "an unchanged deck file was parsed twice"
+
+    # A rewrite is a different file, and must be seen. Written through the
+    # same path a deck edit uses, with a stamp the cache cannot mistake for
+    # the old one.
+    _write(path, name="Edited")
+    import os
+    os.utime(path, ns=(0, 0))
+    assert Deck.load(path).name == "Edited"
+    assert len(parses) == 2
+
+
+def test_the_cache_never_hands_out_the_same_object_twice(tmp_path):
+    """The cached deck is copied on the way out.
+
+    `Deck` is a mutable dataclass and `FileDeckSource.get` writes `shared` on
+    what it returns, so a cache that handed back the stored instance would let
+    one caller's edit become every later caller's answer.
+    """
+    path = tmp_path / "shared" / "deck.yaml"
+    _write(path)
+
+    first, second = Deck.load(path), Deck.load(path)
+    assert first is not second
+    assert first.cards is not second.cards, "the card list is shared"
+
+    first.name = "Mutated"
+    first.cards[0].category = "ramp"
+    third = Deck.load(path)
+    assert third.name == "Cache Test"
+    assert third.cards[0].category == "land"
+
+
+def test_one_cache_entry_per_deck_file_however_often_it_is_edited(tmp_path):
+    """The cache is keyed on path, so editing cannot grow it without bound."""
+    import os
+
+    from mtglab.decks import model
+
+    path = tmp_path / "churn" / "deck.yaml"
+    _write(path)
+    model._PARSED.clear()
+
+    for i in range(12):
+        _write(path, name=f"Edit {i}")
+        os.utime(path, ns=(i + 1, i + 1))
+        Deck.load(path)
+
+    mine = [k for k in model._PARSED if k.startswith(str(tmp_path))]
+    assert len(mine) == 1, f"twelve edits left {len(mine)} entries behind"
