@@ -1,9 +1,10 @@
 # Blue — Craft & Knowledge
 
-Three facets: Python best practices, TypeScript/React best practices, and the
-Claude-first documentation and memory audit. Blue is the color of perfected
-craft and of knowing things — including knowing yourself, which is what the
-third facet is.
+Four facets: Python best practices, TypeScript/React best practices, the
+Claude-first documentation and memory audit, and the spirit of Magic. Blue is
+the color of perfected craft and of knowing things — including knowing
+yourself, which is what the third facet is, and knowing the game whose name
+is on the door, which is the fourth.
 
 ## Facet: Python craft
 
@@ -127,3 +128,46 @@ files against them.
 - The question to end on: *could a fresh session, given only this repo and
   these memories, pick up the work without asking Aaron anything already
   answered?* Every "no" is a finding.
+
+## Facet: The spirit of Magic
+
+Commandment 3 made operational, the way ROADMAP item 12 operationalised
+commandment 5. The other facets keep the copy true; this one keeps it Magic.
+The sweep asks one question of every rendered sentence and surface: *is the
+game's own vocabulary and iconography doing the talking, or has plain
+conversational English crept in where a Magic word would serve?*
+
+- **Prefer Magic's word over the conversational one wherever a real term
+  fits.** The app at its best already speaks this way — cards are *entombed*
+  in a graveyard and *returned* from it, removal is *exile*, the Wheel deals
+  fates — and it drifts at the edges: a generic "Delete", "Error",
+  "Loading…" or "No results" where the game has a truer word. Grep
+  `web/src` for rendered strings — labels, buttons, empty states, error and
+  loading copy, placeholders, tooltips, toasts — and walk the live surface
+  reading each line with the question above. CLI output and artifact prose
+  are surfaces too.
+- **"Within reason" is a real boundary, and commandment 2 draws it.** A term
+  qualifies only if a newcomer can still act on the sentence — flavour that
+  obscures what a control does is a regression wearing a costume. The
+  glossary (`glossary.py`) is what squares the two commandments: a Magic
+  term the UI teaches on hover is beginner-safe in a way a bare one is not,
+  so "use the term *and* glossary it" beats both the plain word and the
+  unexplained term. A flavour fix that needs a new glossary entry is still a
+  safe fix; the entry rides along.
+- **Iconography counts as vocabulary.** Where a color, cost, or identity
+  renders as prose or a plain swatch, the official symbols (`symbols.py`,
+  `managlyphs.ts` offline) are the Magic-speaking alternative; likewise the
+  app's own materials — the felt, the brass, the vine. Commandment 5 bounds
+  the palette (real card art, real materials, never clip art) and White's
+  law binds every asset: this facet may *propose* imagery, but the animist
+  and its licence gate decide whether it exists.
+- **Some words are load-bearing; renaming them is not a safe fix.** Wire
+  tokens, `glossary.py` keys (`SIMULATOR_KEYS` pins them), YAML fields, and
+  CLI verbs are API. The pattern is flavouring the *rendered label* over an
+  unchanged token — `lib/claudecopy.ts` is exactly that seam — and renaming
+  the token underneath is a queued item. Commandment 10 still governs: a
+  flavourful sentence that names a seed, model, or database has made things
+  worse, not better.
+- Record in the ledger which surfaces were swept and what was flavoured, so
+  the next run starts where this one stopped instead of re-reading the
+  whole app.
