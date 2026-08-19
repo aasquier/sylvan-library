@@ -17,6 +17,7 @@ CI (ADR 6), so the fixture is a real DuckDB pool of 21 real cards with a
 legal 99 built out of them.
 """
 
+import hashlib
 import sys
 import time
 from dataclasses import replace
@@ -1274,6 +1275,29 @@ def test_identify_without_a_pool_says_so(client, tmp_path):
         ]}).json()
     assert body["readings"] == []
     assert "data refresh" in body["message"]
+
+def test_the_reader_shelf_refuses_a_name_it_does_not_hold(client):
+    """`ocr.ASSETS` is the guard: there is no pattern to get wrong."""
+    assert client.get("/api/ocr/worker.js").status_code == 404
+    assert client.get("/api/ocr/eng.traineddata").status_code == 404
+
+
+def test_the_reader_shelf_serves_a_cached_file(client, tmp_path, monkeypatch):
+    """Served first-party and immutable, because the cache path carries the
+    pinned versions -- these bytes can never come to mean anything else."""
+    from mtglab import ocr
+
+    monkeypatch.setattr(ocr, "_download", lambda url: b"console.log(1)")
+    monkeypatch.setitem(
+        ocr.ASSETS, "worker.min.js",
+        ocr.Asset(url="https://example.invalid/w.js",
+                  digest=hashlib.sha256(b"console.log(1)").hexdigest(),
+                  size=14, media_type="text/javascript"))
+    with config.use_paths(data_dir=tmp_path / "shelf"):
+        response = client.get("/api/ocr/worker.min.js")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == (
+        "public, max-age=31536000, immutable")
 
 # --------------------------------------------------------------------- sim
 

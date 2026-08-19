@@ -213,3 +213,85 @@ def test_the_batch_is_bounded(con):
 
 def test_reading_nothing_at_all(con):
     assert identify.read(con, []) == []
+
+# ------------------------------------------- the corner as a reader sees it
+
+def test_the_corner_a_real_reader_actually_returned(con):
+    """The verbatim output of Tesseract on a real Lord of the Rings Sol Ring.
+
+    Captured in a browser, against the crop this code ships, from Scryfall's
+    488px image -- a *pessimistic* source, since a phone photograph carries
+    four times the detail. It is here rather than a tidy invented string
+    because every tidy string I would have written was wrong: the set code
+    does not arrive as a token, it arrives welded to the language tag and the
+    artist's initials.
+    """
+    sighting = identify.from_corner(con, "U0284\nLTCENLIK")
+    assert sighting.set_code == "LTC"
+    assert sighting.collector_number == "0284"
+    assert identify.read(con, [sighting])[0].resolved == "Sol Ring"
+
+
+def test_the_number_line_yields_no_set(con):
+    """`U0284` is a rarity welded to a number. A token that starts with a
+    digit is never a set code, and this one must not become `U0`."""
+    assert identify.from_corner(con, "U0284").set_code is None
+    assert identify.from_corner(con, "0284/0281 U").set_code is None
+
+
+def test_only_the_first_token_of_a_line_may_be_a_set(con):
+    """The set code is the leftmost thing on its line, so the artist never
+    gets a vote -- and `CHRISRAHN` has `CHR` as a prefix."""
+    assert identify.from_corner(con, "MOM 137 CHRISRAHN").set_code == "MOM"
+    # The artist alone, with no set code in front of them, matches nothing.
+    assert identify.from_corner(con, "CHRISRAHN").set_code is None
+
+
+def test_the_longest_real_prefix_wins(con):
+    """`MOM` and `M12` are both in the fixture; a run-together token has to
+    resolve to the code that is actually there, not the shortest guess."""
+    assert identify.from_corner(con, "MOMENEXT").set_code == "MOM"
+    assert identify.from_corner(con, "M12ENAB").set_code == "M12"
+
+
+def test_a_set_code_that_does_not_exist_is_not_one(con):
+    """The whole reason this moved out of the browser. `TTBS` is what the
+    reader returned when the crop was wrong, and no client-side rule can
+    know it is not a set -- only the pool's own 986 can say."""
+    assert identify.from_corner(con, "TTBS\nMAS").set_code is None
+
+
+def test_the_copyright_line_is_not_a_collector_number(con):
+    """It sits directly below the crop and bleeds in constantly."""
+    assert identify.from_corner(con, "TM AND C 2021 WIZARDS").collector_number is None
+
+
+def test_an_explicit_set_code_beats_a_raw_corner(con):
+    """A caller that already has the fields is not second-guessed -- the
+    text path exists for readers that only have pixels."""
+    reading = identify.read(con, [Sighting(
+        set_code="ltc", collector_number="284", corner="COMPLETE NONSENSE")])[0]
+    assert reading.resolved == "Sol Ring"
+
+
+def test_a_corner_of_nothing_is_harmless(con):
+    for junk in [None, "", "   ", "|||", "\n\n"]:
+        sighting = identify.from_corner(con, junk)
+        assert sighting.set_code is None
+        assert sighting.collector_number is None
+
+
+def test_the_set_code_table_is_read_once_per_batch(con, monkeypatch):
+    """Forty sightings must not be forty scans of 107,338 rows."""
+    calls = []
+    real = identify.set_codes
+    monkeypatch.setattr(identify, "set_codes",
+                        lambda c: (calls.append(1), real(c))[1])
+    identify.read(con, [Sighting(corner="LTCENLIK\nU0284")] * 20)
+    assert len(calls) == 1
+
+
+def test_no_corner_text_means_no_scan_at_all(con, monkeypatch):
+    monkeypatch.setattr(identify, "set_codes", lambda c: pytest.fail(
+        "the set-code table was read for a batch with no corner text"))
+    assert len(identify.read(con, [Sighting(title="Sol Ring")])) == 1

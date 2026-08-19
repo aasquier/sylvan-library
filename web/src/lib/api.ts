@@ -426,6 +426,48 @@ export interface DeckLog {
   entries: DeckLogEntry[]
 }
 
+/** One card as the camera's review list renders it. Narrower than a search
+ *  result on purpose: this list can hold forty entries with pictures on a
+ *  phone, and oracle text is what a card's own page is for. */
+export interface IdentifiedCard {
+  name: string
+  mana_cost: string | null
+  type_line: string
+  color_identity: string[]
+  image: string | null
+  art_crop: string | null
+}
+
+/** A candidate the title tier offers. `score` is a string distance and is
+ *  carried so a list can be ordered and shaded — **never so anything can
+ *  threshold on it.** The scores of right and wrong answers overlap; see
+ *  `cards/identify.py`. */
+export interface IdentifiedCandidate extends IdentifiedCard {
+  score: number
+}
+
+/** What the pool made of one sighting.
+ *
+ * `resolved` is non-null only when a set code and collector number found a
+ * printing — a lookup with no judgement in it. A title produces
+ * `candidates` and nothing else, however certain it looks. */
+export interface Reading {
+  via: 'printing' | 'title' | 'nothing'
+  resolved: IdentifiedCard | null
+  candidates: IdentifiedCandidate[]
+}
+
+export interface IdentifyResult {
+  readings: Reading[]
+  /** Counted apart, and never summed: two of the three are work nobody has
+   *  done yet. */
+  resolved: number
+  offered: number
+  unread: number
+  dropped: number
+  message?: string
+}
+
 export interface ImportResult {
   slug: string
   /** Whose library it landed in — always the caller's. Sent back rather than
@@ -1643,6 +1685,12 @@ export const api = {
     status?: string
     dry_run?: boolean
   }) => post<ImportResult>('/api/decks/import', body),
+  // What a camera thought it saw, read against the pool. **No image is sent**
+  // — a sighting is a set code, a collector number and a title, and the
+  // photograph never leaves the browser. A POST because forty of them with
+  // free-text titles do not belong in an access log.
+  identifyCards: (sightings: { corner?: string; title?: string }[]) =>
+    post<IdentifyResult>('/api/cards/identify', { sightings }),
   // The 32 combinations and their history. No card pool, no decks, no network —
   // so the first screen of the create flow renders on a fresh clone.
   // Separate from `deck()` on purpose: it runs several extra pool queries

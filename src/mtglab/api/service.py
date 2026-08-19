@@ -2292,6 +2292,10 @@ def identify_cards(sightings: list[dict[str, Any]]) -> dict[str, Any]:
                 set_code=(s.get("set") or None),
                 collector_number=(s.get("number") or None),
                 title=(s.get("title") or None),
+                # The bottom-left block as the reader saw it. Preferred over
+                # the two fields above, because finding a set code inside
+                # `LTCENLIK` needs the pool's own 986 -- see `from_corner`.
+                corner=(s.get("corner") or None),
             )
             for s in sightings[:identify.MAX_SIGHTINGS]
         ]

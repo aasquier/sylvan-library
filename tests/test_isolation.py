@@ -133,6 +133,11 @@ SHARED = {
     # session, nothing per-account to reach.
     "/api/symbols/{code}.svg": "a shared cache of public mana-symbol art; "
                                "nothing per-account",
+    # The reading engine, same runtime-cache shape again: a fixed table of
+    # Apache-2.0 files, byte-identical for every session, fetched by the
+    # camera door and by nothing else.
+    "/api/ocr/{name}": "a shared cache of the Apache-2.0 OCR engine; the "
+                       "same three files for everyone, nothing per-account",
 }
 
 # Belongs to one person. Each entry says how to make one as user A and where to

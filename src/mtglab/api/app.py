@@ -1193,6 +1193,30 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             path, media_type="image/svg+xml",
             headers={"Cache-Control": "public, max-age=604800"})
 
+    @app.get("/api/ocr/{name}")
+    def ocr_asset(name: str) -> FileResponse:
+        """One file of the reading engine, off the shelf `ocr.py` fills.
+
+        Six megabytes of WebAssembly and trained data that git never holds
+        and no page ever hotlinks -- the mana-symbol arrangement (ADR 33)
+        applied to somebody else's compiler output. The name must be a key
+        of `ocr.ASSETS`, which is the whole path-traversal story: there is
+        no pattern to get wrong, only a table to be absent from.
+
+        Immutable, unlike the symbols beside it, and that is the digest's
+        doing: the cache path carries the pinned versions, so these bytes
+        can never mean anything else.
+        """
+        from mtglab import ocr as ocrshelf
+
+        path = ocrshelf.ensure(name)
+        if path is None:
+            raise HTTPException(status_code=404, detail="no such reader file")
+        asset = ocrshelf.ASSETS[name]
+        return FileResponse(
+            path, media_type=asset.media_type,
+            headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
     # -------------------------------------------------------------- sim
 
     # The job closures capture `decks` and run after the response has been

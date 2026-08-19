@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, deckUrl, errorMessage, type ImportResult } from '../lib/api'
+import CameraDoor from '../components/camera'
 import {
   Badge, ErrorNote, ManaText, PageMasthead, Spinner, TextField,
 } from '../components/ui'
@@ -139,27 +140,45 @@ export default function Import() {
             {lines} non-empty line{lines === 1 ? '' : 's'}
           </p>
 
-          {/* The deck that exists nowhere online. Every import path here is
-              text, so a deck that lives in a box on a table has nothing to
-              paste from — and that is exactly the deck a first-time player
-              owns. Naming the free apps costs a paragraph and closes the
-              gap today; a camera of our own is ROADMAP item 14. The caps
-              are stated because finding one at card ninety is worse than
-              reading it here. */}
-          <div className="rounded-lg px-4 py-3 text-xs leading-relaxed"
+          {/* The deck that exists nowhere online. Every other import path
+              here is text, so a deck that lives in a box on a table has
+              nothing to paste from — and that is exactly the deck a
+              first-time player owns (commandment 2). The camera is the door
+              for it; the apps below stay named because ours reads one card
+              at a time and a whole 99 is faster through theirs. */}
+          <div className="space-y-3 rounded-lg px-4 py-3"
                style={{ background: 'var(--gridline)',
                         color: 'var(--text-secondary)' }}>
-            <strong style={{ color: 'var(--text-primary)' }}>
-              Only have the cards?
-            </strong>{' '}
-            A deck sleeved up on the table has no list to copy. A free
-            scanner app will photograph the stack and hand you an export
-            this page already reads — <em>Dragon Shield MTG Scanner</em>
-            {' '}writes plain text and asks nothing of you,{' '}
-            <em>ManaBox</em> writes the Arena format, and{' '}
-            <em>Delver Lens</em> is the most accurate of the three on
-            Android, though its free export stops at 100 cards a session:
-            one Commander deck exactly. Paste whatever they give you.
+            <p className="text-xs leading-relaxed">
+              <strong style={{ color: 'var(--text-primary)' }}>
+                Only have the cards?
+              </strong>{' '}
+              A deck sleeved up on the table has no list to copy. Photograph
+              them one at a time and the pool will name them — a card's set
+              code and collector number are enough to look it up exactly, and
+              when the corner will not read, you choose from the closest
+              names in the pool.
+            </p>
+
+            <CameraDoor onCards={(lines) => {
+              // Appended to the box rather than imported: what the camera
+              // produces is a decklist like any other, and it goes through
+              // the same preview, the same gate and the same draft (ADR 13).
+              setText((current) => {
+                const before = current.trimEnd()
+                return `${before ? `${before}\n` : ''}${lines.join('\n')}\n`
+              })
+            }} />
+
+            <p className="text-xs leading-relaxed">
+              For a whole deck at once, a free scanner app is quicker, and
+              every one of them exports a format this page already reads —{' '}
+              <em>Dragon Shield MTG Scanner</em> writes plain text and asks
+              nothing of you, <em>ManaBox</em> writes the Arena format, and{' '}
+              <em>Delver Lens</em> is the most accurate on Android, though
+              its free export stops at 100 cards a session: one Commander
+              deck exactly.
+            </p>
           </div>
         </section>
 

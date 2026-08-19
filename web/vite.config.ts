@@ -49,6 +49,14 @@ export default defineConfig({
         // basenames are stable on every platform and mean something in a
         // diff.
         assetFileNames: 'assets/[name].[ext]',
+        // The OCR engine's client half, lazily imported by `lib/reader.ts`.
+        // Named, because its package entry is `src/index.js` and the chunk
+        // would otherwise be committed as `src.js` — which tells a reader of
+        // the diff nothing, and is exactly what the note above is about.
+        manualChunks(id: string) {
+          if (id.includes('tesseract.js')) return 'reader'
+          return undefined
+        },
       },
     },
   },

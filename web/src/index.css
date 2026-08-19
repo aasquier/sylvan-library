@@ -5011,3 +5011,55 @@ button:hover .tarot-fan-card {
   background: var(--baseline);
   border-radius: 6px;
 }
+
+/* ---------------------------------------------------------------- camera
+ *
+ * The card guide in the viewfinder (ROADMAP item 14). Four brackets rather
+ * than a full rectangle: a closed box invites lining the card up to the
+ * *frame*, and what actually matters is that the corner and the title are
+ * inside it, which brackets say without hiding either.
+ *
+ * It breathes, because a viewfinder that sits perfectly still reads as a
+ * frozen picture rather than a live lens (commandment 6) — and because the
+ * pulse is the only thing on screen saying the camera is running while
+ * somebody is fumbling a card out of a sleeve.
+ */
+.camera-guide {
+  position: relative;
+  border-radius: 4.5% / 3.2%;   /* a Magic card's own corner radius */
+  box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.45);
+  animation: camera-breathe 3.4s ease-in-out infinite;
+}
+
+/* The brackets. One element, two gradients per corner, drawn with a conic
+ * mask so the arms stay square as the guide's aspect changes. */
+.camera-guide::before,
+.camera-guide::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px solid var(--series-2, #d8b26a);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.camera-guide::before {
+  clip-path: polygon(0 0, 34% 0, 34% 2px, 2px 2px, 2px 22%, 0 22%,
+                     0 100%, 34% 100%, 34% calc(100% - 2px),
+                     2px calc(100% - 2px), 2px 78%, 0 78%);
+}
+.camera-guide::after {
+  clip-path: polygon(100% 0, 66% 0, 66% 2px, calc(100% - 2px) 2px,
+                     calc(100% - 2px) 22%, 100% 22%,
+                     100% 100%, 66% 100%, 66% calc(100% - 2px),
+                     calc(100% - 2px) calc(100% - 2px),
+                     calc(100% - 2px) 78%, 100% 78%);
+}
+
+@keyframes camera-breathe {
+  0%, 100% { opacity: 0.72; }
+  50%      { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .camera-guide { animation: none; opacity: 0.9; }
+}

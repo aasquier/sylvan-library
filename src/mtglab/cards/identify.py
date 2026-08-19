@@ -81,6 +81,14 @@ _FACE_NUMBER = re.compile(r"^\s*(?P<number>[^/\s]+)")
 #: Stored lowercase in the pool, which is why every comparison folds case.
 _SET_CODE = re.compile(r"^[A-Za-z0-9]{2,6}$")
 
+#: A collector number anywhere inside a token: `U0284` carries `0284`, since
+#: the rarity letter runs into the number as often as not.
+_FACE_NUMBER_IN = re.compile(r"(?P<number>\d{1,4}[a-z]?)")
+
+#: Four digits that are a plausible year. The copyright line sits directly
+#: below the crop and Magic has never printed a collector number this high.
+_YEAR = re.compile(r"(19|20)\d\d")
+
 
 @dataclass(frozen=True)
 class Sighting:
@@ -95,6 +103,10 @@ class Sighting:
     set_code: str | None = None
     collector_number: str | None = None
     title: str | None = None
+    #: The bottom-left block exactly as the reader saw it, newlines and all.
+    #: Preferred over the two fields above when present, because picking the
+    #: set code out of it needs the 986 real ones -- see `from_corner`.
+    corner: str | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +132,77 @@ class Reading:
     #: `title` (offered, not decided), or `nothing`.
     via: str = "nothing"
     candidates: list[Candidate] = field(default_factory=list)
+
+
+
+def set_codes(con: Any) -> frozenset[str]:
+    """Every set code the pool knows, upper-cased.
+
+    Read once per `read` and handed down, rather than memoised on the
+    module. A module memo would be faster and wrong: tests build a pool
+    apiece and the app can be pointed at another with `config.use_paths`, so
+    a cached table outlives the database it came from. One scan of 107,338
+    rows is ~16ms against a batch that already costs a scan per title.
+    """
+    rows = con.execute(
+        "SELECT DISTINCT upper(set_code) FROM printings "
+        "WHERE set_code IS NOT NULL").fetchall()
+    return frozenset(str(r[0]) for r in rows)
+
+
+def from_corner(con: Any, text: str | None, *,
+                codes: frozenset[str] | None = None) -> Sighting:
+    """Read a set code and a collector number out of the raw corner block.
+
+    **This is server-side because the answer needs the pool.** A card's
+    bottom-left prints the set code, the language and the artist on one line,
+    and a real reader returns them run together -- an actual capture of a
+    Lord of the Rings Sol Ring came back as::
+
+        U0284
+        LTCENLIK
+
+    `LTC` is in there and no amount of client-side string work can find it,
+    because "is this a set code" is a question only the 986 real ones answer.
+    A browser would have to be handed that table to ask it.
+
+    Two rules keep the match honest, and both were measured:
+
+    * **Longest real prefix of a line's *first* token.** The set code is the
+      leftmost thing on its line, so the artist that follows never gets a
+      vote -- which matters, because `CHRISRAHN` has `CHR` (Chronicles) as a
+      prefix and 12 of 13 real artist names tested have no match at all.
+    * **A token starting with a digit is never a set code.** It is the
+      collector-number line, and `U0284` must yield a number and no set.
+    """
+    if not text:
+        return Sighting(corner=text)
+    if codes is None:
+        codes = set_codes(con)
+    number: str | None = None
+    code: str | None = None
+
+    for line in text.split("\n")[:8]:
+        tokens = [t for t in re.split(r"[^0-9A-Za-z]+", line) if t]
+        if not tokens:
+            continue
+        if number is None:
+            for token in tokens:
+                digits = _FACE_NUMBER_IN.search(token)
+                # A four-digit year is the copyright line, which sits just
+                # below and bleeds into the crop constantly.
+                if digits and not _YEAR.fullmatch(digits["number"]):
+                    number = digits["number"]
+                    break
+        if code is None:
+            first = tokens[0].upper()
+            if not first[:1].isdigit():
+                for size in range(6, 1, -1):
+                    if len(first) >= size and first[:size] in codes:
+                        code = first[:size]
+                        break
+
+    return Sighting(set_code=code, collector_number=number, corner=text)
 
 
 def face_number(text: str | None) -> str | None:
@@ -188,13 +271,24 @@ def read(con: Any, sightings: list[Sighting]) -> list[Reading]:
     side by side; a sighting nothing could be made of comes back as
     `via="nothing"` rather than being dropped.
     """
+    batch = sightings[:MAX_SIGHTINGS]
+    # One scan for the whole batch. `from_corner` would otherwise repeat it
+    # per card, which is forty scans for one photographed deck.
+    codes = (set_codes(con)
+             if any(s.corner and not s.set_code for s in batch)
+             else frozenset())
+
     out: list[Reading] = []
-    for sighting in sightings[:MAX_SIGHTINGS]:
+    for raw in batch:
+        # A raw corner block is read here rather than in the browser, because
+        # picking a set code out of it needs the pool's own table.
+        sighting = (from_corner(con, raw.corner, codes=codes)
+                    if raw.corner and not raw.set_code else raw)
         name = by_printing(con, sighting.set_code, sighting.collector_number)
         if name is not None:
             out.append(Reading(resolved=name, via="printing"))
             continue
-        candidates = by_title(con, sighting.title)
+        candidates = by_title(con, raw.title)
         out.append(Reading(
             via="title" if candidates else "nothing",
             candidates=candidates,
