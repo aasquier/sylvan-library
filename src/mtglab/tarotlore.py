@@ -1371,6 +1371,361 @@ MINOR_FACTS: tuple[Fact, ...] = (
          "Whatever else the card says, the king of the water suit is not in "
          "it.",
          PLATE, "cups-14"),
+
+    # ------------------------------------------------------------ swords
+    Fact("swords-01-crown",
+         "A crown sits on the point of the sword with an olive branch hanging "
+         "off one side and a palm frond off the other — victory and peace, "
+         "balanced on the tip of the blade.",
+         f"{PLATE}; {PICTORIAL_KEY}", "swords-01"),
+    Fact("swords-01-mountains",
+         "The landscape under this Ace is a range of bare grey mountains and "
+         "nothing else. Each Ace gets a different ground, and the sword suit "
+         "gets the hardest one.",
+         PLATE, "swords-01"),
+    Fact("swords-01-grip",
+         "The hand holds the sword upright by the grip with the blade "
+         "straight up the middle of the card. It is the only Ace where the "
+         "object is a weapon and the hand is holding it the way you would use "
+         "it.",
+         PLATE, "swords-01"),
+    Fact("swords-01-suit",
+         "Swords became spades in an ordinary pack, and the word is the "
+         "giveaway: Italian spade means swords. The pip on a modern spade is a "
+         "sword blade that lost its handle over four centuries of printing.",
+         "Michael Dummett, The Game of Tarot (1980)", "swords-01"),
+    Fact("swords-01-clouds",
+         "Clouds are the sword suit's signature and they start here, boiling "
+         "round the wrist. Air is the suit's element and Smith drew it as "
+         "weather rather than as emptiness.",
+         PLATE, "swords-01"),
+
+    Fact("swords-02-blindfold",
+         "She is blindfolded and holding two swords crossed over her chest, "
+         "which means she tied it on before she picked them up, or somebody "
+         "else did. Either way she cannot see and she is armed.",
+         PLATE, "swords-02"),
+    Fact("swords-02-justice",
+         "Justice, eleven cards away in the trumps, is the one who is "
+         "famously *not* blindfolded in this deck. Smith moved the blindfold "
+         "off the figure everybody expects it on and put it here.",
+         PLATE, "swords-02"),
+    Fact("swords-02-moon",
+         "There is a thin crescent moon in the top right, the only card in "
+         "the suit with a moon. It is waxing.",
+         PLATE, "swords-02"),
+    Fact("swords-02-rocks",
+         "Behind her is a flat sea with rocks scattered through it, drawn as "
+         "small dark humps. It is the calmest water in the deck and the least "
+         "safe to sail.",
+         PLATE, "swords-02"),
+    Fact("swords-02-bench",
+         "She sits on a plain stone bench with her feet together, out of "
+         "doors, on the shore. Nothing about the setting explains why she is "
+         "there.",
+         PLATE, "swords-02"),
+
+    Fact("swords-03-heart",
+         "A red heart pierced by three swords, in the rain. There is no "
+         "person on this card at all — it is the deck's most famous image and "
+         "one of only a handful with nobody in it.",
+         PLATE, "swords-03"),
+    Fact("swords-03-sola",
+         "The pierced heart is usually traced back to the fifteenth-century "
+         "Sola Busca deck, whose photographs were on show at the British "
+         "Museum two years before Smith drew this one.",
+         "British Museum Sola-Busca holdings; comparative studies of the two "
+         "decks", "swords-03"),
+    Fact("swords-03-rain",
+         "The rain is drawn as long straight ruled lines right across the "
+         "card, over the clouds and the heart alike. Smith let the weather "
+         "cross in front of the subject, which almost nothing else in the "
+         "deck does.",
+         PLATE, "swords-03"),
+    Fact("swords-03-flat",
+         "The heart is a flat shape with no shading and no anatomy — the "
+         "valentine heart, not the organ. It is the most graphic, least "
+         "illustrative image in the 78.",
+         PLATE, "swords-03"),
+    Fact("swords-03-simple",
+         "Three swords, one heart, some rain. In a deck where the Seven of "
+         "Cups holds seven separate visions, this one says everything with "
+         "four objects.",
+         PLATE, "swords-03"),
+
+    Fact("swords-04-tomb",
+         "A knight lies full length on a tomb with his hands together in "
+         "prayer, carved in effigy. He is not asleep and not dead in the "
+         "usual sense — he is a monument.",
+         PLATE, "swords-04"),
+    Fact("swords-04-three-one",
+         "Three swords hang point-down on the wall above him and the fourth "
+         "is carved along the side of the tomb beneath him. Three in the air, "
+         "one in the stone.",
+         PLATE, "swords-04"),
+    Fact("swords-04-window",
+         "There is a stained-glass window in the top left corner, drawn in "
+         "full colour, showing a standing figure and a smaller one kneeling. "
+         "It is the only stained glass in the deck.",
+         PLATE, "swords-04"),
+    Fact("swords-04-church",
+         "Everything else in the card is the inside of a church rendered in "
+         "flat grey — so the one bright thing is a window somebody else is "
+         "praying in. Smith put the colour where the living are.",
+         PLATE, "swords-04"),
+    Fact("swords-04-quiet",
+         "This is the only card in the whole suit where nothing is happening "
+         "and nobody is suffering. In a suit of thirteen difficult pictures, "
+         "the rest is a tomb.",
+         PLATE, "swords-04"),
+
+    Fact("swords-05-smirk",
+         "The young man in the foreground is smirking, and he is holding "
+         "three swords while two more lie on the ground. It is the only "
+         "openly unpleasant face in the deck.",
+         PLATE, "swords-05"),
+    Fact("swords-05-losers",
+         "Two figures walk away with their heads down and their backs to him, "
+         "one with a hand to their face. Smith drew the victory and the cost "
+         "in one picture and put the cost in the distance.",
+         PLATE, "swords-05"),
+    Fact("swords-05-sky",
+         "The clouds are torn into ragged strips right across the sky — the "
+         "most violent weather in the deck, on a card where the fighting is "
+         "already over.",
+         PLATE, "swords-05"),
+    Fact("swords-05-ground",
+         "Two swords lie abandoned in the sand at his feet and he has not "
+         "picked them up. He has taken three of five, which is exactly enough "
+         "to have won.",
+         PLATE, "swords-05"),
+    Fact("swords-05-shore",
+         "There is water behind them and a low shoreline. The defeated are "
+         "walking toward it, and there is nothing on the far side.",
+         PLATE, "swords-05"),
+
+    Fact("swords-06-ferry",
+         "A ferryman poles a flat punt across water carrying a cloaked figure "
+         "and a child, with six swords stood upright in the bow. The swords "
+         "are cargo, not weapons.",
+         PLATE, "swords-06"),
+    Fact("swords-06-water",
+         "The water is choppy on the near side of the boat and glassy flat "
+         "ahead of it. Smith put the whole meaning of the card in the "
+         "surface of the water.",
+         PLATE, "swords-06"),
+    Fact("swords-06-faces",
+         "Nobody's face is visible. The passenger is hooded and turned away, "
+         "the child is a bundle, and the ferryman has his back to us.",
+         PLATE, "swords-06"),
+    Fact("swords-06-swords",
+         "The six swords are stuck through the bottom of the boat and it is "
+         "not sinking. It is the quietest impossible thing in the deck.",
+         PLATE, "swords-06"),
+    Fact("swords-06-trees",
+         "There are two small trees on the far bank and nothing else. The "
+         "destination is drawn, and it is almost empty.",
+         PLATE, "swords-06"),
+
+    Fact("swords-07-blades",
+         "He is carrying five swords by the blades, gripped against his "
+         "chest, which is how you carry swords you did not bring. Two are "
+         "still standing in the ground behind him.",
+         PLATE, "swords-07"),
+    Fact("swords-07-look",
+         "He is creeping away on his toes and looking back over his shoulder "
+         "with a grin. It is the only figure in the deck caught mid-theft.",
+         PLATE, "swords-07"),
+    Fact("swords-07-camp",
+         "The tents behind him are a military camp with a flag flying, and "
+         "small figures moving about at the far left. He is robbing an army "
+         "that has not noticed.",
+         PLATE, "swords-07"),
+    Fact("swords-07-two",
+         "The two he left behind are planted upright in the earth, exactly "
+         "like the ones the Five's victor did not pick up. Smith kept the "
+         "abandoned sword as a motif across the suit.",
+         PLATE, "swords-07"),
+    Fact("swords-07-yellow",
+         "The whole sky is flat yellow. In this suit, which is otherwise all "
+         "grey cloud and black night, the theft happens in broad daylight.",
+         PLATE, "swords-07"),
+
+    Fact("swords-08-bound",
+         "She is bound in cloth wound round her arms and body, and "
+         "blindfolded, standing in shallow water. Her feet are not tied.",
+         PLATE, "swords-08"),
+    Fact("swords-08-gap",
+         "Eight swords stand around her, but they are set in a broken line "
+         "with a clear gap in front of her. The cage is not closed and the "
+         "card makes sure you can see that.",
+         PLATE, "swords-08"),
+    Fact("swords-08-castle",
+         "A castle sits on a crag behind her, high and small, with a red "
+         "roof. Somebody up there put her here.",
+         PLATE, "swords-08"),
+    Fact("swords-08-marsh",
+         "The ground is a marsh — you can see the standing water round her "
+         "bare feet. It is the only card where a figure is standing in water "
+         "without being at a shore.",
+         PLATE, "swords-08"),
+    Fact("swords-08-blindfold",
+         "She is the second blindfolded woman in the suit, after the Two, and "
+         "the only figure in the deck who is both blindfolded and bound. "
+         "Smith did not repeat herself often.",
+         PLATE, "swords-08"),
+
+    Fact("swords-09-black",
+         "The background is solid black, top to bottom, and the nine swords "
+         "hang across it in a stack. It is the darkest card in the deck by a "
+         "long way.",
+         PLATE, "swords-09"),
+    Fact("swords-09-quilt",
+         "The quilt on the bed is a chequerboard of red roses and astrological "
+         "signs, alternating square by square. Somebody sat and drew every "
+         "one of them for a card about a nightmare.",
+         PLATE, "swords-09"),
+    Fact("swords-09-carving",
+         "The side of the bed is carved with a scene of one figure standing "
+         "over another with a blade. The furniture in the room is having the "
+         "same dream.",
+         PLATE, "swords-09"),
+    Fact("swords-09-hands",
+         "She is sitting up with her face in both hands, and the swords are "
+         "behind her on the wall rather than over the bed. Nothing in the "
+         "room is actually threatening her.",
+         PLATE, "swords-09"),
+    Fact("swords-09-roses",
+         "The roses on the quilt are the same five-petalled rose the Fool "
+         "carries and Death flies on a banner. It is the most repeated flower "
+         "in the deck.",
+         PLATE, "swords-09"),
+
+    Fact("swords-10-dawn",
+         "The sky is black, but there is a broad band of yellow dawn along "
+         "the horizon under it. The most final card in the deck has a sunrise "
+         "in it.",
+         PLATE, "swords-10"),
+    Fact("swords-10-hand",
+         "His right hand is arranged in a blessing — two fingers up, the "
+         "others folded. Smith gave the gesture to a man face down with ten "
+         "swords in his back.",
+         PLATE, "swords-10"),
+    Fact("swords-10-water",
+         "The water beyond him is completely flat and unbroken. In a suit "
+         "whose Six made choppy water mean something, this is water with "
+         "nothing left to say.",
+         PLATE, "swords-10"),
+    Fact("swords-10-red",
+         "The red cloak spread under him is the strongest colour on the card "
+         "and it is arranged like a pool. Smith let the cloth do what she did "
+         "not draw.",
+         PLATE, "swords-10"),
+    Fact("swords-10-ten",
+         "Ten is more swords than any injury needs, and they are placed "
+         "evenly down his spine. The excess is the point.",
+         PLATE, "swords-10"),
+
+    Fact("swords-11-birds",
+         "There is a flock of birds in the sky above the Page. Birds and "
+         "butterflies run through all four Swords court cards the way "
+         "salamanders run through Wands and fish through Cups — each suit "
+         "gave its royals a creature.",
+         PLATE, "swords-11"),
+    Fact("swords-11-wind",
+         "His hair is blown sideways, the clouds are piled and moving, and "
+         "the grass on the hilltop is bent. The air suit is the only one "
+         "where Smith drew the element itself.",
+         PLATE, "swords-11"),
+    Fact("swords-11-twohands",
+         "He holds the sword up in both hands, off to one side, and looks the "
+         "other way. He is the only court figure whose weapon and attention "
+         "point in different directions.",
+         PLATE, "swords-11"),
+    Fact("swords-11-hilltop",
+         "He is standing on a green rise above the clouds, with more cloud "
+         "below him than above. The Swords court cards climb: the Page on a "
+         "hill, the Queen above the cloud line entirely.",
+         PLATE, "swords-11"),
+    Fact("swords-11-braced",
+         "His feet are planted wide apart, braced. Compare the Page of Cups "
+         "standing easy with a hand on his hip — Smith gave each suit's Page "
+         "a different way of standing.",
+         PLATE, "swords-11"),
+
+    Fact("swords-12-gallop",
+         "The horse is at full gallop with all four legs off the ground, and "
+         "it is the fastest thing in the deck. Everything else on horseback "
+         "is walking or rearing.",
+         PLATE, "swords-12"),
+    Fact("swords-12-bent",
+         "The trees at the bottom left are bent right over and the clouds are "
+         "drawn in streaks. Smith bent the scenery rather than adding motion "
+         "lines to the horse.",
+         PLATE, "swords-12"),
+    Fact("swords-12-birds",
+         "The cloth on his horse is patterned with birds, and there is a red "
+         "plume streaming off his helmet. Even at a gallop the suit's "
+         "creature is on him.",
+         PLATE, "swords-12"),
+    Fact("swords-12-forward",
+         "He is leaning forward past the horse's neck with the sword up and "
+         "back, and his visor is open. He is the only knight whose face you "
+         "can see clearly and he is not looking at us.",
+         PLATE, "swords-12"),
+    Fact("swords-12-alone",
+         "There is nothing in front of him — no enemy, no army, no gate. The "
+         "card is a charge with no target drawn.",
+         PLATE, "swords-12"),
+
+    Fact("swords-13-hand",
+         "Her left hand is raised open, palm out — the only royal in the deck "
+         "making a gesture rather than holding something. The sword is in the "
+         "other hand, upright.",
+         PLATE, "swords-13"),
+    Fact("swords-13-cherub",
+         "Her throne is carved with a winged cherub's head on the side and "
+         "butterflies below it. Butterflies are the air suit's second "
+         "creature and they turn up on the King's throne as well.",
+         PLATE, "swords-13"),
+    Fact("swords-13-clouds",
+         "The clouds are level with the seat of her throne, so she is sitting "
+         "at the top of the sky. She is the highest-placed figure in the 78.",
+         PLATE, "swords-13"),
+    Fact("swords-13-bird",
+         "There is exactly one bird in her sky, small and dark and a long way "
+         "off. The Page has a whole flock; she has one.",
+         PLATE, "swords-13"),
+    Fact("swords-13-tassel",
+         "A long tassel hangs from her wrist and blows sideways in the same "
+         "wind as the Page's hair. Smith kept one weather system running "
+         "across four cards.",
+         PLATE, "swords-13"),
+
+    Fact("swords-14-front",
+         "He faces straight out at you, square on, with the sword upright and "
+         "tilted slightly across his body. He is the only king in the deck "
+         "who looks directly at the reader.",
+         PLATE, "swords-14"),
+    Fact("swords-14-butterflies",
+         "The back of his throne is carved with butterflies and crescent "
+         "moons. His queen has butterflies and a cherub; the pair share a "
+         "workshop.",
+         PLATE, "swords-14"),
+    Fact("swords-14-birds",
+         "Two birds fly in the sky on his right, and there are trees on both "
+         "sides of him. After a suit of black skies and marshes, the king "
+         "sits in ordinary weather.",
+         PLATE, "swords-14"),
+    Fact("swords-14-tilt",
+         "The sword is not vertical — it leans, and the tilt is the only "
+         "thing in his posture that is not perfectly symmetrical. Smith "
+         "unbalanced him by a few degrees on purpose.",
+         PLATE, "swords-14"),
+    Fact("swords-14-ground",
+         "He is seated on bare earth and grass with no dais, in the open air. "
+         "The King of Cups gets a slab in the sea and this one gets a field.",
+         PLATE, "swords-14"),
 )
 
 
