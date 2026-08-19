@@ -1079,6 +1079,14 @@ applies to each. Ordered by cost:
     wasted ones is a loss. It is the first mode below the floor, which is why
     the 2026-08-16 claim "all above Sonnet 5's minimum" needed this note.
     Cost of the residue: ~$0.001 a scan, ~$0.10 for a 100-card camera import.
+  - **What a camera deck import costs, since Green will want it.** Measured at
+    1,290 input and ~40 output tokens a card, a 100-card import is 129,000 in
+    / 4,000 out = **≈$0.30 today, ≈$0.45 from 2026-09-01**, on the paid tier.
+    It is the first surface whose cost scales with *how much a person does*
+    rather than how many times they ask a question, which is what makes it
+    the one worth a quota conversation. The free tier exists beside it (local
+    OCR, ~24s a card against Claude's ~3.1s) and is the reason this is a
+    choice rather than a bill — but see the cross-color note below.
   - **Spend knobs, seven modes now.** Model `claude-sonnet-5` for everybody by
     default; `tiers.py` grants `opus` (`claude-opus-5`) or `fable`
     (`claude-fable-5`) per account, resolved **once per conversation** in
@@ -1162,6 +1170,14 @@ applies to each. Ordered by cost:
     `edhrec.com`, `console.anthropic.com`, `platform.claude.com` and
     `fly-metrics.net` are links a person clicks, not fetches. Nothing in
     category (c): no dead or replaceable external URL found.
+  - **Cross-color, for Red or Green: an auth question with a spend answer.**
+    `/api/ocr` is not in `PUBLIC_PATHS`, and memory records it answering 401
+    on the instance with the worker's own fetches *unverified*. Not re-derived
+    here and not Black's to settle — but the consequence is: if the free
+    reader cannot load its engine deployed, **every camera scan falls through
+    to the paid tier**, and the number above stops being a choice. Settling it
+    needs a signed-in pass on the real instance (commandment 14), which is
+    Green's ground.
   - **`mtglab animist verify`: every committed asset held to its recipe.**
   - **Bundle** (committed `web_dist`, gzip -9): `charts.js` 399,398 /
     **111,241** · `app.js` 291,488 / **90,829** · `ivy-canopy.webp` 219,330 ·
