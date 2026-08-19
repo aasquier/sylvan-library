@@ -663,7 +663,42 @@ spirit of Magic*
      its own docstring). `user_decks.yaml` in HOSTING.md read as a filename and
      is a column.
 - **Queued for Aaron:**
-  0. **The simulator renders a raw seed, and commandment 10 names seeds
+  1. **A deck that picks a printing credits the wrong painter, and three of
+     the six do it right now.** Found by the About Claude keeper duty
+     (commandment 18), which is where this facet reads artist credits, and
+     then confirmed against live deck data. `service.get_deck` swaps the
+     commander's **images** for the chosen printing and says so in a comment
+     — "the chosen printing replaces the images and nothing else. Oracle text,
+     cost, type line and colour identity are the *card's*, and they do not vary
+     by printing". True, and incomplete: **`artist` and `flavor_text` do vary
+     by printing**, and `_card_json(full=True)` sends both from the
+     `oracle_cards` row, which is Scryfall's representative printing and not
+     the one on screen. `DeckDetail.tsx` then renders
+     `Art by {card.artist} · {card.printing.set_name}` — **the set name from
+     the chosen printing and the painter from a different one**, side by side
+     in the same sentence. Its own comment states the intended rule exactly
+     ("the artist belongs to the printing being shown… otherwise two decks on
+     the same commander credit the same painter for different paintings") and
+     the code does not keep it.
+     Verified without recalling a single card: for each of the three decks with
+     a `commander_art`, the chosen `printings.image_normal` differs from
+     `oracle_cards.image_normal`, so the two rows are different paintings.
+     Atla Palani shows *The List* and credits `dmc`'s painter; Gyome shows
+     *Commander 2021* and credits `soc`'s; Trostani shows *Return to Ravnica*
+     and credits `c19`'s.
+     **Not fixable without a pool change, which is why it is queued:** the
+     `printings` table has no `artist` column and no `flavor_text` column, so
+     there is nothing to read. The fix is to carry both through the printings
+     ingest in `cards/db.py`, bump `SCHEMA_VERSION`, and have `_chosen_art`
+     and `_card_art_overrides` return them — which obliges every instance to
+     `data refresh` before the credit is right, and `/api/health`'s
+     `pool_stale` is exactly the schema check that would say so. The stopgap
+     (suppress the credit when a printing was chosen) trades a wrong
+     attribution for a missing one, and this project's own standard is that
+     every hotlinked painting carries a visible credit — so it is Aaron's call
+     which way that goes, not a polish run's. **Cross-color: this is White's
+     attribution facet as much as Blue's, and Black's ingest.**
+  2. **The simulator renders a raw seed, and commandment 10 names seeds
      explicitly.** `routes/Simulator.tsx` draws `<Badge>seed {seed}</Badge>`
      beside every result and a `NumberField label="Seed"` in the controls. The
      commandment's own parenthesis says it was sharpened on 2026-08-17 "after
@@ -683,7 +718,7 @@ spirit of Magic*
      reproducibility surface, which is a real feature and the reason runs are
      seeded by default; (b) is the stricter reading of the commandment. Aaron's
      call, and it is a UI change either way, so commandment 16 applies.
-  1. **`cli.py` is the last strict-mypy exception and it keeps growing:
+  3. **`cli.py` is the last strict-mypy exception and it keeps growing:
      79 → 109 → 126.** Re-measured 2026-08-19 by removing the override block:
      73 `no-untyped-def`, 52 `no-untyped-call`, 1 `no-any-return`. Still
      annotations rather than a rewrite, just more of them, in one 2,400-line
@@ -691,7 +726,7 @@ spirit of Magic*
      consecutive rise is the argument**: a module on the list absorbs every new
      untyped function without a word, and at the current rate the cost of
      clearing it grows faster than anyone will choose to pay it.
-  2. **`numpy` is a core dependency and only the `animist` extra uses it.**
+  4. **`numpy` is a core dependency and only the `animist` extra uses it.**
      `pyproject.toml` declares `numpy>=1.26` under `[project] dependencies`;
      the only importers in the whole package are `animist/{ops,encode,motion}.py`,
      which the extra's own comment describes as build-time tooling ("the app
@@ -703,20 +738,25 @@ spirit of Magic*
      change only the `image` job can fully verify, which is the case the skill
      says to queue rather than bundle. Worth pairing with White's deferred
      `license-files` widening, which is the same job's feedback loop.
-  3. **Adopt Claude Code hooks for the two traps that have already cost hours.**
-     `.claude/` holds `launch.json` and `skills/` and **no `settings.json`**, so
-     the harness enforces nothing. Two of this project's most expensive rules
-     are prose-only — *never `git add -A`* (`decks/` is the app's live data
-     directory; it once swept a test deck into a "docs only" PR) and *never
-     `git stash` on this repo* (index corruption; commit WIP instead). A
-     `PreToolUse` hook on `Bash` matching those two command shapes turns both
-     into a refusal instead of a paragraph somebody has to have read. This run's
-     whole thesis is that a rule enforced by nothing drifts, and these are the
-     two with a measured cost. Queued rather than done because it changes how
-     every session behaves and that is Aaron's call, not a polish run's.
-     A third candidate, weaker: a `PostToolUse` hook reminding that `web_dist/`
-     needs rebuilding after an edit under `web/src`.
-  4. ~~**`api/service.py` reaches past `cards/db.py` to `duckdb` directly.**~~
+  5. ~~**Adopt Claude Code hooks for the two traps that have already cost
+     hours.**~~ **Landed in [#135](https://github.com/aasquier/sylvan-library/pull/135),
+     2026-08-16** — and the entry above was **stale when it was written**.
+     `.claude/settings.json` and `.claude/hooks/guard-git.py` are both tracked,
+     the `PreToolUse` matcher on `Bash` is exactly the proposal, and the hook's
+     own docstring cites this facet's reasoning back at it. The claim
+     "`.claude/` holds `launch.json` and `skills/` and no `settings.json`" was
+     already false by two days when the 2026-08-18 run recorded it.
+     **This is worth more than the item, and it is Colorless's business:** the
+     rule that a queued finding is *not re-litigated* is what preserved it. The
+     rule is right — it stops a run bikeshedding a decision waiting on Aaron —
+     but "not re-litigated" has to mean "the argument is not reopened", never
+     "the tree is not re-checked". Two of Blue's three queued items had in fact
+     landed (this and item 4), and neither run noticed.
+     The one part still open is the weaker third candidate: a `PostToolUse`
+     hook reminding that `web_dist/` needs rebuilding after an edit under
+     `web/src`. (A missed rebuild is caught by CI's `frontend` job, so this is
+     convenience rather than a guard, which is why it stayed behind.)
+  6. ~~**`api/service.py` reaches past `cards/db.py` to `duckdb` directly.**~~
      **Closed.** #181's performance pass took the first of the two proposed
      ways out: `cards/db.py::connect_readonly` exists and `api/service.py`
      calls it, with the only remaining `duckdb` name in that file a
@@ -724,7 +764,7 @@ spirit of Magic*
      2026-08-19 across the whole package: **no `duckdb.connect` outside
      `cards/db.py`**, so CLAUDE.md's rule now holds without an exception.
      Kept as a line so the next run does not re-find it.
-  5. **`ROADMAP.md` has become a narrative log, and is 3,109 lines.** CLAUDE.md
+  7. **`ROADMAP.md` has become a narrative log, and is 3,109 lines.** CLAUDE.md
      describes it as "goals vs reality, open decisions"; a great deal of it is
      now a per-PR account of work already landed, with its own supersession
      markers (the crystal-ball sections are correctly marked superseded by the
