@@ -640,6 +640,27 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
     # ------------------------------------------------------------ cards
 
+    @app.post("/api/cards/identify")
+    def identify_cards(payload: dict[str, Any]) -> dict[str, Any]:
+        """Read what a camera thought it saw against the pool.
+
+        A POST because a fanned spread is forty sightings and a title is
+        free text, neither of which belongs in a query string -- and because
+        what somebody is holding is not a thing to leave in an access log.
+
+        No image is ever sent here. The body is a list of
+        `{set, number, title}`, all optional, and the answer is a card per
+        sighting or a shortlist per sighting. Which of the two, and why it is
+        never both, is argued in `cards/identify.py`.
+        """
+        raw = payload.get("sightings")
+        if not isinstance(raw, list):
+            raise HTTPException(
+                status_code=422,
+                detail="sightings must be a list of {set, number, title}")
+        sightings = [s for s in raw if isinstance(s, dict)]
+        return service.identify_cards(sightings)
+
     @app.get("/api/cards/search")
     def search_cards(
         q: str = "",

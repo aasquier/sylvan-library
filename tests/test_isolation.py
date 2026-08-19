@@ -84,6 +84,7 @@ SHARED = {
                      "owner is resolved through Library and the job is scoped",
     "/api/sim/lands": "submits a job too, same resolution, and the job is scoped",
     "/api/cards/search": "the public Scryfall pool",
+    "/api/cards/identify": "the same pool, asked the other way round -- a set\n                            code and a collector number in, a card name out. It\n                            reads no deck and writes nothing, and the photograph\n                            it came from never leaves the browser",
     "/api/sets/upcoming": "Scryfall's own release calendar",
     "/api/colors": "a fixed taxonomy, no data at all",
     "/api/colors/progress": "scored over the shared library",

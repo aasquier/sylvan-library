@@ -194,14 +194,22 @@ SOL_RING_PRINTING = "22222222-2222-4222-8222-222222222222"
 def printed(pool):
     """Two real printing rows: one of the commander, one of another card.
 
-    `tiny_pool` loads oracle rows only, so without this the printings table
-    is empty and every id is refused — which would make the test below pass
-    while proving nothing about *whose* card the printing is.
+    Every id is refused against an empty printings table, which would make
+    the test below pass while proving nothing about *whose* card a printing
+    is — so this fixture arranges the two rows it needs.
+
+    It **clears the table first**, and that line is why this docstring
+    changed. It used to say `tiny_pool` loaded no printings and lean on it;
+    the fixture then grew twelve real rows for the camera's corner tier and
+    two tests broke, because they were asserting over a set they had
+    inherited rather than chosen. A fixture that means "exactly these two
+    rows" has to say so.
     """
     from mtglab.cards import db
 
     con = db.connect(pool)
     try:
+        con.execute("DELETE FROM printings")
         for card, pid in (("Gyome, Master Chef", GYOME_PRINTING),
                           ("Sol Ring", SOL_RING_PRINTING)):
             oracle_id = con.execute(

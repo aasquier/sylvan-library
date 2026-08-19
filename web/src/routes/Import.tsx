@@ -138,6 +138,29 @@ export default function Import() {
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {lines} non-empty line{lines === 1 ? '' : 's'}
           </p>
+
+          {/* The deck that exists nowhere online. Every import path here is
+              text, so a deck that lives in a box on a table has nothing to
+              paste from — and that is exactly the deck a first-time player
+              owns. Naming the free apps costs a paragraph and closes the
+              gap today; a camera of our own is ROADMAP item 14. The caps
+              are stated because finding one at card ninety is worse than
+              reading it here. */}
+          <div className="rounded-lg px-4 py-3 text-xs leading-relaxed"
+               style={{ background: 'var(--gridline)',
+                        color: 'var(--text-secondary)' }}>
+            <strong style={{ color: 'var(--text-primary)' }}>
+              Only have the cards?
+            </strong>{' '}
+            A deck sleeved up on the table has no list to copy. A free
+            scanner app will photograph the stack and hand you an export
+            this page already reads — <em>Dragon Shield MTG Scanner</em>
+            {' '}writes plain text and asks nothing of you,{' '}
+            <em>ManaBox</em> writes the Arena format, and{' '}
+            <em>Delver Lens</em> is the most accurate of the three on
+            Android, though its free export stops at 100 cards a session:
+            one Commander deck exactly. Paste whatever they give you.
+          </div>
         </section>
 
         <section className="space-y-3">
