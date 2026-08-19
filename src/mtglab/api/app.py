@@ -226,10 +226,21 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         # must never leak -- the claim link's token -- rides in the fragment,
         # which no Referer header ever carries. This is belt and braces.
         headers.setdefault("Referrer-Policy", "same-origin")
-        # Nothing in the app wants a sensor, so say it outright: an XSS that
-        # got this far still cannot ask the browser for one.
+        # One sensor is wanted, by one door: the camera import (ADR 34) calls
+        # `getUserMedia` from this origin. `self` is the narrowest value that
+        # allows it -- an embedded frame still cannot ask -- and the two the
+        # app has no use for stay denied outright, so an XSS that got this far
+        # cannot reach a microphone or a position.
+        #
+        # This read `camera=()` until 2026-08-19. It was written when "nothing
+        # in the app wants a sensor" was true and was not revisited when the
+        # camera door landed, so the feature shipped unable to open a camera
+        # at all: the policy denies the origin itself, `getUserMedia` rejects,
+        # and the door reports a refusal nobody made. A sentence in a comment
+        # asserting what the app does not do is a claim to re-check against
+        # the app, which is the same rule CLAUDE.md draws around `.[dev]`.
         headers.setdefault("Permissions-Policy",
-                           "camera=(), microphone=(), geolocation=()")
+                           "camera=(self), microphone=(), geolocation=()")
         if secure:
             # Only when TLS fronts the app (the same condition as the cookie's
             # `Secure` flag). A year, no preload: preload is a public,
