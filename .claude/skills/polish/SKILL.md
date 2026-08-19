@@ -1,14 +1,14 @@
 ---
 name: polish
-description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Python or TypeScript best practices, testing (including mutation testing), performance, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, infrastructure efficiency/upgrades/cost, browser/mobile compatibility, scalability, the repo's Claude-facing docs (including trimming stale or verbose context), or the spirit of Magic — sweeping copy and UI for chances to prefer Magic: the Gathering terminology and iconography over plain conversational English. Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' or 'polish all' (all five in one merged report), on 'polish rainbow' (all five as separate runs, one color at a time), on 'run the polish pass', and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears."
+description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Python or TypeScript best practices, testing (including mutation testing), performance, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, infrastructure efficiency/upgrades/cost, browser/mobile compatibility, scalability, the repo's Claude-facing docs (including trimming stale or verbose context), or the spirit of Magic — sweeping copy and UI for chances to prefer Magic: the Gathering terminology and iconography over plain conversational English. Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' (the artifacts pass over the skill, the ledger and the dev tooling), on 'polish converge' or 'polish all' (all five colors merged into one report), on 'polish rainbow' (all six as separate runs, one at a time), on 'run the polish pass', and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears. Also covers the repo's measuring shelf itself: mtglab bench (benchmarking, profiling, cache hit rates) and mtglab mutate (mutation testing)."
 ---
 
 # The Polish Pass
 
 A recurring, ledger-driven quality pass over this codebase and its
-infrastructure. Aaron's fifteen quality facets are organised as the five
-colors of Magic; one invocation runs **one color, deeply**. The point is not a
-skim of everything — it is that over a cycle of five runs, every facet gets a
+infrastructure. Aaron's quality facets are organised as the five colors of
+Magic plus colorless; one invocation runs **one color, deeply**. The point is not a
+skim of everything — it is that over a cycle of six runs, every facet gets a
 real audit, and the ledger makes the next run smarter than the last.
 
 ## Before anything else
@@ -30,10 +30,34 @@ ledger so the checklist gets fixed.
 | **Black** | Ruthless Efficiency | Claude API spend; static assets over hotlinks; performance & efficiency |
 | **Red** | Speed & Alarum | CI/CD pipeline; alerting & self-healing |
 | **Green** | Growth & Resilience | Browser & mobile compatibility; cloud resource watch; scalability & user adaptability |
+| **Colorless** | The Artifacts | The pass auditing itself: did last cycle's findings land; is each checklist still finding things; the dev tooling (`bench`, `mutate`, the cache register); cross-color leftovers |
 
 Each color has a reference file — `references/white.md` and so on — holding
 the full checklist, the repo-specific anchors, and the known traps. Read the
 one you are running, and only that one; the others are for their own runs.
+
+## The measuring shelf
+
+Three tools in the repo answer questions this pass used to answer by hand or
+by guess. Reach for them before hand-timing anything, and put their output in
+the ledger rather than a summary of it.
+
+```bash
+mtglab bench run [--cold] [--only X]   # the declared suite, medians and p95
+mtglab bench profile <target>          # database budget, imports, hot frames
+mtglab bench caches                    # hit rates — a dead cache is visible
+mtglab mutate run --sample N --seed S  # does the suite hold what it claims?
+mtglab animist verify                  # committed assets vs their recipes
+```
+
+Each exists because a checklist line failed. `bench profile` splits the
+**database** budget out by measuring it at the query probe rather than
+subtracting it, because cProfile raises no event for an extension call and had
+been blaming DuckDB's 38ms on three lines of Python. `bench caches` counts
+hits, because a cache can be correct, tested, and never once used. `mutate`
+runs against a **throwaway copy** of the package, because the hand protocol it
+replaces edited the real file and put it back. Black's and White's references
+say when to use which.
 
 ## Choosing the color
 
@@ -45,22 +69,48 @@ one you are running, and only that one; the others are for their own runs.
   ground between one color and all five: still real depth per color, not a
   shallow survey. Say which two you picked and why. (More than two distinct
   concerns is a colorless run — see below.)
+- If Aaron asked about the **pass itself** — the skill, the ledger, the
+  tooling, whether old findings ever landed — that is **colorless**. It is a
+  run of its own, not a survey.
 - If Aaron asked for **all**, everything, or the full cycle in one report —
-  run **colorless**. If he asked for all five as **separate** runs — run
-  **rainbow**. Both are below.
+  run **converge** (`/polish all` is the same thing). If he asked for all of
+  them as **separate** runs — run **rainbow**. Both are below.
 - Invoked bare, read the ledger and pick the color that most needs a run:
   staleness first (longest since last run), then urgency (a trend line moving
   the wrong way, or queued findings piling up, beats mere staleness). Ties
-  break in WUBRG order. Say which color you picked and why before starting.
+  break in WUBRG order, with colorless last. Say which color you picked and
+  why before starting.
 
-## Colorless — all five, one merged report
+## Colorless — the artifacts, and the pass auditing itself
 
-`/polish colorless` (also `/polish all`) runs every color in one session and
-blends them into a single report. Colorless is the right word: the five
-identities dissolve into one generic pass. Be honest about what that costs —
-it is a **survey of the whole realm**, deliberately shallower per color than a
-solo run, because five solo runs' depth does not fit one session and
-pretending otherwise produces five skims labelled as audits.
+`/polish colorless` is its own run, not a survey of the other five. Its
+subject is everything that belongs to no color and therefore to nobody: **the
+skill, the ledger, and the developer tooling.** Whether last cycle's queued
+findings ever landed. Whether each checklist is still finding things or has
+started reciting them. Whether `bench` and `mutate` still measure what they
+claim. And the findings that fell between two colors, which in practice means
+they fell out of both.
+
+It goes **last** — after White, Blue, Black, Red and Green — because it audits
+what they just did, and because that is the order Magic sorts a collection in.
+`references/colorless.md` is the checklist.
+
+Two things to hold on to. **It does not re-audit the five colors**: a real
+code bug found here gets written into that color's section as a finding for
+that color's next run, because this run's diff belongs to the skill, the
+ledger and the tooling. And it is the **cheapest run in the cycle** — no live
+instance, no card pool, no network — so a rainbow that has run long is still
+worth finishing.
+
+## Converge — all five colors, one merged report
+
+`/polish converge` (also `/polish all`) runs every color in one session and
+blends them into a single report. Converge is the right word: Magic's mechanic
+counts how many colors of mana were spent on one spell, and this is one spell
+paid for with all five. Be honest about what that costs — it is a **survey of
+the whole realm**, deliberately shallower per color than a solo run, because
+five solo runs' depth does not fit one session and pretending otherwise
+produces five skims labelled as audits.
 
 Run it in two phases:
 
@@ -74,24 +124,24 @@ Run it in two phases:
    the highest-value handful over everything that qualifies. One branch, one
    PR, ledger updated across all five sections.
 
-Tag colorless runs in the ledger as e.g. `2026-08-16 (colorless)` — the tag
-matters because a colorless run resets staleness only softly: a color whose
+Tag converge runs in the ledger as e.g. `2026-08-19 (converge)` — the tag
+matters because a converge run resets staleness only softly: a color whose
 last touch was a survey is staler than its date suggests, and the next bare
 `/polish` should weigh that.
 
-## Rainbow — all five, one color at a time
+## Rainbow — all six, one at a time
 
-`/polish rainbow` runs the full cycle at **full solo depth** — one subagent per
-color, **serially, in WUBRG order**: White, Blue, Black, Red, Green. Rainbow is
-the opposite of colorless: every color shines separately and completely, no
-survey shortcut. It is the most thorough option and the most expensive — five
-real audits' worth of tokens — so it is Aaron's explicit call and his tokens;
-do not reach for it when colorless or a solo run would do.
+`/polish rainbow` runs the full cycle at **full solo depth** — one subagent
+each, **serially, in WUBRG order and then colorless**: White, Blue, Black,
+Red, Green, Colorless. Rainbow is the opposite of converge: every color shines
+separately and completely, no survey shortcut. It is the most thorough option
+and the most expensive — six real audits' worth of tokens — so it is Aaron's
+explicit call and his tokens; do not reach for it when converge or a solo run
+would do.
 
-The shape to hold in your head: **rainbow is five solo runs, chained.** Each
-color is an ordinary run of the protocol below — main working tree, own branch,
-own PR — and the next color does not start until the previous one's PR has
-merged.
+The shape to hold in your head: **rainbow is six solo runs, chained.** Each is
+an ordinary run of the protocol below — main working tree, own branch, own PR —
+and the next does not start until the previous one's PR has merged.
 
 Why serial, and why that order:
 
@@ -102,18 +152,20 @@ Why serial, and why that order:
   from a main that already holds its predecessors' entries, so the conflicts
   never exist rather than getting resolved. (Parallel was tried once, on
   2026-08-16; that churn is why this paragraph exists.)
-- **One subagent per color, for context rather than collision.** Five audits'
-  depth does not fit one context window — that is the whole difference between
-  rainbow and colorless — so each color still gets its own fresh agent.
+- **One subagent each, for context rather than collision.** Six audits' depth
+  does not fit one context window — that is the whole difference between
+  rainbow and converge — so each still gets its own fresh agent.
 - **WUBRG, because Magic says so and the dependencies happen to agree.**
   Commandment 3 settles the order on its own, but it is also topologically
   correct: White's licensing law binds Black's static-assets facet, Black's
   spend numbers feed Green's quota proposal, and Red's external probe is
-  Green's baseline. Every cross-color dependency points forward. One wrinkle
-  worth knowing rather than fixing: Blue's docs-and-memory audit runs second
-  but would sometimes rather run last, since the colors after it generate the
-  drift it hunts. Let the ledger carry that across to the next cycle — it is
-  what the ledger is for.
+  Green's baseline. Every cross-color dependency points forward.
+- **Colorless last, because it audits the other five.** It reads what this
+  rainbow just found, checks each checklist against it, and closes the loop
+  that Blue's docs-and-memory audit cannot: Blue runs second but generates
+  most of its value last, since the colors after it produce the drift it
+  hunts. That used to be a wrinkle the ledger carried into the next cycle.
+  It is now a run.
 
 Orchestration:
 
@@ -124,23 +176,25 @@ Orchestration:
   gauntlet, which was the parallel version's hidden tax.
 - Give each agent exactly one color and its reference file, the ledger, and
   the same run protocol and non-negotiables below.
-- **Each color lands its own branch and PR**, kept independently reviewable —
-  never five colors' diffs on one branch, which would be a mass-restructure by
-  the back door. Each agent updates **only its own ledger section**.
+- **Each lands its own branch and PR**, kept independently reviewable — never
+  six runs' diffs on one branch, which would be a mass-restructure by the back
+  door. Each agent updates **only its own ledger section**; colorless is the
+  one exception, since correcting an entry another color wrote is its job.
 - **Merge before advancing.** Watch the six checks, merge when green, and only
-  then start the next color. Remember what merging means here: a green merge
-  deploys itself (ADR 23), so a rainbow is five deploys and five brief
-  downtimes — one more reason schema migrations stay a queued item.
+  then start the next. Remember what merging means here: a green merge deploys
+  itself (ADR 23), so a rainbow is up to six deploys and six brief downtimes —
+  one more reason schema migrations stay a queued item.
 - A color with only queued findings and no safe fix opens **no PR**. Carry its
-  ledger text onto the next color's branch and move straight on; there is
-  nothing to merge and so nothing to wait for.
+  ledger text onto the next branch and move straight on; there is nothing to
+  merge and so nothing to wait for.
 - You are the collector: relay each color's report as it lands — the agent's
   own report never reaches Aaron — resolve cross-color overlap when a later
   color re-proposes an earlier one's fix, and close with one consolidated
   summary. Tag each ledger section `YYYY-MM-DD (rainbow)`.
 - A rainbow may outlive a session, and that is fine. The merged PRs and the
   ledger are the resume point: read the ledger, see which colors already carry
-  this rainbow's tag, and pick up at the next one in WUBRG order.
+  this rainbow's tag, and pick up at the next one in WUBRG order — colorless
+  after Green.
 
 ## The ledger
 
@@ -163,8 +217,14 @@ It is what makes the pass cumulative rather than repetitive.
    `origin/main` (never work on main; never `git stash` on this repo — commit
    WIP instead).
 2. **Audit.** Work the reference checklist against the current tree and, where
-   it says so, the live instance. Measure rather than guess — the reference
-   files say what to measure and the ledger is where numbers go.
+   it says so, the live instance. **Measure with the tools rather than by
+   hand, and never guess a cause.** The shelf above is the instrument set; the
+   reference files say which tool answers which question, and the ledger is
+   where the numbers go. Two rules the 2026-08-19 pass paid for: **a large
+   number is a question, not a datum** — anything slow gets profiled and the
+   profile goes in the ledger, not just the millisecond — and **a probe finds
+   *which*, only a profile finds *why***, so a sentence beginning "presumably"
+   is not a finding.
 3. **Triage every finding** into exactly one of:
    - **Safe fix** — implement it this run. Safe means: behavior-preserving or
      bug-fixing with a test; no new runtime dependency; no schema migration;
@@ -194,7 +254,8 @@ It is what makes the pass cumulative rather than repetitive.
    (the determinism digest and `SIM_VERSION` move as a pair), `ruff check src
    tests`, `mypy`, and `npm --prefix web run check`; rebuild the committed
    bundle (`npm --prefix web run build`) if anything under `web/src` changed.
-   Check `data/app.db` was not dirtied by the suite. For UI-visible changes,
+   Check `data/app.db` was not dirtied by the suite (`ls -la data/`, not
+   `git status`, which is blind to a gitignored file). For UI-visible changes,
    drive the real surface — a green jsdom test has not seen a layout. Since
    2026-08-16 that includes authenticated flows on the deployed instance:
    the `claude` account (a plain user; its edits are confined to its own

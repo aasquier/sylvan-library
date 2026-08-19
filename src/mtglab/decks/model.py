@@ -20,6 +20,8 @@ from typing import Any
 
 import yaml
 
+from mtglab import caches
+
 #: The C loader when libyaml is compiled in, the pure-Python one otherwise.
 #: `yaml.safe_load` always takes the Python path even with libyaml bound, and
 #: the difference is not small: 36ms against 7ms for one curated deck file,
@@ -158,6 +160,9 @@ DECK_STAGES = ("draft", "curated")
 #: `mtime_ns` **and** size, because mtime alone can repeat within a
 #: filesystem's granularity.
 _PARSED: dict[str, tuple[int, int, Deck]] = {}
+_PARSE_STATS = caches.register(
+    "deck.parsed", clear=_PARSED.clear, size=lambda: len(_PARSED),
+    note="deck.yaml parsed once per (mtime_ns, size); copied on the way out")
 
 
 @dataclass
@@ -268,8 +273,10 @@ class Deck:
         stamp = (st.st_mtime_ns, st.st_size)
         cached = _PARSED.get(str(path))
         if cached is not None and cached[:2] == stamp:
+            _PARSE_STATS.hit()
             hit = cached[2]
         else:
+            _PARSE_STATS.miss()
             hit = cls.from_text(path.read_text(encoding="utf-8"),
                                 slug=path.parent.name, source_path=path)
             _PARSED[str(path)] = (*stamp, hit)

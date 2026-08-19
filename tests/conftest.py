@@ -53,7 +53,7 @@ import os
 import pytest
 from hypothesis import HealthCheck, settings
 
-from mtglab import config
+from mtglab import caches, config
 
 #: The developer's own `app.db`, resolved once from the ambient environment --
 #: before any test can call `config.use_paths` -- so the guard below watches
@@ -206,6 +206,28 @@ def _no_deck_log(monkeypatch):
             pass
 
     monkeypatch.setattr(service, "log", _Silent())
+
+
+@pytest.fixture(autouse=True)
+def _pool_handles_released():
+    """No test leaves an open handle on the pool for the next one to trip on.
+
+    A fifth autouse fixture, and the first about a *handle* rather than a
+    write. `api/service.py` keeps one read-only DuckDB connection alive on a
+    thirty-second lease so the loaded database instance survives between
+    requests (#181) — and DuckDB refuses a second connection to the same file
+    with a different configuration. So one test that loaded a page could make
+    a later test's read-write `db.connect()` fail, in a different file, with
+    an error about configuration and no hint about who was holding what. That
+    is exactly the shape the four fixtures above exist to prevent.
+
+    Deliberately `release_handles` rather than `clear_all`: a stale cached
+    *value* costs a re-parse and is not this fixture's business, while a stale
+    handle refuses somebody else's work. Nothing is imported to do it — the
+    register is empty unless the module that owns the keeper has been loaded.
+    """
+    yield
+    caches.release_handles()
 
 
 settings.register_profile("dev", max_examples=200, deadline=None)

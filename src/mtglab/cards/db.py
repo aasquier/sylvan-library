@@ -20,16 +20,23 @@ import gzip
 import json
 import sys
 import threading
+import time
 import urllib.request
 from collections import OrderedDict
-from collections.abc import Iterable, Iterator, MutableMapping, Sequence
+from collections.abc import (
+    Callable,
+    Iterable,
+    Iterator,
+    MutableMapping,
+    Sequence,
+)
 from dataclasses import dataclass
 from importlib import util
 from pathlib import Path
 from typing import Any, TextIO, TypeAlias
 from weakref import WeakKeyDictionary
 
-from mtglab import config
+from mtglab import caches, config
 
 #: A DuckDB connection.
 #:
@@ -170,7 +177,7 @@ def connect(db_path: str | Path = "data/mtg.duckdb") -> Connection:
 
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    con = duckdb.connect(str(path))
+    con = _probed(duckdb.connect(str(path)))
     con.execute(SCHEMA)
     for name, sql_type in _ADDED_COLUMNS:
         con.execute(f"ALTER TABLE oracle_cards ADD COLUMN IF NOT EXISTS "
@@ -200,7 +207,7 @@ def connect_readonly(db_path: str | Path = "data/mtg.duckdb") -> Connection:
     duckdb = _duckdb()  # lazy, exactly as in `connect`
 
     path = Path(db_path)
-    con = duckdb.connect(str(path), read_only=True)
+    con = _probed(duckdb.connect(str(path), read_only=True))
     # Remember which file this handle reads, so `oracle_columns` and
     # `get_cards` can key their answers on the pool rather than on the handle.
     # Weak, so noting it here never keeps a connection alive.
@@ -215,6 +222,78 @@ def connect_readonly(db_path: str | Path = "data/mtg.duckdb") -> Connection:
     # simply pay the old price, which is the right trade for a batch job.
     _CONNECTION_POOL_PATH[con] = path
     return con
+
+
+#: Set while `mtglab bench` is measuring, and `None` in every other process.
+#:
+#: It exists because **cProfile cannot see inside an extension call.** A
+#: DuckDB `execute` is a method on a C type, and the profiler raises no event
+#: for it -- so its time is folded into the tottime of the Python frame that
+#: called it. That is not a rounding error: a profile of the card search
+#: reported 38ms inside `service.search_cards`, a function whose own body is a
+#: few string joins, because the query underneath it was invisible. A run
+#: reading that table concludes the Python is slow and rewrites the wrong
+#: thing.
+#:
+#: So the boundary times itself. Two numbers fall out and the second is worth
+#: as much as the first: the **database budget** (how much of a request is
+#: DuckDB's, exactly, rather than by subtraction) and the **statement count**,
+#: which is how an n+1 is found. A pattern sweep for n+1 cannot see one that
+#: happens inside a library; a counter that says a request ran 441 statements
+#: needs no pattern at all.
+_QUERY_PROBE: Callable[[str, float], None] | None = None
+
+
+def set_query_probe(probe: Callable[[str, float], None] | None) -> None:
+    """Time every statement this module's connections run, or stop.
+
+    Only `mtglab bench` and its tests call this. With no probe set, `_probed`
+    hands back the raw connection, so the app runs exactly the code it ran
+    before this existed -- no wrapper, no branch, nothing to pay for.
+    """
+    global _QUERY_PROBE
+    _QUERY_PROBE = probe
+
+
+class _ProbedConnection:
+    """A connection that reports how long each statement took.
+
+    Returns *itself* from `execute`, which is what DuckDB's own connection
+    does, so `con.execute(...).fetchall()` chains through here and lands on
+    the real handle by way of `__getattr__`. Everything else forwards
+    untouched.
+
+    Weak-referenceable on purpose: `_CONNECTION_POOL_PATH` is a
+    `WeakKeyDictionary` keyed on the connection, and a wrapper that could not
+    be a key would silently disable both pool caches -- turning a benchmark
+    into a measurement of an app nobody runs.
+    """
+
+    __slots__ = ("__weakref__", "_con")
+
+    def __init__(self, con: Any) -> None:
+        self._con = con
+
+    def execute(self, *args: Any, **kwargs: Any) -> _ProbedConnection:
+        probe = _QUERY_PROBE
+        if probe is None:
+            self._con.execute(*args, **kwargs)
+            return self
+        sql = args[0] if args else ""
+        start = time.perf_counter()
+        try:
+            self._con.execute(*args, **kwargs)
+        finally:
+            probe(str(sql), time.perf_counter() - start)
+        return self
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._con, name)
+
+
+def _probed(con: Any) -> Any:
+    """Wrap a fresh connection, but only while somebody is measuring."""
+    return _ProbedConnection(con) if _QUERY_PROBE is not None else con
 
 
 #: Which pool file each read-only handle was opened on. Weak in both
@@ -263,6 +342,7 @@ def oracle_columns(con: Connection) -> set[str]:
             key = (str(path), st.st_mtime_ns, st.st_size)
             cached = _COLUMN_CACHE.get(key)
             if cached is not None:
+                _COLUMN_STATS.hit()
                 return cached
 
     rows = con.execute(
@@ -270,6 +350,7 @@ def oracle_columns(con: Connection) -> set[str]:
         "WHERE table_name = 'oracle_cards'").fetchall()
     cols = {r[0] for r in rows}
     if key is not None:
+        _COLUMN_STATS.miss()
         _COLUMN_CACHE[key] = cols
     return cols
 
@@ -762,12 +843,28 @@ def _pool_stamp(con: Connection) -> tuple[str, int, int] | None:
     return (str(path), st.st_mtime_ns, st.st_size)
 
 
+def _clear_card_cache() -> None:
+    with _CARD_CACHE_LOCK:
+        _CARD_CACHE.clear()
+
+
 def cache_clear() -> None:
     """Forget every memoised lookup. For tests, and for a process that has just
     rebuilt the pool in place and does not want to wait for a stat to notice."""
-    with _CARD_CACHE_LOCK:
-        _CARD_CACHE.clear()
+    _clear_card_cache()
     _COLUMN_CACHE.clear()
+
+
+#: Counters, so `mtglab bench caches` can say whether either of these is
+#: earning its keep. `_COLUMN_CACHE`'s ancestor was correct and never hit --
+#: see `mtglab.caches`, which exists because of it.
+_CARD_STATS = caches.register(
+    "pool.cards", clear=_clear_card_cache, size=lambda: len(_CARD_CACHE),
+    note="get_cards, keyed on the pool stamp and the exact name list")
+_COLUMN_STATS = caches.register(
+    "pool.columns", clear=_COLUMN_CACHE.clear,
+    size=lambda: len(_COLUMN_CACHE),
+    note="which columns oracle_cards has, per pool file")
 
 
 def get_cards(con: Connection, names: Iterable[str]) -> dict[str, CardRecord]:
@@ -795,6 +892,7 @@ def get_cards(con: Connection, names: Iterable[str]) -> dict[str, CardRecord]:
         with _CARD_CACHE_LOCK:
             hit = _CARD_CACHE.get(key)
             if hit is not None:
+                _CARD_STATS.hit()
                 _CARD_CACHE.move_to_end(key)
                 return dict(hit)
 
@@ -846,6 +944,7 @@ def get_cards(con: Connection, names: Iterable[str]) -> dict[str, CardRecord]:
 
     if key is not None:
         with _CARD_CACHE_LOCK:
+            _CARD_STATS.miss()
             _CARD_CACHE[key] = out
             _CARD_CACHE.move_to_end(key)
             while len(_CARD_CACHE) > _CARD_CACHE_MAX:

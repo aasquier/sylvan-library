@@ -17,7 +17,7 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from mtglab import colors, config, lore
+from mtglab import caches, colors, config, lore
 from mtglab import glossary as gloss
 from mtglab.cards import db, identify
 from mtglab.cards.db import art_crop_from
@@ -81,6 +81,21 @@ _KEEPER_USED = 0.0
 #: the app is idle blocks for at most this.
 _KEEPER_IDLE = 30.0
 _REAPER: threading.Thread | None = None
+
+
+def _drop_keeper() -> None:
+    with _KEEPER_LOCK:
+        _release_keeper()
+
+
+#: A hit here is the stamp matching, which is exactly what the keeper is for:
+#: DuckDB's loaded instance stayed alive, so the next `connect_readonly` costs
+#: 0.7ms instead of 17.5ms. A low rate means the lease is expiring inside the
+#: burst it exists to cover -- a finding about `_KEEPER_IDLE`, not about DuckDB.
+_KEEPER_STATS = caches.register(
+    "pool.keeper", clear=_drop_keeper, holds_handle=True,
+    size=lambda: 0 if _KEEPER is None else 1,
+    note="the held read-only handle that keeps the pool's instance loaded")
 
 
 def _reap_keeper() -> None:
@@ -168,7 +183,9 @@ def _pin(path: Path) -> None:
     stamp = (st.st_mtime_ns, st.st_size)
     _KEEPER_USED = time.monotonic()
     if _KEEPER is not None and stamp == _KEEPER_STAMP:
+        _KEEPER_STATS.hit()
         return
+    _KEEPER_STATS.miss()
     with _KEEPER_LOCK:
         if _KEEPER is not None and stamp == _KEEPER_STAMP:
             return
@@ -2588,6 +2605,10 @@ def search_cards(*, q: str = "", identity: str = "", type_line: str = "",
 # --------------------------------------------------------------------- sets
 
 _SETS_CACHE: dict[str, Any] = {}
+_SETS_STATS = caches.register(
+    "sets.upcoming", clear=_SETS_CACHE.clear,
+    size=lambda: 1 if _SETS_CACHE else 0,
+    note="Scryfall's unreleased sets, held for the calendar day")
 
 
 def upcoming_sets(*, force: bool = False) -> dict[str, Any]:
@@ -2599,9 +2620,11 @@ def upcoming_sets(*, force: bool = False) -> dict[str, Any]:
     """
     today = date.today().isoformat()
     if not force and _SETS_CACHE.get("day") == today:
+        _SETS_STATS.hit()
         # The cache maps two keys to two shapes, so indexing is Any; the cast
         # states what "data" holds rather than widening the return type.
         return cast("dict[str, Any]", _SETS_CACHE["data"])
+    _SETS_STATS.miss()
 
     req = urllib.request.Request(
         SCRYFALL_SETS, headers={"User-Agent": USER_AGENT,
