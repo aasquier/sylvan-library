@@ -227,10 +227,55 @@ def fetch(*, transport: Transport | None = None,
         except (ValueError, TypeError):
             return _failed("Fly's answer was not the JSON this expects", stamp)
 
+    _settle_edge(values)
     answer = {"configured": True, "ok": True, "values": values,
               "app": APP_NAME, "org": ORG_SLUG}
     _cache = (stamp, answer)
     return answer
+
+
+#: The edge counter that proves the metric exists. Any app the edge is
+#: serving at all has answered a 2xx in the last day; nothing else here is
+#: guaranteed to have happened.
+EDGE_WITNESS = "edge_2xx"
+
+#: The edge counters whose absence is ambiguous, and which `EDGE_WITNESS`
+#: disambiguates. 5xx is the one that matters -- it is the alarm.
+EDGE_SILENT = ("edge_4xx", "edge_5xx")
+
+
+def _settle_edge(values: dict[str, float | None]) -> None:
+    """Turn an edge counter's ambiguous absence into the zero it means.
+
+    `_scalar` returns `None` for an empty vector and is right to: absent and
+    zero are genuinely different answers, and collapsing them is how a broken
+    query gets read as good news. But for the edge counters that distinction
+    is recoverable, and leaving it unmade put the ambiguity on the one tile
+    where it does the most harm.
+
+    Prometheus has no zero. `sum(increase(...{status=~"5.."}[24h]))` over a
+    day with no 5xx matches no samples and returns an empty vector -- the same
+    empty vector a misspelt series name returns. So "Edge failed" rendered an
+    em-dash for a perfectly healthy day and an em-dash for a query that had
+    never worked, and #172 is the proof that is not hypothetical: two of these
+    queries *were* wrong, for a fortnight, and looked exactly like this.
+
+    The witness resolves it without a second round trip. All three counters
+    read the same series and differ only in their `status` filter, so a
+    populated `edge_2xx` proves `fly_edge_http_responses_count` exists and is
+    being scraped for this app -- and an empty 4xx or 5xx beside it is a real
+    zero rather than a question. With the witness itself absent nothing is
+    known, and every counter stays `None` and stays an em-dash.
+
+    Deliberately not `or vector(0)` in the query, which is the usual fix: that
+    makes every result a number and throws away the failure mode this module
+    exists to have caught once already.
+    """
+    if values.get(EDGE_WITNESS) is None:
+        return
+    for name in EDGE_SILENT:
+        if name in values and values[name] is None:
+            values[name] = 0.0
 
 
 def _failed(reason: str, stamp: float) -> dict[str, Any]:

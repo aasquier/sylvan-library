@@ -1,6 +1,7 @@
 """One person's decks, as rows in `app.db` (ADR 4's second tier, ADR 22).
 
-The curated six are file-backed in git permanently and are not in here. This is
+The curated six are file-backed permanently (on disk, not in git -- ADR 30)
+and are not in here. This is
 where everybody else's decks live, and the only reason it can exist at all is
 the property ADR 4 bought: `deck.yaml`'s text is what a row stores, so
 `Deck.from_text` parses both tiers and the gate, the compiler and the artifact
@@ -237,8 +238,8 @@ class SqlDeckSource:
         A mark rather than a `DELETE`, which is the protocol's requirement and
         not a preference: `delete` returns a location because an implementation
         that cannot say where the deck went has destroyed it rather than
-        removed it. The deck most likely to be deleted by mistake is a draft
-        imported ten minutes ago, and for that deck there is no `git checkout`.
+        removed it. No deck in either tier has a revision behind it (ADR 30),
+        so the mark is the only thing standing between a misclick and the work.
         """
         self._writable_or_raise(slug)
         with db.connection() as con:

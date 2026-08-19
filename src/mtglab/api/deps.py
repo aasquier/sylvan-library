@@ -126,9 +126,9 @@ def deck_source(caller: Scope) -> DeckSource:
 
     **Read stays shared; write does not.** Everyone with a session sees the
     same six decks — that is the classification in `tests/test_isolation.py`
-    and it is unchanged. But this library is one person's work, held in git as
-    the source of truth, and served from `/data/decks` where an edit is the
-    only copy. Before there was a second account, "shared" and "editable by
+    and it is unchanged. But this library is one person's work, and since
+    ADR 30 the copy served from `/data/decks` is the *only* copy: an edit has
+    no revision behind it. Before there was a second account, "shared" and "editable by
     whoever is looking" were indistinguishable. An invite made them different,
     and this is the line.
 

@@ -1834,8 +1834,7 @@ def entomb_cards(slug: str, *, names: list[str],
     All or nothing: a name that is not in the 99 refuses the whole batch
     before anything is written, because a sweep that silently skipped two of
     its ten cards would report a deck state nobody chose. One write, one gate
-    verdict, one entry in the deck's git history when the file tier is the
-    source.
+    verdict, one entry in the deck's activity log (ADR 28).
     """
     wanted = [n.strip() for n in names if str(n).strip()]
     if not wanted:

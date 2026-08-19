@@ -179,8 +179,77 @@ state, never checklists.
 
 *Python craft · TypeScript/React craft · Claude-first docs & memory*
 
-- **Last run:** 2026-08-16 (rainbow). First Blue run — everything here is baseline.
-- **Fixed and landed:**
+- **Last run:** 2026-08-18 (punch-list item 5, Blue + Red in one session —
+  Aaron's ask was API hygiene and dev-cycle relics, which is Blue, and alerts
+  and instability signals, which is Red). Previous: 2026-08-16 (rainbow).
+- **Fixed this run (2026-08-18):**
+  1. **ADR 30 superseded half of ADR 1 and eighteen code comments never heard.**
+     Decks came out of git on 2026-08-16; `docs/adr/README.md` records the
+     supersession correctly and ADR 30's own text calls it "half a sentence of
+     1, and it is the half everything since had leaned on". The leaning was
+     never swept. Eighteen sites across eleven files still taught the old
+     world, in four flavours: `deck.yaml` "is tracked in git"; "deck history is
+     git history", offering `git log -p decks/gyome-food/deck.yaml` as the swap
+     record; `swaps.md` diffing "the last git commit" when it diffs
+     `artifacts/deck.last-built.yaml`; and **`git checkout` named as a deck's
+     undo**, four times. The last two are not stale prose but wrong
+     instructions — a session that believes them looks for a diff that cannot
+     exist and offers a recovery that cannot work — and one of the eighteen was
+     **printed to the terminal** by `mtglab decks log`. Third time this class
+     has been caught (the ledger records "deck history is git history" shipping
+     in two components, found 2026-08-16 by driving the live surface), so this
+     run left a tripwire instead of a fourth correction:
+     `tests/test_deck_location_drift.py`, scoped to `src/mtglab` and `web/src`
+     because the ADRs are immutable and ADR 1 is *titled* with the superseded
+     claim.
+  2. **`mtglab animist verify` was pinned on 2 of 12 recipes.**
+     `tests/test_animist_recipes_repo.py` named `ambience` and `tarot` by hand;
+     the ten added since — the wheel's menagerie, the séance parchment, the
+     Learn bookworm, the three ambience motions — were verified by nothing. The
+     file *did* check that the glob could see them, and reachability had been
+     mistaken for verification. Now parametrised over the same glob the CLI
+     uses, so a recipe committed tomorrow is covered the day it lands, plus a
+     test that the glob is exhaustive against `git ls-files`. All twelve hold.
+     Costs 3s.
+  3. **`.gitignore` was ignoring the deck *source package*, and nobody could
+     have seen it.** ADR 30's rule is written `decks/`, and a bare directory
+     pattern in gitignore matches **at every depth** — so it covered
+     `src/mtglab/decks/` too, thirteen tracked modules. Nothing was broken:
+     an ignore rule cannot untrack a tracked file, so the package worked, the
+     suite passed, CI passed, and it had presumably been this way since ADR 30
+     landed. What was broken was *tomorrow* — `git add src/mtglab/decks/x.py`
+     refuses outright and `git add -A` skips it in silence, so the next module
+     added there arrives in CI as an ImportError for a file the diff does not
+     contain. ADR 28's own note dates the trigger: "the tenth edit operation is
+     the one somebody adds in a year." **Found by tripping over it** — staging
+     this run's own edits to `decks/edit.py` and friends is what made git
+     object. Fixed by anchoring to `/decks/`; the app's data directory is still
+     ignored (a test asserts that too, because the over-correction is worse
+     than the bug) and `build/` still covers its copy.
+     `tests/test_gitignore_shadowing.py` is the guard, and it is deliberately
+     the *general* one: it asks `git check-ignore` whether a new file would be
+     accepted in **every directory git already tracks a file in**, derived from
+     `git ls-files` rather than a hand-kept tree list — because a hand-kept
+     list needs exclusions for `src/mtg_lab.egg-info/` and `.claude/worktrees/`
+     (both correctly ignored, neither source), and an exclusion list is where
+     the next real offender gets waved through. Mutation-verified three ways:
+     the original bug, the over-correction, and a *hypothetical future*
+     over-broad rule (`assets/`), which it also catches.
+- **The trap this run paid for, and the reason both fixes carry mutation
+  evidence:** the tripwire in finding 1 **passed as decoration on its first
+  draft.** It matched line by line, every offence it was written for happened
+  to fit on one line, and it went green. Re-breaking `model.py` did not fire
+  it, because the restored claim wrapped after "directory and". This codebase
+  wraps comments at 79 columns, so *any sentence long enough to be worth
+  banning spans two lines*. It now flattens each file to one line before
+  matching, and is verified by re-injecting all nine original offences
+  verbatim — 9 caught, 0 missed. A second draft failed the opposite way: a bare
+  `\bin git\b` cannot tell the claim from its denial, and flagged every
+  sentence written to *correct* the drift. It bans the affirmative verbs
+  instead (`tracked|held|file-backed|committed|diffed in git`, `lives in git`).
+  **The tripwire found four sites the hand sweep missed**, all in
+  `source.py`/`sqlsource.py`, which is the argument for writing it at all.
+- **Fixed and landed (previous run):**
   1. **`cards/db.py` graduated off the strict-mypy exception list**, which is
      now one module (`cli.py`) rather than two. All 24 errors were annotations,
      not a rewrite: `con` parameters took the `Connection` alias the module had
@@ -251,12 +320,21 @@ state, never checklists.
     total), `PT` **112** (0 / 112, was 65), `SLF` **67** (0 / 67, was 63), `N`
     **40** (39 / 1, was 38). Everything except `N` lives almost entirely in
     `tests/`, so the recorded "cost" was never really a cost to `src`.
-  - **pytest:** 1926 passed, 2 skipped (the pinned skip count) in **159s** on
-    this Mac, uncontended and post-#129. Incidental cross-check of White's
-    conftest fix: a full run left `data/app.db`'s mtime untouched, where the
-    pre-#129 run in this same worktree had written it.
-  - **frontend:** `npm --prefix web run check` green — typecheck, oxlint with
-    the new rule, 432 Vitest tests across 23 files in ~27s.
+  - **pytest (2026-08-18):** **2350 passed, 0 skipped in 208s** on this Mac
+    (was 1926 / 2 skipped / 159s on 2026-08-16 — the suite grew 22% in two
+    days). **The zero is not a regression in the skip gate**: the two
+    `needs_full_pool` tests *pass* here because this machine has the pool, and
+    skip in CI, which is where `ci.yml`'s `expected=2` counts them. Confirmed
+    by running `-m needs_full_pool` alone: 2 passed. Recorded so the next run
+    does not chase it.
+  - **frontend (2026-08-18):** `npm --prefix web run check` green — **499
+    Vitest tests across 28 files in ~37s** (was 432 / 23 / ~27s). Bundle
+    rebuilt and byte-identical, comments being stripped.
+  - **pytest (2026-08-16):** 1926 passed, 2 skipped in **159s**, uncontended
+    and post-#129. Incidental cross-check of White's conftest fix: a full run
+    left `data/app.db`'s mtime untouched, where the pre-#129 run in this same
+    worktree had written it.
+  - **frontend (2026-08-16):** green — 432 Vitest tests across 23 files in ~27s.
   - **Layering, grepped not trusted:** `api/` imports `cli.py` **nowhere**;
     `mana.py` and `sim/` are stdlib+numpy only; `anthropic`, `PIL` and `dotenv`
     have **no** module-level import anywhere in `src/` (`argon2` does, and
@@ -413,9 +491,32 @@ state, never checklists.
 
 *CI/CD · alerting & self-healing*
 
-- **Last run:** 2026-08-16 (rainbow). First Red run; everything below is a
-  first baseline, so read the numbers as a starting point and not as a trend.
-- **Fixed and landed:** `concurrency` groups on `codeql.yml` and
+- **Last run:** 2026-08-18 (punch-list item 5, with Blue). Previous:
+  2026-08-16 (rainbow), which was the first Red run and the baseline the
+  numbers below are now a trend against.
+- **Fixed this run (2026-08-18): the alarm tile could not tell "all clear"
+  from "I could not ask".** "Edge failed" renders `fmtCount(edge_5xx)`, and
+  `—` was the answer both when the edge served zero 5xx *and* when the query
+  was broken. That is not hypothetical: #172 had found two Fly queries wrong
+  for a fortnight, and an em-dash is exactly how they presented. Prometheus
+  has no zero — `sum(increase(...{status=~"5.."}[24h]))` over a clean day
+  matches no samples and returns the same empty vector a misspelt series name
+  returns — so the one tile that is the instability alarm was the one tile
+  incapable of reporting good news. Fixed with a **witness**: all three edge
+  counters read `fly_edge_http_responses_count` and differ only in the
+  `status` filter, so a populated `edge_2xx` proves the series exists and is
+  being scraped, and an empty 4xx/5xx beside it is a real zero. With the
+  witness itself empty nothing is claimed and every counter stays `None`.
+  Deliberately **not** `or vector(0)` in the query, which is the usual fix and
+  would make every result a number — throwing away the failure mode this
+  module was built after. `_scalar`'s None-not-zero rule is untouched; the
+  settling happens above it, where the witness is in scope. Mutation-verified
+  both ways: dropping the call fails the quiet-day test, dropping the witness
+  check fails the two tests that pin "nothing is claimed".
+  This is trap #2 from the punch-list batch — *a probe that cannot fail
+  differently is not a probe* — restated one turn on: **a readout that cannot
+  succeed differently from failing is not a readout.**
+- **Fixed and landed (previous run):** `concurrency` groups on `codeql.yml` and
   `dependency-review.yml`, which `ci.yml` has had since it was written and
   these two never did. **The waste was observed rather than theorised**, on
   this same afternoon: Blue pushed a fixup at 20:08:10Z and again at
@@ -550,6 +651,41 @@ state, never checklists.
     fails; the Fly cert covers the apex only). Harmless until a friend types
     it. Trigger: anyone reports the site not loading and turns out to have
     typed `www.`.
+- **Measurements (2026-08-18):**
+  - **CI per-job medians, n=10** (the ten most recent `ci.yml` runs, #168–#173
+    and their pushes), against the 2026-08-16 baseline:
+    `test (3.11)` **186s** (155–215, was 158) · `test (3.12)` **300s**
+    (274–338, was 284) · `frontend` **44s** (37–49, was 36) ·
+    `no-secrets-or-card-data` **6s** (5–7, was 5) · `image` **304s** (62–363,
+    was 292). Everything grew and nothing grew alarmingly; the suite itself
+    gained 424 tests in the same window (see Blue), which accounts for the
+    test legs. **The critical path is still a tie** — `image` 304s vs
+    `test (3.12)` 300s — so the deferred "speed up `image`" item's whole
+    argument holds unchanged, and re-checking this pair stays the precondition
+    for touching either.
+  - **Live probe (2026-08-18 23:36Z).** `GET /api/health` **200** in 364ms
+    (TTFB 363ms), `GET /` **200** in 218ms, `GET /api/decks` **401**. Health
+    body: pool true, 35,390 oracle cards, 107,338 printings, **7 decks**,
+    `pool_stale` false. Note `pool_stale` is a *schema* check (does the pool
+    predate the printed-stat columns), **not an age check** — the bulk file is
+    `oracle_cards-2026-08-13.jsonl.gz`, five days old, and nothing reports
+    that. Not filed as a finding; recorded so the next run does not read
+    `pool_stale: false` as "the pool is fresh".
+  - **Instance:** machine `84e19ef25041e8`, **version 108** (was 65 on
+    2026-08-16 — 43 machine versions in two days, all deploys), `iad`,
+    `shared-cpu-1x`/1 GB, 1/1 checks passing. Deployed at 23:32:42Z during
+    this run; logs show a clean boot — health check failed once at 23:32:42
+    and passed at 23:32:50, which is the 8-second startup window and not a
+    fault. **No OOM, no unexplained restart, no 5xx in the log.**
+  - **Volume:** 104 MB used of 2.9 GB (**4%**, 2.7 GB free) —
+    `mtg.duckdb` 76M, `scryfall` 24M, `cache` 4.4M, `decks` 304K, `app.db`
+    244K. **6 snapshots**, one per day, newest 9 hours old, 5-day retention,
+    370 MiB stored. Headroom is not a concern this quarter.
+  - **TLS expiry 2026-11-11** unchanged (Let's Encrypt, issued 2026-08-13,
+    ~85 days remaining, apex-only SAN).
+  - **Queued-item triggers checked:** the merge queue (#5) has **not** fired —
+    zero open PRs, and serial work keeps it that way. Everything else in the
+    queue below is still waiting on Aaron and unchanged by this run.
 - **Measurements (2026-08-16):**
   - **CI per-job medians**, n=10 runs — the ten most recent, which are #128
     through #132 and their pushes, all taken after rainbow went serial, so

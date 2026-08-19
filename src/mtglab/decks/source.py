@@ -1,7 +1,8 @@
 """Where decks come from.
 
-Today there is exactly one answer -- `decks/<slug>/deck.yaml` in git, which is
-the source of truth (ADR 1). Tomorrow there are two: `docs/HOSTING.md` keeps the
+Today there is exactly one answer -- `decks/<slug>/deck.yaml` on disk, which is
+the source of truth (ADR 1) and, since ADR 30, the app's live data rather than
+anything git tracks. Tomorrow there are two: `docs/HOSTING.md` keeps the
 curated decks file-backed *permanently* and adds other people's decks from
 SQLite on the volume (ADR 4). So this protocol is not scaffolding for a
 hypothetical; it is the shape the system ends up with, and introducing it while
@@ -83,9 +84,10 @@ class DeckSource(Protocol):
         aside; a future SQL source would mark a row.
 
         This is the only operation here that can lose work nothing else
-        recorded. A curated deck lives in git and `git checkout` is its undo,
-        but a deck imported an hour ago and never committed has no other copy —
-        which is exactly the deck somebody is most likely to delete by mistake.
+        recorded, and since ADR 30 that is true of *every* deck: none of them
+        is in git, so none of them has a checkout to fall back on. The
+        graveyard undoes an entombed card (ADR 27); nothing undoes a deleted
+        deck but the directory this moves aside.
 
         Raises `DeckNotFound` or `ReadOnlySource`.
         """
@@ -209,24 +211,23 @@ class FileDeckSource:
     def delete(self, slug: str) -> str:
         """Move the deck's whole directory into `.trash/`, and say where.
 
-        A move rather than an unlink, for one reason: the deck this is most
-        likely to be pointed at by mistake is a draft imported ten minutes ago
-        and never committed, and for that deck there is no `git checkout` to
-        undo with. Moving costs one rename and makes the mistake survivable.
+        A move rather than an unlink, for one reason: since ADR 30 no deck is
+        in git, so no deck has a revision to restore from -- the draft imported
+        ten minutes ago and the curated deck of a year's thinking are equally
+        gone. Moving costs one rename and makes the mistake survivable.
 
         The directory goes whole — `artifacts/` with it — because the artifacts
         are generated from the deck file and a folder of primers for a deck
         that no longer exists is worse than no folder at all.
 
         `.trash` is dot-prefixed so `config.deck_paths` cannot see it: that
-        glob is `*/deck.yaml`, and a trashed deck sits one level deeper. It is
-        gitignored, so a deleted deck leaves the working tree without leaving a
-        staged deletion nobody asked for.
+        glob is `*/deck.yaml`, and a trashed deck sits one level deeper. The
+        whole tree is the app's data directory rather than anything tracked
+        (ADR 30), so this is the only record that the deck was ever here.
 
         Refused outright on a read-only source, before anything moves. This is
         the operation the flag exists for: a delete here takes the artifacts
-        with it, and for a deck imported an hour ago and never committed there
-        is no `git checkout` to undo with.
+        with it, and nothing outside `.trash/` remembers the deck existed.
         """
         self._writable_or_raise(slug)
         path = self._path(slug)                      # raises DeckNotFound

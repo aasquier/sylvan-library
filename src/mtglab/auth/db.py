@@ -237,8 +237,9 @@ _MIGRATIONS: tuple[str, ...] = (
     """,
     # -- 6 ------------------------------------------------------------------
     # ADR 4's second deck tier, arriving as ADR 22. The curated six stay
-    # file-backed in git permanently and are *not* in here; this is where
-    # everybody else's decks live, one row each.
+    # file-backed permanently -- on disk rather than in git, once ADR 30 said
+    # so -- and are *not* in here; this is where everybody else's decks live,
+    # one row each.
     #
     # `yaml` holds the same text `deck.yaml` holds, which is the property ADR 4
     # bought and this table spends: `Deck.from_text` parses both, so the gate,

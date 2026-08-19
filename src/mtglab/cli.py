@@ -528,7 +528,7 @@ def cmd_decks_log(args):
     rows = log.entries(args.slug, limit=args.limit)
     if not rows:
         print(f"\n  {deck.name}: nothing recorded yet.")
-        print("  Edits made before this log existed are in git, not here.\n")
+        print("  Edits made before this log existed were never recorded.\n")
         return
 
     capped = " (most recent; raise --limit for more)" \
