@@ -126,6 +126,25 @@ def desktop_jar(forge_home: Path | None = None) -> Path:
     return jars[-1]
 
 
+_JAR_VERSION = re.compile(r"^forge-gui-desktop-(.+)-jar-with-dependencies\.jar$")
+
+
+def forge_version(forge_home: Path | None = None) -> str | None:
+    """Which Forge is installed, read off the jar's own name.
+
+    The match ledger records it (ADR 36): Forge's AI is the instrument every
+    recorded game was measured with, and an upgrade changes the instrument --
+    ratings computed across an unversioned upgrade would silently mix two
+    judges. `None` when the name does not parse, which the ledger stores as
+    "not reported" rather than guessing.
+    """
+    try:
+        match = _JAR_VERSION.match(Path(desktop_jar(forge_home)).name)
+    except ForgeNotInstalled:
+        return None
+    return match.group(1) if match else None
+
+
 # -------------------------------------------------------------- the profile
 
 def forge_profile() -> Path:
@@ -181,6 +200,9 @@ class SimRun:
     # Seat number (1-based, the order decks were passed) -> deck slug.
     seats: dict[int, str] = field(default_factory=dict)
     coverage: list[CoverageReport] = field(default_factory=list)
+    # Which Forge played, from the jar's name -- or None when the run was
+    # rebuilt from a wire payload that predates the field (deploy skew).
+    forge_version: str | None = None
 
     @property
     def games(self) -> list[parse.GameResult]:
@@ -325,7 +347,8 @@ def run_games(decks: list[Deck], *, games: int = 1, clock: int = 300,
     output = parse.parse(text)
 
     run = SimRun(argv=argv, output=output, wall_seconds=elapsed,
-                 seats=seats, coverage=reports)
+                 seats=seats, coverage=reports,
+                 forge_version=forge_version(forge_home))
 
     if not output.trustworthy:
         raise ResultsUntrustworthy(

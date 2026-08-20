@@ -73,6 +73,10 @@ def run_to_wire(run: SimRun) -> dict[str, Any]:
         # JSON keys are strings; the seat numbers come back in `run_from_wire`.
         "seats": {str(seat): slug for seat, slug in run.seats.items()},
         "wall_seconds": run.wall_seconds,
+        # For the match ledger (ADR 36). Optional in both directions on
+        # purpose: an old shim omits it and an old app ignores it, so deploy
+        # skew degrades to "not reported" rather than to an error.
+        "forge_version": run.forge_version,
     }
 
 
@@ -87,8 +91,10 @@ def run_from_wire(payload: dict[str, Any]) -> SimRun:
             timed_out=bool(g.get("timed_out")))
         for g in payload.get("games", [])
     ]
+    version = payload.get("forge_version")
     return SimRun(
         argv=[], output=parse.SimOutput(games=games),
         wall_seconds=float(payload.get("wall_seconds", 0.0)),
         seats={int(seat): str(slug)
-               for seat, slug in (payload.get("seats") or {}).items()})
+               for seat, slug in (payload.get("seats") or {}).items()},
+        forge_version=None if version is None else str(version))

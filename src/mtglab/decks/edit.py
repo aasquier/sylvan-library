@@ -39,7 +39,13 @@ from typing import Any
 
 import yaml
 
-from mtglab.decks.model import DECK_STAGES, DECK_STATUSES, load_yaml
+from mtglab.decks.model import (
+    ARCHETYPES,
+    DECK_STAGES,
+    DECK_STATUSES,
+    THEMES,
+    load_yaml,
+)
 
 # `  - name: Primeval Titan` -- the first line of a card entry. The name may be
 # quoted, and a card name can contain almost anything, so the value is taken
@@ -69,7 +75,10 @@ SETTABLE_FIELDS = ("category", "qty", "why", "art")
 # What `set_deck_field` will write: the deck's own scalars. `strategy` and
 # `notes` are prose and belong to `set_note`; `commander` and `companion` change
 # what the whole deck is legal to contain and are a rebuild, not a field edit.
-SETTABLE_DECK_FIELDS = ("stage", "status", "bracket", "commander_art", "pilot")
+# `themes` is the one non-scalar -- a list, but a list of vocabulary keys, so
+# it edits like an enum with a plural rather than like the card blocks.
+SETTABLE_DECK_FIELDS = ("stage", "status", "bracket", "commander_art", "pilot",
+                        "archetype", "themes")
 
 # The most anybody's name needs. A pilot is a person at a table, not a bio.
 PILOT_MAX = 40
@@ -80,7 +89,8 @@ PILOT_MAX = 40
 # every deck in the repository.
 _DECK_KEY_ORDER = ("slug", "name", "status", "stage", "commander", "shared",
                    "pilot", "commander_art", "companion", "bracket",
-                   "strategy", "notes", "cards", "swap_board", "graveyard")
+                   "archetype", "themes", "strategy", "notes", "cards",
+                   "swap_board", "graveyard")
 
 # A Scryfall printing id: a plain UUID. Checked by shape rather than against
 # the pool, because `edit.py` is pure text surgery over YAML and reaching for
@@ -305,7 +315,12 @@ class _Folded(str):
 
 
 class _FoldedDumper(yaml.SafeDumper):
-    pass
+    # The same override `model._Dumper` carries, for the same reason: a list
+    # rendered here (`themes`, the one settable list field) must sit indented
+    # under its key the way every hand-written deck file writes one.
+    def increase_indent(self, flow: bool = False,
+                        indentless: bool = False) -> None:
+        return super().increase_indent(flow, False)
 
 
 _FoldedDumper.add_representer(
@@ -864,7 +879,7 @@ def set_card_field(text: str, *, name: str, field: str, value: Any) -> str:
 
 
 def set_deck_field(text: str, *, field: str, value: Any) -> str:
-    """Change one of the deck's own scalars: its stage, status or bracket.
+    """Change one of the deck's own fields: stage, status, a label, and kin.
 
     The one that matters is `stage`, because promoting a draft to curated is
     the last step of an import and was, until this operation existed, the last
@@ -917,6 +932,35 @@ def set_deck_field(text: str, *, field: str, value: Any) -> str:
                 f"a UUID; the deck page's art picker sets this for you, and "
                 f"`mtglab decks set <slug> --art <set-code>` takes a set code "
                 f"and looks the id up.")
+    elif field == "archetype":
+        # The closed Forge-pilotability class (see `model.ARCHETYPES` for why
+        # it is closed and small). Emptying it is a real operation -- it means
+        # "this deck sits on no rating board" -- so a blank passes through.
+        value = str(value or "").strip().lower()
+        if value and value not in ARCHETYPES:
+            raise EditFailed(
+                f"{value!r} is not an archetype; choose one of "
+                f"{', '.join(ARCHETYPES)}, or clear it")
+    elif field == "themes":
+        # The open identity list. A comma-separated string or a list both
+        # arrive here (the CLI sends the former, JSON the latter); either way
+        # every entry must be in the vocabulary, which is how a typo is a
+        # refusal instead of a theme nobody else's filter will ever match.
+        # Order is kept and duplicates are dropped -- the first mention wins.
+        raw = value.split(",") if isinstance(value, str) else list(value or [])
+        themes: list[str] = []
+        for item in raw:
+            theme = str(item).strip().lower()
+            if not theme:
+                continue
+            if theme not in THEMES:
+                raise EditFailed(
+                    f"{theme!r} is not in the theme vocabulary; the list "
+                    f"grows by editing THEMES in decks/model.py, never by "
+                    f"typo. Known themes: {', '.join(THEMES)}")
+            if theme not in themes:
+                themes.append(theme)
+        value = themes
     else:
         value = str(value).strip().lower()
         allowed: tuple[str, ...] = {"stage": DECK_STAGES,

@@ -1370,6 +1370,11 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
 
         decks = [lib.source_for(owner).get(slug) for owner, slug in pairs]
         addresses = [f"{owner}/{slug}" for owner, slug in pairs]
+        # For the match ledger: the same ownership key the activity log uses
+        # (an owner_id, NULL for the file tier — never the URL's owner
+        # segment, which is not stable across configurations).
+        owner_ids = [service.owner_id_of(lib.source_for(owner))
+                     for owner, _slug in pairs]
         try:
             # The pre-flight runs where the card scripts live: against the
             # local zip, or on the worker machine (which this wakes — the
@@ -1385,7 +1390,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         except ForgeNotInstalled as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-        return _job_for(plan_forge(decks, addresses, payload),
+        return _job_for(plan_forge(decks, addresses, payload, owner_ids),
                         caller).as_dict()
 
     @app.get("/api/jobs")

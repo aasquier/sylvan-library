@@ -1294,10 +1294,10 @@ applies to each. Ordered by cost:
      `cache_creation_input_tokens`. Writes bill at **1.25× input**, so
      `mtglab claude usage`'s **$1.64** is a floor on the bill, not the bill —
      and `prices.py`'s own docstring says so. Two things changed around it.
-     The migration is now **v11, not v9**: schema v9 and v10 both landed for
-     other work since this was queued, which is evidence the "own branch,
-     merged while somebody is watching" cost is one this repo already pays
-     routinely. And the instrument matters more than it did, because the
+     The migration is now **v12, not v9**: schema v9, v10 and v11 (the match
+     ledger, ADR 36) all landed for other work since this was queued, which
+     is evidence the "own branch, merged while somebody is watching" cost is
+     one this repo already pays routinely. And the instrument matters more than it did, because the
      Sonnet 5 introductory rate ends **2026-08-31** and every figure this
      table produces rises 50% on 2026-09-01.
   2. **The theme conversation's second cache breakpoint — payoff now bounded.**
@@ -2934,7 +2934,7 @@ act on soonest, not by color:
 5. **Black 1 — cache-write tokens are invisible and are the priciest class**
    (1.25× input). Re-verified: `cache_creation_input_tokens` appears **nowhere
    in `src/`**. One column plus one assignment, but a **schema migration**
-   (now v11) on a forward-only ladder that applies on boot unwatched — so it
+   (now v12) on a forward-only ladder that applies on boot unwatched — so it
    wants its own branch merged while somebody is watching. **Dated urgency:**
    Sonnet 5's introductory rate ends **2026-08-31**, and this is the
    instrument that would show what the 50% rise actually costs.

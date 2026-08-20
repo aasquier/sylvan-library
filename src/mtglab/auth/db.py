@@ -39,7 +39,7 @@ from mtglab import config
 
 # Bumped when `_MIGRATIONS` grows. Stored in SQLite's own `user_version`, which
 # costs no table and cannot be forgotten in a schema dump.
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 # One entry per version, applied in order to whatever the file is at. A fresh
 # database runs all of them; an existing one runs the tail. The invite and
@@ -437,6 +437,99 @@ _MIGRATIONS: tuple[str, ...] = (
     # makes a rolled-back deploy survivable.
     """
     ALTER TABLE users ADD COLUMN model_tier TEXT;
+    """,
+    # -- 11 -----------------------------------------------------------------
+    # The match ledger (ADR 36): every Forge match this instance plays,
+    # recorded by `sim/tier3/ledger.py` from the two places a match finishes
+    # -- the API job and the CLI. The data foundry the Simulator's next phase
+    # drinks from: Bayesian ratings, the win-probability regression and the
+    # game-length survival curves are all queries over these three tables,
+    # and Tier 2's calibration anchor is too.
+    #
+    # Three tables rather than one, because the three kinds of row answer
+    # different questions and are joined on demand: a *match* is one JVM run
+    # (its seed, clock and provenance), a *seat* is a deck's part in it, and a
+    # *game* is one measured outcome. Not JSON blobs like `sim_cache`, and
+    # deliberately: `sim_cache` rows are opaque memoisation, while these are
+    # the dataset the rating boards GROUP BY -- a shape SQL should see.
+    #
+    # Decisions, each argued rather than defaulted:
+    #
+    # - **Games store facts as parsed, never verdicts.** `winner_seat` is kept
+    #   even when `timed_out` is set, exactly as `parse.GameResult` keeps
+    #   them apart -- a clocked-out game with a winner line is a real
+    #   measurement of a fake outcome, and folding the rule "a clock-out
+    #   counts for nobody" into the row would make it unqueryable the day the
+    #   rule needs re-examining. Readers apply the rule; `ledger.py`'s
+    #   tallies are the reference implementation.
+    # - **Seats snapshot the deck's labels at match time.** `archetype` and
+    #   `themes` are copied from the deck when it plays, because the boards
+    #   group matches by the class a deck *wore when it played* -- relabelling
+    #   a deck must not silently rewrite the history of every game it ever
+    #   played. `themes` is a JSON array in TEXT: it is carried for display
+    #   and later analysis, never grouped on, so first normal form buys
+    #   nothing here but a fourth table.
+    # - **`owner_id` follows `deck_log`**: NULL is the file-backed curated
+    #   library, everybody else's decks carry `user_decks.owner_id`, and the
+    #   CASCADE takes a deleted account's seats with it -- their slugs are
+    #   their content. A match missing a seat drops out of per-deck queries
+    #   by construction (the JOIN finds nothing), which is the intended
+    #   afterlife rather than an accident.
+    # - **`seed` is nullable.** API runs are always seeded; a CLI run can be
+    #   deliberately unseeded, and recording NULL is honest where inventing a
+    #   number would poison "is this reproducible" forever.
+    # - **`forge_version` is nullable**, because an old worker image answers
+    #   the wire without one; the reader treats NULL as "not reported".
+    #
+    # Derived-adjacent like nothing else here: these rows can NOT be
+    # recomputed (a Forge game is a real event), but losing them costs
+    # history and ratings, never anybody's words or credentials.
+    """
+    CREATE TABLE forge_matches (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at      TEXT    NOT NULL,
+        seed            INTEGER,
+        clock           INTEGER NOT NULL,
+        games_requested INTEGER NOT NULL,
+        forge_version   TEXT,
+        -- 0: this machine's JVM; 1: the forge-worker machine (ADR 35).
+        hosted          INTEGER NOT NULL DEFAULT 0,
+        wall_seconds    REAL
+    );
+
+    CREATE TABLE forge_seats (
+        match_id  INTEGER NOT NULL REFERENCES forge_matches(id)
+                  ON DELETE CASCADE,
+        -- 1-based, the order the decks were handed to Forge; what
+        -- `forge_games.winner_seat` points at.
+        seat      INTEGER NOT NULL,
+        owner_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        slug      TEXT    NOT NULL,
+        -- The commander names as a JSON array (partners are two), for the
+        -- theater and the war room to render without loading the deck.
+        commander TEXT    NOT NULL,
+        -- The labels the deck wore when it played. '' / '[]' when undeclared.
+        archetype TEXT    NOT NULL,
+        themes    TEXT    NOT NULL,
+        PRIMARY KEY (match_id, seat)
+    );
+
+    -- The per-deck question ("every match goreclaw played"), which is the
+    -- one every board and every rating update starts from.
+    CREATE INDEX forge_seats_by_deck ON forge_seats(owner_id, slug);
+
+    CREATE TABLE forge_games (
+        match_id     INTEGER NOT NULL REFERENCES forge_matches(id)
+                     ON DELETE CASCADE,
+        game_index   INTEGER NOT NULL,
+        -- As parsed, even beside timed_out = 1. See the note above.
+        winner_seat  INTEGER,
+        milliseconds INTEGER NOT NULL,
+        turns        INTEGER,
+        draw         INTEGER NOT NULL,
+        timed_out    INTEGER NOT NULL,
+        PRIMARY KEY (match_id, game_index)
+    );
     """,
 )
 

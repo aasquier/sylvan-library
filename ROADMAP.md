@@ -42,6 +42,47 @@ changed, and the account below survives only because it carries the reasoning
 that a diff does not. And it is not the current list; when it disagrees with
 the ledger, the ledger is right.
 
+### The next phase — the Simulator learns (decided 2026-08-20)
+
+ADR 35 finished and proven, the direction was researched the same day (the
+"Beyond the Goldfish" report) and Aaron chose the sequence. Five steps, each
+its own branch or few, in this order because each drinks from the one before:
+
+1. **The match ledger** ([ADR 36](docs/adr/0036-the-match-ledger-records-declared-labels.md))
+   — every Forge match recorded in `app.db` (migration 11): the match, its
+   seats, its games as parsed. With it, the two-axis deck labelling Aaron
+   ruled on: an open hand-curated `themes` list (identity; never scraped —
+   goal 8's boundary stands) and a small closed `archetype` class that only
+   the rating boards group by. Both declared in `deck.yaml`, never derived —
+   derivation would launder Forge's pilot bias into the boards.
+2. **The match theater** — #203's stream carries only a count; extend the
+   shim's NDJSON to carry each parsed row (winner, turns, seconds), let the
+   job expose partial rows, and the Simulator renders the match live:
+   commanders' art face off, brass win pips, rows sliding in, the bar as a
+   forge-heat gauge (CSS only, `prefers-reduced-motion` honoured).
+3. **The Karsten shelf + mulligan policy search** (Tier 1.5, pure Python):
+   hypergeometric colored-source requirements and the regression land count
+   computed from the actual compiled 99, set beside the Monte Carlo answer;
+   a `KeepRule` sweep reporting the best keep rule per deck; a castability
+   heatmap per card and turn. Teaches while it advises (commandment 2).
+4. **Ratings, then the regression** — TrueSkill-style posteriors per
+   archetype class and **never across** (goal 7's engine, goal 9's honest
+   shape), then a win-probability logistic regression over compiled-deck
+   features once an overnight Mac round-robin fills the ledger. Survival
+   curves per matchup feed the timeout and the copy. Small models on our own
+   match data: yes. RL that plays Magic: no — the research frontier is five
+   Standard archetypes and two players; Forge already is our playing AI.
+5. **Tier 2, the pod simulator — last**, with the discipline the old plan
+   lacked: it must reproduce the Forge ledger's heads-up results before its
+   pod numbers are believed. Pods are the question Forge measurably cannot
+   answer (40% hit the clock), which is Tier 2's justification and its
+   calibration anchor in one.
+
+Every learned output is labelled an estimate (rule 3: say which system
+answered); nothing ML-heavy ever ships in the container — training runs on
+the Mac, artifacts stay numpy-scale, and anything heavier goes behind an
+extra like `depth`.
+
 1. ~~**The best-practices and cleanup pass.**~~ Landed 2026-08-12: the API
    catch-all refuses `/api` misses as JSON, dead code out, mode tool sets
    enforced at dispatch, four-colour names in, `api/service.py` and

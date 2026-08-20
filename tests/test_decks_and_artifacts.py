@@ -244,6 +244,30 @@ def test_an_unrecognised_status_fails_the_gate():
     assert "deck-status" in codes
 
 
+def test_labels_outside_the_vocabulary_warn_and_absent_is_fine():
+    """The two labelling axes (ADR 36) strike the `unknown-category` bargain:
+    a hand-written label off the vocabulary warns, an edit through the app is
+    refused outright, and an unlabelled deck is undeclared, not wrong."""
+    from mtglab.decks.validate import validate
+
+    labelled = Deck.from_text(
+        "slug: x\nname: X\narchetype: aggro\nthemes:\n  - cats\ncards: []\n")
+    assert not {i.code for i in validate(labelled, None).issues} & \
+        {"unknown-archetype", "unknown-theme"}
+
+    off = Deck.from_text(
+        "slug: x\nname: X\narchetype: tempo\nthemes:\n  - fud\ncards: []\n")
+    rep = validate(off, None)
+    warn_codes = {i.code for i in rep.warnings}
+    assert {"unknown-archetype", "unknown-theme"} <= warn_codes
+    error_codes = {i.code for i in rep.errors}
+    assert not {"unknown-archetype", "unknown-theme"} & error_codes
+
+    bare = Deck.from_text("slug: x\nname: X\ncards: []\n")
+    assert not {i.code for i in validate(bare, None).issues} & \
+        {"unknown-archetype", "unknown-theme"}
+
+
 # The two tests that used to live here reading the maintainer's real decks —
 # their statuses and stages — left with ADR 30: decks are live app data, so a
 # checkout has none to read. The facts they pinned are prose in CLAUDE.md's

@@ -24,7 +24,14 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from mtglab.decks import companion, partners
-from mtglab.decks.model import CATEGORIES, DECK_STAGES, DECK_STATUSES, Deck
+from mtglab.decks.model import (
+    ARCHETYPES,
+    CATEGORIES,
+    DECK_STAGES,
+    DECK_STATUSES,
+    THEMES,
+    Deck,
+)
 
 if TYPE_CHECKING:
     from mtglab.cards.db import CardRecord
@@ -100,6 +107,22 @@ def validate(deck: Deck, cards: dict[str, CardRecord] | None = None, *,
         rep.add("error", "deck-stage",
                 f"stage {deck.stage!r} is not one of {', '.join(DECK_STAGES)}")
     drafting = deck.stage == "draft"
+
+    # The labelling axes warn rather than block, the same bargain as
+    # `unknown-category` below: the warning is for a hand-written file, while
+    # an edit through the app chooses from the vocabulary and is refused
+    # outright by `edit.set_deck_field`. Absent is fine -- an unlabelled deck
+    # is undeclared, not wrong -- but a label outside the vocabulary would
+    # silently fragment the very grouping it exists for.
+    if deck.archetype and deck.archetype not in ARCHETYPES:
+        rep.add("warn", "unknown-archetype",
+                f"archetype {deck.archetype!r} is not one of "
+                f"{', '.join(ARCHETYPES)}")
+    for theme in deck.themes:
+        if theme not in THEMES:
+            rep.add("warn", "unknown-theme",
+                    f"theme {theme!r} is not in the vocabulary; the list "
+                    f"grows by editing THEMES in decks/model.py")
 
     # Two commanders share the command zone, so the deck holds 98 rather than
     # 99. `expected_size` is the single-commander default; adjust it by however

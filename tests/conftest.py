@@ -209,6 +209,27 @@ def _no_deck_log(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_match_ledger(monkeypatch):
+    """No test's Forge match job deposits rows in the developer's real app.db.
+
+    The `_no_deck_log` hazard through the newest door (ADR 36): the match job
+    in `api/forgeruns.py` records every finished match through
+    `sim/tier3/ledger.py`, which resolves its database from `config` — and
+    `test_api_forge.py` runs match jobs by the dozen. Only the module
+    attribute `forgeruns` holds is replaced; the ledger itself stays real,
+    which is what `test_forge_ledger.py` exercises against a scratch path,
+    and one test in `test_api_forge.py` points the real module back in to
+    prove the seam end to end. The CLI's call site needs no stub: the CLI
+    tests already run inside `config.use_paths(data_dir=...)`.
+    """
+    from types import SimpleNamespace
+
+    from mtglab.api import forgeruns
+    monkeypatch.setattr(forgeruns, "ledger",
+                        SimpleNamespace(record=lambda *args, **kwargs: None))
+
+
+@pytest.fixture(autouse=True)
 def _pool_handles_released():
     """No test leaves an open handle on the pool for the next one to trip on.
 

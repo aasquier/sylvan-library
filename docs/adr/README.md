@@ -46,6 +46,10 @@ they differ.
 | [30](0030-decks-are-live-app-data.md) | Decks are live app data, not repository content | Accepted |
 | [31](0031-motion-is-seeded-and-a-procedural-source-is-its-own-declaration.md) | Motion is seeded, and a procedural source is its own declaration | Accepted |
 | [32](0032-card-art-motion-is-derived-at-runtime-and-never-committed.md) | Card-art motion is derived at runtime, and never committed | Accepted |
+| [33](0033-official-symbols-fill-a-runtime-cache.md) | The official mana symbols fill a runtime cache, and the drawn five become the fallback | Accepted |
+| [34](0034-claude-reads-a-photograph-and-the-pool-names-the-card.md) | Claude reads a photograph, and the pool names the card | Accepted |
+| [35](0035-the-forge-joins-the-simulator-and-a-worker-runs-it-hosted.md) | The Forge joins the Simulator, and a worker runs it hosted | Accepted |
+| [36](0036-the-match-ledger-records-declared-labels.md) | The match ledger records real games, and the labels it snapshots are declared | Accepted |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the

@@ -290,7 +290,11 @@ src/mtglab/
                           shim.py (the worker machine's stdlib HTTP door,
                           which stops its own machine when idle), worker.py
                           (the app's Machines API client; creation belongs
-                          to the deploy workflow, never a request thread)
+                          to the deploy workflow, never a request thread),
+                          and ledger.py (ADR 36: every match recorded into
+                          app.db from the two places one finishes -- the API
+                          job and the CLI, never the worker; games stored as
+                          parsed, labels snapshotted, `record` never raises)
   artifacts/generate.py   the five deliverables
   claude/                 client, tools, stance, persona, and seven modes
                           across six features: interview.py (a card's `why`),
@@ -588,6 +592,7 @@ mtglab sim mana <slug>            # baseline consistency
 mtglab sim lands <slug> 30 40     # is the land count right?
 mtglab sim cache                  # what Tier 1 results are memoised; --clear
 mtglab sim forge <a> <b> [c] [d]  # Tier 3 — Forge plays real games
+mtglab sim matches                # the match ledger: every Forge match recorded
 mtglab decks build <slug>         # before a refactor, so swaps.md can diff it
 ```
 
@@ -1091,6 +1096,16 @@ owned.
 Separately, each declares `stage: draft | curated` — whether it has been
 reasoned about, as opposed to whether it exists. **All six are curated.** A
 deck brought in with `decks import` starts as a draft; see rule 4.
+
+A deck may also declare its two labelling axes (ADR 36, decided 2026-08-20):
+an open `themes` list (identity — several per deck, from the hand-curated
+vocabulary in `model.THEMES`, which grows only by editing it, never by
+scraping) and a closed `archetype` (aggro | midrange | control | combo — the
+class the rating boards group by, coarse on purpose). Both are declared, never
+derived: a derived class would launder Forge's pilot bias into the boards. The
+match ledger snapshots both at match time, so relabelling a deck changes its
+next match and never its history. Absent means unlabelled, which is where all
+six start — declaring theirs is Aaron's call, deck by deck.
 
 Two decks currently fail the gate on one card each, deliberately and not as a
 bug to route around: **Goreclaw** runs Primeval Titan and **Atla Palani** runs

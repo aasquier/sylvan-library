@@ -44,7 +44,12 @@ def client(tmp_path):
         deck.slug, deck.name = slug, name
         (root / slug).mkdir(parents=True)
         (root / slug / "deck.yaml").write_text(deck.dump(), encoding="utf-8")
-    with config.use_paths(decks_dir=root), TestClient(create_app()) as c:
+    # `data_dir` too, since ADR 36: a match job records into the ledger, and
+    # `app.db` resolves from `config`. The conftest stub already silences the
+    # writer; this keeps the one test that re-points the real module inside
+    # the scratch directory rather than the developer's data.
+    with config.use_paths(decks_dir=root, data_dir=tmp_path / "data"), \
+            TestClient(create_app()) as c:
         yield c
 
 
@@ -179,6 +184,37 @@ def test_a_match_runs_as_a_job_and_reports_honestly(client, forge_present,
     clocked = [r for r in body["rows"] if r["timed_out"]]
     assert clocked and all(not r["draw"] and r["winner"] is None
                            for r in clocked)
+
+
+def test_a_match_job_records_into_the_ledger(client, forge_present,
+                                             monkeypatch):
+    """The seam test the `_no_deck_log` discipline requires: conftest stubs
+    `forgeruns.ledger` for the whole suite, so one test points the real
+    module back in and proves a finished match lands as a row -- a stub
+    nothing ever removes is how a broken seam stays green. The client
+    fixture's scratch `data_dir` is what the row lands in."""
+    from mtglab.sim.tier3 import ledger as real_ledger
+
+    monkeypatch.setattr(forgeruns, "ledger", real_ledger)
+    monkeypatch.setattr(
+        forge_run, "run_games",
+        lambda decks, *, games, clock, seed, on_game=None: fake_match(games))
+    job = post(client).json()
+    assert await_job(client, job["id"])["status"] == "done"
+
+    [match] = real_ledger.recent()
+    assert [s["slug"] for s in match["seats"]] == [A, B]
+    # The file tier's ownership key, exactly as the activity log writes it.
+    assert all(s["owner_id"] is None for s in match["seats"])
+    assert match["games_requested"] == 4
+    assert match["seed"] == forgeruns.DEFAULT_SEED
+    assert match["clock"] == forgeruns.CLOCK
+    assert match["hosted"] is False
+    # `fake_match(4)`: one clock-out with a winner line, one real draw, two
+    # honest wins -- the ledger's reference reading agrees with `_shape`.
+    assert match["timed_out"] == 1
+    assert match["draws"] == 1
+    assert {s["slug"]: s["wins"] for s in match["seats"]} == {A: 1, B: 1}
 
 
 def test_games_are_clamped_before_the_label_is_written(client, forge_present,

@@ -39,6 +39,72 @@ def load_yaml(text: str) -> Any:
     return yaml.load(text, SAFE_LOADER)
 
 
+# The deck-labelling axes, two on purpose (Aaron's call, 2026-08-20; the match
+# ledger is what forced the decision). One axis was proposed and refused:
+# EDHREC keeps roughly four thousand themes, so a single small vocabulary is
+# either too coarse to say what a deck *is* or too fine for any grouping to
+# hold enough games to mean anything. So the axes split by question:
+#
+# - `THEMES` answers "what is this deck about" -- rich identity, several per
+#   deck, and an *open* vocabulary: it grows by editing this tuple, which is a
+#   decision someone makes, never a scrape. (EDHREC's theme list is derived
+#   from their own aggregated data and CLAUDE.md bans crawling either way;
+#   ROADMAP goal 8 records the three lawful options and this is option 2.)
+# - `ARCHETYPES` answers "which rating board may this deck's Forge results
+#   share" -- one per deck, a *closed* class, coarse on purpose: per-archetype
+#   reporting is law because Forge pilots the classes differently, and a
+#   grouping fine enough to be interesting is too fine to hold enough games.
+#
+# Both are DECLARED in deck.yaml and never derived from the list. A derived
+# class would be laundering: whatever signal picked it would correlate with
+# how well Forge pilots the deck, and the boards would quietly rank decks by
+# the very bias the class exists to contain.
+THEMES = (
+    "angels",
+    "aristocrats",
+    "artifacts",
+    "auras",
+    "big-mana",
+    "blink",
+    "cats",
+    "clues",
+    "counters",
+    "dinosaurs",
+    "dragons",
+    "elves",
+    "enchantments",
+    "equipment",
+    "food",
+    "goblins",
+    "graveyard",
+    "group-hug",
+    "landfall",
+    "lands",
+    "lifegain",
+    "mill",
+    "politics",
+    "ramp",
+    "reanimator",
+    "sacrifice",
+    "spellslinger",
+    "spirits",
+    "stax",
+    "stompy",
+    "superfriends",
+    "tokens",
+    "treasure",
+    "tribal",
+    "vehicles",
+    "voltron",
+    "wheels",
+    "zombies",
+)
+
+# Ordered as the standing caveat orders them -- best-piloted first: Forge's AI
+# is best with aggro and midrange, poor with control, bad with most combo.
+# That gradient is exactly why the class exists and why it stays this small.
+ARCHETYPES = ("aggro", "midrange", "control", "combo")
+
 # Macro categories tracked for balance analysis. The set is deliberately small
 # and fixed so that category counts are comparable across decks.
 CATEGORIES = (
@@ -204,6 +270,15 @@ class Deck:
     commander_art: str = ""
     companion: str | None = None
     bracket: int | None = None
+    # The two labelling axes (see THEMES and ARCHETYPES above for the whole
+    # argument). `archetype` is the closed Forge-pilotability class the rating
+    # boards group by -- empty means undeclared, and an undeclared deck simply
+    # has no board to sit on. `themes` is the open identity list users will
+    # see and filter by. Both are declared here, in the source of truth, and
+    # the match ledger snapshots them at match time -- a deck relabelled later
+    # keeps the class it wore when it played.
+    archetype: str = ""
+    themes: list[str] = field(default_factory=list)
     strategy: str = ""
     # Free-form notes that flow into the advanced primer.
     notes: dict[str, str] = field(default_factory=dict)
@@ -315,6 +390,9 @@ class Deck:
             commander_art=str(raw.get("commander_art") or "").strip(),
             companion=raw.get("companion"),
             bracket=raw.get("bracket"),
+            archetype=str(raw.get("archetype") or "").strip().lower(),
+            themes=[str(t).strip().lower()
+                    for t in (raw.get("themes") or []) if str(t).strip()],
             strategy=raw.get("strategy", ""),
             notes=dict(raw.get("notes", {})),
             cards=[CardEntry.from_obj(c) for c in raw.get("cards", [])],
@@ -351,6 +429,12 @@ class Deck:
             payload["companion"] = self.companion
         if self.bracket is not None:
             payload["bracket"] = self.bracket
+        # Written only when declared, like `pilot` above: unlabelled is the
+        # default and a round trip must not grow lines asserting it.
+        if self.archetype:
+            payload["archetype"] = self.archetype
+        if self.themes:
+            payload["themes"] = self.themes
         if self.strategy:
             payload["strategy"] = self.strategy
         if self.notes:
