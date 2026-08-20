@@ -113,6 +113,7 @@ function job(result: unknown): Job {
   return {
     id: 'j1', kind: 'claude.research', status: 'done', done: 1, total: 1,
     percent: 100, label: 'research: …', result, error: null,
+    partial: null,
     created_at: '2026-08-14T12:00:00+00:00',
   }
 }

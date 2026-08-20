@@ -60,7 +60,8 @@ const job = (result: unknown, status: 'queued' | 'done' = 'done') => ({
   done: status === 'done' ? 1 : 0, total: 1,
   percent: status === 'done' ? 100 : 0,
   label: 'dossier: Goreclaw, Terror of Qal Sisma',
-  result, error: null, created_at: '2026-08-13T18:40:00+00:00',
+  result, partial: null, error: null,
+  created_at: '2026-08-13T18:40:00+00:00',
 })
 
 const DECK = {

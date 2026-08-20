@@ -27,6 +27,8 @@ import {
   ByTurnChart, CommanderCurve, LandSweepChart, LandTradeoffChart, WastedManaChart,
 } from '../components/lazycharts'
 import { DataTable } from '../components/datatable'
+import { MatchTheater } from '../components/theater'
+import { theaterRows } from '../lib/theater'
 import { HelpTip, Term } from '../components/term'
 
 type Mode = 'mana' | 'lands' | 'forge'
@@ -158,6 +160,14 @@ export default function Simulator() {
     if (slug) setParams(owner ? { deck: slug, owner } : { deck: slug },
                         { replace: true })
   }, [slug, owner, setParams])
+
+  /** The shelf's own record of a deck in one of the two seats, or null while
+   *  the shelf is still loading. Matched on owner as well as slug, because an
+   *  address is both (ADR 22) and two libraries may hold the same slug — an
+   *  empty owner is the pre-owner bookmark shape and matches on slug alone,
+   *  exactly as the resolution above does. */
+  const deckOf = (s: string, o: string) =>
+    decks.find((d) => d.slug === s && (!o || d.owner === o)) ?? null
 
   async function run(withSeed = seed) {
     if (!slug) return
@@ -318,35 +328,40 @@ export default function Simulator() {
 
       {error && <ErrorNote>Simulation failed: {error}</ErrorNote>}
 
-      {running && job && (
+      {/* A match gets a stage instead of a bar. It is one element across both
+          phases — fed from the job's `partial` while the games are landing and
+          from the result's own rows once they have all landed — so the pips
+          that lit one at a time are still lit when the match is over and the
+          win has somewhere to arrive.
+
+          Keyed on the job id, which is the only remount anybody wants: a
+          second match against the same two decks reuses the row numbers 1..n,
+          so without it React would match the new match's rows to the old
+          one's elements and the second run would play out with no strikes at
+          all. */}
+      {mode === 'forge' && job && (running || forge) && (
+        <MatchTheater
+          key={job.id}
+          a={deckOf(slug, owner)} b={deckOf(oppSlug, oppOwner)}
+          aSlug={slug} bSlug={oppSlug}
+          games={forge ? forge.games : (job.total || forgeGames)}
+          rows={forge ? forge.rows : theaterRows(job.partial)}
+          running={running}
+        />
+      )}
+
+      {running && job && mode !== 'forge' && (
         <div className="card-surface space-y-2 rounded-xl p-4">
           <div className="flex items-center justify-between text-sm">
             <Spinner label={job.label || 'Running…'} />
             <span className="tabular" style={{ color: 'var(--text-secondary)' }}>
-              {mode === 'forge'
-                ? (job.total > 0 && job.done > 0
-                    ? `game ${Math.min(job.done + 1, job.total)} of ${job.total}`
-                    : '')
-                : `${job.percent}%`}
+              {job.percent}%
             </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full" style={{ background: 'var(--gridline)' }}>
             <div className="h-full rounded-full transition-all"
                  style={{ width: `${job.percent}%`, background: 'var(--series-1)' }} />
           </div>
-          {mode === 'forge' && (
-            // The Forge reports each game as it ends, so the bar ticks per
-            // game — but nothing arrives before the first result, so the
-            // quiet opening gets its own honest sentence.
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {job.done === 0
-                ? 'Lighting the forge — the first game usually reports ' +
-                  'within half a minute.'
-                : 'Whole games of Commander, one at a time — a typical game ' +
-                  'takes a few seconds, and a wide board can take two ' +
-                  'minutes while the pilot thinks.'}
-            </p>
-          )}
         </div>
       )}
 
