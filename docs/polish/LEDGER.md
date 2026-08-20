@@ -1232,7 +1232,18 @@ applies to each. Ordered by cost:
 - **Last run:** 2026-08-19 (rainbow). Previous: 2026-08-16 (rainbow), plus two
   un-run entries from the same week — the targeted performance pass and the
   measuring shelf — both kept below.
-- **Fixed this run (2026-08-19, rainbow):**
+- **Measured out of band (2026-08-20, ADR 35 live — the hosted Forge's cost
+  shape, from the first paid matches on the instance):** wake from `stopped`
+  is **~5s** (hand-timed against the real machine; `worker.BOOT_SECONDS=90`
+  is the refusal ceiling, not the expectation). JVM boot plus the card
+  database is **~14s** of startup inside the match. A 3-game heads-up match:
+  median **5.5–5.8s/game**, **~40s wall**, ~4s of it on the app's request
+  thread — inside the spike's local band, so the dedicated CPU is honest.
+  The shim self-stops after 180s idle, so one match occupies the machine for
+  roughly wall + 180s; at performance-2x/4GB rates that is **~1¢ per
+  match**, and a stopped machine bills only its rootfs storage. Baseline,
+  not a finding — the number a future "the worker feels slow/expensive"
+  gets measured against.
   1. **The shelf asked for one printing per pinned deck.** `_tiles` batches
      the gate, the pool lookup and (one layer down) each deck's *card* art —
      `_card_art_overrides` refuses the N+1 in its own docstring — and then

@@ -36,6 +36,7 @@ the worker enforces its own invariant rather than inheriting one.
 
 from __future__ import annotations
 
+import contextlib
 import hmac
 import json
 import os
@@ -45,6 +46,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from mtglab.decks.model import Deck
 from mtglab.sim.tier3 import run as forge
 from mtglab.sim.tier3 import wire
 from mtglab.sim.tier3.coverage import ForgeNotInstalled, check, implemented_names
@@ -186,11 +188,15 @@ class Handler(BaseHTTPRequestHandler):
             games = int(body.get("games", 1))
             clock = int(body.get("clock", 300))
             seed = None if body.get("seed") is None else int(body["seed"])
+            stream = bool(body.get("stream"))
         except Exception as exc:  # noqa: BLE001
             self._send(400, {"error": f"unreadable request: {exc}"})
             return
         # One JVM at a time, whatever the caller believes about its own lane.
         with STATE.match_lock:
+            if stream:
+                self._match_streamed(decks, games, clock, seed)
+                return
             try:
                 result = forge.run_games(decks, games=games, clock=clock,
                                          seed=seed, memory_mb=_memory_mb())
@@ -201,6 +207,55 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(500, {"error": f"{type(exc).__name__}: {exc}"})
                 return
         self._send(200, wire.run_to_wire(result))
+
+    def _match_streamed(self, decks: list[Deck], games: int, clock: int,
+                        seed: int | None) -> None:
+        """The same match, reported one game at a time.
+
+        A match takes minutes and a job on the far side wants to tick per
+        game, so a `{"stream": true}` request answers 200 up front and then
+        speaks newline-delimited JSON as the match runs: `{"game": n}` per
+        finished game, then exactly one of `{"result": ...}` or
+        `{"error": ...}`. The headers go out before `run_games` does, which
+        is why failure is a line rather than a status code here -- 200 was
+        already spent buying the right to speak early. Chunked framing is
+        written by hand because `BaseHTTPRequestHandler` offers none, and
+        `protocol_version = "HTTP/1.1"` (declared above for keep-alive)
+        requires the framing once Content-Length is unknowable.
+
+        A caller that never asks to stream gets the plain answer, so an app
+        deployed a few minutes apart from its worker keeps working in both
+        directions -- an old shim ignores the flag, and `worker.py` reads the
+        Content-Type before deciding how to listen.
+        """
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.end_headers()
+
+        def emit(payload: dict[str, Any]) -> None:
+            # A vanished listener must not kill the JVM mid-game: the write
+            # fails quietly and the match plays out. The idle watchdog cannot
+            # stop the machine under it -- this request is still in flight.
+            data = json.dumps(payload).encode("utf-8") + b"\n"
+            try:
+                self.wfile.write(f"{len(data):X}\r\n".encode("ascii")
+                                 + data + b"\r\n")
+                self.wfile.flush()
+            except OSError:
+                pass
+
+        try:
+            result = forge.run_games(decks, games=games, clock=clock,
+                                     seed=seed, memory_mb=_memory_mb(),
+                                     on_game=lambda n: emit({"game": n}))
+        except Exception as exc:  # noqa: BLE001 - becomes the job's error
+            emit({"error": f"{type(exc).__name__}: {exc}",
+                  "type": type(exc).__name__})
+        else:
+            emit({"result": wire.run_to_wire(result)})
+        with contextlib.suppress(OSError):
+            self.wfile.write(b"0\r\n\r\n")
 
 
 def serve(host: str = "::", port: int = 8080) -> ThreadingHTTPServer:

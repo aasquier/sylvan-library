@@ -13,6 +13,8 @@ is a property of Forge, not of this code.
 
 from __future__ import annotations
 
+import io
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -245,26 +247,12 @@ def test_run_games_refuses_fewer_than_two_decks():
 
 def test_the_subprocess_timeout_is_derived_not_unbounded(monkeypatch):
     """Forge's `-c` bounds a game; nothing bounded the process until now, and
-    one measured game ran 134 seconds."""
-    from mtglab.sim.tier3 import run
-
-    captured = {}
-
-    def fake_run(argv, **kw):
-        captured.update(kw)
-        raise AssertionError("stop here -- the argv is not the point")
-
-    monkeypatch.setattr(run, "implemented_names", lambda *a, **k: INDEX)
-    monkeypatch.setattr(run, "ensure_profile", lambda *a, **k: None)
-    monkeypatch.setattr(run.dck, "write_dck",
-                        lambda d, *a, **k: type("P", (), {"name": "x.dck"})())
-    monkeypatch.setattr(run, "java_binary", lambda: "java")
-    monkeypatch.setattr(run, "desktop_jar", lambda *a: "forge.jar")
-    monkeypatch.setattr(run.subprocess, "run", fake_run)
-
-    with pytest.raises(AssertionError):
-        run.run_games([make_deck(), make_deck()], games=4, clock=300)
-    assert captured["timeout"] == 60 + 4 * 300
+    one measured game ran 134 seconds. The bound is the interval on the timer
+    that kills the JVM, so that is what this captures."""
+    captured: dict = {}
+    run = _stub_forge(monkeypatch, WON, captured)
+    run.run_games([make_deck(), make_deck()], games=4, clock=300)
+    assert captured["timer_seconds"] == 60 + 4 * 300
 
 
 def test_check_coverage_raises_rather_than_returning_a_flag(monkeypatch):
@@ -480,7 +468,28 @@ def test_a_clean_report_mentions_its_face_renames():
 
 # ---------------------------------------------- the run, faked at subprocess
 
-def _stub_forge(monkeypatch, stdout: str, captured: dict | None = None):
+class _FakeProc:
+    """What `Popen` hands back, shaped for the streaming read loop."""
+
+    def __init__(self, text: str):
+        self.stdout = io.StringIO(text)
+        self.returncode = 0
+        self.killed = False
+
+    def wait(self, timeout=None):
+        return self.returncode
+
+    def kill(self):
+        self.killed = True
+
+
+def _stub_forge(monkeypatch, stdout: str, captured: dict | None = None,
+                fire_timer: bool = False):
+    """Fake the JVM at the `Popen` seam `run_games` actually uses.
+
+    `fire_timer: True` runs the deadline callback the moment the timer
+    starts, which is how the timeout path is driven without waiting for one.
+    """
     from mtglab.sim.tier3 import run
 
     monkeypatch.setattr(run, "implemented_names", lambda *a, **k: INDEX)
@@ -490,11 +499,27 @@ def _stub_forge(monkeypatch, stdout: str, captured: dict | None = None):
     monkeypatch.setattr(run, "java_binary", lambda: "java")
     monkeypatch.setattr(run, "desktop_jar", lambda *a: "forge.jar")
 
-    def fake_run(argv, **kw):
+    def fake_popen(argv, **kw):
+        proc = _FakeProc(stdout)
         if captured is not None:
             captured["argv"] = argv
-        return type("Proc", (), {"stdout": stdout, "stderr": ""})()
-    monkeypatch.setattr(run.subprocess, "run", fake_run)
+            captured["proc"] = proc
+        return proc
+    monkeypatch.setattr(run.subprocess, "Popen", fake_popen)
+
+    class FakeTimer:
+        def __init__(self, seconds, fn):
+            if captured is not None:
+                captured["timer_seconds"] = seconds
+            self.fn = fn
+
+        def start(self):
+            if fire_timer:
+                self.fn()
+
+        def cancel(self):
+            pass
+    monkeypatch.setattr(run.threading, "Timer", FakeTimer)
     return run
 
 
@@ -510,6 +535,41 @@ def test_run_games_maps_seats_and_carries_the_seed(monkeypatch):
     game = result.games[0]
     assert result.winner_slug(game) == "second"
     assert result.startup_seconds >= 0.0
+
+
+def test_run_games_ticks_once_per_finished_game(monkeypatch):
+    """The output is streamed and `on_game` hears each result line as it
+    passes — the count, not the content, because ticks are progress and the
+    parsed tally at the end is the only result anybody may quote."""
+    two_games = WON + "Game Result: Game 2 ended in a Draw! Took 9000 ms.\n"
+    run = _stub_forge(monkeypatch, two_games)
+    ticks: list[int] = []
+    result = run.run_games([make_deck(), make_deck()], games=2,
+                           on_game=ticks.append)
+    assert ticks == [1, 2]
+    assert len(result.games) == 2
+
+
+def test_a_tick_line_and_a_parsed_result_are_the_same_pattern():
+    """`is_game_result` shares the parser's own regexes; a line the tick
+    counts is a line the tally will keep, and nothing else ticks."""
+    assert parse.is_game_result(
+        "Game Result: Game 1 ended in 16702 ms. Ai(2)-X has won!")
+    assert parse.is_game_result(
+        "Game Result: Game 2 ended in a Draw! Took 9000 ms.")
+    assert not parse.is_game_result("Game Outcome: Turn 11")
+    assert not parse.is_game_result(
+        'An unsupported card was requested: "X" from "[N.A.]".')
+
+
+def test_a_run_past_its_deadline_is_killed_and_raises(monkeypatch):
+    """The deadline is a timer that kills the JVM; the read loop then ends at
+    EOF and the flag tells a killed run from a finished one."""
+    captured: dict = {}
+    run = _stub_forge(monkeypatch, WON, captured, fire_timer=True)
+    with pytest.raises(subprocess.TimeoutExpired):
+        run.run_games([make_deck(), make_deck()], games=1)
+    assert captured["proc"].killed
 
 
 def test_a_dropped_card_raises_rather_than_reporting(monkeypatch):

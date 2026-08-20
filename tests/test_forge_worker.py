@@ -94,13 +94,20 @@ def test_coverage_reports_survive_the_wire():
 
 # ---------------------------------------------------------------- the shim
 
+def _fake_run_games(decks, *, games, clock, seed, memory_mb, on_game=None):
+    """What the shim's seam fakes: a match that ticks like the real one."""
+    played = min(games, 3)
+    for n in range(1, played + 1):
+        if on_game is not None:
+            on_game(n)
+    return fake_run(played)
+
+
 @pytest.fixture
 def shim_url(monkeypatch):
     """A real shim on a loopback port, with the JVM-shaped seams faked."""
     monkeypatch.setattr(shim, "implemented_names", lambda: INDEX)
-    monkeypatch.setattr(
-        forge_run, "run_games",
-        lambda decks, *, games, clock, seed, memory_mb: fake_run())
+    monkeypatch.setattr(forge_run, "run_games", _fake_run_games)
     monkeypatch.delenv("MTGLAB_FORGE_SHIM_TOKEN", raising=False)
     server = shim.serve("127.0.0.1", 0)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -173,6 +180,42 @@ def test_a_failing_run_is_a_500_with_the_reason(shim_url, monkeypatch):
     assert "dropped card: X" in body["error"]
 
 
+def stream(url: str, payload: dict) -> list[dict]:
+    """POST /match with `stream: true` and read the NDJSON lines back."""
+    request = urllib.request.Request(
+        f"{url}/match", headers={"Content-Type": "application/json"},
+        data=json.dumps(payload).encode(), method="POST")
+    with urllib.request.urlopen(request, timeout=10) as response:
+        assert "ndjson" in response.headers.get("Content-Type", "")
+        return [json.loads(line) for line in response]
+
+
+def test_the_shim_streams_a_tick_per_game_then_the_result(shim_url):
+    lines = stream(
+        shim_url,
+        {"decks": wire.decks_to_wire([make_deck("a"), make_deck("b")]),
+         "games": 3, "clock": 300, "seed": 42, "stream": True})
+    assert [line.get("game") for line in lines[:-1]] == [1, 2, 3]
+    run = wire.run_from_wire(lines[-1]["result"])
+    assert len(run.games) == 3
+    assert run.seats == {1: "deck-a", 2: "deck-b"}
+
+
+def test_a_streamed_failure_is_an_error_line_naming_its_type(shim_url,
+                                                             monkeypatch):
+    """200 is already spent when a streamed match fails, so the refusal is a
+    line — and it carries the exception type, which is how the client keeps
+    `ForgeNotInstalled` 503-shaped across the wire."""
+    def explode(decks, *, games, clock, seed, memory_mb, on_game=None):
+        raise ForgeNotInstalled("no jar on this machine")
+    monkeypatch.setattr(forge_run, "run_games", explode)
+    lines = stream(shim_url,
+                   {"decks": wire.decks_to_wire([make_deck()]),
+                    "games": 1, "stream": True})
+    assert lines[-1]["type"] == "ForgeNotInstalled"
+    assert "no jar" in lines[-1]["error"]
+
+
 def test_the_token_gates_every_route_when_set(shim_url, monkeypatch):
     monkeypatch.setenv("MTGLAB_FORGE_SHIM_TOKEN", "sesame")
     assert fetch(f"{shim_url}/healthz")[0] == 401
@@ -217,6 +260,70 @@ def test_the_client_runs_a_match_over_real_http(worker_env):
                            games=3, clock=300, seed=42)
     assert run.seats == {1: "deck-a", 2: "deck-b"}
     assert len(run.games) == 3
+
+
+def test_the_client_relays_per_game_ticks(worker_env):
+    """The whole point of the stream: `on_game` fires here, on the app's
+    machine, once per game the worker finished."""
+    ticks: list[int] = []
+    run = worker.run_match([make_deck("a"), make_deck("b")],
+                           games=3, clock=300, seed=42,
+                           on_game=ticks.append)
+    assert ticks == [1, 2, 3]
+    assert len(run.games) == 3
+
+
+def test_a_streamed_forge_not_installed_arrives_as_itself(worker_env,
+                                                          monkeypatch):
+    def explode(decks, *, games, clock, seed, memory_mb, on_game=None):
+        raise ForgeNotInstalled("no jar on this machine")
+    monkeypatch.setattr(forge_run, "run_games", explode)
+    with pytest.raises(ForgeNotInstalled, match="no jar"):
+        worker.run_match([make_deck()], games=1, clock=300, seed=None)
+
+
+def test_the_client_accepts_a_plain_answer_from_an_older_shim(monkeypatch):
+    """Deploy skew: the app can update minutes before its worker, so a shim
+    that ignores `stream: true` and answers one flat JSON body must still
+    make a match — with no ticks, which is the honest degradation."""
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    answer = json.dumps(wire.run_to_wire(fake_run())).encode()
+
+    class OldShim(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = b'{"ok": true}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(answer)))
+            self.end_headers()
+            self.wfile.write(answer)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), OldShim)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    monkeypatch.setenv("MTGLAB_FORGE_WORKER_URL",
+                       f"http://127.0.0.1:{server.server_address[1]}")
+    try:
+        ticks: list[int] = []
+        run = worker.run_match([make_deck("a"), make_deck("b")],
+                               games=3, clock=300, seed=1,
+                               on_game=ticks.append)
+        assert len(run.games) == 3
+        assert ticks == []
+    finally:
+        server.shutdown()
 
 
 def test_the_client_raises_coverage_failures_with_the_cards_named(worker_env):

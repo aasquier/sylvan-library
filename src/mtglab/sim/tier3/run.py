@@ -23,7 +23,9 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -232,7 +234,8 @@ def check_coverage(decks: list[Deck],
 def run_games(decks: list[Deck], *, games: int = 1, clock: int = 300,
               seed: int | None = None, memory_mb: int = 4096,
               forge_home: Path | None = None,
-              timeout: float | None = None) -> SimRun:
+              timeout: float | None = None,
+              on_game: Callable[[int], None] | None = None) -> SimRun:
     """Play `games` Commander games between `decks` and return the results.
 
     `clock` is Forge's `-c`: seconds before a game is called a draw. The
@@ -248,6 +251,13 @@ def run_games(decks: list[Deck], *, games: int = 1, clock: int = 300,
     `games * clock` plus an allowance for JVM start is the honest ceiling --
     and an unbounded wait is not hypothetical here, since one measured Trostani
     game ran 134 seconds.
+
+    `on_game` is called with the count of games finished so far (1, 2, ...)
+    as each result line arrives, which is what lets a job tick per game
+    instead of sitting at zero for the whole match. The output is streamed
+    either way; the callback only decides whether anybody hears about it.
+    Ticks are best-effort progress, never results -- the tally that matters is
+    parsed from the complete output below, after the second coverage check.
     """
     if len(decks) < 2:
         raise ValueError("a game needs at least two decks")
@@ -275,15 +285,44 @@ def run_games(decks: list[Deck], *, games: int = 1, clock: int = 300,
     if seed is not None:
         argv += ["-s", str(seed)]
 
-    started = time.monotonic()
-    proc = subprocess.run(
-        argv, cwd=home, capture_output=True, text=True, timeout=timeout)
-    elapsed = time.monotonic() - started
-
     # Forge writes the card-database complaints to stderr and the results to
     # stdout, but not reliably -- the unsupported-card warning arrives on both.
-    # Parsing the union is what makes the second coverage check dependable.
-    output = parse.parse((proc.stdout or "") + "\n" + (proc.stderr or ""))
+    # stderr is folded into stdout so one stream can be read live (the tick)
+    # and parsed whole (the tally); the union is what makes the second
+    # coverage check dependable, exactly as it was under `capture_output`.
+    started = time.monotonic()
+    proc = subprocess.Popen(argv, cwd=home, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True)
+    # A blocking readline honours no deadline of its own, so the deadline is a
+    # timer that kills the JVM -- EOF then ends the read loop, and the flag is
+    # what tells a killed run from a finished one.
+    expired = threading.Event()
+
+    def _out_of_time() -> None:
+        expired.set()
+        proc.kill()
+
+    timer = threading.Timer(timeout, _out_of_time)
+    timer.start()
+    lines: list[str] = []
+    finished_games = 0
+    try:
+        assert proc.stdout is not None  # PIPE above guarantees it
+        for raw in proc.stdout:
+            lines.append(raw)
+            if parse.is_game_result(raw):
+                finished_games += 1
+                if on_game is not None:
+                    on_game(finished_games)
+        proc.wait()
+    finally:
+        timer.cancel()
+    elapsed = time.monotonic() - started
+    if expired.is_set():
+        raise subprocess.TimeoutExpired(argv, timeout)
+
+    text = "".join(lines)
+    output = parse.parse(text)
 
     run = SimRun(argv=argv, output=output, wall_seconds=elapsed,
                  seats=seats, coverage=reports)
@@ -298,5 +337,5 @@ def run_games(decks: list[Deck], *, games: int = 1, clock: int = 300,
     if not output.games:
         raise ResultsUntrustworthy(
             f"Forge produced no game results in {elapsed:.1f}s. Last output:\n"
-            + "\n".join((proc.stdout or "").splitlines()[-15:]))
+            + "\n".join(text.splitlines()[-15:]))
     return run

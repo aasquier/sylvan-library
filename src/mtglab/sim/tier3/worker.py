@@ -36,6 +36,7 @@ import os
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from typing import Any
 
 from mtglab.decks.model import Deck
@@ -225,16 +226,63 @@ def check_coverage(decks: list[Deck]) -> list[CoverageReport]:
 
 
 def run_match(decks: list[Deck], *, games: int, clock: int,
-              seed: int | None) -> SimRun:
+              seed: int | None,
+              on_game: Callable[[int], None] | None = None) -> SimRun:
     """One match on the worker, returned as if it had run here.
 
-    The timeout mirrors `run_games`'s own derivation (`60 + games * clock`)
-    plus slack for the wake and the JVM — the subprocess on the far side is
-    already bounded, so this is the belt over that suspenders.
+    The ask carries `stream: true`, so a current shim answers in
+    newline-delimited JSON — `{"game": n}` as each game finishes (handed to
+    `on_game`, the same callback `run_games` takes, so `forgeruns` cannot
+    tell the two paths apart), then `{"result": ...}` or `{"error": ...}` as
+    the last line. A shim from before the flag ignores it and answers one
+    plain JSON body; the Content-Type is what says which conversation this
+    is, and both are accepted so a deploy that updates the app a few minutes
+    before its worker never breaks a match over it.
+
+    The timeout is per read rather than per match now, and `clock + 120`
+    bounds every wait this request can make: the JVM boot before the first
+    line, and one game before each line after it. The subprocess on the far
+    side is already bounded whole (`60 + games * clock`), so this is the
+    belt over that suspenders.
     """
     base = _ready()
-    answer = _post(base, "/match",
-                   {"decks": wire.decks_to_wire(decks), "games": games,
-                    "clock": clock, "seed": seed},
-                   timeout=180 + games * clock)
-    return wire.run_from_wire(answer)
+    payload = {"decks": wire.decks_to_wire(decks), "games": games,
+               "clock": clock, "seed": seed, "stream": True}
+    request = urllib.request.Request(
+        f"{base}/match", method="POST",
+        data=json.dumps(payload).encode("utf-8"), headers=_shim_headers())
+    try:
+        with urllib.request.urlopen(request, timeout=clock + 120) as response:
+            if "ndjson" not in (response.headers.get("Content-Type") or ""):
+                # An older shim played the whole match and answered it flat.
+                answer = json.loads(response.read())
+                if not isinstance(answer, dict):
+                    raise RuntimeError(
+                        "forge worker: unexpected answer from /match")
+                return wire.run_from_wire(answer)
+            for raw in response:
+                line = json.loads(raw)
+                if not isinstance(line, dict):
+                    raise RuntimeError(
+                        "forge worker: unreadable line from /match")
+                if "game" in line:
+                    if on_game is not None:
+                        on_game(int(line["game"]))
+                elif "error" in line:
+                    message = str(line["error"])
+                    if line.get("type") == "ForgeNotInstalled":
+                        raise ForgeNotInstalled(message)
+                    raise RuntimeError(message)
+                elif "result" in line:
+                    return wire.run_from_wire(dict(line["result"]))
+    except urllib.error.HTTPError as exc:
+        try:
+            answer = json.loads(exc.read())
+        except (ValueError, OSError):
+            answer = {}
+        raise _refused(answer if isinstance(answer, dict) else {},
+                       exc.code) from exc
+    except OSError as exc:
+        raise RuntimeError(f"forge worker: /match failed: {exc}") from exc
+    raise RuntimeError(
+        "forge worker: the match stream ended without a result")
