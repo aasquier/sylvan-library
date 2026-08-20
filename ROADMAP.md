@@ -2003,9 +2003,12 @@ real Commander games headless and reports them per archetype. `sim/tier3/`,
 setup in [docs/FORGE.md](docs/FORGE.md).
 
 The remaining work is a board-state manager for the UI — still explicitly *not*
-a rules engine. **Whether Forge can be reached from a hosted instance is still
-an open decision**; the spike measured what it would cost, but did not pick a
-shape. See below.
+a rules engine. **The hosted question is decided as of 2026-08-20**
+([ADR 35](docs/adr/0035-the-forge-joins-the-simulator-and-a-worker-runs-it-hosted.md)):
+the Simulator has a Forge mode behind an environment gate — heads-up only,
+because pods are 40% clock on this hardware — and the deployed instance gets
+it when the on-demand worker machine lands on its own branch. Until then the
+gate answers honestly: no Forge there.
 
 ## 4. Shopping, swaps, deals
 
@@ -2737,8 +2740,17 @@ and a decision about what a ranking would even mean.
 
 ### Can Forge run where the app runs?
 
-**The prior question is answered; the deployment shape is still open.** Recorded
-2026-08-11, gates goals 2, 3 and 7.
+**Decided 2026-08-20 —
+[ADR 35](docs/adr/0035-the-forge-joins-the-simulator-and-a-worker-runs-it-hosted.md).**
+The Simulator grew a gated heads-up Forge mode (live wherever the
+distribution is installed, honestly absent elsewhere), and the hosted shape
+is the third of the three below: an on-demand Fly worker machine with a
+dedicated CPU, stopped when idle, started per job — chosen because throttled
+shared CPU does not merely run the spike's tail slowly, it pushes real games
+into the clock and corrupts the measurement. The worker is its own branch
+and is not yet built. The spike record below stands as the evidence base.
+
+Recorded 2026-08-11, gated goals 2, 3 and 7.
 [ADR 14](docs/adr/0014-python-decides-claude-advises.md) makes Forge the thing
 that plays games. Forge is a JVM desktop application with its own card
 database, and `forge.jar sim -d ... -f commander` is a headless mode of it —

@@ -1325,6 +1325,60 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         return _job_for(plan_lands(slug, payload, source=lib.source_for(owner)),
                         caller).as_dict()
 
+    @app.get("/api/forge")
+    def forge_status() -> dict[str, Any]:
+        """Is Tier 3 reachable from this process? (ADR 35.)
+
+        The gate the Simulator asks before it offers real games — the same
+        contract as `/api/claude`: a fact about the environment, reaching no
+        network and booting no JVM. Where the answer is no, the mode is
+        honestly absent (the Ask Claude rule), and `why` is maintainer-facing
+        prose the client must not render.
+        """
+        from mtglab.api.forgeruns import status
+        return status()
+
+    @app.post("/api/sim/forge")
+    def sim_forge(payload: dict[str, Any], lib: Lib,
+                  caller: Scope) -> dict[str, Any]:
+        """Queue one heads-up Forge match (ADR 35). Returns a **job**.
+
+        Everything refusable is refused here, not in the job (the
+        `themeruns` division): decks that do not resolve are 404 via the
+        `DeckNotFound` handler, an uninstalled Forge is 503, and a deck with
+        cards Forge does not implement is a 422 that names them — because a
+        Forge game *plays on* without them and reports a winner, which is
+        the one failure this surface exists to never serve.
+        """
+        from mtglab.api.forgeruns import plan_forge, status
+        from mtglab.sim.tier3.coverage import ForgeNotInstalled
+        from mtglab.sim.tier3.run import CoverageFailed, check_coverage
+
+        pairs = []
+        for side in ("a", "b"):
+            slug = payload.get(f"{side}_slug")
+            if not slug:
+                raise HTTPException(status_code=422,
+                                    detail=f"{side}_slug is required")
+            owner = str(payload.get(f"{side}_owner") or lib.my_owner)
+            pairs.append((owner, str(slug)))
+
+        gate = status()
+        if not gate["available"]:
+            raise HTTPException(status_code=503, detail=gate["why"])
+
+        decks = [lib.source_for(owner).get(slug) for owner, slug in pairs]
+        addresses = [f"{owner}/{slug}" for owner, slug in pairs]
+        try:
+            check_coverage(decks)
+        except CoverageFailed as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ForgeNotInstalled as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        return _job_for(plan_forge(decks, addresses, payload),
+                        caller).as_dict()
+
     @app.get("/api/jobs")
     def list_jobs(caller: Scope) -> list[dict[str, Any]]:
         return [j.as_dict() for j in jobs.all_jobs(owner=caller.user_id)]

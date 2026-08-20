@@ -306,6 +306,11 @@ src/mtglab/
   api/jobs.py             the job registry; two pools, CPU and NET, and a
                           `key` that makes asking twice at once one job
   api/simruns.py          Tier 1 planned in the request, run in a job
+  api/forgeruns.py        Tier 3 heads-up matches as jobs (ADR 35): a gate
+                          the client asks first, refusals in the request,
+                          one FORGE lane worker so two JVMs cannot race the
+                          .dck directory; hosted runs await the worker
+                          machine, its own branch
   api/themeruns.py        both theme halves, same shape (226s / 134s, ADR 20)
   api/dossierruns.py      the commander dossier, same shape (236s, ADR 19)
   api/scanruns.py         one photographed card read by Claude, same shape

@@ -14,8 +14,8 @@ import goldfishMp4 from '../assets/simulator/goldfish-loop.mp4'
 import goldfishStill from '../assets/simulator/goldfish-still.webp'
 import goldfishWebm from '../assets/simulator/goldfish-loop.webm'
 import {
-  api, errorMessage, followJob, type DeckTile, type Job, type LandResult,
-  type ManaResult,
+  api, errorMessage, followJob, type DeckTile, type ForgeResult, type Job,
+  type LandResult, type ManaResult,
 } from '../lib/api'
 import { ReplayGlyph } from '../components/glyphs'
 import { percent } from '../lib/mtg'
@@ -29,7 +29,7 @@ import {
 import { DataTable } from '../components/datatable'
 import { HelpTip, Term } from '../components/term'
 
-type Mode = 'mana' | 'lands'
+type Mode = 'mana' | 'lands' | 'forge'
 
 /**
  * Every control and every figure on this screen, keyed to `glossary.py`.
@@ -99,6 +99,14 @@ export default function Simulator() {
   const [owner, setOwner] = useState(params.get('owner') ?? '')
   const [mode, setMode] = useState<Mode>('mana')
   const [games, setGames] = useState(20000)
+  // The Forge mode (ADR 35). The gate decides whether the mode exists at all
+  // — where Forge is not installed the option never renders, which is the
+  // Ask Claude rule: honestly absent, never greyed out with an excuse.
+  const [forgeReady, setForgeReady] = useState(false)
+  const [oppSlug, setOppSlug] = useState('')
+  const [oppOwner, setOppOwner] = useState('')
+  const [forgeGames, setForgeGames] = useState(10)
+  const [forge, setForge] = useState<ForgeResult | null>(null)
   const [minLands, setMinLands] = useState(2)
   const [maxLands, setMaxLands] = useState(5)
   const [minPieces, setMinPieces] = useState(3)
@@ -129,7 +137,19 @@ export default function Simulator() {
         // everybody else's, so first-match is the precedence a person wants.
         setOwner(d.find((deck) => deck.slug === slug)?.owner ?? '')
       }
+      // The opponent's seat starts occupied by the next deck along, because a
+      // control whose first state is invalid is a form that scolds before
+      // anybody has touched it.
+      const second = d[1] ?? first
+      if (second) {
+        setOppSlug(second.slug)
+        setOppOwner(second.owner)
+      }
     }).catch((e) => setError(errorMessage(e)))
+    // Asked once per mount, like `/api/claude`: a fact about the environment.
+    // A failed ask means the mode stays absent, which is the honest floor.
+    api.forgeStatus().then((s) => setForgeReady(s.available))
+      .catch(() => setForgeReady(false))
     // Cancel any in-flight poll when the screen unmounts.
     return () => cancelRef.current?.()
   }, [])                                     // eslint-disable-line react-hooks/exhaustive-deps
@@ -145,6 +165,7 @@ export default function Simulator() {
     setError(null)
     setMana(null)
     setLands(null)
+    setForge(null)
     try {
       const payload = {
         slug, owner, games, min_lands: minLands, max_lands: maxLands,
@@ -153,7 +174,12 @@ export default function Simulator() {
       const submitted =
         mode === 'mana'
           ? await api.simMana({ ...payload, turns: 12 })
-          : await api.simLands({ ...payload, low, high, games: Math.min(games, 25000) })
+          : mode === 'lands'
+            ? await api.simLands({ ...payload, low, high, games: Math.min(games, 25000) })
+            : await api.simForge({
+                a_slug: slug, a_owner: owner, b_slug: oppSlug,
+                b_owner: oppOwner, games: forgeGames, seed: withSeed,
+              })
       setJob(submitted)
       // The submitted job is handed on: results are cached server-side, so it
       // can already be `done` and there is nothing to poll for.
@@ -161,7 +187,8 @@ export default function Simulator() {
       cancelRef.current = follower.cancel
       const finished = await follower.promise
       if (mode === 'mana') setMana(finished.result as ManaResult)
-      else setLands(finished.result as LandResult)
+      else if (mode === 'lands') setLands(finished.result as LandResult)
+      else setForge(finished.result as ForgeResult)
     } catch (e) {
       setError(errorMessage(e))
     }
@@ -201,6 +228,10 @@ export default function Simulator() {
           costs, repeat. It is a <Term name="goldfish">goldfish</Term> — nobody
           is playing against you — so it answers questions about mana and no
           others.
+          {forgeReady && <>
+            {' '}Or hand the table to <Term name="tier-3">the Forge</Term>,
+            and real games get played — whole ones, with an opponent.
+          </>}
         </p>
       </PageMasthead>
 
@@ -227,17 +258,41 @@ export default function Simulator() {
                 options={[
                   { value: 'mana', label: 'Mana & consistency' },
                   { value: 'lands', label: 'Land count sweep' },
+                  // Only where the gate said so — absent, never greyed out.
+                  ...(forgeReady
+                    ? [{ value: 'forge', label: 'Real games (Forge)' }]
+                    : []),
                 ]} />
-        <NumberField label="Games" value={games} onChange={setGames}
-                     min={100} max={200000} step={1000} help={help('sim.games')} />
-        {mode === 'lands' ? (
+        {mode === 'forge' ? (
+          <>
+            <Select label="Opponent"
+                    value={oppOwner ? `${oppOwner}/${oppSlug}` : oppSlug}
+                    onChange={(v) => {
+                      const cut = v.indexOf('/')
+                      setOppOwner(cut < 0 ? '' : v.slice(0, cut))
+                      setOppSlug(cut < 0 ? v : v.slice(cut + 1))
+                    }}
+                    options={decks.map((d) => ({
+                      value: `${d.owner}/${d.slug}`,
+                      label: (d.writable ? d.name : `${d.name} — ${d.owner}`)
+                        + (d.pilot ? ` (${d.pilot})` : ''),
+                    }))} />
+            <NumberField label="Games" value={forgeGames} onChange={setForgeGames}
+                         min={1} max={20} help={help('sim.forge_games')} />
+          </>
+        ) : (
+          <NumberField label="Games" value={games} onChange={setGames}
+                       min={100} max={200000} step={1000} help={help('sim.games')} />
+        )}
+        {mode === 'lands' && (
           <>
             <NumberField label="From lands" value={low} onChange={setLow} min={20} max={59}
                          help={help('sim.land_range')} />
             <NumberField label="To lands" value={high} onChange={setHigh} min={21} max={60}
                          help={help('sim.land_range')} />
           </>
-        ) : (
+        )}
+        {mode === 'mana' && (
           <>
             <NumberField label="Keep min lands" value={minLands} onChange={setMinLands}
                          min={0} max={7} help={help('sim.min_lands')} />
@@ -267,14 +322,27 @@ export default function Simulator() {
         <div className="card-surface space-y-2 rounded-xl p-4">
           <div className="flex items-center justify-between text-sm">
             <Spinner label={job.label || 'Running…'} />
-            <span className="tabular" style={{ color: 'var(--text-secondary)' }}>
-              {job.percent}%
-            </span>
+            {mode !== 'forge' && (
+              <span className="tabular" style={{ color: 'var(--text-secondary)' }}>
+                {job.percent}%
+              </span>
+            )}
           </div>
-          <div className="h-2 overflow-hidden rounded-full" style={{ background: 'var(--gridline)' }}>
-            <div className="h-full rounded-full transition-all"
-                 style={{ width: `${job.percent}%`, background: 'var(--series-1)' }} />
-          </div>
+          {mode === 'forge' ? (
+            // No bar: the match is one subprocess with no per-game feedback,
+            // and a bar pinned at 0% reads as a hang. Say what is true.
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Forge is playing whole games of Commander, one at a time — a
+              typical game takes a few seconds, and a wide board can take two
+              minutes while the pilot thinks. Ten games is usually two or
+              three minutes end to end.
+            </p>
+          ) : (
+            <div className="h-2 overflow-hidden rounded-full" style={{ background: 'var(--gridline)' }}>
+              <div className="h-full rounded-full transition-all"
+                   style={{ width: `${job.percent}%`, background: 'var(--series-1)' }} />
+            </div>
+          )}
         </div>
       )}
 
@@ -432,6 +500,64 @@ export default function Simulator() {
           <Provenance seed={lands.seed} cached={lands.cached}
                       computed_at={lands.computed_at} />
           <Caveat>{lands.caveat}</Caveat>
+        </div>
+      )}
+
+      {forge && (
+        <div className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {forge.decks.map((d) => (
+              <StatTile key={d.address} label={`${d.name} wins`}
+                        value={d.wins.toString()}
+                        hint={`of ${forge.played} played`}
+                        help={help('stat.forge_wins')} />
+            ))}
+            <StatTile label="Draws" value={forge.draws.toString()}
+                      hint="finished with no winner" />
+            <StatTile label="Hit the clock" value={forge.timed_out.toString()}
+                      hint={`called off at ${forge.clock}s`}
+                      tone={forge.timed_out > 0 ? 'warning' : undefined}
+                      help={help('stat.forge_timed_out')} />
+            <StatTile label="Game length"
+                      value={forge.median_seconds != null
+                        ? `${forge.median_seconds}s` : '—'}
+                      hint={forge.max_seconds != null
+                        ? `median — longest ${forge.max_seconds}s` : undefined}
+                      help={help('stat.forge_length')} />
+          </div>
+
+          <section className="card-surface space-y-2 rounded-xl p-5">
+            <h3 className="text-sm font-semibold">Every game</h3>
+            <DataTable
+              columns={[
+                { key: 'game', label: 'Game' },
+                { key: 'winner', label: 'Winner' },
+                { key: 'turns', label: 'Turns' },
+                { key: 'seconds', label: 'Seconds' },
+                { key: 'outcome', label: 'Outcome' },
+              ]}
+              rows={forge.rows.map((r) => ({
+                game: r.game,
+                winner: forge.decks.find((d) => d.slug === r.winner)?.name
+                  ?? '—',
+                turns: r.turns ?? '—',
+                seconds: r.seconds,
+                outcome: r.timed_out ? 'hit the clock'
+                  : r.draw ? 'draw' : 'won',
+              }))}
+            />
+          </section>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs"
+               style={{ color: 'var(--text-secondary)' }}>
+            <Badge>shuffle {forge.seed}</Badge>
+            <span>
+              {forge.played} games in {Math.round(forge.wall_seconds)}s —
+              {' '}{Math.round(forge.startup_seconds)}s of that was lighting
+              the forge.
+            </span>
+          </div>
+          <Caveat>{forge.caveat}</Caveat>
         </div>
       )}
     </div>

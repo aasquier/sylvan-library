@@ -46,23 +46,31 @@ the known one: the pipeline still has no `authored` source kind
     (no audio track was delivered).
   - Scaled to 1280x720 (Lanczos) -- the masthead renders the loop at ~260px
     wide on a laptop, and 720p is what its two siblings ship.
-  - Made seamless by **ping-pong**, like the About Claude masthead, and the
-    choice was measured, not stylistic: first-versus-last mean absolute
-    difference is 3.20/255 against an adjacent-frame noise floor of 0.05
-    (source resolution) -- a hard cut would pop -- and the fish faces *left*
-    in the first frame and *right* in the last, so the séance room's
-    cross-dissolve would ghost two fish facing opposite ways at every loop.
-    The clip plays forward then reversed
-    (`split[a][b];[b]reverse,trim=start_frame=1:end_frame=240[r];[a][r]concat`,
-    the trim dropping the two frames the mirror would duplicate), giving 480
-    frames / 20.0s whose loop seam is an adjacent-frame step by construction,
-    measured at 1.20/255 on the 720p master. The reversed half reads as the
-    fish turning back the other way, which is what an idling goldfish does;
-    the hourglasses' sand runs upward in it, at a scale no masthead reveals.
+  - Made seamless by **ping-pong of the calmest window**, and both halves of
+    that choice were measured. Forward-only was ruled out by search: across
+    every frame pair at least 5s apart, the best match differs by 6.22/255
+    inside the bowl against a 0.47 adjacent-frame baseline -- the fish makes
+    one continuous journey and never revisits a pose, so any forward cut
+    jump-cuts the fish, and a dissolve over it ghosts two fish (it also
+    faces left at the clip's start and right at its end). A whole-clip
+    ping-pong was tried first and Aaron's eye threw it out (2026-08-20):
+    reversing the fish's late big turn read as swimming awkwardly backwards.
+    The shipped loop instead ping-pongs frames 48-168, the window a motion
+    sweep found calmest -- peak per-frame bowl motion 0.63/255 vs 1.19 for
+    the whole clip, with the turn entirely outside it -- so the reversed
+    half is only the fish's gentle drift, played back up. Forward then
+    reversed
+    (`trim=start_frame=48:end_frame=169,setpts=PTS-STARTPTS,scale,split[a][b];[b]reverse,trim=start_frame=1:end_frame=120[r];[a][r]concat`,
+    the trim dropping the two frames the mirror would duplicate), giving 240
+    frames / 10.0s whose loop seam is an adjacent-frame step by
+    construction.
   - The ping-pong master was cut at H.264 crf 18 (an intermediate, not
-    shipped), then encoded twice: VP9 `-crf 40 -b:v 0 -row-mt 1` (266 KB)
-    and H.264 `-crf 28 -preset slow -profile:v high` (299 KB), both
-    `yuv420p`, mp4 with `+faststart`.
-  - `goldfish-still.webp` is frame 120 of the master at quality 80 (49 KB)
-    -- the poster and the reduced-motion floor, since the masthead with
-    motion unwelcome must still be a table and not a hole.
+    shipped), then encoded twice: VP9 `-crf 34 -b:v 0 -row-mt 1` (174 KB)
+    and H.264 `-crf 24 -preset slow -profile:v high` (246 KB), both
+    `yuv420p`, mp4 with `+faststart` -- two crf steps richer than the first
+    cut, bought back by the halved frame count, against the choppiness the
+    same eye pass called out.
+  - `goldfish-still.webp` is source frame 120 at quality 80 (49 KB) --
+    inside the shipped window, so the poster is a frame the loop actually
+    passes through; the poster and the reduced-motion floor, since the
+    masthead with motion unwelcome must still be a table and not a hole.
