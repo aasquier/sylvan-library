@@ -486,9 +486,45 @@ TERMS: tuple[Term, ...] = (
         "Where Tier 1 stops, Forge starts: it plays the whole game, with "
         "opponents and interaction. The catch is that its AI is good with "
         "aggro and midrange, poor with control and bad with most combo, so its "
-        "results are reported per archetype and never as a single ranking. It "
-        "runs from the command line rather than from this app.",
-        "simulator", ("tier-1",)),
+        "results are reported per archetype and never as a single ranking. "
+        "The Simulator plays heads-up matches where Forge is installed; "
+        "bigger tables run from the command line.",
+        "simulator", ("tier-1", "sim.forge_games")),
+    Term(
+        "sim.forge_games", "Games",
+        "How many real games Forge plays. Each one costs real minutes.",
+        "Unlike Tier 1's tens of thousands of shuffles, these are whole games "
+        "of Commander played by an AI, and a typical one takes several "
+        "seconds — with a long tail, because a wide board is expensive to "
+        "think about. Ten games is enough to see a lopsided matchup and "
+        "nowhere near enough to trust a close one; read the split as a "
+        "sketch, not a record.",
+        "simulator", ("tier-3", "stat.forge_wins")),
+    Term(
+        "stat.forge_wins", "Wins",
+        "Games this deck won outright. Draws and clock-outs count for nobody.",
+        "A win is Forge's AI piloting both decks to a finished game, so it "
+        "measures the matchup as Forge plays it — which is well for aggro "
+        "and midrange, poorly for control and combo. A lopsided count in ten "
+        "games says something real; a 6–4 says almost nothing yet.",
+        "simulator", ("tier-3", "stat.forge_timed_out")),
+    Term(
+        "stat.forge_length", "Game length",
+        "The median and longest game, in real seconds of engine time.",
+        "A median and a tail rather than an average, because game length is "
+        "heavily skewed: most games land in a narrow band and one wide board "
+        "can take twenty times the median while the AI weighs it. The tail "
+        "is what the clock has to be set against.",
+        "simulator", ("tier-3", "stat.forge_timed_out")),
+    Term(
+        "stat.forge_timed_out", "Hit the clock",
+        "Games called off unfinished when they ran past the time limit.",
+        "Forge folds these into its draw count; this app refuses to. A real "
+        "draw is a game outcome. A clock-out is the measurement giving up — "
+        "the AI was still thinking when time ran out — and a result where "
+        "many games hit the clock says more about the clock than about "
+        "either deck.",
+        "simulator", ("tier-3", "stat.forge_length")),
 )
 
 BY_KEY = {t.key: t for t in TERMS}

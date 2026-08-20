@@ -371,6 +371,46 @@ export interface LandResult extends SimProvenance {
   caveat: string
 }
 
+/** Whether Tier 3 is installed where the server runs (ADR 35). `why` is
+ *  maintainer-facing prose and is never rendered — the client says it in its
+ *  own words or, better, says nothing (the mode is honestly absent). */
+export interface ForgeStatus {
+  available: boolean
+  why: string | null
+}
+
+export interface ForgeDeckRow {
+  slug: string
+  name: string
+  address: string
+  wins: number
+}
+
+export interface ForgeGameRow {
+  game: number
+  winner: string | null
+  seconds: number
+  turns: number | null
+  draw: boolean
+  timed_out: boolean
+}
+
+export interface ForgeResult {
+  decks: ForgeDeckRow[]
+  games: number
+  played: number
+  draws: number
+  timed_out: number
+  median_seconds: number | null
+  max_seconds: number | null
+  startup_seconds: number
+  wall_seconds: number
+  clock: number
+  seed: number
+  rows: ForgeGameRow[]
+  caveat: string
+}
+
 export interface SuggestionCandidate {
   name: string
   mana_cost: string | null
@@ -1984,6 +2024,8 @@ export const api = {
   // own library, which is what an old bookmark's `?deck=` amounts to.
   simMana: (payload: Record<string, unknown>) => post<Job>('/api/sim/mana', payload),
   simLands: (payload: Record<string, unknown>) => post<Job>('/api/sim/lands', payload),
+  forgeStatus: () => get<ForgeStatus>('/api/forge'),
+  simForge: (payload: Record<string, unknown>) => post<Job>('/api/sim/forge', payload),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),
 }
 

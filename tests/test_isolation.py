@@ -83,6 +83,14 @@ SHARED = {
     "/api/sim/mana": "submits a job against a deck the caller may see; the "
                      "owner is resolved through Library and the job is scoped",
     "/api/sim/lands": "submits a job too, same resolution, and the job is scoped",
+    # ADR 35's two. The gate is the same class of thing as `/api/claude`: a
+    # fact about the environment, identical for every caller. The match route
+    # resolves both decks through Library exactly as the two sim routes above
+    # resolve one, so somebody else's private deck is a 404 here too, and the
+    # job it hands back is scoped by `jobs.get` like every other.
+    "/api/forge": "whether the Forge is installed on this instance",
+    "/api/sim/forge": "submits a job against two decks the caller may see; "
+                      "both resolved through Library, and the job is scoped",
     "/api/cards/search": "the public Scryfall pool",
     "/api/cards/identify": "the same pool, asked the other way round -- a set\n                            code and a collector number in, a card name out. It\n                            reads no deck and writes nothing, and the photograph\n                            it came from never leaves the browser",
     "/api/sets/upcoming": "Scryfall's own release calendar",

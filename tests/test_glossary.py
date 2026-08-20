@@ -94,6 +94,9 @@ SIMULATOR_KEYS = (
     # The texture stats (second 2026-08-15 punch list, item 11).
     "stat.median_first_spell", "stat.stalled_turns",
     "stat.missed_drop", "stat.card_timing",
+    # The Forge mode (ADR 35).
+    "sim.forge_games", "stat.forge_wins", "stat.forge_length",
+    "stat.forge_timed_out",
 )
 
 

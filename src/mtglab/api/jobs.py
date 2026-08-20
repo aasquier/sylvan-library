@@ -53,9 +53,18 @@ CPU = "cpu"
 #: four-minute stall for nothing. See the module docstring for why two.
 NET = "net"
 
+#: Work that waits on a Forge subprocess (ADR 35). The thread sleeps in
+#: `subprocess.run` while the JVM burns the CPU, so it fits neither lane:
+#: in `CPU` it would block Tier 1 sweeps for the minutes a match takes, and
+#: in `NET` two matches could run at once — which races the shared `.dck`
+#: directory `ensure_profile` hands out and saturates the machine besides.
+#: One worker makes both impossible by construction rather than by care.
+FORGE = "forge"
+
 _LANES: dict[str, ThreadPoolExecutor] = {
     CPU: ThreadPoolExecutor(max_workers=1, thread_name_prefix="mtglab-job"),
     NET: ThreadPoolExecutor(max_workers=2, thread_name_prefix="mtglab-net"),
+    FORGE: ThreadPoolExecutor(max_workers=1, thread_name_prefix="mtglab-forge"),
 }
 _LOCK = threading.Lock()
 _JOBS: dict[str, Job] = {}
