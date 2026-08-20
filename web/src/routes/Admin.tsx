@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 // stays because `ClaudePanel` takes one as a prop.
 import {
   api, errorMessage, type Account, type AccountList, type AdminClaude,
-  type ModelTier,
+  type AdminStorage, type ModelTier,
 } from '../lib/api'
 import { Badge, ErrorNote, PageMasthead, Spinner } from '../components/ui'
 import { EditsChart, TrafficChart } from '../components/lazycharts'
@@ -404,6 +404,25 @@ function MachinePanel() {
   )
 }
 
+/** The cache tile's second line: only the shelves that are actually there.
+ *
+ *  An empty shelf is dropped rather than printed as `— `, so a fresh instance
+ *  says nothing instead of saying nothing four times. `other` is printed
+ *  whenever it is non-zero and never suppressed: bytes nobody has named are
+ *  the one number this line exists to surface. */
+function cacheHint(cache: AdminStorage['cache']): string | undefined {
+  const parts = [
+    ['motion', cache.cardmotion_bytes],
+    ['reader', cache.ocr_bytes],
+    ['symbols', cache.symbols_bytes],
+    ['other', cache.other_bytes],
+  ] as const
+  const shown = parts
+    .filter(([, bytes]) => bytes !== null && bytes > 0)
+    .map(([name, bytes]) => `${name} ${fmtBytes(bytes)}`)
+  return shown.length > 0 ? shown.join(' · ') : undefined
+}
+
 /** What the volume is holding: the pool, the databases, the caches, the decks.
  *  Every figure here is bytes on disk, which is why they are one tab — the
  *  question they answer together is "will this fill up". */
@@ -422,9 +441,7 @@ function StoragePanel() {
                 hint="users, sessions, caches and the ledgers" />
       <StatTile label="Caches"
                 value={storage ? fmtBytes(storage.cache_bytes) : '—'}
-                hint={storage
-                  ? `motion ${fmtBytes(storage.cache.cardmotion_bytes)} · symbols ${fmtBytes(storage.cache.symbols_bytes)}`
-                  : undefined} />
+                hint={storage ? cacheHint(storage.cache) : undefined} />
       <StatTile label="Decks on the volume"
                 value={storage ? storage.decks.count : '—'}
                 hint={storage

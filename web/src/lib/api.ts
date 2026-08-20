@@ -641,7 +641,16 @@ export interface AdminStorage {
   pool_bytes: number | null
   scryfall_bulk_bytes: number | null
   cache_bytes: number | null
-  cache: { symbols_bytes: number | null; cardmotion_bytes: number | null }
+  /** The three shelves, plus whatever they do not account for. `other_bytes`
+   *  is the honest half: a fixed list of tenants cannot show the one nobody
+   *  added to it, and the reading engine was 38% of this cache while the tile
+   *  named only two of them. */
+  cache: {
+    symbols_bytes: number | null
+    cardmotion_bytes: number | null
+    ocr_bytes: number | null
+    other_bytes: number | null
+  }
   decks: { count: number; bytes: number | null; trashed: number }
 }
 

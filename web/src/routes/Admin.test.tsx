@@ -138,7 +138,10 @@ beforeEach(() => {
     pool_bytes: null,
     scryfall_bulk_bytes: null,
     cache_bytes: 3 * 1024 ** 2,
-    cache: { symbols_bytes: 1024, cardmotion_bytes: null },
+    // One shelf filled, one empty, one holding the reading engine, and a
+    // remainder — the four states the cache line has to render distinctly.
+    cache: { symbols_bytes: 1024, cardmotion_bytes: null,
+             ocr_bytes: 6 * 1024 ** 2, other_bytes: 512 * 1024 },
     decks: { count: 7, bytes: 90 * 1024, trashed: 1 },
   })
   vi.mocked(api.adminClaude).mockResolvedValue({
@@ -546,6 +549,21 @@ describe('the dashboard', () => {
     const decksTile = screen.getByText('Decks on the volume')
       .closest('div') as HTMLElement
     expect(within(decksTile).getByText('7')).toBeTruthy()
+  })
+
+  it('itemises the cache, including the part it has no name for', async () => {
+    // The tile named `motion` and `symbols` and nothing else while the
+    // reading engine was 38% of the deployed cache — a line that reads as a
+    // breakdown and is not one. `other` is what makes that impossible to
+    // repeat; an empty shelf is dropped rather than printed as a dash.
+    render(<Admin />)
+    await openTab('Storage')
+
+    const caches = (await screen.findByText('Caches'))
+      .closest('div') as HTMLElement
+    expect(within(caches).getByText(
+      'reader 6.0 MB · symbols 1.0 kB · other 512 kB')).toBeTruthy()
+    expect(within(caches).queryByText(/motion/)).toBeNull()
   })
 
   it('names the Claude that answered, never the model id', async () => {
