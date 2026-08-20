@@ -40,7 +40,7 @@ from collections.abc import Callable
 from typing import Any
 
 from mtglab.decks.model import Deck
-from mtglab.sim.tier3 import wire
+from mtglab.sim.tier3 import parse, wire
 from mtglab.sim.tier3.coverage import CoverageReport, ForgeNotInstalled
 from mtglab.sim.tier3.run import SimRun, raise_unless_covered
 
@@ -227,17 +227,21 @@ def check_coverage(decks: list[Deck]) -> list[CoverageReport]:
 
 def run_match(decks: list[Deck], *, games: int, clock: int,
               seed: int | None,
-              on_game: Callable[[int], None] | None = None) -> SimRun:
+              on_game: Callable[[int, parse.GameResult | None], None]
+              | None = None) -> SimRun:
     """One match on the worker, returned as if it had run here.
 
     The ask carries `stream: true`, so a current shim answers in
-    newline-delimited JSON — `{"game": n}` as each game finishes (handed to
-    `on_game`, the same callback `run_games` takes, so `forgeruns` cannot
-    tell the two paths apart), then `{"result": ...}` or `{"error": ...}` as
-    the last line. A shim from before the flag ignores it and answers one
-    plain JSON body; the Content-Type is what says which conversation this
-    is, and both are accepted so a deploy that updates the app a few minutes
-    before its worker never breaks a match over it.
+    newline-delimited JSON — `{"game": n, "row": ...}` as each game finishes
+    (handed to `on_game`, the same callback `run_games` takes, so `forgeruns`
+    cannot tell the two paths apart), then `{"result": ...}` or
+    `{"error": ...}` as the last line. A shim from before the flag ignores it
+    and answers one plain JSON body; the Content-Type is what says which
+    conversation this is, and both are accepted so a deploy that updates the
+    app a few minutes before its worker never breaks a match over it. The
+    `row` is newer still (the match theater), so it is optional the same way:
+    a pre-theater shim sends the count alone and `on_game` hears `None` for
+    the row — the bar still ticks, the theater just has nothing to seat.
 
     The timeout is per read rather than per match now, and `clock + 120`
     bounds every wait this request can make: the JVM boot before the first
@@ -267,7 +271,10 @@ def run_match(decks: list[Deck], *, games: int, clock: int,
                         "forge worker: unreadable line from /match")
                 if "game" in line:
                     if on_game is not None:
-                        on_game(int(line["game"]))
+                        row = line.get("row")
+                        on_game(int(line["game"]),
+                                wire.game_from_wire(dict(row))
+                                if isinstance(row, dict) else None)
                 elif "error" in line:
                     message = str(line["error"])
                     if line.get("type") == "ForgeNotInstalled":

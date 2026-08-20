@@ -102,12 +102,14 @@ def test_coverage_reports_survive_the_wire():
 # ---------------------------------------------------------------- the shim
 
 def _fake_run_games(decks, *, games, clock, seed, memory_mb, on_game=None):
-    """What the shim's seam fakes: a match that ticks like the real one."""
+    """What the shim's seam fakes: a match that ticks like the real one —
+    count and completed game both, as `run_games` reports since the theater."""
     played = min(games, 3)
+    run = fake_run(played)
     for n in range(1, played + 1):
         if on_game is not None:
-            on_game(n)
-    return fake_run(played)
+            on_game(n, run.games[n - 1])
+    return run
 
 
 @pytest.fixture
@@ -269,15 +271,29 @@ def test_the_client_runs_a_match_over_real_http(worker_env):
     assert len(run.games) == 3
 
 
-def test_the_client_relays_per_game_ticks(worker_env):
+def test_the_client_relays_per_game_ticks_with_their_rows(worker_env):
     """The whole point of the stream: `on_game` fires here, on the app's
-    machine, once per game the worker finished."""
+    machine, once per game the worker finished — and since the match theater
+    each tick carries the game itself, rebuilt from the same codec the final
+    result crosses in. This runs over real HTTP, so it is the row's whole
+    journey: parsed on the worker, encoded on the tick line, decoded here."""
     ticks: list[int] = []
+    rows: list[object] = []
+
+    def on_game(n, row):
+        ticks.append(n)
+        rows.append(row)
+
     run = worker.run_match([make_deck("a"), make_deck("b")],
-                           games=3, clock=300, seed=42,
-                           on_game=ticks.append)
+                           games=3, clock=300, seed=42, on_game=on_game)
     assert ticks == [1, 2, 3]
     assert len(run.games) == 3
+    # The streamed rows are the run's games, field for field — including the
+    # edges: game 1 clocked out holding a winner line, game 2 really drew.
+    assert [(r.index, r.milliseconds, r.draw, r.winner_seat, r.turns,
+             r.timed_out) for r in rows] == \
+        [(g.index, g.milliseconds, g.draw, g.winner_seat, g.turns,
+          g.timed_out) for g in run.games]
 
 
 def test_a_streamed_forge_not_installed_arrives_as_itself(worker_env,
@@ -326,9 +342,59 @@ def test_the_client_accepts_a_plain_answer_from_an_older_shim(monkeypatch):
         ticks: list[int] = []
         run = worker.run_match([make_deck("a"), make_deck("b")],
                                games=3, clock=300, seed=1,
-                               on_game=ticks.append)
+                               on_game=lambda n, row: ticks.append(n))
         assert len(run.games) == 3
         assert ticks == []
+    finally:
+        server.shutdown()
+
+
+def test_a_pre_theater_stream_still_ticks_with_no_rows(monkeypatch):
+    """The middle skew: a #203-era shim streams `{"game": n}` with no `row`.
+    The bar must still move — `on_game` hears the count and `None` — and the
+    result must still arrive whole."""
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    final = json.dumps({"result": wire.run_to_wire(fake_run())}).encode()
+
+    class MidShim(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_GET(self):
+            body = b'{"ok": true}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            for payload in (b'{"game": 1}\n', b'{"game": 2}\n',
+                            b'{"game": 3}\n', final + b"\n"):
+                self.wfile.write(f"{len(payload):X}\r\n".encode("ascii")
+                                 + payload + b"\r\n")
+            self.wfile.write(b"0\r\n\r\n")
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), MidShim)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    monkeypatch.setenv("MTGLAB_FORGE_WORKER_URL",
+                       f"http://127.0.0.1:{server.server_address[1]}")
+    try:
+        heard: list[tuple[int, object]] = []
+        run = worker.run_match([make_deck("a"), make_deck("b")],
+                               games=3, clock=300, seed=1,
+                               on_game=lambda n, row: heard.append((n, row)))
+        assert len(run.games) == 3
+        assert heard == [(1, None), (2, None), (3, None)]
     finally:
         server.shutdown()
 

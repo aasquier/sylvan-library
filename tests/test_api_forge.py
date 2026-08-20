@@ -251,17 +251,21 @@ def test_asking_twice_in_flight_is_one_job(client, forge_present, monkeypatch):
 
 def test_the_job_ticks_as_games_finish(client, forge_present, monkeypatch):
     """Per-game progress (the Popen stream): each `on_game` moves the job's
-    `done`, so the client's clock can be a bar that actually ticks."""
+    `done` — and since the match theater, the job's `partial` carries the
+    rows so far, in exactly the shape the finished result's `rows` will use,
+    then clears when the result arrives (a leftover partial is a stale
+    second copy)."""
     reported = threading.Event()
     release = threading.Event()
 
     def streaming_run(decks, *, games, clock, seed, on_game=None):
         assert on_game is not None, "the job must ask to hear ticks"
-        on_game(1)
-        on_game(2)
+        match = fake_match(games)
+        on_game(1, match.games[0])   # the clock-out holding a winner line
+        on_game(2, match.games[1])   # the real draw
         reported.set()
         release.wait(JOB_TIMEOUT_S)
-        return fake_match(games)
+        return match
 
     monkeypatch.setattr(forge_run, "run_games", streaming_run)
     try:
@@ -270,9 +274,18 @@ def test_the_job_ticks_as_games_finish(client, forge_present, monkeypatch):
         body = client.get(f"/api/jobs/{job['id']}").json()
         assert (body["done"], body["total"]) == (2, 4)
         assert body["status"] == "running"
+        rows = body["partial"]["rows"]
+        assert [r["game"] for r in rows] == [1, 2]
+        # The clock-out rule holds live exactly as it holds in the tally.
+        assert rows[0]["timed_out"] and rows[0]["winner"] is None
+        assert rows[1]["draw"] and not rows[1]["timed_out"]
     finally:
         release.set()
-    assert await_job(client, job["id"])["status"] == "done"
+    done = await_job(client, job["id"])
+    assert done["status"] == "done"
+    assert done["partial"] is None
+    # One row builder: what streamed is what the tale of the tape holds.
+    assert done["result"]["rows"][:2] == rows
 
 
 def test_the_lane_is_forge_not_cpu():
@@ -343,9 +356,10 @@ def test_a_worker_match_is_the_same_job_with_the_same_shape(client,
                     slugs=[d.slug for d in decks])
         if on_game is not None:
             # The stream relays ticks from the worker; the job must hear them
-            # through this seam exactly as it hears local ones.
+            # through this seam exactly as it hears local ones. Rowless, as a
+            # pre-theater shim streams them — the bar must not care.
             for n in range(1, games + 1):
-                on_game(n)
+                on_game(n, None)
         return fake_match(games)
 
     monkeypatch.setattr(worker, "run_match", run_match)

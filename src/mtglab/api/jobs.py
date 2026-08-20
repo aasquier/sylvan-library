@@ -41,7 +41,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Protocol
 
 #: Work that burns CPU: Tier 1, the land sweep. One worker, because the
 #: simulation is pure Python and extra threads would contend on the GIL and
@@ -79,8 +79,24 @@ _JOBS: dict[str, Job] = {}
 # the LRU-by-`created_at` order is unchanged.
 MAX_JOBS = 200
 
-#: What a worker is handed to report with: `progress(done, total)`.
-Progress = Callable[[int, int], None]
+class Progress(Protocol):
+    """What a worker is handed to report with: `progress(done, total)`.
+
+    `partial` is the third, optional argument (the match theater): a payload
+    the client may render before the result exists — the rows of a match
+    still being played. It replaces what was there, is serialised on the job
+    while the job runs, and is cleared the moment the job finishes, because
+    the result is the whole answer and a leftover partial is a second copy
+    that would go stale. Progress was a plain two-argument Callable until
+    then; every existing worker still calls it that way, which is why the
+    third argument defaults rather than demands.
+    """
+
+    # `done` and `total` are positional-only: workers name those parameters
+    # freely (`simruns` calls one `_total`), and a Protocol would otherwise
+    # bind the names as part of the contract.
+    def __call__(self, done: int, total: int, /,
+                 partial: Any | None = None) -> None: ...
 
 
 @dataclass
@@ -91,6 +107,9 @@ class Job:
     done: int = 0
     total: int = 0
     result: Any = None
+    # What is known before the result is: the match theater's rows-so-far.
+    # Live only while the job is — `submit` clears it on completion.
+    partial: Any = None
     error: str | None = None
     label: str = ""
     # Whose job this is. `None` means "the local user", which is everybody when
@@ -115,6 +134,7 @@ class Job:
             "done": self.done,
             "total": self.total,
             "percent": pct,
+            "partial": self.partial,
             "label": self.label,
             "result": self.result,
             "error": self.error,
@@ -245,8 +265,10 @@ def submit(kind: str, fn: Callable[[Progress], Any],
         _JOBS[job.id] = job
         _keep_locked()
 
-    def progress(done: int, total: int) -> None:
+    def progress(done: int, total: int, partial: Any | None = None) -> None:
         job.done, job.total = done, total
+        if partial is not None:
+            job.partial = partial
 
     def wrapped() -> None:
         job.status = "running"
@@ -255,6 +277,9 @@ def submit(kind: str, fn: Callable[[Progress], Any],
             job.status = "done"
             if job.total:
                 job.done = job.total
+            # The result is the whole answer; a partial left behind is a
+            # stale second copy of part of it.
+            job.partial = None
         except Exception as exc:                                    # noqa: BLE001
             # Surface the type and message; a local tool is more useful when it
             # says what broke than when it returns a bare 500.

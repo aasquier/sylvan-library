@@ -101,6 +101,25 @@ def _seed(payload: dict[str, Any]) -> int:
     return int(raw)
 
 
+def _row(game: Any, slug: str | None) -> dict[str, Any]:
+    """One game as the client renders it, whichever moment it arrives in.
+
+    The same dict serves twice: inside the finished result's `rows`, and on
+    the job's `partial` while the match is still playing (the match theater).
+    One builder is what makes a streamed row and its final self identical —
+    a theater that showed one shape live and another in the tale of the tape
+    would be the drift `wire.game_to_wire` exists to prevent, one layer up.
+    """
+    return {
+        "game": game.index,
+        "winner": None if game.timed_out else slug,
+        "seconds": round(game.milliseconds / 1000, 1),
+        "turns": game.turns,
+        "draw": game.draw and not game.timed_out,
+        "timed_out": game.timed_out,
+    }
+
+
 def _shape(decks: list[Deck], addresses: list[str], games: int, seed: int,
            result: Any) -> dict[str, Any]:
     """The payload a match becomes. Medians and tails, never a mean alone.
@@ -120,14 +139,7 @@ def _shape(decks: list[Deck], addresses: list[str], games: int, seed: int,
         # measurement giving up wearing a trophy.
         if slug is not None and not game.timed_out:
             wins[slug] = wins.get(slug, 0) + 1
-        rows.append({
-            "game": game.index,
-            "winner": None if game.timed_out else slug,
-            "seconds": round(game.milliseconds / 1000, 1),
-            "turns": game.turns,
-            "draw": game.draw and not game.timed_out,
-            "timed_out": game.timed_out,
-        })
+        rows.append(_row(game, slug))
     seconds = sorted(r["seconds"] for r in rows)
     return {
         "decks": [
@@ -181,11 +193,25 @@ def plan_forge(decks: list[Deck], addresses: list[str],
         progress(0, games)
 
         # Forge's output is streamed, so the job ticks once per finished
-        # game and the client's clock can be a bar that moves. Clamped
-        # because a tick is a progress report, not a result — the shaped
-        # answer below is the only tally anybody should quote.
-        def tick(finished: int) -> None:
-            progress(min(finished, games), games)
+        # game — and since the match theater, each tick carries the game it
+        # just watched end, shaped by the same `_row` the final tally uses
+        # and exposed on the job's `partial` for the client to seat live.
+        # Clamped because a tick is a progress report, not a result — the
+        # shaped answer below is the only tally anybody should quote. Seat
+        # order is the deck order (`run_games` and the shim both promise
+        # it), which is what lets a slug be named before the run exists.
+        # A pre-theater shim streams counts without rows; the bar still
+        # moves and `partial` simply stays sparse.
+        seats = {i: deck.slug for i, deck in enumerate(decks, 1)}
+        rows_so_far: list[dict[str, Any]] = []
+
+        def tick(finished: int, game: Any = None) -> None:
+            if game is not None:
+                slug = (seats.get(game.winner_seat)
+                        if game.winner_seat is not None else None)
+                rows_so_far.append(_row(game, slug))
+            progress(min(finished, games), games,
+                     partial={"rows": list(rows_so_far)})
 
         # Same match, two places it can run (ADR 35): the worker when the
         # environment names one, a local subprocess otherwise. `run_match`

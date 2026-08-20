@@ -549,15 +549,42 @@ def test_run_games_maps_seats_and_carries_the_seed(monkeypatch):
 
 def test_run_games_ticks_once_per_finished_game(monkeypatch):
     """The output is streamed and `on_game` hears each result line as it
-    passes — the count, not the content, because ticks are progress and the
-    parsed tally at the end is the only result anybody may quote."""
+    passes — the count and, since the match theater, the game it completed.
+    Ticks are progress, never results: the tally is the parser's complete
+    output, and the strongest guarantee available is asserted below — the
+    game a tick carried IS the tally's game, by identity, because both come
+    off one `StreamParser`."""
     two_games = WON + "Game Result: Game 2 ended in a Draw! Took 9000 ms.\n"
     run = _stub_forge(monkeypatch, two_games)
     ticks: list[int] = []
+    heard: list[object] = []
+
+    def on_game(n, game):
+        ticks.append(n)
+        heard.append(game)
+
     result = run.run_games([make_deck(), make_deck()], games=2,
-                           on_game=ticks.append)
+                           on_game=on_game)
     assert ticks == [1, 2]
     assert len(result.games) == 2
+    assert all(a is b for a, b in zip(heard, result.games, strict=True))
+
+
+def test_the_stream_parser_hands_back_each_game_as_it_completes():
+    """The incremental half of `parse`: a held turn line attaches to the
+    result that follows it, noise returns nothing, and what `feed` hands back
+    is the very object the accumulated output keeps."""
+    sp = parse.StreamParser()
+    assert sp.feed("Game Outcome: Turn 11") is None
+    game = sp.feed("Game Result: Game 1 ended in 16702 ms. Ai(2)-X has won!")
+    assert game is not None
+    assert (game.turns, game.winner_seat) == (11, 2)
+    assert sp.feed("some interleaved AI chatter") is None
+    assert sp.feed("Stopping slow match as draw") is None
+    clocked = sp.feed("Game Result: Game 2 ended in 300000 ms. Ai(1)-X has won!")
+    assert clocked is not None and clocked.timed_out
+    assert sp.output.games == [game, clocked]
+    assert sp.output.games[0] is game
 
 
 def test_a_tick_line_and_a_parsed_result_are_the_same_pattern():
