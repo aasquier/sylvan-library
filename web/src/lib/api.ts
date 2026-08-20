@@ -585,6 +585,19 @@ export interface Job {
   percent: number
   label: string
   result: unknown
+  /** What is true *so far*, while the job is still running — and `null` the
+   *  moment it is not.
+   *
+   *  The server clears it on completion deliberately (`jobs.py`): `result` is
+   *  the whole answer, so a partial left lying beside it is a stale second
+   *  copy of the same match. Read it for a live view and read `result` for
+   *  the record; never merge the two.
+   *
+   *  `unknown` rather than a union, for the same reason `result` is: the
+   *  shape belongs to the job's `kind`, and the screen that submitted the job
+   *  is the only thing that knows which. The Forge's is
+   *  `{ rows: ForgeGameRow[] }` — see `theaterRows`. */
+  partial: unknown
   error: string | null
   created_at: string
 }

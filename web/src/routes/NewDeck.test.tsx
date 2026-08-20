@@ -679,6 +679,7 @@ describe('the proposal', () => {
       onTick({
         id: 'j9', kind: 'claude.theme.proposal', status: 'running',
         done: 3, total: 8, percent: 38, label: '', result: null, error: null,
+        partial: null,
         created_at: new Date(Date.now() - 90_000).toISOString(),
       })
       return { promise: new Promise(() => {}), cancel: () => {} }

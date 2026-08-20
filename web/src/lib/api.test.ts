@@ -28,6 +28,9 @@ function job(overrides: Partial<Job> = {}): Job {
     percent: 0,
     label: 'gyome-food: mana, 20,000 games',
     result: null,
+    // Always on the wire (`jobs.py` serialises it unconditionally) and
+    // null unless the job is a running one with something to say so far.
+    partial: null,
     error: null,
     created_at: '2026-08-10T00:00:00Z',
     ...overrides,
