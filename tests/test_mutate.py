@@ -38,6 +38,72 @@ def test_the_catalogue_finds_each_kind_it_claims():
             "guard"} <= kinds
 
 
+DECORATED = textwrap.dedent('''\
+    from dataclasses import dataclass
+    from functools import lru_cache
+
+
+    @dataclass(frozen=True)
+    class Limit:
+        n: int
+
+
+    @lru_cache(maxsize=16)
+    def cached(n):
+        strict = True
+        return n if strict else 0
+    ''')
+
+
+def test_a_decorator_flag_is_not_a_mutation_site():
+    """`@dataclass(frozen=True)` is a declaration, not a branch.
+
+    Nothing reads it after import, so no assertion can tell the two values
+    apart and no test could ever kill the mutation — it is a guaranteed
+    survivor, forever, and it drags the kill rate down for a reason that says
+    nothing about the suite. Measured 2026-08-19: 19 such sites across the 18
+    declared modules, every one `frozen=True`, and 22% of the whole `constant`
+    class. A 25-mutation sample drew two and both survived.
+    """
+    found = operators.find(DECORATED, module="sample", relpath="sample.py")
+    on_decorator = [m for m in found if m.line == 5]
+    assert not on_decorator, f"decorator flag catalogued: {on_decorator}"
+
+
+def test_the_exclusion_reaches_the_decorator_and_nothing_past_it():
+    """Both halves, because an over-broad rule is the worse failure here.
+
+    A body-level `True` is an ordinary constant site and must stay; so must
+    `@lru_cache(maxsize=16)`, which is a *boundary* on a number a test can
+    absolutely notice. Only a decorator's booleans go.
+    """
+    found = operators.find(DECORATED, module="sample", relpath="sample.py")
+    assert any(m.operator == "constant" and m.line == 12 for m in found), \
+        "a boolean in a function body is still a mutation site"
+    assert any(m.operator == "boundary" and m.line == 10 for m in found), \
+        "a decorator's *number* is still a mutation site"
+
+
+def test_the_real_catalogue_holds_no_decorator_flag():
+    """The guard against the exclusion silently ceasing to apply.
+
+    `_decorator_flags` matches on `(lineno, col_offset)`, so a change to how
+    the catalogue walks the tree could stop the two agreeing and nothing else
+    would say so — the count would simply drift back up.
+    """
+    import ast
+
+    for relpath in harness.TARGETS:
+        source = (SRC / relpath).read_text(encoding="utf-8")
+        flags = operators._decorator_flags(ast.parse(source))
+        if not flags:
+            continue
+        sites = {(m.line, m.col) for m in operators.find(
+            source, module=relpath, relpath=relpath)}
+        assert not (flags & sites), \
+            f"{relpath}: decorator flags back in the catalogue"
+
+
 def test_a_mutation_changes_exactly_one_span():
     mutation = next(m for m in operators.find(
         SAMPLE, module="sample", relpath="sample.py")
@@ -136,6 +202,32 @@ def test_the_sample_is_reproducible_from_its_seed():
     third = random.Random(12).sample(available, 5)
     assert [m.describe() for m in first] == [m.describe() for m in second]
     assert [m.describe() for m in first] != [m.describe() for m in third]
+
+
+def test_a_named_site_is_selected_by_its_line_and_not_by_its_text():
+    """`--only decks/analyze.py:33` must not also mean line 336.
+
+    The first draft joined `relpath:line` and asked for a substring, and the
+    very first use — re-checking a survivor the ledger had recorded — silently
+    swept in a second line whose number merely started with the same digits.
+    A path fragment is still a substring; the number is compared as a number.
+    """
+    available = mutate.catalogue(SRC)
+    picked = mutate.select(available, ["decks/analyze.py:33"])
+    assert picked, "the site the ledger names must still exist"
+    assert {m.line for m in picked} == {33}
+
+
+def test_a_filter_matching_nothing_raises_rather_than_running_nothing():
+    """A sample of zero reports a flawless kill rate over no mutants at all.
+
+    That is the harness's own shipped bug pointed the other way: a mistyped
+    test filename used to silently *widen* what ran, and a mistyped path here
+    would silently narrow it to nothing. Both read as success.
+    """
+    available = mutate.catalogue(SRC)
+    with pytest.raises(ValueError, match="matched none"):
+        mutate.select(available, ["decks/analyze.py:99999"])
 
 
 def test_a_report_counts_survivors_against_a_real_denominator():

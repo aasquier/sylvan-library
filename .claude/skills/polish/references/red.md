@@ -34,9 +34,15 @@ adopting.
   non-GitHub-authored), permissions blocks minimal (`contents: read` unless
   a job needs more), no `pull_request_target` foot-guns. This repo is
   public; its workflows are an attack surface.
-- The pinned invariants stay pinned: the skip gate at 2, the `image` job as
-  the only container build (never runnable on this Mac), deploy `needs` all
-  four `ci.yml` jobs. Verify, don't assume.
+- The pinned invariants stay pinned: the skip gate at 2 — **that is CI's
+  number, and the local suite skips 0**, because this Mac has the pool and
+  both `needs_full_pool` tests run — the `image` job as the only container
+  build (never runnable on this Mac), and deploy `needs` every other job in
+  `ci.yml`. The last of those is a test now
+  (`test_the_deploy_job_waits_for_every_other_job_in_the_file`), and it
+  **derives** the expected set from the file's own job list rather than
+  restating it, so adding a job and forgetting `needs` fails locally instead
+  of shipping a red suite. Verify the rest, don't assume.
 - **Free-tier feature audit**: check GitHub's changelog for features now free
   for public repos — merge queue, artifact attestations, better caching,
   required workflows. Adoptions that change contributor workflow are queued;

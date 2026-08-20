@@ -225,6 +225,17 @@ It is what makes the pass cumulative rather than repetitive.
    profile goes in the ledger, not just the millisecond — and **a probe finds
    *which*, only a profile finds *why***, so a sentence beginning "presumably"
    is not a finding.
+
+   One standing question besides, whatever the color: **which of this facet's
+   absolute claims is enforced by nothing?** "Always", "never", "every", "all"
+   — in CLAUDE.md, in a docstring, in `web/README.md`, in this skill. For each,
+   ask what fails if it stops being true; when the answer is *nothing*, it has
+   already drifted or it will. The pass learned this four times before the
+   2026-08-19 rainbow found five more in one day — an extras list, a `needs`
+   list, a motion guard, a stated rule with no pin, a prose-only lint rule —
+   which is why it now lives here, where every run reads it, rather than only
+   in the colorless reference, where the sixth run does. **The fix is to make
+   the claim machine-checked, never to reword it.**
 3. **Triage every finding** into exactly one of:
    - **Safe fix** — implement it this run. Safe means: behavior-preserving or
      bug-fixing with a test; no new runtime dependency; no schema migration;
@@ -247,9 +258,19 @@ It is what makes the pass cumulative rather than repetitive.
    The test is not diff size; it is *can I fully prove this green before
    pushing?* If the only proof is CI itself, queue it (or land it alone on a
    branch Aaron can watch), never bundle it into a fix set.
-4. **Fix.** Every bug fix gets a test. Match the surrounding code's idiom and
-   comment density. If a finding grows beyond surgical mid-fix, stop, back it
-   out to a queued item, and say so.
+4. **Fix.** Every bug fix gets a test — and **derive the expectation from the
+   source of truth rather than restating the claim.** A test that repeats the
+   sentence it is checking cannot tell you the sentence is wrong: the deck
+   History tab said earlier edits were "in git" for two ADRs' worth of time
+   beside a green `expect(getByText(/in git, not here/))`, and a licence-notice
+   test drafted its own shelf entry and stayed green against the bug it was
+   written for. The working form reads the truth back — the route test takes
+   the filename *off* `ocr.ASSETS`, the deploy-`needs` test derives the job set
+   from `ci.yml`'s own job list, the extras test parses `pyproject.toml`. Then
+   **verify by mutation, not by greenness**: break the thing, watch the test
+   fail, restore it. Match the surrounding code's idiom and comment density,
+   and if a finding grows beyond surgical mid-fix, stop, back it out to a
+   queued item, and say so.
 5. **Verify.** The full local gauntlet before any push: complete `pytest`
    (the determinism digest and `SIM_VERSION` move as a pair), `ruff check src
    tests`, `mypy`, and `npm --prefix web run check`; rebuild the committed

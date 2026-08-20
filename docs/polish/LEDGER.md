@@ -216,20 +216,31 @@ state, never checklists.
     `decks/` is read-only in `test_edit.py` (it asserts the file is unchanged).
     One open risk: `.hypothesis/` is a single shared directory every worker
     writes; CI already sets `database=None`, local `dev` does not.
-  - **Parameterize `cards/db.py::snapshot_prices`.** It interpolates `on_date`
-    into `DATE '{on_date}'` and into the count query. Not reachable today — the
-    only production caller (`cli.py:108`) passes no date, and the parameter is
-    exercised only by a test with a literal — but it is string-built SQL taking
-    a caller-supplied string. Trigger: the first time `on_date` is wired to a
-    route, a scheduled job argument, or anything a user can influence.
+  - ~~**Parameterize `cards/db.py::snapshot_prices`.**~~ **Landed in
+    [#135](https://github.com/aasquier/sylvan-library/pull/135), 2026-08-16 —
+    corrected by Colorless 2026-08-19.** The code reads
+    `CAST(? AS DATE)` with a bound `params` list, and the docstring above it
+    says "`on_date` is **bound, not interpolated**"; #135's own commit message
+    opens with "The date was interpolated" and explains the fix. **The entry
+    below was re-affirmed verbatim three days later by a run that re-swept
+    every *other* f-string site in the file and never re-read this one** —
+    including the sentence "`snapshot_prices` is still the only one", which was
+    true of the sweep and false of the item. Same PR, same day, four items:
+    three were marked landed here and this was the fourth. This is Blue's
+    2026-08-19 lesson in its deferred form — *not re-litigated* must mean the
+    argument is not reopened, never that the tree is not re-checked — and it is
+    now the **third** time this shape has been caught, so the standing habit is
+    to re-verify every carried item against the tree before copying it forward.
+    Kept as a line rather than deleted so the next run does not re-find it.
     (Audited alongside it and *fine*: the other three f-string `execute` sites
     interpolate module constants only — `SCHEMA_VERSION`, `_ADDED_COLUMNS`, and
     two hardcoded table names. Re-swept 2026-08-19 over everything added
     since: `claude/ledger.py::summary` interpolates a **column name**, which
     cannot be bound as a parameter, and guards it with an `AXES` tuple and an
     explicit raise; `decks/sqlsource.py` and `decks/wheel.py` build a `where`
-    clause from fixed literals and bind every value. `snapshot_prices` is
-    still the only one.)
+    clause from fixed literals and bind every value. That sweep stands; its
+    conclusion — "`snapshot_prices` is still the only one" — does not, because
+    `snapshot_prices` had stopped being one of them.)
   - **`ocr.installed()` has no caller.** Its docstring says it is "for the
     health endpoint and for a client that would rather not open a viewfinder
     it cannot use", and neither exists — the client asks for its three files
@@ -276,6 +287,13 @@ state, never checklists.
       keyword arguments are structural rather than behavioural and will
       survive forever, which quietly depresses every kill rate. Two of seven
       survivors here.
+      **Colorless acted on this 2026-08-19 and it was bigger than two:** 19
+      sites across the 18 modules, every one `frozen=True`, and **22% of the
+      whole `constant` class**. They are out of the catalogue now
+      (`operators._decorator_flags`), so **1,279 → 1,260 and `constant` 86 →
+      67**. Read this run's 72% against the old denominator; the next White
+      draw is against the new one, and the shift is a removed floor of
+      guaranteed survivors rather than a suite that improved.
     - `ocr.py:147` (`30` → `31`) — the `urlopen` timeout. Equivalent by
       design: `tests/test_ocr.py` opens by saying no test sends a request.
     - `cards/identify.py:200` (`6` → `7`) — the longest set-code prefix tried
@@ -475,6 +493,14 @@ does not do:
 - **`decks/analyze.py:33` and `decks/companion.py:139`, boundary constants.**
   Both are numbers in a table; the tests exercise the table's behaviour rather
   than its edges. Worth a look next White run, not this one.
+  **The next White run did not look, and Colorless re-ran them by name on
+  2026-08-19: all four are still alive** — `analyze.py:33` `8`→`9` and
+  `12`→`13`, `companion.py:139` `<`→`<=` and `3`→`4`. Not a failure of the
+  draw but of its shape: a fresh seeded sample of 25 from 1,260 sites will
+  never revisit a named site, so "worth a look next run" means *forever*
+  unless somebody asks directly. `mtglab mutate run --only <path:line>` is
+  that verb now, and it costs a second a site. **Still open, and still
+  White's.**
 - **`sim/cache.py:243` (`ensure_ascii`) and `:356` (`row["b"] or 0`).** Both
   effectively equivalent on any input this app produces — the cache key holds
   numbers and an ASCII keep_rule, and `row["b"]` is falsy only for an empty
@@ -825,9 +851,11 @@ spirit of Magic*
     across 31 files in ~26s** (was 499 / 28 / ~37s on 2026-08-18). Bundle
     rebuilt; only `DeckDetail.js` moved, which is fix 3.
   - **Layering, grepped not trusted:** `api/` imports `cli.py` **nowhere**;
-    **no `duckdb.connect` outside `cards/db.py`** (queued item 4, now closed);
+    **no `duckdb.connect` outside `cards/db.py`** (queued item 6, now closed —
+    this line said "item 4", corrected by Colorless);
     `mana.py` and `sim/` are stdlib-only — note *not* stdlib+numpy, since
-    **numpy appears in no module outside `animist/`** (queued item 2); no
+    **numpy appears in no module outside `animist/`** (queued item 4, likewise
+    corrected from "item 2"); no
     module-level `anthropic`, `PIL`, `dotenv`, `torch` or `numpy` anywhere in
     `src/`; no 3.12-only syntax, so the `>=3.11` floor holds.
   - **Frontend compatibility:** **zero regex lookbehind** under `web/src`
@@ -905,7 +933,8 @@ a technology-name sweep for `git`, `YAML`, `Python`, `DuckDB`, `SQLite`,
 **The headline, and it is not a flavour finding:** the vast majority of those
 hits are in *comments*, which commandment 10 does not reach. Exactly **two**
 render. One is fixed above (the History tab's "in git"); the other is the
-simulator's seed, queued as item 0 because the wording is a decision. That is
+simulator's seed, **queued as item 2** (this line said "item 0"; corrected by
+Colorless) because the wording is a decision. That is
 a good result for a first sweep and worth writing down as the baseline —
 this app is not leaking its machinery, it leaked twice.
 
@@ -2319,11 +2348,86 @@ runs against a cache nobody emptied.
 *The pass auditing itself: last cycle's findings · are the checklists still
 finding things · the developer tooling · cross-color leftovers*
 
-- **Last run:** 2026-08-19 (the run that created this section). Previous: none
-  — colorless was the name of the merged-survey mode until this session, and
-  that mode is now `converge`.
-- **What changed in the skill this run** (Aaron's ask, in a clean session
-  after the targeted performance pass exposed seven structural gaps):
+- **Last run:** 2026-08-19 (rainbow) — the first colorless run to have five
+  colors to audit. Previous: 2026-08-19 (the run that created this section).
+- **Fixed this run (2026-08-19, rainbow):**
+  1. **The mutation catalogue held 19 sites no test could ever kill, and they
+     were 22% of one whole class.** White handed this over as an observation
+     about two survivors; measured, it is a category. `@dataclass(frozen=True)`
+     is a *declaration*, read by `dataclass` at import and by no code path
+     afterwards, so flipping it changes nothing any assertion reaches — 19 such
+     sites across the 18 declared modules, every one `frozen=True`, and **22%
+     of the 86 `constant` sites**. That is not an equivalent mutant (a fact
+     about one line, worth recording once) but a **shape the repo keeps
+     adding**, so it compounds: a floor of guaranteed survivors dragging every
+     kill rate down for a reason that says nothing about the suite.
+     `operators._decorator_flags` excludes them — **1,279 → 1,260, `constant`
+     86 → 67** — deliberately narrow, booleans on a decorator's keyword
+     arguments only, because `@lru_cache(maxsize=16)` is a *boundary* on a
+     number a test can absolutely notice and stays in. Three tests, all
+     mutation-verified: dropping the exclusion fails two, widening it to every
+     boolean fails a third, and the third reads the real catalogue rather than
+     the fixture so the two halves cannot drift apart in silence.
+  2. **`mtglab mutate run --only <path:line>`, because a recorded survivor had
+     no verb.** Every run writes down the survivors it read, and the obvious
+     next question — *is that one still alive?* — could only be asked by
+     drawing a fresh random sample that will never revisit a named site. So
+     survivors accumulated as prose nobody could cheaply re-check, and two went
+     two runs unread. First use found four still alive (White's section has
+     them) and **a bug in the new flag**: `--only decks/analyze.py:33` also
+     swept in line 336, because the first draft matched `relpath:line` as one
+     string. A path fragment is still a substring; the number is compared as a
+     number. A pattern matching nothing **raises** rather than reporting a
+     flawless kill rate over no mutants — the harness's own shipped bug (a
+     mistyped test filename silently *widening* what ran) pointed the other
+     way. Both mutation-verified.
+  3. **`bench profile` told runs that zero warm imports was the only right
+     answer, in three places, while its own threshold said 200 and its own
+     output said 7–31.** Both cannot be true and the threshold is the half that
+     behaves: #181 did not *remove* DuckDB's per-parameter `import pandas`
+     probe, it **answered** it with a `sys.modules` sentinel, so a warm bind
+     still enters the import machinery and still counts — it simply stopped
+     walking `sys.path`. Traced rather than reasoned: a warm `/api/decks` makes
+     25 `__import__` calls a request, six of them `pandas`, all resolving from
+     `sys.modules`; a defused three-parameter bind reports **exactly 6**,
+     deterministically, two per bound value. The three sentences now say to
+     read the count against `IMPORT_CALLS_SUSPECT`, and
+     `test_a_warm_request_imports_something_and_that_is_not_the_alarm` pins the
+     band **from below** — the direction nobody was watching, and the one where
+     a later "fix" makes every healthy profile read as a finding.
+     Mutation-verified by tightening the threshold to 0. *An instrument that
+     cries wolf is one nobody reads, and its numbers are still in the ledger.*
+  4. **Four checklist corrections and one hand-off honoured.**
+     `references/green.md`'s motion bullet was still a judgement call
+     ("Animations should respect it") three lines under the correction that
+     says to audit the artifact — Green filed the note rather than applying it
+     and named Colorless as the owner; it names `tests/test_reduced_motion.py`
+     now, with the reason. `references/black.md` said **six** Claude modes
+     through the very run that measured seven. `references/white.md` hard-coded
+     a catalogue size that had already moved twice in a week. `references/red.md`
+     carried the skip gate as "2" without Red's own correction that **the local
+     suite skips 0** and 2 is CI's number by construction; it also now names
+     the deploy-`needs` test Red landed.
+- **Promoted into `SKILL.md`, where every run reads it** (both patterns were
+  found independently by more than one color this rainbow, which is the test
+  for promotion):
+  - **"A rule enforced by nothing drifts"** was already written down — in
+    `references/colorless.md`, the one file only the sixth run opens. Blue,
+    Red and Green each rediscovered it in the same day (an extras list, a
+    `needs` list, a motion guard), and White found a fifth (a stated rule with
+    no pin at `sim/compile.py:102`). It is now a standing question in step 2 of
+    the run protocol. The colorless reference keeps the half that is genuinely
+    its own: sweeping *the skill's* absolutes, and the corollary that a guard
+    needs a test proving it is not inert.
+  - **"Derive the expectation; never restate the claim."** Blue found the
+    sharp case (`expect(getByText(/in git, not here/))` sat green beside a
+    sentence that was false twice over) and White found the near-miss (a
+    licence-notice test whose first draft supplied its own shelf entry). Red's
+    deploy test and Blue's extras test are the working form, and both say so in
+    their own docstrings. Now in step 4 beside "every bug fix gets a test",
+    with mutation verification as the second beat.
+- **What changed in the skill on the previous run** (Aaron's ask, in a clean
+  session after the targeted performance pass exposed seven structural gaps):
   1. **Black's performance facet was rewritten around profiling.** It used to
      say "record the response time", which a run did — 224ms for `/api/decks`
      — while the largest performance bug in the codebase sat inside that
@@ -2347,8 +2451,149 @@ finding things · the developer tooling · cross-color leftovers*
   `mtglab bench`'s first cold run found a bug in `mtglab bench` — a warm
   profile printed under a cold heading. Both are the shape this pass exists
   for: *the instrument disagreeing with the story*.
-- **Queued for Aaron:** nothing new. `mutmut`/`cosmic-ray` remain queued in
-  White's section as the exhaustive-run escalation.
+- **Queued for Aaron:** nothing new from this run. `mutmut`/`cosmic-ray`
+  remain queued in White's section as the exhaustive-run escalation. What this
+  run owes instead is the list below.
+
+### Every straggler, deduplicated and verified — 2026-08-19
+
+Aaron's ruling this rainbow was *"let's fix all stragglers at the end"*, and a
+stragglers pass follows this run. This is its input: **22 items open across
+five sections — White 2, Blue 6, Black 2, Red 8, Green 4, Colorless 0 — each
+re-checked against the tree rather than copied forward**, because three
+separate colors this cycle found a carried item that had already landed and
+one of those was three days old. Sections own their own entries; this is an
+index with a verdict, not a second copy.
+
+**Verified already landed, and marked so in their own sections** (do not
+re-open):
+
+| item | landed |
+|---|---|
+| White · package licence in `pyproject.toml` | #135, 2026-08-16 |
+| White · widen CI's card-data filename scan | Red, 2026-08-16 |
+| White · CLAUDE.md's Setup block names a missing interpreter | Blue, #186 |
+| **White · parameterize `snapshot_prices`** (deferred) | **#135 — found by this run; it had been re-affirmed verbatim three days after it was fixed** |
+| Blue · Claude Code hooks | #135 (the `PostToolUse` third is still open) |
+| Blue · `api/service.py` reaching past `cards/db.py` | #181 |
+| Green · five of eight nav destinations unreachable on a phone | 2026-08-16 |
+
+**Still open — Aaron's ruling wanted.** Ordered by what a fresh session can
+act on soonest, not by color:
+
+1. **Red 4 + Red 8 — four repository settings, all free, all pure win, all
+   Aaron's to flip** (a run cannot). Re-read from the API tonight:
+   `sha_pinning_required: false`, `allowed_actions: "all"`, secret scanning
+   **disabled**, push protection **disabled**. The repo already pins all
+   eleven actions by hand, so the first makes a convention structural; the
+   second and third matter because `no-secrets-or-card-data`'s grep is
+   *post-hoc by construction* — it runs after the push, on a public repo, so
+   when it fails the key is already published. Anthropic has been a GitHub
+   secret-scanning partner since 2024, so a leaked key is forwarded and
+   revoked with nobody in the loop. **These four are the cheapest yes in the
+   whole list and should be first.**
+2. **Red 1 + Red 3 — nothing tells Aaron the site is down.** One question, two
+   halves, and the cheapest first step is **free**: does `fly-metrics.net`
+   have any alert rule at all? (`FLY_METRICS_TOKEN` is set, so Fly's
+   Prometheus is live and the admin page already reads it.) Then the
+   off-platform half, which cannot live on the platform it watches:
+   UptimeRobot free + Pushover ($5 once). Red 3 is its precondition —
+   `/api/health` must report sickness (`app_db` opens, `disk_free_mb`,
+   `schema_version`) **while still answering 200**, because Fly stops routing
+   on a failing check and with one machine that turns "logins are broken" into
+   "the site is down". **Red 2 rides along and is not optional:** `HEAD /` and
+   `HEAD /api/health` answer **405**, so a monitor left on a HEAD default
+   alerts continuously against a healthy site.
+3. **Blue 2 — the simulator renders a raw seed, and commandment 10 names seeds
+   explicitly.** The *whether* is settled; the *what* is two readings.
+   (a) flavour the label only — `Seed` → `Shuffle`, wire field untouched, the
+   `lib/claudecopy.ts` pattern; (b) stop showing the number, keeping "New
+   sample" as the only control. (a) preserves ADR 18's reproducibility
+   surface; (b) is the stricter reading. **Commandment 16 either way.**
+4. **Blue 1 — three of six decks credit the wrong painter right now.** A deck
+   that pins a printing gets that printing's `set_name` and the *oracle* row's
+   `artist`, side by side in one sentence, and the code's own comment states
+   the rule it breaks. Not fixable without a pool change (`printings` has no
+   `artist` or `flavor_text` column), so it is **schema + a mandatory
+   `data refresh`** — which is why it is Aaron's. The stopgap trades a wrong
+   credit for a missing one, against a project standard that every painting
+   carries a visible credit. *Cross-color: White's attribution facet, Black's
+   ingest.*
+5. **Black 1 — cache-write tokens are invisible and are the priciest class**
+   (1.25× input). Re-verified: `cache_creation_input_tokens` appears **nowhere
+   in `src/`**. One column plus one assignment, but a **schema migration**
+   (now v11) on a forward-only ladder that applies on boot unwatched — so it
+   wants its own branch merged while somebody is watching. **Dated urgency:**
+   Sonnet 5's introductory rate ends **2026-08-31**, and this is the
+   instrument that would show what the 50% rise actually costs.
+6. **Green 5a — `SCHEMA_VERSION` is surfaced nowhere.** Re-grepped: not in
+   `/api/health`, not on the admin panel, and it is at 10. Six lines, one
+   field and one tile — and it is precisely the number ADR 23 makes worth
+   seeing, since migrations apply on boot with nobody watching. Pairs with (5)
+   and with Red 6. *(Green 5b — newest snapshot age — needs a Fly API call the
+   app does not make, and Red 6 is the sharper half of the same worry.)*
+7. **Red 6 — a deploy takes no snapshot, which is exactly backwards.** The
+   volume is most at risk on the boot after a merge; Fly's snapshots are daily
+   and unrelated to that. Needs a `FLY_API_TOKEN` scope check and a decision
+   about failing the deploy when the snapshot fails.
+8. **Red 7 — the `image` job spends 60% of itself emulating an architecture
+   nothing deploys to.** 182s of arm64 QEMU on a job whose live machine
+   answers `x86_64`. Three options written out: drop it, move it to the now-free
+   `ubuntu-24.04-arm` runner, or keep it. **The only lever in six runs that
+   would move CI's wall clock**, and the Dockerfile's own comment is the
+   decision it was added under, which is why it is not a safe fix.
+9. **White 4 — the coverage floor is a tripwire, not a floor.** 95.136%
+   against `fail_under = 95`, ~16 statements of headroom on 11,512, and the
+   comment beside it still claims "the suite runs about 96". Two honest
+   options — move the floor to 94 and say why, or spend a session on
+   `api/adminstats.py` 76%, `api/admin.py` 85%, `api/argueruns.py` 86%,
+   `animist/fetch.py` 81%. Drifting is the one option nobody chose.
+10. **White 1 — four open CodeQL `py/polynomial-redos`**, re-read from the API
+    tonight, all in `decks/decklist.py` (166/171/184/254) and all behind auth.
+    The pre-auth one cleared. Suggested direction unchanged: bound the pasted
+    decklist's length *before* the regex runs; the value is Aaron's.
+11. **Green 1 — the stated floor is Safari 15; the bundle needs 16.4.** And
+    the camera door now requires 16.4 by a second, independent route
+    (`tesseract-core-simd-lstm.wasm.js`; WebAssembly SIMD is 16.4). Safari 15
+    on macOS 12 is this dev machine's own browser, so the severity question is
+    a ten-second check that still has not been made.
+12. **Green 3 + Green 4 — the phone.** 21 of 23 interactive elements under
+    44px on `/import` at 375px ("Back to the library" is 17px), and
+    `env(safe-area-inset-*)` appears nowhere — the latter needs
+    `viewport-fit=cover` *and* the insets together, and Aaron's physical phone.
+    One spacing-scale decision covers most of both.
+13. **Blue 3 — `cli.py` is the last strict-mypy exception and it keeps
+    growing: 79 → 109 → 126.** Annotations rather than a rewrite, but in one
+    2,400-line file, so it wants its own branch. **The third consecutive rise
+    is the argument.**
+14. **Blue 4 — `numpy` is a core dependency and only `animist` imports it.**
+    Verified: the only importers are `animist/{ops,encode,motion}.py`, so every
+    base install and the deployed image carry it for code that never runs
+    there. A **packaging** change only the `image` job can prove — pair it with
+    White's deferred `license-files` widening, same feedback loop.
+15. **Blue 7 — `ROADMAP.md` is 3,109 lines and has become a narrative log.**
+    Unchanged tonight. The four planning documents total 7,073 lines, which is
+    a per-session cost. Concrete proposal to say yes or no to: keep ROADMAP as
+    goals, open decisions and the next two or three items; move the landed
+    narratives to a `docs/HISTORY.md` nothing reads at session start.
+16. **Black 2 — the theme conversation's second cache breakpoint**, and the
+    honest note is that it is now **bounded at ~0.8%** of that mode's input
+    (99.2% of the prompt is already served from cache across 77 real turns).
+    Small, not large; still needs (5) as its instrument.
+17. **Blue 5 (remainder) — a `PostToolUse` hook** reminding that `web_dist/`
+    needs rebuilding after an edit under `web/src`. Convenience, not a guard:
+    CI's `frontend` job already catches a missed rebuild.
+18. **Red 5 — a merge queue, and its trigger has not fired.** Checked tonight:
+    **one** open PR, a Dependabot bump, against a threshold of "more than two
+    at once". Serial rainbow is what dissolved the case and it keeps
+    dissolving it. Listed for completeness rather than for action — the
+    stragglers pass should read this one and move on.
+
+**Findings for a color's own next run** (not Aaron's, recorded so they are not
+lost between them): the four live mutants at `decks/analyze.py:33` and
+`decks/companion.py:139`, still alive after two runs — White's, and now
+re-checkable with one command.
+
 - **Deferred:**
   - **Blue is four facets and the longest reference; Red is two and the
      shortest.** Not obviously wrong — Blue's facets are cheap to sweep and
@@ -2358,18 +2603,98 @@ finding things · the developer tooling · cross-color leftovers*
   - **The bench suite is in-process and cannot see the proxy, TLS, or the
      machine.** Live-instance numbers are still hand-taken. *Trigger:* a
      deployed regression the local bench could not reproduce.
+  - **The ledger is 2,600 lines and the pass reads it at the start of every
+     run.** Blue's queued item 7 makes the same argument about `ROADMAP.md`,
+     and this file is on the same curve — three dated measurement blocks in
+     Red alone, five in Black. Not trimmed here, because the two things that
+     make it long are the two things that make it work: corrections kept
+     *beside* their originals, and measurements kept even when healthy. The
+     honest cut is the third copy of a number nobody compares against.
+     *Trigger:* a run that cannot read its own section in one sitting, or
+     Aaron ruling on item 7 — whichever comes first, since the answer should
+     be the same for both files.
+- **Is each checklist still finding things, or reciting them?** Verdict per
+  color, measured as *what its last run found* against *what its file spends
+  its words on*:
+  - **White — earning it, and the most.** Four fixes, none of which the file
+    would have found by reciting: the only third-party code this project
+    actually redistributes had no notice; the newest paid surface's job body
+    had no tests; two runtime shelves were missing from the mutate map. The
+    facet that produced them is the *clean-checkout install*, which the file
+    added deliberately after the last gap was found by accident. Keep it.
+  - **Blue — earning it, and the enrichment half worked.** The previous
+    colorless run predicted the failure mode ("the sweep has concrete greps
+    and the enrichment needs taste") and it did not happen: half two produced a
+    real four-item shortlist ordered by cost, plus — the part that makes the
+    next run cheaper — a *considered and rejected* list with the argument for
+    each. Half one's result is worth recording as a baseline: exactly **two**
+    technology names render across 24,712 lines of `web/src`, and everything
+    else is comments, which commandment 10 does not reach.
+  - **Black — earning it, and its own correction bit.** The 2026-08-19 rewrite
+    around profiling was Colorless's doing last run, and this run it caught two
+    comments naming an *unmeasured* cause — including one inside `bench` itself.
+    That is the facet working as rebuilt. Its stale line ("six modes") is fixed
+    above and was a count, not a method.
+  - **Red — earning it, and it is the file that most needs re-reading rather
+    than re-running.** Its fix this run came from asking what *nothing*
+    checked, not from a checklist line. Its two facets are expensive to probe
+    and cheap to recite, and eight open items is the largest queue in the
+    file — but every one is genuinely Aaron-shaped, so the queue length is the
+    facet's honest output rather than its backlog.
+  - **Green — earning it, and it produced this run's sharpest lesson.** Its own
+    2026-08-16 correction said *audit the artifact*, and three bullets later it
+    hand-audited motion in the source, correctly, in the wrong file, and
+    recorded the sweep as complete. **The correction a run makes in one facet
+    is owed to its siblings in the same section** — that is the generalisation,
+    it is Green's phrasing, and it is why the motion bullet is now a test.
+- **The tooling, run and read as evidence about itself:**
+  - `mtglab animist verify` — **12 recipes, all held.** The old memory note
+    that only 2 of 12 were pinned is stale twice over: Blue parametrised
+    `tests/test_animist_recipes_repo.py` over the CLI's own glob on 2026-08-18,
+    and White confirmed the video outputs are genuinely decoded (a missing
+    `imageio_ffmpeg` produces a *failure*, not a silent pass).
+  - `mtglab bench run` — **12 targets, 12 resolved, no `skipped` row.** Warm
+    medians within noise of Black's post-fix table (`/api/decks` 17.6ms,
+    `/api/health` 7.9ms, search 45.1ms). The only target over 25ms is search,
+    profiled unasked, database-bound at 84% inside one statement — the tool
+    routing rather than describing, as designed.
+  - `mtglab bench caches` — unchanged and healthy: `deck.parsed` 60/0,
+    `pool.columns` 15/0, `pool.keeper` 36/0, `pool.cards` 27/3. Three read
+    *never asked* because this suite does not log in. **No cache has been added
+    since the register landed and nothing in it is dead.**
+  - `mtglab mutate` — catalogue **1,260 sites across 18 modules** after fix 1
+    (356 boundary, 327 comparison, 192 arithmetic, 163 guard, 155 boolean, 67
+    constant). Kill rate is a *trend and needs a denominator*: 76% (19/25,
+    seed 0, 1,231 sites) → 72% (18/25, seed 1, 1,279) → the next draw is
+    against 1,260 with a floor of guaranteed survivors removed, so a rise there
+    is the catalogue, not the suite. **No fresh draw taken here on purpose** —
+    that is White's, and a second sample from a different run only adds noise.
+  - **`mtglab bench profile`'s import counter disagreed with its own
+    documentation**, which is the one thing on this shelf that had actually
+    gone wrong. Fixed above. *The instrument was right and its story was
+    wrong, which is the harder direction to notice.*
 - **Standing questions for the next colorless run**, so it starts with
   evidence rather than a blank page:
-  - Did the enrichment half actually produce shortlists, or did it collapse
-    back into the sweep? (The failure mode is predictable: the sweep has
-    concrete greps and the enrichment needs taste.)
-  - Is `mtglab bench run`'s target list still resolving everything? A row
-    reading `skipped` is the finding, not the footnote.
-  - Has the mutation kill rate moved, and is the cause named?
-  - Are any survivors from a previous run still unread?
-- **Staleness, honestly stated** for the next bare `/polish`: all five colors
-  were last swept 2026-08-16 (rainbow); Black additionally had a targeted
-  performance pass 2026-08-19 and now carries the freshest numbers in the
-  file. **Blue is the stalest in substance** — its docs-and-memory audit
-  predates six merged PRs and the whole camera-import feature — and it also
-  owns the new enrichment half, which has never run. Blue next.
+  - Did the stragglers pass actually clear the list above, and did anything on
+    it turn out to have landed already *again*? That is now three cycles
+    running; if it happens a fourth, the habit needs a mechanism.
+  - Has the mutation kill rate moved against the **1,260** denominator, and is
+    the cause named — new tests, new code, or a different draw?
+  - Were the survivors on record re-run with `--only`, or did the new verb go
+    the way of the old prose?
+  - Blue's enrichment shortlist produced four items and built none (the run hit
+    its surgical cap). Did the next Blue run build one, or does the shortlist
+    just grow?
+  - `references/blue.md` is 227 lines against `references/red.md`'s 97. The
+    deferred item below wants re-checking once the enrichment half has run
+    twice; it has now run once.
+- **Staleness, honestly stated** for the next bare `/polish`: **all six colors
+  carry the 2026-08-19 rainbow tag**, so nothing is stale by date and the
+  ordering has to come from substance instead. **Red first.** It owns eight of
+  the twenty-one open items, two of them (alerting, and the four repository
+  settings) are the only ones where the current state is *nothing is watching*,
+  and its one lever on CI's wall clock has been deferred through six runs on a
+  tie that has not broken. Green second, because its two phone items are the
+  only ones a newcomer meets first (commandment 2) and both need Aaron's own
+  hardware. After the stragglers pass, re-read this line rather than inheriting
+  it — a pass that clears half the list changes the answer.

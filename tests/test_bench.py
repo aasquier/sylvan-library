@@ -247,6 +247,35 @@ def test_the_import_counter_can_see_an_import_storm():
     assert "import machinery" in noisy.verdict()
 
 
+def test_a_warm_request_imports_something_and_that_is_not_the_alarm(tmp_path):
+    """The other half of the storm test, and the half that was prose.
+
+    `import_calls` was documented in three places as "zero is the only right
+    answer on a warm request" while `IMPORT_CALLS_SUSPECT` sat at 200 and the
+    tool reported 7–31 every time. Both cannot be true, and the threshold is
+    the half that behaves: #181 did not *remove* DuckDB's per-parameter
+    `import pandas` probe, it answered it with a `sys.modules` sentinel, so
+    the probe still enters the import machinery and still counts — it simply
+    stopped walking `sys.path`. Two calls per bound value, deterministically.
+
+    Pinned from below because that is the direction nobody was watching. A
+    later run "fixing" the count to match the old sentence, or tightening the
+    threshold onto the warm band, would make every healthy profile read as a
+    finding — and an instrument that cries wolf is one nobody reads.
+    """
+    con = db.connect(tmp_path / "pool.duckdb")
+
+    def bind_three():
+        con.execute("SELECT ?, ?, ?", ["a", "b", "c"]).fetchone()
+
+    bind_three()                                   # warm every lazy import
+    prof = benchprofile.profile_target("bind", bind_three, repeat=3)
+    assert prof.import_calls > 0, \
+        "a bound parameter still asks; the sentinel answers it, cheaply"
+    assert prof.import_calls < benchprofile.IMPORT_CALLS_SUSPECT
+    assert "import machinery" not in prof.verdict()
+
+
 def test_the_verdict_routes_rather_than_describes():
     """Two numbers get read as two numbers; the verdict says which lever."""
     prof = benchprofile.profile_target("pure python", lambda: sum(range(9999)),

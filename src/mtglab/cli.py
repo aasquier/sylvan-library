@@ -2036,21 +2036,31 @@ def cmd_mutate_run(args):
 
     src = Path(__file__).resolve().parents[1]
     available = mutaterun.catalogue(src)
-    print(f"{len(available)} mutation sites across "
-          f"{len(mutaterun.TARGETS)} modules; sampling {args.sample} "
-          f"at seed {args.seed}\n")
+    if args.only:
+        print(f"{len(available)} mutation sites across "
+              f"{len(mutaterun.TARGETS)} modules; re-running the ones "
+              f"matching {', '.join(args.only)}\n")
+    else:
+        print(f"{len(available)} mutation sites across "
+              f"{len(mutaterun.TARGETS)} modules; sampling {args.sample} "
+              f"at seed {args.seed}\n")
 
     def announce(result):
         verdict = "killed  " if result.killed else "SURVIVED"
         print(f"  {verdict} {result.seconds:5.1f}s  "
               f"{result.mutation.describe()}")
 
-    report = mutaterun.run(sample=args.sample, seed=args.seed, full=args.full,
-                           src=src, on_result=announce)
+    try:
+        report = mutaterun.run(sample=args.sample, seed=args.seed,
+                               full=args.full, src=src, only=args.only,
+                               on_result=announce)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     rate = report.kill_rate
+    drawn = ("named" if args.only
+             else f"drawn from {report.sites} sites, seed {report.seed}")
     print(f"\nkill rate {rate:.0%} -- {report.killed} of "
-          f"{len(report.results)}, drawn from {report.sites} sites, "
-          f"seed {report.seed}")
+          f"{len(report.results)}, {drawn}")
     if report.survivors:
         print("\nSurvivors. Each is a question rather than a verdict: some "
               "are\nequivalent mutants no test could ever kill, and telling "
@@ -2433,6 +2443,12 @@ def main(argv=None):
                     help="run the whole suite against each mutation instead "
                          "of the tests that ought to defend it -- slower, and "
                          "the only way a survivor is a claim about the suite")
+    mr.add_argument("--only", action="append", metavar="PATH:LINE",
+                    help="re-run named sites instead of drawing a sample -- "
+                         "'decks/analyze.py:33'. Repeatable. This is how a "
+                         "survivor the ledger recorded gets re-checked; a "
+                         "pattern matching nothing is an error, never an "
+                         "empty run")
     mr.set_defaults(func=cmd_mutate_run)
     mutate.add_parser("list", help="every site the catalogue can reach"
                       ).set_defaults(func=cmd_mutate_list)

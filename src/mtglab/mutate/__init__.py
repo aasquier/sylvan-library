@@ -21,9 +21,10 @@ from mtglab.mutate.harness import (
     catalogue,
     missing_tests,
     run,
+    select,
     shadow,
 )
 from mtglab.mutate.operators import Mutation, find
 
 __all__ = ["TARGETS", "Mutation", "Report", "Result", "catalogue", "find",
-           "missing_tests", "run", "shadow"]
+           "missing_tests", "run", "select", "shadow"]

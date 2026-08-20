@@ -22,9 +22,11 @@ So a profile here reports three budgets rather than one:
 * **imports** -- a *count* of calls into `importlib`, and their share of the
   traced run. The count is the honest half: reproducing the pandas storm on
   this suite moves the share from 0.1% to 4.9%, which is easy to read past,
-  and the call count from ~0 to thousands, which is not. A warm request that
-  imports anything at all is a bug whatever it costs, and a count cannot be
-  deflated by a fast machine the way a percentage can.
+  and the call count from a handful to thousands, which is not, and a count
+  cannot be deflated by a fast machine the way a percentage can. **Read it
+  against `IMPORT_CALLS_SUSPECT`, never against zero** -- this paragraph said
+  "a warm request that imports anything at all is a bug" until 2026-08-19, and
+  the number beside it has never once been zero.
 
 One number is deliberately **not** reported as milliseconds: cProfile's own
 totals. Its overhead is charged per call, so a target making many cheap calls
@@ -115,8 +117,22 @@ class Profile:
     #: Exact, from the query probe -- never `wall` minus something.
     db_s: float
     queries: QueryLog
-    #: Calls into `importlib` per run of the target. Zero is the only right
-    #: answer on a request path; the pandas storm made it 1,768.
+    #: Calls into `importlib` per run of the target, judged against
+    #: `IMPORT_CALLS_SUSPECT` and **never against zero**.
+    #:
+    #: This line used to say zero was the only right answer, which is not
+    #: reachable and never was. #181 did not remove DuckDB's per-parameter
+    #: `import pandas` probe -- it *answered* it, with a `None` sentinel in
+    #: `sys.modules` -- so the probe still enters the import machinery and
+    #: still counts, it just no longer walks `sys.path`. Measured 2026-08-19:
+    #: a fully-defused three-parameter bind reports exactly **6**, two per
+    #: bound value, deterministically; the warm suite runs 7-31 across its
+    #: twelve targets, a cold one ~900, and the storm 92,057.
+    #:
+    #: The distinction is the whole point. A run holding the old sentence
+    #: would file a false finding on every single warm profile, which is how
+    #: an instrument gets ignored -- and an instrument nobody reads is worse
+    #: than an absent one, because its numbers are still in the ledger.
     import_calls: int
     #: Their share of the traced run. Read second -- see the module docstring
     #: on why the count is the sturdier of the two.
