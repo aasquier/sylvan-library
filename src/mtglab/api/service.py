@@ -232,7 +232,7 @@ def _connect() -> DuckDBPyConnection | None:
 
 
 def pool_stale(con: DuckDBPyConnection) -> bool:
-    """Whether the pool predates the printed-stat columns. Never raises.
+    """Whether the pool predates the columns the app reads. Never raises.
 
     Wrapped because `health()` must answer on a database in any state at all,
     including one from a future version of this code. A health check that
@@ -277,9 +277,12 @@ def health(*, source: DeckSource | None = None) -> dict[str, Any]:
         # A card pool loaded before the printed-stat columns existed answers every
         # question about power with NULL, which reads as "this card has no
         # power". Saying so is the difference between a prompt to re-ingest and
-        # a quiet wrong answer about every creature in the library.
+        # a quiet wrong answer about every creature in the library. Since
+        # 2026-08-19 it also covers `printings.artist`, where the same NULL
+        # reads as "this painting is unsigned" and costs a deck its credit
+        # line -- see `db.pool_is_stale`.
         "pool_stale": stale,
-        **({"message": "pool predates power/toughness -- "
+        **({"message": "pool predates the printed stats or the painters -- "
                        "run `mtglab data refresh`"} if stale else {}),
     }
 
@@ -614,6 +617,16 @@ def commander_dossier(slug: str, *,
                 "AND released_at = ? LIMIT 1", [name, printed[1]]).fetchone()
             first_set = row[0] if row else None
 
+        # This panel is about a *deck's* commander, so the two printing facts
+        # below follow the deck's chosen printing exactly as `get_deck`'s hero
+        # panel does. Nothing renders them here today; the payload is right
+        # anyway, because the surface that starts rendering them is the one
+        # that would otherwise rediscover the wrong-painter bug. One
+        # primary-key lookup, and only for a deck that pinned a printing.
+        chosen = _chosen_art(deck, con)
+        artist = chosen["artist"] if chosen else rec.artist
+        flavor_text = chosen["flavor_text"] if chosen else rec.flavor_text
+
         return {
             "slug": deck.slug,
             "card": {
@@ -622,8 +635,8 @@ def commander_dossier(slug: str, *,
                 "mana_cost": rec.mana_cost,
                 "type_line": rec.type_line,
                 "oracle_text": rec.oracle_text,
-                "flavor_text": rec.flavor_text,
-                "artist": rec.artist,
+                "flavor_text": flavor_text,
+                "artist": artist,
                 "power": rec.power,
                 "toughness": rec.toughness,
                 "loyalty": rec.loyalty,
@@ -737,15 +750,35 @@ def _chosen_arts(art_ids: list[str], con: Any) -> dict[str, dict[str, Any]]:
 
     An id the pool no longer has simply does not come back, which is what
     makes the single-deck wrapper below able to return None for it.
+
+    **The painter and the flavour text come back with the picture**, because
+    they belong to the printing exactly as the set name does. Read off the
+    oracle row instead — which is what happened until 2026-08-19 — the deck
+    page renders "Art by ⟨one printing's painter⟩ · ⟨another printing's set⟩"
+    in a single sentence. Three decks pin a printing and one of them was
+    wrong: Trostani credited Sidharth Chaturvedi (`c19`) over Chippy's
+    Return to Ravnica painting. The other two pin a *re-scan of the same
+    painting*, so the oracle row happened to name the right person — which is
+    a coincidence, not a correct credit, and the next art choice re-rolls it.
+
+    `db.printing_columns` rather than a fixed column list, for the reason
+    `_select` gives: the app's handle is read-only and cannot migrate itself,
+    so a pool built before these columns existed must degrade to "no credit
+    known" rather than failing to bind. `pool_is_stale` is what stops that
+    from being mistaken for "this painting is unsigned".
     """
     if not art_ids or con is None:
         return {}
+    have = db.printing_columns(con)
+    extra = ", ".join(c if c in have else f"NULL AS {c}"
+                      for c in ("artist", "flavor_text"))
     rows = con.execute(
-        f"SELECT id, image_normal, set_name, set_code FROM printings "
-        f"WHERE id IN ({','.join('?' * len(art_ids))})",
+        f"SELECT id, image_normal, set_name, set_code, {extra} "
+        f"FROM printings WHERE id IN ({','.join('?' * len(art_ids))})",
         art_ids).fetchall()
     return {r[0]: {"image": r[1], "art_crop": art_crop_from(r[1]),
-                   "set_name": r[2], "set_code": (r[3] or "").upper()}
+                   "set_name": r[2], "set_code": (r[3] or "").upper(),
+                   "artist": r[4], "flavor_text": r[5]}
             for r in rows if r[1]}
 
 
@@ -775,6 +808,12 @@ def _card_art_overrides(deck: Deck,
     reason the shelf batches the gate. A stale id -- a printing that left the
     pool -- simply does not come back, and the card renders its default, the
     same forgiving answer `_chosen_art` gives the commander.
+
+    Carries the painter and the flavour text for the same reason `_chosen_arts`
+    does. Nothing renders a card's credit today -- `_card_json` sends those two
+    only for the commander -- so this is the rule holding for the 99 *before*
+    a surface needs it, rather than the commander's bug waiting to be
+    rediscovered one row down.
     """
     chosen = {c.name: c.art
               for c in [*deck.cards, *deck.swap_board, *deck.graveyard]
@@ -782,26 +821,42 @@ def _card_art_overrides(deck: Deck,
     if not chosen or con is None:
         return {}
     ids = list(chosen.values())
+    have = db.printing_columns(con)
+    extra = ", ".join(c if c in have else f"NULL AS {c}"
+                      for c in ("artist", "flavor_text"))
     rows = con.execute(
-        f"SELECT id, image_normal FROM printings "
+        f"SELECT id, image_normal, {extra} FROM printings "
         f"WHERE id IN ({','.join('?' * len(ids))}) "
         f"AND image_normal IS NOT NULL",
         ids).fetchall()
-    by_id = {r[0]: r[1] for r in rows}
-    return {name: {"image": by_id[art_id],
-                   "art_crop": art_crop_from(by_id[art_id])}
+    by_id = {r[0]: {"image": r[1], "artist": r[2], "flavor_text": r[3]}
+             for r in rows}
+    return {name: {**by_id[art_id],
+                   "art_crop": art_crop_from(by_id[art_id]["image"])}
             for name, art_id in chosen.items() if art_id in by_id}
 
 
 def _with_art(row: dict[str, Any],
               overrides: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """One row, wearing its chosen printing. Images only -- oracle text, cost
-    and identity are the card's and do not vary by printing, exactly as the
-    commander's `_chosen_art` note argues."""
+    """One row, wearing its chosen printing.
+
+    The picture, the painter and the flavour text, because all three are the
+    *printing's*. Oracle text, cost, type line and identity are the card's and
+    genuinely do not vary between printings -- swapping those would make a
+    cosmetic choice look like it changed what the card does.
+
+    The credits are written only onto a row that already carries them, i.e.
+    `_card_json(full=True)`. Adding the keys to a row that asked for the short
+    form would put two fields on all 99 that nothing reads, which is the cost
+    `full` exists to avoid.
+    """
     chosen = overrides.get(row["name"])
     if chosen and row.get("known"):
         row["image"] = chosen["image"]
         row["art_crop"] = chosen["art_crop"] or row.get("art_crop")
+        for field in ("artist", "flavor_text"):
+            if field in row:
+                row[field] = chosen[field]
     return row
 
 
@@ -826,14 +881,31 @@ def get_deck(slug: str, *, source: DeckSource | None = None,
                 "SELECT oracle_id FROM oracle_cards WHERE name = ? LIMIT 1",
                 [deck.commander[0]]).fetchone()
             commander_card["oracle_id"] = row[0] if row else None
-        # The chosen printing replaces the images and nothing else. Oracle text,
-        # cost, type line and colour identity are the *card's*, and they do not
-        # vary by printing -- swapping them here would make a cosmetic choice
-        # look like it changed what the commander does.
+        # The chosen printing replaces everything that is the *printing's* --
+        # the images, the painter, the flavour text -- and nothing else. Oracle
+        # text, cost, type line and colour identity are the *card's* and do not
+        # vary by printing; swapping those would make a cosmetic choice look
+        # like it changed what the commander does.
+        #
+        # That second sentence was the whole comment until 2026-08-19, and the
+        # categorisation was wrong: `artist` and `flavor_text` came off the
+        # oracle row, which is Scryfall's representative printing rather than
+        # the one on screen, so the page rendered one printing's set name
+        # beside another printing's painter -- see `_chosen_arts` for which
+        # deck it actually cost, and why the other two were lucky.
+        #
+        # Assigned unconditionally rather than `or`-ed with what was there: a
+        # printing the pool has no painter for (an un-refreshed pool, or a
+        # printing Scryfall never attributed) must show *no* credit, because
+        # falling back would restore the bug in its quietest form. `health()`
+        # reports `pool_stale` so a missing credit has somewhere to be
+        # explained.
         chosen = _chosen_art(deck, con)
         if commander_card and chosen:
             commander_card["image"] = chosen["image"]
             commander_card["art_crop"] = chosen["art_crop"] or commander_card.get("art_crop")
+            commander_card["artist"] = chosen["artist"]
+            commander_card["flavor_text"] = chosen["flavor_text"]
             commander_card["printing"] = {"set_name": chosen["set_name"],
                                           "set_code": chosen["set_code"]}
         # The 99's own choices, one batch query (see `_card_art_overrides`).

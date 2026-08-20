@@ -122,7 +122,7 @@ load-bearing.
 ```bash
 python3.12 -m venv .venv && source .venv/bin/activate   # any 3.11+ will do
 pip install -e ".[dev]"
-mtglab data refresh          # ~500MB from Scryfall, several minutes
+mtglab data refresh          # ~100MB gzipped from Scryfall; ~28 min, measured
 pytest -q
 mtglab claude check          # optional: is the API key live?
 ```
@@ -157,6 +157,18 @@ that this section does not name.
 those are not reachable — widen the environment's access level first, or run
 `--oracle-only` (much smaller, covers everything except pricing). Do not put
 `data refresh` in a setup script; it will blow the five-minute budget.
+
+**It takes about 28 minutes on this Mac, and that line said "several minutes"
+until 2026-08-19** — a claim nobody had timed since the tool was written.
+Measured: the two downloads finish in ~9 minutes and `load_printings` spends
+the remaining ~16 on 107,355 rows, at roughly 110 rows a second. That is not
+the disk's fault and it is not yours; the profile names `executemany` running
+DuckDB's prepared-statement path once per row. It is **queued** in
+`docs/polish/LEDGER.md` under Black, not fixed. Two things to know before you
+start one: **budget half an hour**, and **do not interrupt it** —
+`load_printings` empties the table before it fills it, so a killed refresh
+leaves the pool with no printings at all and every deck page showing default
+art until you run it again.
 
 ## Architecture
 

@@ -803,6 +803,79 @@ spirit of Magic*
      every hotlinked painting carries a visible credit — so it is Aaron's call
      which way that goes, not a polish run's. **Cross-color: this is White's
      attribution facet as much as Blue's, and Black's ingest.**
+
+     **CORRECTION, and it is the more useful half: the count was wrong. One
+     deck of six credited the wrong painter, not three.** The verification
+     quoted above — "the chosen `printings.image_normal` differs from
+     `oracle_cards.image_normal`, so the two rows are different paintings" —
+     is an **inference, and an unsound one**. A different image URL is a
+     different *scan*: a reprint with a new stamp or a new frame gets its own
+     URL for the same painting. The field that actually answers "is this the
+     same painting" is Scryfall's `illustration_id`, which this pool does not
+     store, so the audit reached for the nearest thing and reported it as a
+     check. Read out of the 2026-08-19 bulk file rather than the pool:
+
+     | deck | chosen printing | oracle row | same illustration? |
+     |---|---|---|---|
+     | Atla Palani | `plst` DMC-142, Ekaterina Burmak | `dmc` #142, Ekaterina Burmak | **yes** — `19ac91ff…` both |
+     | Gyome | `c21` #332, Steve Prescott | `soc` #313, Steve Prescott | **yes** — `15f7d58c…` both |
+     | Trostani | `rtr` #206, **Chippy** | `c19` #204, **Sidharth Chaturvedi** | **no** — `4c60d46e…` vs `893c51a5…` |
+
+     So the page said *"Art by Sidharth Chaturvedi · Return to Ravnica"* over
+     Chippy's Return to Ravnica painting, and printed the `c19` flavour text
+     ("There are no soloists in the chorus of Selesnya.") under a printing that
+     has none. The other two were right by luck: their pinned printing is a
+     re-scan of the same painting, so the oracle row's painter *was* the
+     painting's painter. **The bug is exactly as real and the fix is
+     unchanged** — a credit that is correct by coincidence is not a correct
+     credit — but the blast radius was one deck. The lesson is the pass's own:
+     *a probe finds which, only the right field finds why*; the audit had the
+     right instinct and the wrong column, and wrote it up as a verification
+     because the numbers came out of a query.
+
+     **CLOSED 2026-08-19 (PR #PRNUM). Aaron ruled: fix it properly, on its own
+     branch.** The schema, not the stopgap. `printings` gained `artist` and
+     `flavor_text`; `_ADDED_COLUMNS` is keyed by table now, because it held
+     only `oracle_cards`' additions and `printings` had never gained one — so
+     the mechanism that makes an old pool *readable* did not reach the table
+     this change touches. `_chosen_arts` and `_card_art_overrides` return both
+     credits, `get_deck` assigns them **unconditionally** (an `or` fallback
+     would restore the bug in its quietest form), and `commander_dossier` —
+     which sends the same two fields and renders neither — follows the same
+     rule so the surface that starts rendering them cannot rediscover it.
+
+     Three things worth keeping. **The staleness question is one word, not
+     two:** `pool_is_stale` now asks about the painter as well as the printed
+     stats, because both NULLs read as a confident fact ("this card has no
+     power", "this painting is unsigned") and `health()` giving two flags
+     would mean nobody read either. It short-circuits on an **empty
+     `printings`** first, since `--oracle-only` is a supported refresh and a
+     deliberate state must not read as an old one. **The credit degrades to
+     absent, never to the oracle row's** — that is the stopgap this item
+     rejected, but only for the window before a refresh, and `DeckDetail.tsx`
+     now renders the set name on its own so a degraded line still says which
+     printing was chosen. And **`cardmotion.resolve_subject` stopped asking
+     Scryfall**: its docstring said in so many words that "the pool's
+     `printings` table stores no artist", which was the truest sentence in the
+     repo until this landed and is exactly the shape of claim that goes stale
+     silently. It reads the pool first and keeps the fetch as the fallback.
+
+     The measured before/after, looked up rather than recalled, is in the
+     *Measured* table below.
+
+     **It left one thing queued, found while landing it: `pool_stale` is
+     answered by nobody.** `/api/health` has reported it since the printed-stat
+     columns landed, and grepping for a consumer turns up none — the client's
+     `Health` interface in `lib/api.ts` does not even declare the field, so
+     `App.tsx` and `Library.tsx` both drop it on the floor. The signal is
+     therefore honest and invisible: between this deploy and the volume's
+     `data refresh`, the instance renders three decks' credit lines as a set
+     name with no painter and the only place that explains why is a `curl`.
+     Six lines to fix, and the precedent is exact — **Green 5a put
+     `SCHEMA_VERSION` on the Admin dashboard for the same argument** (PR #192),
+     a number that changes while nobody is watching. Queued rather than fixed
+     because it is a UI change and commandment 16 applies. *Cross-color:
+     Green's dashboard, Red's alerting.*
   2. **The simulator renders a raw seed, and commandment 10 names seeds
      explicitly.** `routes/Simulator.tsx` draws `<Badge>seed {seed}</Badge>`
      beside every result and a `NumberField label="Seed"` in the controls. The
@@ -929,6 +1002,17 @@ spirit of Magic*
      trim to this ruling; **that pairing is cut here**, because the two files
      are long for different reasons and the answer is not the same for both.
 - **Deferred:**
+  - **`printings.illustration_id`, the column that would have caught the
+    miscount above.** Scryfall's stable id for a *painting*, as distinct from a
+    printing: it is what makes "these two rows show the same art" a lookup
+    instead of a guess at image URLs, and guessing at image URLs is how Blue 1
+    came to say three decks when it was one. Left out of the 2026-08-19 fix
+    deliberately — the credit needs `artist` and nothing else, and a second
+    column means a second mandatory `data refresh` for a field no code reads.
+    Trigger: the first feature that has to answer "is this a different
+    painting" — deduplicating the art picker's near-identical tiles is the
+    likely one, since a card with eight re-scans of one painting currently
+    offers eight tiles.
   - **Adopting ruff's `N` group (43 in `src`, 1 in `tests`).** The only excluded
     group whose cost is now plausibly payable, but naming rules rename things,
     which is a wide diff for no behaviour change. Trigger: a session already
@@ -954,6 +1038,35 @@ spirit of Magic*
     imported or referenced — it ships in the wheel as a namespace with nothing
     in it. Trigger for all three: the next session working in that area, or a
     colorless run willing to take a delete-only diff.
+- **Measurements (2026-08-19, the wrong-painter fix — this Mac, full pool,
+  re-ingested that afternoon):**
+  - **`GET /api/decks`, branch against `origin/main`, same pool, same
+    session** — because the credit had to be carried by a query that already
+    runs, and "already runs" is a claim to check rather than assert. Four
+    samples each of `mtglab bench run --only`, alternated: **branch 21.1 /
+    21.3 / 19.3 / 21.7ms** warm median against **main 25.6 / 19.0 / 19.9 /
+    20.5ms**. A ~1ms difference inside a spread main's own samples already
+    cover twice over — no regression, and no claim of an improvement either.
+    The number that actually settles it is structural: `bench profile` reports
+    **1 statement per request on both**, with the branch's read as
+    `SELECT id, image_normal, set_name, set_code, artist, flavor_text FROM
+    printings WHERE id IN (?,?,?)`. Two more columns on the row Black made
+    batched in #187, not a second query and not an N+1.
+  - **Against the ledger's recorded 16.5ms, these are not comparable and must
+    not be read as a regression.** The pool was rebuilt between the two runs
+    (35,393 oracle rows, 107,355 printings, 78MB → 98MB) and the shelf now
+    serves seven decks rather than six. 21ms is the new baseline; the next run
+    compares against that.
+  - **pytest:** 2478 passed, 0 skipped in 236.6s (was 2419 in 176.1s at the
+    rainbow — this branch adds 8). **Vitest:** 543 in 55.5s (was 537; this
+    branch adds 2). `ruff` clean, `mypy` clean over 107 files with the
+    strict-exception list still empty.
+  - **The pool itself, since the staleness probe now depends on it:**
+    **107,355 of 107,355 printings carry an artist**, zero NULL. So a NULL
+    `printings.artist` really does mean "this pool predates the column"
+    rather than "Scryfall never attributed this printing", which is the
+    assumption `pool_is_stale` rests on and the reason it is checked here
+    rather than assumed.
 - **Measurements (2026-08-19, rainbow — quiet machine, serial run):**
   - **mypy:** clean over **107** source files (was 82 on 2026-08-16 — the
     camera door, the bench and the mutate harness). Strict-exception list is
@@ -1190,6 +1303,44 @@ applies to each. Ordered by cost:
      ~0.8% of this mode's input. Still queued rather than fixed — it changes
      what a paid path caches and only spending confirms it — but it is a
      small item, not a large one, and (1) remains the prerequisite instrument.
+  3. **`load_printings` ingests at ~110 rows a second, and the whole refresh
+     takes 28 minutes.** Added 2026-08-19, found by watching a `data refresh`
+     that the wrong-painter fix (Blue 1) made mandatory — the previous bulk
+     file was dated 2026-08-10, so nobody had timed one in over a week and
+     `CLAUDE.md` had said *"several minutes"* since the tool was written.
+     **Measured, not estimated:** both downloads complete in ~9 minutes
+     (24.5MB oracle, 77.5MB default, both gzipped), and `load_printings`
+     spends the remaining **~16 minutes on 107,355 rows**.
+
+     **The cause is profiled rather than guessed**, which is the difference
+     between this and a plausible sentence: macOS `sample` on the live process
+     puts the time in `duckdb::DataChunk::Initialize` and in `malloc`/`free`
+     churn across sixteen threads. That is allocator overhead, not insertion —
+     the signature of `executemany` driving DuckDB's **prepared-statement path
+     once per row**, re-initialising a DataChunk and engaging the parallel
+     executor each time, instead of taking a bulk path at all. It is
+     pre-existing: Blue 1's branch names the INSERT's columns explicitly
+     (a strict improvement on the positional `VALUES (?…)` it replaced) and
+     leaves the batching exactly as `main` has it.
+
+     **Direction, for whoever takes it:** DuckDB can read the JSONL itself
+     (`read_json_auto` over the gzipped file, one statement) or accept an
+     Arrow table, either of which replaces the row loop with a real bulk
+     path. Measure before and after — a large number is a question, not a
+     datum — and note that `load_oracle` has the same shape over 35,393 rows
+     and should be measured in the same sitting rather than assumed fine.
+
+     **There is a robustness half, and it may matter more than the speed.**
+     `load_printings` runs `DELETE FROM printings` *before* the loop, so those
+     16 minutes are a window in which an interrupted refresh leaves the pool
+     with **no printings at all** — every deck page falls back to default art
+     and the art picker offers nothing, with no error anywhere to explain it.
+     A single bulk statement is atomic where a 22-batch loop is not, so the
+     two arguments point the same way. Written into `CLAUDE.md`'s refresh
+     paragraph in the meantime, which is where somebody looks before pressing
+     Ctrl-C. **Not implemented deliberately** — Aaron's call was to queue it
+     rather than tangle a loader rewrite into a branch already waiting on his
+     eye.
 - **Deferred (re-checked, both still deferred):**
   - **Interview and single-card argue have neither a cache nor an in-flight
     dedupe key.** The trigger named last time was "either endpoint becoming a
@@ -2725,6 +2876,10 @@ act on soonest, not by color:
    credit for a missing one, against a project standard that every painting
    carries a visible credit. *Cross-color: White's attribution facet, Black's
    ingest.*
+   **CLOSED 2026-08-19 (PR #PRNUM): the schema, not the stopgap.** Aaron's
+   ruling. Blue's section has the full account; the operational half is that
+   **every instance owes a `data refresh`** before the credit comes back, and
+   `/api/health` says `pool_stale` until it does.
 5. **Black 1 — cache-write tokens are invisible and are the priciest class**
    (1.25× input). Re-verified: `cache_creation_input_tokens` appears **nowhere
    in `src/`**. One column plus one assignment, but a **schema migration**

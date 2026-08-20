@@ -212,16 +212,33 @@ def test_resolve_subject_reads_the_pool_row(pool) -> None:
     assert subject.art_url
 
 
-def _insert_printing(pool, printing_id: str, normal_url: str) -> None:
+def _insert_printing(pool, printing_id: str, normal_url: str,
+                     artist: str | None = None) -> None:
     pool.execute(
-        "INSERT INTO printings (id, name, image_normal) VALUES (?, ?, ?)",
-        [printing_id, "Gyome, Master Chef", normal_url])
+        "INSERT INTO printings (id, name, image_normal, artist) "
+        "VALUES (?, ?, ?, ?)",
+        [printing_id, "Gyome, Master Chef", normal_url, artist])
+
+
+def test_a_printing_the_pool_can_credit_needs_no_network(pool) -> None:
+    """`printings.artist` exists since 2026-08-19, so the common case is a
+    local read. The fetch is a function that raises: if the credit came back
+    right, nothing asked Scryfall."""
+    def never(pid: str):
+        raise AssertionError("the pool already knows this painter")
+
+    _insert_printing(pool, "print-1",
+                     "https://cards.scryfall.io/normal/front/9/9/p1.jpg",
+                     artist="Pool Painter")
+    subject = resolve_subject(pool, "Gyome, Master Chef", art_id="print-1",
+                              fetch_card_json=never)
+    assert subject.artist == "Pool Painter"
 
 
 def test_resolve_subject_honours_the_chosen_printing(pool) -> None:
-    """A deck's `commander_art` names the painting to derive; the artist for
-    that printing comes from Scryfall at build time (the pool stores none)
-    rather than crediting the default printing's painter."""
+    """A deck's `commander_art` names the painting to derive; a printing the
+    pool cannot credit falls back to Scryfall at build time rather than
+    crediting the default printing's painter."""
     _insert_printing(pool, "print-2",
                      "https://cards.scryfall.io/normal/front/9/9/p2.jpg")
     subject = resolve_subject(

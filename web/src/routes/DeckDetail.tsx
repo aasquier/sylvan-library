@@ -409,14 +409,18 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
             {deck.writable && <ShareToggle deck={deck} deckRef={deckRef}
                                            onChanged={onRefresh} />}
             {deck.writable && <ArtPicker deck={deckRef} onPicked={onRefresh} />}
-            {card?.artist && (
+            {card && (card.artist || card.printing?.set_name) && (
               <span className="self-center text-xs" style={{ color: 'var(--text-muted)' }}>
-                {/* The artist belongs to the printing being shown, so when a
-                    deck has picked one, name it. Otherwise two decks on the
-                    same commander credit the same painter for different
-                    paintings. */}
-                Art by {card.artist}
-                {card.printing?.set_name && ` · ${card.printing.set_name}`}
+                {/* Both halves of this sentence belong to the same printing.
+                    They did not until 2026-08-19: the set came off the deck's
+                    chosen printing and the painter off the oracle row, so
+                    three decks credited one painter for another's painting.
+                    The server now sends the chosen printing's own artist —
+                    or none, which is why the set can render alone. A missing
+                    credit is honest; the wrong one is the bug. */}
+                {card.artist && `Art by ${card.artist}`}
+                {card.artist && card.printing?.set_name && ' · '}
+                {card.printing?.set_name}
               </span>
             )}
           </div>

@@ -105,7 +105,16 @@ CREATE TABLE IF NOT EXISTS printings (
     price_usd       DOUBLE,
     price_usd_foil  DOUBLE,
     price_eur       DOUBLE,
-    tcg_product_id  VARCHAR
+    tcg_product_id  VARCHAR,
+    -- These two live here as well as on `oracle_cards`, and that is the whole
+    -- point: a painter and a piece of flavour text belong to a *printing*.
+    -- The oracle row carries Scryfall's representative one, which may be a
+    -- different painting from the one a deck that pinned an art is showing --
+    -- so a deck page read the set name off the chosen printing and the
+    -- painter off another, and credited the wrong person in the same
+    -- sentence. See `api.service._chosen_arts` for the deck it cost.
+    flavor_text     VARCHAR,
+    artist          VARCHAR
 );
 
 -- Append-only daily snapshots. This is what makes deal-watching possible:
@@ -125,18 +134,25 @@ CREATE INDEX IF NOT EXISTS idx_printings_oracle ON printings(oracle_id);
 """
 
 
-#: Columns added to `oracle_cards` after the table first shipped. `CREATE TABLE
-#: IF NOT EXISTS` does nothing to a database that already has the table, so an
-#: existing pool would keep the old shape and every query naming a new column
-#: would fail. Adding them here makes an old database *readable*; it does not
-#: make it *correct*, because the values only arrive on the next ingest --
-#: which is why `pool_is_stale` exists rather than leaving a silently
-#: all-NULL column to be mistaken for "no card has power".
-_ADDED_COLUMNS = (
-    ("power", "VARCHAR"), ("toughness", "VARCHAR"), ("loyalty", "VARCHAR"),
-    ("defense", "VARCHAR"), ("game_changer", "BOOLEAN"),
-    ("flavor_text", "VARCHAR"), ("artist", "VARCHAR"),
-)
+#: Columns added after each table first shipped. `CREATE TABLE IF NOT EXISTS`
+#: does nothing to a database that already has the table, so an existing pool
+#: would keep the old shape and every query naming a new column would fail.
+#: Adding them here makes an old database *readable*; it does not make it
+#: *correct*, because the values only arrive on the next ingest -- which is why
+#: `pool_is_stale` exists rather than leaving a silently all-NULL column to be
+#: mistaken for "no card has power" or for "nobody painted this printing".
+#:
+#: Keyed by table since 2026-08-19: it held only `oracle_cards`' additions
+#: while `printings` had never gained a column, and the first one it gained
+#: would otherwise have shipped with no way for an existing pool to read it.
+_ADDED_COLUMNS = {
+    "oracle_cards": (
+        ("power", "VARCHAR"), ("toughness", "VARCHAR"), ("loyalty", "VARCHAR"),
+        ("defense", "VARCHAR"), ("game_changer", "BOOLEAN"),
+        ("flavor_text", "VARCHAR"), ("artist", "VARCHAR"),
+    ),
+    "printings": (("flavor_text", "VARCHAR"), ("artist", "VARCHAR")),
+}
 
 
 def _duckdb() -> Any:
@@ -179,9 +195,10 @@ def connect(db_path: str | Path = "data/mtg.duckdb") -> Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     con = _probed(duckdb.connect(str(path)))
     con.execute(SCHEMA)
-    for name, sql_type in _ADDED_COLUMNS:
-        con.execute(f"ALTER TABLE oracle_cards ADD COLUMN IF NOT EXISTS "
-                    f"{name} {sql_type}")
+    for table, columns in _ADDED_COLUMNS.items():
+        for name, sql_type in columns:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
+                        f"{name} {sql_type}")
     return con
 
 
@@ -301,7 +318,8 @@ def _probed(con: Any) -> Any:
 #: not keep a connection alive, so the keys are weak.
 _CONNECTION_POOL_PATH: MutableMapping[Connection, Path] = WeakKeyDictionary()
 
-#: `oracle_columns` answers, keyed by the pool file and its stamp.
+#: `oracle_columns` and `printing_columns` answers, keyed by the pool file, its
+#: stamp, and the table asked about.
 #:
 #: Keyed on the **file**, not on the connection, and that was the second
 #: attempt. Keyed on the handle it was correct and useless: every endpoint in
@@ -312,12 +330,13 @@ _CONNECTION_POOL_PATH: MutableMapping[Connection, Path] = WeakKeyDictionary()
 #: The columns are a property of the database file, and the stamp is what
 #: keeps that honest: a `data refresh` that adds a column rewrites the file,
 #: which changes `mtime_ns` and size, which is a different key. Bounded by the
-#: number of pool files a process ever opens -- one, outside the tests.
-_COLUMN_CACHE: dict[tuple[str, int, int], set[str]] = {}
+#: number of pool files a process ever opens -- one, outside the tests --
+#: times the two tables anybody asks about.
+_COLUMN_CACHE: dict[tuple[str, int, int, str], set[str]] = {}
 
 
-def oracle_columns(con: Connection) -> set[str]:
-    """The columns `oracle_cards` actually has on this connection.
+def _table_columns(con: Connection, table: str) -> set[str]:
+    """The columns `table` actually has on this connection.
 
     Needed because the migration in `connect()` cannot always run: the API
     opens the pool **read-only** so a `data refresh` cannot lock the app out,
@@ -332,14 +351,14 @@ def oracle_columns(con: Connection) -> set[str]:
     never depends on the cache being there.
     """
     path = _CONNECTION_POOL_PATH.get(con)
-    key: tuple[str, int, int] | None = None
+    key: tuple[str, int, int, str] | None = None
     if path is not None:
         try:
             st = path.stat()
         except OSError:
             key = None
         else:
-            key = (str(path), st.st_mtime_ns, st.st_size)
+            key = (str(path), st.st_mtime_ns, st.st_size, table)
             cached = _COLUMN_CACHE.get(key)
             if cached is not None:
                 _COLUMN_STATS.hit()
@@ -347,7 +366,7 @@ def oracle_columns(con: Connection) -> set[str]:
 
     rows = con.execute(
         "SELECT column_name FROM information_schema.columns "
-        "WHERE table_name = 'oracle_cards'").fetchall()
+        "WHERE table_name = ?", [table]).fetchall()
     cols = {r[0] for r in rows}
     if key is not None:
         _COLUMN_STATS.miss()
@@ -355,8 +374,24 @@ def oracle_columns(con: Connection) -> set[str]:
     return cols
 
 
+def oracle_columns(con: Connection) -> set[str]:
+    """The columns `oracle_cards` has here. See `_table_columns`."""
+    return _table_columns(con, "oracle_cards")
+
+
+def printing_columns(con: Connection) -> set[str]:
+    """The columns `printings` has here. See `_table_columns`.
+
+    `printings` gained its first new columns on 2026-08-19, which is when this
+    stopped being a question only `oracle_cards` had to answer: a deck page
+    naming `p.artist` against a pool built the week before would not degrade,
+    it would fail to bind.
+    """
+    return _table_columns(con, "printings")
+
+
 def pool_is_stale(con: Connection) -> bool:
-    """Does this pool predate the power/toughness columns?
+    """Does this pool predate the columns the app now reads?
 
     Worth a named question rather than a silent NULL. A database loaded before
     those columns existed answers every query about them with NULL, which reads
@@ -365,8 +400,16 @@ def pool_is_stale(con: Connection) -> bool:
     `health()` reports this so the app can say "re-ingest" instead of showing
     every creature as statless.
 
-    Cheap: one scan short-circuited by LIMIT, and creatures are over half the
-    pool, so a current database answers immediately.
+    Two questions, because two tables have grown: the printed stats on
+    `oracle_cards`, and the painter on `printings`. The second reads the same
+    way as the first — a pool that predates it credits no painting at all,
+    where the bug it was added to fix credited the *wrong* one — and the
+    honest answer to both is the same word, so they share it rather than
+    giving `health()` two flags nobody would read separately.
+
+    Cheap: one scan per table, short-circuited by LIMIT. Creatures are over
+    half the pool and paper printings essentially all name a painter, so a
+    current database answers immediately.
     """
     if not con.execute("SELECT 1 FROM oracle_cards LIMIT 1").fetchall():
         # An empty pool is not a stale one — there is nothing to be wrong
@@ -374,8 +417,18 @@ def pool_is_stale(con: Connection) -> bool:
         return False
     if "power" not in oracle_columns(con):
         return True
+    if not con.execute(
+            "SELECT 1 FROM oracle_cards WHERE power IS NOT NULL "
+            "LIMIT 1").fetchall():
+        return True
+    # `--oracle-only` is a supported refresh, so an empty `printings` is a
+    # deliberate state rather than an old one and must not read as stale.
+    if not con.execute("SELECT 1 FROM printings LIMIT 1").fetchall():
+        return False
+    if "artist" not in printing_columns(con):
+        return True
     return not con.execute(
-        "SELECT 1 FROM oracle_cards WHERE power IS NOT NULL LIMIT 1").fetchall()
+        "SELECT 1 FROM printings WHERE artist IS NOT NULL LIMIT 1").fetchall()
 
 
 def _fetch_json(url: str) -> Any:
@@ -530,7 +583,24 @@ def _printing_row(c: dict[str, Any]) -> tuple[Any, ...]:
         c.get("finishes") or [], img.get("normal"),
         f("usd"), f("usd_foil"), f("eur"),
         str(c.get("tcgplayer_id") or "") or None,
+        # Same front-face fallback as `_oracle_row`, for the same reason: a
+        # double-faced printing puts both on its faces, and reading only the
+        # top level records a painting as unattributed.
+        _front(c, "flavor_text"), _front(c, "artist"),
     )
+
+
+#: Named rather than positional, exactly as `_ORACLE_COLUMNS` is and for the
+#: reason that one was: `INSERT INTO printings VALUES (?...)` matched the row
+#: tuple by *position* against a literal column count spelled out at two call
+#: sites, so adding `flavor_text` and `artist` meant three edits that agree or
+#: an insert that lands every value one column to the left.
+_PRINTING_COLUMNS = (
+    "id", "oracle_id", "name", "set_code", "set_name", "collector_number",
+    "rarity", "released_at", "digital", "promo", "finishes", "image_normal",
+    "price_usd", "price_usd_foil", "price_eur", "tcg_product_id",
+    "flavor_text", "artist",
+)
 
 
 def _iter_json_array(fh: TextIO) -> Iterator[dict[str, Any]]:
@@ -614,6 +684,9 @@ def load_oracle(con: Connection, path: Path, *, batch: int = 5000) -> int:
 
 
 def load_printings(con: Connection, path: Path, *, batch: int = 5000) -> int:
+    insert = (f"INSERT OR REPLACE INTO printings "
+              f"({', '.join(_PRINTING_COLUMNS)}) VALUES "
+              f"({','.join('?' * len(_PRINTING_COLUMNS))})")
     con.execute("DELETE FROM printings")
     rows, total = [], 0
     for card in _iter_cards(path):
@@ -621,15 +694,11 @@ def load_printings(con: Connection, path: Path, *, batch: int = 5000) -> int:
             continue
         rows.append(_printing_row(card))
         if len(rows) >= batch:
-            con.executemany(
-                "INSERT OR REPLACE INTO printings VALUES "
-                "(" + ",".join("?" * 16) + ")", rows)
+            con.executemany(insert, rows)
             total += len(rows)
             rows = []
     if rows:
-        con.executemany(
-            "INSERT OR REPLACE INTO printings VALUES "
-            "(" + ",".join("?" * 16) + ")", rows)
+        con.executemany(insert, rows)
         total += len(rows)
     return total
 
@@ -864,7 +933,7 @@ _CARD_STATS = caches.register(
 _COLUMN_STATS = caches.register(
     "pool.columns", clear=_COLUMN_CACHE.clear,
     size=lambda: len(_COLUMN_CACHE),
-    note="which columns oracle_cards has, per pool file")
+    note="which columns oracle_cards and printings have, per pool file")
 
 
 def get_cards(con: Connection, names: Iterable[str]) -> dict[str, CardRecord]:

@@ -1080,6 +1080,27 @@ happens more often now.
 Scryfall publishes daily; deck tooling does not need day-fresh data. Monthly is
 plenty unless you are watching prices.
 
+**A pool schema change makes this mandatory, and `/api/health` says so.**
+`pool_stale` is true when the volume's pool predates a column the code now
+reads, and the app degrades to "we do not know" rather than to a wrong answer —
+so the instance keeps serving, with the affected field simply absent, until
+somebody runs the command below. Two have shipped: the printed stats
+(2026-08-16) and the **painter and flavour text on `printings`**
+(2026-08-19, so a deck showing a chosen printing renders no credit line until
+the refresh, where before it rendered the wrong one). Nothing else is affected
+and no deploy is needed afterwards.
+
+**Budget half an hour and do not interrupt it.** Measured on the maintainer's
+Mac, 2026-08-19: **~28 minutes**, of which ~9 are the two downloads and ~16 are
+`load_printings` alone, at roughly 110 rows a second for 107,355 rows. That is
+a known inefficiency, profiled and queued in `docs/polish/LEDGER.md` under
+Black, not a symptom of the machine. The reason not to interrupt is separate
+and sharper: **`load_printings` empties the table before it fills it**, so a
+killed refresh leaves the pool with no printings at all — every deck page
+showing default art, the art picker offering nothing, and no error to say why.
+Re-running it is the only fix. On the instance this compounds with the timings
+below, so scale up first.
+
 ```bash
 fly ssh console -C "mtglab data refresh"
 ```

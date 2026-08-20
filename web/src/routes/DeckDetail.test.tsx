@@ -1135,6 +1135,50 @@ describe('DeckDetail hero', () => {
     await screen.findByText('Goreclaw — Mono-Green Stompy')
     expect(screen.queryByAltText('Goreclaw, Terror of Qal Sisma')).toBeNull()
   })
+
+  /** The credit line, whose two halves must name the same printing.
+   *
+   * They did not until 2026-08-19: the set came off the deck's chosen
+   * printing and the painter off the pool's oracle row, so the Trostani deck
+   * credited Sidharth Chaturvedi for Chippy's painting in one sentence. The
+   * server is where that was fixed; what belongs here is that the line
+   * survives a painter the pool cannot name, because the fix's own
+   * degradation must not swallow the printing too.
+   */
+  const withCommander = (extra: Record<string, unknown>) =>
+    vi.mocked(api.deck).mockResolvedValue({
+      ...DECK,
+      commander_card: {
+        name: 'Goreclaw, Terror of Qal Sisma',
+        category: 'commander', why: '', qty: 1, known: true,
+        image: 'https://example.test/goreclaw-full.jpg',
+        ...extra,
+      },
+    } as unknown as Deck)
+
+  it('credits the painter and the printing together', async () => {
+    withCommander({
+      artist: 'Chris Rahn',
+      printing: { set_name: 'Multiverse Legends', set_code: 'MUL' },
+    })
+    renderUnfolded()
+    expect(await screen.findByText(/Art by Chris Rahn · Multiverse Legends/))
+      .toBeTruthy()
+  })
+
+  it('names the printing even when the painter is unknown', async () => {
+    // An un-refreshed pool answers NULL for every printing's artist. The
+    // honest reading is a missing credit, never the oracle row's painter —
+    // but the deck did pick a printing, and saying so is what stops the
+    // degradation from looking like no choice was ever made.
+    withCommander({
+      artist: null,
+      printing: { set_name: 'Multiverse Legends', set_code: 'MUL' },
+    })
+    renderUnfolded()
+    expect(await screen.findByText('Multiverse Legends')).toBeTruthy()
+    expect(screen.queryByText(/Art by/)).toBeNull()
+  })
 })
 
 /**

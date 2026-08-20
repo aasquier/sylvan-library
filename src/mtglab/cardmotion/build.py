@@ -69,12 +69,16 @@ def resolve_subject(con: Connection, name: str, *, art_id: str | None = None,
 
     `art_id` is the deck's chosen printing (`commander_art`): the derivative
     must be built from the painting the deck actually shows, or the serving
-    tier's art match will — correctly — refuse to serve it. The pool's
-    `printings` table stores no artist, so the credit line for a chosen
-    printing comes from Scryfall at build time, the same trip the art bytes
-    already make; an unreachable answer degrades to "(artist unrecorded)"
-    rather than crediting the default printing's painter with someone
-    else's work.
+    tier's art match will — correctly — refuse to serve it.
+
+    The credit for that printing comes from the pool's own `printings.artist`
+    since 2026-08-19, and from Scryfall at build time when the pool has none —
+    a pool built before that column existed, or a printing Scryfall never
+    attributed. An unreachable answer degrades to "(artist unrecorded)" rather
+    than crediting the default printing's painter with someone else's work,
+    which is the same rule `service._chosen_arts` keeps for the deck page and
+    is not negotiable: this is somebody's painting, hotlinked under Wizards'
+    Fan Content Policy, and a wrong name is worse than no name.
     """
     row = con.execute(
         "SELECT oracle_id, name, artist, image_art_crop, scryfall_uri "
@@ -86,11 +90,12 @@ def resolve_subject(con: Connection, name: str, *, art_id: str | None = None,
                            "rule 1: card facts come from the pool")
     oracle_id, card_name, artist, art_url, scryfall_uri = row
     if art_id:
-        from mtglab.cards.db import art_crop_from
+        from mtglab.cards.db import art_crop_from, printing_columns
 
+        has_artist = "artist" in printing_columns(con)
         printing = con.execute(
-            "SELECT image_normal FROM printings WHERE id = ?",
-            [art_id]).fetchone()
+            f"SELECT image_normal, {'artist' if has_artist else 'NULL'} "
+            f"FROM printings WHERE id = ?", [art_id]).fetchone()
         chosen_url = art_crop_from(printing[0]) if printing else None
         if not chosen_url:
             raise BuildRefused(
@@ -99,17 +104,22 @@ def resolve_subject(con: Connection, name: str, *, art_id: str | None = None,
                 "deck's art choice")
         if cache.art_stem(chosen_url) != cache.art_stem(art_url or ""):
             art_url = chosen_url
-            fetch = fetch_card_json or _scryfall_card_json
-            try:
-                card_json = fetch(art_id)
-                artist = str(card_json.get("artist", "")) or None
-                scryfall_uri = str(card_json.get("scryfall_uri", "")) \
-                    or scryfall_uri
-            except (OSError, ValueError):
-                # Offline, refused, or not JSON: the painting still gets
-                # derived, and the credit degrades honestly rather than
-                # naming the default printing's painter.
-                artist = None
+            artist = printing[1] or None
+            if artist is None:
+                # The pool cannot say -- it predates the column, or Scryfall
+                # never attributed this printing. One request, the same trip
+                # the art bytes already make.
+                fetch = fetch_card_json or _scryfall_card_json
+                try:
+                    card_json = fetch(art_id)
+                    artist = str(card_json.get("artist", "")) or None
+                    scryfall_uri = str(card_json.get("scryfall_uri", "")) \
+                        or scryfall_uri
+                except (OSError, ValueError):
+                    # Offline, refused, or not JSON: the painting still gets
+                    # derived, and the credit degrades honestly rather than
+                    # naming the default printing's painter.
+                    artist = None
     if not art_url:
         raise BuildRefused(f"{card_name} has no art crop in the pool -- "
                            "nothing to animate")
