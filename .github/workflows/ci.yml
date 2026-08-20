@@ -691,9 +691,28 @@ jobs:
             metadata: {mtglab_role: "forge-worker"}
           }')
 
+          # Polling rather than the API's `/wait` endpoint, learned from the
+          # first live run: `wait` caps its `timeout` parameter at 60 and
+          # answers 400 above it, and an explicit `start` on a machine that
+          # `create` is already launching answers 412. Reading the state
+          # until it settles has neither edge, and the first image pull can
+          # take minutes, which is longer than one `wait` may cover.
+          settle() {
+            want="$1"; tries="$2"; state=""
+            for _ in $(seq 1 "$tries"); do
+              state=$(curl -fsS -H "$AUTH" "$API/machines/$id" \
+                | jq -r '.state')
+              [ "$state" = "$want" ] && return 0
+              sleep 5
+            done
+            echo "::error::forge-worker never reached '$want' (state: $state)"
+            return 1
+          }
+
           id=$(curl -fsS -H "$AUTH" "$API/machines" \
             | jq -r '.[] | select(.name=="forge-worker") | .id' | head -1)
           if [ -z "$id" ]; then
+            # Create launches the machine itself; no explicit start needed.
             id=$(curl -fsS -X POST -H "$AUTH" -H 'Content-Type: application/json' \
               -d "$(jq -n --argjson c "$config" \
                     '{name: "forge-worker", region: "iad", config: $c}')" \
@@ -704,18 +723,20 @@ jobs:
               -d "$(jq -n --argjson c "$config" '{config: $c}')" \
               "$API/machines/$id" > /dev/null
             echo "updated forge-worker machine $id"
+            # An update restarts a running machine itself; a stopped one
+            # needs the nudge, and 412 from a machine already on its way up
+            # is fine — the settle below is the real check.
+            curl -fsS -X POST -H "$AUTH" "$API/machines/$id/start" \
+              > /dev/null || true
           fi
 
-          # Wake it so the image lands on the host (generous timeout: the
-          # first pull is ~1GB), then stop it — stopped-when-idle is the
-          # steady state and per-second billing is the point.
-          curl -fsS -X POST -H "$AUTH" "$API/machines/$id/start" > /dev/null || true
-          curl -fsS -H "$AUTH" \
-            "$API/machines/$id/wait?state=started&timeout=300" > /dev/null
+          # Wake it so the image lands on the host, then put it to sleep —
+          # stopped-when-idle is the steady state and per-second billing is
+          # the point.
+          settle started 60
           curl -fsS -X POST -H "$AUTH" "$API/machines/$id/stop" > /dev/null
-          curl -fsS -H "$AUTH" \
-            "$API/machines/$id/wait?state=stopped&timeout=120" > /dev/null || true
-          echo "forge-worker holds $IMAGE, stopped"
+          settle stopped 24 || true
+          echo "forge-worker holds $IMAGE, state: $state"
 
       # For the log, so a bad deploy has something to roll back *to* without
       # anybody having to reconstruct which release was last good.
