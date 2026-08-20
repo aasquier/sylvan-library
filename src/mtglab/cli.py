@@ -49,7 +49,13 @@ from mtglab import config
 # `bench.targets` reaches the API and the pool inside `suite()`, never at
 # import, so a plain `mtglab decks list` pays nothing for it.
 from mtglab.bench.targets import PROFILE_OVER_MS
-from mtglab.decks.model import CATEGORIES, DECK_STAGES, DECK_STATUSES, Deck
+from mtglab.decks.model import (
+    ARCHETYPES,
+    CATEGORIES,
+    DECK_STAGES,
+    DECK_STATUSES,
+    Deck,
+)
 from mtglab.sim.compile import (
     PoolRequired,
     compile_deck,
@@ -435,13 +441,14 @@ def cmd_decks_set(args: argparse.Namespace) -> None:
                     if args.art is not None and args.card else None))
     deck_fields = (("stage", args.stage), ("status", args.status),
                    ("bracket", args.bracket), ("pilot", args.pilot),
+                   ("archetype", args.archetype), ("themes", args.themes),
                    ("commander_art", _art_id(args)
                     if args.art is not None and not args.card else None))
     chosen = [(f, v) for f, v in card_fields + deck_fields if v is not None]
     if len(chosen) != 1:
         sys.exit("choose exactly one of --why, --category, --qty, --art (with "
                  "--card) or --stage, --status, --bracket, --pilot, "
-                 "--art (without)")
+                 "--archetype, --themes, --art (without)")
     field, value = chosen[0]
     on_a_card = field in dict(card_fields)
 
@@ -748,10 +755,21 @@ def cmd_sim_forge(args: argparse.Namespace) -> None:
             forge.ResultsUntrustworthy) as exc:
         sys.exit(str(exc))
 
+    # The match ledger (ADR 36): recorded here and in the API job — the two
+    # places a match finishes. Never raises; an overnight round-robin must
+    # not die on a ledger hiccup with the JVM's work already done.
+    from mtglab.sim.tier3 import ledger
+    ledger.record(result, decks, seed=args.seed, clock=args.clock,
+                  games_requested=args.games, hosted=False)
+
     wins: dict[str, int] = {}
     for game in result.games:
-        wins[result.winner_slug(game) or "draw"] = \
-            wins.get(result.winner_slug(game) or "draw", 0) + 1
+        # The clock-out rule, same as `forgeruns._shape` and the ledger's
+        # reference reading: a game that hit the clock counts for nobody,
+        # even when Forge printed a winner line after the slow-match warning.
+        slug = result.winner_slug(game)
+        key = slug if slug is not None and not game.timed_out else "draw"
+        wins[key] = wins.get(key, 0) + 1
 
     played = [g.milliseconds / 1000 for g in result.games]
     print(f"{len(result.games)} games in {result.wall_seconds:.1f}s "
@@ -769,6 +787,44 @@ def cmd_sim_forge(args: argparse.Namespace) -> None:
         print(f"  ({clocked} hit the {args.clock}s clock and were called draws)")
     print("\nForge's AI is best at aggro and midrange, poor at control and bad "
           "at most combo.\nRead these per archetype, not as one ranking.")
+
+
+def cmd_sim_matches(args: argparse.Namespace) -> None:
+    """The match ledger, newest first (ADR 36).
+
+    The window onto the table the ratings will read — a ledger nobody can see
+    into is a ledger that has to be trusted rather than checked, which is the
+    `sim cache` argument re-applied to real games.
+    """
+    from mtglab.sim.tier3 import ledger
+
+    if not config.APP_DB_PATH.exists():
+        print("no matches recorded yet -- `mtglab sim forge` records as it plays")
+        return
+    matches = ledger.recent(limit=args.limit)
+    if not matches:
+        print("no matches recorded yet -- `mtglab sim forge` records as it plays")
+        return
+    print(f"ledger: {config.APP_DB_PATH}")
+    for m in matches:
+        when = m["created_at"][:19].replace("T", " ")
+        where = "worker" if m["hosted"] else "local"
+        version = f", Forge {m['forge_version']}" if m["forge_version"] else ""
+        seeded = f"seed {m['seed']}" if m["seed"] is not None else "unseeded"
+        print(f"\n#{m['id']}  {when} UTC  ({where}{version}, {seeded})")
+        for seat in m["seats"]:
+            labels = seat["archetype"] or "unlabelled"
+            if seat["themes"]:
+                labels += "; " + ", ".join(seat["themes"])
+            print(f"  {seat['slug']:<22} {seat['wins']:>2} win"
+                  f"{'s' if seat['wins'] != 1 else ''}  ({labels})")
+        extras = []
+        if m["draws"]:
+            extras.append(f"{m['draws']} real draw{'s' if m['draws'] != 1 else ''}")
+        if m["timed_out"]:
+            extras.append(f"{m['timed_out']} hit the {m['clock']}s clock")
+        tail = f"  ({', '.join(extras)})" if extras else ""
+        print(f"  {m['played']} of {m['games_requested']} games{tail}")
 
 
 # -------------------------------------------------------------------- price
@@ -2187,6 +2243,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     st.add_argument("--pilot",
                     help="who sleeves this deck up — a name, or '' to untag "
                          "(second 2026-08-15 punch list, item 10)")
+    st.add_argument("--archetype",
+                    help=f"the rating boards' class: one of "
+                         f"{', '.join(ARCHETYPES)}, or '' to clear")
+    st.add_argument("--themes",
+                    help="what the deck is about, comma-separated from the "
+                         "hand-curated vocabulary (see `decks/model.py`); "
+                         "'' clears the list")
     st.add_argument("--art", metavar="SET",
                     help="which printing's art the deck shows for its "
                          "commander: a set code, or a printing id when a set "
@@ -2248,6 +2311,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     fg.add_argument("--check-only", action="store_true",
                     help="card-coverage pre-flight only; needs no JVM")
     fg.set_defaults(func=cmd_sim_forge)
+    fm = sim.add_parser("matches",
+                        help="the match ledger -- every Forge match recorded")
+    fm.add_argument("--limit", type=int, default=20)
+    fm.set_defaults(func=cmd_sim_matches)
 
     ui = sub.add_parser("ui")
     ui.add_argument("--port", type=int, default=8765)

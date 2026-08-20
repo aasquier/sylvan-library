@@ -40,6 +40,13 @@ from mtglab.api.jobs import FORGE, Plan, Progress
 from mtglab.api.simruns import DEFAULT_SEED
 from mtglab.decks.model import Deck
 
+# At module level, unlike the tier3 imports inside the closures, and on
+# purpose: the module is light (its database import is lazy), and a module
+# attribute is a seam — `tests/conftest.py` replaces it so no test's match
+# job deposits rows in the developer's real app.db, the same door
+# `service.log` already has.
+from mtglab.sim.tier3 import ledger
+
 FORGE_CAVEAT = (
     "Forge's AI is best with aggro and midrange, poor with control, and bad "
     "with most combo — read results per archetype, never as a single "
@@ -144,7 +151,8 @@ def _shape(decks: list[Deck], addresses: list[str], games: int, seed: int,
 
 
 def plan_forge(decks: list[Deck], addresses: list[str],
-               payload: dict[str, Any]) -> Plan:
+               payload: dict[str, Any],
+               owner_ids: list[int | None] | None = None) -> Plan:
     """One heads-up match, planned. Refusals happened at the route already.
 
     `decks` arrive resolved because resolving them is the route's job — it
@@ -152,7 +160,9 @@ def plan_forge(decks: list[Deck], addresses: list[str],
     this decides is the work: coverage has passed, so the closure is exactly
     one `run_games` call. `addresses` are the `owner/slug` pairs the client
     asked with, echoed back so the result can say whose decks played without
-    the job inventing a second naming scheme.
+    the job inventing a second naming scheme. `owner_ids` ride along for the
+    match ledger, which keys ownership the way the activity log does (an
+    `owner_id`, never the URL's owner segment — ADR 28 has the argument).
 
     Heads-up only, and that is ADR 35 rather than a limitation to lift
     casually: measured on this hardware, 40% of four-player games hit the
@@ -182,13 +192,21 @@ def plan_forge(decks: list[Deck], addresses: list[str],
         # hands back a `SimRun` rebuilt from the wire and relays the same
         # per-game ticks, so `_shape` and the bar cannot tell the difference
         # — that is `wire.py`'s whole promise.
-        if worker.configured():
+        hosted = worker.configured()
+        if hosted:
             result: Any = worker.run_match(decks, games=games, clock=CLOCK,
                                            seed=seed, on_game=tick)
         else:
             result = forge.run_games(decks, games=games, clock=CLOCK,
                                      seed=seed, on_game=tick)
         progress(games, games)
+        # The match ledger (ADR 36). After the run and before the shaping,
+        # because the shape is for this response and the ledger is for every
+        # question after it — and `record` never raises, so a ledger problem
+        # cannot cost anybody a match they just watched finish.
+        ledger.record(result, decks, seed=seed, clock=CLOCK,
+                      games_requested=games, hosted=hosted,
+                      owner_ids=owner_ids)
         return _shape(decks, addresses, games, seed, result)
 
     return Plan("sim.forge", label, None, compute, lane=FORGE, key=key)

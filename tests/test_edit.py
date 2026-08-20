@@ -544,6 +544,60 @@ def test_a_pilot_is_a_name_with_its_case_kept(tmp_path):
         set_deck_field(DECK, field="pilot", value="x" * 41)
 
 
+def test_an_archetype_comes_from_the_closed_class():
+    """The rating boards' axis (ADR 36): closed, coarse, and refused outside
+    the vocabulary -- a typo accepted here would fragment the grouping the
+    class exists for."""
+    out = set_deck_field(DECK, field="archetype", value="Midrange")
+    assert yaml.safe_load(out)["archetype"] == "midrange"
+
+    with pytest.raises(EditFailed, match="not an archetype"):
+        set_deck_field(DECK, field="archetype", value="tempo")
+
+    # Clearing is a real operation: the deck sits on no board.
+    cleared = set_deck_field(out, field="archetype", value="")
+    assert not yaml.safe_load(cleared).get("archetype")
+
+
+def test_themes_come_from_the_vocabulary_deduped_in_order():
+    """The identity axis (ADR 36): open but hand-curated, so membership is
+    checked, order is the author's, and a duplicate is dropped rather than
+    counted twice."""
+    out = set_deck_field(DECK, field="themes", value="Food, aristocrats, food")
+    assert yaml.safe_load(out)["themes"] == ["food", "aristocrats"]
+    # Indented under the key, the way every hand-written deck file is.
+    assert "themes:\n  - food\n  - aristocrats" in out
+
+    # A list arrives from JSON as itself; the CLI sends a comma string.
+    assert yaml.safe_load(
+        set_deck_field(DECK, field="themes", value=["cats"]))["themes"] == ["cats"]
+
+    with pytest.raises(EditFailed, match="not in the theme vocabulary"):
+        set_deck_field(DECK, field="themes", value="fud")
+
+    cleared = set_deck_field(out, field="themes", value="")
+    assert yaml.safe_load(cleared).get("themes") == []
+
+
+def test_labels_round_trip_through_the_model():
+    """Written only when declared: the six curated files must not grow lines
+    asserting the default they already had."""
+    from mtglab.decks.model import Deck as DeckModel
+
+    out = set_deck_field(
+        set_deck_field(DECK, field="archetype", value="aggro"),
+        field="themes", value="cats,tribal")
+    deck = DeckModel.from_text(out, slug="mini")
+    assert (deck.archetype, deck.themes) == ("aggro", ["cats", "tribal"])
+    dumped = deck.dump()
+    assert "archetype: aggro" in dumped
+    assert "- cats" in dumped
+
+    bare = DeckModel.from_text(DECK, slug="mini").dump()
+    assert "archetype" not in bare
+    assert "themes" not in bare
+
+
 def test_promotion_leaves_every_card_and_note_alone():
     draft = DECK.replace("bracket: 4", "bracket: 4\nstage: draft")
     out = set_deck_field(draft, field="stage", value="curated")

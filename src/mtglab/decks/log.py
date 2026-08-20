@@ -144,7 +144,12 @@ def describe(extra: Mapping[str, Any]) -> tuple[str, str]:
         field = str(extra["field"])
         word = _FIELD_WORDS.get(field, field)
         value = extra.get("value")
-        text = "" if value is None else str(value).strip()
+        if isinstance(value, (list, tuple)):
+            # `themes` is a list, and `str(list)` would put brackets and
+            # quotes in a sentence people read.
+            text = ", ".join(str(v) for v in value)
+        else:
+            text = "" if value is None else str(value).strip()
         # Emptiness is checked first, and that ordering is the whole of this
         # branch: clearing the art back to the default printing is a real
         # edit, and the art rule below would have reported it as a change to

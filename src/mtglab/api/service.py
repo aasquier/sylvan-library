@@ -494,6 +494,10 @@ def _tiles(decks: list[Deck], con: Any, *, writable: bool,
             "commander": deck.commander,
             "companion": deck.companion,
             "bracket": deck.bracket,
+            # The two labelling axes, on the shelf because the shelf is where
+            # filtering by them will live. Empty means undeclared, not zero.
+            "archetype": deck.archetype,
+            "themes": deck.themes,
             "total_cards": deck.total_cards,
             "land_count": deck.land_count,
             "strategy": deck.strategy,
@@ -954,6 +958,11 @@ def get_deck(slug: str, *, source: DeckSource | None = None,
             "commander": deck.commander,
             "companion": deck.companion,
             "bracket": deck.bracket,
+            # The labelling axes (model.THEMES / model.ARCHETYPES): declared
+            # in deck.yaml, snapshotted by the match ledger, edited through
+            # `set_deck_field` like the deck's other own fields.
+            "archetype": deck.archetype,
+            "themes": deck.themes,
             "strategy": deck.strategy,
             "notes": deck.notes,
             "total_cards": deck.total_cards,
@@ -1014,7 +1023,7 @@ def history_for(slug: str, *, source: DeckSource | None = None,
     decks.get(slug)                     # 404 before anything is read
     return {
         "slug": slug,
-        "entries": log.entries(slug, owner_id=_owner_id_of(decks),
+        "entries": log.entries(slug, owner_id=owner_id_of(decks),
                                limit=limit),
     }
 
@@ -1918,8 +1927,12 @@ def _identity_of(deck: Deck, con: DuckDBPyConnection) -> frozenset[str]:
     return identity
 
 
-def _owner_id_of(decks: DeckSource) -> int | None:
+def owner_id_of(decks: DeckSource) -> int | None:
     """Which library these decks are in, as the activity log keys it.
+
+    Public since the match ledger (ADR 36): `api/app.py`'s Forge route asks
+    the same question of each seat's source, and the two ledgers must key
+    ownership identically or one deck's history splits in two.
 
     `None` is the file-backed curated library, which is one per instance and
     has no row in `users` to point at; a `SqlDeckSource` answers with the
@@ -1967,7 +1980,7 @@ def _commit(slug: str, decks: DeckSource, updated: str,
     decks.write_text(slug, updated)
     action, summary = log.describe(extra)
     log.record(slug=slug, action=action, summary=summary,
-               owner_id=_owner_id_of(decks), actor=actor)
+               owner_id=owner_id_of(decks), actor=actor)
     after = decks.get(slug)
     con = _connect()
     try:
@@ -2224,7 +2237,7 @@ def _check_printing(deck: Any, printing_id: str) -> None:
 def set_deck_field(slug: str, *, field: str, value: Any,
                    source: DeckSource | None = None,
                    actor: str | None = None) -> dict[str, Any]:
-    """Change one of the deck's own scalars: stage, status, bracket or art.
+    """Change one of the deck's own fields: stage, status, a label, and kin.
 
     Promotion -- `stage` to `curated` -- is the one that closes the import
     lifecycle. It is refused while any card is blank, by the edit layer, so the

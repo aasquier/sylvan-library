@@ -344,6 +344,16 @@ def test_a_directory_with_no_jar_names_the_env_var(tmp_path):
     assert "MTGLAB_FORGE_HOME" in str(exc.value)
 
 
+def test_forge_version_reads_the_jar_name_and_never_raises(tmp_path):
+    """The match ledger's provenance column (ADR 36): the version is the jar
+    name's middle, and a directory with no Forge answers None -- the recorder
+    must not fail a match over a name it cannot parse."""
+    from mtglab.sim.tier3 import run as forge
+    (tmp_path / "forge-gui-desktop-2.0.14-jar-with-dependencies.jar").touch()
+    assert forge.forge_version(tmp_path) == "2.0.14"
+    assert forge.forge_version(tmp_path / "empty") is None
+
+
 def test_an_unreadable_home_is_not_installed_rather_than_a_crash(tmp_path):
     """The deployed 500 of 2026-08-20: `Path.home()` is `/root` in the
     container while the app runs as `mtglab`, so the probe's stat raised

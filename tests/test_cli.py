@@ -1491,6 +1491,74 @@ def test_sim_forge_reports_wins_draws_and_clockouts_separately(
     assert "Read these per archetype, not as one ranking." in out
 
 
+def test_sim_forge_a_clocked_out_win_line_counts_for_nobody(
+        decks, monkeypatch, capsys):
+    """The parse edge `forgeruns._shape` already refuses, now refused here
+    too: Forge can print a winner line after the slow-match warning, and a
+    "win" awarded because the other AI ran out of thinking time is the
+    measurement giving up wearing a trophy."""
+    from mtglab.sim.tier3 import run as forge
+    monkeypatch.setattr(forge, "run_games", lambda *a, **kw: _forge_result([
+        (5000, False, "mini"), (300000, True, "mini")]))
+    code, _ = run(["sim", "forge", "mini", "mini"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "  mini                   1\n" in out
+    assert "2" not in out.split("per game")[1].split("\n")[1]
+    assert "(1 hit the 300s clock and were called draws)" in out
+
+
+def _forge_sim_run():
+    """A real `SimRun`, because the ledger records its actual fields."""
+    from mtglab.sim.tier3 import parse
+    from mtglab.sim.tier3.run import SimRun
+    games = [parse.GameResult(index=1, milliseconds=5_000, winner="Ai(1)-x",
+                              winner_seat=1, turns=8)]
+    return SimRun(argv=["java"], output=parse.SimOutput(games=games),
+                  wall_seconds=12.0, seats={1: "mini", 2: "mini"},
+                  forge_version="2.0.14")
+
+
+def test_sim_forge_records_into_the_match_ledger(decks, monkeypatch):
+    """The CLI is the second of the two call sites ADR 36 names -- an
+    overnight Mac round-robin has to land in the same table a hosted match
+    does, or the data foundry starves."""
+    from mtglab.sim.tier3 import ledger
+    from mtglab.sim.tier3 import run as forge
+    monkeypatch.setattr(forge, "run_games",
+                        lambda *a, **kw: _forge_sim_run())
+    code, _ = run(["sim", "forge", "mini", "mini", "--games", "1"])
+    assert code == 0
+    [match] = ledger.recent()
+    assert match["seed"] is None       # unseeded, recorded honestly as NULL
+    assert match["hosted"] is False
+    assert match["games_requested"] == 1
+    assert match["forge_version"] == "2.0.14"
+    assert [s["slug"] for s in match["seats"]] == ["mini", "mini"]
+
+
+def test_sim_matches_renders_the_ledger(decks, capsys):
+    from mtglab.decks.model import Deck
+    from mtglab.sim.tier3 import ledger
+    deck = Deck(slug="mini", name="Mini", archetype="aggro", themes=["cats"])
+    ledger.record(_forge_sim_run(), [deck, deck], seed=7, clock=300,
+                  games_requested=1, hosted=False)
+    code, _ = run(["sim", "matches"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "seed 7" in out
+    assert "Forge 2.0.14" in out
+    assert "aggro; cats" in out
+    assert "1 of 1 games" in out
+
+
+def test_sim_matches_with_no_ledger_says_so(decks, capsys):
+    code, _ = run(["sim", "matches"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "no matches recorded yet" in out
+
+
 def test_sim_forge_check_only_prints_coverage_and_runs_nothing(
         decks, monkeypatch, capsys):
     from types import SimpleNamespace

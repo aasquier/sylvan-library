@@ -46,7 +46,8 @@ def fake_run(games: int = 3) -> SimRun:
                          winner_seat=2, turns=9),
     ]
     return SimRun(argv=["java"], output=parse.SimOutput(games=results[:games]),
-                  wall_seconds=70.0, seats={1: "deck-a", 2: "deck-b"})
+                  wall_seconds=70.0, seats={1: "deck-a", 2: "deck-b"},
+                  forge_version="2.0.14")
 
 
 # ---------------------------------------------------------------- the wire
@@ -72,6 +73,12 @@ def test_a_run_survives_the_wire_with_its_edges():
     assert back.seats == run.seats
     assert back.startup_seconds == run.startup_seconds
     assert back.winner_slug(back.games[2]) == "deck-b"
+    # The match ledger's provenance column rides the wire (ADR 36) — and an
+    # old shim's payload without it rebuilds as "not reported", not an error.
+    assert back.forge_version == "2.0.14"
+    skewed = wire.run_to_wire(run)
+    del skewed["forge_version"]
+    assert wire.run_from_wire(skewed).forge_version is None
 
 
 def test_a_remote_run_shapes_identically_to_a_local_one():
