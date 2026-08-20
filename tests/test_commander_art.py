@@ -137,8 +137,9 @@ def test_the_selected_printing_is_marked(pool, tmp_path):
     listing = service.commander_printings("mini", source=src)
     assert listing["selected"] == A_PRINTING
     chosen = [p for p in listing["printings"] if p["selected"]]
-    # The tiny pool carries no printings table, so this asserts the contract
-    # rather than a row: whatever is listed, at most the picked one is marked.
+    # `A_PRINTING` is not one of the tiny pool's rows, so this asserts the
+    # contract rather than a row: whatever is listed, at most the picked one
+    # is marked.
     assert len(chosen) <= 1
 
 
@@ -188,40 +189,54 @@ def test_only_the_first_size_segment_is_replaced():
 
 GYOME_PRINTING = "11111111-1111-4111-8111-111111111111"
 SOL_RING_PRINTING = "22222222-2222-4222-8222-222222222222"
+#: A second Gyome printing whose painter the pool cannot name — an
+#: un-refreshed pool, or a printing Scryfall never attributed.
+GYOME_UNSIGNED = "55555555-5555-4555-8555-555555555555"
 
 
 @pytest.fixture
 def printed(pool):
-    """Two real printing rows: one of the commander, one of another card.
+    """Three real printing rows: two of the commander, one of another card.
 
     Every id is refused against an empty printings table, which would make
     the test below pass while proving nothing about *whose* card a printing
-    is — so this fixture arranges the two rows it needs.
+    is — so this fixture arranges the rows it needs.
 
     It **clears the table first**, and that line is why this docstring
     changed. It used to say `tiny_pool` loaded no printings and lean on it;
     the fixture then grew twelve real rows for the camera's corner tier and
     two tests broke, because they were asserting over a set they had
-    inherited rather than chosen. A fixture that means "exactly these two
-    rows" has to say so.
+    inherited rather than chosen. A fixture that means "exactly these rows"
+    has to say so.
+
+    The painters are what make the wrong-painter tests possible, and they are
+    deliberately **not** `tiny_pool`'s oracle-row painters: Gyome's oracle row
+    credits Steve Prescott, so a page reading the printing's painter and a
+    page reading the card's now say different names.
     """
     from mtglab.cards import db
 
     con = db.connect(pool)
     try:
         con.execute("DELETE FROM printings")
-        for card, pid in (("Gyome, Master Chef", GYOME_PRINTING),
-                          ("Sol Ring", SOL_RING_PRINTING)):
+        rows = (
+            ("Gyome, Master Chef", GYOME_PRINTING,
+             "Test Painter", "Dinner is served."),
+            ("Sol Ring", SOL_RING_PRINTING, "Ring Painter", None),
+            ("Gyome, Master Chef", GYOME_UNSIGNED, None, None),
+        )
+        for card, pid, artist, flavour in rows:
             oracle_id = con.execute(
                 "SELECT oracle_id FROM oracle_cards WHERE name = ?",
                 [card]).fetchone()[0]
             con.execute(
                 "INSERT INTO printings (id, oracle_id, name, set_code, "
                 "set_name, collector_number, rarity, released_at, digital, "
-                "promo, image_normal) VALUES (?, ?, ?, 'tst', 'Test Set', "
+                "promo, image_normal, artist, flavor_text) "
+                "VALUES (?, ?, ?, 'tst', 'Test Set', "
                 "'1', 'rare', DATE '2024-01-01', FALSE, FALSE, "
-                "'https://cards.scryfall.io/normal/front/a/b/x.jpg')",
-                [pid, oracle_id, card])
+                "'https://cards.scryfall.io/normal/front/a/b/x.jpg', ?, ?)",
+                [pid, oracle_id, card, artist, flavour])
     finally:
         con.close()
     yield
@@ -243,9 +258,21 @@ def test_a_printing_of_this_commander_is_accepted(printed, source):
     service._check_printing(deck, GYOME_PRINTING)      # does not raise
 
 
-def test_the_chosen_printing_replaces_the_art_and_nothing_else(printed, tmp_path):
-    """A cosmetic choice must not look like it changed what the commander does,
-    so oracle text, cost and type line stay the card's."""
+def test_the_chosen_printing_replaces_what_belongs_to_a_printing(printed,
+                                                                 tmp_path):
+    """The images, the painter and the flavour text follow the choice; oracle
+    text, cost and type line stay the card's.
+
+    Two halves, and the second was wrong until 2026-08-19. A cosmetic choice
+    must not look like it changed what the commander *does* — that is the
+    first half, and it was right from the start. But `artist` and
+    `flavor_text` were on the wrong side of the line: both vary by printing,
+    both came off the oracle row, and the deck page rendered
+    "Art by ⟨one printing's painter⟩ · ⟨another printing's set⟩" in a single
+    sentence — Trostani credited Sidharth Chaturvedi over Chippy's painting,
+    and the two other decks that pin a printing were right only because
+    theirs is a re-scan of the same art.
+    """
     yaml = DECK_YAML.replace("bracket: 4",
                              f"commander_art: {GYOME_PRINTING}\nbracket: 4")
     path = tmp_path / "picked" / "deck.yaml"
@@ -258,10 +285,61 @@ def test_the_chosen_printing_replaces_the_art_and_nothing_else(printed, tmp_path
 
     assert picked["commander_card"]["image"].endswith("/a/b/x.jpg")
     assert picked["commander_card"]["printing"]["set_code"] == "TST"
+    # The printing's own credits, not the card's. The oracle row credits a
+    # different painter, which is what makes this an assertion rather than a
+    # coincidence.
+    assert plain["commander_card"]["artist"] == "Steve Prescott"
+    assert picked["commander_card"]["artist"] == "Test Painter"
+    assert picked["commander_card"]["flavor_text"] == "Dinner is served."
+    # And what the card *is* does not move.
     assert picked["commander_card"]["oracle_text"] == \
         plain["commander_card"]["oracle_text"]
     assert picked["commander_card"]["mana_cost"] == \
         plain["commander_card"]["mana_cost"]
+    assert picked["commander_card"]["type_line"] == \
+        plain["commander_card"]["type_line"]
+
+
+def test_a_printing_the_pool_cannot_credit_shows_no_painter_at_all(printed,
+                                                                   tmp_path):
+    """Not the oracle row's painter, which is the bug in its quietest form.
+
+    A pool that predates `printings.artist` answers NULL for every printing,
+    and so does a printing Scryfall never attributed. Falling back to the card
+    row would put a name under a painting that person did not paint — worse
+    than no credit, and undetectable, because the sentence would read
+    perfectly. `health()` reports `pool_stale` so the missing credit has an
+    explanation.
+    """
+    yaml = DECK_YAML.replace("bracket: 4",
+                             f"commander_art: {GYOME_UNSIGNED}\nbracket: 4")
+    path = tmp_path / "unsigned" / "deck.yaml"
+    path.parent.mkdir()
+    path.write_text(yaml, encoding="utf-8")
+    src = MemoryDeckSource([Deck.load(path)])
+
+    card = service.get_deck("mini", source=src)["commander_card"]
+    assert card["artist"] is None
+    assert card["flavor_text"] is None
+    # The printing itself is still named — a credit line reading only "Test
+    # Set" is honest, where an empty one hides that a choice was made.
+    assert card["printing"]["set_name"] == "Test Set"
+
+
+def test_the_dossier_credits_the_printing_the_deck_shows(printed, tmp_path):
+    """Same rule, second payload. Nothing renders these two fields today;
+    the surface that starts to is the one that would otherwise rediscover
+    the wrong-painter bug one endpoint over."""
+    yaml = DECK_YAML.replace("bracket: 4",
+                             f"commander_art: {GYOME_PRINTING}\nbracket: 4")
+    path = tmp_path / "dossier" / "deck.yaml"
+    path.parent.mkdir()
+    path.write_text(yaml, encoding="utf-8")
+    src = MemoryDeckSource([Deck.load(path)])
+
+    card = service.commander_dossier("mini", source=src)["card"]
+    assert card["artist"] == "Test Painter"
+    assert card["flavor_text"] == "Dinner is served."
 
 
 def source_for(yaml_text, tmp_path):
@@ -393,6 +471,43 @@ def test_a_cards_chosen_printing_replaces_its_images_and_nothing_else(
     # The pool's facts are untouched, and the unchosen card keeps its default.
     assert rows["Sol Ring"]["oracle_text"]
     assert not rows["Swamp"]["image"].endswith("/a/b/x.jpg")
+    # No credit on any of the 99: `_card_json` sends the painter and the
+    # flavour text only under `full=True`, which is the commander's row. Two
+    # fields on 99 rows nothing reads is the cost `full` exists to avoid.
+    assert "artist" not in rows["Sol Ring"]
+
+
+def test_a_cards_chosen_printing_carries_its_credits_to_a_row_that_wants_them(
+        printed, tmp_path):
+    """The commander's rule, one row down, before a surface needs it.
+
+    `_card_art_overrides` fetched only the image, exactly as `_chosen_arts`
+    did — so the day something renders a card's credit it would credit the
+    oracle row's painter for the chosen printing's painting, which is the
+    commander's bug rediscovered. The override carries the credits now, and
+    `_with_art` writes them onto a row that already carries the keys.
+    """
+    yaml = CARDED_YAML.replace("why: Fast mana.",
+                               f"why: Fast mana.\n    art: {SOL_RING_PRINTING}")
+    path = tmp_path / "credited-card" / "deck.yaml"
+    path.parent.mkdir()
+    path.write_text(yaml, encoding="utf-8")
+    deck = Deck.load(path)
+
+    con = service._connect()
+    try:
+        overrides = service._card_art_overrides(deck, con)
+    finally:
+        con.close()
+    assert overrides["Sol Ring"]["artist"] == "Ring Painter"
+
+    hero = service._with_art(
+        {"name": "Sol Ring", "known": True, "image": "old", "art_crop": "old",
+         "artist": "Oracle Painter", "flavor_text": "the oracle row's"},
+        overrides)
+    assert hero["artist"] == "Ring Painter"
+    assert hero["flavor_text"] is None, \
+        "the chosen printing has none, and the card row's is a different one"
 
 
 def test_a_stale_card_art_id_falls_back_to_the_default(printed, tmp_path):

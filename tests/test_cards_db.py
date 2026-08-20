@@ -548,6 +548,81 @@ def test_an_empty_pool_is_not_stale(tmp_path):
         con.close()
 
 
+#: A `printings` table as it stood before it carried a painter. The current
+#: `SCHEMA` cannot express this, which is the point: what is being tested is a
+#: database somebody already has on disk.
+OLD_PRINTINGS = """
+CREATE TABLE printings (
+    id VARCHAR PRIMARY KEY, oracle_id VARCHAR, name VARCHAR,
+    set_code VARCHAR, set_name VARCHAR, collector_number VARCHAR,
+    rarity VARCHAR, released_at DATE, digital BOOLEAN, promo BOOLEAN,
+    finishes VARCHAR[], image_normal VARCHAR, price_usd DOUBLE,
+    price_usd_foil DOUBLE, price_eur DOUBLE, tcg_product_id VARCHAR
+);
+"""
+
+
+def _old_printings_pool(tmp_path):
+    """A pool with current oracle rows and a `printings` table from before the
+    painter column. Returns the path; the caller opens it however it likes."""
+    from mtglab.cards.db import connect, load_oracle
+    path = tmp_path / "old-printings.duckdb"
+    con = connect(path)
+    load_oracle(con, _jsonl(tmp_path, DFC_FIXTURE))
+    con.execute("DROP TABLE printings")
+    con.execute(OLD_PRINTINGS)
+    con.execute("INSERT INTO printings (id, name, image_normal) "
+                "VALUES ('p1', 'Smothering Tithe', 'https://img/p1.jpg')")
+    con.close()
+    return path
+
+
+def test_a_pool_whose_printings_predate_the_painter_reports_itself_stale(
+        tmp_path):
+    """The same argument the printed stats made, one table over: an all-NULL
+    `artist` reads as "this painting is unsigned", and a deck showing a chosen
+    printing then loses its credit line with no explanation anywhere.
+    """
+    from mtglab.cards.db import connect_readonly, pool_is_stale
+    con = connect_readonly(_old_printings_pool(tmp_path))
+    try:
+        assert pool_is_stale(con) is True
+    finally:
+        con.close()
+
+
+def test_a_pool_whose_printings_predate_the_painter_still_answers(tmp_path):
+    """And it must not fail to *bind*. The app's handle is read-only, so it
+    cannot migrate itself -- a fixed column list would turn this into an
+    immediate outage for every existing pool rather than a prompt to
+    re-ingest."""
+    from mtglab.api import service
+    from mtglab.cards.db import connect_readonly, printing_columns
+    con = connect_readonly(_old_printings_pool(tmp_path))
+    try:
+        assert "artist" not in printing_columns(con)
+        assert service._chosen_arts(["p1"], con) == {
+            "p1": {"image": "https://img/p1.jpg",
+                   "art_crop": service.art_crop_from("https://img/p1.jpg"),
+                   "set_name": None, "set_code": "",
+                   "artist": None, "flavor_text": None},
+        }
+    finally:
+        con.close()
+
+
+def test_connect_migrates_an_old_printings_table_in_place(tmp_path):
+    """`_ADDED_COLUMNS` is keyed by table because of this: `printings` had
+    never gained a column, so the mechanism that makes an old `oracle_cards`
+    readable did not reach it."""
+    from mtglab.cards.db import connect, printing_columns
+    con = connect(_old_printings_pool(tmp_path))
+    try:
+        assert {"artist", "flavor_text"} <= printing_columns(con)
+    finally:
+        con.close()
+
+
 # -------------------------------------------------------- ingest, end to end
 
 def _bulk(tmp: Path, cards, name="oracle.jsonl.gz") -> Path:
@@ -582,10 +657,13 @@ def test_load_printings_skips_digital_and_snapshots_prices(tmp_path):
          "image_uris": {"normal": "https://img/normal/p1.jpg"}},
         {"id": "p2", "oracle_id": "o1", "name": "Sol Ring", "set": "arena",
          "digital": True},
-        # A double-faced printing carries its images on the faces.
+        # A double-faced printing carries its images -- and its painter and
+        # flavour text -- on the faces.
         {"id": "p3", "oracle_id": "o2", "name": "A // B", "set": "neo",
          "prices": {"usd": None},
-         "card_faces": [{"image_uris": {"normal": "https://img/normal/p3.jpg"}}]},
+         "card_faces": [{"image_uris": {"normal": "https://img/normal/p3.jpg"},
+                         "artist": "Face Painter",
+                         "flavor_text": "From the front."}]},
     ], name="printings.jsonl")
     assert db.load_printings(con, path, batch=1) == 2
 
@@ -596,6 +674,37 @@ def test_load_printings_skips_digital_and_snapshots_prices(tmp_path):
 
     # The daily price snapshot: only priced printings land in history.
     assert db.snapshot_prices(con, on_date="2026-08-14") == 1
+    con.close()
+
+
+def test_a_printings_painter_and_flavour_survive_the_ingest(tmp_path):
+    """Both are facts about a *printing*, and until 2026-08-19 the pool had
+    nowhere to put them -- so a deck showing a chosen printing read its
+    painter off the oracle row, which is a different painting.
+
+    The DFC row is here for the same reason it is in `_oracle_row`: Scryfall
+    puts both fields on the faces, and reading only the top level records a
+    painting as unattributed.
+    """
+    from mtglab.cards import db
+    con = db.connect(tmp_path / "t.duckdb")
+    path = _bulk(tmp_path, [
+        {"id": "p1", "oracle_id": "o1", "name": "Sol Ring", "set": "ltc",
+         "artist": "Myles Wohl", "flavor_text": "The subject of innovation.",
+         "image_uris": {"normal": "https://img/normal/p1.jpg"}},
+        {"id": "p3", "oracle_id": "o2", "name": "A // B", "set": "neo",
+         "card_faces": [{"image_uris": {"normal": "https://img/normal/p3.jpg"},
+                         "artist": "Face Painter",
+                         "flavor_text": "From the front."}]},
+    ], name="printings.jsonl")
+    db.load_printings(con, path)
+
+    rows = dict(con.execute(
+        "SELECT id, artist FROM printings").fetchall())
+    assert rows == {"p1": "Myles Wohl", "p3": "Face Painter"}
+    flavour = con.execute(
+        "SELECT flavor_text FROM printings WHERE id = 'p1'").fetchone()
+    assert flavour[0] == "The subject of innovation."
     con.close()
 
 
