@@ -2689,6 +2689,46 @@ runs against a cache nobody emptied.
     resolved value.
 
 
+### The lease that never came due — 2026-08-19 (stragglers)
+
+Filed under Green because it is a **cloud-resource and deployed-behaviour**
+finding, not a code-craft one: nothing about the app on a laptop was wrong.
+
+**`mtglab data refresh` could not run on the instance at all.** `data refresh`
+needs DuckDB's exclusive lock; the app holds a shared one through the pool
+keeper, whose lease is `service._KEEPER_IDLE`. That was **30.0s against a 30s
+`/api/health` check** — and `service.health` opens the pool (it counts both
+tables and calls `pool_stale`). The lease was renewed by the one caller that
+never stops asking, exactly as often as it expired. Forty consecutive attempts
+over five minutes were refused, every one at `connect`, every one naming the
+same holder.
+
+`_reap_keeper`'s own docstring argues that the keeper *must not* lock a refresh
+out — "that is a worse bug than the 17.5ms `_pin` exists to save". **The
+argument was right and the constant under it was never checked against the
+platform.** A number is not protected by the paragraph above it.
+
+Fixed at 10.0s, which still spans the burst the lease exists for (a page load
+is four requests) and leaves two thirds of every check cycle free.
+`tests/test_pool_keeper.py` **derives** the ceiling from `fly.toml` rather than
+restating 30s, so moving the check's interval fails there instead of silently
+re-closing the door; it also pins the floor, so nobody shrinks the lease past
+the burst it was bought for, and pins that `health` still opens the pool, since
+that coupling is what makes the interval a ceiling at all. Mutation-verified
+four ways including the production value.
+
+**Two things this cost, both worth carrying.** The runbook's step 6 had
+**never worked on a populated volume** — the single run that verified it was
+the *first* load, when no pool file existed to lock. A step verified once on
+an empty volume is verified in the one state you will never be in again.
+And a failed `fly ssh` job reported **exit code 0** twice, because the
+`| tail` pipeline returned its own status; the same shape as "a destructive
+test failure reads exactly like a successful kill", one layer out.
+
+Still open after this: the volume's pool is stale until the refresh actually
+runs, so three decks show a set name with no painter. That is #195's designed
+degradation, not a new fault.
+
 ## Colorless — The Artifacts
 
 *The pass auditing itself: last cycle's findings · are the checklists still
