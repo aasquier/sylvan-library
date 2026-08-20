@@ -12,6 +12,36 @@ Status keys: **done** · **partial** · **not started**
 Decided 2026-08-12, in order. Everything below it in this file is the longer
 arc; this is what the next few sessions actually do.
 
+### Where things stand — 2026-08-19
+
+The sixteen items below are a phase-by-phase account and **fifteen of them
+have landed.** This is the short answer a fresh session needs before reading
+any of it, and the list it should read *instead* of the account: the open work
+now lives in `docs/polish/LEDGER.md`, under **"Every straggler, deduplicated
+and verified"**, which is re-checked against the tree rather than carried
+forward.
+
+- **The polish rainbow finished 2026-08-19** — all six colours, one PR each
+  (#185–#190), then a stragglers pass over what they left (#191 onward). Every
+  colour section in the ledger carries the `2026-08-19 (rainbow)` tag, so
+  nothing is stale by date and the next run's ordering has to come from
+  substance.
+- **Still open and Aaron's to rule on**, in the ledger's own order: four
+  repository settings (secret scanning and push protection are *off*); nothing
+  watches whether the site is up; the wrong-painter credit, which needs a pool
+  schema change and a `data refresh`; cache-write tokens, which needs schema
+  v11 on a ladder that applies on boot; a deploy that takes no snapshot; the
+  arm64 half of the `image` job; the phone's touch targets; and whether the
+  landed narratives below move to a `docs/HISTORY.md`.
+- **Still open and nobody's to rule on:** item 5's remainder — driving the
+  deployed instance by hand — and item 16's next branch, region-scoped motion
+  (the flame on Syr Gwyn's torch, the cranes on Farewell).
+
+Two things this section is *not*. It is not a changelog — git holds what
+changed, and the account below survives only because it carries the reasoning
+that a diff does not. And it is not the current list; when it disagrees with
+the ledger, the ledger is right.
+
 1. ~~**The best-practices and cleanup pass.**~~ Landed 2026-08-12: the API
    catch-all refuses `/api` misses as JSON, dead code out, mode tool sets
    enforced at dispatch, four-colour names in, `api/service.py` and
@@ -653,7 +683,11 @@ arc; this is what the next few sessions actually do.
    What is left: driving the app itself — the Learn page, the theme interview,
    the dossier, a deck edit surviving a restart. **The Claude surfaces became
    reachable on 2026-08-13** (`mtglab claude check` answers `pipe open` on the
-   machine) and are still entirely unexercised there.
+   machine). Since 2026-08-16 the driving no longer stops at the login page
+   either: the `claude` account is a live-testing seat Aaron signs in and
+   Claude rides, so an authenticated flow on the deployed instance is now a
+   thing a session can do rather than a thing it can only ask for. See
+   `docs/ENGINEERING.md`, "Mobile engines, and the live seat".
 
    Two punchlist items came out of the first real claim, both now built:
    choosing your own username at sign-up (#67), and **deleting an account**,

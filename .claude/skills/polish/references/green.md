@@ -11,11 +11,14 @@ when ten users become a hundred.
 Commandment 2 makes this concrete: the newcomer someone shares the site with
 is opening it on *their* phone, in *their* browser. It has to just work.
 
-- The compatibility floor is real and personal: **Safari 15 on macOS 12 is
-  the dev machine's own browser** — but check the ledger before repeating that
-  number, because the 2026-08-16 run found the shipped bundle needs 16.4 and
-  queued the question of which way to resolve it. Check newer JS/CSS features
-  against whatever the floor actually is — `:has()`, container queries,
+- **The floor is Safari 16.4, declared by Aaron on 2026-08-19** and pinned as
+  `FLOOR` in `tests/test_browser_floor.py`, whose docstring has the argument:
+  two independent routes reach the same number — Tailwind v4's `@property` and
+  `color-mix(in lab, …)`, and the camera door's SIMD wasm core. Do not
+  re-derive it; three runs already did. Note the consequence for this machine:
+  **Safari 15.6 on macOS 12 is now below the floor**, so the dev browser is no
+  longer a witness for it and the Playwright/WebKit 17.4 rig is. Check newer
+  JS/CSS features against 16.4 — `:has()`, container queries,
   `structuredClone`, top-level await in served code. When Vite's target and
   reality disagree, reality is the phone that renders white.
 - **Audit `src/mtglab/web_dist/assets/`, not `web/src`, and run

@@ -42,8 +42,12 @@ still meets them and whether the standards themselves have fallen behind.
 
 - The gauntlet is `npm --prefix web run check` (tsc, oxlint
   `--deny-warnings`, Vitest). The audit is what the gauntlet *cannot* see:
-  - **No regex lookbehind anywhere under `web/src`** — Safari 15 is a real
-    user (this very dev machine). Grep for `(?<`.
+  - **No regex lookbehind anywhere under `web/src`** — it is a SyntaxError at
+    parse time below the Safari 16.4 floor, which takes the whole module with
+    it rather than degrading. `tests/test_browser_floor.py` checks the
+    *bundle*, which is the half a grep of `web/src` cannot reach; the grep is
+    still worth running on new source, remembering that `(?<name>…)` is a
+    named capture group and not the hazard.
   - `noUncheckedIndexedAccess` is on, and since 2026-08-16 the no-`!` rule is
     **enforced by oxlint** (`typescript/no-non-null-assertion`, off for
     `*.test.ts(x)`) rather than by prose — so the gauntlet now catches it and

@@ -46,6 +46,18 @@ state, never checklists.
      (`name, = [n for n in ocr.ASSETS if n.endswith(".LICENSE.txt")]`) rather
      than restating it, because the first draft supplied its own table entry
      and stayed green against the bug.
+
+     **Precision added 2026-08-19 (stragglers), because the run reported this
+     URL as "answers 200 on sylvan-libraries.com" and unqualified that is
+     false.** It answers **401 to anyone without a session**, which Green
+     re-confirmed by curl the same day — `/api/ocr/*` is not in
+     `PUBLIC_PATHS`. Both observations are true and the difference is a
+     cookie. The arrangement is still correct and should **not** be "fixed"
+     by making the notice public: Apache-2.0 asks that the notice travel with
+     the *distribution*, the distribution here is the worker served to a
+     signed-in browser, and the notice reaches exactly that audience by
+     exactly that door. What the ledger should carry is the qualified claim —
+     *200 to the audience that receives the code* — not the bare status.
   2. **The newest paid surface's job body had no tests at all.**
      `api/scanruns.py` sat at **61%**, the least-covered module in the app,
      and the missing lines were the whole closure: the `ModeExhausted` and
@@ -160,6 +172,42 @@ state, never checklists.
      parser. Suggested direction unchanged: a max-length bound on the pasted
      decklist *before* the regex runs, whose value is Aaron's call. Wants a
      per-pattern test.
+
+     **Answered 2026-08-19 (stragglers), and the answer is that the suggested
+     direction was taken three days ago and CodeQL cannot see it.** The bound
+     exists: `decklist.MAX_LINE = 512`, applied once in `parse`'s loop before
+     the first `search`, with `test_no_pattern_is_handed_more_than_the_bound`
+     covering all five patterns and three boundary tests beside it — landed in
+     [#132](https://github.com/aasquier/sylvan-library/pull/132) on 2026-08-16,
+     the same PR that took `_HEADER` apart. Its value is argued from Magic
+     rather than rounded to: the longest card name ever printed is the
+     141-character Unhinged elemental whose name is a joke about long card
+     names, and a line carries a quantity, a set code, a collector number and
+     markers besides. **That fix is what cleared the fifth decklist alert and
+     the pre-auth one**; these four survived it.
+     **Proved rather than assumed, from CodeQL's own SARIF** (the analysis of
+     `main` at `cf0a640`, pulled through the API rather than read off the
+     alert list). Every one of the four taint paths runs
+     `decklist.py:217 line` → `decklist.py:248 line` — **straight past the
+     guard at line 226**. `py/polynomial-redos` for Python has no string-length
+     barrier, so a correct bound is invisible to it and no further bounding
+     will ever clear these. The fourth path adds the other half of the same
+     story: it leaves `_strip_annotations` through the return value at line
+     188 and re-enters as `body`, a node no guard on `line` could ever cover.
+     **Two options left, and both are Aaron's.** (a) Dismiss the four as false
+     positives — the input is bounded at 512 characters before any pattern
+     runs, the argument is one sentence, and dismissing a security alert on a
+     public repository is a maintainer's call rather than a run's. (b) Rewrite
+     the patterns so they are linear rather than merely bounded — the leading
+     `\s*` in `_MARKER`/`_BRACKET`/`_PRINTING` and the `\s*[xX]?\s+` in `_QTY`
+     are what the query names. **(b) is not a safe fix and cannot be made one
+     here**, for a reason worth keeping: a pull-request CodeQL analysis reports
+     only alerts *new* against the base, so a PR that fixed these would report
+     `results: 0` exactly as a PR that did nothing does. The proof would arrive
+     after merge and after deploy, which is one step worse than the case the
+     skill already says to queue. The parser is also six decks' import path and
+     `decklist.py`'s own comment argues against per-pattern surgery.
+     Recommendation: (a), and leave the code alone.
   2. ~~**Package licence undeclared in `pyproject.toml`.**~~ **Landed in
      [#135](https://github.com/aasquier/sylvan-library/pull/135), 2026-08-16**
      — `license = "MIT"`, `license-files = ["LICENSE"]`, `setuptools>=77`.
@@ -192,6 +240,37 @@ state, never checklists.
      the worst at 61% and is fixed above; `cardmotion/depth.py` reads 0% by
      design — it is the `depth` extra's loader and never runs in CI.) Aaron's
      call because a coverage floor is a policy, not a bug.
+
+     **CLOSED 2026-08-19 (stragglers, PR #194). Aaron's ruling: close the gap,
+     not lower the floor.** **95.185% → 95.749%** (11,573 statements, 492
+     missed against 557), so the headroom went from ~21 statements to **~87**.
+     The four modules: `adminstats` 78 → 97, `admin` 85 → 99, `argueruns`
+     86 → 98, `animist/fetch` 81 → 97. Suite 2,439 → 2,470 tests, and the
+     wall clock went *down* (377s → 352s), which is noise rather than a claim.
+     **Coverage was the measurement and not the goal, and the tests are worth
+     more than the percentage.** What they assert is behaviour nothing had
+     ever asserted: the admin routes' whole refusal surface (503 when mail is
+     unconfigured, 502 on a bounced invite with the account still there, 422
+     on a tier this build does not ship — reachable, it turns out, only *from*
+     a granted tier, since `tiers.get` answers the default for an unknown key
+     on both sides of the comparison); the **Linux half** of the memory panel,
+     which is the half the container actually runs and the dev Mac never
+     reaches; the argue sweep's credential-vanishing path, which is its
+     docstring's headline behaviour; and the animist downloader's `.part`
+     discipline, checked *during* the body read rather than after it.
+     The best of them is not a coverage test at all. `adminstats._user_state`
+     restates `admin._state` on purpose, and its docstring argues that a
+     disagreement would show as the accounts table and the dashboard tile
+     contradicting each other on one page —
+     `test_the_accounts_table_and_the_dashboard_agree_about_every_state`
+     drives **both** spellings over all four states on one connection, which
+     turns that comment into a check. Mutation-verified, like the `.part` pair.
+     **Two lines were left uncovered deliberately.** `api/admin.py:337-338`
+     (the delete route's `LastAdmin`) is **unreachable through HTTP**: the
+     caller must be a usable admin to pass the middleware, and the handler
+     refuses self-deletion first, so no request can delete the last one. The
+     rule itself is tested at `users.delete`. Defensive depth, correctly kept,
+     and worth naming so the next run does not spend an hour on it.
   5. **CLAUDE.md's Setup block cannot bootstrap this machine, and nothing
      says so.** Found by this cycle's clean-checkout install (below). It opens
      `python -m venv .venv` — there is **no `python` on this PATH at all**;
@@ -755,14 +834,26 @@ spirit of Magic*
      "mulligan, ramp, seed…" as example words, and after the relabel that
      example matched nothing. `tests/test_technology_never_renders.py` is the
      tripwire, mutation-verified against all five original shapes.
-  3. **`cli.py` is the last strict-mypy exception and it keeps growing:
-     79 → 109 → 126.** Re-measured 2026-08-19 by removing the override block:
-     73 `no-untyped-def`, 52 `no-untyped-call`, 1 `no-any-return`. Still
-     annotations rather than a rewrite, just more of them, in one 2,400-line
-     file — so it wants its own branch rather than a ride-along. **The third
-     consecutive rise is the argument**: a module on the list absorbs every new
-     untyped function without a word, and at the current rate the cost of
-     clearing it grows faster than anyone will choose to pay it.
+  3. ~~**`cli.py` is the last strict-mypy exception and it keeps growing:
+     79 → 109 → 126.**~~ **CLOSED 2026-08-19 (stragglers, PR #194): 126 → 0,
+     and the exception list is now empty.** Annotations only — no restructure,
+     and the reason it was cheaper than the rising number suggested is worth
+     recording. **53 of the 73 `no-untyped-def` errors were one signature
+     written 53 times** (an argparse handler takes a `Namespace` and returns
+     nothing), applied in a single pass. **The 52 `no-untyped-call` errors
+     were not separate work at all** — they were the same 73 seen from the
+     call site, and annotating each callee cleared them with no edit at any
+     caller; 126 → 73 → 8 → 0 in three passes. What was left is what every
+     earlier graduation left: `Any` coming back out of a JSON-shaped dict,
+     named into a local. Types needed only in a signature are imported under
+     `TYPE_CHECKING`, so the CLI's deliberate import laziness is intact
+     (`mtglab.cli` imports in 178 ms).
+     **The claim is now machine-checked rather than commented.**
+     `test_no_first_party_module_is_exempt_from_strict_mypy` reads the
+     override table out of `pyproject.toml` and what counts as first-party off
+     `src/`, so the next module put back on the list fails a test — which is
+     the standing question applied to this facet's own trend line, since
+     nothing had been stopping the count from rising.
   4. **`numpy` is a core dependency and only the `animist` extra uses it.**
      `pyproject.toml` declares `numpy>=1.26` under `[project] dependencies`;
      the only importers in the whole package are `animist/{ops,encode,motion}.py`,
@@ -812,6 +903,31 @@ spirit of Magic*
      A concrete proposal to say yes or no to: keep ROADMAP as goals, open
      decisions and the next two or three items, and move the landed narratives
      to a `docs/HISTORY.md` that nothing reads at session start.
+
+     **Half-answered 2026-08-19 (stragglers, PR #194), and the structural half
+     is still Aaron's.** The stragglers pass was asked to weigh whether
+     Colorless's argument for *not* trimming the ledger also protects
+     `ROADMAP.md`. **It does not, and the measurement is why.** The ledger is
+     long because it keeps corrections beside their originals and healthy
+     measurements alongside regressions — both of which a later run reads.
+     ROADMAP is long because of **one section**: "The near-term TODO" is 1,896
+     of the 3,109 lines (61%), it holds sixteen phase items, and **fifteen of
+     them have landed**. That is not a correction and not a measurement; it is
+     an account of what happened, which git already has.
+     So the trim taken here is the surgical half only, and it *adds* rather
+     than cuts: a **"Where things stand"** block at the head of that section
+     saying what is actually open, pointing at the straggler list below as the
+     live one, and stating plainly that when the two disagree the ledger wins.
+     A fresh session now gets the answer in twenty lines instead of inferring
+     it from 1,896. One stale claim went with it — item 5 said the deployed
+     Claude surfaces were "entirely unexercised there", which the `claude`
+     live-testing seat has made false since 2026-08-16.
+     **What is still queued is the `docs/HISTORY.md` split itself**, unchanged
+     and unargued-against: moving the landed narratives out is a decision about
+     what a roadmap is for, and it is a large diff in the project's most-read
+     planning document. The deferred item below used to pair the ledger's own
+     trim to this ruling; **that pairing is cut here**, because the two files
+     are long for different reasons and the answer is not the same for both.
 - **Deferred:**
   - **Adopting ruff's `N` group (43 in `src`, 1 in `tests`).** The only excluded
     group whose cost is now plausibly payable, but naming rules rename things,
@@ -2131,6 +2247,33 @@ runs against a cache nobody emptied.
      separately — either the non-SIMD core (slower, on the tier that is already
      8× slower than Claude) or the door refusing on old phones. Recorded as an
      input to the decision, not as an argument either way.
+
+     **CLOSED 2026-08-19 (stragglers, PR #194). Aaron's ruling: declare 16.4
+     and document it.** Both routes re-verified against the artifacts rather
+     than against this entry, and the counts had already moved — the committed
+     stylesheet carries **53** `@property` rules and **17** `color-mix(in lab`
+     values today, not the 56 and 10 recorded above, which is the argument for
+     re-measuring a count rather than quoting one. The second route holds:
+     `lib/reader.ts` still asks for `/api/ocr/tesseract-core-simd-lstm.wasm.js`
+     and `ocr.ASSETS` has no non-SIMD sibling to fall back to.
+     Written down **once**, in `tests/test_browser_floor.py`'s docstring, with
+     `web/README.md` and `references/green.md` pointing at it rather than
+     restating it — three runs derived these same two facts and left the number
+     open, which is what a decision recorded in a ledger and nowhere else
+     costs. `references/blue.md`'s lookbehind bullet lost its "Safari 15 is a
+     real user" justification, which had been the wrong reason for a right
+     rule since Tailwind v4 landed.
+     **The second route is now pinned, because it is the removable one.**
+     `test_the_camera_door_still_holds_the_floor_independently` reads the core
+     name off `ocr.ASSETS` and checks `reader.ts` asks for that same file; a
+     swap to the plain core is a one-word edit in two files that would silently
+     leave Tailwind holding the floor alone. Mutation-verified. The tripwire
+     cannot reach the served engine itself — it is fetched at run time and git
+     holds none of it — so the names are what there is to hold.
+     **One consequence to carry forward:** Safari 15.6 on macOS 12 is now
+     *below* the declared floor, so this dev machine's own browser has stopped
+     being a witness for it and the Playwright/WebKit 17.4 rig is the only one
+     on this hardware.
   2. **Five of eight nav destinations were unreachable on a phone.**
      **Landed 2026-08-16** — the strip wraps below `lg`, all eight visible at
      375px, and the same branch fixed the failed lazy chunk that unmounted the
@@ -2272,7 +2415,11 @@ runs against a cache nobody emptied.
   - **The browser floor holds at Safari 16.4**, unchanged across the 81 pull
     requests merged since 2026-08-16 (#107–#188). `tests/test_browser_floor.py` green; the floor is
     still set by `@property` and `color-mix(in lab`, no new feature crossed it,
-    and no regex lookbehind reached the bundle.
+    and no regex lookbehind reached the bundle. **Declared rather than merely
+    held as of 2026-08-19** (stragglers, PR #194) — Aaron's ruling, the
+    argument in that file's docstring, and the counts re-measured off the
+    committed stylesheet: **53 `@property`, 17 `color-mix(in lab`, 2
+    `color-mix(in oklab`.**
   - **The OCR shelf's served JavaScript, scanned for the first time.** It is
     the newest third-party code the project actually redistributes and it is
     *not* in `web_dist`, so the floor tripwire cannot see it (and cannot be
@@ -2526,6 +2673,15 @@ re-open):
 | Blue · `api/service.py` reaching past `cards/db.py` | #181 |
 | Green · five of eight nav destinations unreachable on a phone | 2026-08-16 |
 
+**What the stragglers pass has closed so far**, tagged in each item below and
+in its own colour's section: Blue 2 (#191), Green 5a (#192), Red 7 (#193), and
+the four repository settings (Red 4 + Red 8, done through the API rather than
+a PR). Then — bundled as one branch on Aaron's instruction, PR #194 —
+**White 4** (coverage), **Blue 3** (`cli.py`), **Green 1** (the Safari floor),
+half of **Blue 7** (ROADMAP), and an *answer* rather than a fix for **White 1**
+(the ReDoS alerts, which turn out to be unfixable-by-bounding; see the entry).
+That is **nine of the twenty-two** the run opened with.
+
 **Still open — Aaron's ruling wanted.** Ordered by what a fresh session can
 act on soonest, not by color:
 
@@ -2599,34 +2755,70 @@ act on soonest, not by color:
    `image-arm64` builds `linux/arm64` on `ubuntu-24.04-arm` and does nothing
    else. Cache scopes are now named per architecture — left at the default
    the two jobs share one and each evicts the other's layers every run, which
-   is a cache that costs storage and returns nothing. Expect the first run
-   after this to be *slower* than steady state on both legs: the new scopes
-   start cold.
+   is a cache that costs storage and returns nothing.
 
-   Two consequences worth carrying. **`deploy` needs five jobs now**, which
-   `tests/test_packaging.py` enforced the moment the job was added — #188's
-   guard earning itself back within a day, and mutation-verified again here.
-   And **`image-arm64` is not a required check**: it gates the deploy, not the
-   merge. The branch protection list was read back from the API rather than
-   assumed (six contexts, unchanged), because ENGINEERING §5's own scar is a
-   table that claimed a check was required two days before it was. Adding it
-   is a repository setting and therefore Aaron's; until he does, a red
-   `image-arm64` blocks a release without blocking a merge.
+   **Measured on the first run: `image` 302s → 79s, `image-arm64` 59s, the two
+   in parallel.** Recorded because the prediction written here before the run
+   was *wrong in the good direction* — it warned the first build would be
+   slower than steady state, the new scopes being cold. QEMU turned out to
+   dominate so completely that a cold native build beats a warm emulated one;
+   the cold-scope effect was real and an order of magnitude too small to see.
+   `image` is no longer the critical path at all: **`test (3.12)` at 4m31s is,
+   unambiguously**, which retires the coin flip Red deferred this item on
+   through six runs and points the next CI-time question at the Python suite.
+
+   **`deploy` needs five jobs now**, which `tests/test_packaging.py` enforced
+   the moment the job was added — #188's guard earning itself back within a
+   day, and mutation-verified again here by unwiring the new job.
+
+   **`image-arm64` became a required check the same day**, after the merge —
+   Aaron's call, applied through the API and read back: **seven contexts now**,
+   with admin enforcement, strict and linear history all confirmed unchanged.
+   It was landed *without* being required, and the PR and four doc files said
+   so plainly rather than describing the list they were about to ask for,
+   because ENGINEERING §5's own scar is a table that claimed a check was
+   required two days before it was. Adding it necessarily comes second: the
+   context has to exist before it can be demanded.
 9. **White 4 — the coverage floor is a tripwire, not a floor.** 95.136%
    against `fail_under = 95`, ~16 statements of headroom on 11,512, and the
    comment beside it still claims "the suite runs about 96". Two honest
    options — move the floor to 94 and say why, or spend a session on
    `api/adminstats.py` 76%, `api/admin.py` 85%, `api/argueruns.py` 86%,
    `animist/fetch.py` 81%. Drifting is the one option nobody chose.
+
+   **CLOSED 2026-08-19 (stragglers, PR #194) — Aaron's ruling: close the gap,
+   not lower the floor. 95.185% → 95.749%, headroom ~21 → ~87 statements, and
+   the four thin modules are 97/99/98/97.** The stale "the suite runs about
+   96" comment is replaced with the measurement and the date. Detail,
+   including the two lines left uncovered on purpose, is in White's own
+   section.
 10. **White 1 — four open CodeQL `py/polynomial-redos`**, re-read from the API
     tonight, all in `decks/decklist.py` (166/171/184/254) and all behind auth.
     The pre-auth one cleared. Suggested direction unchanged: bound the pasted
     decklist's length *before* the regex runs; the value is Aaron's.
+    **ANSWERED 2026-08-19 (stragglers), no code change: the bound landed in
+    #132 three days ago and CodeQL cannot see it.** Proved from the SARIF of
+    `main` at `cf0a640` — all four taint paths run `line` at 217 straight to
+    `line` at 248, past the guard at 226, because `py/polynomial-redos` for
+    Python has no string-length barrier. So no further bounding clears these.
+    Aaron's two options are in White's own section, with the recommendation
+    (dismiss as false positives) and the reason the alternative cannot be
+    proved before merge. **This is the fourth cycle running in which a carried
+    item turned out to have already landed**, and the standing question below
+    said a fourth would mean the habit needs a mechanism. **The trigger has
+    fired; the mechanism is now owed** — and this item shows what it has to
+    catch, since the tree was *not* re-checked against a fix that had been
+    sitting in `decklist.py` for three days under a comment naming CodeQL.
 11. **Green 1 — the stated floor is Safari 15; the bundle needs 16.4.** And
     the camera door now requires 16.4 by a second, independent route
     (`tesseract-core-simd-lstm.wasm.js`; WebAssembly SIMD is 16.4). Safari 15
     on macOS 12 is this dev machine's own browser, so the severity question is
     a ten-second check that still has not been made.
+    **CLOSED 2026-08-19 (stragglers, PR #194). Aaron's ruling: declare 16.4
+    and document it.** Both routes re-verified against the artifacts (the
+    counts had moved: 53 and 17, not 56 and 10), written down once in
+    `tests/test_browser_floor.py`, and the removable route — the SIMD core —
+    is now pinned by a mutation-verified test.
 12. **Green 3 + Green 4 — the phone.** 21 of 23 interactive elements under
     44px on `/import` at 375px ("Back to the library" is 17px), and
     `env(safe-area-inset-*)` appears nowhere — the latter needs
@@ -2636,6 +2828,11 @@ act on soonest, not by color:
     growing: 79 → 109 → 126.** Annotations rather than a rewrite, but in one
     2,400-line file, so it wants its own branch. **The third consecutive rise
     is the argument.**
+    **CLOSED 2026-08-19 (stragglers, PR #194): 126 → 0 and the exception list
+    is empty.** Cheaper than the number suggested — 53 errors were one
+    signature written 53 times, and the 52 call-site errors were the same
+    errors seen from the other end. Now guarded by a test that reads the
+    override table out of `pyproject.toml`.
 14. **Blue 4 — `numpy` is a core dependency and only `animist` imports it.**
     Verified: the only importers are `animist/{ops,encode,motion}.py`, so every
     base install and the deployed image carry it for code that never runs
@@ -2646,6 +2843,15 @@ act on soonest, not by color:
     a per-session cost. Concrete proposal to say yes or no to: keep ROADMAP as
     goals, open decisions and the next two or three items; move the landed
     narratives to a `docs/HISTORY.md` nothing reads at session start.
+    **HALF-ANSWERED 2026-08-19 (stragglers, PR #194).** Asked whether
+    Colorless's reason for not trimming the ledger also protects ROADMAP: **it
+    does not.** The ledger is long because of corrections and measurements a
+    later run reads; ROADMAP is long because of one section — "The near-term
+    TODO" is 1,896 of 3,109 lines and fifteen of its sixteen items have
+    landed. The surgical half is taken (a twenty-line "Where things stand"
+    block at its head, and one stale claim corrected); **the `docs/HISTORY.md`
+    split is still queued and still Aaron's.** The deferred pairing below —
+    "the answer should be the same for both files" — should be cut.
 16. **Black 2 — the theme conversation's second cache breakpoint**, and the
     honest note is that it is now **bounded at ~0.8%** of that mode's input
     (99.2% of the prompt is already served from cache across 77 real turns).
@@ -2680,9 +2886,12 @@ re-checkable with one command.
      make it long are the two things that make it work: corrections kept
      *beside* their originals, and measurements kept even when healthy. The
      honest cut is the third copy of a number nobody compares against.
-     *Trigger:* a run that cannot read its own section in one sitting, or
-     Aaron ruling on item 7 — whichever comes first, since the answer should
-     be the same for both files.
+     *Trigger:* a run that cannot read its own section in one sitting.
+     **The pairing to Blue's item 7 is cut, 2026-08-19 (stragglers):** the
+     stragglers pass measured both files and they are long for different
+     reasons — ROADMAP's bulk is one 1,896-line section of landed narrative,
+     this file's is corrections and measurements kept on purpose. The answer
+     is not the same for both, so this item no longer waits on that one.
 - **Is each checklist still finding things, or reciting them?** Verdict per
   color, measured as *what its last run found* against *what its file spends
   its words on*:

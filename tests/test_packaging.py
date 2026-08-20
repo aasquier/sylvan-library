@@ -496,3 +496,35 @@ def test_no_deck_is_tracked_by_git():
     assert tracked == [], (
         "decks are live app data (ADR 30) and must not be tracked: "
         f"{tracked[:5]}")
+
+
+# ------------------------------------------ what the type checker still checks
+
+def test_no_first_party_module_is_exempt_from_strict_mypy():
+    """The exception list emptied on 2026-08-19 and has to stay empty.
+
+    `[tool.mypy] strict = true` covers the package; an entry under
+    `[[tool.mypy.overrides]]` takes a named module back out of it. Three of
+    those are legitimate and all three name somebody else's package -- a
+    dependency that ships no stubs. A first-party one is different in kind:
+    it exempts code this repo writes, and the module that sat there absorbed
+    every new untyped function without a word, going 79 -> 109 -> 126 while
+    the comment beside it said the list was shrinking.
+
+    Derived rather than restated. What counts as first-party is read off
+    `src/`, so a module added under a new package name is caught the same way
+    `mtglab.cli` would be -- a hard-coded list of forbidden names would only
+    ever catch the one that already happened.
+    """
+    parsed = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    ours = {p.name for p in (ROOT / "src").iterdir() if p.is_dir()}
+    exempt = {module
+              for override in parsed["tool"]["mypy"].get("overrides", [])
+              for module in override["module"]
+              if module.split(".")[0] in ours}
+    assert not exempt, (
+        f"{sorted(exempt)} is exempt from strict mypy. The list was emptied "
+        "deliberately; putting our own code back on it is a decision to argue "
+        "in the comment above the override, not one to take because a new "
+        "function was quicker to leave unannotated."
+    )

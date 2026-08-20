@@ -716,5 +716,193 @@ def test_deleting_an_account_that_is_not_there(client):
     ).status_code == 404
 
 
+# ------------------------------------------- the refusals the page has to show
+
+def test_an_instance_with_no_mail_configured_says_so_rather_than_500ing(
+        tmp_path, monkeypatch):
+    """503, not 500. Nothing is broken -- something is unset, and the person
+    reading the message is the one who can set it.
+
+    Built with no `email_sender`, which is what a real process does: the
+    decision is deferred to `sender_from_env` and made when a message is
+    actually being sent. With auth on and no key, ADR 16 refuses rather than
+    printing addresses into whatever collects stdout.
+    """
+    monkeypatch.delenv("MTGLAB_ADMIN_EMAIL", raising=False)
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    # `sender_from_env` reads the environment, not `create_app`'s argument --
+    # the console fallback is right for a laptop and refused for a deployment,
+    # and which one this is is an environment fact.
+    monkeypatch.setenv("MTGLAB_REQUIRE_AUTH", "1")
+    jobs.clear()
+    with config.use_paths(data_dir=tmp_path / "data"):
+        connection = db.connect()
+        try:
+            users.create(connection, "root", password=PASSWORD,
+                         email="root@example.com", is_admin=True)
+        finally:
+            connection.close()
+        app = create_app(require_auth=True, secure_cookies=False)
+        with TestClient(app) as test_client:
+            test_client.post("/api/auth/login",
+                             json={"username": "root", "password": PASSWORD})
+            response = test_client.post("/api/admin/users",
+                                        json={"email": "new@example.com"})
+
+    assert response.status_code == 503
+    assert "RESEND_API_KEY" in response.json()["detail"]
+
+
+def test_an_invite_with_no_address_at_all_is_refused(client):
+    """`normalise_email` answers `None` for an absent field rather than
+    raising, so the handler has to catch the gap itself -- and an invite with
+    nowhere to send the link is the one thing this route cannot do."""
+    response = client.post("/api/admin/users", json={"username": "someone"})
+
+    assert response.status_code == 422
+    assert "email" in response.json()["detail"]
+
+
+def test_a_username_that_cannot_be_normalised_asks_for_one(client):
+    """The address is fine and its local part is not a usable handle.
+
+    ADR 16's rule is that a login handle chosen by a mangling rule is one its
+    owner has to be told, so the route refuses and asks rather than inventing
+    `a2`. The detail says *choose a username*, because that is the field the
+    page then has to show.
+    """
+    response = client.post("/api/admin/users", json={"email": "a@example.com"})
+
+    assert response.status_code == 422
+    assert "choose a username" in response.json()["detail"]
+
+
+def test_an_invite_onto_somebody_elses_handle_is_a_conflict(client):
+    """A new address, a username already taken. 409 rather than 422: the
+    request is well-formed and it conflicts with the state of the world."""
+    response = client.post("/api/admin/users",
+                           json={"email": "someone@example.com",
+                                 "username": "friend"})
+
+    assert response.status_code == 409
+    assert "already registered" in response.json()["detail"]
+
+
+class Refusing:
+    """An `EmailSender` that fails the way a provider outage does."""
+
+    def send(self, message: mail.Message) -> None:
+        raise mail.EmailNotSent("the provider refused")
+
+
+@pytest.fixture
+def broken_mail(tmp_path, monkeypatch):
+    """The `client` fixture with a sender that cannot deliver."""
+    monkeypatch.delenv("MTGLAB_ADMIN_EMAIL", raising=False)
+    jobs.clear()
+    with config.use_paths(data_dir=tmp_path / "data"):
+        connection = db.connect()
+        try:
+            users.create(connection, "root", password=PASSWORD,
+                         email="root@example.com", is_admin=True)
+            users.create(connection, "friend", password=OTHER,
+                         email="friend@example.com")
+        finally:
+            connection.close()
+        app = create_app(require_auth=True, secure_cookies=False,
+                         email_sender=Refusing())
+        with TestClient(app) as test_client:
+            test_client.post("/api/auth/login",
+                             json={"username": "root", "password": PASSWORD})
+            yield test_client
+
+
+def test_an_invite_whose_mail_bounces_says_the_account_exists_anyway(
+        broken_mail):
+    """502, and the account is really there.
+
+    Half of this operation succeeded and the honest answer says which half:
+    pressing invite again once mail works is the fix, and that path is the
+    resend path this route already supports.
+    """
+    response = broken_mail.post("/api/admin/users",
+                                json={"email": "new@example.com"})
+
+    assert response.status_code == 502
+    assert "the account exists" in response.json()["detail"]
+    listed = {u["username"] for u in
+              broken_mail.get("/api/admin/users").json()["users"]}
+    assert "new" in listed
+
+
+def test_a_reset_whose_mail_bounces_is_reported_to_the_admin(broken_mail):
+    """The other direction of ADR 16's split. `POST /api/auth/reset` hides
+    whether the address resolves and so cannot report a delivery failure; an
+    authorised admin is owed the truth."""
+    assert broken_mail.post(
+        "/api/admin/users/friend/reset").status_code == 502
+
+
+def test_an_account_with_no_address_cannot_be_sent_a_reset(client):
+    """Created on the machine with `mtglab users add`, which never asks for
+    one. The message names the command that does work instead."""
+    with db.connection() as connection:
+        users.create(connection, "local", password=OTHER)
+
+    response = client.post("/api/admin/users/local/reset")
+
+    assert response.status_code == 422
+    assert "mtglab users passwd" in response.json()["detail"]
+
+
+# ------------------------------------------------------- the model tier field
+
+def test_the_tier_a_person_is_answered_by_is_set_through_the_same_route(client):
+    """One PATCH for all three fields, and the roster the page offers comes
+    from the same table the route validates against."""
+    offered = {t["key"] for t in
+               client.get("/api/admin/users").json()["tiers"]}
+    assert "opus" in offered, offered
+
+    response = client.patch("/api/admin/users/friend",
+                            json={"model_tier": "opus"})
+
+    assert response.status_code == 200
+    assert response.json()["model_tier"] == "opus"
+
+
+def test_setting_the_tier_to_what_it_already_is_changes_nothing(client):
+    """The comparison goes through `tiers.get` on both sides, so an account
+    holding NULL and one holding the default key read as the same tier. With
+    nothing else in the payload there is nothing to change, which is the 422
+    the empty-patch rule already gives."""
+    assert client.patch("/api/admin/users/friend",
+                        json={"model_tier": None}).status_code == 422
+
+
+def test_a_tier_this_build_does_not_have_is_refused(client):
+    """422 rather than 409: a key nobody ships is a malformed request, not a
+    conflicting one, and the refusal comes from `claude/tiers.py` so the CLI
+    and this route cannot disagree about what exists.
+
+    Asked *from* a granted tier, which is the only way to reach the refusal
+    and is worth knowing rather than working around. Reading tolerates an
+    unknown key on purpose -- `tiers.get` answers the default for one, so that
+    a stale value in the column is a person answered by the ordinary model
+    rather than an error -- and the handler compares through `get` on both
+    sides. From the default, an unknown key therefore reads as *no change* and
+    is refused as an empty patch; from `opus` it reads as a change, reaches the
+    write path, and `set_model_tier` refuses the key itself.
+    """
+    client.patch("/api/admin/users/friend", json={"model_tier": "opus"})
+
+    response = client.patch("/api/admin/users/friend",
+                            json={"model_tier": "haiku-9"})
+
+    assert response.status_code == 422
+    assert "no such tier" in response.json()["detail"]
+    assert client.get("/api/admin/users").json()["users"], "still listable"
+
+
 if __name__ == "__main__":                                    # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
