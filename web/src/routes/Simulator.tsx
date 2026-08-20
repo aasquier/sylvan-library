@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+/**
+ * The Opponent: a goldfish idling in a glass bowl across a candlelit card
+ * table — the goldfish this page's own masthead copy has always named, given
+ * its seat. An authored loop like the About Claude masthead (the séance
+ * room's second cousin): Claude wrote the scene, Aaron conjured it, and
+ * `PROVENANCE.md` beside the files holds the licence judgement and the exact
+ * encode. This page left the Mystical Archive masthead cycle for it
+ * deliberately — the cycle's story is in `CardSearch.tsx` — and the still is
+ * the poster, the reduced-motion floor and the room's backdrop wash.
+ */
+import goldfishMp4 from '../assets/simulator/goldfish-loop.mp4'
+import goldfishStill from '../assets/simulator/goldfish-still.webp'
+import goldfishWebm from '../assets/simulator/goldfish-loop.webm'
 import {
   api, errorMessage, followJob, type DeckTile, type Job, type LandResult,
   type ManaResult,
@@ -34,15 +47,6 @@ type Mode = 'mana' | 'lands'
  */
 const help = (key: string) => <HelpTip name={key} />
 
-/**
- * Strategic Planning, Robbie Trevino, Strixhaven Mystical Archive (2021) —
- * look at the top three, keep the one the plan needs, which is a goldfish run
- * in two sentences of rules text. Part of the Mystical Archive cycle the page
- * mastheads share; see `CardSearch.tsx` for why that cycle, and `PageMasthead`
- * for the hotlink-and-credit rules.
- */
-const STRATEGIC_PLANNING_ART =
-  'https://cards.scryfall.io/art_crop/front/f/d/fd7b2ee8-9f2f-4624-a788-15b88e6a2d50.jpg'
 
 /** The seed a run gets unless you ask for another. Matches
  * `simruns.DEFAULT_SEED`, so the app and the CLI describe the same sample. */
@@ -179,14 +183,18 @@ export default function Simulator() {
   return (
     <div className="space-y-6">
       <PageMasthead
-        art={STRATEGIC_PLANNING_ART}
-        alt="Strategic Planning, painted by Robbie Trevino: open hands over
-             three glowing cards laid in a triangle, sight-lines drawn between
-             them toward an eye at the apex."
+        art={goldfishStill}
+        video={{ webm: goldfishWebm, mp4: goldfishMp4 }}
+        alt="A candlelit study table dressed in green felt: a hand of seven
+             face-down cards fanned on the near felt, and across the table a
+             goldfish idling in a glass bowl on a brass stand — the opponent,
+             waiting. Hourglasses run on the shelves behind it."
         title="Simulator"
         credit={<>
-          <em>Strategic Planning</em> by Robbie Trevino, Strixhaven Mystical
-          Archive — look at the top three, keep what the plan needs.
+          The opponent&rsquo;s seat, taken at last: the goldfish this page has
+          always played against, waiting out your ten thousand shuffles. The
+          scene is ours outright — Claude wrote it, Aaron conjured it — so for
+          once there is no painter to name.
         </>}>
         <p>
           <Term name="tier-1">Tier 1</Term> Monte Carlo: shuffle, draw, pay
