@@ -55,6 +55,31 @@ def reports_from_wire(payload: list[dict[str, Any]]) -> list[CoverageReport]:
     ]
 
 
+def game_to_wire(game: parse.GameResult) -> dict[str, Any]:
+    """One game, encoded once for both journeys it makes.
+
+    A finished run's games cross inside `run_to_wire` below; since the match
+    theater, each game also crosses *alone*, on the stream's `{"game": n}`
+    line, the moment it ends. One codec for both is what keeps a streamed row
+    and the same row in the final tally byte-identical — the drift this
+    module exists to make impossible.
+    """
+    return {"index": game.index, "milliseconds": game.milliseconds,
+            "draw": game.draw, "winner": game.winner,
+            "winner_seat": game.winner_seat, "turns": game.turns,
+            "timed_out": game.timed_out}
+
+
+def game_from_wire(payload: dict[str, Any]) -> parse.GameResult:
+    return parse.GameResult(
+        index=int(payload["index"]), milliseconds=int(payload["milliseconds"]),
+        draw=bool(payload.get("draw")), winner=payload.get("winner"),
+        winner_seat=(None if payload.get("winner_seat") is None
+                     else int(payload["winner_seat"])),
+        turns=None if payload.get("turns") is None else int(payload["turns"]),
+        timed_out=bool(payload.get("timed_out")))
+
+
 def run_to_wire(run: SimRun) -> dict[str, Any]:
     """A finished `SimRun`, minus what does not travel.
 
@@ -64,12 +89,7 @@ def run_to_wire(run: SimRun) -> dict[str, Any]:
     is not serialised; the rebuilt run computes the same number.
     """
     return {
-        "games": [
-            {"index": g.index, "milliseconds": g.milliseconds, "draw": g.draw,
-             "winner": g.winner, "winner_seat": g.winner_seat,
-             "turns": g.turns, "timed_out": g.timed_out}
-            for g in run.games
-        ],
+        "games": [game_to_wire(g) for g in run.games],
         # JSON keys are strings; the seat numbers come back in `run_from_wire`.
         "seats": {str(seat): slug for seat, slug in run.seats.items()},
         "wall_seconds": run.wall_seconds,
@@ -81,16 +101,7 @@ def run_to_wire(run: SimRun) -> dict[str, Any]:
 
 
 def run_from_wire(payload: dict[str, Any]) -> SimRun:
-    games = [
-        parse.GameResult(
-            index=int(g["index"]), milliseconds=int(g["milliseconds"]),
-            draw=bool(g.get("draw")), winner=g.get("winner"),
-            winner_seat=(None if g.get("winner_seat") is None
-                         else int(g["winner_seat"])),
-            turns=None if g.get("turns") is None else int(g["turns"]),
-            timed_out=bool(g.get("timed_out")))
-        for g in payload.get("games", [])
-    ]
+    games = [game_from_wire(g) for g in payload.get("games", [])]
     version = payload.get("forge_version")
     return SimRun(
         argv=[], output=parse.SimOutput(games=games),

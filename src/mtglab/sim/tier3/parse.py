@@ -79,78 +79,102 @@ class SimOutput:
 
 
 def is_game_result(line: str) -> bool:
-    """Did this line just finish a game? The streaming tick's one question.
+    """Did this line just finish a game? A single-line predicate.
 
-    `run.py` streams Forge's output live and reports progress per game; this
-    is the same pair of patterns the full parse recognises results by, shared
-    so the tick and the tally cannot drift apart — a progress bar that counts
-    lines the parser will later reject would tick past its own total.
+    `run.py` used to count ticks with this and tally with `parse` -- two
+    readers of the same stream, kept honest only by sharing regexes. Both now
+    ride one `StreamParser`, so this survives as the cheap question a caller
+    with no state wants answered (and as the seam older tests pin).
     """
     stripped = line.strip()
     return bool(_WON.match(stripped) or _DRAW.match(stripped))
 
 
-def parse(text: str) -> SimOutput:
-    """Parse a whole `sim` run.
+class StreamParser:
+    """The parser, fed one line at a time as Forge speaks.
 
-    Forge interleaves game logs, AI warnings and card-database complaints on
-    the same stream, so this matches lines it recognises and ignores the rest
-    rather than trying to model the whole log.
+    `feed` returns a `GameResult` at the moment a result line completes one,
+    and accumulates everything into `output` exactly as `parse` would --
+    because `parse` *is* this machine fed a whole text. One parser for the
+    tick and the tally is the property #203 bought by sharing regexes, made
+    structural: they cannot drift because they are the same pass. The match
+    theater rides it one step further -- the row a tick carries is the row
+    the final tally holds, by identity.
     """
-    out = SimOutput()
-    # "Game Outcome: Turn N" is printed before the "Game Result" line it
-    # belongs to, so it is held until the result arrives.
-    pending_turn: int | None = None
-    pending_timeout = False
 
-    for raw in text.splitlines():
+    def __init__(self) -> None:
+        self.output = SimOutput()
+        # "Game Outcome: Turn N" and the slow-match warning are printed
+        # before the "Game Result" line they belong to, so both are held
+        # until the result arrives.
+        self._pending_turn: int | None = None
+        self._pending_timeout = False
+
+    def feed(self, raw: str) -> GameResult | None:
+        """Read one line; hand back the game it completed, if it did.
+
+        Forge interleaves game logs, AI warnings and card-database complaints
+        on the same stream, so this matches lines it recognises and ignores
+        the rest rather than trying to model the whole log.
+        """
         line = raw.strip()
 
         if _SLOW in line:
-            pending_timeout = True
-            continue
+            self._pending_timeout = True
+            return None
 
         m = _UNSUPPORTED.match(line)
         if m:
             # Forge repeats the complaint per copy; a name is a name.
-            if m.group(1) not in out.unsupported:
-                out.unsupported.append(m.group(1))
-            continue
+            if m.group(1) not in self.output.unsupported:
+                self.output.unsupported.append(m.group(1))
+            return None
 
         m = _DECK_FAILED.match(line)
         if m:
-            out.deck_load_failures.append(m.group(1))
-            continue
+            self.output.deck_load_failures.append(m.group(1))
+            return None
 
         m = _TURN.match(line)
         if m:
-            pending_turn = int(m.group(1))
-            continue
+            self._pending_turn = int(m.group(1))
+            return None
 
         m = _WON.match(line)
         if m:
             label = m.group(3)
             seat = PLAYER.match(label)
-            out.games.append(GameResult(
+            game = GameResult(
                 index=int(m.group(1)),
                 milliseconds=int(m.group(2)),
                 winner=label,
                 winner_seat=int(seat.group(1)) if seat else None,
-                turns=pending_turn,
-                timed_out=pending_timeout,
-            ))
-            pending_turn, pending_timeout = None, False
-            continue
+                turns=self._pending_turn,
+                timed_out=self._pending_timeout,
+            )
+            self.output.games.append(game)
+            self._pending_turn, self._pending_timeout = None, False
+            return game
 
         m = _DRAW.match(line)
         if m:
-            out.games.append(GameResult(
+            game = GameResult(
                 index=int(m.group(1)),
                 milliseconds=int(m.group(2)),
                 draw=True,
-                turns=pending_turn,
-                timed_out=pending_timeout,
-            ))
-            pending_turn, pending_timeout = None, False
+                turns=self._pending_turn,
+                timed_out=self._pending_timeout,
+            )
+            self.output.games.append(game)
+            self._pending_turn, self._pending_timeout = None, False
+            return game
 
-    return out
+        return None
+
+
+def parse(text: str) -> SimOutput:
+    """Parse a whole `sim` run: `StreamParser` fed every line at once."""
+    parser = StreamParser()
+    for raw in text.splitlines():
+        parser.feed(raw)
+    return parser.output

@@ -346,7 +346,8 @@ def _sweep(slug: str, deck: Deck, commander: SimCard | None,
             rows.append(hit.result)
             continue
 
-        def step(done: int, _total: int, _base: int = simulated * games) -> None:
+        def step(done: int, _total: int, partial: Any | None = None,
+                 _base: int = simulated * games) -> None:
             progress(_base + done, total_steps)
 
         row = _land_row(count, resized[count], commander, games, turns, keep,

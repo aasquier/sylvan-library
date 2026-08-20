@@ -246,9 +246,15 @@ class Handler(BaseHTTPRequestHandler):
                 pass
 
         try:
-            result = forge.run_games(decks, games=games, clock=clock,
-                                     seed=seed, memory_mb=_memory_mb(),
-                                     on_game=lambda n: emit({"game": n}))
+            # The row rides the tick (the match theater): the game the parser
+            # just completed crosses beside its count, in the same encoding
+            # the final result will carry it. An app from before the theater
+            # ignores the extra key, so the skew story is unchanged.
+            result = forge.run_games(
+                decks, games=games, clock=clock, seed=seed,
+                memory_mb=_memory_mb(),
+                on_game=lambda n, g: emit(
+                    {"game": n, "row": wire.game_to_wire(g)}))
         except Exception as exc:  # noqa: BLE001 - becomes the job's error
             emit({"error": f"{type(exc).__name__}: {exc}",
                   "type": type(exc).__name__})

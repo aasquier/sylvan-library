@@ -257,7 +257,8 @@ def run_games(decks: list[Deck], *, games: int = 1, clock: int = 300,
               seed: int | None = None, memory_mb: int = 4096,
               forge_home: Path | None = None,
               timeout: float | None = None,
-              on_game: Callable[[int], None] | None = None) -> SimRun:
+              on_game: Callable[[int, parse.GameResult], None] | None = None,
+              ) -> SimRun:
     """Play `games` Commander games between `decks` and return the results.
 
     `clock` is Forge's `-c`: seconds before a game is called a draw. The
@@ -275,11 +276,13 @@ def run_games(decks: list[Deck], *, games: int = 1, clock: int = 300,
     game ran 134 seconds.
 
     `on_game` is called with the count of games finished so far (1, 2, ...)
-    as each result line arrives, which is what lets a job tick per game
-    instead of sitting at zero for the whole match. The output is streamed
-    either way; the callback only decides whether anybody hears about it.
-    Ticks are best-effort progress, never results -- the tally that matters is
-    parsed from the complete output below, after the second coverage check.
+    and the game just parsed, as each result line arrives -- what lets a job
+    tick per game and the match theater show the row behind the tick. The
+    output is streamed either way; the callback only decides whether anybody
+    hears about it. Ticks are best-effort progress, never results -- the
+    tally that matters is the parser's complete output below, after the
+    second coverage check, and since #204 the ticks and the tally are one
+    `StreamParser` rather than two readers sharing regexes.
     """
     if len(decks) < 2:
         raise ValueError("a game needs at least two decks")
@@ -327,15 +330,17 @@ def run_games(decks: list[Deck], *, games: int = 1, clock: int = 300,
     timer = threading.Timer(timeout, _out_of_time)
     timer.start()
     lines: list[str] = []
+    parser = parse.StreamParser()
     finished_games = 0
     try:
         assert proc.stdout is not None  # PIPE above guarantees it
         for raw in proc.stdout:
             lines.append(raw)
-            if parse.is_game_result(raw):
+            game = parser.feed(raw)
+            if game is not None:
                 finished_games += 1
                 if on_game is not None:
-                    on_game(finished_games)
+                    on_game(finished_games, game)
         proc.wait()
     finally:
         timer.cancel()
@@ -344,7 +349,7 @@ def run_games(decks: list[Deck], *, games: int = 1, clock: int = 300,
         raise subprocess.TimeoutExpired(argv, timeout)
 
     text = "".join(lines)
-    output = parse.parse(text)
+    output = parser.output
 
     run = SimRun(argv=argv, output=output, wall_seconds=elapsed,
                  seats=seats, coverage=reports,
