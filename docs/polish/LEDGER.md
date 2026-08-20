@@ -2458,11 +2458,12 @@ finding things · the developer tooling · cross-color leftovers*
 ### Every straggler, deduplicated and verified — 2026-08-19
 
 Aaron's ruling this rainbow was *"let's fix all stragglers at the end"*, and a
-stragglers pass follows this run. This is its input: **21 items open across
-six sections, each re-checked against the tree rather than copied forward** —
-because three separate colors this cycle found a carried item that had already
-landed, and one of those was three days old. Sections own their own entries;
-this is an index with a verdict, not a second copy.
+stragglers pass follows this run. This is its input: **22 items open across
+five sections — White 2, Blue 6, Black 2, Red 8, Green 4, Colorless 0 — each
+re-checked against the tree rather than copied forward**, because three
+separate colors this cycle found a carried item that had already landed and
+one of those was three days old. Sections own their own entries; this is an
+index with a verdict, not a second copy.
 
 **Verified already landed, and marked so in their own sections** (do not
 re-open):
@@ -2582,6 +2583,11 @@ act on soonest, not by color:
 17. **Blue 5 (remainder) — a `PostToolUse` hook** reminding that `web_dist/`
     needs rebuilding after an edit under `web/src`. Convenience, not a guard:
     CI's `frontend` job already catches a missed rebuild.
+18. **Red 5 — a merge queue, and its trigger has not fired.** Checked tonight:
+    **one** open PR, a Dependabot bump, against a threshold of "more than two
+    at once". Serial rainbow is what dissolved the case and it keeps
+    dissolving it. Listed for completeness rather than for action — the
+    stragglers pass should read this one and move on.
 
 **Findings for a color's own next run** (not Aaron's, recorded so they are not
 lost between them): the four live mutants at `decks/analyze.py:33` and
