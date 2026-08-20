@@ -50,7 +50,19 @@ it reads a zip, needs no Java, and is the cheap thing to run first.
 
 ## What the bridge had to work around
 
-Four things, each established by running Forge rather than by reading its wiki.
+Five things, each established by running Forge rather than by reading its wiki.
+
+**`sim` still initialises AWT, and dies silently without a display.** Found on
+the first live worker machine (2026-08-20): `forge.view.Main` touches fonts
+and the toolkit before any game starts, a headless Linux answers with
+`HeadlessException`, and Forge's own crash reporter swallows it whole — exit
+code 1, zero bytes of output, no log file, diagnosed only by `-verbose:class`
+showing that exception as the last class loaded. `-Djava.awt.headless=true`
+makes it worse, not better (the AWT calls then throw instead of rendering).
+The worker image's answer is a full JRE plus `xvfb`: `MTGLAB_JAVA` points at
+a wrapper that runs every JVM under `xvfb-run -a`, so Forge gets a display
+that renders nowhere. A Mac never shows this — a logged-in session always has
+a display, which is why the spike couldn't have caught it.
 
 **`-D` does not work for a single match.** The documented "absolute directory
 to load decks from" is only wired into tournament mode; the single-match path

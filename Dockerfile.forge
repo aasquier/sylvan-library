@@ -65,14 +65,34 @@ LABEL org.opencontainers.image.title="sylvan-library-forge-worker" \
       org.opencontainers.image.licenses="MIT"
 
 # Take Debian's security updates, for the reason the app Dockerfile gives at
-# length: the base only rebuilds when Docker Hub feels like it. The JRE comes
-# from the same `apt-get` — Forge needs 17+, `run.java_binary` checks the
-# version rather than trusting PATH, and headless is enough because `sim -q`
-# opens no window.
+# length: the base only rebuilds when Docker Hub feels like it.
+#
+# The JRE is the **full** one and the image carries an X server, and that is
+# the fifth fact about Forge established by running it rather than reading
+# about it (docs/FORGE.md has the other four): `sim -q` opens no window, but
+# `forge.view.Main` still initialises AWT — fonts, toolkit — before the
+# simulation starts. On the first live worker this died as a
+# `HeadlessException` swallowed whole by Forge's own crash reporter: exit 1,
+# zero bytes of output, diagnosed only by `-verbose:class` showing that
+# exception as the last class loaded. The headless JRE package cannot fix
+# that (it has no X toolkit at all, which *forces* headless mode), so:
+# `openjdk-21-jre` for a real AWT, `xvfb`+`xauth` for a display that renders
+# nowhere, and `fontconfig`+`fonts-dejavu-core` so font init finds something
+# to load. ~200MB over the headless build, on an image that already carries
+# half a gigabyte of card scripts.
 RUN apt-get update \
  && apt-get upgrade -y --no-install-recommends \
- && apt-get install -y --no-install-recommends openjdk-21-jre-headless \
+ && apt-get install -y --no-install-recommends \
+      openjdk-21-jre xvfb xauth fontconfig fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
+
+# The JVM the bridge runs is this wrapper: `run.java_binary` honours
+# `MTGLAB_JAVA` first, and `xvfb-run -a` gives every invocation its own
+# throwaway display. The version probe pays a spare Xvfb start; a match pays
+# nothing it wasn't already paying.
+RUN printf '#!/bin/sh\nexec xvfb-run -a java "$@"\n' > /usr/local/bin/forge-java \
+ && chmod +x /usr/local/bin/forge-java
+ENV MTGLAB_JAVA=/usr/local/bin/forge-java
 
 # The same fixed uid as the app image, for the same reason: predictability
 # over accident. `--chown` on the copies below is what makes 470MB of Forge
