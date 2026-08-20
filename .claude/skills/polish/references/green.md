@@ -40,9 +40,20 @@ is opening it on *their* phone, in *their* browser. It has to just work.
 - Responsive sweep of anything new since last run at phone, tablet, laptop
   widths — and both themes. A screenshot at each width is the evidence;
   "the classes look right" is not.
-- Motion accessibility: Commandment 6 wants a living page *and*
-  `prefers-reduced-motion` is a promise to users who get motion-sick.
-  Animations should respect it — reduced, not necessarily removed.
+- **Motion accessibility: run `tests/test_reduced_motion.py`, and audit the
+  bundle if you audit by hand at all.** Commandment 6 wants a living page
+  *and* `prefers-reduced-motion` is a promise to users who get motion-sick —
+  reduced, not necessarily removed. This is the bullet above's lesson a second
+  time, and the 2026-08-16 run learned it the expensive way *in this facet*:
+  it resolved 43 animating rules against nine guard blocks in
+  `web/src/index.css`, correctly, and recorded the sweep as complete — while
+  the two genuinely loose animations were Tailwind utilities (`animate-spin`
+  on the shared `Spinner`, `animate-pulse` on the lazy-chunk skeleton) that
+  exist *only* in the built artifact. The test now reads the bundle, resolves
+  every animating rule against the guards, and carries `COVERED_BY` for the
+  two mechanisms a stylesheet cannot show — a base class on the same element,
+  and an ancestor the guard `display: none`s. Both directions are
+  self-checking, so it cannot rot into a list of excuses.
 - Cross-browser: Chrome, Firefox, Safari on desktop; Safari and Chrome on
   mobile. The practical method is feature-floor discipline plus real-engine
   checks, and since 2026-08-16 both phone engines are testable from this

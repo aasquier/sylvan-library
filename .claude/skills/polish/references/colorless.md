@@ -58,13 +58,14 @@ run reports green, and the bugs are somewhere the file never looks.
   this skill were written, and every one of them started as "the checklist
   said record the number, and the number was recorded, and the bug was inside
   it".
-- **A rule enforced by nothing drifts** — the pass's own lasting lesson, found
-  four separate times. Sweep the reference files and CLAUDE.md for absolute
-  claims with no mechanism behind them ("always", "never", "every", "all"),
-  and for each: what fails if it stops being true? The fix is always to make
-  the claim machine-checked, never to reword it. And the corollary: **a guard
-  whose failure mode is silent permission is worse than none**, so any guard
-  proposed here needs a test that fails when the guard is *inert*.
+- **A rule enforced by nothing drifts** — the pass's own lasting lesson, and
+  since 2026-08-19 it is a standing question in `SKILL.md` step 2, because
+  three colors found it independently in one rainbow while the lesson sat in
+  this file, which only the sixth run reads. What stays *here* is the sweep of
+  the skill's own surface: the reference files and this one are full of
+  absolutes nobody checks. And the corollary, which belongs to whoever
+  proposes a guard: **a guard whose failure mode is silent permission is worse
+  than none**, so it needs a test that fails when the guard is *inert*.
 - Check the skill's own description line still triggers on the words Aaron
   actually uses. A skill that does not fire is a skill that does not exist.
 
@@ -81,9 +82,14 @@ is worse than no tool, because its numbers are believed.
   ```bash
   mtglab bench run                 # does the suite still resolve its targets?
   mtglab bench caches              # is anything registered but dead?
-  mtglab mutate run --sample 8 --seed 0
+  mtglab mutate list               # has the catalogue grown or shrunk, and why?
+  mtglab mutate run --only <site>  # are the ledger's survivors still alive?
   mtglab animist verify
   ```
+
+  A fresh seeded *draw* is White's job and re-drawing one here only adds a
+  sample nobody asked for. The colorless questions are the ones a draw cannot
+  answer: did the catalogue move, and are the survivors on record still there.
 
 - **A skipped row is the finding.** `bench` reports unavailable targets by
   name for exactly this reason: a suite that quietly shrank still prints a

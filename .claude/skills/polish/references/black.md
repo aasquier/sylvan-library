@@ -15,10 +15,13 @@ what it costs in performance. Black is ruthless, not lawless.
 Load the `claude-api` skill before reading or writing any integration code —
 repo rule, and the pricing/caching facts there beat memory.
 
-- Map the spend first: six modes (interview, argue, dossier, research, theme
-  ×2), their models, their max_tokens/effort settings, and what
-  `claude/ledger.py` has recorded. Numbers into the ledger — spend trends
-  are the whole point of tracking this facet over runs.
+- Map the spend first: **seven** modes across six features (interview, argue,
+  dossier, research, theme ×2, and **scan** — ADR 34's card transcriber, which
+  this file said "six" through the run that measured it), their models, their
+  max_tokens/effort settings, and what `claude/ledger.py` has recorded.
+  Numbers into the ledger — spend trends are the whole point of tracking this
+  facet over runs. Count the modes from `claude/modes.py` rather than from
+  this sentence; the number moves and this line will not.
 - Prompt caching: `converse` caches on its system block, which is why
   personas are **appended** and dealt cards ride in the message. Audit any
   change since last run for something that moved per-turn content into the
@@ -109,7 +112,13 @@ mtglab mutate list               # (White's facet, same shelf)
   parameter — 1,768 failed imports, 162ms of a 200ms endpoint, all inside the
   import machinery. The statement **count** in `bench profile` is the n+1
   detector that needs no pattern; the import call count is the storm detector.
-  Zero imports is the only right answer on a warm request.
+  **Read that count against `IMPORT_CALLS_SUSPECT` (200), never against
+  zero** — this line said zero until 2026-08-19 and zero is not reachable.
+  #181 *answered* DuckDB's probe with a `sys.modules` sentinel rather than
+  removing it, so a warm bind still enters the import machinery: exactly two
+  calls per bound value, and the warm suite runs 7–31 across its targets. A
+  run holding the old sentence files a false finding on every profile it
+  takes.
 - **Every cache gets a hit-rate check, not only a correctness test.** `mtglab
   bench caches` reports the register in `caches.py`. A cache that never hits
   is complexity wearing a win's clothes, and the standing example was correct,

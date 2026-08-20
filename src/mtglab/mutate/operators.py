@@ -77,14 +77,55 @@ def find(source: str, *, module: str, relpath: str) -> list[Mutation]:
     """
     tree = ast.parse(source)
     lines = source.splitlines()
+    declared = _decorator_flags(tree)
     out: list[Mutation] = []
     for node in ast.walk(tree):
-        out.extend(_from_node(node, lines, module=module, relpath=relpath))
+        out.extend(_from_node(node, lines, module=module, relpath=relpath,
+                              declared=declared))
     return sorted(out, key=lambda m: (m.line, m.col, m.operator))
 
 
+def _decorator_flags(tree: ast.AST) -> set[tuple[int, int]]:
+    """Boolean keyword arguments of a decorator call -- `@dataclass(frozen=True)`.
+
+    Kept **out** of the catalogue, and the reason is a category rather than a
+    line. A mutation earns its place when a test *could* notice; this one never
+    can. `frozen=True` is a declaration about the class, read by `dataclass` at
+    import time and by no code path afterwards, so flipping it changes nothing
+    any assertion reaches unless a test asserts `FrozenInstanceError` -- and no
+    test here does, nor should have to.
+
+    That makes it different in kind from an equivalent mutant, which is a fact
+    about one line and worth recording once. This is a fact about a *shape* the
+    repo keeps adding, so it recurs and compounds. Measured 2026-08-19 across
+    the 18 declared modules: **19 sites, every one of them `frozen=True`, and
+    22% of the whole `constant` class.** Left in, they are a floor of
+    guaranteed survivors that drags every kill rate down for a reason that says
+    nothing at all about the suite -- a 25-mutation sample drew two and both
+    survived, which is what prompted this.
+
+    Deliberately narrow: only booleans, and only a decorator call's keyword
+    arguments. `@lru_cache(maxsize=16)` is a *boundary* mutation on a number a
+    test can absolutely notice, and it stays.
+    """
+    out: set[tuple[int, int]] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef
+                          | ast.ClassDef):
+            continue
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call):
+                continue
+            for keyword in decorator.keywords:
+                value = keyword.value
+                if isinstance(value, ast.Constant) and value.value in (
+                        True, False) and isinstance(value.value, bool):
+                    out.add((value.lineno, value.col_offset))
+    return out
+
+
 def _from_node(node: ast.AST, lines: list[str], *, module: str,
-               relpath: str) -> Iterator[Mutation]:
+               relpath: str, declared: set[tuple[int, int]]) -> Iterator[Mutation]:
     def make(line: int, col: int, end: int, was: str, now: str,
              op: str) -> Mutation:
         return Mutation(module=module, relpath=relpath, line=line, col=col,
@@ -113,6 +154,8 @@ def _from_node(node: ast.AST, lines: list[str], *, module: str,
 
     elif isinstance(node, ast.Constant) and _single_line(node):
         if node.value is True or node.value is False:
+            if (node.lineno, node.col_offset) in declared:
+                return          # a decorator's flag -- see `_decorator_flags`
             yield make(node.lineno, node.col_offset, node.end_col_offset or 0,
                        str(node.value), str(not node.value), "constant")
         elif isinstance(node.value, int) and not isinstance(node.value, bool):

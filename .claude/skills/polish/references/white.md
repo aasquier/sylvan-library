@@ -168,10 +168,15 @@ tests never feels expensive.
   checks the suite nobody is watching. It is no longer a hand protocol:
 
   ```bash
-  mtglab mutate list                        # 1,231 sites across 16 modules
+  mtglab mutate list                        # every site, and its defenders
   mtglab mutate run --sample 12 --seed 0    # a reproducible draw
   mtglab mutate run --sample 6 --full       # judged by the whole suite
+  mtglab mutate run --only decks/analyze.py:33   # is that survivor still alive?
   ```
+
+  **Read the catalogue's size off `mutate list`, not off this file** — it was
+  1,231 across 16 modules when the harness landed and 1,260 across 18 by the
+  end of the same week, and a number written here is a number that drifts.
 
   Every mutation is applied to a **throwaway copy** of the package and pytest
   is pointed at the copy, so the working tree cannot be reached at all — the
@@ -179,7 +184,7 @@ tests never feels expensive.
   left a mutation in the tree with `git status` as the only thing between that
   and a commit.
 
-  Three things to hold on to when reading the output. **Record the seed** —
+  Four things to hold on to when reading the output. **Record the seed** —
   a kill rate nobody can reproduce is a number that can only be quoted, and
   the ledger wants a figure that trends. **A survivor is a question, not a
   verdict**: some mutations are semantically equivalent and no test could ever
@@ -189,6 +194,14 @@ tests never feels expensive.
   weaker claim than a survivor of `--full`. A module with no mapping is a
   finding of its own — add it there, and `tests/test_mutate.py` fails if a
   mapping names a file that does not exist.
+
+  Fourth, and it is the one this facet kept skipping: **re-run the survivors
+  the last run recorded, by name.** A fresh seeded draw of 25 from 1,260 sites
+  will not revisit them, so a survivor left "worth a look next White run" is
+  worth a look forever — `decks/analyze.py:33` and `decks/companion.py:139`
+  sat that way for two runs and both are still alive. `--only` is that
+  question asked directly, it costs a second a site, and a pattern matching
+  nothing raises rather than reporting a flawless rate over no mutants.
 
   `mutmut`/`cosmic-ray` stay **queued** as the escalation for an exhaustive
   run over one module; the harness covers the routine sampling, and the

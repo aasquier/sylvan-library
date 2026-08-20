@@ -30,6 +30,7 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -168,12 +169,55 @@ def shadow(src: Path, into: Path) -> Path:
     return into
 
 
+def select(available: list[Mutation], only: Sequence[str]) -> list[Mutation]:
+    """The mutations whose `relpath:line` contains one of `only`.
+
+    This exists because of what the ledger does with a survivor. Every run
+    records the ones it read -- `decks/analyze.py:33`, `sim/compile.py:102` --
+    and the obvious next question a later run has is *is that one still
+    alive?*, which until now had no verb. So survivors accumulated as prose
+    nobody could cheaply re-check, and two of them went two runs unread.
+    `--only decks/analyze.py:33` is that question, asked directly.
+
+    **A filter matching nothing raises.** A sample of zero would report a
+    flawless kill rate over no mutants at all, which is the harness's own
+    shipped bug (a mistyped test filename silently *widened* the tests that
+    ran) pointed the other way -- and a typo in a path is exactly as easy to
+    make.
+
+    **A line number is compared, never matched as text.** The first draft
+    joined `relpath:line` and asked for a substring, and the first real use of
+    it -- re-checking `decks/analyze.py:33` -- silently swept in line 336 as
+    well. A path fragment is still a substring, because naming the whole
+    `mtglab/decks/analyze.py` to ask about one line is friction nobody needs;
+    the number after the colon is an integer and is compared as one.
+    """
+    chosen = [m for m in available if any(_matches(m, p) for p in only)]
+    if not chosen:
+        raise ValueError(
+            f"--only {', '.join(only)} matched none of {len(available)} "
+            "sites; `mtglab mutate list` names every one")
+    return chosen
+
+
+def _matches(mutation: Mutation, pattern: str) -> bool:
+    """`path/fragment.py:33` -- substring on the path, equality on the line."""
+    fragment, _, line = pattern.rpartition(":")
+    if fragment and line.isdigit():
+        return fragment in mutation.relpath and mutation.line == int(line)
+    return pattern in mutation.relpath
+
+
 def run(*, sample: int = 12, seed: int = 0, full: bool = False,
         src: Path | None = None, workdir: Path | None = None,
         targets: dict[str, tuple[str, ...]] | None = None,
-        timeout: float = TIMEOUT_SECONDS,
+        timeout: float = TIMEOUT_SECONDS, only: Sequence[str] | None = None,
         on_result: object = None) -> Report:
-    """Draw a seeded sample of mutations, apply each, and see who notices."""
+    """Draw a seeded sample of mutations, apply each, and see who notices.
+
+    `only` names sites instead of drawing them: the seed and the sample size
+    stop applying, because a named site is not a sample.
+    """
     src = src or Path(__file__).resolve().parents[2]
     work = Path(workdir) if workdir is not None else None
     if work is None:
@@ -182,9 +226,12 @@ def run(*, sample: int = 12, seed: int = 0, full: bool = False,
     root = shadow(src, work)
 
     available = catalogue(src, targets)
-    rng = random.Random(seed)
-    chosen = (list(available) if sample >= len(available)
-              else rng.sample(available, sample))
+    if only:
+        chosen = select(available, only)
+    else:
+        rng = random.Random(seed)
+        chosen = (list(available) if sample >= len(available)
+                  else rng.sample(available, sample))
     chosen.sort(key=lambda m: (m.relpath, m.line, m.col))
 
     report = Report(sites=len(available), seed=seed, full=full)
