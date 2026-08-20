@@ -2172,6 +2172,43 @@ runs against a cache nobody emptied.
      one field on `/api/admin/stats/system`, one tile on the Machine tab beside
      Process memory. Six lines, and deliberately not taken this run because it
      would be a third user-visible change in a pass already owing an eye-walk.
+
+     **Landed 2026-08-19 (stragglers), PR #192.** A `schema` field on
+     `/api/admin/stats/system` and a Schema tile on the Machine row. Two
+     numbers rather than the one the recipe called for: `applied` is read off
+     the file, `expected` off the code running here, because **a lone version
+     number cannot be wrong** and the mismatch is the only state worth an
+     alarm. The read is a `mode=ro` connection rather than `db.connect` --
+     that one *applies* migrations, so the recipe's obvious implementation
+     would have let an admin upgrade the volume by refreshing a stats tab.
+     Mutation testing earned its place twice here: it killed a first draft
+     whose `expected` was a literal that happened to equal the constant (the
+     restated-claim shape, in the code this time rather than the test), and
+     it falsified a docstring that credited the wrong guard for not
+     conjuring a database.
+
+     **And then it bit, which is the part worth keeping.** The mutation that
+     proves this guard replaces the read-only connection with `db.connect` --
+     the exact wrongness the guard exists to catch -- and the test that
+     carries it had moved `SCHEMA_VERSION` to 4242 without a `use_paths`
+     sandbox. So the mutation run migrated the **maintainer's own `app.db`**
+     to version 4242, where `_apply_migrations` returns early and would have
+     silently skipped every future migration. Found by Aaron's eye on the
+     tile itself -- the number rendered `v4242 / code here expects v10`,
+     which is the feature working. Repaired to 10, data intact
+     (`integrity_check ok`, one user), and the test now runs in `tmp_path`;
+     the same three mutations afterwards leave the file byte-identical.
+
+     Three things this argues, none of them about schema versions.
+     **`mtglab mutate` applies its wrongnesses to a throwaway copy of the
+     package for exactly this reason, and a hand-rolled `sed`-and-run loop
+     has no such copy** -- the harness's own safety was reasoned about and
+     the ad-hoc version inherited none of it. **A test that installs a fake
+     constant must be sandboxed even when it only reads**, because the
+     mutation that checks it is not required to only read. And **a
+     destructive test failure reads exactly like a successful kill**: the
+     run failed, which is what "killed" means, so the damage was recorded as
+     a pass and only surfaced two steps later on a screen.
      (b) **Newest snapshot age**, which needs a Fly API call the app does not
      make today and is therefore a real design decision rather than a field.
      Red's queued item 6 (a snapshot taken *at* deploy) is the sharper half of
@@ -2543,7 +2580,8 @@ act on soonest, not by color:
    `/api/health`, not on the admin panel, and it is at 10. Six lines, one
    field and one tile — and it is precisely the number ADR 23 makes worth
    seeing, since migrations apply on boot with nobody watching. Pairs with (5)
-   and with Red 6. *(Green 5b — newest snapshot age — needs a Fly API call the
+   and with Red 6. **CLOSED 2026-08-19 (stragglers, PR #192), as a pair —
+   applied and expected — since one number cannot disagree with anything.** *(Green 5b — newest snapshot age — needs a Fly API call the
    app does not make, and Red 6 is the sharper half of the same worry.)*
 7. **Red 6 — a deploy takes no snapshot, which is exactly backwards.** The
    volume is most at risk on the boot after a merge; Fly's snapshots are daily

@@ -95,6 +95,46 @@ def _count_dirs(path: Path) -> int:
         return 0
 
 
+def _schema() -> dict[str, Any]:
+    """What migration version this box's `app.db` actually reached.
+
+    ADR 23 is why this is worth a tile: merging deploys, so a schema
+    migration applies on boot with nobody watching, and the ladder is
+    forward-only -- rolling the code back does not roll the schema back.
+    Until now the only way to ask what the volume had reached was an ssh.
+
+    Two numbers rather than one. `applied` is read from the file; `expected`
+    is what this code was written against. They are equal on every healthy
+    boot, which is exactly why the pair is worth showing -- a single number
+    cannot be wrong, and a mismatch is the one thing here worth an alarm.
+
+    Read through a bare read-only connection rather than `db.connect`,
+    because that one *applies* migrations: a stats panel that could change
+    the schema by being looked at is not a stats panel.
+
+    Two things keep it harmless, and they overlap on purpose. A plain
+    `sqlite3.connect` on a missing path *creates* the file; `mode=ro` refuses
+    instead, and `exists()` never asks. Either alone would do for that, which
+    is worth writing down because it means a mutation run can delete one and
+    stay green -- the redundancy is deliberate, not an untested line. They
+    answer different questions: `mode=ro` says this connection may never
+    write anything at all, and `exists()` says a laptop with no `app.db`
+    should not log a warning every time a timer refreshes the panel.
+    """
+    applied: int | None = None
+    if config.APP_DB_PATH.exists():
+        try:
+            con = sqlite3.connect(f"file:{config.APP_DB_PATH}?mode=ro",
+                                  uri=True)
+            try:
+                applied = con.execute("PRAGMA user_version").fetchone()[0]
+            finally:
+                con.close()
+        except sqlite3.Error as exc:
+            _LOG.warning("could not read app.db schema version (%s)", exc)
+    return {"applied": applied, "expected": db.SCHEMA_VERSION}
+
+
 def _rss() -> dict[str, Any]:
     """This process's resident memory, as well as the platform tells it.
 
@@ -184,6 +224,7 @@ def install(app: FastAPI) -> None:
         except OSError:
             load = []
         return {
+            "schema": _schema(),
             "process": _rss(),
             "memory": _machine_memory(),
             "load": load,
