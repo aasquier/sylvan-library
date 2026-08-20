@@ -691,28 +691,38 @@ jobs:
             metadata: {mtglab_role: "forge-worker"}
           }')
 
-          # Polling rather than the API's `/wait` endpoint, learned from the
-          # first live run: `wait` caps its `timeout` parameter at 60 and
-          # answers 400 above it, and an explicit `start` on a machine that
-          # `create` is already launching answers 412. Reading the state
-          # until it settles has neither edge, and the first image pull can
-          # take minutes, which is longer than one `wait` may cover.
-          settle() {
-            want="$1"; tries="$2"; state=""
-            for _ in $(seq 1 "$tries"); do
+          # Two facts about the Machines API, both learned from live runs
+          # rather than docs: `/wait` caps its `timeout` at 60 and answers
+          # 400 above it (run 1), and `start` answers 412 while a machine is
+          # mid-transition — including the moments after `update` returns —
+          # so a single start attempt against a stopped machine can lose the
+          # race and leave it asleep forever (run 2). The cure for both is
+          # one loop that reads the state and *nudges as it polls*: a
+          # `stopped` machine is started again on every pass, a
+          # transitioning one is simply waited out, and the loop converges
+          # from any starting point. Proven against the real machine before
+          # this landed: stopped -> started in one cycle, ~5s.
+          wake() {
+            state=""
+            for _ in $(seq 1 60); do
               state=$(curl -fsS -H "$AUTH" "$API/machines/$id" \
                 | jq -r '.state')
-              [ "$state" = "$want" ] && return 0
+              case "$state" in
+                started) return 0 ;;
+                stopped)
+                  curl -fsS -X POST -H "$AUTH" "$API/machines/$id/start" \
+                    > /dev/null || true ;;
+              esac
               sleep 5
             done
-            echo "::error::forge-worker never reached '$want' (state: $state)"
+            echo "::error::forge-worker never started (state: $state)"
             return 1
           }
 
           id=$(curl -fsS -H "$AUTH" "$API/machines" \
             | jq -r '.[] | select(.name=="forge-worker") | .id' | head -1)
           if [ -z "$id" ]; then
-            # Create launches the machine itself; no explicit start needed.
+            # Create launches the machine itself; wake() just watches it up.
             id=$(curl -fsS -X POST -H "$AUTH" -H 'Content-Type: application/json' \
               -d "$(jq -n --argjson c "$config" \
                     '{name: "forge-worker", region: "iad", config: $c}')" \
@@ -723,19 +733,19 @@ jobs:
               -d "$(jq -n --argjson c "$config" '{config: $c}')" \
               "$API/machines/$id" > /dev/null
             echo "updated forge-worker machine $id"
-            # An update restarts a running machine itself; a stopped one
-            # needs the nudge, and 412 from a machine already on its way up
-            # is fine — the settle below is the real check.
-            curl -fsS -X POST -H "$AUTH" "$API/machines/$id/start" \
-              > /dev/null || true
           fi
 
           # Wake it so the image lands on the host, then put it to sleep —
           # stopped-when-idle is the steady state and per-second billing is
           # the point.
-          settle started 60
+          wake
           curl -fsS -X POST -H "$AUTH" "$API/machines/$id/stop" > /dev/null
-          settle stopped 24 || true
+          for _ in $(seq 1 24); do
+            state=$(curl -fsS -H "$AUTH" "$API/machines/$id" \
+              | jq -r '.state')
+            [ "$state" = "stopped" ] && break
+            sleep 5
+          done
           echo "forge-worker holds $IMAGE, state: $state"
 
       # For the log, so a bad deploy has something to roll back *to* without
