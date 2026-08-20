@@ -761,7 +761,7 @@ fly deploy
 ```
 
 This is the **first** deploy, and the manual path generally. Routine deploys
-are automatic as of 2026-08-14: a push to `main` whose four checks are green
+are automatic as of 2026-08-14: a push to `main` whose `ci.yml` checks are green
 deploys itself, and there is a manual button in the Actions tab that runs the
 whole workflow and then deploys. See
 [ADR 23](adr/0023-a-green-main-deploys-itself.md) and §5 below for the runbook.
@@ -997,9 +997,9 @@ untouched: a stripped click spends nothing.
 
 ### Deploying
 
-**A push to `main` whose four checks are green deploys itself**, since
+**A push to `main` whose `ci.yml` checks are green deploys itself**, since
 2026-08-14 — [ADR 23](adr/0023-a-green-main-deploys-itself.md). The `deploy`
-job in `ci.yml` `needs` all four checks, so it cannot start unless they passed,
+job in `ci.yml` `needs` every other job, so it cannot start unless they passed,
 and it runs only for a push to `main` or an explicit `workflow_dispatch`.
 Expect it about ten minutes after a merge; most of that is the `image` job.
 

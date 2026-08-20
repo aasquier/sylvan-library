@@ -623,7 +623,7 @@ list had to be updated in the same change, or the check would have stopped
 gating while still appearing to pass.**
 
 **And the CD half, added 2026-08-14** — [ADR 23](adr/0023-a-green-main-deploys-itself.md).
-A `deploy` job that `needs` all four checks and runs only on a push to `main`
+A `deploy` job that `needs` every other check and runs only on a push to `main`
 or a `workflow_dispatch`, so a green `main` deploys itself. The prompt was a
 silent failure rather than a loud one: the quality pass above renamed a wire
 field and the running instance went on answering the old name, because
@@ -743,7 +743,7 @@ The settings on `main`, recorded so they can be rebuilt:
 | Setting | Value | Why |
 | --- | --- | --- |
 | Pull request required | yes, **0 approvals** | A solo maintainer cannot approve their own PR, so requiring 1 would deadlock the repo |
-| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-card-data`, `image`, `dependency-review` | The whole pipeline. Renaming a CI job silently stops gating until this list is updated |
+| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-card-data`, `image`, `dependency-review` | Read back from the API 2026-08-19 and correct as listed. **`image-arm64` is a `ci.yml` job and is *not* on this list** — it gates `deploy` through `needs`, not merging. Renaming a CI job silently stops gating until this list is updated |
 | Strict (branch up to date) | yes | Checks that passed against a stale base did not test what is being merged |
 | Enforce for admins | **yes** | Off, it does not apply to the only contributor, which makes it decorative |
 | Force pushes, deletions | blocked | |

@@ -247,18 +247,27 @@ jobs:
   # that does not gate.
   image:
     runs-on: ubuntu-latest
-    # The longest job by far: the arm64 build at the end runs under QEMU. This
-    # is a stuck-build ceiling, not a target.
+    # amd64 only since 2026-08-19. arm64 used to run here at the end, under
+    # QEMU, and cost 182 of this job's 302 seconds -- 60% of the longest job
+    # in the pipeline, emulating an architecture nothing deploys to: the live
+    # machine answers `x86_64` and the arm64 manifest was never pushed. It is
+    # now `image-arm64` below, on a native runner. The ceiling stays generous
+    # because it is a stuck-build ceiling, not a target.
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8  # v4.2.0
+      # No QEMU here any more -- this runner is amd64 and so is what it builds.
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
 
-      # amd64 first, and `load`ed into the daemon, because the smoke test and
-      # the scan below need a real image to run rather than a manifest. arm64
-      # follows at the end; a multi-arch build cannot be loaded.
+      # `load`ed into the daemon, because every check below needs a real image
+      # to run rather than a manifest -- which is also why this is the job
+      # that keeps them: a multi-arch build cannot be loaded, so the arm64
+      # job can build and nothing more.
+      #
+      # The cache scope is named per architecture. Left at the default, the
+      # two jobs share one scope and each evicts the other's layers on every
+      # run, which is a cache that costs storage and returns nothing.
       - name: Build (linux/amd64)
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
         with:
@@ -266,8 +275,8 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: sylvan-library:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=image-amd64
+          cache-to: type=gha,mode=max,scope=image-amd64
 
       # Rule 5, enforced against the artifact rather than against the tree. The
       # `no-secrets-or-card-data` job checks what is *tracked*; this checks what is
@@ -457,14 +466,35 @@ jobs:
       # is arm64, so "it builds" has to mean both. Nothing is pushed -- there is
       # no registry in this story yet, and publishing is a decision with a
       # signing and provenance conversation attached (ENGINEERING §5).
-      - name: Build (linux/amd64, linux/arm64)
+  # arm64, built natively rather than emulated. Split out of `image` on
+  # 2026-08-19: under QEMU this build was 182 of that job's 302 seconds, and
+  # the thing it was proving -- that the Dockerfile is architecture-honest --
+  # does not need an emulator to prove it. GitHub's arm64 runners went GA for
+  # public repositories on 2025-08-07 and are free for them, so this costs
+  # nothing but a second runner.
+  #
+  # It builds and stops. The pool, deck, art and smoke checks all live in
+  # `image` and all need a loaded image, which a cross-architecture build
+  # cannot give this runner -- and running them twice would prove the same
+  # `.dockerignore` twice.
+  #
+  # Nothing here pushes. The live machine answers `x86_64`; this is the job
+  # that means a move to arm would be a deploy rather than a porting session.
+  image-arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
+
+      - name: Build (linux/arm64)
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=image-arm64
+          cache-to: type=gha,mode=max,scope=image-arm64
 
   # Continuous deployment to the Fly instance. Added 2026-08-14, because the
   # alternative was a person running `fly deploy` from a laptop and remembering
@@ -477,7 +507,7 @@ jobs:
   # that failed one -- rather than relying on branch protection, which governs
   # merging and has nothing to say about a workflow_dispatch run.
   deploy:
-    needs: [test, frontend, no-secrets-or-card-data, image]
+    needs: [test, frontend, no-secrets-or-card-data, image, image-arm64]
     # Two conditions, and the ref one is deliberately outside the event check.
     #
     # Never from a pull request: a fork's PR must not be able to reach the

@@ -981,12 +981,21 @@ on a container change rather than as a surprise.
 The sixth is `dependency-review`, required since 2026-08-14 and the only one
 that is **not** a `ci.yml` job. It runs on `pull_request` only — it diffs the
 dependency graph between base and head, and a push has no base — so it gates
-merging and takes no part in the deploy, whose `needs` list is `ci.yml`'s four.
+merging and takes no part in the deploy, whose `needs` list is `ci.yml`'s five.
 It also cannot be run locally in any useful form. See ENGINEERING §5.
 
-**Merging deploys.** Since 2026-08-14 a push to `main` whose four checks are
-green deploys itself ([ADR 23](docs/adr/0023-a-green-main-deploys-itself.md));
-the `deploy` job `needs` all four, so it cannot run on a red suite. Expect the
+There is a **seventh job**, `image-arm64`, added 2026-08-19 when the arm64
+build moved off QEMU onto a native runner — and it is deliberately described
+here as a job rather than as a seventh required check, because it **is not
+one**. It gates the *deploy* (`deploy` needs it, and `tests/test_packaging.py`
+forces that), so a red `image-arm64` stops a release; it does not stop a
+merge until somebody adds it to the required list, which is a repository
+setting and not a file in this repo. ENGINEERING §5 is where that list lives
+and why writing an aspirational one there is worse than writing none.
+
+**Merging deploys.** Since 2026-08-14 a push to `main` whose `ci.yml` checks
+are green deploys itself ([ADR 23](docs/adr/0023-a-green-main-deploys-itself.md));
+the `deploy` job `needs` all five, so it cannot run on a red suite. Expect the
 instance to be live about ten minutes after a merge, and note the two
 consequences: **every merge is a few seconds of downtime** (one machine, one
 volume, so Fly cannot roll), and **a schema migration in `auth/db.py` applies
@@ -998,7 +1007,7 @@ deploys; the runbook and the rollback are `docs/HOSTING.md` §5.
 
 **Do not open a documentation-only pull request.** Updating `ROADMAP.md` when
 direction changes is required and the rule above still holds — but a PR whose
-whole diff is a few paragraphs costs six CI jobs, a review round trip and a
+whole diff is a few paragraphs costs seven CI jobs, a review round trip and a
 squash commit to land prose nobody was blocked on. Three of them went in over
 2026-08-12 alone ([#54](https://github.com/aasquier/sylvan-library/pull/54),
 [#56](https://github.com/aasquier/sylvan-library/pull/56), and #58, which was
