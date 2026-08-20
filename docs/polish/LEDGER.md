@@ -46,6 +46,18 @@ state, never checklists.
      (`name, = [n for n in ocr.ASSETS if n.endswith(".LICENSE.txt")]`) rather
      than restating it, because the first draft supplied its own table entry
      and stayed green against the bug.
+
+     **Precision added 2026-08-19 (stragglers), because the run reported this
+     URL as "answers 200 on sylvan-libraries.com" and unqualified that is
+     false.** It answers **401 to anyone without a session**, which Green
+     re-confirmed by curl the same day — `/api/ocr/*` is not in
+     `PUBLIC_PATHS`. Both observations are true and the difference is a
+     cookie. The arrangement is still correct and should **not** be "fixed"
+     by making the notice public: Apache-2.0 asks that the notice travel with
+     the *distribution*, the distribution here is the worker served to a
+     signed-in browser, and the notice reaches exactly that audience by
+     exactly that door. What the ledger should carry is the qualified claim —
+     *200 to the audience that receives the code* — not the bare status.
   2. **The newest paid surface's job body had no tests at all.**
      `api/scanruns.py` sat at **61%**, the least-covered module in the app,
      and the missing lines were the whole closure: the `ModeExhausted` and
@@ -2662,12 +2674,13 @@ re-open):
 | Green · five of eight nav destinations unreachable on a phone | 2026-08-16 |
 
 **What the stragglers pass has closed so far**, tagged in each item below and
-in its own colour's section: Blue 2 (#191), Green 5a (#192), the four
-repository settings (Red 4 + Red 8, done through the API rather than a PR),
-and — bundled as one branch on Aaron's instruction, PR #194 — **White 4**
-(coverage), **Blue 3** (`cli.py`), **Green 1** (the Safari floor), half of
-**Blue 7** (ROADMAP), and an *answer* rather than a fix for **White 1** (the
-ReDoS alerts, which turn out to be unfixable-by-bounding; see the entry).
+in its own colour's section: Blue 2 (#191), Green 5a (#192), Red 7 (#193), and
+the four repository settings (Red 4 + Red 8, done through the API rather than
+a PR). Then — bundled as one branch on Aaron's instruction, PR #194 —
+**White 4** (coverage), **Blue 3** (`cli.py`), **Green 1** (the Safari floor),
+half of **Blue 7** (ROADMAP), and an *answer* rather than a fix for **White 1**
+(the ReDoS alerts, which turn out to be unfixable-by-bounding; see the entry).
+That is **nine of the twenty-two** the run opened with.
 
 **Still open — Aaron's ruling wanted.** Ordered by what a fresh session can
 act on soonest, not by color:
