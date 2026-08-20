@@ -2593,6 +2593,25 @@ act on soonest, not by color:
    `ubuntu-24.04-arm` runner, or keep it. **The only lever in six runs that
    would move CI's wall clock**, and the Dockerfile's own comment is the
    decision it was added under, which is why it is not a safe fix.
+
+   **CLOSED 2026-08-19 (stragglers, PR #193). Aaron chose the native runner.**
+   `image` is amd64-only and keeps every check that needs a loaded image;
+   `image-arm64` builds `linux/arm64` on `ubuntu-24.04-arm` and does nothing
+   else. Cache scopes are now named per architecture — left at the default
+   the two jobs share one and each evicts the other's layers every run, which
+   is a cache that costs storage and returns nothing. Expect the first run
+   after this to be *slower* than steady state on both legs: the new scopes
+   start cold.
+
+   Two consequences worth carrying. **`deploy` needs five jobs now**, which
+   `tests/test_packaging.py` enforced the moment the job was added — #188's
+   guard earning itself back within a day, and mutation-verified again here.
+   And **`image-arm64` is not a required check**: it gates the deploy, not the
+   merge. The branch protection list was read back from the API rather than
+   assumed (six contexts, unchanged), because ENGINEERING §5's own scar is a
+   table that claimed a check was required two days before it was. Adding it
+   is a repository setting and therefore Aaron's; until he does, a red
+   `image-arm64` blocks a release without blocking a merge.
 9. **White 4 — the coverage floor is a tripwire, not a floor.** 95.136%
    against `fail_under = 95`, ~16 statements of headroom on 11,512, and the
    comment beside it still claims "the suite runs about 96". Two honest
