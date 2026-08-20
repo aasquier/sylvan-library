@@ -60,11 +60,30 @@ its own branch or few, in this order because each drinks from the one before:
    job expose partial rows, and the Simulator renders the match live:
    commanders' art face off, brass win pips, rows sliding in, the bar as a
    forge-heat gauge (CSS only, `prefers-reduced-motion` honoured).
-3. **The Karsten shelf + mulligan policy search** (Tier 1.5, pure Python):
-   hypergeometric colored-source requirements and the regression land count
-   computed from the actual compiled 99, set beside the Monte Carlo answer;
-   a `KeepRule` sweep reporting the best keep rule per deck; a castability
-   heatmap per card and turn. Teaches while it advises (commandment 2).
+3. **The Karsten shelf + mulligan policy search** — *built 2026-08-21*
+   (`sim/karsten.py`, `sim/mulligan.py`, `api/shelfruns.py`, two Simulator
+   modes, `mtglab sim shelf` and `mtglab sim mulligan`). Hypergeometric
+   coloured-source requirements, a regression land count and a per-card
+   castability heatmap, all off the same compiled 99 Tier 1 is handed;
+   plus a 33-rule `KeepRule` grid search. Three things it decided that the
+   next steps inherit:
+
+   - **The two tiers answer different questions and must never be stacked in
+     one column.** The closed form asks whether the mana would be there
+     given the card is in hand; Tier 1 asks whether you cast it. They
+     coincide only on the commander, and there the measured gap runs -12.3
+     to +15.1 points across the six decks — ramp the arithmetic cannot see,
+     against tapped lands and colour screw it ignores. **That gap is the
+     product**, not a defect to tune away.
+   - **A verdict is reported per rung, not per colour** (commandment 2).
+     Mono-green Goreclaw covers every single-symbol card it owns and misses
+     one triple; "green: short by 11" would tell a beginner their mana base
+     is broken.
+   - **Flatness is measured against the default, never against the grid.**
+     The grid deliberately holds rules nobody would play, so its spread is
+     always wide; four of the six decks correctly report "your default is
+     already right", and then name the rule that deploys the same while
+     mulliganing 14% of hands instead of 43%.
 4. **Ratings, then the regression** — TrueSkill-style posteriors per
    archetype class and **never across** (goal 7's engine, goal 9's honest
    shape), then a win-probability logistic regression over compiled-deck

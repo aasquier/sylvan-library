@@ -1325,6 +1325,46 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         return _job_for(plan_lands(slug, payload, source=lib.source_for(owner)),
                         caller).as_dict()
 
+    @app.post("/api/sim/shelf")
+    def sim_shelf(payload: dict[str, Any], lib: Lib) -> dict[str, Any]:
+        """The closed form for one deck (Tier 1.5), computed in the request.
+
+        The one simulation route that is **not** a job, and the reason is a
+        measurement rather than a preference: `karsten.shelf` is arithmetic
+        over an already-compiled deck and runs in 0.03-0.04s, where a Tier 1
+        run is eighteen seconds. `api/shelfruns.py`'s docstring carries the
+        numbers. `owner` resolves as it does for `/api/sim/mana`.
+        """
+        slug = payload.get("slug")
+        if not slug:
+            raise HTTPException(status_code=422, detail="slug is required")
+        owner = str(payload.get("owner") or lib.my_owner)
+        from mtglab.api.shelfruns import shelf_result
+        try:
+            return shelf_result(slug, payload, source=lib.source_for(owner))
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            # No pool, or a deck that cannot compile. 422 rather than 500:
+            # this is a fact about the request's deck, not a broken server.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post("/api/sim/policy")
+    def sim_policy(payload: dict[str, Any], lib: Lib,
+                   caller: Scope) -> dict[str, Any]:
+        """Queue a mulligan policy search. `owner` as for `/api/sim/mana`.
+
+        A job, unlike the shelf above, because it is thirty-three seeded Tier 1
+        runs and takes about fifty seconds.
+        """
+        slug = payload.get("slug")
+        if not slug:
+            raise HTTPException(status_code=422, detail="slug is required")
+        owner = str(payload.get("owner") or lib.my_owner)
+        from mtglab.api.shelfruns import plan_policy
+        return _job_for(plan_policy(slug, payload, source=lib.source_for(owner)),
+                        caller).as_dict()
+
     @app.get("/api/forge")
     def forge_status() -> dict[str, Any]:
         """Is Tier 3 reachable from this process? (ADR 35.)

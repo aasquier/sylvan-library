@@ -481,6 +481,79 @@ TERMS: tuple[Term, ...] = (
         "it is why every result it gives you carries its caveat.",
         "simulator", ("goldfish", "tier-3")),
     Term(
+        "tier-1.5", "The closed form",
+        "The same questions as Tier 1, answered with arithmetic instead of "
+        "shuffling — exactly, and instantly.",
+        "Tier 1 shuffles your deck twenty thousand times and counts what "
+        "happened. The closed form works out the odds directly, without "
+        "shuffling at all, which makes it exact — but exact about a "
+        "simpler game. It assumes you keep your opening seven, play a land "
+        "every turn, and never wait on a tapped land or a summoning-sick "
+        "creature, and it cannot see ramp at all. So the two disagree, and "
+        "the disagreement is the useful part: it measures everything the "
+        "arithmetic left out.",
+        "simulator", ("tier-1", "stat.sources_needed", "stat.card_lag")),
+    Term(
+        "sim.target", "Consistency bar",
+        "How often you want a card's colours to be there on time. Ninety "
+        "percent is the usual answer.",
+        "Every source requirement is measured against this. Ninety percent "
+        "means accepting that one game in ten goes wrong on colour, which is "
+        "about as much as a deck can ask for without spending its whole list "
+        "on lands. A cut-throat deck may want more and a relaxed one may "
+        "happily take less — raising it does not improve your deck, it "
+        "changes what counts as good enough and so raises every number "
+        "beside it.",
+        "simulator", ("tier-1.5", "stat.sources_needed")),
+    Term(
+        "stat.sources_needed", "Sources needed",
+        "How many cards producing a colour you need to reliably cast a spell "
+        "of that colour on time.",
+        "Worked out from your deck's real size and the real number of "
+        "coloured symbols on the card, at the consistency bar you set. One "
+        "coloured symbol wants roughly a fifth of the deck making that "
+        "colour; two want about a third; three want nearly half, which is "
+        "why triple-symbol cards are so demanding in a hundred-card deck. "
+        "It is reported one rung per symbol count, because being short for "
+        "your greediest card is not the same as being short everywhere.",
+        "simulator", ("tier-1.5", "pip", "mana-base")),
+    Term(
+        "stat.card_lag", "Lag",
+        "Turns between what a card costs and the turn you can actually rely "
+        "on casting it.",
+        "A three-drop you cannot reliably cast until turn six is three turns "
+        "late, and that gap is a mana base problem rather than a card "
+        "problem. It assumes the card is already in your hand — this asks "
+        "whether the mana would be there, not whether you drew it, which is "
+        "a different question and a much lower number. Cards that never "
+        "become reliable inside the horizon are charged at least the gap "
+        "they would have if they arrived just past it.",
+        "simulator", ("tier-1.5", "stat.card_timing", "mana-base")),
+    Term(
+        "stat.regression_lands", "Suggested lands",
+        "A land count read off your curve by a published formula, rather "
+        "than by simulating this deck.",
+        "It is a straight line fitted to thousands of winning sixty-card "
+        "tournament decks, rescaled to a hundred cards: more expensive "
+        "cards want more lands, cheap acceleration wants fewer. It is fast "
+        "and it is a starting point, but it was not fitted to Commander and "
+        "it cannot see your cheap card draw, so it reads a little high. The "
+        "land sweep simulates this actual deck and prices flooding, which "
+        "this cannot; read them together.",
+        "simulator", ("stat.argmax_lands", "flood", "tier-1.5")),
+    Term(
+        "stat.policy_gain", "Policy gain",
+        "Extra spells deployed through turn 8 by the best mulligan rule, "
+        "against the one the simulator uses by default.",
+        "Keep rules are searched rather than assumed, and they are judged on "
+        "deployment for the same reason land counts are: mulligan rate alone "
+        "recommends keeping every hand, and hand quality alone recommends "
+        "mulliganing forever. Deployment prices both, because a hand thrown "
+        "away costs a card and a hand kept on two lands costs the turns it "
+        "spends stuck.",
+        "simulator", ("stat.spells_through_t8", "sim.min_pieces",
+                      "stat.mulligan_rate")),
+    Term(
         "tier-3", "Tier 3",
         "Forge — a real rules engine playing real games, with a real AI.",
         "Where Tier 1 stops, Forge starts: it plays the whole game, with "

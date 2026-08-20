@@ -371,6 +371,113 @@ export interface LandResult extends SimProvenance {
   caveat: string
 }
 
+/** Tier 1.5, the closed form. One rung of a colour's ladder.
+ *
+ * A colour is reported as a ladder of these rather than as one verdict: a
+ * deck short for its greediest triple-symbol card is not a deck short of that
+ * colour, and collapsing the two tells a beginner their mana base is broken
+ * when one card is greedy.
+ */
+export interface PipTierRow {
+  pips: number
+  turn: number
+  need: number
+  have: number
+  met: boolean
+  shortfall: number
+  odds_now: number
+  /** Capped server-side; `card_count` is the true total. */
+  cards: string[]
+  card_count: number
+}
+
+export interface ColorRequirementRow {
+  color: string
+  have: number
+  have_lands: number
+  met: boolean
+  shortfall: number
+  tiers: PipTierRow[]
+}
+
+/** One card's castability across turns 1..`horizon` — the heatmap's row.
+ *
+ * `on_curve` is null past the horizon rather than zero, because zero would be
+ * a claim the shelf never made. `lag` is null when the card never becomes
+ * reliable; the server has already sorted the list worst-first, so a client
+ * rendering the head is showing the rows worth reading.
+ */
+export interface CardOddsRow {
+  name: string
+  mv: number
+  on_curve: number | null
+  reliable_turn: number | null
+  lag: number | null
+  by_turn: number[]
+}
+
+export interface LandEstimate {
+  lands_now: number
+  recommended: number
+  delta: number
+  average_mana_value: number
+  cheap_accelerants: number
+  caveats: string[]
+}
+
+/** The closed form for one deck. Note it carries no `SimProvenance`: it is
+ *  computed in the request every time, so there is no seed to report and
+ *  nothing to be cached-and-stale about. */
+export interface ShelfResult {
+  slug: string
+  deck_name: string
+  deck_size: number
+  lands: number
+  target: number
+  on_the_play: boolean
+  horizon: number
+  colors: ColorRequirementRow[]
+  lands_estimate: LandEstimate
+  cards: CardOddsRow[]
+  approximated: string[]
+  caveat: string
+}
+
+export interface PolicyRow {
+  min_lands: number
+  max_lands: number
+  min_pieces: number
+  describe: string
+  spells_through_t8: number
+  mulligan_rate: number
+  avg_mulligans: number
+  median_commander_turn: number | null
+  color_screw_rate: number
+  stalled_turns: number
+}
+
+/** The mulligan policy search.
+ *
+ * `flat` is the server's verdict and the client must not recompute it: it is
+ * measured against the default rule rather than against the grid's range, and
+ * a second implementation of that rule here would be a second chance to get
+ * it wrong.
+ */
+export interface PolicyResult extends SimProvenance {
+  slug: string
+  deck_name: string
+  games: number
+  turns: number
+  rows: PolicyRow[]
+  best: PolicyRow
+  baseline: PolicyRow
+  gentlest: PolicyRow
+  spread: number
+  gain: number
+  flat: boolean
+  caveat: string
+}
+
 /** Whether Tier 3 is installed where the server runs (ADR 35). `why` is
  *  maintainer-facing prose and is never rendered — the client says it in its
  *  own words or, better, says nothing (the mode is honestly absent). */
@@ -2037,6 +2144,13 @@ export const api = {
   // own library, which is what an old bookmark's `?deck=` amounts to.
   simMana: (payload: Record<string, unknown>) => post<Job>('/api/sim/mana', payload),
   simLands: (payload: Record<string, unknown>) => post<Job>('/api/sim/lands', payload),
+  /** The closed form. Answers in the request rather than handing back a job —
+   *  it is 40ms of arithmetic, and the one simulation route that is not a
+   *  job. See `api/shelfruns.py` for the measurement behind that. */
+  simShelf: (payload: Record<string, unknown>) =>
+    post<ShelfResult>('/api/sim/shelf', payload),
+  simPolicy: (payload: Record<string, unknown>) =>
+    post<Job>('/api/sim/policy', payload),
   forgeStatus: () => get<ForgeStatus>('/api/forge'),
   simForge: (payload: Record<string, unknown>) => post<Job>('/api/sim/forge', payload),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),

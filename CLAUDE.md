@@ -283,6 +283,26 @@ src/mtglab/
   sim/compile.py          deck.yaml + pool -> SimCards
   sim/cache.py            memoised Tier 1 results, keyed on compiled input
   sim/tier1/engine.py     Monte Carlo goldfish
+  sim/karsten.py          Tier 1.5, the closed form: hypergeometric coloured
+                          source requirements, a regression land count and a
+                          per-card castability heatmap, all computed from the
+                          same compiled 99 Tier 1 is handed. Stdlib only
+                          (`math.comb`), no sampling, no seed, no model. It
+                          answers a *different* question from Tier 1 --
+                          "would the mana be there", not "did you cast it" --
+                          and the two coincide only on the commander, where
+                          the measured gap runs -12.3 to +15.1 points across
+                          the six decks. Which way it cuts is a fact about
+                          the deck (ramp the arithmetic cannot see, against
+                          tapped lands and colour screw the arithmetic
+                          ignores), which is why it renders beside the
+                          simulation and never instead of it
+  sim/mulligan.py         the keep-rule grid search: 33 rules, one seed,
+                          judged on spells through T8 like the land sweep.
+                          Its verdict is `flat` measured **against the
+                          default**, never against the grid's range -- the
+                          grid deliberately holds rules nobody would play, so
+                          a spread-based verdict would never fire
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse;
                           plus the hosted half (ADR 35) -- wire.py (what
                           crosses the private network, decks as deck.yaml
@@ -317,6 +337,13 @@ src/mtglab/
   api/jobs.py             the job registry; two pools, CPU and NET, and a
                           `key` that makes asking twice at once one job
   api/simruns.py          Tier 1 planned in the request, run in a job
+  api/shelfruns.py        Tier 1.5's two, shaped differently on purpose: the
+                          shelf is a **plain route** (measured at 0.03-0.04s,
+                          so a job would add a submit and a poll to a call
+                          that finishes before serialisation) and the policy
+                          search is a job (33 seeded Tier 1 runs, ~50s, CPU
+                          pool). The one place the sibling-duration rule came
+                          out *different* for two surfaces in one module
   api/forgeruns.py        Tier 3 heads-up matches as jobs (ADR 35): a gate
                           the client asks first, refusals in the request,
                           one FORGE lane worker so two JVMs cannot race the
@@ -590,6 +617,8 @@ mtglab claude argue <slug> --card X   # the case against a slot; never for it
 mtglab decks swap <slug> --out X --in Y --why '...'   # apply your choice
 mtglab sim mana <slug>            # baseline consistency
 mtglab sim lands <slug> 30 40     # is the land count right?
+mtglab sim shelf <slug>           # Tier 1.5 -- the closed form, no shuffling
+mtglab sim mulligan <slug>        # search keep rules; best policy for a deck
 mtglab sim cache                  # what Tier 1 results are memoised; --clear
 mtglab sim forge <a> <b> [c] [d]  # Tier 3 — Forge plays real games
 mtglab sim matches                # the match ledger: every Forge match recorded
@@ -948,6 +977,16 @@ State that caveat when quoting its numbers.
 speed.** Commander speed rises monotonically with land count, so optimising it
 alone always recommends more lands. Deployment peaks and then falls as flood
 sets in. That peak is the answer.
+
+**Tier 1.5** (`sim/karsten.py`, `mtglab sim shelf`) answers with arithmetic
+what Tier 1 answers by sampling -- exactly, and about a simpler game. It
+assumes you keep your seven, hit every land drop, and have every drawn source
+in play, and it cannot see ramp at all. **Quote it as a question about the
+mana base, never as a chance of having the card**: a 96.7% turn-one card is
+cast in 4.3% of games, and both figures are correct because they answer
+different questions. Its coloured requirements run a shade stricter than
+Karsten's published table, which models the London mulligan and this does not;
+the direction is known, documented and pinned by a test.
 
 **Tier 2** (pod simulator, not yet built, and **deferred behind Tier 3** as of
 2026-08-11) is a model of Magic. Right for bracket placement and matchup

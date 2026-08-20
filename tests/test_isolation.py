@@ -83,6 +83,14 @@ SHARED = {
     "/api/sim/mana": "submits a job against a deck the caller may see; the "
                      "owner is resolved through Library and the job is scoped",
     "/api/sim/lands": "submits a job too, same resolution, and the job is scoped",
+    # Tier 1.5's two. The shelf is the only simulation route that answers in
+    # the request rather than handing back a job -- it is 40ms of arithmetic --
+    # but it resolves its deck through Library exactly as the others do, so
+    # somebody else's private deck is a 404 here as well.
+    "/api/sim/shelf": "computes the closed form for a deck the caller may "
+                      "see; resolved through Library, answered in the request",
+    "/api/sim/policy": "submits a job against a deck the caller may see; same "
+                       "resolution as /api/sim/mana, and the job is scoped",
     # ADR 35's two. The gate is the same class of thing as `/api/claude`: a
     # fact about the environment, identical for every caller. The match route
     # resolves both decks through Library exactly as the two sim routes above
