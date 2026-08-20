@@ -15,7 +15,7 @@ import goldfishStill from '../assets/simulator/goldfish-still.webp'
 import goldfishWebm from '../assets/simulator/goldfish-loop.webm'
 import {
   api, errorMessage, followJob, type DeckTile, type ForgeResult, type Job,
-  type LandResult, type ManaResult,
+  type LandResult, type ManaResult, type PolicyResult, type ShelfResult,
 } from '../lib/api'
 import { ReplayGlyph } from '../components/glyphs'
 import { percent } from '../lib/mtg'
@@ -28,10 +28,11 @@ import {
 } from '../components/lazycharts'
 import { DataTable } from '../components/datatable'
 import { MatchTheater } from '../components/theater'
+import { ClosedForm, PolicyReport } from '../components/closedform'
 import { theaterRows } from '../lib/theater'
 import { HelpTip, Term } from '../components/term'
 
-type Mode = 'mana' | 'lands' | 'forge'
+type Mode = 'mana' | 'lands' | 'shelf' | 'policy' | 'forge'
 
 /**
  * Every control and every figure on this screen, keyed to `glossary.py`.
@@ -119,6 +120,18 @@ export default function Simulator() {
   const [job, setJob] = useState<Job | null>(null)
   const [mana, setMana] = useState<ManaResult | null>(null)
   const [lands, setLands] = useState<LandResult | null>(null)
+  // Tier 1.5. The shelf is not a job -- it answers in the request -- so it has
+  // no `Job` beside it and its own small in-flight flag instead.
+  const [shelf, setShelf] = useState<ShelfResult | null>(null)
+  const [shelfBusy, setShelfBusy] = useState(false)
+  const [policy, setPolicy] = useState<PolicyResult | null>(null)
+  // Its own control, like `forgeGames`, rather than sharing the mana run's
+  // twenty thousand and silently clamping it. A field reading 20,000 above a
+  // report saying "2,000 games each" is a screen contradicting itself, and
+  // the honest fix is a control that cannot be set to a number the run will
+  // not honour.
+  const [policyGames, setPolicyGames] = useState(2000)
+  const [target, setTarget] = useState(90)
   const [error, setError] = useState<string | null>(null)
   const cancelRef = useRef<null | (() => void)>(null)
 
@@ -176,20 +189,50 @@ export default function Simulator() {
     setMana(null)
     setLands(null)
     setForge(null)
-    try {
-      const payload = {
-        slug, owner, games, min_lands: minLands, max_lands: maxLands,
-        min_pieces: minPieces, seed: withSeed,
+    setShelf(null)
+    setPolicy(null)
+    const payload = {
+      slug, owner, games, min_lands: minLands, max_lands: maxLands,
+      min_pieces: minPieces, seed: withSeed,
+    }
+
+    // The closed form is the one mode with no job to follow: it is 40ms of
+    // arithmetic and the route answers in the request. It gets its own branch
+    // rather than a fake job, because pretending it is one would mean a
+    // spinner, a poll and a job id for a call that has already returned.
+    if (mode === 'shelf') {
+      setShelfBusy(true)
+      try {
+        setShelf(await api.simShelf({ slug, owner, target: target / 100 }))
+      } catch (e) {
+        setError(errorMessage(e))
+      } finally {
+        setShelfBusy(false)
       }
+      return
+    }
+
+    try {
       const submitted =
         mode === 'mana'
           ? await api.simMana({ ...payload, turns: 12 })
           : mode === 'lands'
             ? await api.simLands({ ...payload, low, high, games: Math.min(games, 25000) })
-            : await api.simForge({
-                a_slug: slug, a_owner: owner, b_slug: oppSlug,
-                b_owner: oppOwner, games: forgeGames, seed: withSeed,
-              })
+            : mode === 'policy'
+              ? await api.simPolicy({
+                  slug, owner, seed: withSeed,
+                  // Its own field, capped at 2,000: this multiplies by the
+                  // size of the grid, so the mana run's 20,000 would be
+                  // thirty-three simulations of 20,000 games. At 2,000 the
+                  // sampling error on deployment is already well under the
+                  // threshold the verdict is reported at, so a bigger sample
+                  // would buy precision the answer throws away.
+                  games: policyGames,
+                })
+              : await api.simForge({
+                  a_slug: slug, a_owner: owner, b_slug: oppSlug,
+                  b_owner: oppOwner, games: forgeGames, seed: withSeed,
+                })
       setJob(submitted)
       // The submitted job is handed on: results are cached server-side, so it
       // can already be `done` and there is nothing to poll for.
@@ -198,6 +241,7 @@ export default function Simulator() {
       const finished = await follower.promise
       if (mode === 'mana') setMana(finished.result as ManaResult)
       else if (mode === 'lands') setLands(finished.result as LandResult)
+      else if (mode === 'policy') setPolicy(finished.result as PolicyResult)
       else setForge(finished.result as ForgeResult)
     } catch (e) {
       setError(errorMessage(e))
@@ -215,7 +259,8 @@ export default function Simulator() {
     void run(next)
   }
 
-  const running = job?.status === 'queued' || job?.status === 'running'
+  const running = shelfBusy
+    || job?.status === 'queued' || job?.status === 'running'
 
   return (
     <div className="space-y-6">
@@ -268,6 +313,8 @@ export default function Simulator() {
                 options={[
                   { value: 'mana', label: 'Mana & consistency' },
                   { value: 'lands', label: 'Land count sweep' },
+                  { value: 'shelf', label: 'The closed form' },
+                  { value: 'policy', label: 'Mulligan policy search' },
                   // Only where the gate said so — absent, never greyed out.
                   ...(forgeReady
                     ? [{ value: 'forge', label: 'Real games (Forge)' }]
@@ -290,6 +337,10 @@ export default function Simulator() {
             <NumberField label="Games" value={forgeGames} onChange={setForgeGames}
                          min={1} max={20} help={help('sim.forge_games')} />
           </>
+        ) : mode === 'policy' ? (
+          <NumberField label="Games per rule" value={policyGames}
+                       onChange={setPolicyGames} min={200} max={2000} step={200}
+                       help={help('sim.games')} />
         ) : (
           <NumberField label="Games" value={games} onChange={setGames}
                        min={100} max={200000} step={1000} help={help('sim.games')} />
@@ -301,6 +352,10 @@ export default function Simulator() {
             <NumberField label="To lands" value={high} onChange={setHigh} min={21} max={60}
                          help={help('sim.land_range')} />
           </>
+        )}
+        {mode === 'shelf' && (
+          <NumberField label="Consistency %" value={target} onChange={setTarget}
+                       min={50} max={99} help={help('sim.target')} />
         )}
         {mode === 'mana' && (
           <>
@@ -363,6 +418,27 @@ export default function Simulator() {
                  style={{ width: `${job.percent}%`, background: 'var(--series-1)' }} />
           </div>
         </div>
+      )}
+
+      {/* Tier 1.5 renders as its own section rather than folded into the mana
+          screen. The numbers answer a different question -- "would the mana be
+          there", not "did you cast it" -- and stacking two true figures that
+          answer different questions in one column is how a screen lies with
+          correct numbers. `karsten.py`'s docstring carries the measurement. */}
+      {shelf && (
+        <section className="card-surface space-y-2 rounded-xl p-5">
+          <ClosedForm shelf={shelf} />
+          <Caveat>{shelf.caveat}</Caveat>
+        </section>
+      )}
+
+      {policy && (
+        <section className="card-surface space-y-2 rounded-xl p-5">
+          <PolicyReport policy={policy} />
+          <Provenance seed={policy.seed} cached={policy.cached}
+                      computed_at={policy.computed_at} />
+          <Caveat>{policy.caveat}</Caveat>
+        </section>
       )}
 
       {mana && (

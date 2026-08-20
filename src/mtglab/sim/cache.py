@@ -94,6 +94,7 @@ import hashlib
 import json
 import logging
 import sqlite3
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -218,13 +219,22 @@ def _card_form(card: SimCard) -> list[Any]:
 
 
 def key(kind: str, *, library: list[SimCard], commander: SimCard | None,
-        games: int, turns: int, keep_rule: KeepRule, seed: int) -> str | None:
+        games: int, turns: int, keep_rule: KeepRule, seed: int,
+        extra: Mapping[str, Any] | None = None) -> str | None:
     """The cache key for one `run()`, or `None` if caching is unavailable.
 
     Every argument here is an argument of `run`, which is the property
     `RUN_INPUTS` exists to keep true. `keep_rule` goes in through `asdict`
     rather than field by field, so a new mulligan lever is in the key the day
     it is added instead of the day somebody remembers it.
+
+    `extra` carries inputs that belong to one *kind* of run rather than to
+    `run` itself -- the mulligan sweep's grid is the first, since which rules
+    were tried decides the answer and no argument of `run` mentions them. It
+    is kept out of `fingerprint()` on purpose: the fingerprint is global, so
+    hashing `mulligan.py` into it would throw away every cached Tier 1 result
+    each time a grid constant moved, invalidating answers that provably could
+    not have changed. A per-kind input belongs in a per-kind key.
     """
     engine = fingerprint()
     if engine is None:
@@ -239,6 +249,9 @@ def key(kind: str, *, library: list[SimCard], commander: SimCard | None,
         "turns": turns,
         "keep_rule": asdict(keep_rule),
         "seed": seed,
+        # Absent rather than null when unused, so every key computed before
+        # this parameter existed still hashes to what it hashed to.
+        **({"extra": dict(extra)} if extra else {}),
     }
     blob = json.dumps(payload, sort_keys=True, separators=(",", ":"),
                       ensure_ascii=True)

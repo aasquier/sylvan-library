@@ -1409,6 +1409,124 @@ def test_land_sweep_returns_a_row_per_count_and_reports_the_spread(sim_client):
     assert result["caveat"], "Tier 1 numbers must ship with their caveat"
 
 
+# ------------------------------------------------- Tier 1.5, over the wire
+#
+# The HTTP surface, tested as a surface. CLAUDE.md's dossier lesson is exactly
+# this: forty-two tests exercised that module, none asked what the route did,
+# and it shipped broken. The shelf is the more dangerous of the two here
+# because it is the only simulation route that answers *in the request* -- so
+# the thing a client depends on is a 200 with a body, not a job id.
+
+
+def test_the_shelf_answers_in_the_request_rather_than_handing_back_a_job(sim_client):
+    """The one simulation route that is not a job, asserted as not a job.
+
+    A regression that made this a job would still 200 and would still "work"
+    to a careless test; the client would then poll a `id` that is really a
+    payload and render nothing.
+    """
+    body = sim_client.post("/api/sim/shelf", json={"slug": "mono-green"})
+    assert body.status_code == 200, body.text
+    payload = body.json()
+    assert "status" not in payload and "id" not in payload, (
+        "the shelf must answer with its result, not with a job")
+    assert payload["deck_size"] > 0
+    assert payload["caveat"]
+
+
+def test_the_shelf_requires_a_slug(sim_client):
+    assert sim_client.post("/api/sim/shelf", json={}).status_code == 422
+
+
+def test_an_unknown_deck_is_a_404_from_the_shelf(sim_client):
+    assert sim_client.post("/api/sim/shelf",
+                           json={"slug": "no-such-deck"}).status_code == 404
+
+
+def test_the_shelf_reports_a_colour_ladder_and_a_land_estimate(sim_client):
+    payload = sim_client.post("/api/sim/shelf",
+                              json={"slug": "mono-green"}).json()
+    green = next(c for c in payload["colors"] if c["color"] == "G")
+    assert green["tiers"], "a colour with no rungs is a colour nobody asked for"
+    for tier in green["tiers"]:
+        assert tier["need"] >= tier["pips"]
+        assert 0.0 <= tier["odds_now"] <= 1.0
+        # The card list is capped for the wire but the count is the truth, so
+        # a client can say "and 27 more" without being handed 27 names.
+        assert len(tier["cards"]) <= 6
+        assert tier["card_count"] >= len(tier["cards"])
+    assert payload["lands_estimate"]["caveats"], (
+        "the estimate must never ship without saying what it could not see")
+
+
+def test_the_shelf_rows_carry_a_full_turn_series(sim_client):
+    payload = sim_client.post("/api/sim/shelf",
+                              json={"slug": "mono-green"}).json()
+    horizon = payload["horizon"]
+    assert payload["cards"], "a deck with spells must produce rows"
+    for row in payload["cards"]:
+        assert len(row["by_turn"]) == horizon
+        assert all(0.0 <= x <= 1.0 for x in row["by_turn"])
+        # Null rather than zero past the horizon: "not asked" is not "no".
+        if row["mv"] > horizon:
+            assert row["on_curve"] is None
+
+
+def test_the_shelf_clamps_the_consistency_target(sim_client):
+    """An absurd target is clamped, not rejected -- `_mana_params`' rule."""
+    for target, expected in ((9.0, 0.99), (0.0, 0.5)):
+        payload = sim_client.post(
+            "/api/sim/shelf",
+            json={"slug": "mono-green", "target": target}).json()
+        assert payload["target"] == expected
+
+
+def test_a_higher_target_never_asks_for_fewer_sources(sim_client):
+    """Raising the bar cannot lower a requirement. A sign error here would
+    read as a deck improving because somebody got stricter."""
+    def need(target):
+        payload = sim_client.post(
+            "/api/sim/shelf",
+            json={"slug": "mono-green", "target": target}).json()
+        green = next(c for c in payload["colors"] if c["color"] == "G")
+        return green["tiers"][0]["need"]
+    assert need(0.95) >= need(0.75)
+
+
+def test_the_policy_search_is_a_job_and_finishes(sim_client):
+    submitted = sim_client.post(
+        "/api/sim/policy",
+        json={"slug": "mono-green", "games": 200}).json()
+    body = await_job(sim_client, submitted["id"])
+    assert body["status"] == "done", body
+    result = body["result"]
+    assert result["rows"], "a search with no rows has recommended nothing"
+    assert result["best"]["spells_through_t8"] == max(
+        r["spells_through_t8"] for r in result["rows"])
+    # The verdict rides on the payload so the client never recomputes it.
+    assert isinstance(result["flat"], bool)
+    assert result["gain"] == round(
+        result["best"]["spells_through_t8"]
+        - result["baseline"]["spells_through_t8"], 2)
+
+
+def test_the_policy_search_requires_a_slug(sim_client):
+    assert sim_client.post("/api/sim/policy", json={}).status_code == 422
+
+
+def test_a_policy_search_for_an_unknown_deck_fails_as_a_job(sim_client):
+    """`plan_policy` defers a planning failure into the job, like `plan_mana`.
+
+    A 200 then a job in state `error` is the shape the UI knows; failing at
+    the route instead would be an optimisation that broke something.
+    """
+    submitted = sim_client.post(
+        "/api/sim/policy", json={"slug": "no-such-deck", "games": 200})
+    assert submitted.status_code == 200
+    body = await_job(sim_client, submitted.json()["id"])
+    assert body["status"] == "error"
+
+
 def test_land_sweep_normalises_a_reversed_range(sim_client):
     """low/high the wrong way round should sweep, not return nothing."""
 

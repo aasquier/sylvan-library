@@ -705,6 +705,130 @@ def cmd_sim_lands(args: argparse.Namespace) -> None:
           "you are buying commander speed with flood.")
 
 
+def cmd_sim_shelf(args: argparse.Namespace) -> None:
+    """The closed form: what arithmetic says, before any shuffling happens.
+
+    Printed as a teaching sheet rather than as a table of figures, which is
+    commandment 2 in a terminal: every block says what it measured and what it
+    could not see, because a number nobody can interpret is worse than no
+    number at all.
+    """
+    from mtglab.sim import karsten
+
+    deck = _load(args.slug)
+    library, commander = _sim_cards(deck, _pool(deck))
+    shelf = karsten.shelf(library, commander, target=args.target,
+                          on_the_play=not args.on_the_draw)
+
+    seat = "on the play" if shelf.on_the_play else "on the draw"
+    print(f"{deck.name}")
+    print(f"{shelf.deck_size} cards, {shelf.lands} lands, "
+          f"judged at {shelf.target:.0%} consistency, {seat}.\n")
+
+    print("COLOURED SOURCES -- what your own cards demand")
+    print("  A rung per pip count, because a deck short on triple-pip cards is")
+    print("  not a deck short on colour.\n")
+    for req in shelf.colors:
+        print(f"  {req.color}: you have {req.have} sources "
+              f"({req.have_lands} lands, {req.have - req.have_lands} other)")
+        for tier in req.tiers:
+            verdict = "ok" if tier.met else f"short {tier.shortfall}"
+            more = f" (+{len(tier.cards) - 1} more)" if len(tier.cards) > 1 else ""
+            print(f"      {tier.pips} pip on T{tier.turn}: wants {tier.need:>2}"
+                  f"  -- {verdict:<8} you make it {tier.odds_now:.0%} of the "
+                  f"time  [{tier.cards[0]}{more}]")
+        print()
+
+    est = shelf.land_estimate
+    print("LAND COUNT -- a regression, not a simulation")
+    print(f"  You run {est.lands_now}. The fit says {est.recommended} "
+          f"({est.delta:+d}), from an average mana value of "
+          f"{est.average_mana_value} and {est.cheap_accelerants} cheap "
+          f"accelerants.")
+    for caveat in est.caveats:
+        print(f"    - {caveat}")
+    print("  Read `mtglab sim lands` beside this: it simulates *this* deck and "
+          "prices flood,")
+    print("  which the fit cannot.\n")
+
+    print("LATEST CARDS -- cost against when the mana is actually there")
+    print("  'lag' is turns between what a card costs and when you can rely on")
+    print("  casting it. This assumes the card is in your hand; it is a "
+          "question")
+    print("  about the mana base, not about drawing.\n")
+    shown = [o for o in shelf.odds if o.mv <= karsten.HORIZON][: args.top]
+    print(f"  {'card':38} {'cost':>4} {'on curve':>9} {'reliable':>9} {'lag':>6}")
+    for odds in shown:
+        curve = "n/a" if odds.on_curve is None else f"{odds.on_curve:.0%}"
+        reliable = ("never" if odds.reliable_turn is None
+                    else f"T{odds.reliable_turn}")
+        lag = f"+{odds.lag}" if odds.lag is not None else f">={odds.lateness}"
+        print(f"  {odds.name[:38]:38} {odds.mv:>4} {curve:>9} {reliable:>9} "
+              f"{lag:>6}")
+    if shelf.approximated:
+        print(f"\n  {len(shelf.approximated)} card(s) demand two or more "
+              "colours, where this method")
+        print("  approximates and reads slightly low: "
+              f"{', '.join(shelf.approximated[:4])}"
+              + (", ..." if len(shelf.approximated) > 4 else ""))
+
+
+def cmd_sim_mulligan(args: argparse.Namespace) -> None:
+    """Search the keep-rule grid and report which policy deploys most."""
+    from mtglab.sim import mulligan
+
+    deck = _load(args.slug)
+    library, commander = _sim_cards(deck, _pool(deck))
+    grid = mulligan.candidates()
+    print(f"{deck.name}: {len(grid)} keep rules x {args.games:,} games "
+          f"(seed {args.seed}) ...\n")
+    sweep = mulligan.search(library, commander, games=args.games,
+                            turns=args.turns, seed=args.seed)
+
+    print(f"  {'spells T8':>9} {'mull%':>7} {'cmdr':>5}  rule")
+    for row in sweep.rows[: args.top]:
+        marks = "".join((
+            "*" if row is sweep.best else " ",
+            "=" if (row.min_lands, row.max_lands, row.min_pieces)
+            == (sweep.baseline.min_lands, sweep.baseline.max_lands,
+                sweep.baseline.min_pieces) else " ",
+        ))
+        cmdr = ("--" if row.median_commander_turn is None
+                else f"T{row.median_commander_turn:g}")
+        print(f"{marks}{row.spells_through_t8:>9.2f} {row.mulligan_rate:>7.1%} "
+              f"{cmdr:>5}  {row.describe}")
+    print("\n  * best   = the default this simulator uses when you choose "
+          "nothing\n")
+
+    if sweep.flat:
+        print(f"NO CHANGE WORTH MAKING. The best rule beats your default by "
+              f"{sweep.gain:+.2f} spells")
+        print(f"through turn 8, under the {mulligan.FLAT} threshold this calls "
+              "noise. The grid")
+        print(f"spans {sweep.spread:.2f} spells overall, but most of that "
+              "range is rules nobody")
+        print("would play -- flatness is measured against your default, not "
+              "against the grid.")
+        gentle = sweep.gentlest
+        if gentle.mulligan_rate < sweep.baseline.mulligan_rate - 0.05:
+            print(f"\nStill worth knowing: '{gentle.describe}' deploys the "
+                  f"same ({gentle.spells_through_t8:.2f})")
+            print(f"while mulliganing {gentle.mulligan_rate:.0%} of hands "
+                  f"instead of {sweep.baseline.mulligan_rate:.0%}. Same "
+                  "result, fewer hands thrown away.")
+    else:
+        print(f"BEST: {sweep.best.describe}")
+        print(f"  {sweep.best.spells_through_t8:.2f} spells through turn 8, "
+              f"{sweep.gain:+.2f} against your default's "
+              f"{sweep.baseline.spells_through_t8:.2f},")
+        print(f"  mulliganing {sweep.best.mulligan_rate:.0%} of hands against "
+              f"{sweep.baseline.mulligan_rate:.0%}.")
+    print()
+    print("Judged on spells deployed through turn 8: mulligan rate alone "
+          "recommends keeping")
+    print("everything, and hand quality alone recommends mulliganing forever.")
+
+
 def cmd_sim_cache(args: argparse.Namespace) -> None:
     """Inspect or empty the memoised Tier 1 results.
 
@@ -2297,6 +2421,26 @@ def main(argv: Sequence[str] | None = None) -> None:
     ld.add_argument("--games", type=int, default=5000)
     ld.add_argument("--seed", type=int, default=7)
     ld.set_defaults(func=cmd_sim_lands)
+    sh = sim.add_parser("shelf",
+                        help="Tier 1.5 -- the closed form: coloured source "
+                             "requirements, a land count and per-card lag")
+    sh.add_argument("slug")
+    sh.add_argument("--target", type=float, default=0.90,
+                    help="consistency to judge against (default 0.90)")
+    sh.add_argument("--on-the-draw", action="store_true",
+                    help="judge on the draw; the default is the harder case")
+    sh.add_argument("--top", type=int, default=15,
+                    help="how many of the latest cards to list")
+    sh.set_defaults(func=cmd_sim_shelf)
+    mu = sim.add_parser("mulligan",
+                        help="search keep rules and report the best policy")
+    mu.add_argument("slug")
+    mu.add_argument("--games", type=int, default=2000,
+                    help="games per rule; the grid is ~33 rules")
+    mu.add_argument("--turns", type=int, default=10)
+    mu.add_argument("--seed", type=int, default=7)
+    mu.add_argument("--top", type=int, default=10)
+    mu.set_defaults(func=cmd_sim_mulligan)
     sc = sim.add_parser("cache", help="what Tier 1 results are memoised")
     sc.add_argument("--clear", action="store_true",
                     help="drop every cached result; they recompute on demand")

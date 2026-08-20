@@ -28,6 +28,16 @@
   --seq-450: #2a78d6;
   --seq-600: #184f95;
 
+  /* The castability heatmap (Tier 1.5). A sequential ramp of one hue rather
+     than red-to-green: the grid's values are not good-versus-bad -- 40% on
+     turn two for an eight-drop is neither -- and a red/green ramp is the
+     commonest way to build a chart a colourblind reader cannot use. Every
+     cell prints its own number over the wash, so the colour finds the shape
+     and never carries the value on its own. `--heat-on` is the ink for a
+     cell whose wash has gone dark enough to swallow body text. */
+  --heat-ink: #2a78d6;
+  --heat-on: #fcfcfb;
+
   --status-good: #0ca30c;
   --status-warning: #fab219;
   --status-serious: #ec835a;
@@ -96,6 +106,9 @@
   --seq-400: #3987e5;
   --seq-450: #5598e7;
   --seq-600: #86b6ef;
+
+  --heat-ink: #5598e7;
+  --heat-on: #0d0d0d;
 
   --vine: #6fae7f;
 }
