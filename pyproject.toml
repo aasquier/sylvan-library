@@ -183,9 +183,27 @@ skip_empty = true
 # argue/dossier/research printing, 70% -> 98% for cli.py), the theme modes'
 # call path faked at `Turn`, Forge's run path faked at `subprocess`, the
 # Scryfall ingest against fake bulk files, and the ADR 22 SQL deck tier
-# exercised directly. The point of the floor is a percent of headroom: the
-# suite runs about 96, so a change that costs a full point of coverage is
-# loud, and ordinary churn is not.
+# exercised directly. The point of the floor is a percent of headroom, so that
+# a change costing a full point of coverage is loud and ordinary churn is not.
+#
+# **That headroom is a measured number and it has to be re-measured, not
+# recalled.** The line here used to say "the suite runs about 96", which was
+# true when it was written and had been false for two polish runs by the time
+# anybody checked: the suite reached 95.0 on 2026-08-16 and 95.136 on
+# 2026-08-19, which is ~16 statements above the floor on 11,512 -- a tripwire
+# rather than a floor, one uncovered branch from a red build nobody would
+# recognise. The honest options were to lower the floor or to close the gap;
+# Aaron chose to close it.
+#
+#   2026-08-19: 95.185% -> **95.749%** (11,573 statements, 492 missed), which
+#   is ~87 statements of headroom. The ground came from the four modules
+#   carrying the gap, and from behaviour that had never been asserted rather
+#   than from lines touched to make a number move: the admin routes' refusals
+#   (mail unconfigured, a bounced invite, a tier this build does not ship),
+#   the two spellings of the account-state ladder checked against each other,
+#   the Linux half of the memory panel that only the container ever runs, the
+#   argue sweep's credential-vanishes-mid-run path, and the animist
+#   downloader's `.part` discipline. 76%/85%/86%/81% -> 97%/99%/98%/97%.
 fail_under = 95
 
 [tool.pytest.ini_options]
@@ -208,7 +226,7 @@ markers = [
 ]
 
 [tool.mypy]
-# Strict by default, with a named and shrinking list of exceptions below.
+# Strict, over the whole package, with no per-module exception left.
 #
 # That direction matters more than the starting point. The alternative --
 # lax by default, strict where someone opted in -- means a new module is born
@@ -228,19 +246,23 @@ strict = true
 # Show the rule name so a failure says which knob it came from.
 show_error_codes = true
 
-# The one module that does not pass `--strict` yet. It is here to be worked
-# down, not to be permanent -- and until then the *rest* of the package cannot
-# regress, which is the point. `check_untyped_defs` still applies to it (that
-# was clean across the whole package on day one), so this is a weaker check
-# rather than no check.
+# **The exception list is empty as of 2026-08-19, and the empty list is the
+# whole argument for having kept it short.** `cli.py` was the last name on it
+# and the only one that ever grew while sitting there: 79 errors when the
+# checker landed, 109 on 2026-08-16, 126 on 2026-08-19. A module on this list
+# absorbs every new untyped function without a word, and three consecutive
+# rises are what a silent absorber looks like from outside.
 #
-#   cli.py   109   (79 when the checker landed; measured again 2026-08-16)
-#
-# That number went **up**, which is the argument for keeping the list short:
-# a module on it absorbs every new untyped function without a word. The 109
-# are 59 `no-untyped-def` and 48 `no-untyped-call` -- the argparse handlers
-# calling each other -- so it is annotations rather than a rewrite, just a
-# lot of them, and it wants its own branch.
+# Graduating it cost annotations and nothing else -- no restructure. The 126
+# were 73 `no-untyped-def`, 52 `no-untyped-call` and one `no-any-return`, and
+# 53 of the 73 were the same signature written 53 times: an argparse handler
+# takes a `Namespace` and returns nothing. The `no-untyped-call` errors were
+# not separate work at all; they were the first 73 seen from the call site,
+# and annotating the callee cleared them without a single edit at the caller.
+# What was left is what the other graduations left: `Any` coming back out of
+# a JSON-shaped dict, named into a local so the return type is checked rather
+# than waived. Types needed only in a signature are imported under
+# `TYPE_CHECKING`, so the CLI's deliberate import laziness is intact.
 #
 # api/service.py and api/simruns.py graduated 2026-08-12. The other six of the
 # original eight -- api/app.py, artifacts/generate.py, and decks/{analyze,
@@ -249,23 +271,7 @@ show_error_codes = true
 # cards/db.py graduated 2026-08-16 (24 errors, all annotations: the `con`
 # parameters take the `Connection` alias the module already defined, the JSON
 # helpers take `dict[str, Any]`, and two `Any` returns became named locals).
-[[tool.mypy.overrides]]
-module = [
-    "mtglab.cli",
-]
-# `strict` is not a per-module setting -- it is shorthand that expands at the
-# top level only, so `strict = false` here would be silently ignored and these
-# modules would fail the build anyway. The flags it turns on have to be named
-# one at a time, which is tedious but at least makes the exemption explicit:
-# these two are relaxed, and everything else `strict` implies still applies.
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-disallow_untyped_calls = false
-disallow_any_generics = false
-warn_return_any = false
-# The one that stays on. It was clean across the whole package on day one, so
-# these modules are still checked -- just not required to be annotated.
-check_untyped_defs = true
+# cli.py graduated 2026-08-19 and closed the list.
 
 # imageio-ffmpeg ships no py.typed and no stubs exist for it. The surface this
 # package uses is four call sites in animist/{encode,verify}.py, each wrapped

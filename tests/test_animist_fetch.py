@@ -130,3 +130,99 @@ def test_category_fetch_lands_every_passing_file(tmp_path: Path) -> None:
     assert set(local) == {"RWS1909 The Star.jpg"}
     assert confirmed.skipped == ("Banner.jpg",)
     assert len(calls) == 1
+
+
+# ---------------------------------------------- the downloader behind the seam
+
+class _FakeResponse:
+    """Enough of an HTTP response for the chunked read the downloader does.
+
+    `watch` runs on every chunk, which is where the ordering claim is
+    checkable: what the filesystem looks like *during* the body read is the
+    whole point of writing through a `.part`.
+    """
+
+    def __init__(self, payload: bytes, chunk: int,
+                 watch: Any = None) -> None:
+        self._rest = payload
+        self._chunk = chunk
+        self._watch = watch
+
+    def read(self, size: int) -> bytes:
+        if self._watch is not None:
+            self._watch()
+        take, self._rest = self._rest[:self._chunk], self._rest[self._chunk:]
+        return take
+
+    def __enter__(self) -> _FakeResponse:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+
+def test_the_real_downloader_writes_a_part_file_and_renames_it(tmp_path,
+                                                               monkeypatch):
+    """`_download` is what runs when nothing injects a downloader, and every
+    other test in this file replaces it -- so the discipline it copied from
+    `cards/db.py` had no test of its own.
+
+    Both halves of that discipline are asserted: the project's User-Agent
+    goes out on the request, and the bytes land through a `.part` that is gone
+    once the rename completes. The chunk size is deliberately smaller than the
+    payload, because a single-read fake would pass whether or not the loop
+    works.
+    """
+    from mtglab.animist import fetch as fetch_mod
+    from mtglab.animist.sources import USER_AGENT
+
+    seen: dict[str, Any] = {}
+    target = tmp_path / "leaves.jpg"
+
+    def mid_flight() -> None:
+        # What the filesystem looks like while the body is arriving. The
+        # rename at the end proves nothing about order unless this does.
+        seen.setdefault("part_mid_flight",
+                        (tmp_path / "leaves.jpg.part").exists())
+        seen.setdefault("target_mid_flight", target.exists())
+
+    def fake_urlopen(request: Any, timeout: float | None = None) -> Any:
+        seen["url"] = request.full_url
+        seen["agent"] = request.get_header("User-agent")
+        seen["timeout"] = timeout
+        return _FakeResponse(b"a" * 5000, chunk=1024, watch=mid_flight)
+
+    monkeypatch.setattr(fetch_mod.urllib.request, "urlopen", fake_urlopen)
+
+    fetch_mod._download("https://img.example/leaves.jpg", target)
+
+    assert target.read_bytes() == b"a" * 5000
+    assert seen["part_mid_flight"] is True
+    assert seen["target_mid_flight"] is False, \
+        "the finished name appeared before the body did"
+    assert not (tmp_path / "leaves.jpg.part").exists(), \
+        "an interrupted download must never be mistaken for a cached copy"
+    assert seen["url"] == "https://img.example/leaves.jpg"
+    assert seen["agent"] == USER_AGENT
+    assert seen["timeout"] is not None, "a fetch with no timeout can hang"
+
+
+def test_a_failed_download_leaves_no_finished_file(tmp_path, monkeypatch):
+    """The reason the `.part` exists at all. A connection that dies mid-body
+    must not leave something the next run reads as cached -- `fetch_source`
+    skips anything already at the target path, so a truncated file there would
+    be permanent."""
+    from mtglab.animist import fetch as fetch_mod
+
+    class _Dying(_FakeResponse):
+        def read(self, size: int) -> bytes:
+            raise OSError("the connection went away")
+
+    monkeypatch.setattr(fetch_mod.urllib.request, "urlopen",
+                        lambda request, timeout=None: _Dying(b"", 1))
+    target = tmp_path / "leaves.jpg"
+
+    with pytest.raises(OSError):
+        fetch_mod._download("https://img.example/leaves.jpg", target)
+
+    assert not target.exists(), "a half-download must not look cached"

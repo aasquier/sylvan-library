@@ -19,6 +19,14 @@ them as separate steps on purpose, so a type error reports as a type error.
 
 ## Conventions that are load-bearing
 
+- **The browser floor is Safari 16.4** (declared 2026-08-19), and it is a
+  declared value rather than a remembered one: `FLOOR` in
+  `tests/test_browser_floor.py`, checked against the *committed bundle* rather
+  than against `web/src`, because every feature that ever moved it arrived
+  through a dependency. Two independent things hold it — Tailwind v4's
+  `@property` and `color-mix(in lab, …)`, and the camera door's SIMD wasm core
+  — so lowering it means answering both. That file's docstring is the whole
+  argument; do not re-derive it here.
 - **Routes are lazy.** Every non-landing screen is a `React.lazy` line in
   `App.tsx`; a new screen wants one, not a top-level import. The entry chunk
   is ~266 kB and stays that way by this rule.

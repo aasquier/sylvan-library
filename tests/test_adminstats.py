@@ -17,6 +17,7 @@ properties are mostly about honesty on a fresh box:
 import logging
 import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -323,3 +324,214 @@ def test_activity_sees_the_job_registry_as_counts_only(client):
         assert "somebody's deck" not in str(body)
     finally:
         jobs.clear()
+
+
+# ------------------------------------------- the two spellings of one ladder
+
+def test_the_accounts_table_and_the_dashboard_agree_about_every_state():
+    """`api/admin.py:_state` and `adminstats.py:_user_state` are the same four
+    rules written twice, and the second one's docstring says the duplication is
+    deliberate. This is that claim made checkable.
+
+    Both spellings are called over the same four accounts on the same
+    connection. The comment argues that a disagreement would show up as the
+    accounts table and the dashboard tile contradicting each other on one page;
+    without this, the two could drift for a release before anybody noticed,
+    which is precisely what the shared import was rejected for avoiding
+    *later* rather than never.
+    """
+    from mtglab.api import admin as admin_routes
+    from mtglab.auth import invites
+
+    with config.use_paths(data_dir=Path(tempfile.mkdtemp()) / "data"):
+        con = db.connect()
+        try:
+            signed_in = users.create(con, "active", password=PASSWORD)
+            invited = users.create(con, "invited", email="i@example.com")
+            invites.send_invite(con, invited, sender=_Silent())
+            # Created on the machine and never given one: `mtglab users add`
+            # without a password, and no invite to claim either.
+            stranded = users.create(con, "stranded")
+            off = users.create(con, "off", password=OTHER)
+            users.set_disabled(con, off.id, True)
+
+            expected = {"active": "active", "invited": "invited",
+                        "stranded": "no password", "off": "disabled"}
+            for user in (signed_in, invited, stranded, off):
+                fresh = users.get(con, user.username)
+                table = admin_routes._state(con, fresh)
+                tile = adminstats._user_state(con, fresh)
+                assert table == tile == expected[fresh.username], (
+                    f"{fresh.username}: accounts table says {table!r}, "
+                    f"dashboard says {tile!r}")
+        finally:
+            con.close()
+
+
+class _Silent:
+    """An `EmailSender` that sends nothing. No test here sends mail."""
+
+    def send(self, message) -> None:
+        del message
+
+
+# ----------------------------------------- the platform the container is on
+
+class _FakeProc:
+    """Enough of `Path` to stand in for the two files only Linux has.
+
+    The deployed instance is the audience for `_rss` and `_machine_memory`,
+    and the dev Mac takes the fallback branch in both -- so the code that
+    actually runs in production is the code no test on this machine reaches.
+    Mapping the two `/proc` paths onto real files is the cheapest way to run
+    the Linux half here; everything else delegates, so nothing else changes.
+    """
+
+    def __init__(self, mapping: dict[str, Path]) -> None:
+        self._mapping = mapping
+
+    def __call__(self, raw: str) -> Path:
+        return self._mapping.get(raw, Path(raw))
+
+
+def test_resident_memory_is_read_from_proc_where_there_is_one(tmp_path,
+                                                              monkeypatch):
+    """Linux reports the *current* RSS in kilobytes; the fallback reports a
+    peak. `kind` is what lets the page label the number honestly, so it is
+    asserted alongside the value rather than treated as decoration."""
+    status = tmp_path / "status"
+    status.write_text("Name:\tpython\nVmRSS:\t  123456 kB\nThreads:\t9\n")
+    monkeypatch.setattr(adminstats, "Path",
+                        _FakeProc({"/proc/self/status": status}))
+
+    assert adminstats._rss() == {"bytes": 123456 * 1024, "kind": "current"}
+
+
+def test_an_unreadable_proc_falls_back_rather_than_failing(tmp_path,
+                                                           monkeypatch,
+                                                           caplog):
+    """A stats panel may not be the thing that takes the page down. The file
+    exists and its contents are nonsense, which is the shape a container
+    runtime change would produce."""
+    status = tmp_path / "status"
+    status.write_text("VmRSS:\tnot-a-number kB\n")
+    monkeypatch.setattr(adminstats, "Path",
+                        _FakeProc({"/proc/self/status": status}))
+
+    with caplog.at_level(logging.WARNING, logger="mtglab.api.adminstats"):
+        answer = adminstats._rss()
+
+    assert answer["kind"] == "peak", "fell back rather than raising"
+    assert caplog.records, "a broken /proc is worth saying out loud"
+
+
+def test_available_memory_is_read_where_the_kernel_offers_it(tmp_path,
+                                                             monkeypatch):
+    """`MemAvailable` is Linux's own answer to how much could be allocated
+    before swapping. There is no portable equivalent, so off Linux the field
+    is absent rather than approximated -- which is why it needs a Linux."""
+    meminfo = tmp_path / "meminfo"
+    meminfo.write_text("MemTotal:       2048000 kB\n"
+                       "MemFree:          10240 kB\n"
+                       "MemAvailable:   1024000 kB\n")
+    monkeypatch.setattr(adminstats, "Path",
+                        _FakeProc({"/proc/meminfo": meminfo}))
+
+    assert adminstats._machine_memory()["available_bytes"] == 1024000 * 1024
+
+
+def test_a_platform_that_cannot_be_asked_reports_no_total(monkeypatch):
+    """`os.sysconf` is the portable half and it is not portable everywhere.
+    None rather than a guess: a memory tile showing an invented total is
+    worse than one showing a gap."""
+    monkeypatch.setattr(adminstats.os, "sysconf",
+                        lambda name: (_ for _ in ()).throw(ValueError(name)))
+
+    assert adminstats._machine_memory()["total_bytes"] is None
+
+
+def test_a_garbled_meminfo_leaves_the_field_absent(tmp_path, monkeypatch):
+    """Absent, not zero -- the same rule the storage view follows, because
+    zero free memory and no answer are very different things to show."""
+    meminfo = tmp_path / "meminfo"
+    meminfo.write_text("MemAvailable:\n")
+    monkeypatch.setattr(adminstats, "Path",
+                        _FakeProc({"/proc/meminfo": meminfo}))
+
+    assert adminstats._machine_memory()["available_bytes"] is None
+
+
+def test_a_machine_with_no_load_average_reports_none_rather_than_500ing(
+        client, monkeypatch):
+    """`os.getloadavg` raises where the platform cannot answer. An empty list
+    is a widget that hides; an exception is an admin page that does not load."""
+    monkeypatch.setattr(adminstats.os, "getloadavg",
+                        lambda: (_ for _ in ()).throw(OSError("no such thing")))
+
+    assert client.get("/api/admin/stats/system").json()["load"] == []
+
+
+# -------------------------------------------------- when the disk says no
+
+def test_a_store_that_cannot_be_sized_is_absent_rather_than_zero(tmp_path,
+                                                                 monkeypatch,
+                                                                 caplog):
+    """The third answer this helper can give. `None` already means "not there
+    yet"; a directory that refuses to be walked is also not a size, and
+    reporting `0` would put a full volume on the page as an empty one."""
+    directory = tmp_path / "cache"
+    directory.mkdir()
+    monkeypatch.setattr(Path, "rglob",
+                        lambda self, pattern: (_ for _ in ()).throw(
+                            OSError("permission denied")))
+
+    with caplog.at_level(logging.WARNING, logger="mtglab.api.adminstats"):
+        assert adminstats._size_of(directory) is None
+
+    assert caplog.records, "a refused read is worth saying out loud"
+
+
+def test_counting_directories_survives_a_refused_listing(tmp_path,
+                                                         monkeypatch):
+    """Zero here is right rather than a lie: the count is "how many decks",
+    and a listing that cannot be read is a count nobody can act on."""
+    directory = tmp_path / "decks"
+    directory.mkdir()
+    monkeypatch.setattr(Path, "iterdir",
+                        lambda self: (_ for _ in ()).throw(OSError("nope")))
+
+    assert adminstats._count_dirs(directory) == 0
+
+
+def test_a_corrupt_app_db_reports_no_version_and_still_reports_the_expected_one(
+        tmp_path, caplog):
+    """The other half of the pair. `applied` is a fact about the file and can
+    go missing; `expected` is a fact about the code and cannot -- so a
+    database that is not a database must still leave the tile able to say
+    what this build was written against."""
+    (tmp_path / "app.db").write_text("this is not a database")
+
+    with (config.use_paths(data_dir=tmp_path),
+          caplog.at_level(logging.WARNING, logger="mtglab.api.adminstats")):
+        reported = adminstats._schema()
+
+    assert reported == {"applied": None, "expected": db.SCHEMA_VERSION}
+    assert caplog.records, "a corrupt app.db is worth a warning"
+
+
+# --------------------------------------------------- the one view off the box
+
+def test_fly_metrics_report_unconfigured_rather_than_broken(client,
+                                                            monkeypatch):
+    """`FLY_METRICS_TOKEN` is the maintainer's to mint and unset is an
+    ordinary state, so the widget hides rather than showing a dashboard that
+    looks broken. The route is `async` and hands the blocking fetch to a
+    threadpool; going through the client is what exercises that."""
+    from mtglab.api import flymetrics
+
+    monkeypatch.delenv("FLY_METRICS_TOKEN", raising=False)
+    flymetrics.reset()
+
+    body = client.get("/api/admin/stats/fly").json()
+
+    assert body == {"configured": False, "ok": False, "values": {}}

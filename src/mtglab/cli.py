@@ -37,7 +37,10 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Sequence
 from pathlib import Path
+from types import ModuleType
+from typing import TYPE_CHECKING, Any
 
 from mtglab import config
 
@@ -53,6 +56,20 @@ from mtglab.sim.compile import (
     enters_tapped,
     fetches_lands,
 )
+
+# Types only. Every one of these lives behind a module this file imports inside
+# a function on purpose -- the pool's DuckDB, the depth extra's torch, Pillow --
+# and `from __future__ import annotations` means a name used only in a
+# signature never has to exist at run time. Importing them for real here would
+# undo the laziness the commands were written for.
+if TYPE_CHECKING:  # pragma: no cover
+    import sqlite3
+
+    from mtglab.animist.recipe import Recipe
+    from mtglab.cardmotion.depth import DepthModel
+    from mtglab.cards.db import CardRecord
+    from mtglab.mutate.harness import Result
+    from mtglab.sim.tier1.engine import SimCard
 
 # Re-exported for callers that still import them from here. The definitions
 # live in `config` so the API does not have to import the CLI, and so tests can
@@ -75,7 +92,7 @@ def _load(slug: str) -> Deck:
     return Deck.load(path)
 
 
-def _pool(deck: Deck):
+def _pool(deck: Deck) -> dict[str, CardRecord] | None:
     """Look up every card in the deck. Returns None if the DB is absent, so
     callers can degrade to structural checks with a visible warning."""
     if not config.DB_PATH.exists():
@@ -91,7 +108,7 @@ def _pool(deck: Deck):
 
 # --------------------------------------------------------------------- data
 
-def cmd_data_refresh(args):
+def cmd_data_refresh(args: argparse.Namespace) -> None:
     from mtglab.cards import db
     con = db.connect(config.DB_PATH)
     print("downloading oracle_cards ...")
@@ -108,7 +125,7 @@ def cmd_data_refresh(args):
     con.close()
 
 
-def cmd_data_snapshot(args):
+def cmd_data_snapshot(args: argparse.Namespace) -> None:
     from mtglab.cards import db
     con = db.connect(config.DB_PATH)
     n = db.snapshot_prices(con)
@@ -123,7 +140,7 @@ def load_all_decks(decks_dir: Path | None = None) -> list[Deck]:
     return [Deck.load(p) for p in config.deck_paths(decks_dir)]
 
 
-def cmd_decks_list(args):
+def cmd_decks_list(args: argparse.Namespace) -> None:
     if not config.DECKS_DIR.exists():
         sys.exit("no decks/ directory")
     for deck in load_all_decks():
@@ -137,7 +154,7 @@ def cmd_decks_list(args):
               f"{cmd}{draft}")
 
 
-def cmd_decks_validate(args):
+def cmd_decks_validate(args: argparse.Namespace) -> None:
     from mtglab.decks.validate import validate
     deck = _load(args.slug)
     rep = validate(deck, _pool(deck))
@@ -146,7 +163,7 @@ def cmd_decks_validate(args):
     sys.exit(1 if rep.errors else 0)
 
 
-def cmd_decks_import(args):
+def cmd_decks_import(args: argparse.Namespace) -> None:
     """Bring a decklist in as a draft.
 
     Shares its implementation with the API, so a list imported in the terminal
@@ -201,7 +218,7 @@ def cmd_decks_import(args):
           "rationale for you.")
 
 
-def cmd_decks_suggest(args):
+def cmd_decks_suggest(args: argparse.Namespace) -> None:
     """Shortlist replacements for a card that has to leave the deck.
 
     Informational, so it exits 0 even when the deck is broken. `decks validate`
@@ -256,7 +273,7 @@ def cmd_decks_suggest(args):
         print()
 
 
-def _report_edit(result):
+def _report_edit(result: dict[str, Any]) -> None:
     """What every deck edit prints: the gate, then the reminder to commit.
 
     An edit that did not re-run the gate would be a deck changed and
@@ -274,7 +291,7 @@ def _report_edit(result):
           "  edit changed.")
 
 
-def cmd_decks_swap(args):
+def cmd_decks_swap(args: argparse.Namespace) -> None:
     """Apply a swap the user has already decided on.
 
     Shares its implementation with the API rather than duplicating it, so the
@@ -292,7 +309,7 @@ def cmd_decks_swap(args):
     _report_edit(result)
 
 
-def cmd_decks_add(args):
+def cmd_decks_add(args: argparse.Namespace) -> None:
     from mtglab.api import service
 
     try:
@@ -307,7 +324,7 @@ def cmd_decks_add(args):
     _report_edit(result)
 
 
-def cmd_decks_remove(args):
+def cmd_decks_remove(args: argparse.Namespace) -> None:
     from mtglab.api import service
 
     try:
@@ -325,7 +342,7 @@ def cmd_decks_remove(args):
     _report_edit(result)
 
 
-def cmd_decks_return(args):
+def cmd_decks_return(args: argparse.Namespace) -> None:
     from mtglab.api import service
 
     try:
@@ -337,7 +354,7 @@ def cmd_decks_return(args):
     _report_edit(result)
 
 
-def cmd_decks_exile(args):
+def cmd_decks_exile(args: argparse.Namespace) -> None:
     from mtglab.api import service
 
     try:
@@ -349,7 +366,7 @@ def cmd_decks_exile(args):
     _report_edit(result)
 
 
-def _art_id(args, card=None):
+def _art_id(args: argparse.Namespace, card: str | None = None) -> str | None:
     """Turn `--art <set-code>` into the printing id the deck file stores.
 
     A set code is what a person has to hand -- nobody knows a Scryfall UUID --
@@ -380,7 +397,8 @@ def _art_id(args, card=None):
 
     exact = [p for p in printings if p["id"] == ref]
     if exact:
-        return exact[0]["id"]
+        found: str = exact[0]["id"]
+        return found
 
     matches = [p for p in printings if p["set_code"] == ref.upper()]
     if not matches:
@@ -395,10 +413,11 @@ def _art_id(args, card=None):
                   f"{match['rarity']:<9} {match['set_name']}")
         print()
         sys.exit("re-run with --art <id>")
-    return matches[0]["id"]
+    chosen: str = matches[0]["id"]
+    return chosen
 
 
-def cmd_decks_set(args):
+def cmd_decks_set(args: argparse.Namespace) -> None:
     """Change one field -- of a card with `--card`, of the deck without it.
 
     Exactly one field per invocation, matching the operation underneath. A
@@ -445,7 +464,7 @@ def cmd_decks_set(args):
     _report_edit(result)
 
 
-def cmd_decks_promote(args):
+def cmd_decks_promote(args: argparse.Namespace) -> None:
     """Promote a draft to curated -- the last step of an import.
 
     Refused while any card is still blank, and the refusal names them. That is
@@ -465,7 +484,7 @@ def cmd_decks_promote(args):
     _report_edit(result)
 
 
-def cmd_decks_delete(args):
+def cmd_decks_delete(args: argparse.Namespace) -> None:
     """Remove a deck from the library, recoverably.
 
     Interactive by default: it prints what is about to go and asks for a word
@@ -501,7 +520,7 @@ def cmd_decks_delete(args):
     print(f"  moved to {result['moved_to']} -- it is not gone, it is aside.")
 
 
-def cmd_decks_note(args):
+def cmd_decks_note(args: argparse.Namespace) -> None:
     from mtglab.api import service
 
     value = args.value
@@ -517,7 +536,7 @@ def cmd_decks_note(args):
     _report_edit(result)
 
 
-def cmd_decks_log(args):
+def cmd_decks_log(args: argparse.Namespace) -> None:
     """What has been done to this deck, newest first (ADR 28).
 
     Reads the file tier -- `owner_id IS NULL` -- because that is the only
@@ -548,7 +567,7 @@ def cmd_decks_log(args):
     print()
 
 
-def _when(stamp):
+def _when(stamp: str) -> str:
     """An ISO-8601 UTC instant as something a terminal column can hold.
 
     Falls back to the raw string rather than raising: a row that cannot be
@@ -563,7 +582,7 @@ def _when(stamp):
         return str(stamp)
 
 
-def cmd_decks_build(args):
+def cmd_decks_build(args: argparse.Namespace) -> None:
     from mtglab.artifacts.generate import SNAPSHOT, DraftDeck, write_all
     from mtglab.decks.validate import validate
 
@@ -601,7 +620,7 @@ def cmd_decks_build(args):
 
 # ----------------------------------------------------------------------- ui
 
-def cmd_ui(args):
+def cmd_ui(args: argparse.Namespace) -> None:
     """Serve the local app."""
     try:
         import uvicorn
@@ -635,7 +654,9 @@ def cmd_ui(args):
 # `mtglab.sim.compile` -- they are simulator concerns, and the API needs them
 # without importing the command line. Imported above and re-exported.
 
-def _sim_cards(deck: Deck, cards):
+def _sim_cards(deck: Deck,
+               cards: dict[str, Any] | None
+               ) -> tuple[list[SimCard], SimCard | None]:
     """CLI wrapper: turn a missing pool into a clean exit rather than a
     traceback. Library callers should use `compile_deck` and catch
     `PoolRequired`."""
@@ -645,7 +666,7 @@ def _sim_cards(deck: Deck, cards):
         sys.exit(str(exc))
 
 
-def cmd_sim_mana(args):
+def cmd_sim_mana(args: argparse.Namespace) -> None:
     from mtglab.sim.tier1.engine import KeepRule, run
     deck = _load(args.slug)
     library, commander = _sim_cards(deck, _pool(deck))
@@ -655,7 +676,7 @@ def cmd_sim_mana(args):
               keep_rule=rule, seed=args.seed).report())
 
 
-def cmd_sim_lands(args):
+def cmd_sim_lands(args: argparse.Namespace) -> None:
     from mtglab.sim.tier1.engine import run
     deck = _load(args.slug)
     library, commander = _sim_cards(deck, _pool(deck))
@@ -677,7 +698,7 @@ def cmd_sim_lands(args):
           "you are buying commander speed with flood.")
 
 
-def cmd_sim_cache(args):
+def cmd_sim_cache(args: argparse.Namespace) -> None:
     """Inspect or empty the memoised Tier 1 results.
 
     Break-glass and a window, in that order. The cache is keyed on the compiled
@@ -705,7 +726,7 @@ def cmd_sim_cache(args):
         print(f"computed between {info['oldest'][:19]} and {info['newest'][:19]} UTC")
 
 
-def cmd_sim_forge(args):
+def cmd_sim_forge(args: argparse.Namespace) -> None:
     """Tier 3: hand the decks to Forge and report what it played.
 
     `--check-only` is the coverage pre-flight on its own. It reads a zip and
@@ -752,7 +773,7 @@ def cmd_sim_forge(args):
 
 # -------------------------------------------------------------------- price
 
-def cmd_price_deck(args):
+def cmd_price_deck(args: argparse.Namespace) -> None:
     from mtglab.cards import db
     if not config.DB_PATH.exists():
         sys.exit("run `mtglab data refresh` first")
@@ -785,7 +806,7 @@ def cmd_price_deck(args):
 # on a machine they are sitting at (`docs/HOSTING.md` §4 step 8), and for the
 # unclaimed account an invite leaves behind when there is no mail provider yet.
 
-def _auth():
+def _auth() -> tuple[ModuleType, ModuleType, ModuleType, ModuleType]:
     """The auth package, or a clean exit naming the extra that is missing."""
     try:
         from mtglab.auth import db, passwords, sessions, users
@@ -795,7 +816,7 @@ def _auth():
     return db, passwords, sessions, users
 
 
-def _connect():
+def _connect() -> sqlite3.Connection:
     """`app.db`, with the maintainer reconciled to admin first (ADR 17).
 
     Every `users` command goes through here rather than calling `db.connect`,
@@ -805,7 +826,7 @@ def _connect():
     db, _, _, _ = _auth()
     from mtglab.auth import bootstrap
 
-    con = db.connect()
+    con: sqlite3.Connection = db.connect()
     try:
         bootstrap.ensure_maintainer(con)
     except Exception:
@@ -829,7 +850,7 @@ def _prompt_new_password(who: str) -> str:
     return first
 
 
-def cmd_users_add(args):
+def cmd_users_add(args: argparse.Namespace) -> None:
     _db, _, _, users = _auth()
 
     password = None if args.no_password else _prompt_new_password(args.username)
@@ -851,7 +872,7 @@ def cmd_users_add(args):
         print("  no password set -- this account cannot log in yet.")
 
 
-def _username_for(email: str, users) -> str:
+def _username_for(email: str, users: ModuleType) -> str:
     """A default login handle from an address' local part.
 
     `ada.lovelace@example.com` becomes `ada.lovelace`, which is both usable and
@@ -861,10 +882,11 @@ def _username_for(email: str, users) -> str:
     a mangling rule is one its owner has to be told.
     """
     local = email.partition("@")[0]
-    return users.normalise_username(local)
+    handle: str = users.normalise_username(local)
+    return handle
 
 
-def cmd_users_invite(args):
+def cmd_users_invite(args: argparse.Namespace) -> None:
     """Create an account nobody has a password for, and mail its owner a link.
 
     ADR 16 in one command. The account is created **unclaimed** -- a real row
@@ -928,7 +950,7 @@ def cmd_users_invite(args):
           "expires in a week.")
 
 
-def cmd_users_list(args):
+def cmd_users_list(args: argparse.Namespace) -> None:
     _db, _, sessions, users = _auth()
     from mtglab.auth import tokens
     from mtglab.claude import tiers
@@ -958,7 +980,7 @@ def cmd_users_list(args):
         con.close()
 
 
-def cmd_users_passwd(args):
+def cmd_users_passwd(args: argparse.Namespace) -> None:
     """Set a password, ending every session for that account.
 
     The revocation is not a courtesy. A password change is usually somebody who
@@ -982,7 +1004,7 @@ def cmd_users_passwd(args):
         print(f"  {ended} session(s) ended -- every device signs in again.")
 
 
-def _set_disabled(username: str, disabled: bool):
+def _set_disabled(username: str, disabled: bool) -> None:
     _db, _, _, users = _auth()
 
     con = _connect()
@@ -1006,15 +1028,15 @@ def _set_disabled(username: str, disabled: bool):
         print(f"  {ended} session(s) ended.")
 
 
-def cmd_users_disable(args):
+def cmd_users_disable(args: argparse.Namespace) -> None:
     _set_disabled(args.username, True)
 
 
-def cmd_users_enable(args):
+def cmd_users_enable(args: argparse.Namespace) -> None:
     _set_disabled(args.username, False)
 
 
-def cmd_users_delete(args):
+def cmd_users_delete(args: argparse.Namespace) -> None:
     """Delete an account for good. The break-glass path the browser refuses.
 
     Interactive by default and shaped like `decks delete`: it prints what is
@@ -1056,7 +1078,7 @@ def cmd_users_delete(args):
         print(f"  {ended} session(s) ended.")
 
 
-def _set_admin(username: str, is_admin: bool):
+def _set_admin(username: str, is_admin: bool) -> None:
     """Grant or revoke admin. The caller `users.set_admin` never had (ADR 17).
 
     `--admin` at creation was the only way to make one, so an account promoted
@@ -1096,7 +1118,7 @@ def _set_admin(username: str, is_admin: bool):
     print(f"  {remaining} admin(s) can sign in.")
 
 
-def cmd_users_tier(args):
+def cmd_users_tier(args: argparse.Namespace) -> None:
     """Choose which Claude answers an account. The break-glass twin of the
     Admin page's control, and the only one that works on a fresh volume.
 
@@ -1127,17 +1149,17 @@ def cmd_users_tier(args):
         con.close()
 
 
-def cmd_users_promote(args):
+def cmd_users_promote(args: argparse.Namespace) -> None:
     _set_admin(args.username, True)
 
 
-def cmd_users_demote(args):
+def cmd_users_demote(args: argparse.Namespace) -> None:
     _set_admin(args.username, False)
 
 
 # -------------------------------------------------------------------- claude
 
-def cmd_claude_check(args):
+def cmd_claude_check(args: argparse.Namespace) -> None:
     """One real call, so "is the pipe open" is a command rather than a guess.
 
     Worth having as a command rather than only a test because of when it gets
@@ -1165,7 +1187,7 @@ def cmd_claude_check(args):
             print(f"    {name}")
 
 
-def cmd_claude_interview(args):
+def cmd_claude_interview(args: argparse.Namespace) -> None:
     """Questions about one card's slot, so you can write its rationale.
 
     Prints questions and no rationale, which is the whole design rather than a
@@ -1216,13 +1238,13 @@ def cmd_claude_interview(args):
     print(f"  tokens: {usage['input_tokens']} in / {usage['output_tokens']} out")
 
 
-def _wrapped(text, indent="  ", width=76):
+def _wrapped(text: str, indent: str = "  ", width: int = 76) -> str:
     import textwrap
     return textwrap.fill(text, width=width, initial_indent=indent,
                          subsequent_indent=indent)
 
 
-def cmd_claude_argue(args):
+def cmd_claude_argue(args: argparse.Namespace) -> None:
     """The case against one card's slot (ADR 25). One direction, on purpose.
 
     Prints charges and alternatives and no case in favour, because there is no
@@ -1289,7 +1311,7 @@ def cmd_claude_argue(args):
     print(f"  tokens: {usage['input_tokens']} in / {usage['output_tokens']} out")
 
 
-def cmd_claude_dossier(args):
+def cmd_claude_dossier(args: argparse.Namespace) -> None:
     """Who a deck's commander is (ADR 19), from the pool and the open web.
 
     The printing is where ADR 14's third boundary lives in a terminal, so it is
@@ -1339,7 +1361,8 @@ def cmd_claude_dossier(args):
               else f"written by {report['model']}")
     print(f"  Claude's writing, not the gate's — {origin}\n")
 
-    def passage(title, section, extra=""):
+    def passage(title: str, section: dict[str, Any],
+                extra: str = "") -> None:
         cites = " ".join(f"[{i}]" for i in section["source_ids"])
         print(f"  {title}{extra}{'  ' + cites if cites else ''}")
         print(_wrapped(section["prose"], indent="    "))
@@ -1386,7 +1409,7 @@ def cmd_claude_dossier(args):
     print()
 
 
-def cmd_claude_research(args):
+def cmd_claude_research(args: argparse.Namespace) -> None:
     """A question about Magic the pool cannot answer (ADR 26).
 
     Note what this command does *not* take: a slug. Research is deck-blind by
@@ -1475,7 +1498,7 @@ def cmd_claude_research(args):
     print()
 
 
-def cmd_claude_usage(args):
+def cmd_claude_usage(args: argparse.Namespace) -> None:
     """Where the Claude money went, from the ledger in app.db.
 
     **This prints dollars now, and that reverses what this docstring used to
@@ -1504,7 +1527,7 @@ def cmd_claude_usage(args):
               + (f" since {args.since}" if args.since else "") + ".")
         return
 
-    def table(title: str, key: str, data):
+    def table(title: str, key: str, data: list[dict[str, Any]]) -> None:
         # 34 wide: `theme-conversation:fortune-teller` is 32 characters, and a
         # mode name carrying a persona is the longest thing this column holds.
         # At 22 the numbers no longer lined up under their headings, which on
@@ -1555,7 +1578,7 @@ def cmd_claude_usage(args):
 
 # ---------------------------------------------------------------- cardmotion
 
-def cmd_cardmotion_build(args):
+def cmd_cardmotion_build(args: argparse.Namespace) -> None:
     """Derive a card's motion (ADR 32): pool facts, Scryfall art, cached
     derivative. A dev-machine run -- the app only ever serves the cache."""
     _animist_pixels()
@@ -1614,7 +1637,7 @@ def cmd_cardmotion_build(args):
           "runbook line")
 
 
-def cmd_cardmotion_sync(args):
+def cmd_cardmotion_sync(args: argparse.Namespace) -> None:
     """Every deck's commander vs the cache: build what is missing, from the
     printing each deck actually shows. The catch-all for imported decks and
     art swaps alike -- deployed instances then receive the cache over sftp,
@@ -1631,7 +1654,7 @@ def cmd_cardmotion_sync(args):
         sys.exit(f"refused: unknown effect {args.effect!r} "
                  f"(one of: {', '.join(sorted(EFFECTS))})")
 
-    def load_model_once():
+    def load_model_once() -> DepthModel:
         from mtglab.cardmotion.depth import DepthError, load_model
         try:
             print("loading the depth model (first run downloads weights)...")
@@ -1659,7 +1682,7 @@ def cmd_cardmotion_sync(args):
         sys.exit(1)
 
 
-def cmd_cardmotion_status(args):
+def cmd_cardmotion_status(args: argparse.Namespace) -> None:
     """Every cached derivative: card, effect, artist, when."""
     from mtglab.cardmotion import cache
 
@@ -1683,7 +1706,7 @@ def cmd_cardmotion_status(args):
 
 # ------------------------------------------------------------------- animist
 
-def _animist_recipe(path_str):
+def _animist_recipe(path_str: str | Path) -> Recipe:
     """Load and validate, or refuse with the schema's own sentence."""
     from mtglab.animist.recipe import RecipeError, load_recipe
 
@@ -1693,7 +1716,7 @@ def _animist_recipe(path_str):
         sys.exit(f"refused: {exc}")
 
 
-def _animist_pixels():
+def _animist_pixels() -> None:
     """The moment pixels get touched is the moment the extra is required."""
     from mtglab import animist
 
@@ -1737,7 +1760,7 @@ def _animist_crfs(spec: str) -> list[int]:
     return crfs
 
 
-def cmd_animist_build(args):
+def cmd_animist_build(args: argparse.Namespace) -> None:
     """The whole pipeline for one recipe. The gate runs first and blocks."""
     _animist_pixels()
     from mtglab.animist.encode import EncodeError
@@ -1763,7 +1786,7 @@ def cmd_animist_build(args):
         print("  dry run -- nothing touched the asset directory")
 
 
-def cmd_animist_fetch(args):
+def cmd_animist_fetch(args: argparse.Namespace) -> None:
     """Gate, then warm the cache. No pixels are transformed."""
     from mtglab.animist.fetch import fetch_source
     from mtglab.animist.sources import LicenceRefused, SourceError
@@ -1782,7 +1805,7 @@ def cmd_animist_fetch(args):
         sys.exit(f"refused: {exc}")
 
 
-def cmd_animist_licence(args):
+def cmd_animist_licence(args: argparse.Namespace) -> None:
     """The gate alone: every source's confirmed licence, dated. No download."""
     from mtglab.animist.sources import LicenceRefused, SourceError, confirm
 
@@ -1819,7 +1842,7 @@ def _animist_all_recipes() -> list[Path]:
     return found
 
 
-def cmd_animist_verify(args):
+def cmd_animist_verify(args: argparse.Namespace) -> None:
     """Committed assets against their recipes. The suite runs this too."""
     _animist_pixels()
     from mtglab.animist.verify import verify_recipe
@@ -1842,7 +1865,7 @@ def cmd_animist_verify(args):
         sys.exit(1)
 
 
-def cmd_animist_measure(args):
+def cmd_animist_measure(args: argparse.Namespace) -> None:
     """The size curve for one output, and where its knee sits.
 
     For a still, runs the output's ops *except* any `resize`, then encodes
@@ -1907,7 +1930,7 @@ def cmd_animist_measure(args):
 
 # ------------------------------------------------------------------- bench
 
-def cmd_bench_run(args):
+def cmd_bench_run(args: argparse.Namespace) -> None:
     """Time the declared suite, cold or warm, and print a ledger-ready table."""
     from mtglab.bench import run as benchrun
     from mtglab.bench import targets as benchtargets
@@ -1950,7 +1973,7 @@ def cmd_bench_run(args):
             print(f"  {s.target.name}: {s.skipped}")
 
 
-def cmd_bench_profile(args):
+def cmd_bench_profile(args: argparse.Namespace) -> None:
     """One target, profiled in full."""
     from mtglab.bench import profile as benchprofile
     from mtglab.bench import targets as benchtargets
@@ -1988,7 +2011,7 @@ def cmd_bench_profile(args):
               f"{frame.where}")
 
 
-def cmd_bench_caches(args):
+def cmd_bench_caches(args: argparse.Namespace) -> None:
     """What this process memoises, and whether any of it is earning its keep."""
     from mtglab import caches
     from mtglab.bench import run as benchrun
@@ -2017,7 +2040,7 @@ def cmd_bench_caches(args):
             print(f"    {row.name}")
 
 
-def cmd_bench_list(args):
+def cmd_bench_list(args: argparse.Namespace) -> None:
     """The declared suite, and what each target needs in order to run."""
     from mtglab.bench import targets as benchtargets
     for target in benchtargets.suite():
@@ -2030,7 +2053,7 @@ def cmd_bench_list(args):
 
 # ------------------------------------------------------------------ mutate
 
-def cmd_mutate_run(args):
+def cmd_mutate_run(args: argparse.Namespace) -> None:
     """Break the code on purpose and count what the suite never noticed."""
     from mtglab import mutate as mutaterun
 
@@ -2045,7 +2068,7 @@ def cmd_mutate_run(args):
               f"{len(mutaterun.TARGETS)} modules; sampling {args.sample} "
               f"at seed {args.seed}\n")
 
-    def announce(result):
+    def announce(result: Result) -> None:
         verdict = "killed  " if result.killed else "SURVIVED"
         print(f"  {verdict} {result.seconds:5.1f}s  "
               f"{result.mutation.describe()}")
@@ -2072,7 +2095,7 @@ def cmd_mutate_run(args):
           "to a\nthrowaway copy of the package. Nothing to restore.")
 
 
-def cmd_mutate_list(args):
+def cmd_mutate_list(args: argparse.Namespace) -> None:
     """Every mutation the catalogue can make, by module and kind."""
     from collections import Counter
 
@@ -2091,7 +2114,7 @@ def cmd_mutate_list(args):
         print(f"    {kind:12} {count}")
 
 
-def main(argv=None):
+def main(argv: Sequence[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="mtglab", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="group", required=True)

@@ -3898,6 +3898,91 @@ def test_the_same_selection_twice_in_flight_is_one_sweep(in_memory_client,
             "the sweep must not have been paid for twice"
 
 
+@pytest.mark.parametrize("cards", [None, "Sol Ring", ["Sol Ring", 7], {}])
+def test_a_selection_that_is_not_a_list_of_names_is_a_422(in_memory_client,
+                                                          cards):
+    """The shape check runs before the deck is even loaded. A payload the
+    client could not have sent is still a payload the endpoint is public to,
+    and `cards` is what the whole plan is built out of."""
+    jobs.clear()
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        r = client.post("/api/decks/local/mono-green/argue/deck",
+                        json={"cards": cards})
+        assert r.status_code == 422
+        assert jobs.all_jobs() == [], "nothing should have been queued"
+
+
+def test_the_credential_going_away_stops_the_sweep_rather_than_burning_it(
+        in_memory_client, monkeypatch):
+    """The one failure that is not per-card. Every remaining slot would fail
+    the same way, so they are marked unattempted and the sweep stops -- and it
+    stops as `done`, because the partial reports are the thing that was paid
+    for."""
+    import mtglab.claude.client as cc
+    from mtglab.api import service as service_mod
+
+    def vanishes(*, slug, card, requested=None, focus="", source=None,
+                 tier=None):
+        if card == "Sol Ring":
+            return {"card": card, "asked": True}
+        raise cc.ClaudeUnavailable("no credential")
+
+    jobs.clear()
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(service_mod, "claude_argue", vanishes)
+
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        r = client.post(
+            "/api/decks/local/mono-green/argue/deck",
+            json={"cards": ["Sol Ring", "Regal Behemoth",
+                              "Vorinclex, Voice of Hunger"]})
+        body = await_job(client, r.json()["id"])
+
+        assert body["status"] == "done"
+        result = body["result"]
+        assert [rep["card"] for rep in result["reports"]] == ["Sol Ring"]
+        # The one that failed says why; the one after it says it was never
+        # tried, which is a different thing to tell somebody.
+        assert "Regal Behemoth" in result["errors"]
+        assert result["errors"]["Vorinclex, Voice of Hunger"] == \
+            "not attempted: the credential went away"
+        # Reported as finished rather than left mid-bar: the sweep stopped on
+        # purpose, and a progress bar frozen at 1 of 3 reads as a hang.
+        assert body["done"] == body["total"] == 3
+
+
+def test_a_surprise_from_one_card_is_recorded_like_any_other_failure(
+        in_memory_client, monkeypatch):
+    """Not every failure is one the mode declared. An unexpected exception is
+    still one card's problem, and the sweep owes the other slots their
+    answers -- the same treatment `ClaudeFailed` gets, which is what the bare
+    `except` is there to guarantee."""
+    import mtglab.claude.client as cc
+    from mtglab.api import service as service_mod
+
+    def surprising(*, slug, card, requested=None, focus="", source=None,
+                   tier=None):
+        if card == "Sol Ring":
+            raise RuntimeError("something nobody predicted")
+        return {"card": card, "asked": True}
+
+    jobs.clear()
+    monkeypatch.setattr(cc, "credential_present", lambda: True)
+    monkeypatch.setattr(cc, "sdk_installed", lambda: True)
+    monkeypatch.setattr(service_mod, "claude_argue", surprising)
+
+    with in_memory_client([tiny_pool.mono_green_deck()]) as client:
+        r = client.post("/api/decks/local/mono-green/argue/deck",
+                        json={"cards": ["Sol Ring", "Regal Behemoth"]})
+        body = await_job(client, r.json()["id"])
+
+        assert body["status"] == "done", "one surprise is not a failed sweep"
+        result = body["result"]
+        assert [rep["card"] for rep in result["reports"]] == ["Regal Behemoth"]
+        assert result["errors"]["Sol Ring"]
+
+
 # ------------------------------------------------------------------ the wheel
 
 def test_wheel_route_spins_and_a_seed_replays(pool, client):
