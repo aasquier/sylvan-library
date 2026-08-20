@@ -5063,3 +5063,25 @@ button:hover .tarot-fan-card {
 @media (prefers-reduced-motion: reduce) {
   .camera-guide { animation: none; opacity: 0.9; }
 }
+
+/* ------------------------------------- the two animations we did not write
+ *
+ * Every guard above arrests something declared in this file. These two are
+ * Tailwind utilities — `animate-spin` on `Spinner` (components/ui.tsx) and
+ * `animate-pulse` on the lazy-chunk skeleton (lib/deferred.tsx) — so they
+ * exist only in the *bundle*, and a sweep of this stylesheet could never see
+ * them. That is the browser-floor lesson (`tests/test_browser_floor.py`) in
+ * its sibling facet: what a phone parses is the artifact, not the source.
+ * `tests/test_reduced_motion.py` now reads the artifact.
+ *
+ * The spinner is **slowed rather than stopped**, because it is a status
+ * indicator before it is decoration: a ring that has stopped turning says
+ * "this is broken", which is the one thing it must never say while the
+ * server is still working. The skeleton is stopped outright — a placeholder
+ * holding still is still a placeholder, and its inline opacity is the
+ * resting frame.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin { animation-duration: 2.4s; }
+  .animate-pulse { animation: none; }
+}

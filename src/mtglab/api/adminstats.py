@@ -68,6 +68,26 @@ def _size_of(path: Path) -> int | None:
     return None
 
 
+def _cache_breakdown(cache: Path, total: int | None) -> dict[str, int | None]:
+    """The cache, tenant by tenant, with whatever is left over named as such.
+
+    Three shelves live under `data/cache` on a deployed volume: the mana
+    symbols (ADR 33), the card-motion derivatives (ADR 32) and the reading
+    engine (`ocr.py`). `other_bytes` is what the named three do not account
+    for, and it is the part that matters: this panel shipped naming two of
+    the three while the reading engine was **38% of the cache**, so the tile
+    read as a breakdown while quietly under-reporting its newest tenant. A
+    remainder cannot hide a fourth shelf the way a fixed list can -- the next
+    one somebody adds shows up as unexplained bytes rather than as nothing.
+    """
+    named = {"symbols_bytes": _size_of(cache / "symbols"),
+             "cardmotion_bytes": _size_of(cache / "cardmotion"),
+             "ocr_bytes": _size_of(cache / "ocr")}
+    other = (None if total is None
+             else max(0, total - sum(v for v in named.values() if v)))
+    return {**named, "other_bytes": other}
+
+
 def _count_dirs(path: Path) -> int:
     try:
         return sum(1 for p in path.iterdir() if p.is_dir()) if path.is_dir() else 0
@@ -181,15 +201,13 @@ def install(app: FastAPI) -> None:
         """
         del caller
         cache = config.DATA_DIR / "cache"
+        cache_bytes = _size_of(cache)
         return {
             "app_db_bytes": _size_of(config.APP_DB_PATH),
             "pool_bytes": _size_of(config.DB_PATH),
             "scryfall_bulk_bytes": _size_of(config.SCRYFALL_DIR),
-            "cache_bytes": _size_of(cache),
-            "cache": {
-                "symbols_bytes": _size_of(cache / "symbols"),
-                "cardmotion_bytes": _size_of(cache / "cardmotion"),
-            },
+            "cache_bytes": cache_bytes,
+            "cache": _cache_breakdown(cache, cache_bytes),
             "decks": {
                 "count": _count_dirs(config.DECKS_DIR),
                 "bytes": _size_of(config.DECKS_DIR),

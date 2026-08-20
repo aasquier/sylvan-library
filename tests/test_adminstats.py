@@ -94,6 +94,41 @@ def test_storage_says_null_for_absent_and_sized_for_present(client):
     assert body["decks"]["trashed"] == 0
 
 
+def test_the_cache_breakdown_cannot_hide_a_shelf_nobody_named(client):
+    """The failure this remainder was added for, reproduced.
+
+    The tile shipped naming `cardmotion` and `symbols` while the reading
+    engine (`ocr.py`, ~5.8MB) sat beside them unnamed — 38% of the deployed
+    cache, present in the total and absent from the breakdown, so the line
+    read as an itemisation and was not one. A fixed list of tenants can only
+    ever miss the next one; a remainder cannot. `surprise` below is that next
+    one, standing in for whatever it turns out to be.
+    """
+    cache = config.DATA_DIR / "cache"
+    sizes = {"symbols": 10, "cardmotion": 200, "ocr": 3000, "surprise": 40000}
+    for name, size in sizes.items():
+        (cache / name).mkdir(parents=True)
+        (cache / name / "blob").write_bytes(b"x" * size)
+
+    body = client.get("/api/admin/stats/storage").json()["cache"]
+
+    assert body["symbols_bytes"] == sizes["symbols"]
+    assert body["cardmotion_bytes"] == sizes["cardmotion"]
+    assert body["ocr_bytes"] == sizes["ocr"]
+    # The whole point: the shelf this endpoint has never heard of is still
+    # counted, and it is counted somewhere a reader can see it.
+    assert body["other_bytes"] == sizes["surprise"]
+
+
+def test_an_unfilled_cache_reports_nothing_rather_than_zero(client):
+    """Absent is not empty, the same distinction the pool makes above."""
+    body = client.get("/api/admin/stats/storage").json()
+
+    assert body["cache_bytes"] is None
+    assert body["cache"] == {"symbols_bytes": None, "cardmotion_bytes": None,
+                             "ocr_bytes": None, "other_bytes": None}
+
+
 def test_claude_totals_carry_their_caveat(client):
     """The numbers and the sentence travel together, Tier 1's rule."""
     empty = client.get("/api/admin/stats/claude").json()
