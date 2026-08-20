@@ -61,13 +61,20 @@ GAMES_MAX = 20
 def status() -> dict[str, Any]:
     """Is the Forge reachable from this process? A fact about the environment.
 
-    Probes the two things a run needs — the distribution's jar and a JVM new
+    Two environments, one contract. With the hosted worker configured
+    (ADR 35's second half), the answer is yes on configuration alone — no
+    network, no machine woken to ask, exactly as `/api/claude` answers on the
+    presence of a key rather than by calling Anthropic. Otherwise this probes
+    the two things a local run needs — the distribution's jar and a JVM new
     enough — without booting either. `why` is maintainer-facing prose (it
     names paths and version floors); the client renders its own words, which
     is commandment 10 doing its usual work.
     """
     from mtglab.sim.tier3 import run as forge
+    from mtglab.sim.tier3 import worker
     from mtglab.sim.tier3.coverage import ForgeNotInstalled
+    if worker.configured():
+        return {"available": True, "why": None}
     try:
         forge.desktop_jar()
         forge.java_binary()
@@ -160,11 +167,21 @@ def plan_forge(decks: list[Deck], addresses: list[str],
 
     def compute(progress: Progress) -> dict[str, Any]:
         from mtglab.sim.tier3 import run as forge
+        from mtglab.sim.tier3 import worker
         # One subprocess, no per-game feedback until it returns: total is
         # honest and `done` stays at zero rather than pretending. The client
         # shows a clock, not a bar — the theme proposal's deal.
         progress(0, games)
-        result = forge.run_games(decks, games=games, clock=CLOCK, seed=seed)
+        # Same match, two places it can run (ADR 35): the worker when the
+        # environment names one, a local subprocess otherwise. `run_match`
+        # hands back a `SimRun` rebuilt from the wire, so `_shape` cannot
+        # tell the difference — that is `wire.py`'s whole promise.
+        if worker.configured():
+            result: Any = worker.run_match(decks, games=games, clock=CLOCK,
+                                           seed=seed)
+        else:
+            result = forge.run_games(decks, games=games, clock=CLOCK,
+                                     seed=seed)
         progress(games, games)
         return _shape(decks, addresses, games, seed, result)
 

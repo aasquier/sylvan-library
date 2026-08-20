@@ -93,6 +93,23 @@ tell. So coverage is checked twice, by two independent routes:
 
 All six curated decks pass the pre-flight with no missing cards.
 
+## Hosted: the worker machine
+
+The deployed app plays matches too, and holds none of the above (ADR 35).
+`Dockerfile.forge` bakes the JRE, the pinned 2.0.14 distribution and
+`sim/tier3/shim.py` into a worker image; the deploy workflow keeps a
+dedicated-CPU machine named `forge-worker` pointed at it, stopped between
+matches. The app wakes it per job over the Machines API, runs the same
+pre-flight against the worker's own card scripts (`/coverage`, on the
+request thread, so a 422 still names the cards before any JVM boots), plays
+the match over the private network (`/match`), and the shim stops its own
+machine after `MTGLAB_FORGE_IDLE_SECONDS` of quiet. Results are rebuilt into
+the same `SimRun` a local run returns — `sim/tier3/wire.py` is the seam, and
+`tests/test_forge_worker.py` pins that both halves shape identically.
+`docs/HOSTING.md` §7 has the provisioning runbook and the licensing note
+(the image holds GPL'd Forge and is pushed only to the app's private
+registry — deployment, never distribution).
+
 ## Reading the results
 
 `CLAUDE.md` says it and it is worth repeating here: **report per archetype,

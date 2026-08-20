@@ -1757,60 +1757,76 @@ Ticked items are done as of 2026-08-13.
       silently: `mtglab users invite friend@example.com` on a fresh volume,
       before the maintainer's own account exists. The full argument is
       [ADR 17](adr/0017-the-maintainer-is-named-in-the-environment.md).
-- [ ] **The Forge deployment shape** — local only, server-side, or a worker.
-      Open in `ROADMAP.md`, and the section below is what it costs.
-- [ ] **Fly or Hetzner.** §4 recommends Fly for the app alone. **If Forge goes
-      server-side that recommendation flips**: 1 GB RAM is already the number
-      to watch for DuckDB plus numpy, and Forge wants gigabytes of its own.
+- [x] **The Forge deployment shape** — decided 2026-08-20, an on-demand
+      worker machine ([ADR 35](adr/0035-the-forge-joins-the-simulator-and-a-worker-runs-it-hosted.md)).
+      The section below records what was built and how to provision it.
+- [x] **Fly or Hetzner.** Resolved by the same decision: the Hetzner case was
+      "Forge on the app box", and ADR 35 put Forge on its own Fly machine
+      instead — dedicated CPU while it runs, nothing while it sleeps. The app
+      machine's sizing is untouched.
 - [ ] **Whether Claude research is gated per user.** The interview is cheap
       (~$1–1.50 a draft on Sonnet 5); research is the unestimated half. ADR 15's
       stance dial doubles as the control, and *off* is a defensible default.
 
-### If Forge goes server-side, this is what it adds
+### The Forge worker, as built (ADR 35's second half)
 
-Measured during the feasibility spike, 2026-08-11. See
-[FORGE.md](FORGE.md) for the mechanics.
+The spike's costs, for the record — measured 2026-08-11 on the 2015 MBP, and
+the numbers that sized the worker:
 
 | | Cost |
 | --- | --- |
 | Forge distribution in the image | ~470 MB unpacked |
-| A JRE 17+ | ~190 MB more |
+| A JRE (21, headless) | ~190 MB more |
 | JVM boot + card database | **~9s per `sim` invocation**, flat, amortises over `-n` |
 | A heads-up game | median 4.6–6.8s across every archetype |
 | The tail | **one Trostani game took 134s** |
-| Four-player pods | **not yet measured, and heavier** — a pod was still running after ~4 min for 5 games |
-| Heap used in the spike | `-Xmx4096m` |
+| Four-player pods | 40% hit the clock — why the app surface is heads-up only |
+| Heap ceiling | `-Xmx3072m` on the worker (the shim's default), on a 4 GB machine |
 
-Four things that are code changes, not just sizing:
+**The shape.** A second machine named `forge-worker` in the same Fly app,
+built from `Dockerfile.forge` (JRE 21 + the Forge 2.0.14 distribution,
+SHA-256-pinned + `sim/tier3/shim.py` in front of `run_games`). Dedicated CPU
+(`performance-2x`), because ADR 35's core argument is that shared-core
+throttling stretches the measured tail into the clock and corrupts results
+into fake draws. The machine is **stopped** between matches: the app starts
+it per job through the Machines API, talks to the shim over the private
+network (`<machine-id>.vm.<app>.internal`), and the shim exits after
+`MTGLAB_FORGE_IDLE_SECONDS` of quiet — its `restart: no` policy turns that
+exit into `stopped`, which bills nothing but rootfs. A ten-game match plus
+the idle window costs on the order of a cent.
 
-- [ ] **`forge.profile.properties` must be baked at image build.** `run.py`
-      writes it into the Forge install directory, because that is the only
-      place Forge reads it from. A read-only mount decided later would break
-      `ensure_profile` at runtime.
-- [ ] **Generated `.dck` files are named for the deck slug in one shared
-      directory.** Two concurrent runs race. Needs a per-run directory before
-      more than one person can press the button.
-- [ ] **Forge must run with its own directory as the working directory**, which
-      constrains how the process is launched in a container.
-- [x] **The licensing question is answered — and it is not a blocker.**
-      Researched 2026-08-11; the reasoning is in [NOTICE.md](../NOTICE.md).
-      **Forge is GPL-3.0, not AGPL-3.0**, so *running* it as a network service
-      is not distribution and a hosted instance owes nobody source. This
-      project stays MIT because `run.py` starts a separate process rather than
-      linking. And being noncommercial is irrelevant to the GPL either way —
-      its terms are identical sold or free. The one action that would trigger
-      obligations is **publishing a container image containing Forge**, so:
-- [ ] **Put Forge on the volume, not in the image.** The pool already lives
-      there for a licensing reason of its own (Scryfall asks that bulk data not
-      be redistributed), and Forge fits the same slot for the same shape of
-      reason: an image that does not contain it cannot redistribute it. This
-      also keeps the image small and makes a Forge upgrade a volume operation
-      rather than a rebuild. Fold the download into the same manual runbook as
-      `data refresh`. **If Forge ever does go into a published image instead**,
-      pin the exact version and ship the corresponding source alongside it —
-      do not rely on a written offer, which is poorly suited to registry
-      distribution because there is no reliable way to present it to whoever
-      pulls the image.
+**Lifecycle.** The deploy workflow owns the machine: it builds and pushes the
+worker image to the app's private registry, creates or updates `forge-worker`
+with it, wakes it once so the host pulls the image, and stops it. The machine
+carries no `fly_process_group` metadata, so `flyctl deploy` never touches it.
+The app never creates infrastructure from a request thread — a missing
+machine is a 503, and the fix is running a deploy.
+
+**Provisioning, once per instance** (the two secrets the workflow cannot set):
+
+```bash
+fly tokens create deploy -a sylvan-library    # then:
+fly secrets set MTGLAB_FLY_API_TOKEN=<that token> \
+                MTGLAB_FORGE_SHIM_TOKEN=$(openssl rand -hex 32)
+```
+
+`MTGLAB_FORGE_WORKER=1` is already in `fly.toml`; the gate at `/api/forge`
+answers yes only once the token secret exists, so a deploy before this step
+is honest rather than broken. Setting secrets restarts the app machine.
+Rollback is the same lever in reverse: `fly secrets unset MTGLAB_FLY_API_TOKEN`
+hides the mode again, and `fly machine destroy forge-worker` reclaims the
+rootfs; the next deploy recreates it.
+
+The spike's four code-change warnings all landed inside the build rather
+than as runbook steps: the profile is baked at image build (`Dockerfile.forge`
+writes exactly what `ensure_profile` would), the `.dck` race is closed by the
+one-worker `FORGE` lane plus the shim's own match lock, and the
+working-directory constraint is the image's `WORKDIR`. The licensing answer
+moved with the shape: the image *does* contain Forge now, and stays compliant
+because it is pushed only to the app's private registry — deployment, not
+distribution. [NOTICE.md](../NOTICE.md) §Forge carries the full argument;
+the one thing that must never happen is that image reaching a public
+registry.
 
 **The honest read right now:** local-only is unblocked and costs nothing.
 Server-side is affordable on a Hetzner box and not on the 1 GB Fly instance

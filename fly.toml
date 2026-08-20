@@ -4,11 +4,13 @@
 # tracked file's contents for an API key. `RESEND_API_KEY` and
 # `ANTHROPIC_API_KEY` are `fly secrets set`, never `[env]` — see §4 step 4.
 #
-# Fly is what §4 recommends *for the app alone*, and that recommendation is
-# still open in §7: it flips to a Hetzner box if Forge ever goes server-side,
-# because Forge wants ~470MB of card data, a JRE, and gigabytes of heap. This
-# file is the only Fly-specific thing in the repository — the Dockerfile is
-# plain OCI and runs anywhere — so switching costs this file and nothing else.
+# Fly is what §4 recommends, and the Forge question that once pointed at a
+# Hetzner box was settled the other way by ADR 35: Forge runs on an on-demand
+# worker **machine in this same app** — dedicated CPU, stopped when idle,
+# managed by the deploy workflow rather than by this file (it carries no
+# process-group metadata, so `fly deploy` never touches it). This file and
+# the worker steps in `.github/workflows/ci.yml` are the only Fly-specific
+# things in the repository; the Dockerfiles are plain OCI and run anywhere.
 
 app = "sylvan-library"
 primary_region = "iad"          # change to the region nearest you
@@ -112,6 +114,16 @@ primary_region = "iad"          # change to the region nearest you
   # the visitor's — Fly documents that outright — and so would any other
   # reverse proxy. Moving off Fly means removing this line, not renaming it.
   MTGLAB_CLIENT_IP_HEADER = "Fly-Client-IP"
+
+  # Tier 3 runs on the worker machine (ADR 35), not in this container — there
+  # is no JVM here and `desktop_jar` answers accordingly. The dial alone is
+  # not enough to flip the gate: `worker.configured()` also requires
+  # `MTGLAB_FLY_API_TOKEN` (a deploy token, `fly secrets set`, never here —
+  # the repo is public), so a deploy before that secret exists still answers
+  # `/api/forge` honestly with `available: false`. `MTGLAB_FORGE_SHIM_TOKEN`
+  # is the second secret worth setting: one app's secrets reach every machine
+  # in it, so setting it once gates the shim and arms the client together.
+  MTGLAB_FORGE_WORKER = "1"
 
 [[mounts]]
   source = "mtglab_data"
