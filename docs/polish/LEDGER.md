@@ -2187,13 +2187,13 @@ runs against a cache nobody emptied.
     over 25 ms is card search, and it is **database-bound** (35.0 ms of 42.5
     inside one statement) — Black's ground, not a Python lever.
   - **Reduced-motion coverage, counted rather than recalled:** 114 animating
-    rules in the bundle, 12 guard blocks, 85 guarded classes. 47 rules have no
+    rules in the bundle, 12 guard blocks, 87 guarded classes. 47 rules have no
     guard by class; 45 are covered by a base class on the same element or a
     `display: none` ancestor (each read out of the component that renders it,
     now recorded in `COVERED_BY`); 2 were loose and are fixed. On 2026-08-16
     the same count over `web/src/index.css` alone was 43.
-  - **The browser floor holds at Safari 16.4**, unchanged across ~40 merged
-    PRs since 2026-08-16. `tests/test_browser_floor.py` green; the floor is
+  - **The browser floor holds at Safari 16.4**, unchanged across the 81 pull
+    requests merged since 2026-08-16 (#107–#188). `tests/test_browser_floor.py` green; the floor is
     still set by `@property` and `color-mix(in lab`, no new feature crossed it,
     and no regex lookbehind reached the bundle.
   - **The OCR shelf's served JavaScript, scanned for the first time.** It is
