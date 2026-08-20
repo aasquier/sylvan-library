@@ -744,6 +744,17 @@ spirit of Magic*
      reproducibility surface, which is a real feature and the reason runs are
      seeded by default; (b) is the stricter reading of the commandment. Aaron's
      call, and it is a UI change either way, so commandment 16 applies.
+
+     **Landed 2026-08-19 (stragglers), reading (a), PR #191.** Aaron chose the
+     rename. `seed 7` → `shuffle 7`, `label="Seed"` → `"Shuffle"`, and the
+     `sim.seed` glossary entry relabelled and reworded — it said "seed" four
+     more times behind the tooltip, which is the one place a beginner goes to
+     be *told* the word. The wire field, the key and `SIMULATOR_KEYS` are
+     untouched, so ADR 18's reproducibility surface is intact. The sweep also
+     found a fourth site nobody had counted: `/learn`'s search box offered
+     "mulligan, ramp, seed…" as example words, and after the relabel that
+     example matched nothing. `tests/test_technology_never_renders.py` is the
+     tripwire, mutation-verified against all five original shapes.
   3. **`cli.py` is the last strict-mypy exception and it keeps growing:
      79 → 109 → 126.** Re-measured 2026-08-19 by removing the override block:
      73 `no-untyped-def`, 52 `no-untyped-call`, 1 `no-any-return`. Still
@@ -2510,6 +2521,8 @@ act on soonest, not by color:
    `lib/claudecopy.ts` pattern; (b) stop showing the number, keeping "New
    sample" as the only control. (a) preserves ADR 18's reproducibility
    surface; (b) is the stricter reading. **Commandment 16 either way.**
+   **CLOSED 2026-08-19 (stragglers, PR #191): reading (a), plus a fourth
+   render the audit had missed and a tripwire so there is no fifth.**
 4. **Blue 1 — three of six decks credit the wrong painter right now.** A deck
    that pins a printing gets that printing's `set_name` and the *oracle* row's
    `artist`, side by side in one sentence, and the code's own comment states

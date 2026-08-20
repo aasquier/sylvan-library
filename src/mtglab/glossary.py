@@ -304,14 +304,14 @@ TERMS: tuple[Term, ...] = (
         "costs seconds, not minutes.",
         "simulator", ("sim.seed", "goldfish")),
     Term(
-        "sim.seed", "Seed",
-        "The number the shuffler starts from. The same seed gives the same "
-        "games, every time.",
-        "Runs are seeded so that looking at a deck twice gives the same "
+        "sim.seed", "Shuffle",
+        "Which shuffle the games are dealt from. The same shuffle gives the "
+        "same games, every time.",
+        "Runs hold one shuffle so that looking at a deck twice gives the same "
         "answer and costs nothing the second time — results are cached against "
-        "the seed and the compiled deck. Wanting a fresh sample is legitimate, "
-        "and that is what New sample is: it picks a seed nobody would pick "
-        "twice. A number quoted from a cached run says so.",
+        "this number and the compiled deck. Wanting a fresh sample is "
+        "legitimate, and that is what New sample is: it picks a shuffle "
+        "nobody would pick twice. A number quoted from a cached run says so.",
         "simulator", ("sim.games",)),
     Term(
         "sim.min_lands", "Keep min lands",
