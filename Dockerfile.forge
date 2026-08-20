@@ -1,0 +1,105 @@
+# The Forge worker image (ADR 35, decision 5). Not the app — see `Dockerfile`
+# for that. This machine exists to hold a JVM and ~470MB of somebody else's
+# rules engine, wake when a match is asked for, and stop itself when idle;
+# `src/mtglab/sim/tier3/shim.py` is everything it runs.
+#
+# **This Mac cannot build it** (macOS 12, no container runtime), so CI is
+# where this file is proven: the `image` job builds it on every pull request,
+# and the deploy job pushes it to Fly's private registry and points the
+# `forge-worker` machine at it. A red build is the first real feedback.
+#
+# Three stages: fetch (download and verify Forge), builder (the Python venv),
+# runtime (JRE + both of the above, non-root).
+
+# -------------------------------------------------------------------- fetch
+
+FROM python:3.12-slim AS fetch
+
+# The 2.0.14 release, pinned by the SHA-256 GitHub publishes for the asset.
+# Despite the name it *is* the distribution — forge.sh, the desktop jar and
+# res/ (docs/FORGE.md says so, established by unpacking it). Executable code
+# is pinned by digest here for the same reason `ocr.py` pins its WebAssembly.
+ARG FORGE_URL="https://github.com/Card-Forge/forge/releases/download/forge-2.0.14/forge-installer-2.0.14.tar.bz2"
+ARG FORGE_SHA256="e71749376945177d603d52a21a089bc1574330cf34599544b6bae1a04c83da41"
+
+COPY scripts/fetch_forge.py /fetch_forge.py
+RUN python /fetch_forge.py "$FORGE_URL" "$FORGE_SHA256" /opt/forge
+
+# `forge.profile.properties` baked at build (ADR 35): Forge reads this file
+# from its own program directory and nowhere else, and it is what points the
+# engine's user data at a directory this image owns rather than at the
+# invoking user's home. The content must match what `run.ensure_profile`
+# would write for these paths, so the runtime check finds it current and
+# never needs to write into the install.
+RUN printf 'userDir=/opt/forge-profile\ncacheDir=/opt/forge-profile/cache\ncardPicsDir=/opt/forge-profile/cache/pics\n' \
+      > /opt/forge/forge.profile.properties \
+ && mkdir -p /opt/forge-profile/decks/commander /opt/forge-profile/cache
+
+# ------------------------------------------------------------------ builder
+
+FROM python:3.12-slim AS builder
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_ROOT_USER_ACTION=ignore
+
+WORKDIR /build
+COPY pyproject.toml ./
+COPY src ./src
+
+# The **base** install, no extras: the shim needs `sim/tier3` and the deck
+# model, none of which touches FastAPI or the Anthropic SDK. What it does
+# drag in (DuckDB, numpy) is the price of one package with one dependency
+# list — cheaper to carry than a second, hand-maintained list that drifts.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir .
+
+# ------------------------------------------------------------------ runtime
+
+FROM python:3.12-slim AS runtime
+
+LABEL org.opencontainers.image.title="sylvan-library-forge-worker" \
+      org.opencontainers.image.description="Forge match worker (ADR 35)" \
+      org.opencontainers.image.source="https://github.com/aasquier/sylvan-library" \
+      org.opencontainers.image.licenses="MIT"
+
+# Take Debian's security updates, for the reason the app Dockerfile gives at
+# length: the base only rebuilds when Docker Hub feels like it. The JRE comes
+# from the same `apt-get` — Forge needs 17+, `run.java_binary` checks the
+# version rather than trusting PATH, and headless is enough because `sim -q`
+# opens no window.
+RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && apt-get install -y --no-install-recommends openjdk-21-jre-headless \
+ && rm -rf /var/lib/apt/lists/*
+
+# The same fixed uid as the app image, for the same reason: predictability
+# over accident. `--chown` on the copies below is what makes 470MB of Forge
+# arrive owned correctly without a layer-doubling `chown -R` afterwards. The
+# profile directory must be writable — every match writes `.dck` files and
+# Forge writes its cache there — and the install itself is owned too, because
+# Forge runs with it as the working directory and a rules engine that cannot
+# write a log where it stands fails in ways nobody should have to debug.
+RUN useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin mtglab
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=fetch --chown=10001:10001 /opt/forge /opt/forge
+COPY --from=fetch --chown=10001:10001 /opt/forge-profile /opt/forge-profile
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    MTGLAB_FORGE_HOME=/opt/forge \
+    MTGLAB_FORGE_PROFILE=/opt/forge-profile
+
+USER mtglab
+WORKDIR /opt/forge
+
+EXPOSE 8080
+
+# The shim serves until it has been idle long enough, then exits 0 — with the
+# machine's `restart: no` policy that is how "stopped when idle" actually
+# happens, because Fly's proxy-driven auto-stop never sees private-network
+# traffic. See `shim.py`'s docstring.
+CMD ["python", "-m", "mtglab.sim.tier3.shim"]

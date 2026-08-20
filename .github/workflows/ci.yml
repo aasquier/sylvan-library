@@ -278,6 +278,29 @@ jobs:
           cache-from: type=gha,scope=image-amd64
           cache-to: type=gha,mode=max,scope=image-amd64
 
+      # The Forge worker image (ADR 35). Built here so a pull request that
+      # breaks `Dockerfile.forge` is red before it merges — this Mac cannot
+      # build any image, so this step is the only pre-merge proof there is.
+      # Build-only: the smoke checks above interrogate the *app* image, and
+      # the worker's contract (the shim answers, Forge runs) can only be
+      # proven by the machine itself.
+      #
+      # Deliberately **not** scanned by Trivy, and that is a decision rather
+      # than an omission: the distribution is upstream's jar-with-dependencies,
+      # so a fixable CVE in a library Forge bundles would red this required
+      # check forever with nothing we could patch. The worker is reachable
+      # only over the private network, token-gated, and runs for minutes at a
+      # time; the app image — the one the internet talks to — keeps its scan.
+      - name: Build the Forge worker image (linux/amd64)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: .
+          file: Dockerfile.forge
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=forge-amd64
+          cache-to: type=gha,mode=max,scope=forge-amd64
+
       # Rule 5, enforced against the artifact rather than against the tree. The
       # `no-secrets-or-card-data` job checks what is *tracked*; this checks what is
       # *shipped*, which is a different thing the moment a `.dockerignore` line
@@ -605,6 +628,94 @@ jobs:
               sys.exit(1)
           print(f"up: {h['oracle_cards']} oracle cards, {h['decks']} decks")
           PY
+
+      # ---- The Forge worker (ADR 35's second half) -----------------------
+      #
+      # Build the worker image, push it to Fly's registry, and point the
+      # `forge-worker` machine at it. Three things worth stating:
+      #
+      # * `registry.fly.io` is the app's own private registry — the same one
+      #   `flyctl deploy --local-only` above just pushed to. This is not the
+      #   public publishing ENGINEERING §5 keeps behind a signing
+      #   conversation.
+      # * The sync starts the machine once so the *host* pulls the image now,
+      #   then stops it. Without that, the first match after a deploy would
+      #   pay the pull inside somebody's request thread — the exact failure
+      #   keeping the machine pre-created is meant to prevent.
+      # * The machine carries no `fly_process_group` metadata, so `flyctl
+      #   deploy` (which manages process groups from `fly.toml`) never
+      #   touches it; this step is its whole lifecycle.
+      #
+      # After the smoke test on purpose: the app deploy is proven first, and
+      # a red worker sync is feedback about the worker, not a rollback of the
+      # app.
+      - name: Log docker in to Fly's registry
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl auth docker
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
+
+      # The same cache scope the `image` job writes, so this is mostly a
+      # cache replay: the Forge download layer in particular (~300MB from
+      # GitHub) should be fetched once per Forge version, not once per deploy.
+      - name: Push the Forge worker image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: .
+          file: Dockerfile.forge
+          platforms: linux/amd64
+          push: true
+          tags: registry.fly.io/sylvan-library:forge-worker-${{ github.sha }}
+          cache-from: type=gha,scope=forge-amd64
+
+      - name: Point the forge-worker machine at it, and put it to sleep
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          IMAGE="registry.fly.io/sylvan-library:forge-worker-${GITHUB_SHA}"
+          API="https://api.machines.dev/v1/apps/sylvan-library"
+          AUTH="Authorization: Bearer $FLY_API_TOKEN"
+
+          # Dedicated CPU is ADR 35's core sizing argument: on throttled
+          # shared cores the measured tail stretches into the clock and
+          # clock-outs are corrupted measurements, not slow ones. 2 vCPUs and
+          # 4GB against a 3GB JVM heap ceiling (the shim's default) — resize
+          # against measurement, not upward by reflex.
+          config=$(jq -n --arg img "$IMAGE" '{
+            image: $img,
+            guest: {cpu_kind: "performance", cpus: 2, memory_mb: 4096},
+            restart: {policy: "no"},
+            auto_destroy: false,
+            metadata: {mtglab_role: "forge-worker"}
+          }')
+
+          id=$(curl -fsS -H "$AUTH" "$API/machines" \
+            | jq -r '.[] | select(.name=="forge-worker") | .id' | head -1)
+          if [ -z "$id" ]; then
+            id=$(curl -fsS -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+              -d "$(jq -n --argjson c "$config" \
+                    '{name: "forge-worker", region: "iad", config: $c}')" \
+              "$API/machines" | jq -r '.id')
+            echo "created forge-worker machine $id"
+          else
+            curl -fsS -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+              -d "$(jq -n --argjson c "$config" '{config: $c}')" \
+              "$API/machines/$id" > /dev/null
+            echo "updated forge-worker machine $id"
+          fi
+
+          # Wake it so the image lands on the host (generous timeout: the
+          # first pull is ~1GB), then stop it — stopped-when-idle is the
+          # steady state and per-second billing is the point.
+          curl -fsS -X POST -H "$AUTH" "$API/machines/$id/start" > /dev/null || true
+          curl -fsS -H "$AUTH" \
+            "$API/machines/$id/wait?state=started&timeout=300" > /dev/null
+          curl -fsS -X POST -H "$AUTH" "$API/machines/$id/stop" > /dev/null
+          curl -fsS -H "$AUTH" \
+            "$API/machines/$id/wait?state=stopped&timeout=120" > /dev/null || true
+          echo "forge-worker holds $IMAGE, stopped"
 
       # For the log, so a bad deploy has something to roll back *to* without
       # anybody having to reconstruct which release was last good.

@@ -356,6 +356,23 @@ def test_a_directory_with_no_jar_names_the_env_var(tmp_path):
     assert "MTGLAB_FORGE_HOME" in str(exc.value)
 
 
+def test_an_unreadable_home_is_not_installed_rather_than_a_crash(tmp_path):
+    """The deployed 500 of 2026-08-20: `Path.home()` is `/root` in the
+    container while the app runs as `mtglab`, so the probe's stat raised
+    `PermissionError` and the gate at `/api/forge` answered 500 instead of
+    `available: false`. A directory this process cannot look inside holds no
+    Forge this process can run."""
+    from mtglab.sim.tier3 import run as forge
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o000)
+    try:
+        with pytest.raises(forge.ForgeNotInstalled):
+            forge.desktop_jar(locked / "forge")
+    finally:
+        locked.chmod(0o755)
+
+
 def test_the_profile_is_ours_not_the_users_own(tmp_path, monkeypatch):
     """Forge defaults to the user's own data directory. Writing generated decks
     there would mix them into whatever the person saved by hand."""

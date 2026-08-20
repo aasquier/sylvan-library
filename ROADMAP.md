@@ -2006,9 +2006,11 @@ The remaining work is a board-state manager for the UI — still explicitly *not
 a rules engine. **The hosted question is decided as of 2026-08-20**
 ([ADR 35](docs/adr/0035-the-forge-joins-the-simulator-and-a-worker-runs-it-hosted.md)):
 the Simulator has a Forge mode behind an environment gate — heads-up only,
-because pods are 40% clock on this hardware — and the deployed instance gets
-it when the on-demand worker machine lands on its own branch. Until then the
-gate answers honestly: no Forge there.
+because pods are 40% clock on this hardware. **The worker landed the same
+day**: `Dockerfile.forge` + `sim/tier3/{shim,worker,wire}.py` put matches on
+an on-demand dedicated-CPU machine, stopped when idle; the deployed gate
+answers yes once `MTGLAB_FLY_API_TOKEN` is set (`docs/HOSTING.md` §7 is the
+runbook).
 
 ## 4. Shopping, swaps, deals
 
@@ -2747,8 +2749,10 @@ distribution is installed, honestly absent elsewhere), and the hosted shape
 is the third of the three below: an on-demand Fly worker machine with a
 dedicated CPU, stopped when idle, started per job — chosen because throttled
 shared CPU does not merely run the spike's tail slowly, it pushes real games
-into the clock and corrupts the measurement. The worker is its own branch
-and is not yet built. The spike record below stands as the evidence base.
+into the clock and corrupts the measurement. **The worker is built as of
+2026-08-20** — `Dockerfile.forge`, the shim, and the Machines API client;
+`docs/HOSTING.md` §7 records provisioning. The spike record below stands as
+the evidence base.
 
 Recorded 2026-08-11, gated goals 2, 3 and 7.
 [ADR 14](docs/adr/0014-python-decides-claude-advises.md) makes Forge the thing

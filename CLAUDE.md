@@ -283,7 +283,14 @@ src/mtglab/
   sim/compile.py          deck.yaml + pool -> SimCards
   sim/cache.py            memoised Tier 1 results, keyed on compiled input
   sim/tier1/engine.py     Monte Carlo goldfish
-  sim/tier3/              the Forge bridge: .dck export, coverage, run, parse
+  sim/tier3/              the Forge bridge: .dck export, coverage, run, parse;
+                          plus the hosted half (ADR 35) -- wire.py (what
+                          crosses the private network, decks as deck.yaml
+                          text and results rebuilt into a real SimRun),
+                          shim.py (the worker machine's stdlib HTTP door,
+                          which stops its own machine when idle), worker.py
+                          (the app's Machines API client; creation belongs
+                          to the deploy workflow, never a request thread)
   artifacts/generate.py   the five deliverables
   claude/                 client, tools, stance, persona, and seven modes
                           across six features: interview.py (a card's `why`),
@@ -309,8 +316,10 @@ src/mtglab/
   api/forgeruns.py        Tier 3 heads-up matches as jobs (ADR 35): a gate
                           the client asks first, refusals in the request,
                           one FORGE lane worker so two JVMs cannot race the
-                          .dck directory; hosted runs await the worker
-                          machine, its own branch
+                          .dck directory; hosted, the same match runs on the
+                          forge-worker machine (Dockerfile.forge) -- woken
+                          per job, stopped when idle, gate flipped by
+                          MTGLAB_FORGE_WORKER + MTGLAB_FLY_API_TOKEN
   api/themeruns.py        both theme halves, same shape (226s / 134s, ADR 20)
   api/dossierruns.py      the commander dossier, same shape (236s, ADR 19)
   api/scanruns.py         one photographed card read by Claude, same shape

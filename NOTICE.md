@@ -135,9 +135,18 @@ repository today but all of which bind a hosted instance that ships it:
    that, and Forge is not under it.
 
 Where an obligation *would* attach is **publishing a container image with Forge
-inside it**, which is distribution in the ordinary way. `docs/HOSTING.md` §7
-records the practical route around that, and it is the same one already used
-for the card pool: keep it on the volume, not in the image.
+inside it**, which is distribution in the ordinary way. The hosted worker
+(ADR 35, `Dockerfile.forge`) builds exactly such an image — and stays on the
+right side of that line because the image is never published: it is pushed
+only to the app's **private, org-scoped registry** (`registry.fly.io`) as a
+deployment step, readable by nobody but this app's own account. GPLv3 §0 ties
+"convey" to propagation "that enables other parties to make or receive
+copies", and a private registry used to move a binary onto one's own server
+enables no other party anything — the same argument that lets anyone `scp` a
+GPL binary to their own host. What must therefore never happen is pushing
+that image to a public registry, or making the Fly registry tag pullable by
+others; if the image is ever published, pin the exact Forge version and ship
+the corresponding source alongside it.
 
 Nothing here is legal advice.
 

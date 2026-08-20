@@ -218,3 +218,74 @@ def test_the_lane_is_forge_not_cpu():
     plan = forgeruns.plan_forge([deck, deck], ["local/a", "local/b"], {})
     assert plan.lane == jobs.FORGE
     assert plan.key is not None and "local/a" in plan.key
+
+
+# ------------------------------------------------------- the hosted worker
+#
+# ADR 35's second half: same route, same refusals, same job — the match just
+# runs on the worker machine. These pin that the route consults the worker
+# seam when it is configured, and that its failures wear the same status
+# codes the local ones do.
+
+from mtglab.sim.tier3 import worker  # noqa: E402
+
+
+@pytest.fixture
+def worker_mode(monkeypatch):
+    monkeypatch.setattr(worker, "configured", lambda: True)
+    monkeypatch.setattr(forge_run, "check_coverage",
+                        lambda *a: pytest.fail(
+                            "worker mode must not read a local zip"))
+    monkeypatch.setattr(forge_run, "run_games",
+                        lambda *a, **k: pytest.fail(
+                            "worker mode must not start a local JVM"))
+
+
+def test_the_gate_says_yes_when_the_worker_is_configured(client, worker_mode):
+    body = client.get("/api/forge")
+    assert body.status_code == 200
+    assert body.json() == {"available": True, "why": None}
+
+
+def test_a_worker_coverage_failure_is_the_same_422(client, worker_mode,
+                                                   monkeypatch):
+    monkeypatch.setattr(
+        worker, "check_coverage",
+        lambda decks: (_ for _ in ()).throw(
+            forge_run.CoverageFailed("missing: Nonexistent Card 1")))
+    refused = post(client)
+    assert refused.status_code == 422
+    assert "Nonexistent Card 1" in refused.json()["detail"]
+    assert client.get("/api/jobs").json() == []
+
+
+def test_a_worker_that_will_not_come_up_is_a_503(client, worker_mode,
+                                                 monkeypatch):
+    monkeypatch.setattr(
+        worker, "check_coverage",
+        lambda decks: (_ for _ in ()).throw(
+            ForgeNotInstalled("no machine named 'forge-worker'")))
+    assert post(client).status_code == 503
+    assert client.get("/api/jobs").json() == []
+
+
+def test_a_worker_match_is_the_same_job_with_the_same_shape(client,
+                                                            worker_mode,
+                                                            monkeypatch):
+    monkeypatch.setattr(worker, "check_coverage", lambda decks: [])
+    seen = {}
+
+    def run_match(decks, *, games, clock, seed):
+        seen.update(games=games, clock=clock, seed=seed,
+                    slugs=[d.slug for d in decks])
+        return fake_match(games)
+
+    monkeypatch.setattr(worker, "run_match", run_match)
+    job = post(client).json()
+    result = await_job(client, job["id"])
+    assert result["status"] == "done"
+    assert seen == {"games": 4, "clock": forgeruns.CLOCK,
+                    "seed": forgeruns.DEFAULT_SEED, "slugs": [A, B]}
+    body = result["result"]
+    assert body["timed_out"] == 1 and body["draws"] == 1
+    assert {d["slug"]: d["wins"] for d in body["decks"]} == {A: 1, B: 1}

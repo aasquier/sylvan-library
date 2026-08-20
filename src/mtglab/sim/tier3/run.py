@@ -106,7 +106,17 @@ def java_binary() -> Path:
 
 def desktop_jar(forge_home: Path | None = None) -> Path:
     home = Path(forge_home) if forge_home is not None else config.forge_home()
-    jars = sorted(home.glob("forge-gui-desktop-*-jar-with-dependencies.jar"))
+    # A directory this process cannot even look inside is a directory with no
+    # Forge in it. Deployed, `Path.home()` is `/root` while the app runs as
+    # `mtglab`, so the glob's stat raises `PermissionError` -- and the gate at
+    # `/api/forge` answered 500 instead of `available: false` until this was
+    # caught on the live instance (2026-08-20).
+    try:
+        jars = sorted(home.glob("forge-gui-desktop-*-jar-with-dependencies.jar"))
+    except OSError as exc:
+        raise ForgeNotInstalled(
+            f"no Forge distribution readable at {home} ({exc}) -- set "
+            f"MTGLAB_FORGE_HOME to an unpacked Forge distribution") from exc
     if not jars:
         raise ForgeNotInstalled(
             f"no Forge desktop jar in {home} -- set MTGLAB_FORGE_HOME to an "
@@ -190,6 +200,21 @@ class SimRun:
         return self.seats.get(game.winner_seat)
 
 
+def raise_unless_covered(reports: list[CoverageReport]) -> None:
+    """One message format for a failed pre-flight, wherever it was computed.
+
+    Split out of `check_coverage` when the worker landed (ADR 35): the shim
+    computes reports on the worker machine and `worker.py` re-raises them on
+    the request thread, and two hand-written copies of this message would
+    drift the day one of them was edited.
+    """
+    broken = [r for r in reports if not r.ok]
+    if broken:
+        raise CoverageFailed(
+            "Forge does not implement every card, so no result would mean "
+            "anything:\n" + "\n".join(r.summary() for r in broken))
+
+
 def check_coverage(decks: list[Deck],
                    forge_home: Path | None = None) -> list[CoverageReport]:
     """Pre-flight every deck. Raises `CoverageFailed` if any card is missing.
@@ -200,11 +225,7 @@ def check_coverage(decks: list[Deck],
     """
     index = implemented_names(forge_home)
     reports = [check(deck, index) for deck in decks]
-    broken = [r for r in reports if not r.ok]
-    if broken:
-        raise CoverageFailed(
-            "Forge does not implement every card, so no result would mean "
-            "anything:\n" + "\n".join(r.summary() for r in broken))
+    raise_unless_covered(reports)
     return reports
 
 

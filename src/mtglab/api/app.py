@@ -1351,6 +1351,7 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         the one failure this surface exists to never serve.
         """
         from mtglab.api.forgeruns import plan_forge, status
+        from mtglab.sim.tier3 import worker
         from mtglab.sim.tier3.coverage import ForgeNotInstalled
         from mtglab.sim.tier3.run import CoverageFailed, check_coverage
 
@@ -1370,7 +1371,15 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         decks = [lib.source_for(owner).get(slug) for owner, slug in pairs]
         addresses = [f"{owner}/{slug}" for owner, slug in pairs]
         try:
-            check_coverage(decks)
+            # The pre-flight runs where the card scripts live: against the
+            # local zip, or on the worker machine (which this wakes — the
+            # one request-thread cost the hosted shape adds, bounded by
+            # `worker.BOOT_SECONDS` so a machine that will not come up is a
+            # 503 rather than a hang).
+            if worker.configured():
+                worker.check_coverage(decks)
+            else:
+                check_coverage(decks)
         except CoverageFailed as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ForgeNotInstalled as exc:
