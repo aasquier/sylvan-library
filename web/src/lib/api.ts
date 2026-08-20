@@ -626,6 +626,12 @@ export interface AccountList {
  * mark that is all the dev Mac can report — a peak shown as a level would
  * read as a leak. */
 export interface AdminSystem {
+  /** What migration version this box's `app.db` reached, and what the code
+   *  running here was written against. Equal on every healthy boot — the
+   *  pair is the point, since ADR 23 applies migrations on a deploy with
+   *  nobody watching and the ladder is forward-only. `applied` is null only
+   *  when there is no database yet, which is a fresh laptop. */
+  schema: { applied: number | null; expected: number }
   process: { bytes: number; kind: 'current' | 'peak' }
   memory: { total_bytes: number | null; available_bytes: number | null }
   load: number[]

@@ -319,7 +319,7 @@ function MachinePanel() {
 
   return (
     <section className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <StatTile label="Process memory"
                   value={system ? fmtBytes(system.process.bytes) : '—'}
                   hint={system
@@ -346,6 +346,22 @@ function MachinePanel() {
                     : '—'}
                   hint={system
                     ? `${fmtBytes(system.disk.free_bytes)} free of ${fmtBytes(system.disk.total_bytes)}`
+                    : undefined} />
+        {/* Not a measure of how the box is coping, which is what the rest of
+            this row is — it is the one number ADR 23 makes worth watching.
+            A merge deploys itself, the migration runs on boot with nobody
+            looking, and the ladder is forward-only, so rolling the code back
+            leaves the schema where it got to. Shown as a pair because a lone
+            version number cannot be wrong. */}
+        <StatTile label="Schema"
+                  value={system?.schema.applied != null
+                    ? `v${system.schema.applied}` : '—'}
+                  hint={system
+                    ? (system.schema.applied === system.schema.expected
+                        ? 'matches the code running here'
+                        : <span style={{ color: 'var(--status-warning)' }}>
+                            code here expects v{system.schema.expected}
+                          </span>)
                     : undefined} />
       </div>
 

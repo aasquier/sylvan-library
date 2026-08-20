@@ -14,6 +14,8 @@ properties are mostly about honesty on a fresh box:
   a question, or another person's job.
 """
 
+import logging
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -28,7 +30,7 @@ pytest.importorskip("argon2")
 from fastapi.testclient import TestClient
 
 from mtglab import config
-from mtglab.api import jobs
+from mtglab.api import adminstats, jobs
 from mtglab.api.app import create_app
 from mtglab.auth import db, users
 from mtglab.claude import ledger
@@ -78,6 +80,93 @@ def test_system_reports_the_process_and_the_volume(client):
     # The volume the number describes is named, so the page never has to
     # guess which mount it is looking at.
     assert body["disk"]["path"] == str(config.DATA_DIR)
+
+
+def test_system_reports_the_schema_version_the_file_actually_reached(client):
+    """Both halves, because a lone version number cannot be wrong.
+
+    ADR 23 is the reason this is on a panel at all: a merge deploys itself
+    and the migration runs on boot with nobody watching, so `applied` is
+    read off the database and `expected` off the code that is running.
+    """
+    body = client.get("/api/admin/stats/system").json()
+
+    # The scratch app.db is migrated by the fixture that logs in, so a
+    # healthy pair is what this box should report.
+    assert body["schema"]["expected"] == db.SCHEMA_VERSION
+    assert body["schema"]["applied"] == db.SCHEMA_VERSION
+
+
+def test_reading_the_schema_version_never_migrates_the_file(tmp_path):
+    """The panel may not change the thing it reports on.
+
+    `db.connect` applies migrations, which is right everywhere except here:
+    an admin refreshing a stats tab would silently upgrade the volume. The
+    check is a database deliberately left at an older version -- if the read
+    path migrates, `user_version` moves and this fails.
+    """
+    stale = tmp_path / "app.db"
+    con = sqlite3.connect(stale)
+    con.execute("PRAGMA user_version = 3")
+    con.commit()
+    con.close()
+
+    with config.use_paths(data_dir=tmp_path):
+        reported = adminstats._schema()
+
+    after = sqlite3.connect(stale)
+    try:
+        left_at = after.execute("PRAGMA user_version").fetchone()[0]
+    finally:
+        after.close()
+
+    assert reported["applied"] == 3
+    assert reported["expected"] == db.SCHEMA_VERSION
+    assert left_at == 3, "reading the version migrated the database"
+
+
+def test_the_schema_version_is_null_rather_than_conjured(tmp_path, caplog):
+    """A missing `app.db` is a fresh laptop, not an error.
+
+    Two guards, checked apart because they are not the same guard and a
+    mutation run caught this docstring crediting the wrong one. `mode=ro` is
+    what refuses to create the file. The `exists()` check earns its line
+    separately: without it every poll of a timer-refreshed panel logs a
+    warning about a database that is *correctly* absent.
+    """
+    with (config.use_paths(data_dir=tmp_path),
+          caplog.at_level(logging.WARNING, logger="mtglab.api.adminstats")):
+        reported = adminstats._schema()
+
+    assert reported["applied"] is None
+    assert reported["expected"] == db.SCHEMA_VERSION
+    assert not (tmp_path / "app.db").exists(), "asking created a database"
+    assert not caplog.records, "an absent database is not worth a warning"
+
+
+def test_the_expected_version_is_read_from_the_code_not_restated(
+        monkeypatch, tmp_path):
+    """It must report the constant, not a copy of today's value of it.
+
+    Asserting `expected == db.SCHEMA_VERSION` cannot tell a lookup from a
+    literal while the literal happens to be right -- the restated-claim shape
+    this cycle found five times. Moving the constant is what separates them.
+
+    `use_paths` is not decoration here, and the first draft omitted it. This
+    test moves `SCHEMA_VERSION` to a number no ladder will ever reach, and
+    `_schema` resolves its database from `config` -- so pointed at the
+    ambient data directory it reads the maintainer's own `app.db` while a
+    fake version is installed. Read-only, so the test itself was harmless;
+    the *mutation* run that checks this guard was not. Replacing the
+    read-only connection with `db.connect` -- exactly the wrongness the
+    guard exists to catch -- migrated the real database to version 4242,
+    where `_apply_migrations` would have returned early forever and silently
+    skipped every future migration. A sandbox is what makes a destructive
+    mutation survivable.
+    """
+    monkeypatch.setattr(db, "SCHEMA_VERSION", 4242)
+    with config.use_paths(data_dir=tmp_path):
+        assert adminstats._schema()["expected"] == 4242
 
 
 def test_storage_says_null_for_absent_and_sized_for_present(client):

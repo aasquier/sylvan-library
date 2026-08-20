@@ -126,6 +126,7 @@ beforeEach(() => {
   // a tab is opened. Answered with data in them so the tests below can also
   // assert the tiles render what the box reported.
   vi.mocked(api.adminSystem).mockResolvedValue({
+    schema: { applied: 10, expected: 10 },
     process: { bytes: 120 * 1024 * 1024, kind: 'current' },
     memory: { total_bytes: 1024 ** 3, available_bytes: 512 * 1024 ** 2 },
     load: [0.12, 0.2, 0.25],
@@ -537,6 +538,35 @@ describe('the dashboard', () => {
     expect(await screen.findByText('120 MB')).toBeTruthy()
     const load = screen.getByText('Load').closest('div') as HTMLElement
     expect(within(load).getByText('0.12 · 0.20 · 0.25')).toBeTruthy()
+  })
+
+  it('shows the schema version, and says so when it disagrees', async () => {
+    // Healthy first: the pair matches, so the hint reassures rather than
+    // warns. A lone version number cannot be wrong, which is why both halves
+    // are on the wire and why this test drives both states.
+    render(<Admin />)
+    await openTab('Machine')
+    const tile = (await screen.findByText('Schema')).closest('div') as HTMLElement
+    expect(within(tile).getByText('v10')).toBeTruthy()
+    expect(within(tile).getByText(/matches the code running here/)).toBeTruthy()
+    cleanup()
+
+    // Then the state the tile exists for: the volume is behind the code that
+    // is running on it, which ADR 23 makes possible on any unwatched boot.
+    vi.mocked(api.adminSystem).mockResolvedValue({
+      schema: { applied: 8, expected: 10 },
+      process: { bytes: 120 * 1024 * 1024, kind: 'current' },
+      memory: { total_bytes: 1024 ** 3, available_bytes: 512 * 1024 ** 2 },
+      load: [0.12, 0.2, 0.25],
+      cpus: 1,
+      disk: { path: '/data', total_bytes: 10 * 1024 ** 3,
+              used_bytes: 4 * 1024 ** 3, free_bytes: 6 * 1024 ** 3 },
+    })
+    render(<Admin />)
+    await openTab('Machine')
+    const stale = (await screen.findByText('Schema')).closest('div') as HTMLElement
+    expect(within(stale).getByText('v8')).toBeTruthy()
+    expect(within(stale).getByText(/expects v10/)).toBeTruthy()
   })
 
   it('sizes the stores under Storage, and never claims an absent one', async () => {
