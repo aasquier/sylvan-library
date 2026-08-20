@@ -168,20 +168,26 @@ def plan_forge(decks: list[Deck], addresses: list[str],
     def compute(progress: Progress) -> dict[str, Any]:
         from mtglab.sim.tier3 import run as forge
         from mtglab.sim.tier3 import worker
-        # One subprocess, no per-game feedback until it returns: total is
-        # honest and `done` stays at zero rather than pretending. The client
-        # shows a clock, not a bar — the theme proposal's deal.
         progress(0, games)
+
+        # Forge's output is streamed, so the job ticks once per finished
+        # game and the client's clock can be a bar that moves. Clamped
+        # because a tick is a progress report, not a result — the shaped
+        # answer below is the only tally anybody should quote.
+        def tick(finished: int) -> None:
+            progress(min(finished, games), games)
+
         # Same match, two places it can run (ADR 35): the worker when the
         # environment names one, a local subprocess otherwise. `run_match`
-        # hands back a `SimRun` rebuilt from the wire, so `_shape` cannot
-        # tell the difference — that is `wire.py`'s whole promise.
+        # hands back a `SimRun` rebuilt from the wire and relays the same
+        # per-game ticks, so `_shape` and the bar cannot tell the difference
+        # — that is `wire.py`'s whole promise.
         if worker.configured():
             result: Any = worker.run_match(decks, games=games, clock=CLOCK,
-                                           seed=seed)
+                                           seed=seed, on_game=tick)
         else:
             result = forge.run_games(decks, games=games, clock=CLOCK,
-                                     seed=seed)
+                                     seed=seed, on_game=tick)
         progress(games, games)
         return _shape(decks, addresses, games, seed, result)
 

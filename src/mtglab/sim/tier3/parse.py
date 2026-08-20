@@ -78,6 +78,18 @@ class SimOutput:
         return not self.unsupported and not self.deck_load_failures
 
 
+def is_game_result(line: str) -> bool:
+    """Did this line just finish a game? The streaming tick's one question.
+
+    `run.py` streams Forge's output live and reports progress per game; this
+    is the same pair of patterns the full parse recognises results by, shared
+    so the tick and the tally cannot drift apart — a progress bar that counts
+    lines the parser will later reject would tick past its own total.
+    """
+    stripped = line.strip()
+    return bool(_WON.match(stripped) or _DRAW.match(stripped))
+
+
 def parse(text: str) -> SimOutput:
     """Parse a whole `sim` run.
 

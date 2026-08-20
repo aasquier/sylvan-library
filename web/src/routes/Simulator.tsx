@@ -322,26 +322,30 @@ export default function Simulator() {
         <div className="card-surface space-y-2 rounded-xl p-4">
           <div className="flex items-center justify-between text-sm">
             <Spinner label={job.label || 'Running…'} />
-            {mode !== 'forge' && (
-              <span className="tabular" style={{ color: 'var(--text-secondary)' }}>
-                {job.percent}%
-              </span>
-            )}
+            <span className="tabular" style={{ color: 'var(--text-secondary)' }}>
+              {mode === 'forge'
+                ? (job.total > 0 && job.done > 0
+                    ? `game ${Math.min(job.done + 1, job.total)} of ${job.total}`
+                    : '')
+                : `${job.percent}%`}
+            </span>
           </div>
-          {mode === 'forge' ? (
-            // No bar: the match is one subprocess with no per-game feedback,
-            // and a bar pinned at 0% reads as a hang. Say what is true.
+          <div className="h-2 overflow-hidden rounded-full" style={{ background: 'var(--gridline)' }}>
+            <div className="h-full rounded-full transition-all"
+                 style={{ width: `${job.percent}%`, background: 'var(--series-1)' }} />
+          </div>
+          {mode === 'forge' && (
+            // The Forge reports each game as it ends, so the bar ticks per
+            // game — but nothing arrives before the first result, so the
+            // quiet opening gets its own honest sentence.
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Forge is playing whole games of Commander, one at a time — a
-              typical game takes a few seconds, and a wide board can take two
-              minutes while the pilot thinks. Ten games is usually two or
-              three minutes end to end.
+              {job.done === 0
+                ? 'Lighting the forge — the first game usually reports ' +
+                  'within half a minute.'
+                : 'Whole games of Commander, one at a time — a typical game ' +
+                  'takes a few seconds, and a wide board can take two ' +
+                  'minutes while the pilot thinks.'}
             </p>
-          ) : (
-            <div className="h-2 overflow-hidden rounded-full" style={{ background: 'var(--gridline)' }}>
-              <div className="h-full rounded-full transition-all"
-                   style={{ width: `${job.percent}%`, background: 'var(--series-1)' }} />
-            </div>
           )}
         </div>
       )}

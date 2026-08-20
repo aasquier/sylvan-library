@@ -153,7 +153,7 @@ def test_a_match_runs_as_a_job_and_reports_honestly(client, forge_present,
                                                     monkeypatch):
     seen = {}
 
-    def run_games(decks, *, games, clock, seed):
+    def run_games(decks, *, games, clock, seed, on_game=None):
         seen.update(games=games, clock=clock, seed=seed,
                     slugs=[d.slug for d in decks])
         return fake_match(games)
@@ -183,8 +183,9 @@ def test_a_match_runs_as_a_job_and_reports_honestly(client, forge_present,
 
 def test_games_are_clamped_before_the_label_is_written(client, forge_present,
                                                        monkeypatch):
-    monkeypatch.setattr(forge_run, "run_games",
-                        lambda decks, *, games, clock, seed: fake_match(games))
+    monkeypatch.setattr(
+        forge_run, "run_games",
+        lambda decks, *, games, clock, seed, on_game=None: fake_match(games))
     job = post(client, games=999).json()
     assert f"{forgeruns.GAMES_MAX} games" in job["label"]
     assert await_job(client, job["id"])["result"]["games"] == forgeruns.GAMES_MAX
@@ -195,7 +196,7 @@ def test_asking_twice_in_flight_is_one_job(client, forge_present, monkeypatch):
     the JVM is working joins the live job rather than queueing a second one."""
     release = threading.Event()
 
-    def slow_run(decks, *, games, clock, seed):
+    def slow_run(decks, *, games, clock, seed, on_game=None):
         release.wait(JOB_TIMEOUT_S)
         return fake_match(games)
 
@@ -210,6 +211,32 @@ def test_asking_twice_in_flight_is_one_job(client, forge_present, monkeypatch):
         release.set()
     await_job(client, first["id"])
     await_job(client, different["id"])
+
+
+def test_the_job_ticks_as_games_finish(client, forge_present, monkeypatch):
+    """Per-game progress (the Popen stream): each `on_game` moves the job's
+    `done`, so the client's clock can be a bar that actually ticks."""
+    reported = threading.Event()
+    release = threading.Event()
+
+    def streaming_run(decks, *, games, clock, seed, on_game=None):
+        assert on_game is not None, "the job must ask to hear ticks"
+        on_game(1)
+        on_game(2)
+        reported.set()
+        release.wait(JOB_TIMEOUT_S)
+        return fake_match(games)
+
+    monkeypatch.setattr(forge_run, "run_games", streaming_run)
+    try:
+        job = post(client).json()
+        assert reported.wait(JOB_TIMEOUT_S)
+        body = client.get(f"/api/jobs/{job['id']}").json()
+        assert (body["done"], body["total"]) == (2, 4)
+        assert body["status"] == "running"
+    finally:
+        release.set()
+    assert await_job(client, job["id"])["status"] == "done"
 
 
 def test_the_lane_is_forge_not_cpu():
@@ -275,9 +302,14 @@ def test_a_worker_match_is_the_same_job_with_the_same_shape(client,
     monkeypatch.setattr(worker, "check_coverage", lambda decks: [])
     seen = {}
 
-    def run_match(decks, *, games, clock, seed):
+    def run_match(decks, *, games, clock, seed, on_game=None):
         seen.update(games=games, clock=clock, seed=seed,
                     slugs=[d.slug for d in decks])
+        if on_game is not None:
+            # The stream relays ticks from the worker; the job must hear them
+            # through this seam exactly as it hears local ones.
+            for n in range(1, games + 1):
+                on_game(n)
         return fake_match(games)
 
     monkeypatch.setattr(worker, "run_match", run_match)
