@@ -833,7 +833,7 @@ spirit of Magic*
      right instinct and the wrong column, and wrote it up as a verification
      because the numbers came out of a query.
 
-     **CLOSED 2026-08-19 (PR #PRNUM). Aaron ruled: fix it properly, on its own
+     **CLOSED 2026-08-19 (PR #195). Aaron ruled: fix it properly, on its own
      branch.** The schema, not the stopgap. `printings` gained `artist` and
      `flavor_text`; `_ADDED_COLUMNS` is keyed by table now, because it held
      only `oracle_cards`' additions and `printings` had never gained one — so
@@ -2876,7 +2876,7 @@ act on soonest, not by color:
    credit for a missing one, against a project standard that every painting
    carries a visible credit. *Cross-color: White's attribution facet, Black's
    ingest.*
-   **CLOSED 2026-08-19 (PR #PRNUM): the schema, not the stopgap.** Aaron's
+   **CLOSED 2026-08-19 (PR #195): the schema, not the stopgap.** Aaron's
    ruling. Blue's section has the full account; the operational half is that
    **every instance owes a `data refresh`** before the credit comes back, and
    `/api/health` says `pool_stale` until it does.
