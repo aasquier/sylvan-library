@@ -229,7 +229,7 @@ describe('the vocabulary tab', () => {
   it('filters on a search, and says so when nothing matches', async () => {
     renderLearn('/learn?tab=words')
     await screen.findByText('Mulligan')
-    const box = screen.getByPlaceholderText(/mulligan, ramp, seed/)
+    const box = screen.getByPlaceholderText(/mulligan, ramp, shuffle/)
     fireEvent.change(box, { target: { value: 'ramp' } })
     // "cheap ramp" is in the min-pieces entry and nowhere in the mulligan one.
     await waitFor(() => expect(screen.queryByText('Mulligan')).toBeNull())

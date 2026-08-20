@@ -429,7 +429,7 @@ function WordsTab() {
         <span className="text-xs uppercase tracking-wide"
               style={{ color: 'var(--text-muted)' }}>Find a word</span>
         <input value={query} onChange={(e) => setQuery(e.target.value)}
-               placeholder="mulligan, ramp, seed…"
+               placeholder="mulligan, ramp, shuffle…"
                className="mt-1 w-full rounded-md px-3 py-2 text-sm"
                style={{ background: 'var(--page)', color: 'var(--text-primary)',
                         border: '1px solid var(--hairline)' }} />

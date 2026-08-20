@@ -75,7 +75,7 @@ function Provenance({ seed, cached, computed_at }: {
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs"
          style={{ color: 'var(--text-secondary)' }}>
-      <Badge>seed {seed}</Badge>
+      <Badge>shuffle {seed}</Badge>
       {cached && computed_at
         ? <span>Cached — computed {ago(computed_at)}. Same deck, same
             parameters, same numbers.</span>
@@ -239,7 +239,7 @@ export default function Simulator() {
                          min={0} max={7} help={help('sim.min_pieces')} />
           </>
         )}
-        <NumberField label="Seed" value={seed} onChange={setSeed}
+        <NumberField label="Shuffle" value={seed} onChange={setSeed}
                      min={1} max={999999} help={help('sim.seed')} />
         <button onClick={() => run()} disabled={running || !slug}
                 className="btn btn-primary btn-accent-1">
