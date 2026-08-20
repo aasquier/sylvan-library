@@ -1105,6 +1105,23 @@ below, so scale up first.
 fly ssh console -C "mtglab data refresh"
 ```
 
+**That line could not work at all until 2026-08-19, and the reason is worth
+the paragraph.** `data refresh` opens the pool read-write and needs DuckDB's
+**exclusive** lock. The app holds a *shared* one through the pool keeper
+(`service._KEEPER`), which is a lease meant to expire after `_KEEPER_IDLE` of
+nobody wanting the pool -- and `_KEEPER_IDLE` was 30.0 while the
+`[[http_service.checks]]` block above calls `/api/health` every **30s**, an
+endpoint that counts both tables and asks `pool_stale`. The lease was renewed
+by the one caller that never stops asking, exactly as often as it came due, so
+the refresh was refused **forty times over five minutes**, always at `connect`,
+always by the same holder. The lease is 10.0s now and a test derives that
+ceiling from `fly.toml`; step 6 works on a populated volume for the first time.
+
+It read as working before only because the one run that succeeded --
+2026-08-13, the measurements below -- was the **first** load, when there was
+no pool file to hold a lock on. A runbook step verified once on an empty
+volume is a runbook step verified in the state you will never be in again.
+
 **One line, and it does not fit on the machine that runs the app.** Measured on
 the first real run, 2026-08-13. The job is five phases and only the first
 prints before it starts:

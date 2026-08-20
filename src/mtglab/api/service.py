@@ -79,7 +79,24 @@ _KEEPER_USED = 0.0
 #: Long enough that it spans a person reading a page and clicking the next
 #: one, short enough that nobody waits on it: a `data refresh` started while
 #: the app is idle blocks for at most this.
-_KEEPER_IDLE = 30.0
+#:
+#: **It must also be shorter than the platform's health-check interval, and
+#: this was 30.0 against a 30s check until 2026-08-19.** `fly.toml` calls
+#: `/api/health` every thirty seconds and `service.health` opens the pool --
+#: it counts both tables and asks `pool_stale` -- so the lease was renewed by
+#: the one caller that never stops asking, exactly as often as it expired.
+#: The app therefore held the shared lock forever and `mtglab data refresh`
+#: could not take the exclusive one **at all** on the instance: forty
+#: consecutive attempts over five minutes, every one refused by the same
+#: holder. `_reap_keeper` below argues at length that the keeper must not
+#: lock a refresh out; it was right, and the number underneath it was not.
+#:
+#: Ten seconds still spans the burst the lease exists for -- a page load is
+#: four requests -- and leaves twenty seconds of every health-check cycle in
+#: which the pool is free. `tests/test_pool_keeper.py` derives the ceiling
+#: from `fly.toml` rather than restating it, so moving the check's interval
+#: fails there instead of silently re-closing the door.
+_KEEPER_IDLE = 10.0
 _REAPER: threading.Thread | None = None
 
 
