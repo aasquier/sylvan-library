@@ -466,7 +466,7 @@ raise `LastAdmin` rather than removing the last admin **who can sign in** —
 enabled and holding a password, because an instance whose only admin is an
 unclaimed invite is locked out just as thoroughly.
 
-The browser side is built (`docs/HOSTING.md` §6 step 5c), so auth is complete
+The browser side is built (`docs/HISTORY.md` §6 step 5c), so auth is complete
 code-side and what is left before a deployment is infrastructure. **Auth is a
 gate, not a route**: with `MTGLAB_REQUIRE_AUTH` on and nobody signed in,
 `App.tsx` renders `routes/Login.tsx` in place of the header, the nav and the
@@ -1145,10 +1145,24 @@ next branch to carry it.
 
 ## Planning documents
 
-`ROADMAP.md` (goals vs reality, open decisions), `docs/ENGINEERING.md` (the
-next phase: compiled backend, testing rigor, CI/CD) and `docs/HOSTING.md`
-(deploying a shared instance). These are kept current deliberately — read them
-before proposing direction, and update them when direction changes.
+`ROADMAP.md` (goals vs reality, what is next, open decisions),
+`docs/ENGINEERING.md` (the next phase: compiled backend, testing rigor, CI/CD)
+and `docs/HOSTING.md` (the runbook for the deployed instance). These are kept
+current deliberately — read them before proposing direction, and update them
+when direction changes.
+
+**`docs/HISTORY.md` is the one that is deliberately not current.** Split out
+of the other two on 2026-08-21 (Aaron's ruling), it holds what they had
+accumulated underneath their live heads: HOSTING's auth, data-model and cost
+analyses and its build order and readiness list, and ROADMAP's sixteen-phase
+account of how this was built. Read it for *why* something is the way it is;
+never for what is true now. Two things about the split are load-bearing.
+**The section numbers travelled with the content** — HOSTING §§1, 2, 3, 6 and
+7 are HISTORY §§1, 2, 3, 6 and 7, and HOSTING keeps a stub at each number —
+because roughly fifty citations point at those numbers and fifteen of them are
+inside ADRs, which are immutable and were not edited. And **nothing was
+rewritten in the move**: where a moved section narrates a plan in the future
+tense, that is the era it was written in.
 
 `docs/adr/` records the decisions themselves — context, options considered,
 decision, consequences. Unlike the three above, **ADRs are immutable once

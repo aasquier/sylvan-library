@@ -3308,6 +3308,75 @@ silent deletion; nothing below was touched.**
    nothing, one `rmdir` to clear. Queued anyway, because the sweep's rule is
    a decision for everything, and the cheap ones are how the rule stays one.
 
+**Ruled by Aaron 2026-08-21, and acted on the same day.** Four of the six
+came back ruled; two came back unmarked and stay queued, per his own standing
+instruction that a blank stays queued.
+
+- **1 — retire, done.** The laptop `decks/_template` is gone and so is the
+  volume's `/data/decks/_template`; each was checked to be byte-identical to
+  the tracked `docs/deck-template.yaml` first (sha256
+  `d616d48f…3872a`) so the removal lost nothing. `/data/decks` now holds
+  exactly the seven deck directories CLAUDE.md names, and `decks/` on the
+  laptop is empty, which is the volume ruling's shape.
+- **2 — its own branch, done, and the mechanism had to change.** The split
+  landed as `docs/HISTORY.md`. **The recommendation as written would have
+  broken about fifty citations, fifteen of them inside ADRs** — ADR 5, 13,
+  14, 16, 17, 23, 30 and 32 all cite `docs/HOSTING.md` by section number, and
+  an ADR is immutable, so the prose could not be followed by an edit. The
+  resolution: **section numbers travel with the content** (HOSTING §§1, 2, 3,
+  6, 7 are HISTORY §§1, 2, 3, 6, 7) and HOSTING keeps a **forwarding stub at
+  each number**, heading text intact so the one real anchor link
+  (`HOSTING.md#7-deployment-readiness--the-running-list`) still resolves. The
+  move was verified as a pure move: the relocated ROADMAP block differs from
+  the original in **eleven lines, all of them link paths** rewritten because
+  the content moved from the repo root into `docs/`, with zero lines added or
+  lost. This is the general lesson and it is not about this file: **a
+  documentation move is a change to a citation graph, and in this repo part
+  of that graph is immutable.**
+- **3 — unmarked, stays queued.** CLAUDE.md's Workflow section still does not
+  say that a local `decks import` writes a scratch deck.
+- **4 — dev harness plus contributor engine.** README no longer sells
+  `mtglab ui` as "the app": the deployed instance is the product, and
+  `mtglab ui` is named as the development harness (commandment 16's walking
+  surface, and what `--dev` is for) and as the contributor engine
+  CONTRIBUTING's local-first story runs on. Nothing was deleted, and the
+  committed `web_dist` is untouched — it remains load-bearing for the deploy,
+  which is the sharpening this item already carried. The consequence the
+  ruling buys: **hosted-first gaps are now gaps**, so `decks build` having no
+  API route is Green's to close rather than CLI territory by design.
+- **5 — retire, done, with the last step left to Aaron.** The four snapshots
+  are archived at `~/backups-app-db-2026-08-21.tar.gz`, beside the deck
+  tarball, and removed from the repo tree. The archive was verified by
+  extracting it and checksum-comparing all four files before the originals
+  were touched, and the scratch extraction was wiped afterwards because it
+  held real account data. **The tarball itself is not deleted** — disposal of
+  personal data stays Aaron's hand on the key.
+- **6 — unmarked, stays queued, and the evidence was wrong.** The directory
+  is **not empty**: it holds `node_modules/.vite/vitest/`, a stray Vitest
+  cache. The sweep that queued it used `ls` without `-a`, so a dotfile hid
+  from it and "empty, one `rmdir` to clear" was never true — it is `rm -rf`.
+  Two things worth keeping. **A sweep that reads a directory must read the
+  hidden entries too**, which is the same class as the completeness claims
+  this ledger keeps catching, one layer down in the tooling. And the stray
+  cache says some Vitest invocation ran from the repo root rather than under
+  `web/`, which is the actual defect the empty directory was a symptom of.
+
+**Found while acting on 4, and fixed on the same branch: README's Status
+section had drifted past its quickstart.** The Blue entry above scoped the
+drift to setup prose; the Status section was worse. It claimed **two** decks
+fail the gate and named Atla Palani for running *Emrakul, the Aeons Torn* —
+the deck runs **Emrakul, the Promised End**, which is legal, so only Goreclaw
+fails. That is the identical error CLAUDE.md corrected on 2026-08-21, sitting
+in a second file nobody re-read; checked this time against the volume's own
+`deck.yaml` and the pool's `legal_commander`, not against either document.
+Also corrected: twenty-five ADRs where there are thirty-seven, five Claude
+modes across four features where there are seven across six, and research
+listed as unbuilt when ADR 26 shipped it. **The rule this earns is the one
+already written twice in CLAUDE.md, now with a third instance and a wider
+scope: a sentence asserting a count or a completeness claim is a claim to
+re-check against the code, and it rots in every file that holds one, not just
+the one with a test pointed at it.**
+
 **Confirmed, no action.** The `~/Downloads` deck markdown is still present
 (the Atla pilot guides, the swap lists, the lot) and CLAUDE.md's sentence
 about it — historical, never edited or re-imported — is still true and
