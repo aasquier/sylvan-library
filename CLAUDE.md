@@ -202,6 +202,14 @@ src/mtglab/
                           fourth of its kind, and still no card's meaning.
                           Cited by id (`tarot:pixie-fee`) so `keep_fact`
                           renders the file's own words, never the model's
+  reference.py            the four prose modules and the theme vocabulary
+                          rendered as the JSON the Go module embeds and
+                          serves (go/internal/reference/data/, written by
+                          `python tests/go_fixtures.py`, held current by
+                          tests/test_go_fixtures.py): exactly the payloads
+                          the routes serve, so either runtime answers the
+                          same bytes. The JSON becomes the authoritative
+                          text at the port's retirement (PLAN Phase 8)
   assets/tarot/           the 78 pictures, package-data; PROVENANCE.md argues
                           the licence and is not optional reading
   animist/                the asset pipeline (ADR 29): recipe -> fetch ->
@@ -442,9 +450,18 @@ go/                       the Go module (ADR 38; module path
                           vectors and a Python-minted session) -- Python still
                           owns every write and the schema ladder; internal/pool
                           (go-duckdb, CGO) and internal/deckyaml (goccy) are
-                          the spikes as packages. The contract suite runs
-                          through the door locally and in CI; PLAN §10 is the
-                          port board
+                          the spikes as packages. Since Phase 3 (2026-08-21)
+                          the door also ANSWERS the routes that have moved:
+                          internal/api is src/mtglab/api one family at a
+                          time (the pool-free reference prose first --
+                          /api/colors, /api/glossary, /api/themes),
+                          internal/reference embeds the JSON mtglab.reference
+                          renders, internal/wire writes FastAPI's envelope,
+                          and the door's routes.go answers a ported route
+                          only for a canonical request (normalised path,
+                          matching method) and proxies everything else as it
+                          arrived. The contract suite runs through the door
+                          locally and in CI; PLAN §10 is the port board
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
                           this one included — normally holds no decks at all

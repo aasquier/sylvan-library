@@ -6,6 +6,12 @@
 JSON. This file holds the committed pair equal to a fresh render, so a change
 to the dumper or to `rich_deck()` fails here with the regeneration command
 rather than leaving the Go side proving equivalence with a stale text.
+
+The reference prose travels the same road (Phase 3): `mtglab.reference`
+renders the five JSON files the Go module embeds and serves, the same
+script writes them, and the tests at the bottom hold the committed files to
+a fresh render -- and hold the payloads to the routes they stand in for, so
+the JSON cannot say one thing while `/api/colors` says another.
 """
 
 from __future__ import annotations
@@ -68,3 +74,63 @@ def test_the_fixture_exercises_the_shapes_it_claims_to():
     assert "Æther" in text and "é" in text               # allow_unicode
     assert "shared: false" in text
     assert "archetype: midrange" in text                 # the legacy key, while unshadowed
+
+
+# ------------------------------------------------------- the reference prose
+
+import pytest  # noqa: E402
+
+from mtglab import lore, reference, tarotlore  # noqa: E402
+from mtglab.decks.model import ARCHETYPES, THEMES  # noqa: E402
+
+
+@pytest.mark.parametrize("name", reference.FILES)
+def test_the_committed_reference_json_is_what_python_renders_now(name):
+    """`go/internal/reference/data/<name>` is the Go module's copy of the
+    prose, embedded and served; it must be byte-for-byte what the Python
+    modules say today, or the two runtimes answer different words."""
+    path = go_fixtures.REFERENCE_DIR / name
+    assert path.exists(), (
+        f"{path} is missing; generate it with `python tests/go_fixtures.py`")
+    assert path.read_text(encoding="utf-8") == reference.render()[name], (
+        f"{path} is stale; regenerate with `python tests/go_fixtures.py`")
+
+
+def test_every_reference_file_is_named():
+    """`FILES` is the Go side's embed list; a payload written under a name
+    not in it would be written and never served."""
+    assert set(reference.FILES) == set(reference.payloads())
+    assert set(reference.FILES) == set(reference.render())
+
+
+def test_the_reference_payloads_are_the_routes_payloads():
+    """The JSON serves the same routes Python serves today, so each payload
+    must be exactly what `api/service.py` renders -- a second copy of the
+    taxonomy that agreed with the first only in spirit would be the drift
+    this file exists to refuse."""
+    from mtglab.api import service
+    assert reference.colors_payload() == service.color_taxonomy()
+    assert reference.glossary_payload() == service.glossary()
+    assert reference.themes_payload() == {"themes": list(THEMES),
+                                          "archetypes": list(ARCHETYPES)}
+
+
+def test_the_lore_payload_carries_names_and_the_routes_prose():
+    """`lore_shelves` resolves cards through the pool; the JSON carries the
+    names it will resolve and the prose it will render around them, exactly."""
+    payload = reference.lore_payload()
+    assert [f["key"] for f in payload["facts"]] == [f.key for f in lore.FACTS]
+    for rendered, fact in zip(payload["facts"], lore.FACTS, strict=True):
+        assert rendered["cards"] == list(fact.cards)
+        assert (rendered["fact"], rendered["more"], rendered["volume"]) == \
+            (fact.fact, fact.more, fact.volume)
+        assert rendered["learn"] == (
+            {"tab": fact.learn[0], "key": fact.learn[1]} if fact.learn else None)
+    assert [v["key"] for v in payload["volumes"]] == list(lore.VOLUMES)
+
+
+def test_the_tarot_payload_is_every_fact_deck_tier_first():
+    payload = reference.tarotlore_payload()
+    assert [f["id"] for f in payload["facts"]] == [f.id for f in tarotlore.ALL]
+    assert payload["facts"][0]["card"] == ""          # the deck tier leads
+    assert all(f["source"] for f in payload["facts"])  # no fact without one

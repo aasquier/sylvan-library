@@ -83,11 +83,20 @@ Where it stands, kept here so a fresh session knows the frontier:
   written and required; the image's third stage; and **the contract suite
   green through the door, 169/169, locally and as a step of the `contract`
   job on every pull request.** PLAN §7 has the actuals against the estimate
-  (about three hours of one session against ½–1 day) and §10 the port board.
-- **Phase 3 is next** — the read spine: `config`, `cards/db` reads, the
-  `DeckSource` tiers, the gate, `analyze`/`suggest`/search, the reference
-  prose as generated JSON, the shelves; read-only families flipped off the
-  proxy list one at a time, each with the contract run attached.
+  — **about 75 minutes of one session** against ½–1 day, by the clock
+  (first read ~21:25 UTC, merge 22:27, release 22:33; this line said "about
+  three hours" until the timestamps were read back) — and §10 the port
+  board. Phases 3–8 re-priced on it: ~3¾ days at the low end of each band,
+  the whole port ~4–5 days rather than 4–7.
+- **Phase 3 is in progress** (from 2026-08-21, 23:10 UTC) — the read spine:
+  `config`, `cards/db` reads, the `DeckSource` tiers, the gate,
+  `analyze`/`suggest`/search, the reference prose as generated JSON, the
+  shelves; read-only families flipped off the proxy list one at a time, each
+  with the contract run attached. **Landed first:** the flip mechanism
+  (`go/internal/door/routes.go`, `go/internal/api`, `go/internal/wire`) and
+  the pool-free prose family — `/api/colors`, `/api/glossary`, `/api/themes`
+  served by Go from `go/internal/reference/data/`, the JSON `mtglab.reference`
+  renders and `tests/test_go_fixtures.py` keeps current.
 
 ### The next phase — the Simulator learns (decided 2026-08-20)
 

@@ -1,0 +1,1011 @@
+{
+  "colors": [
+    {
+      "code": "W",
+      "name": "White",
+      "wants": "Peace through structure. White believes suffering is a problem of organisation, and that a group that agrees on rules protects everyone in it.",
+      "fears": "That the rules stop serving the people and start serving themselves."
+    },
+    {
+      "code": "U",
+      "name": "Blue",
+      "wants": "Perfection through knowledge. Blue believes anything can be improved given enough information and patience, including itself.",
+      "fears": "That it acts before it understands, and cannot take the move back."
+    },
+    {
+      "code": "B",
+      "name": "Black",
+      "wants": "Power through self-interest. Black is the only colour honest about wanting to win, and it will pay any price it decides is worth paying.",
+      "fears": "That someone else is willing to pay more."
+    },
+    {
+      "code": "R",
+      "name": "Red",
+      "wants": "Freedom through action. Red believes the feeling is the truth, and that a life spent hesitating is a life not lived.",
+      "fears": "Being told to wait."
+    },
+    {
+      "code": "G",
+      "name": "Green",
+      "wants": "Growth through acceptance. Green believes the natural order is already right, and that the work is to find your place in it rather than to redesign it.",
+      "fears": "Change imposed from outside."
+    }
+  ],
+  "tiers": [
+    {
+      "key": "colorless",
+      "label": "Colourless",
+      "blurb": "The absence of colour rather than a choice among colours — and the only identity that can play any land in the game without a cost."
+    },
+    {
+      "key": "mono",
+      "label": "Mono-colour",
+      "blurb": "One colour, and everything it cannot do left undone. The cheapest mana base in the format and the sharpest set of weaknesses, which is what makes these the decks people recommend building first."
+    },
+    {
+      "key": "guild",
+      "label": "Guild — two colours",
+      "blurb": "Two colours, and there are exactly ten ways to pick two: five pairs that sit next to each other on the colour wheel and five that sit opposite. Neighbours cooperate; opposites have to be talked into it, and are usually the more interesting deck."
+    },
+    {
+      "key": "shard",
+      "label": "Shard — three allied colours",
+      "blurb": "Three colours: one colour and both of the two it neighbours, so the whole identity is one unbroken arc of the wheel. A shard agrees with itself, which makes it the more comfortable of the two three-colour shapes and the less pointed one."
+    },
+    {
+      "key": "wedge",
+      "label": "Wedge — a colour and its two enemies",
+      "blurb": "Three colours: one colour and the two it sits opposite. That is the whole difference from a shard, and it is why wedges feel less comfortable and more distinctive — the colours in them disagree, and the deck has to be the argument that settles it."
+    },
+    {
+      "key": "quad",
+      "label": "Four colours",
+      "blurb": "Four colours, best understood by the one they refuse. Each of these is all five minus one, and the missing colour says more about the deck than the four present ones do."
+    },
+    {
+      "key": "five",
+      "label": "All five",
+      "blurb": "Every colour, and the mana base that bill comes with."
+    }
+  ],
+  "eras": [
+    {
+      "name": "Ravnica",
+      "setting": "A city that covers an entire world",
+      "named": "the ten guilds",
+      "story": "Ravnica is one city, everywhere, run by ten guilds under a magically binding treaty. Each guild is one pair of colours, and between them they cover all ten pairs exactly once — which is why the guild names became the standard vocabulary for two-colour decks. Ask a Commander player what their deck is and 'Golgari' is a complete answer."
+    },
+    {
+      "name": "Alara",
+      "setting": "One plane shattered into five",
+      "named": "the five shards",
+      "story": "Alara broke into five fragments and each fragment lost two colours outright — not suppressed, gone, with nothing left to argue against what remained. A world with no ambition; a world with no mercy. The plane was eventually put back together, and the names stayed."
+    },
+    {
+      "name": "Tarkir",
+      "setting": "A world of dragons, and then of clans, and then of dragons",
+      "named": "the five wedges",
+      "story": "Tarkir's five clans each venerated one aspect of dragonkind, and each was built around a colour flanked by the two it least agrees with — an ancestor-cult, a monastery, a raiding horde. Then someone went back through time and changed the outcome, and the dragons won instead. Tarkir has two histories, and cards printed from both."
+    }
+  ],
+  "combinations": [
+    {
+      "key": "C",
+      "name": "Colourless",
+      "tier": "colorless",
+      "colors": [],
+      "size": 0,
+      "tagline": "No colour at all — and a deck that asks what colour is even for.",
+      "history": "Every other slot on this list is a set of colours. This one is the absence of them, and it is a real place to build: Eldrazi, artifacts, and lands that ask nothing of you. Colourless decks trade the identity and the answers a colour brings for a mana base that never betrays them.",
+      "aliases": [],
+      "verified_by": "Kozilek, Butcher of Truth",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Wastes",
+        "Ugin, the Spirit Dragon",
+        "Ulamog, the Ceaseless Hunger"
+      ]
+    },
+    {
+      "key": "W",
+      "name": "Mono-White",
+      "tier": "mono",
+      "colors": [
+        "W"
+      ],
+      "size": 1,
+      "tagline": "The group, protected by rules everyone agreed to.",
+      "history": "White alone is the purest version of the argument: that structure is kindness. It builds wide boards of small creatures, protects them collectively, and answers threats with rules rather than force — exile, taxation, and effects that hit everyone equally, which White considers the fairest kind of answer.",
+      "aliases": [],
+      "verified_by": "Wrath of God",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Swords to Plowshares",
+        "Smothering Tithe",
+        "Ghostly Prison"
+      ]
+    },
+    {
+      "key": "U",
+      "name": "Mono-Blue",
+      "tier": "mono",
+      "colors": [
+        "U"
+      ],
+      "size": 1,
+      "tagline": "Patience, and the confidence that knowing more is winning.",
+      "history": "Blue alone plays a longer game than anyone at the table finds comfortable. It draws, it counters, it takes extra turns, and it wins with something that was never in doubt once it had enough information. Its weakness is the one it admits to: it cannot deal with a permanent it failed to stop on the way in.",
+      "aliases": [],
+      "verified_by": "Counterspell",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Rhystic Study",
+        "Cyclonic Rift",
+        "Brainstorm"
+      ]
+    },
+    {
+      "key": "B",
+      "name": "Mono-Black",
+      "tier": "mono",
+      "colors": [
+        "B"
+      ],
+      "size": 1,
+      "tagline": "Any price, as long as it is worth paying.",
+      "history": "Black alone has the format's most flexible removal and the fewest moral objections. It pays life to draw, sacrifices its own creatures to fuel engines, and reanimates whatever died on the way. Its real restriction is not power but blind spots: enchantments and artifacts are the things it has the hardest time answering.",
+      "aliases": [],
+      "verified_by": "Damnation",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Demonic Tutor",
+        "Reanimate",
+        "Phyrexian Arena"
+      ]
+    },
+    {
+      "key": "R",
+      "name": "Mono-Red",
+      "tier": "mono",
+      "colors": [
+        "R"
+      ],
+      "size": 1,
+      "tagline": "Do it now, and find out whether it worked afterwards.",
+      "history": "Red alone is speed, damage and the willingness to be wrong loudly. It rummages rather than draws, generates treasure and impulsive advantage that expires if unused, and burns whatever it can reach. In Commander its weakness is arithmetic: forty life across three opponents is a lot of damage.",
+      "aliases": [],
+      "verified_by": "Lightning Bolt",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Chaos Warp",
+        "Faithless Looting",
+        "Blasphemous Act"
+      ]
+    },
+    {
+      "key": "G",
+      "name": "Mono-Green",
+      "tier": "mono",
+      "colors": [
+        "G"
+      ],
+      "size": 1,
+      "tagline": "The biggest creatures, and the mana to cast them early.",
+      "history": "Green alone accelerates. It puts lands into play, casts things ahead of schedule, and wins by presenting a board nobody can profitably attack into. It answers artifacts and enchantments comfortably and fliers poorly, and it historically could not draw cards — a gap modern sets have largely closed.",
+      "aliases": [],
+      "verified_by": "Llanowar Elves",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Cultivate",
+        "Beast Within",
+        "Eternal Witness"
+      ]
+    },
+    {
+      "key": "WU",
+      "name": "Azorius",
+      "tier": "guild",
+      "colors": [
+        "W",
+        "U"
+      ],
+      "size": 2,
+      "tagline": "Law as a weapon. Nothing resolves that was not approved.",
+      "history": "The Azorius Senate writes Ravnica's laws and enforces them with detain, taxation and counterspells. Its promise is that a perfectly ordered society is a safe one; its critics point out that a system which never lets anything happen is indistinguishable from one that has stopped working.",
+      "aliases": [],
+      "verified_by": "Azorius Charm",
+      "lore": "The Guildpact that binds all ten guilds was written by an Azorius sphinx, Azor, who then left Ravnica entirely and never came back. The Senate has spent ten thousand years enforcing a document whose author walked away from it, which is either the purest expression of the guild or its standing indictment, depending which guild you ask.",
+      "champions": [
+        {
+          "card": "Azor, the Lawbringer",
+          "role": "The parun: the sphinx who wrote the Guildpact, then abandoned the plane it bound."
+        },
+        {
+          "card": "Isperia, Supreme Judge",
+          "role": "The sphinx who led the Senate after him, and answered petitioners with riddles."
+        },
+        {
+          "card": "Lavinia of the Tenth",
+          "role": "An arrester of the Tenth District — the Senate at street level, where detain is a person with a warrant."
+        }
+      ],
+      "signature": [
+        "Supreme Verdict",
+        "Dovin's Veto",
+        "Grand Arbiter Augustin IV"
+      ]
+    },
+    {
+      "key": "UB",
+      "name": "Dimir",
+      "tier": "guild",
+      "colors": [
+        "U",
+        "B"
+      ],
+      "size": 2,
+      "tagline": "Information as power, and a guild that officially does not exist.",
+      "history": "House Dimir keeps Ravnica's secrets, including the secret of itself — for most of the city's history its existence was a rumour. It mills, it steals, it reads hands and it wins with knowledge nobody knew it had. Blue's patience with black's willingness gives it the format's most comfortable relationship with doing what is necessary.",
+      "aliases": [],
+      "verified_by": "Dimir Charm",
+      "lore": "Dimir's parun broke the Guildpact. Szadek had been feeding on Ravnica for centuries, and when he was finally caught the magically binding treaty that held the city together turned out to be breakable after all — which is the event the rest of Ravnica's modern history proceeds from. The guild's own existence was a rumour for most of that time.",
+      "champions": [
+        {
+          "card": "Szadek, Lord of Secrets",
+          "role": "The parun, and the one who broke the Guildpact by feeding on the city itself."
+        },
+        {
+          "card": "Lazav, Dimir Mastermind",
+          "role": "Guildmaster of a guild that officially does not exist, and a shapeshifter with no face of his own."
+        },
+        {
+          "card": "Etrata, the Silencer",
+          "role": "An assassin whose contracts leave nothing behind for anyone to investigate."
+        }
+      ],
+      "signature": [
+        "Baleful Strix",
+        "Drown in the Loch",
+        "The Scarab God"
+      ]
+    },
+    {
+      "key": "BR",
+      "name": "Rakdos",
+      "tier": "guild",
+      "colors": [
+        "B",
+        "R"
+      ],
+      "size": 2,
+      "tagline": "Cruelty performed for an audience.",
+      "history": "The Cult of Rakdos is Ravnica's entertainment industry, which on Ravnica means blood sport. It is black's appetite with red's showmanship, and its decks are correspondingly direct: sacrifice, damage, and a refusal to play a long game it does not need.",
+      "aliases": [],
+      "verified_by": "Rakdos Charm",
+      "lore": "The guild is named after a demon who is asleep for most of Ravnica's history, and whose waking is treated by every other guild as a civic emergency. What the cult does in the meantime is put on shows. That is not a euphemism and it is not a cover: the performances are the guild, and the fact that people keep coming to them is the point Rakdos is making about everyone else.",
+      "champions": [
+        {
+          "card": "Rakdos, Lord of Riots",
+          "role": "The parun, a demon, and the only guild leader whose absence is the normal state of affairs."
+        },
+        {
+          "card": "Judith, the Scourge Diva",
+          "role": "The cult's impresario — she books the show, and the show is the killing."
+        },
+        {
+          "card": "Exava, Rakdos Blood Witch",
+          "role": "A blood witch of the outer circles, and the guild's recruiting sergeant."
+        }
+      ],
+      "signature": [
+        "Terminate",
+        "Bedevil",
+        "Mayhem Devil"
+      ]
+    },
+    {
+      "key": "RG",
+      "name": "Gruul",
+      "tier": "guild",
+      "colors": [
+        "R",
+        "G"
+      ],
+      "size": 2,
+      "tagline": "Tear the city down and let something honest grow back.",
+      "history": "The Gruul Clans are what Ravnica pushed to the margins, and they want the whole edifice gone. Red's fury and green's conviction that the natural order is right produce the format's least complicated plan: very large creatures, attacking immediately.",
+      "aliases": [],
+      "verified_by": "Gruul Charm",
+      "lore": "The Gruul are what the city displaced. When Ravnica grew to cover the world it grew over their land, and the Guildpact gave them a seat at the table in exchange for their range — a deal the clans have regarded ever since as the theft it was. They are the one guild whose stated goal is the end of the arrangement that keeps all ten of them alive.",
+      "champions": [
+        {
+          "card": "Borborygmos",
+          "role": "Cyclops chieftain of the largest clan, and the loudest argument for tearing the city down."
+        },
+        {
+          "card": "Ruric Thar, the Unbowed",
+          "role": "An ogre who leads by being the last one standing, and hates a spell more than he hates a soldier."
+        },
+        {
+          "card": "Domri Rade",
+          "role": "A Ravnican who left, became a planeswalker, and came back to give the clans someone to follow."
+        }
+      ],
+      "signature": [
+        "Decimate",
+        "Xenagos, God of Revels",
+        "Rhythm of the Wild"
+      ]
+    },
+    {
+      "key": "WG",
+      "name": "Selesnya",
+      "tier": "guild",
+      "colors": [
+        "W",
+        "G"
+      ],
+      "size": 2,
+      "tagline": "The community is the creature.",
+      "history": "The Selesnya Conclave believes the individual matters less than the whole, which is unsettling from the outside and genuinely powerful in play: tokens, anthems, and boards that get stronger for every additional body. White's structure and green's growth agree on almost everything, which makes this the most harmonious pair on the wheel and the least tolerant of dissent.",
+      "aliases": [],
+      "verified_by": "Selesnya Charm",
+      "lore": "Selesnya's founder is not a person. Mat'Selesnya is a shared consciousness the guild's members join, and its leadership speaks through Trostani — three dryads fused into one voice that says 'we'. Every other guild is run by somebody. This one is run by an agreement, which is exactly as reassuring and as unsettling as it sounds.",
+      "champions": [
+        {
+          "card": "Chorus of the Conclave",
+          "role": "Mat'Selesnya given a body — the guild's founder is a consciousness rather than anyone in particular."
+        },
+        {
+          "card": "Trostani, Selesnya's Voice",
+          "role": "Three dryads who speak as one; the guild's leadership is a chorus rather than a chair."
+        },
+        {
+          "card": "Emmara, Soul of the Accord",
+          "role": "The Conclave at human scale, and the elf who kept negotiating after the other guilds stopped."
+        }
+      ],
+      "signature": [
+        "Mirari's Wake",
+        "Aura Shards",
+        "Eladamri's Call"
+      ]
+    },
+    {
+      "key": "WB",
+      "name": "Orzhov",
+      "tier": "guild",
+      "colors": [
+        "W",
+        "B"
+      ],
+      "size": 2,
+      "tagline": "Debt, collected forever, including after death.",
+      "history": "The Orzhov Syndicate is a church and a bank, and it sees no tension between the two. White's obligation plus black's leverage becomes drain, taxation and a workforce of spirits who died still owing. It grinds rather than races, and it is very hard to kill.",
+      "aliases": [],
+      "verified_by": "Orzhov Charm",
+      "lore": "The Orzhov are run by ten ghosts. The Obzedat are the syndicate's founding patriarchs, who declined to stop being in charge when they died and have held the seats ever since — which tells you what the guild thinks a contract is. Its workforce is largely made of people who died still owing, and it considers that an accounting matter.",
+      "champions": [
+        {
+          "card": "Obzedat, Ghost Council",
+          "role": "Ten spirits who refused to vacate, and still hold the syndicate's seats."
+        },
+        {
+          "card": "Teysa Karlov",
+          "role": "The advokist who runs the legal machinery, and the afterlife workforce it produces."
+        },
+        {
+          "card": "Kaya, Orzhov Usurper",
+          "role": "A planeswalker hired to kill the Ghost Council, who then took their chair."
+        }
+      ],
+      "signature": [
+        "Anguished Unmaking",
+        "Vindicate",
+        "Cruel Celebrant"
+      ]
+    },
+    {
+      "key": "UR",
+      "name": "Izzet",
+      "tier": "guild",
+      "colors": [
+        "U",
+        "R"
+      ],
+      "size": 2,
+      "tagline": "Genius with no impulse control.",
+      "history": "The Izzet League invents constantly and asks about consequences afterwards. Blue supplies the intelligence and red supplies the refusal to wait, producing the format's spellslinger decks: cheap instants, effects that copy them, and payoffs that reward casting a great many of them in one turn.",
+      "aliases": [],
+      "verified_by": "Izzet Charm",
+      "lore": "Izzet is the one guild still run by its founder. Niv-Mizzet is a dragon, the most intelligent being on Ravnica, and he has been personally in charge for ten thousand years — a guild whose entire culture is 'try it and see' answering to somebody who has already worked out the answer. When the maze that reordered Ravnica's politics was finally run, the Guildpact was rebuilt inside him.",
+      "champions": [
+        {
+          "card": "Niv-Mizzet, Parun",
+          "role": "The founder, still running it, and the smartest thing on the plane by his own confident assessment."
+        },
+        {
+          "card": "Ral Zarek",
+          "role": "A storm mage who worked for Niv-Mizzet, and then for Nicol Bolas, in that order."
+        },
+        {
+          "card": "Melek, Izzet Paragon",
+          "role": "A weird — a creature of raw elemental magic — and the guild's proof that the experiments work."
+        }
+      ],
+      "signature": [
+        "Thousand-Year Storm",
+        "Prismari Command",
+        "Goblin Electromancer"
+      ]
+    },
+    {
+      "key": "BG",
+      "name": "Golgari",
+      "tier": "guild",
+      "colors": [
+        "B",
+        "G"
+      ],
+      "size": 2,
+      "tagline": "Death is a stage of growth, not the end of one.",
+      "history": "The Golgari Swarm runs Ravnica's undercity and its decomposition, and sees no difference between the two jobs. Black's comfort with the graveyard and green's cycles of growth make the yard a second hand: creatures that want to die, engines that recur them, and value that compounds every time something is lost.",
+      "aliases": [],
+      "verified_by": "Golgari Charm",
+      "lore": "The Swarm holds the undercity and Ravnica's whole decomposition contract, which is the leverage nobody else thinks about until it is withdrawn. Its succession is done the Golgari way: Savra ruled, then her brother Jarad, then Vraska, a gorgon planeswalker who took the guild by killing her way to the top of it. Nothing there is wasted either.",
+      "champions": [
+        {
+          "card": "Savra, Queen of the Golgari",
+          "role": "The Devkarin queen, and Jarad's sister — succession here is a sacrifice outcome."
+        },
+        {
+          "card": "Jarad, Golgari Lich Lord",
+          "role": "Guildmaster of the undercity, and dead for most of his tenure without that slowing him down."
+        },
+        {
+          "card": "Vraska the Unseen",
+          "role": "A gorgon planeswalker who took the Swarm by killing her way to the top of it."
+        }
+      ],
+      "signature": [
+        "Assassin's Trophy",
+        "Deathrite Shaman",
+        "The Gitrog Monster"
+      ]
+    },
+    {
+      "key": "WR",
+      "name": "Boros",
+      "tier": "guild",
+      "colors": [
+        "W",
+        "R"
+      ],
+      "size": 2,
+      "tagline": "Righteous anger, applied immediately.",
+      "history": "The Boros Legion is white's conviction moving at red's speed. It attacks, it goes wide, it doubles its own damage, and it treats hesitation as a moral failure. Long the weakest pair in Commander for lack of card advantage, it has been the biggest beneficiary of impulse-draw and treasure effects.",
+      "aliases": [],
+      "verified_by": "Boros Charm",
+      "lore": "Boros is an army of angels that believes in due process, and the tension between those two things is its whole story. Razia founded the Legion; Aurelia leads it now, and did not inherit it quietly. A guild whose answer to injustice is a charge is always one commander away from being the thing it fights, and it knows that about itself.",
+      "champions": [
+        {
+          "card": "Razia, Boros Archangel",
+          "role": "The parun, and the Legion's founder — Aurelia holds the command now."
+        },
+        {
+          "card": "Aurelia, the Warleader",
+          "role": "The angel who leads the Legion, and did not come by it gently."
+        },
+        {
+          "card": "Feather, the Redeemed",
+          "role": "An angel exiled from the Legion for insubordination, and beloved on the streets for exactly that."
+        }
+      ],
+      "signature": [
+        "Deflecting Palm",
+        "Gisela, Blade of Goldnight",
+        "Warleader's Call"
+      ]
+    },
+    {
+      "key": "UG",
+      "name": "Simic",
+      "tier": "guild",
+      "colors": [
+        "U",
+        "G"
+      ],
+      "size": 2,
+      "tagline": "Improve the organism. Then improve it again.",
+      "history": "The Simic Combine splices what works onto what nearly works. Blue's refinement plus green's growth produces ramp into card draw into enormous, carefully specified creatures — and a reputation at Commander tables for decks that do not interact until they win.",
+      "aliases": [],
+      "verified_by": "Simic Charm",
+      "lore": "The Combine began as Ravnica's research guild and stayed one long after the other nine turned political, which is why it is the guild the others notice last. Its signature product is the krasis — organisms assembled from whatever worked — and its signature failing is that it will not stop at the version that already works.",
+      "champions": [
+        {
+          "card": "Momir Vig, Simic Visionary",
+          "role": "The elf who ran the Combine as a laboratory, back when that was all it was."
+        },
+        {
+          "card": "Prime Speaker Zegana",
+          "role": "A merfolk of the Zonots, and the Combine's speaker after it turned outward."
+        },
+        {
+          "card": "Vorel of the Hull Clade",
+          "role": "A biomancer, and the guild's standing argument that anything worth having is worth doubling."
+        }
+      ],
+      "signature": [
+        "Growth Spiral",
+        "Coiling Oracle",
+        "Hydroid Krasis"
+      ]
+    },
+    {
+      "key": "WUG",
+      "name": "Bant",
+      "tier": "shard",
+      "colors": [
+        "W",
+        "U",
+        "G"
+      ],
+      "size": 3,
+      "tagline": "Order, chivalry, and a hierarchy everyone accepts.",
+      "history": "Bant is white's shard. It kept blue and green and lost black and red entirely — so it has no ambition and no passion, only duty. Angels, knights, and a rigid caste system nobody questions because nobody has anything to be angry about.",
+      "aliases": [],
+      "verified_by": "Bant Charm",
+      "lore": "Bant is what a society looks like when nobody has anything to be angry about. Angels sit at the top of a caste system, every caste knows its sigil and its duty, and the arrangement holds because the shard lost the two colours that would have questioned it. When the shards were forced back together, the first thing through Bant's border was Grixis's undead — a world with no experience of an enemy, meeting one.",
+      "champions": [
+        {
+          "card": "Rafiq of the Many",
+          "role": "A knight of the Order of the Skyward Eye, and Bant's own idea of what a hero is."
+        },
+        {
+          "card": "Jenara, Asura of War",
+          "role": "An angel raised into the caste that fights, on a world where caste is not a matter of opinion."
+        }
+      ],
+      "signature": [
+        "Chulane, Teller of Tales",
+        "Derevi, Empyrial Tactician",
+        "Noble Hierarch"
+      ]
+    },
+    {
+      "key": "WUB",
+      "name": "Esper",
+      "tier": "shard",
+      "colors": [
+        "W",
+        "U",
+        "B"
+      ],
+      "size": 3,
+      "tagline": "Flesh is a rough draft. Etherium is the correction.",
+      "history": "Esper is blue's shard, and it replaced its own biology with metal. White's order and black's ruthlessness serve blue's perfectionism, producing artifice, control and the format's most calculating decks. Losing red and green cost it spontaneity and growth, which Esper regards as an upgrade.",
+      "aliases": [],
+      "verified_by": "Esper Charm",
+      "lore": "Esper replaced itself. Etherium — a metal that improves whatever it is grafted to — was invented there, and the shard took that literally, until having flesh left was a statement about your standing. The catch was arithmetic: there was only ever so much etherium, and a society that measures worth in a finite substance has decided in advance who loses.",
+      "champions": [
+        {
+          "card": "Sharuum the Hegemon",
+          "role": "The sphinx who rules Esper, and the reason its rulers are partly made of metal."
+        },
+        {
+          "card": "Sen Triplets",
+          "role": "Three vedalken siblings who took the shard's appetite for control to its logical end."
+        }
+      ],
+      "signature": [
+        "Zur the Enchanter",
+        "Void Rend",
+        "Raffine, Scheming Seer"
+      ]
+    },
+    {
+      "key": "UBR",
+      "name": "Grixis",
+      "tier": "shard",
+      "colors": [
+        "U",
+        "B",
+        "R"
+      ],
+      "size": 3,
+      "tagline": "Everything is already dead. Use it anyway.",
+      "history": "Grixis is black's shard, stripped of white's compassion and green's renewal, and it ran out of living resources long ago. What is left is necromancy, scarcity and a politics of pure leverage — reanimation, theft, and the cheerful assumption that a corpse is a resource.",
+      "aliases": [],
+      "verified_by": "Grixis Charm",
+      "lore": "Grixis is Nicol Bolas's shard, and the Conflux that put Alara back together is his doing: an elder dragon stripped of most of his power spent a very long time arranging for the five fragments to collide, because what that released was what he wanted back. The place had run out of living things long before. What is left rules by necromancy, because a corpse is the only resource that has not run out.",
+      "champions": [
+        {
+          "card": "Nicol Bolas, Planeswalker",
+          "role": "The elder dragon whose shard this is, and who arranged the Conflux to get his own power back."
+        },
+        {
+          "card": "Thraximundar",
+          "role": "Bolas's general — a zombie who has to keep killing to keep himself running."
+        },
+        {
+          "card": "Sedris, the Traitor King",
+          "role": "A king who died and kept ruling, which on Grixis is not a contradiction."
+        }
+      ],
+      "signature": [
+        "Kess, Dissident Mage",
+        "Marchesa, the Black Rose",
+        "Nekusar, the Mindrazer"
+      ]
+    },
+    {
+      "key": "BRG",
+      "name": "Jund",
+      "tier": "shard",
+      "colors": [
+        "B",
+        "R",
+        "G"
+      ],
+      "size": 3,
+      "tagline": "A food chain with no top and no rules.",
+      "history": "Jund is red's shard: black's appetite and green's ferocity with no white to organise it and no blue to think it through. Dragons at the top, everything else eating each other underneath. In play it is aggression backed by sacrifice value — nothing is wasted, because everything gets eaten eventually.",
+      "aliases": [],
+      "verified_by": "Jund Charm",
+      "lore": "Jund has no government, only a food chain, and the dragons are at the top of it. Everything else is arranged by what eats what: goblins scavenge, viashino raid, human warchiefs hold territory exactly as long as they can hold it. It is the shard that lost white and blue, so nothing on it has ever proposed a rule or thought a plan through.",
+      "champions": [
+        {
+          "card": "Karrthus, Tyrant of Jund",
+          "role": "The dragon at the top, which on Jund is the only office there is."
+        },
+        {
+          "card": "Kresh the Bloodbraided",
+          "role": "A human warchief who measures his standing by what he has killed, and grows on it."
+        }
+      ],
+      "signature": [
+        "Korvold, Fae-Cursed King",
+        "Ziatora, the Incinerator",
+        "Lord Windgrace"
+      ]
+    },
+    {
+      "key": "WRG",
+      "name": "Naya",
+      "tier": "shard",
+      "colors": [
+        "W",
+        "R",
+        "G"
+      ],
+      "size": 3,
+      "tagline": "Nature at a scale that makes worship the sensible response.",
+      "history": "Naya is green's shard, keeping white's reverence and red's passion and losing blue's caution and black's self-interest. Its inhabitants venerate gargantuan beasts, and its decks do roughly that: ramp into enormous creatures and swing.",
+      "aliases": [],
+      "verified_by": "Naya Charm",
+      "lore": "On Naya everything grew. The behemoths are the size of landmarks, the jungle is the size of the world, and the nacatl built a religion around calling them rather than a strategy for fighting them — which, at that scale, is the rational response. The shard's own peace was broken from inside by Marisi, and it has been arguing about whether he was right ever since.",
+      "champions": [
+        {
+          "card": "Mayael the Anima",
+          "role": "The Anima, whose line calls the behemoths the nacatl build their religion around."
+        },
+        {
+          "card": "Marisi, Breaker of the Coil",
+          "role": "The nacatl who broke Naya's peace on purpose, and started the argument the shard is still having."
+        }
+      ],
+      "signature": [
+        "Gishath, Sun's Avatar",
+        "Zacama, Primal Calamity",
+        "Rith, the Awakener"
+      ]
+    },
+    {
+      "key": "WBG",
+      "name": "Abzan",
+      "tier": "wedge",
+      "colors": [
+        "W",
+        "B",
+        "G"
+      ],
+      "size": 3,
+      "tagline": "The family endures. The individual is how it does that.",
+      "history": "The Abzan Houses are white's endurance flanked by black and green: fortress walls, ancestors who keep contributing after death, and creatures that get harder to kill the longer the game runs. Outlast everything, and count the dead as still on the roster.",
+      "aliases": [],
+      "verified_by": "Abzan Charm",
+      "lore": "The Abzan keep their dead on the roster. The kin-tree at the centre of a house is not a memorial, it is the household — ancestors are consulted, counted and expected to contribute, and a warrior who dies has changed department rather than left. In the timeline where the dragons won, the clan is gone and Dromoka's brood holds the same desert.",
+      "champions": [
+        {
+          "card": "Anafenza, the Foremost",
+          "role": "Khan of the Abzan Houses, and the one who decides which ancestors are still contributing."
+        },
+        {
+          "card": "Daghatar the Adamant",
+          "role": "The warrior who held the houses after her, by moving the line rather than yielding it."
+        }
+      ],
+      "signature": [
+        "Doran, the Siege Tower",
+        "Ghave, Guru of Spores",
+        "Eerie Ultimatum"
+      ]
+    },
+    {
+      "key": "WUR",
+      "name": "Jeskai",
+      "tier": "wedge",
+      "colors": [
+        "W",
+        "U",
+        "R"
+      ],
+      "size": 3,
+      "tagline": "Cunning, discipline, and the strike that ends it.",
+      "history": "The Jeskai Way is blue's enlightenment with white's discipline and red's decisiveness — monks who study for decades in order to act instantly. In play it is tempo: cheap interaction, prowess, and a clock that closes while the opponent is still setting up.",
+      "aliases": [],
+      "verified_by": "Jeskai Charm",
+      "lore": "The Jeskai are archivists who fight. Their monasteries kept Tarkir's records through a thousand years in which the plane's own history had been comprehensively rewritten by the people who won, and Narset is the one who read them and worked out what was missing. Decades of study, spent in a single strike, is the Way stated as a training regime.",
+      "champions": [
+        {
+          "card": "Narset, Enlightened Master",
+          "role": "Khan of the Jeskai, and the first in a thousand years to read what Tarkir's history left out."
+        },
+        {
+          "card": "Shu Yun, the Silent Tempest",
+          "role": "A monk of the Way: decades of preparation, spent on one strike."
+        }
+      ],
+      "signature": [
+        "Jeskai Ascendancy",
+        "Kykar, Wind's Fury",
+        "Whirlwind of Thought"
+      ]
+    },
+    {
+      "key": "UBG",
+      "name": "Sultai",
+      "tier": "wedge",
+      "colors": [
+        "U",
+        "B",
+        "G"
+      ],
+      "size": 3,
+      "tagline": "Whatever you have is not enough. Take more.",
+      "history": "The Sultai Brood is black's ambition with blue's cunning and green's abundance, and it is the most decadent faction Magic has printed: wealth, necromancy and a total absence of restraint. Its decks fill the graveyard on purpose and treat it as a resource pool.",
+      "aliases": [],
+      "verified_by": "Sultai Charm",
+      "lore": "The Sultai solved labour by declining to let it retire. The Brood's naga royalty raise the dead to work the rice paddies and hold the courts, and spend the surplus on a level of luxury that is itself the point — the clan's ambition is not power for its own sake but appetite, publicly satisfied. Under the dragons, Silumgar keeps the court and the decadence.",
+      "champions": [
+        {
+          "card": "Sidisi, Brood Tyrant",
+          "role": "Khan of the Sultai, who keeps the dead on staff and the living on notice."
+        },
+        {
+          "card": "Tasigur, the Golden Fang",
+          "role": "A prince who bought his way onto the throne and ate his way through it."
+        }
+      ],
+      "signature": [
+        "Muldrotha, the Gravetide",
+        "Villainous Wealth",
+        "Yarok, the Desecrated"
+      ]
+    },
+    {
+      "key": "WBR",
+      "name": "Mardu",
+      "tier": "wedge",
+      "colors": [
+        "W",
+        "B",
+        "R"
+      ],
+      "size": 3,
+      "tagline": "Speed is the only virtue. Stopping is how you die.",
+      "history": "The Mardu Horde is red's momentum with white's numbers and black's disregard, a raiding culture that measures worth in motion. Its decks go wide and fast, sacrifice freely, and are the wedge least interested in the late game.",
+      "aliases": [],
+      "verified_by": "Mardu Charm",
+      "lore": "The Mardu measure worth in motion, and a horde that stops is a horde that has lost. It is also the clan with the format's best-loved moment of nerve: Alesha took her name in front of the whole horde and invited anyone who objected to say so, and then led them. Her card is a good lesson in rule 2 as well as in courage — she costs {2}{R}, and her identity is all three Mardu colours, because of two hybrid pips in her ability.",
+      "champions": [
+        {
+          "card": "Zurgo Helmsmasher",
+          "role": "Khan of the Horde, and its longest-surviving warlord by the only metric the Mardu keep."
+        },
+        {
+          "card": "Alesha, Who Smiles at Death",
+          "role": "A khan who announced her name to the horde and dared anyone to argue; nobody did, and she led them."
+        }
+      ],
+      "signature": [
+        "Crackling Doom",
+        "Kaalia of the Vast",
+        "Isshin, Two Heavens as One"
+      ]
+    },
+    {
+      "key": "URG",
+      "name": "Temur",
+      "tier": "wedge",
+      "colors": [
+        "U",
+        "R",
+        "G"
+      ],
+      "size": 3,
+      "tagline": "Survive the frontier, and become large enough that it survives you.",
+      "history": "The Temur Frontier is green's savagery with blue's cunning and red's ferocity — a clan that reads the land and then overwhelms it. Ramp, big creatures, and enough card selection to find the right one.",
+      "aliases": [],
+      "verified_by": "Temur Charm",
+      "lore": "The Temur live where the ice is, and their shamans' job is to read what the land is about to do before it does it. That is the whole clan in one sentence: green's endurance and red's ferocity, with just enough blue to see the avalanche coming. They do not out-think the frontier, they out-last it, and then grow to a size it stops being able to argue with.",
+      "champions": [
+        {
+          "card": "Surrak Dragonclaw",
+          "role": "Khan of the Temur, who leads from the front of the hunt because there is nowhere else to lead from."
+        },
+        {
+          "card": "Yasova Dragonclaw",
+          "role": "A Temur elder and shaman-hunter, of the generation that read the ice for a living."
+        }
+      ],
+      "signature": [
+        "Animar, Soul of Elements",
+        "Maelstrom Wanderer",
+        "Temur Ascendancy"
+      ]
+    },
+    {
+      "key": "WUBR",
+      "name": "Artifice",
+      "tier": "quad",
+      "colors": [
+        "W",
+        "U",
+        "B",
+        "R"
+      ],
+      "size": 4,
+      "tagline": "Everything except green — the made over the grown.",
+      "history": "Artifice rejects green: nothing here trusts the natural order, and the answer to every problem is a better artifact. Commander 2016 named this deck Artifice and gave it Breya; EDHREC calls it Yore-Tiller after the Guildpact Nephilim with the same identity.",
+      "aliases": [
+        "Yore-Tiller"
+      ],
+      "verified_by": "Breya, Etherium Shaper",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Breya, Etherium Shaper",
+        "Yore-Tiller Nephilim"
+      ]
+    },
+    {
+      "key": "UBRG",
+      "name": "Chaos",
+      "tier": "quad",
+      "colors": [
+        "U",
+        "B",
+        "R",
+        "G"
+      ],
+      "size": 4,
+      "tagline": "Everything except white — no rules, and no one to enforce them.",
+      "history": "Chaos rejects white, and with it structure, fairness and restraint. What remains is appetite, cunning, fury and growth with nothing moderating any of it — cascade, randomness and effects that hand the outcome to chance on purpose. Yidris led the Commander 2016 deck; EDHREC calls it Glint-Eye.",
+      "aliases": [
+        "Glint-Eye"
+      ],
+      "verified_by": "Yidris, Maelstrom Wielder",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Yidris, Maelstrom Wielder",
+        "Glint-Eye Nephilim"
+      ]
+    },
+    {
+      "key": "WBRG",
+      "name": "Aggression",
+      "tier": "quad",
+      "colors": [
+        "W",
+        "B",
+        "R",
+        "G"
+      ],
+      "size": 4,
+      "tagline": "Everything except blue — act, and do not deliberate.",
+      "history": "Aggression rejects blue, which means it rejects patience, counterplay and the idea that more information would help. It is the four-colour identity that attacks. Saskia fronted the Commander 2016 deck; EDHREC calls it Dune-Brood.",
+      "aliases": [
+        "Dune-Brood"
+      ],
+      "verified_by": "Saskia the Unyielding",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Saskia the Unyielding",
+        "Dune-Brood Nephilim"
+      ]
+    },
+    {
+      "key": "WURG",
+      "name": "Altruism",
+      "tier": "quad",
+      "colors": [
+        "W",
+        "U",
+        "R",
+        "G"
+      ],
+      "size": 4,
+      "tagline": "Everything except black — generosity as a strategy.",
+      "history": "Altruism rejects black, and therefore rejects self-interest as an organising principle. It is the home of group hug: shared draw, shared ramp, symmetrical generosity, and the wager that you will use the gift better than the people you gave it to. Kynaios and Tiro led the Commander 2016 deck; EDHREC calls it Ink-Treader.",
+      "aliases": [
+        "Ink-Treader"
+      ],
+      "verified_by": "Kynaios and Tiro of Meletis",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Kynaios and Tiro of Meletis",
+        "Aragorn, the Uniter",
+        "Ink-Treader Nephilim"
+      ]
+    },
+    {
+      "key": "WUBG",
+      "name": "Growth",
+      "tier": "quad",
+      "colors": [
+        "W",
+        "U",
+        "B",
+        "G"
+      ],
+      "size": 4,
+      "tagline": "Everything except red — patience compounding into inevitability.",
+      "history": "Growth rejects red, and with it impulse, haste and the need for anything to happen right now. It accumulates: counters, permanents, value, until the board is simply better than everyone else's. Atraxa led the Commander 2016 deck and went on to become one of the format's most-built commanders; EDHREC calls this identity Witch-Maw.",
+      "aliases": [
+        "Witch-Maw"
+      ],
+      "verified_by": "Atraxa, Praetors' Voice",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Atraxa, Praetors' Voice",
+        "Atraxa, Grand Unifier",
+        "Witch-Maw Nephilim"
+      ]
+    },
+    {
+      "key": "WUBRG",
+      "name": "Five-Colour",
+      "tier": "five",
+      "colors": [
+        "W",
+        "U",
+        "B",
+        "R",
+        "G"
+      ],
+      "size": 5,
+      "tagline": "All of it, if the mana base can be paid for.",
+      "history": "Five-colour decks give up nothing in card choice and everything in consistency — the whole card pool is legal, and the cost is a mana base that has to produce any colour on any turn. It is the most expensive way to build a deck and the only one with no answers unavailable to it.",
+      "aliases": [],
+      "verified_by": "Sliver Overlord",
+      "lore": "",
+      "champions": [],
+      "signature": [
+        "Progenitus",
+        "Child of Alara",
+        "The Ur-Dragon"
+      ]
+    }
+  ]
+}

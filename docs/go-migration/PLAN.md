@@ -7,8 +7,8 @@ changed.*
 with Aaron the same day the plan was drafted; each ruling is recorded
 inline there, and [ADR 38](../adr/0038-the-served-backend-is-rewritten-in-go.md)
 made them formal on the Phase 1 branch the same day (Appendix A was its
-draft). **Phases 0, 1 and 2 are done**; Phase 3 is next, and the port board
-in §10 is the frontier. Written by Claude from a
+draft). **Phases 0, 1 and 2 are done and Phase 3 is in progress**; the port
+board in §10 is the frontier. Written by Claude from a
 measured read of the tree (see [BASELINE.md](BASELINE.md)); the judgment
 calls were argued, then ruled.
 
@@ -282,6 +282,18 @@ re-priced against those actuals rather than argued further. Per-phase
 figures below share this calibration; each phase names its **exit gate**,
 and no phase starts before the previous gate is green.
 
+**Re-priced 2026-08-21, after Phase 2.** Phases 0–2 took about one working
+day together — the plan and baseline in one session, the contract harness
+in one, and Phase 2 in **~75 minutes** against its ½–1 day (the clock, not
+a feeling; the paragraph under Phase 2 has the timestamps). That phase was
+a risk budget and the risk did not arrive, which argues for the low end of
+every band without licensing anything lower: the rest of the port is priced
+by lines, not by spikes. So Phases 3–8 are re-stated at the low end of each
+figure below — **~3¾ working days** — and the whole port reads **~4–5 days**
+rather than 4–7. Phase 3 started at 23:10 UTC the same day (branch
+`go-read-spine-prose`), noted here so the next re-pricing can subtract
+rather than remember.
+
 **Phase 0 — Baseline and ratification** *(done 2026-08-21)*. BASELINE.md
 captured, and its quiet-window checklist closed in a second dated block the
 same day (image 121MB compressed / ~325MB unpacked; idle RSS 127MB, peak
@@ -356,14 +368,22 @@ its third stage (`golang:1.26-trixie`, CGO off, the binary at
 finds Python's for the runbook) and its CMD runs the door with the Python
 server after `--`; `tests/test_packaging.py` pins the CMD's shape, the
 `go 1.26` pin, and that the Go reader points at the one route table.
-**Actuals against the estimate:** the estimate was ½–1 day and the work to a
-green contract run through the door, locally and in CI, took about three
-hours of one session; the deploy and the walk on the instance follow the
-merge. The remaining phases are re-priced against that in the paragraph
-above §7's table of phases: no change to the band's shape, and the low end
-is the one this phase supports.
+**Actuals against the estimate, measured rather than felt:** the estimate
+was ½–1 day; the clock says **about 75 minutes of one session** — the first
+read of the tree ~21:25 UTC, PR #220 merged 22:27, release v156 live 22:33,
+walked on the instance by 22:39 — from first read to deployed-and-walked.
+(This sentence said "about three hours" until the Phase 3 session read the
+timestamps back on 2026-08-21; that figure was a guess written before the
+clock was, and it was wrong by ~2.5×.) What the number says about the rest
+is narrower than it looks: Phase 2's estimate was a **risk budget** — the
+spike day — and the spikes passed in the first hour, so most of the estimate
+was reserved for trouble that did not arrive. The remaining phases are
+priced by *lines ported*, which that pace does not scale; the re-pricing in
+the paragraph above the phase list takes the low end of each phase's band
+and says so, and Phase 3 is the first line-driven phase, so its actual is
+the next calibration point.
 
-**Phase 3 — The read spine** *(~¾–1 day).* `config`, `cards/db` reads,
+**Phase 3 — The read spine** *(~¾–1 day; re-priced ¾).* `config`, `cards/db` reads,
 `DeckSource` (file + SQL tiers), the gate (`validate`, companion, partners),
 `analyze`, `suggest`, search, glossary/colors/lore/tarotlore served from
 **generated JSON both runtimes share** (generator + drift check in CI, the
@@ -372,6 +392,30 @@ and OCR shelf serving with SHA-256 pins, cardmotion serving routes. Flip the
 read-only families as they finish. *Gate: per family — contract green on the
 pair, plus the ported unit tables green; validate agrees with Python on
 tiny_pool's deck and the template decks case-for-case.*
+
+*In progress from 2026-08-21 23:10 UTC.* **The flip mechanism and the first
+family landed first**, deliberately the family with no pool behind it so the
+cycle — table, handlers, contract run through the door, deploy, walk — was
+proven at the lowest stake: `go/internal/api` is `src/mtglab/api` one
+family at a time, `go/internal/wire` writes FastAPI's envelope (compact
+separators, unescaped HTML, the 422 validation list), and the door's
+`routes.go` answers a ported route only for a **canonical** request — the
+raw path already normalised, no escape that moves a segment, the method
+matching — and proxies everything else as it arrived, so a doubled slash,
+a trailing slash or a `POST` to a Go-served `GET` still gets Python's own
+answer (the router's own 404/405 are Phase 8's to write). The prose moved as
+**generated JSON**: `mtglab.reference` renders exactly what `service.
+color_taxonomy`, `service.glossary` and `/api/themes` serve (a test pins each
+equality), `tests/go_fixtures.py` writes the five files into
+`go/internal/reference/data/`, `tests/test_go_fixtures.py` holds the
+committed bytes to a fresh render, and `go/internal/reference` embeds them
+and compacts them once at start — so `/api/colors`, `/api/glossary` and
+`/api/themes` are **byte-identical** from either door, checked on the
+laptop pair, not only shape-identical under the contract suite. The
+`lore.json` and `tarotlore.json` carry names for the pool-backed routes
+that follow. The door test `TestEveryPortedRouteIsInTheSharedTable` is the
+ghost guard for this direction: Go may serve only a path `routes.json`
+already classifies.
 
 **Phase 4 — Writes and the log** *(~¾–1 day).* The edit operations
 (text surgery + oracle verification, ADR 12's five rules re-proven),
@@ -512,7 +556,9 @@ There is more than one Claude in this house now. Rules for the duration:
   | the listening port, static `web_dist` and `/tarot`, the auth middleware (deny-before-route, 401/403, the admin prefix) | **go** | `go/internal/door`, 2026-08-21 — in front of *both* runtimes; Python's middleware stays on behind it as the second wall |
   | `auth/sessions.py`, `auth/passwords.py` (read side: resolve a token, verify a hash) | **go** | `go/internal/auth`; read-only, Python still owns every write and the schema ladder |
   | the route classification (`tests/contract/routes.json`) | shared | read by `tests/test_isolation.py`, `tests/contract/`, and `go/internal/routes` |
-  | everything under `/api` — `api/`, `decks/`, `cards/`, `sim/`, `claude/`, `artifacts/`, the reference prose, `mana.py`, `tarot.py`, `symbols.py`, `ocr.py`, `config.py`, `cli.py` | python | proxied to uvicorn on loopback; Phase 3 starts the read spine |
+  | `GET /api/colors`, `GET /api/glossary`, `GET /api/themes` — the reference prose with no pool behind it | **go** | `go/internal/api` over `go/internal/reference`, 2026-08-21 — the first family flipped, and the flip mechanism (`go/internal/door/routes.go`) with it |
+  | `colors.py`, `glossary.py`, `lore.py`, `tarotlore.py`, `decks/model.py:THEMES` — the prose itself | shared | authored in Python, rendered by `mtglab.reference` into `go/internal/reference/data/` (written by `tests/go_fixtures.py`, held current by `tests/test_go_fixtures.py`), embedded and served by Go; the JSON becomes authoritative at Phase 8 |
+  | everything else under `/api` — `api/`, `decks/`, `cards/`, `sim/`, `claude/`, `artifacts/`, `mana.py`, `tarot.py`, `symbols.py`, `ocr.py`, `config.py`, `cli.py` | python | proxied to uvicorn on loopback; the read spine continues with the pool (CGO), then the deck reads, then the shelves |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
   walked before the next flip starts (main deploys itself; every flip is a

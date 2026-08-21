@@ -17,6 +17,13 @@ module generates now, so neither side can drift quietly; regenerate with
     python tests/go_fixtures.py
 
 from the repository root after changing `rich_deck()` or the dumper.
+
+**Since Phase 3 this also writes the reference prose** -- the 32 colour
+combinations, the glossary, the lore shelves, the tarot deck's facts and the
+labelling vocabulary -- as the JSON the Go module embeds and serves
+(`go/internal/reference/data/`, rendered by `mtglab.reference`). Same
+command, same drift test, same rule: the committed bytes are what Python
+renders now, or the suite says so and names this command.
 """
 
 from __future__ import annotations
@@ -29,12 +36,15 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from mtglab import reference
 from mtglab.decks.model import CardEntry, Deck
 
 ROOT = Path(__file__).resolve().parents[1]
 TESTDATA = ROOT / "go" / "internal" / "deckyaml" / "testdata"
 YAML_PATH = TESTDATA / "rich-deck.yaml"
 JSON_PATH = TESTDATA / "rich-deck.parsed.json"
+#: Where the Go module embeds the reference prose from (`go:embed data/*`).
+REFERENCE_DIR = ROOT / "go" / "internal" / "reference" / "data"
 
 
 def rich_deck() -> Deck:
@@ -108,6 +118,10 @@ def write() -> None:
     YAML_PATH.write_text(text, encoding="utf-8")
     JSON_PATH.write_text(parsed, encoding="utf-8")
     print(f"wrote {YAML_PATH}\nwrote {JSON_PATH}")
+    REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
+    for name, body in reference.render().items():
+        (REFERENCE_DIR / name).write_text(body, encoding="utf-8")
+        print(f"wrote {REFERENCE_DIR / name}")
 
 
 if __name__ == "__main__":
