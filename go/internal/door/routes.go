@@ -3,6 +3,7 @@ package door
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/api"
@@ -30,8 +31,20 @@ import (
 // did with every /api request before any route moved. At retirement (Phase
 // 8) the fall-through becomes the router's own 404 and 405, and that is the
 // moment to write them, not now.
+//
+// Two refinements, both because a literal path and a templated one can
+// share a shape -- `/api/colors/progress` beside `/api/colors/{key}`, which
+// FastAPI resolves by declaring the literal first. Among the Go routes the
+// most specific pattern wins (a literal segment beats a parameter), so the
+// order routes are listed in never decides anything. And while a literal
+// sibling still lives in Python, the API *reserves* it: `api.Proxied` names
+// the exact paths a template must not capture, and the table hands those to
+// the proxy before any pattern is consulted. The door test holds every
+// reserved path to `routes.json` too, so a typo there is a failing test and
+// not a route quietly answered by the wrong runtime.
 type routeTable struct {
-	routes []compiledRoute
+	routes   []compiledRoute
+	reserved map[string]bool
 }
 
 type compiledRoute struct {
@@ -42,12 +55,18 @@ type compiledRoute struct {
 }
 
 // newRouteTable compiles the API's routes, refusing a table that could match
-// one request two ways: two patterns with the same method and shape, where
-// a literal on one side and a parameter on the other are not told apart.
-// FastAPI resolves such a pair by declaration order; this door refuses to
-// have one, so the question never arises.
-func newRouteTable(routes []api.Route) (*routeTable, error) {
-	t := &routeTable{}
+// one request two ways with nothing to choose between them: two patterns
+// with the same method and the same shape, literal for literal and
+// parameter for parameter. A literal against a parameter in the same slot
+// is allowed and the literal wins.
+func newRouteTable(routes []api.Route, reserved []string) (*routeTable, error) {
+	t := &routeTable{reserved: map[string]bool{}}
+	for _, p := range reserved {
+		if p != NormalisePath(p) || !strings.HasPrefix(p, "/api/") {
+			return nil, fmt.Errorf("reserved path %q is not a canonical /api path", p)
+		}
+		t.reserved[p] = true
+	}
 	for _, r := range routes {
 		if r.Handler == nil {
 			return nil, fmt.Errorf("route %s %s has no handler", r.Method, r.Pattern)
@@ -69,30 +88,47 @@ func newRouteTable(routes []api.Route) (*routeTable, error) {
 		}
 		c := compiledRoute{method: r.Method, pattern: r.Pattern, segments: segs, handler: r.Handler}
 		for _, prior := range t.routes {
-			if prior.method == c.method && overlaps(prior.segments, c.segments) {
-				return nil, fmt.Errorf("routes %s and %s could both match one %s request",
+			if prior.method == c.method && sameShape(prior.segments, c.segments) {
+				return nil, fmt.Errorf("routes %s and %s are the same shape for %s and nothing could choose",
 					prior.pattern, c.pattern, c.method)
 			}
 		}
 		t.routes = append(t.routes, c)
 	}
+	// Most specific first: more literal segments win, so a request that
+	// matches both a literal and a template lands on the literal, whatever
+	// order the API listed them in.
+	sort.SliceStable(t.routes, func(i, j int) bool {
+		return literals(t.routes[i].segments) > literals(t.routes[j].segments)
+	})
 	return t, nil
 }
 
-// overlaps reports whether some request path could match both shapes.
-func overlaps(a, b []string) bool {
+// sameShape reports whether two patterns are literal for literal and
+// parameter for parameter -- the one pair nothing could choose between.
+func sameShape(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}
 	for i := range a {
-		if isParam(a[i]) || isParam(b[i]) {
-			continue
+		if isParam(a[i]) != isParam(b[i]) {
+			return false
 		}
-		if a[i] != b[i] {
+		if !isParam(a[i]) && a[i] != b[i] {
 			return false
 		}
 	}
 	return true
+}
+
+func literals(segments []string) int {
+	n := 0
+	for _, s := range segments {
+		if !isParam(s) {
+			n++
+		}
+	}
+	return n
 }
 
 func isParam(seg string) bool {
@@ -103,7 +139,7 @@ func isParam(seg string) bool {
 // the request is not the door's to answer.
 func (t *routeTable) match(r *http.Request) (http.Handler, bool) {
 	raw := r.URL.Path
-	if r.URL.RawPath != "" || raw != NormalisePath(raw) {
+	if r.URL.RawPath != "" || raw != NormalisePath(raw) || t.reserved[raw] {
 		return nil, false
 	}
 	parts := strings.Split(strings.TrimPrefix(raw, "/"), "/")
@@ -141,5 +177,15 @@ func (t *routeTable) Patterns() []string {
 	for _, c := range t.routes {
 		out = append(out, c.method+" "+c.pattern)
 	}
+	return out
+}
+
+// Reserved is every path handed to the proxy ahead of any pattern.
+func (t *routeTable) Reserved() []string {
+	out := make([]string, 0, len(t.reserved))
+	for p := range t.reserved {
+		out = append(out, p)
+	}
+	sort.Strings(out)
 	return out
 }

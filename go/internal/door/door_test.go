@@ -503,30 +503,6 @@ func TestHSTSRidesOnlyWhenTLSFrontsTheApp(t *testing.T) {
 	}
 }
 
-// ----------------------------------------------------------------- the flag
-
-func TestFlagReadsLikeConfigFlag(t *testing.T) {
-	for raw, want := range map[string]bool{"1": true, "true": true, " YES ": true, "On": true,
-		"0": false, "false": false, "no": false, "maybe": false} {
-		t.Setenv("MTGLAB_TEST_FLAG", raw)
-		if got := Flag("MTGLAB_TEST_FLAG", true); got != want {
-			t.Errorf("Flag(%q) = %v, want %v", raw, got, want)
-		}
-	}
-	t.Setenv("MTGLAB_TEST_FLAG", "")
-	if !Flag("MTGLAB_TEST_FLAG", true) || Flag("MTGLAB_TEST_FLAG", false) {
-		t.Fatal("a blank flag did not fall back to its default")
-	}
-	t.Setenv("MTGLAB_DATA_DIR", "")
-	if got := AppDBPath(); got != filepath.Join("data", "app.db") {
-		t.Fatalf("AppDBPath() = %q", got)
-	}
-	t.Setenv("MTGLAB_DATA_DIR", "/data")
-	if got := AppDBPath(); got != filepath.Join("/data", "app.db") {
-		t.Fatalf("AppDBPath() = %q", got)
-	}
-}
-
 // --------------------------------------------------- the real resolver path
 
 func TestTheRealResolverReadsAppDB(t *testing.T) {
@@ -600,7 +576,11 @@ func TestOnlyACanonicalRequestIsTheDoors(t *testing.T) {
 	proxied := []struct{ method, path string }{
 		{"POST", "/api/glossary"}, {"HEAD", "/api/glossary"}, {"DELETE", "/api/themes"},
 		{"GET", "//api/glossary"}, {"GET", "/api/glossary/"}, {"GET", "/api/./glossary"},
-		{"GET", "/api/x/../glossary"}, {"GET", "/api/glossary%2F"}, {"GET", "/api/colors/G"},
+		{"GET", "/api/x/../glossary"}, {"GET", "/api/glossary%2F"},
+		// A literal Python still owns, beside a template Go answers: the
+		// reservation sends it on as it arrived.
+		{"GET", "/api/colors/progress"},
+		{"GET", "/api/decks"},
 	}
 	for _, c := range proxied {
 		resp := get(t, srv, c.method, c.path, "alice")
@@ -630,7 +610,8 @@ func TestEveryPortedRouteIsInTheSharedTable(t *testing.T) {
 	for _, p := range table.Every() {
 		known[p] = true
 	}
-	compiled, err := newRouteTable(api.New(api.Config{}).Routes())
+	ported := api.New(api.Config{})
+	compiled, err := newRouteTable(ported.Routes(), ported.Proxied())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -640,15 +621,46 @@ func TestEveryPortedRouteIsInTheSharedTable(t *testing.T) {
 			t.Errorf("the door serves %s, which tests/contract/routes.json does not classify", entry)
 		}
 	}
+	// And a reservation names a real Python route, or it is a typo that
+	// would quietly send a Go-served path to the proxy.
+	for _, p := range compiled.Reserved() {
+		if !known[p] {
+			t.Errorf("the door reserves %s for Python, which tests/contract/routes.json does not classify", p)
+		}
+	}
 }
 
-func TestTheRouteTableRefusesAnAmbiguousPair(t *testing.T) {
+func TestTheRouteTableChoosesTheMostSpecificPattern(t *testing.T) {
+	var hit string
+	named := func(name string) http.HandlerFunc {
+		return func(http.ResponseWriter, *http.Request) { hit = name }
+	}
+	// Listed template first on purpose: order must not decide.
+	table, err := newRouteTable([]api.Route{
+		{Method: "GET", Pattern: "/api/colors/{key}", Handler: named("template")},
+		{Method: "GET", Pattern: "/api/colors/progress", Handler: named("literal")},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]string{"/api/colors/progress": "literal", "/api/colors/G": "template"} {
+		req := httptest.NewRequest("GET", path, nil)
+		h, ok := table.match(req)
+		if !ok {
+			t.Fatalf("%s: no match", path)
+		}
+		h.ServeHTTP(httptest.NewRecorder(), req)
+		if hit != want {
+			t.Errorf("%s landed on %s, want %s", path, hit, want)
+		}
+	}
+	// The same shape twice is the pair nothing could choose between.
 	h := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 	if _, err := newRouteTable([]api.Route{
-		{Method: "GET", Pattern: "/api/colors/{key}", Handler: h},
-		{Method: "GET", Pattern: "/api/colors/progress", Handler: h},
-	}); err == nil {
-		t.Fatal("a literal and a parameter in the same slot were accepted; FastAPI resolves that by declaration order and this table must not have to")
+		{Method: "GET", Pattern: "/api/decks/{owner}/{slug}", Handler: h},
+		{Method: "GET", Pattern: "/api/decks/{a}/{b}", Handler: h},
+	}, nil); err == nil {
+		t.Fatal("two templates of one shape were accepted")
 	}
 	for _, bad := range []api.Route{
 		{Method: "GET", Pattern: "/not/api", Handler: h},
@@ -657,16 +669,32 @@ func TestTheRouteTableRefusesAnAmbiguousPair(t *testing.T) {
 		{Method: "GET", Pattern: "/api/{half", Handler: h},
 		{Method: "GET", Pattern: "/api/ok"},
 	} {
-		if _, err := newRouteTable([]api.Route{bad}); err == nil {
+		if _, err := newRouteTable([]api.Route{bad}, nil); err == nil {
 			t.Errorf("accepted %+v", bad)
 		}
+	}
+	if _, err := newRouteTable(nil, []string{"/api/x/"}); err == nil {
+		t.Error("a non-canonical reservation was accepted")
 	}
 	// Different methods on one shape are fine: that is the coexistence case.
 	if _, err := newRouteTable([]api.Route{
 		{Method: "GET", Pattern: "/api/decks/{owner}/{slug}", Handler: h},
 		{Method: "PATCH", Pattern: "/api/decks/{owner}/{slug}", Handler: h},
-	}); err != nil {
+	}, nil); err != nil {
 		t.Fatal(err)
+	}
+	// A reserved literal is the proxy's even though a template matches it.
+	reserved, err := newRouteTable([]api.Route{
+		{Method: "GET", Pattern: "/api/colors/{key}", Handler: h},
+	}, []string{"/api/colors/progress"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := reserved.match(httptest.NewRequest("GET", "/api/colors/progress", nil)); ok {
+		t.Fatal("a reserved path was answered by the door")
+	}
+	if _, ok := reserved.match(httptest.NewRequest("GET", "/api/colors/G", nil)); !ok {
+		t.Fatal("the template stopped matching beside a reservation")
 	}
 }
 
@@ -675,7 +703,7 @@ func TestPathValuesReachTheHandler(t *testing.T) {
 	table, err := newRouteTable([]api.Route{{Method: "GET", Pattern: "/api/decks/{owner}/{slug}/validate",
 		Handler: func(_ http.ResponseWriter, r *http.Request) {
 			got = r.PathValue("owner") + "/" + r.PathValue("slug")
-		}}})
+		}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

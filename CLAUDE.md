@@ -149,9 +149,17 @@ needs neither a network nor an account. `claude check` needs
 requires macOS 13 and this Mac is macOS 12 (ADR 38 decision 5); on this
 machine it is `~/sdk/go1.26.7/bin/go` (the stock `/usr/local/go` is 1.20 and
 too old). CGO needs the Xcode command-line tools (Apple clang 12 is enough;
-the DuckDB driver links with harmless weak-symbol warnings). golangci-lint
+the DuckDB driver links with harmless weak-symbol warnings) **and, since the
+door became a CGO build (Phase 3, 2026-08-21), one linker flag on this Mac:**
+`export CGO_LDFLAGS="-Wl,-U,_SecTrustCopyCertificateChain"` before any `go
+build`/`go test` of a package that reaches `net/http`. The symbol is a macOS
+12 Security API that Go's `crypto/x509` references and that this machine's
+Xcode 12 SDK (macOS 11) does not declare; with CGO off Go links internally
+and never asks, with CGO on clang does the link and refuses. `-U` lets the
+symbol resolve at load time, where macOS 12 has it. Linux -- CI, the image
+-- never sees the flag. golangci-lint
 is `CGO_ENABLED=0 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1`
--- with CGO on, the link fails on this Mac. The three Go gates, run from `go/`:
+-- the same missing symbol, the other way out. The three Go gates, run from `go/`:
 `go vet ./... && go test -race ./... && golangci-lint run ./...`; CI runs
 them on both Linux architectures. To run the pair locally: start `mtglab ui`
 (Python) on one port, then `go run ./cmd/mtglab ui --upstream http://127.0.0.1:<that port>`
@@ -1228,7 +1236,7 @@ deploy through `needs` and is **still not required**; requiring it is a
 repository setting, owed to Aaron (ENGINEERING §5 has the command).
 
 **And three Go jobs, `go (amd64)`, `go (arm64)` and `go-lint`**, added with
-Phase 2 (2026-08-21): `go vet`, the CGO-free door build, race-detected tests
+Phase 2 (2026-08-21): `go vet`, the door build as the image builds it (CGO since Phase 3), race-detected tests
 and a tidy check on both architectures the image is built for, and
 golangci-lint. All three gate the deploy and **are required on `main`** —
 both steps taken in the same change, read back the same day.

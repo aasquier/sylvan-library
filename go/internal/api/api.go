@@ -21,19 +21,27 @@
 package api
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+
+	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
 // Config is what the ported routes need. It grows with the families: the
-// pool arrives with the card reads, the deck library with the deck reads.
+// pool arrived with the card reads; the deck library arrives with the deck
+// reads.
 type Config struct {
 	Logger *slog.Logger
+	// Pool is the card pool, or nil for an instance that has none -- the
+	// same degraded answers `service._connect()` returning None produces.
+	Pool *pool.Pool
 }
 
 // API holds the ported routes' dependencies.
 type API struct {
-	log *slog.Logger
+	log  *slog.Logger
+	pool *pool.Pool
 }
 
 // New builds the ported routes.
@@ -41,7 +49,7 @@ func New(cfg Config) *API {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	return &API{log: cfg.Logger}
+	return &API{log: cfg.Logger, pool: cfg.Pool}
 }
 
 // Route is one ported route: a method, a path template in the syntax
@@ -64,5 +72,39 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/colors", Handler: a.colors},
 		{Method: http.MethodGet, Pattern: "/api/glossary", Handler: a.glossary},
 		{Method: http.MethodGet, Pattern: "/api/themes", Handler: a.themes},
+		// The pool behind the prose, and the pool's own two doors (the
+		// second family): a combination's champions and signature cards,
+		// the shelves' named cards, the search box, and the camera's reader.
+		{Method: http.MethodGet, Pattern: "/api/colors/{key}", Handler: a.combination},
+		{Method: http.MethodGet, Pattern: "/api/lore", Handler: a.lore},
+		{Method: http.MethodGet, Pattern: "/api/cards/search", Handler: a.search},
+		{Method: http.MethodPost, Pattern: "/api/cards/identify", Handler: a.identify},
 	}
 }
+
+// Proxied is every exact path that a pattern above would capture but that
+// still belongs to Python: the door hands these to the proxy before any
+// pattern is consulted. FastAPI resolves `/api/colors/progress` against
+// `/api/colors/{key}` by declaring the literal first; until the literal
+// moves (it reads the deck library, so it comes with the deck family) the
+// template must not answer for it. Each entry leaves this list the day its
+// route arrives in Routes.
+func (a *API) Proxied() []string {
+	return []string{
+		"/api/colors/progress",
+	}
+}
+
+// usePool is `service._connect()` followed by the work: fn runs against a
+// leased pool, and ErrNoPool -- no file, an unreadable file, or an instance
+// built with no pool at all -- is returned for the handler to answer in its
+// degraded shape. Any other error is the query's own and is a 500.
+func (a *API) usePool(ctx context.Context, fn func(*pool.Conn) error) error {
+	if a.pool == nil {
+		return pool.ErrNoPool
+	}
+	return a.pool.Use(ctx, fn)
+}
+
+// noPoolMessage is the sentence every degraded answer carries.
+const noPoolMessage = "no card pool yet -- run `mtglab data refresh`"

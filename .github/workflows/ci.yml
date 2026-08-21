@@ -357,12 +357,13 @@ jobs:
           cache-dependency-path: go/go.sum
       - run: go mod verify
       - run: go vet ./...
-      # The binary the image ships is built CGO-free (see the Dockerfile's
-      # door stage); prove here that it still can be, so an import of the
-      # DuckDB package into the door fails on a pull request rather than in
-      # the image build.
-      - name: The front door builds without CGO
-        run: CGO_ENABLED=0 go build -o /dev/null ./cmd/mtglab
+      # The binary the image ships is a CGO build since Phase 3 (the door
+      # reads the card pool through the DuckDB driver, which links a prebuilt
+      # libduckdb per platform); build it the same way here, on both
+      # architectures, so a link that fails on one of them fails on a pull
+      # request rather than in the image build.
+      - name: The front door builds as the image builds it
+        run: CGO_ENABLED=1 go build -o /dev/null ./cmd/mtglab
       - name: Tests, race-detected
         run: go test -race -count=1 -cover ./...
       - name: go.mod and go.sum are tidy

@@ -35,12 +35,10 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/api"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -59,8 +57,12 @@ type Config struct {
 	WebDist string
 	// TarotDir is the packaged tarot art; same rule.
 	TarotDir string
-	// Upstream is where everything under /api goes.
+	// Upstream is where everything under /api not yet served here goes.
 	Upstream *url.URL
+	// Pool is the card pool the ported routes read, leased (`internal/pool`);
+	// nil is an instance with no pool, answered in the degraded shapes
+	// `service._connect()` returning None produces.
+	Pool *pool.Pool
 	// Logger, or slog.Default().
 	Logger *slog.Logger
 }
@@ -102,7 +104,8 @@ func New(cfg Config) (*Door, error) {
 	}
 	d.static = site
 	d.proxy = newProxy(cfg.Upstream, cfg.Logger)
-	table, err := newRouteTable(api.New(api.Config{Logger: cfg.Logger}).Routes())
+	ported := api.New(api.Config{Logger: cfg.Logger, Pool: cfg.Pool})
+	table, err := newRouteTable(ported.Routes(), ported.Proxied())
 	if err != nil {
 		return nil, err
 	}
@@ -238,29 +241,4 @@ func setDefault(h http.Header, name, value string) {
 // refusals and the ported routes' answers.
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	wire.JSON(w, status, body)
-}
-
-// Flag reads an on/off environment variable the way `config._flag` does:
-// unset or blank is the default; otherwise one of 1/true/yes/on,
-// case-insensitively, is on and anything else is off.
-func Flag(name string, fallback bool) bool {
-	raw := strings.TrimSpace(os.Getenv(name))
-	if raw == "" {
-		return fallback
-	}
-	switch strings.ToLower(raw) {
-	case "1", "true", "yes", "on":
-		return true
-	}
-	return false
-}
-
-// AppDBPath is `config.APP_DB_PATH`: `app.db` inside MTGLAB_DATA_DIR, which
-// defaults to `data`.
-func AppDBPath() string {
-	dir := strings.TrimSpace(os.Getenv("MTGLAB_DATA_DIR"))
-	if dir == "" {
-		dir = "data"
-	}
-	return filepath.Join(dir, "app.db")
 }
