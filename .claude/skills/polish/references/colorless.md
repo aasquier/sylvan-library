@@ -126,6 +126,20 @@ This is where they get a home.
   `converge` survey is staler than its date says. Write the honest ordering
   for the next bare `/polish` at the bottom of the ledger so the next session
   does not have to re-derive it.
+- **The relic sweep** (Aaron's ask, 2026-08-21, the night the laptop deck
+  copies were retired: "we still have a lot of old artifacts from early dev
+  cycles that don't seem to fit anymore"). Walk the tree for things whose
+  reason has moved out from under them: directories and files from an
+  earlier shape (`~/Downloads` deck markdown is the named example — kept
+  historical, never edited), template files that describe a workflow nobody
+  runs any more, docs sections narrating a phase that ended, CLI commands
+  and flags whose data or purpose has migrated (Green's hosted-first facet
+  owns the *capability* question; this sweep owns the *existence* question),
+  scripts and fixtures that outlived the thing they fixed. For each: name
+  it, say what shape it belonged to, and queue keep/retire for Aaron — a
+  relic is a decision, never a silent deletion. The test is Green's,
+  generalised: a thing earns its place by what the *current* shape needs
+  from it, not by having always been there.
 
 ## What this run never does
 

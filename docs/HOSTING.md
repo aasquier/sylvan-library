@@ -14,12 +14,14 @@ stale copy of the code. One instance means one upgrade path.
 
 Everything else depends on this, so it goes first.
 
-**sylvan-library is local-first by design.** `decks/<slug>/deck.yaml` is the
+**The deployed instance holds the library.** `decks/<slug>/deck.yaml` is the
 source of truth. It lived in git when this section was first written; ADR 30
-has since made decks **live app data** — `decks/` locally, `/data/decks` on
-the volume, gitignored everywhere — with the activity log (ADR 28) as the
-edit record and the build snapshot as `swaps.md`'s baseline. What follows kept
-its shape through that change: there are still two tiers, because friends'
+made decks **live app data**, and Aaron's 2026-08-21 ruling finished the
+thought: the volume at `/data/decks` is the one standing copy, gitignored
+everywhere, with the activity log (ADR 28) as the edit record and the build
+snapshot as `swaps.md`'s baseline. A laptop checkout keeps no decks — local
+work pulls them from the instance and deletes them after. What follows kept
+its shape through both changes: there are still two tiers, because friends'
 decks still need per-user storage.
 
 ### Recommended: two tiers, not one
@@ -1585,8 +1587,9 @@ unticked box below is an open question, not a blocker that was ignored.
       deploy. See the deck-drift note in §5, which is the question that choice
       creates rather than answers.
 - [x] **A documented pool-seeding run** against the volume — §4 step 6, which
-      also says where decks come from (a backup, your laptop, or an import —
-      the image carries none since ADR 30). Not a build step and not a boot
+      also says where decks come from (a backup or an import — the image
+      carries none since ADR 30, and since 2026-08-21 no laptop keeps a
+      standing copy either). Not a build step and not a boot
       step: it needs
       several minutes and a ~500 MB download, and with scale-to-zero putting
       boot on the request path it would turn a wake into an outage.

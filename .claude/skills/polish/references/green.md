@@ -1,10 +1,11 @@
 # Green — Growth & Resilience
 
-Three facets: browser and mobile compatibility, the cloud resource watch, and
-scalability. Green is the color that adapts to every terrain and grows
-without breaking — the site working on a phone in someone's kitchen, the
-volume never silently filling, the architecture bending instead of snapping
-when ten users become a hundred.
+Four facets: browser and mobile compatibility, the cloud resource watch,
+scalability, and hosted-first alignment. Green is the color that adapts to
+every terrain and grows without breaking — the site working on a phone in
+someone's kitchen, the volume never silently filling, the architecture
+bending instead of snapping when ten users become a hundred, and nothing the
+product needs still chained to the laptop it grew up on.
 
 ## Facet: browser & mobile compatibility
 
@@ -109,6 +110,43 @@ trend is read.
   A swap that saves money but adds risk or migration work is **queued with
   the arithmetic attached**, never applied; a free upgrade the project is
   merely behind on is a safe fix if the gauntlet can prove it green.
+
+## Facet: hosted-first alignment
+
+Born 2026-08-21, from a divergence only a hand diff caught: ADR 37's deck
+relabels were applied through the local CLI — the tool working exactly as
+designed — onto laptop copies the deployed app never reads. The ADR 36
+labels had already died the same way two days earlier, silently. The root
+was never git (ADR 30 had done that half); it was that the *practice* stayed
+laptop-first: app data in the checkout, a CLI that edits whatever files sit
+in front of it, and docs that called two standing copies normal. Aaron's
+ruling the same night: the volume is the library's one standing copy, and
+this facet exists so the same shape cannot regrow unnoticed.
+
+- **The one-copy rule.** `decks/` in a checkout holds `_template` and
+  nothing else; app data has no second standing copy anywhere. Check it
+  (`ls decks/`), and check the docs still say it (CLAUDE.md "Decks do not
+  live in git"). Local work that pulled real decks for a job — an overnight
+  round-robin, a migration rehearsal — must have cleaned up after itself.
+- **The capability audit, which is the real one.** For each thing the
+  product does to its own data, ask: *can the deployed instance do this
+  without the laptop?* An operation that exists only as a local CLI command
+  couples the product to the laptop, whatever git says. The founding
+  example: labels shipped with no deployed editor — the web UI never grew a
+  themes control, so relabelling six decks took an sftp file migration.
+  Sweep for the next one: anything in CLAUDE.md's workflow section, or in a
+  runbook, whose only path to the live library is "run it on the laptop and
+  push files".
+- **The CLI is not a relic; a laptop-only workflow is.** `mtglab` is the
+  engine's console and runs fine inside `fly ssh console` against the
+  volume — keep it. The test for any command is where its *data* comes
+  from: a command that computes (sim, bench, validate) is placeless; a
+  command whose runbook requires the checkout's copy of app data is the
+  relic. Name those in the ledger rather than assuming either way.
+- **Language sweep.** "Local", "on this machine", "your laptop" in the docs
+  are fine describing dev tooling and false describing app data. Grep for
+  them; each hit either describes tooling (leave it) or describes data
+  (it rotted — fix it).
 
 ## Facet: scalability & user adaptability
 

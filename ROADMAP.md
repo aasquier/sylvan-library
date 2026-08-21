@@ -68,7 +68,21 @@ its own branch or few, in this order because each drinks from the one before:
    expressly forbids automated queries, so the fetch-their-tags idea is
    dead; a lawful label-suggestion step (the dossier's cited web-search
    pattern, output constrained to our vocabulary, human confirms) is
-   recorded there as the future shape.
+   recorded there as the future shape. **The relabels also ended the
+   laptop's deck copies** (Aaron's ruling, same day): applying them locally
+   surfaced that the laptop and volume libraries had already diverged — the
+   ADR 36 labels only ever existed on the laptop — so the volume is now the
+   library's one standing copy, the laptop copies were pushed there,
+   tarballed and deleted, and CLAUDE.md's "Decks do not live in git" section
+   carries the new rule: local work pulls from the instance and cleans up
+   after itself. **Two follow-ups the migration exposed, both queued:** the
+   deck page needs a labels editor — the web UI never grew a themes control,
+   so the only label editor is the CLI, which is exactly the laptop coupling
+   the ruling ended (until it exists, relabels run through `fly ssh console`)
+   — and the polish skill grew the audit for the pattern: Green's new
+   hosted-first-alignment facet (capabilities that exist only as laptop
+   workflows) and Colorless's relic sweep (early-dev leftovers that no
+   longer fit the current shape).
 2. **The match theater** — #203's stream carries only a count; extend the
    shim's NDJSON to carry each parsed row (winner, turns, seconds), let the
    job expose partial rows, and the Simulator renders the match live:
