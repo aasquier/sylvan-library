@@ -3,10 +3,11 @@
 *Flesh to metal, deliberately and with the digests to prove nothing else
 changed.*
 
-**Status: RATIFIED IN SUBSTANCE, 2026-08-21.** The seven decisions in §11
-were ruled with Aaron the same day the plan was drafted; each ruling is
-recorded inline there. What remains formal is Appendix A landing in
-`docs/adr/` as ADR 38, on the Phase 1 branch. Written by Claude from a
+**Status: RATIFIED, 2026-08-21.** The seven decisions in §11 were ruled
+with Aaron the same day the plan was drafted; each ruling is recorded
+inline there, and [ADR 38](../adr/0038-the-served-backend-is-rewritten-in-go.md)
+made them formal on the Phase 1 branch the same day (Appendix A was its
+draft). **Phases 0 and 1 are done**; Phase 2 is next. Written by Claude from a
 measured read of the tree (see [BASELINE.md](BASELINE.md)); the judgment
 calls were argued, then ruled.
 
@@ -233,7 +234,7 @@ should be nothing) goes before his eye first.
 
 | Concern | Choice | Why |
 | --- | --- | --- |
-| Go version | current stable at Phase 2 | **Spike caveat:** this Mac is at its OS ceiling (macOS 12, Intel). Go's minimum macOS has been climbing (1.23 required 11+; the floor has since moved again). Verify current Go runs on this Mac in Phase 0; if the floor has passed 12, pin the newest Go that supports it and note the runway. CI is Linux either way. |
+| Go version | current stable at Phase 2 | **Spike caveat:** this Mac is at its OS ceiling (macOS 12, Intel). Go's minimum macOS has been climbing (1.23 required 11+; the floor has since moved again). Verify current Go runs on this Mac in Phase 0; if the floor has passed 12, pin the newest Go that supports it and note the runway. CI is Linux either way. **Answered 2026-08-21:** the floor has passed 12 — Go 1.27 (August 2026) requires macOS 13, and the 1.26 release notes say 1.26 is the last that runs on macOS 12 (both read from go.dev the same day). So the module pins **`go 1.26`**; `go1.26.7` was installed here via the official per-version installer (`~/sdk/go1.26.7`, the stock `/usr/local/go` 1.20.7 untouched) and runs. The runway is roughly until Go 1.28 ships (~February 2027), after which 1.26 leaves support and this Mac's Go work moves to the CI/container loop or a newer machine. |
 | Module layout | `go/` at repo root | Mirrors `web/`: a source directory beside the Python package, building an artifact the image ships. One module, packages inside mirroring today's map (`go/internal/mana`, `go/internal/sim`, …). |
 | HTTP | stdlib `net/http` (1.22+ mux) | The dependency-light ethos, applied. The deny-before-route middleware is a handler wrapper; no framework earns its place here. |
 | DuckDB | `github.com/marcboeker/go-duckdb` | The community-standard driver; CGO with bundled libduckdb. Spike in Phase 2 for macOS-12 dev + CI arm64. Its Appender is the bulk path the 16-minute `load_printings` wants anyway — the refresh fix rides along. |
@@ -280,20 +281,42 @@ re-priced against those actuals rather than argued further. Per-phase
 figures below share this calibration; each phase names its **exit gate**,
 and no phase starts before the previous gate is green.
 
-**Phase 0 — Baseline and ratification** *(mostly done 2026-08-21; the
-remainder — the quiet-window captures and the Go-on-this-Mac check — rides
-the Phase 1 branch)*. BASELINE.md captured; quiet-window checklist run; Go-on-
-macOS-12 verified; this plan argued over with Aaron, amended, and ADR 38
-(Appendix A) landed on the Phase 1 branch. *Gate: Aaron's yes, in writing,
-in the ADR.*
+**Phase 0 — Baseline and ratification** *(done 2026-08-21)*. BASELINE.md
+captured, and its quiet-window checklist closed in a second dated block the
+same day (image 121MB compressed / ~325MB unpacked; idle RSS 127MB, peak
+215MB; machine-update-to-healthy ≈23s; clean dev install 79s; one item —
+the bench re-measure — deliberately not taken on a busy machine, per the
+ledger's own rule); Go-on-macOS-12 verified (§6: 1.26 is the last, and it
+runs here); this plan argued over with Aaron, amended, and ADR 38 landed on
+the Phase 1 branch. *Gate: Aaron's yes, in writing, in the ADR — met.*
 
-**Phase 1 — The contract harness** *(~¼–½ day; pure Python, no Go).* The
-HTTP suite gains a base-URL mode; golden wire-shape fixtures recorded for
-every route family (success and error paths); the isolation classification
-extracted to a shared data file consumed by the existing test; CI job runs
-the contract suite against the Python app to prove the harness. *Gate: the
-contract suite fails loudly when pointed at a deliberately broken shape
-(mutation-verified, per house habit), and passes against main.*
+**Phase 1 — The contract harness** *(done 2026-08-21, in one session;
+pure Python, no Go).* Built as `tests/contract/` (its README is the map):
+a **contract suite** that runs three ways — in-process `TestClient`
+(inside the ordinary `pytest`), `--live` (the harness seeds a scratch,
+starts `mtglab ui` on it as the container's `CMD` does, and drives it
+over TCP), and `--base-url` against a server somebody else started on a
+directory the same seeder fills, which is the coexistence mode Phase 2
+needs; the **route classification extracted to `tests/contract/routes.json`**,
+read by `tests/test_isolation.py` (which now also holds it equal to
+`api/auth.py`'s allowlist), by the contract suite, and — from Phase 2 —
+by the Go module; **golden wire shapes** (status, content type, pinned
+headers, body *shape* — keys and kinds, never data) for 168 checks across
+six families, success and refusal paths, recorded with `--update-golden`;
+and a **`contract` CI job** running the live mode. *Gate: met and proven
+by mutation* — `tests/test_contract_harness.py` runs every assertion
+against an app broken in one of eight ways (a renamed `detail`, an
+allowlist that grew, a 403 turned 404, a 404 turned 403, a dropped field,
+a drifted status, a missing header, a 429 without `Retry-After`) and shows
+it raise, then runs the whole suite once, as wired, against the envelope
+mutation and shows it go red across the protected sweep. One honest
+narrowing: the plan said "the existing HTTP tests grow a mode"; what was
+built is a *suite* that can run against a live server, because the other
+thirteen HTTP test files reach into process state (`jobs.submit`,
+`MemoryDeckSource`, monkeypatched writers) and could not. They keep doing
+what they do; the contract suite is the live-capable set, and the
+adversarial matrix is written in both. **Owed:** requiring the `contract`
+check on `main` (a repository setting, Aaron's — ENGINEERING §5).
 
 **Phase 2 — Skeleton and front door** *(~½–1 day; the spike day — if the
 plan snags on CGO or the toolchain, it snags here, cheaply, and the
@@ -501,7 +524,9 @@ survived. Rulings recorded per item below.
 
 ---
 
-## Appendix A — ADR 38 draft (lands with Phase 1, not before)
+## Appendix A — ADR 38 draft (landed 2026-08-21 as
+[`docs/adr/0038`](../adr/0038-the-served-backend-is-rewritten-in-go.md);
+kept as the record of the draft)
 
 > **Title:** The served backend is rewritten in Go, and the bench stays
 > Python
@@ -531,7 +556,7 @@ survived. Rulings recorded per item below.
 | Served-app source lines | ~38,000 | |
 | Test lines / count (served app) | 36,589 / 2,668 | |
 | Suite wall clock | 352s @ 2,470 (re-measure) | |
-| CI wall clock (full pipeline) | ~6.5–10 min | |
+| CI wall clock (full pipeline) | 9 m 37 s on the last main run (test job 6 m 16 s; image job 2 m 27 s, 45 s of it the cached amd64 build) | |
 | `GET /api/decks` warm p50 / p95 | 16.5 / 18.0 ms | |
 | `GET /api/decks` cold p50 | 134.2 ms | |
 | `/api/health` warm p50 | 7.3 ms | |
@@ -539,9 +564,9 @@ survived. Rulings recorded per item below.
 | Tier 1: one 20k-game run, 1 core | ~18 s (ENGINEERING §1) | |
 | Tier 1: same run, all cores | n/a (GIL; single worker by design) | |
 | `data refresh` (`load_printings`) | ~16 min / 107,355 rows | |
-| Idle RSS on the instance | (Phase 0 capture) | |
-| Image size (compressed) | (Phase 0 capture) | |
-| Boot → healthy | (Phase 0 capture) | |
+| Idle RSS on the instance | 127 MB (peak 215 MB, 8 threads; 2026-08-21, 2h39m after deploy) | |
+| Image size (compressed) | 121.3 MB, 10 layers (registry manifest); ~325 MB unpacked, 219 MB of it the venv | |
+| Boot → healthy | ≈23 s machine update → health passing (deploy log, bounded below by the check cadence); merge → instance healthy 7 m 44 s; whole pipeline 9 m 37 s | |
 | Direct dependencies (served app) | 8 Python (75 installed dists) | |
 | `REFERENCE_DIGEST` | pinned | must match (or superseding pin + ADR note) |
 | Mana oracle 13,944 cases | pinned digest | must match |

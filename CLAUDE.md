@@ -402,6 +402,11 @@ src/mtglab/
   cli.py
 web/                      frontend source (React + Vite); `npm test` is Vitest,
                           and web/README.md is the conventions map
+tests/contract/           the contract suite: what the served app promises over
+                          the wire, runnable in-process, live over TCP, or
+                          against an external server; routes.json is the one
+                          route table and golden/ the recorded shapes. The Go
+                          migration's referee (docs/go-migration/, ADR 38)
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
                           this one included — normally holds no decks at all
@@ -449,8 +454,9 @@ person on a laptop and a login in front of it would be a regression; the
 deployment turns it on. When it is on, `api/auth.py`'s middleware refuses
 every path that is not in `PUBLIC_PATHS` — **before routing**, so an endpoint
 nobody remembered to protect is refused rather than served. Adding a route
-means classifying it in `tests/test_isolation.py`; the suite fails until you
-do. Anything that belongs to one person is reported as **404, never 403**, to
+means classifying it in `tests/contract/routes.json` — the one table
+`tests/test_isolation.py`, the contract suite and (from Phase 2 of the Go
+migration) the Go module all read; the suite fails until you do. Anything that belongs to one person is reported as **404, never 403**, to
 another (ADR 5). Nothing in `src/mtglab/auth/` imports FastAPI, which is what
 lets `mtglab users` work on a box with no web server.
 
@@ -464,8 +470,8 @@ Admin authorization is built (ADR 17). **Admin routes live under `/api/admin`,
 and the middleware refuses that prefix to a non-admin before routing** — the
 same mechanism as `PUBLIC_PATHS`, so a route is protected by where it is
 mounted. `deps.Admin` is the second check on the handlers. Adding an admin
-route means classifying it as `admin` in `tests/test_isolation.py`, which is
-checked against the prefix in *both* directions; the sweep then requires **403**
+route means classifying it as `admin` in `tests/contract/routes.json`, which
+is checked against the prefix in *both* directions; the sweep then requires **403**
 from a logged-in non-admin. 403 and not ADR 5's 404 is deliberate and argued in
 ADR 17 — an admin route's existence is published in a public repository.
 
@@ -1158,6 +1164,12 @@ merge until somebody adds it to the required list, which is a repository
 setting and not a file in this repo. ENGINEERING §5 is where that list lives
 and why writing an aspirational one there is worse than writing none.
 
+**And an eighth job, `contract`**, added 2026-08-21 with the Go migration's
+Phase 1: it runs `tests/contract` with `--live` — the harness seeds a
+scratch, starts `mtglab ui` on it and drives it over TCP — and it too
+gates the deploy through `needs` and is **not yet required**; requiring it
+is a repository setting, owed to Aaron (ENGINEERING §5 has the command).
+
 **Merging deploys.** Since 2026-08-14 a push to `main` whose `ci.yml` checks
 are green deploys itself ([ADR 23](docs/adr/0023-a-green-main-deploys-itself.md));
 the `deploy` job `needs` all five, so it cannot run on a red suite. Expect the
@@ -1189,8 +1201,11 @@ next branch to carry it.
 ## Planning documents
 
 `ROADMAP.md` (goals vs reality, what is next, open decisions),
-`docs/ENGINEERING.md` (the next phase: compiled backend, testing rigor, CI/CD)
-and `docs/HOSTING.md` (the runbook for the deployed instance). These are kept
+`docs/ENGINEERING.md` (the next phase: compiled backend, testing rigor, CI/CD),
+`docs/HOSTING.md` (the runbook for the deployed instance), and since
+2026-08-21 `docs/go-migration/` (the Go port: PLAN, the append-only
+BASELINE, and the port board once Phase 2 starts — **the main line** until
+the port retires Python, ADR 38). These are kept
 current deliberately — read them before proposing direction, and update them
 when direction changes.
 

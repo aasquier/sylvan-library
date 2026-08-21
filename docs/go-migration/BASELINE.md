@@ -119,14 +119,52 @@ Live instance TTFB p50 from this Mac (5 samples, 2026-08-19): `/` 237ms ·
 Owed before the plan's Phase 0 exit — none was safely measurable today with a
 sibling session active and no wish to disturb the instance:
 
-- [ ] Deployed **image size** (compressed + unpacked; `fly image show` or the
-      registry) and CI image-build wall time.
-- [ ] Instance **RSS** at idle and during a Tier 1 run (`fly ssh console`,
-      `/proc/1/smaps_rollup` of the app process).
-- [ ] **Boot-to-healthy** time (deploy log timestamps: machine start →
-      first 200 from `/api/health`) — the per-merge downtime window.
-- [ ] Fresh `mtglab bench run` + `--cold` on a quiet Mac (compare against the
-      ledger block above; investigate any drift before trusting either).
-- [ ] Fresh full-suite wall clock at 2,668 tests.
-- [ ] `pip install -e ".[dev]"` wall time on a clean checkout (the Go
-      toolchain-setup comparison point).
+- [x] Deployed **image size** (compressed + unpacked; `fly image show` or the
+      registry) and CI image-build wall time. *(block below)*
+- [x] Instance **RSS** at idle *(block below)*; **during a Tier 1 run** not
+      taken — it needs a signed-in request against the instance, which the
+      harness cannot make; a CLI run on the box would measure a second
+      process, not the app. Owed to the Phase 5 measurement, where the GIL
+      dividend is measured anyway.
+- [x] **Boot-to-healthy** time (deploy log timestamps: machine start →
+      first 200 from `/api/health`) — the per-merge downtime window. *(block below)*
+- [ ] Fresh `mtglab bench run` + `--cold` on a quiet Mac — **deliberately not
+      taken 2026-08-21**: the Mac was not quiet (load 4.2, `mediaanalysisd`
+      at 32% CPU), and a number taken then would have had to be explained
+      away against the ledger's. The ledger's 2026-08-19 block stands as the
+      baseline; re-measure on a quiet machine before Phase 8's comparison.
+- [x] Fresh full-suite wall clock *(block below)*.
+- [x] `pip install -e ".[dev]"` wall time on a clean checkout (the Go
+      toolchain-setup comparison point). *(block below)*
+
+## 2026-08-21, later — the quiet-window captures (Phase 0 remainder)
+
+Taken the same day, on the Phase 1 branch, from reads only: the registry
+manifest, `/proc` on the instance over `fly ssh console`, the last `main`
+run's job and step timestamps (`gh run view --json jobs`, run 32509614960,
+commit 0f87bde), and a clean venv in the scratchpad. Nothing was deployed or
+restarted to get them.
+
+| Metric | Measured | How |
+| --- | ---: | --- |
+| App image, compressed | **121.3 MB** (10 layers) | sum of layer sizes in the registry's v2 manifest for the deployed tag |
+| App image, unpacked | **≈325 MB** | `du` on the instance: `/opt/venv` 219M, `/usr/lib` 48M, `/usr/local/lib/python3.12` 28M, `/usr/bin` 23M, `/var` 6.3M, `/etc` 1.3M |
+| Idle RSS, the app process | **127.2 MB** (VmRSS 127,224 kB; VmHWM 214.9 MB; 8 threads) | `/proc/<pid>/status` of `mtglab ui`, 2 h 39 m after the deploy; PID 1 is `/fly/init` at 5 MB |
+| Instance memory | 985 MB total, **680 MB available** | `/proc/meminfo` |
+| Machine update → health passing | **≈23.6 s** | deploy log: "Waiting for machine … to reach a good state" 17:50:36.3 → "Checking health" 17:50:59.3 → app answered 17:50:59.98. Bounded below by the HEALTHCHECK's 10 s grace and 30 s interval, so the process itself boots faster than this reads |
+| Merge → instance healthy | **7 m 44 s** | run created 17:43:16 → smoke test passed 17:51:00 |
+| Whole pipeline (incl. worker image push) | **9 m 37 s** | 17:43:16 → 17:52:53 |
+| `test (3.12)` job / its Tests step | 6 m 16 s / 5 m 40 s (under coverage) | job timestamps; `test (3.11)` 3 m 27 s / 3 m 04 s |
+| `image` job / amd64 build / Forge-worker build | 2 m 27 s / 45 s (cache replay) / 68 s | step timestamps; `image-arm64` build 44 s native |
+| `pip install -e ".[dev,api]"` in CI | 15–16 s (pip cache warm) | step timestamps, both matrix legs |
+| `pip install -e ".[dev]"` on this Mac, clean venv | **79 s**, 330 MB venv (pip cache warm) | `python3.12 -m venv` + install, timed |
+| Full suite wall clock, this Mac | **265 s at 2,904 tests** (the contract suite and its proof added ~236) | `pytest -q` on the Phase 1 branch, same afternoon, load ~3–4 — *faster* than the ledger's 352 s at 2,470 on a quiet day, which is a question for the next bench pass rather than a datum to trust |
+| Go on this Mac | **`go1.26.7 darwin/amd64` runs**; 1.27 requires macOS 13 | official per-version installer into `~/sdk`, 20 s; release notes for 1.26 and 1.27 read the same day |
+
+Two of these are the honest opposite of a clean number and are recorded as
+such. The **boot** figure is a ceiling, not the process's own start time,
+because the only timestamps available sit on either side of a health check
+that polls every 30 s. And the **RSS during a Tier 1 run** was not taken:
+it needs a signed-in request on the instance and the harness holds no
+credentials there; the measurement belongs with Phase 5, where the GIL
+dividend is measured on the same machine anyway.

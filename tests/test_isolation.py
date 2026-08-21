@@ -13,6 +13,10 @@ The four classifications, and what each one is checked to actually do:
 - **public** — reachable with no session. Read straight out of
   `api/auth.py:PUBLIC_PATHS`, so the test and the middleware cannot disagree
   about what is public; a route added to one is a route added to both.
+  Since the Go migration's Phase 1 the same list is also written in
+  `tests/contract/routes.json`, and `test_the_shared_table_matches_the_middleware`
+  holds the two equal -- the file is the table a second implementation is
+  held to, the code is what this one runs.
 - **shared** — needs a session, and then shows the same thing to everyone. The
   curated six are the library, not anybody's property (ADR 1). Each entry
   carries the reason it is shared, so the classification is an argument rather
@@ -31,6 +35,15 @@ Every non-public route is also requested with no cookie at all and must answer
 401. That check is what catches an endpoint declared without protection, and it
 needs no per-route knowledge: the middleware refuses before routing, so the
 route does not have to know it is being protected.
+
+**The classification lives in `tests/contract/routes.json`** (2026-08-21, the
+Go migration's Phase 1), not in this file: one table, read here for the
+in-process sweep over FastAPI's route table, read by `tests/contract/` for the
+same sweep over a live server, and read by the Go module's own sweep from
+Phase 2 -- so the route somebody adds in a year is classified once, in one
+place, or fails three suites. This file keeps what needs the process: the
+route table itself (`client.app.routes`), `jobs.submit`, and the email-caller
+greps.
 
 **A is an admin and B is not**, which is why the adversarial tests below say
 more than they used to: every one of them now also establishes that
@@ -56,6 +69,7 @@ pytest.importorskip("argon2")
 from fastapi.testclient import TestClient
 
 import tiny_pool
+from contract.routes import ROUTES
 from mtglab import config
 from mtglab.api import jobs
 from mtglab.api.app import create_app
@@ -67,182 +81,12 @@ PASSWORD_B = "a-different-long-passphrase"
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "mtglab"
 
-# Needs a session; shows everyone the same thing once you have one. The value
-# is the justification -- if it does not read as a reason, the route is
-# probably user-scoped and mis-filed.
-SHARED = {
-    # The three collection routes. They stay shared because every account may
-    # *call* them -- what differs is what comes back, and a route that filters
-    # its own answer per caller cannot be checked by asking for somebody
-    # else's copy of it. The per-deck routes below are where ADR 22's 404 is
-    # actually enforced, and they are user-scoped now.
-    "/api/decks": "every caller may list; the list is filtered to what they "
-                  "may see, and carries an owner per deck (ADR 22)",
-    "/api/decks/import": "writes into the caller's OWN library, never into an "
-                         "owner named in the path",
-    "/api/sim/mana": "submits a job against a deck the caller may see; the "
-                     "owner is resolved through Library and the job is scoped",
-    "/api/sim/lands": "submits a job too, same resolution, and the job is scoped",
-    # Tier 1.5's two. The shelf is the only simulation route that answers in
-    # the request rather than handing back a job -- it is 40ms of arithmetic --
-    # but it resolves its deck through Library exactly as the others do, so
-    # somebody else's private deck is a 404 here as well.
-    "/api/sim/shelf": "computes the closed form for a deck the caller may "
-                      "see; resolved through Library, answered in the request",
-    "/api/sim/policy": "submits a job against a deck the caller may see; same "
-                       "resolution as /api/sim/mana, and the job is scoped",
-    # ADR 35's two. The gate is the same class of thing as `/api/claude`: a
-    # fact about the environment, identical for every caller. The match route
-    # resolves both decks through Library exactly as the two sim routes above
-    # resolve one, so somebody else's private deck is a 404 here too, and the
-    # job it hands back is scoped by `jobs.get` like every other.
-    "/api/forge": "whether the Forge is installed on this instance",
-    "/api/sim/forge": "submits a job against two decks the caller may see; "
-                      "both resolved through Library, and the job is scoped",
-    "/api/cards/search": "the public Scryfall pool",
-    "/api/cards/identify": "the same pool, asked the other way round -- a set\n                            code and a collector number in, a card name out. It\n                            reads no deck and writes nothing, and the photograph\n                            it came from never leaves the browser",
-    "/api/sets/upcoming": "Scryfall's own release calendar",
-    "/api/colors": "a fixed taxonomy, no data at all",
-    "/api/colors/progress": "scored over the shared library",
-    "/api/colors/{key}": "a fixed taxonomy plus public pool cards",
-    "/api/glossary": "fixed reference prose, no data at all",
-    "/api/themes": "the fixed labelling vocabulary, no data at all",
-    "/api/lore": "fixed reference prose plus public pool cards",
-    "/api/claude": "whether the surface is configured on this instance",
-    # The persona roster and the deal. Both are the same class of thing as
-    # `/api/colors`: a checked-in table and a shuffle, computed from nothing
-    # anybody owns. The reading is seeded and stateless — the client carries
-    # the seed, so there is no dealt spread on the server for anybody to reach,
-    # belonging to them or to anyone else.
-    "/api/claude/personas": "a fixed roster of voices, no data at all",
-    "/api/tarot/reading": "a seeded shuffle of a public-domain deck; no state",
-    # ADR 20's two. Neither takes a deck or a slug — the conversation is about
-    # the person and is held by their browser, so there is nothing here
-    # belonging to one account for another to reach. What comes back is a
-    # suggestion; making the deck goes through the shared create route.
-    "/api/claude/theme": "submits a job; the conversation is the client's and "
-                         "nothing is stored, and the job is scoped",
-    # Submits a job rather than answering — 226 seconds is longer than a hosted
-    # proxy will hold a POST. Filed here for the same reason the two sim routes
-    # are: the *submission* is shared (there is no deck and nothing personal on
-    # the server to reach), and the job it hands back is scoped by `jobs.get`.
-    "/api/claude/theme/proposal": "submits a job; colours and commanders out of "
-                                  "the shared pool, and the job is scoped",
-    # ADR 26. Shared for the strongest version of the theme routes' reason:
-    # this one *cannot* reach a deck. It takes no owner, no slug and no
-    # `DeckSource`, so there is nothing belonging to one account for another to
-    # find — the question is in the request body and the answer comes back on a
-    # job `jobs.get` already scopes. Note the dedupe key is per owner too, so
-    # two accounts asking the same question get two jobs.
-    "/api/claude/research": "submits a job; the question is the caller's and "
-                            "no deck is reachable, and the job is scoped",
-    # ADR 34. The one route that receives a photograph. Shared for the same
-    # reason research is: no deck is reachable, the capture belongs to whoever
-    # sent it and is never stored, and the resulting job is scoped by
-    # `jobs.get` like every other. The dedupe key is a digest of the image and
-    # is matched per owner, so two accounts photographing the same card get
-    # two jobs.
-    "/api/claude/scan": "submits a job; the capture is the caller's, no deck "
-                        "is reachable, and the job is scoped",
-    # ADR 32. A derivative is keyed on a public painting's oracle_id and a
-    # fixed effect name -- the same class of thing as `/api/colors/{key}`:
-    # nothing here belongs to an account, and every session sees the same
-    # cache. Behind auth (not PUBLIC_PATHS) because deck pages are, and a
-    # backdrop should not outlive the door it decorates.
-    "/api/art/motion/{oracle_id}/{effect}": "a shared cache over public "
-                                            "card art; nothing per-account",
-    "/api/art/motion/{oracle_id}/{effect}/{filename}": "one file of the "
-                                                       "same shared cache",
-    # ADR 33. The official mana symbols out of the same kind of shared
-    # runtime cache: keyed on a public symbol code, identical for every
-    # session, nothing per-account to reach.
-    "/api/symbols/{code}.svg": "a shared cache of public mana-symbol art; "
-                               "nothing per-account",
-    # The reading engine, same runtime-cache shape again: a fixed table of
-    # Apache-2.0 files, byte-identical for every session, fetched by the
-    # camera door and by nothing else -- plus the worker's own licence
-    # notice, which is served so the pointer inside the worker resolves
-    # (NOTICE.md, "Tesseract").
-    "/api/ocr/{name}": "a shared cache of the Apache-2.0 OCR engine and its "
-                       "notice; the same files for everyone, nothing "
-                       "per-account",
-}
-
-# Belongs to one person. Each entry says how to make one as user A and where to
-# find it, and the test then tries to reach it as user B.
-USER_SCOPED = {
-    "/api/jobs": "list",
-    "/api/jobs/{job_id}": "item",
-    # ADR 22. Every per-deck route is addressed `/{owner}/{slug}` and answers
-    # **404** for another account's *private* deck -- not 403, which is
-    # reserved for a deck the caller can already read (a shared one they do
-    # not own). `test_a_private_deck_is_a_404_to_another_account` is the
-    # adversarial check; the write half is `tests/test_library_write_gate.py`.
-    #
-    # These were filed SHARED until 2026-08-14, which was correct about
-    # *reading the curated six* and silent about everything else -- the gap
-    # #80 fell through. A deck is now somebody's.
-    "/api/decks/{owner}/{slug}": "item",
-    "/api/decks/{owner}/{slug}/validate": "item",
-    "/api/decks/{owner}/{slug}/stats": "item",
-    # ADR 28. A deck's history is as reachable as the deck and no more: the
-    # route resolves its source through `Library`, so a private deck's log is
-    # a 404 for the same reason and by the same code path the deck itself is.
-    "/api/decks/{owner}/{slug}/log": "item",
-    # The deliverables reach exactly as far as the deck does, both ways. The
-    # GETs are user-scoped rather than SHARED even though the artifacts are
-    # "the shareable surface": shareable means shareable *with the deck*, and
-    # a primer for a private deck names its whole 99. The POST is a deck write
-    # in every sense that matters here -- it is refused by `_for_writing`, so
-    # a stranger's build attempt raises `ReadOnlySource` (403) on a shared
-    # deck and `DeckNotFound` (404) on a private one, like every other write.
-    "/api/decks/{owner}/{slug}/artifacts": "item",
-    "/api/decks/{owner}/{slug}/artifacts/{name}": "item",
-    "/api/decks/{owner}/{slug}/swap": "item",
-    "/api/decks/{owner}/{slug}/cards": "item",
-    "/api/decks/{owner}/{slug}/cards/{name}": "item",
-    # ADR 27: the entombment routes are deck writes like any other -- the
-    # graveyard is part of the deck file, so its reach is the deck's.
-    "/api/decks/{owner}/{slug}/entomb": "item",
-    "/api/decks/{owner}/{slug}/graveyard/{name}": "item",
-    "/api/decks/{owner}/{slug}/graveyard/{name}/return": "item",
-    "/api/decks/{owner}/{slug}/notes/{key}": "item",
-    "/api/decks/{owner}/{slug}/shared": "item",
-    "/api/decks/{owner}/{slug}/suggestions": "item",
-    # The wheel reads the deck (its identity and its 99) to pick a card, so
-    # its reach is the deck's: spinning a stranger's private wheel would
-    # confirm the deck exists.
-    "/api/decks/{owner}/{slug}/wheel": "item",
-    "/api/decks/{owner}/{slug}/commander": "item",
-    "/api/decks/{owner}/{slug}/printings": "item",
-    "/api/decks/{owner}/{slug}/interview": "item",
-    "/api/decks/{owner}/{slug}/argue": "item",
-    "/api/decks/{owner}/{slug}/argue/deck": "item",
-    "/api/decks/{owner}/{slug}/dossier": "item",
-}
-
-# Needs a session belonging to an admin (ADR 17). The value is the
-# justification, same as SHARED -- an admin route is a route that administers
-# *the instance*, and anything that merely feels sensitive belongs in one of the
-# other three.
-#
-# Every entry must live under ADMIN_PREFIX and every route under that prefix
-# must appear here; `test_admin_classification_matches_the_prefix` checks both
-# directions. That is what makes the middleware and this file one statement
-# rather than two that can drift.
-ADMIN = {
-    "/api/admin/users": "every account on the instance, addresses included",
-    "/api/admin/users/{username}": "grants admin, disables and re-enables, "
-                                   "and deletes an account outright",
-    "/api/admin/users/{username}/reset": "mails somebody a password link",
-    "/api/admin/users/{username}/sessions": "signs an account out everywhere",
-    "/api/admin/stats/system": "the process, memory and volume of the box",
-    "/api/admin/stats/storage": "what every store on the volume weighs",
-    "/api/admin/stats/claude": "where the instance's Claude tokens went",
-    "/api/admin/stats/activity": "accounts, sessions and edits across time",
-    "/api/admin/stats/traffic": "requests per day by route template",
-    "/api/admin/stats/fly": "the platform's own view of this instance",
-}
+# The classification, from the shared file. `ROUTES.public` is the file's
+# copy of `PUBLIC_PATHS`; `test_the_shared_table_matches_the_middleware`
+# below is what makes having two copies safe.
+SHARED = ROUTES.shared
+USER_SCOPED = ROUTES.user_scoped
+ADMIN = ROUTES.admin
 
 # The one place `include_email=True` is allowed to appear, now that ADR 17 has
 # widened it from "the CLI only". See `test_addresses_are_serialised_in_two_places`.
@@ -295,20 +139,13 @@ def api_routes(client) -> list:
 def concrete(path: str) -> str:
     """A templated route path with something plausible in every placeholder.
 
-    The values do not have to resolve to anything. Every check that uses this
-    asserts on a refusal that happens *before* the handler runs, so a real slug
-    and a nonsense one produce the same answer -- and one that produced a
-    different answer would be the bug.
+    The values come from the shared file too (`placeholders`), so the Go
+    sweep builds the same URLs. They do not have to resolve to anything:
+    every check that uses this asserts on a refusal that happens *before* the
+    handler runs, so a real slug and a nonsense one produce the same answer
+    -- and one that produced a different answer would be the bug.
     """
-    return (path.replace("{slug}", "arahbo-cats")
-                .replace("{name}", "Forest")
-                .replace("{key}", "mulligan")
-                .replace("{job_id}", "deadbeef")
-                .replace("{username}", "alice")
-                .replace("{oracle_id}", "0aae2e33-0000-4000-8000-000000000000")
-                .replace("{effect}", "depth-drift")
-                .replace("{filename}", "loop.webm")
-                .replace("{code}", "W"))
+    return ROUTES.concrete(path)
 
 
 # ------------------------------------------------------- the generated sweep
@@ -332,6 +169,21 @@ def test_every_route_is_classified(instance):
           "requires it to answer 404 for another user -- or to ADMIN, which "
           "requires it to live under ADMIN_PREFIX and answer 403 to anybody "
           "else.")
+
+
+def test_the_shared_table_matches_the_middleware():
+    """`routes.json` and `api/auth.py` say the same thing, in both directions.
+
+    The file carries a copy of the public list and of the admin prefix
+    because a Go reader cannot import this package. Two copies of a table are
+    safe only while something holds them equal; this does, and fails with the
+    side that moved.
+    """
+    assert set(ROUTES.public) == set(PUBLIC_PATHS), (
+        f"routes.json `public` is {sorted(ROUTES.public)} but "
+        f"api/auth.py PUBLIC_PATHS is {sorted(PUBLIC_PATHS)}; change both "
+        f"or neither")
+    assert ROUTES.admin_prefix == ADMIN_PREFIX
 
 
 def test_classification_has_no_ghosts(instance):
@@ -373,7 +225,11 @@ def test_admin_classification_matches_the_prefix(instance):
 
 
 def test_admin_entries_carry_a_reason():
-    """As with SHARED: the classification is an argument, not a bucket."""
+    """As with SHARED: the classification is an argument, not a bucket.
+
+    `contract.routes.load` refuses a reason of fifteen characters or fewer at
+    load, so this cannot fail without that failing first; it stays because
+    it says *why*, which a loader's error does not."""
     for path, reason in ADMIN.items():
         assert len(reason) > 15, f"{path} is filed as admin without a reason"
 

@@ -630,6 +630,19 @@ field and the running instance went on answering the old name, because
 deploying was still something a person had to remember. A failing test is
 loud, a failing build is loud, **a skipped deploy is silent**.
 
+**The `contract` job, added 2026-08-21** with the Go migration's Phase 1
+([`docs/go-migration/PLAN.md`](go-migration/PLAN.md) §5): `tests/contract/`
+is the part of the suite that can run against a server it did not build —
+in-process by default, over TCP against a child `mtglab ui` with `--live`,
+or against a server somebody else started with `--base-url`. The job runs
+the live mode, which is the only one that proves nothing is stubbed on the
+far side of the socket. Its route classification is `tests/contract/routes.json`,
+read by `tests/test_isolation.py` as well, so the table a second
+implementation is held to is the table this one is held to. The suite's own
+proof is `tests/test_contract_harness.py`: every assertion is run against a
+deliberately broken app and shown to fail, and the whole suite is run once
+in a subprocess against one such app and shown to go red.
+
 Two details worth keeping. `needs` is not redundant with branch protection —
 protection governs *merging* and says nothing about a `workflow_dispatch` run,
 whereas `needs` makes the job structurally unable to start on a red suite
@@ -743,7 +756,7 @@ The settings on `main`, recorded so they can be rebuilt:
 | Setting | Value | Why |
 | --- | --- | --- |
 | Pull request required | yes, **0 approvals** | A solo maintainer cannot approve their own PR, so requiring 1 would deadlock the repo |
-| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-card-data`, `image`, `dependency-review` | Read back from the API 2026-08-19 and correct as listed. **`image-arm64` is a `ci.yml` job and is *not* on this list** — it gates `deploy` through `needs`, not merging. Renaming a CI job silently stops gating until this list is updated |
+| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-card-data`, `image`, `dependency-review` | Read back from the API 2026-08-19 and correct as listed. **`image-arm64` is a `ci.yml` job and is *not* on this list** — it gates `deploy` through `needs`, not merging. **Neither is `contract`** (added 2026-08-21, the Go migration's Phase 1): it gates `deploy` the same way and is owed the second step — `gh api -X POST repos/aasquier/sylvan-library/branches/main/protection/required_status_checks/contexts -f 'contexts[]=contract'` — which is a setting, not a file, and Aaron's to make. Renaming a CI job silently stops gating until this list is updated |
 | Strict (branch up to date) | yes | Checks that passed against a stale base did not test what is being merged |
 | Enforce for admins | **yes** | Off, it does not apply to the only contributor, which makes it decorative |
 | Force pushes, deletions | blocked | |
