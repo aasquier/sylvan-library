@@ -39,27 +39,35 @@ def load_yaml(text: str) -> Any:
     return yaml.load(text, SAFE_LOADER)
 
 
-# The deck-labelling axes, two on purpose (Aaron's call, 2026-08-20; the match
-# ledger is what forced the decision). One axis was proposed and refused:
-# EDHREC keeps roughly four thousand themes, so a single small vocabulary is
-# either too coarse to say what a deck *is* or too fine for any grouping to
-# hold enough games to mean anything. So the axes split by question:
+# The deck-labelling axis is `themes`, and the archetype is a reading of it
+# (ADR 37, superseding ADR 36's second declared axis; Aaron's call,
+# 2026-08-22). Strategy words -- aggro, control, combo, stax, voltron -- are
+# themes like any other: a deck declares as many as are true, which is what
+# lets a control deck with a combo finish say both, as the community's own
+# tagging does and as ADR 36's single slot forbade.
 #
 # - `THEMES` answers "what is this deck about" -- rich identity, several per
 #   deck, and an *open* vocabulary: it grows by editing this tuple, which is a
 #   decision someone makes, never a scrape. (EDHREC's theme list is derived
-#   from their own aggregated data and CLAUDE.md bans crawling either way;
-#   ROADMAP goal 8 records the three lawful options and this is option 2.)
+#   from their own aggregated data, their Terms of Use forbid automated
+#   queries outright, and CLAUDE.md bans crawling either way; the lawful way
+#   this tuple grows is somebody *reading* such a page and editing it, which
+#   is how ADR 37's survey grew it.)
 # - `ARCHETYPES` answers "which rating board may this deck's Forge results
-#   share" -- one per deck, a *closed* class, coarse on purpose: per-archetype
-#   reporting is law because Forge pilots the classes differently, and a
-#   grouping fine enough to be interesting is too fine to hold enough games.
+#   share" -- a *closed* class, coarse on purpose: per-archetype reporting is
+#   law because Forge pilots the classes differently, and a grouping fine
+#   enough to be interesting is too fine to hold enough games. It is not
+#   declared separately: `Deck.archetype` reads the class words out of the
+#   declared themes, worst-piloted wins (see the property for the rule).
 #
-# Both are DECLARED in deck.yaml and never derived from the list. A derived
-# class would be laundering: whatever signal picked it would correlate with
-# how well Forge pilots the deck, and the boards would quietly rank decks by
-# the very bias the class exists to contain.
+# Themes are DECLARED in deck.yaml and never derived from the list. A class
+# derived from the *decklist* would be laundering: whatever signal picked it
+# would correlate with how well Forge pilots the deck, and the boards would
+# quietly rank decks by the very bias the class exists to contain. Deriving
+# the coarse archetype from the *declared* themes is projection, not
+# inference -- the human supplied the only input.
 THEMES = (
+    "aggro",
     "angels",
     "aristocrats",
     "artifacts",
@@ -67,7 +75,10 @@ THEMES = (
     "big-mana",
     "blink",
     "cats",
+    "cedh",
     "clues",
+    "combo",
+    "control",
     "counters",
     "dinosaurs",
     "dragons",
@@ -81,6 +92,7 @@ THEMES = (
     "landfall",
     "lands",
     "lifegain",
+    "midrange",
     "mill",
     "politics",
     "ramp",
@@ -91,9 +103,9 @@ THEMES = (
     "stax",
     "stompy",
     "superfriends",
+    "tempo",
     "tokens",
     "treasure",
-    "tribal",
     "vehicles",
     "voltron",
     "wheels",
@@ -270,14 +282,15 @@ class Deck:
     commander_art: str = ""
     companion: str | None = None
     bracket: int | None = None
-    # The two labelling axes (see THEMES and ARCHETYPES above for the whole
-    # argument). `archetype` is the closed Forge-pilotability class the rating
-    # boards group by -- empty means undeclared, and an undeclared deck simply
-    # has no board to sit on. `themes` is the open identity list users will
-    # see and filter by. Both are declared here, in the source of truth, and
-    # the match ledger snapshots them at match time -- a deck relabelled later
+    # The labelling axis (ADR 37; see THEMES above for the whole argument).
+    # `themes` is the open identity list, strategy words included, and the
+    # `archetype` property below is *read* from it. `legacy_archetype` holds
+    # a deck.yaml's pre-ADR-37 `archetype:` key: it answers only while the
+    # themes name no class word, and `dump` drops it the moment it is
+    # shadowed, so a file migrates itself on its next write. The match ledger
+    # still snapshots the reading at match time -- a deck relabelled later
     # keeps the class it wore when it played.
-    archetype: str = ""
+    legacy_archetype: str = ""
     themes: list[str] = field(default_factory=list)
     strategy: str = ""
     # Free-form notes that flow into the advanced primer.
@@ -297,6 +310,25 @@ class Deck:
     def total_cards(self) -> int:
         """Cards in the 99 (commander and companion sit outside it)."""
         return sum(c.qty for c in self.cards)
+
+    @property
+    def archetype(self) -> str:
+        """The rating boards' class, read from the declared themes (ADR 37).
+
+        Among the four class words present in `themes`, the worst-Forge-
+        piloted wins -- latest in `ARCHETYPES`' best-first gradient -- so a
+        deck that is even partly combo carries combo's caveat, never a
+        rosier board's. Only the four class words feed the rule: `cedh` and
+        `tempo` are identity, not boards. A deck declaring no class word
+        falls back to the legacy declared value while its file still carries
+        one, and otherwise has no board to sit on.
+        """
+        declared = [a for a in ARCHETYPES if a in self.themes]
+        if declared:
+            return declared[-1]
+        if self.legacy_archetype in ARCHETYPES:
+            return self.legacy_archetype
+        return ""
 
     @property
     def by_category(self) -> dict[str, list[CardEntry]]:
@@ -390,7 +422,7 @@ class Deck:
             commander_art=str(raw.get("commander_art") or "").strip(),
             companion=raw.get("companion"),
             bracket=raw.get("bracket"),
-            archetype=str(raw.get("archetype") or "").strip().lower(),
+            legacy_archetype=str(raw.get("archetype") or "").strip().lower(),
             themes=[str(t).strip().lower()
                     for t in (raw.get("themes") or []) if str(t).strip()],
             strategy=raw.get("strategy", ""),
@@ -429,10 +461,15 @@ class Deck:
             payload["companion"] = self.companion
         if self.bracket is not None:
             payload["bracket"] = self.bracket
-        # Written only when declared, like `pilot` above: unlabelled is the
-        # default and a round trip must not grow lines asserting it.
-        if self.archetype:
-            payload["archetype"] = self.archetype
+        # The pre-ADR-37 declared class, written back only while it is
+        # load-bearing: once the themes name a class word the key is shadowed
+        # and the next write drops it -- the same self-cleaning round trip
+        # `commander_art` uses. The value is preserved even when it is not a
+        # class the boards know; a round trip must not eat a line `validate`
+        # is still warning about.
+        if self.legacy_archetype and \
+                not any(a in self.themes for a in ARCHETYPES):
+            payload["archetype"] = self.legacy_archetype
         if self.themes:
             payload["themes"] = self.themes
         if self.strategy:

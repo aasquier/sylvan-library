@@ -53,8 +53,22 @@ its own branch or few, in this order because each drinks from the one before:
    seats, its games as parsed. With it, the two-axis deck labelling Aaron
    ruled on: an open hand-curated `themes` list (identity; never scraped —
    goal 8's boundary stands) and a small closed `archetype` class that only
-   the rating boards group by. Both declared in `deck.yaml`, never derived —
-   derivation would launder Forge's pilot bias into the boards.
+   the rating boards group by. **The second axis lasted two days.** Put next
+   to the decks' own primers it contradicted them (Tivit's page says
+   midrange-control *and* combo; the slot forced one), and its coarseness
+   never bought the board density it was chosen for — measured against the
+   library: one board of four, two boards of one.
+   [ADR 37](docs/adr/0037-the-archetype-is-a-reading-of-the-themes.md)
+   (2026-08-22, after surveying EDHREC's tag taxonomy, where strategy words
+   are multi-taggable themes and no closed slot exists): the class words
+   joined `THEMES`, a deck declares as many as are true, and `archetype` is
+   now *derived* from the declared themes, worst-Forge-piloted class word
+   winning — projection from the human's own declaration, not the decklist
+   inference ADR 36 rightly banned. Same survey, same ADR: EDHREC's ToS
+   expressly forbids automated queries, so the fetch-their-tags idea is
+   dead; a lawful label-suggestion step (the dossier's cited web-search
+   pattern, output constrained to our vocabulary, human confirms) is
+   recorded there as the future shape.
 2. **The match theater** — #203's stream carries only a count; extend the
    shim's NDJSON to carry each parsed row (winner, turns, seconds), let the
    job expose partial rows, and the Simulator renders the match live:

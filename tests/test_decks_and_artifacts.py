@@ -245,27 +245,91 @@ def test_an_unrecognised_status_fails_the_gate():
 
 
 def test_labels_outside_the_vocabulary_warn_and_absent_is_fine():
-    """The two labelling axes (ADR 36) strike the `unknown-category` bargain:
-    a hand-written label off the vocabulary warns, an edit through the app is
-    refused outright, and an unlabelled deck is undeclared, not wrong."""
+    """The labelling axis (ADR 37) strikes the `unknown-category` bargain:
+    a hand-written theme off the vocabulary warns, an edit through the app is
+    refused outright, and an unlabelled deck is undeclared, not wrong. A
+    lingering `archetype:` key warns as legacy whatever its value, because
+    the label lives in `themes` now."""
     from mtglab.decks.validate import validate
 
     labelled = Deck.from_text(
-        "slug: x\nname: X\narchetype: aggro\nthemes:\n  - cats\ncards: []\n")
+        "slug: x\nname: X\nthemes:\n  - aggro\n  - cats\ncards: []\n")
     assert not {i.code for i in validate(labelled, None).issues} & \
-        {"unknown-archetype", "unknown-theme"}
+        {"legacy-archetype", "unknown-theme"}
 
     off = Deck.from_text(
-        "slug: x\nname: X\narchetype: tempo\nthemes:\n  - fud\ncards: []\n")
+        "slug: x\nname: X\narchetype: aggro\nthemes:\n  - fud\ncards: []\n")
     rep = validate(off, None)
     warn_codes = {i.code for i in rep.warnings}
-    assert {"unknown-archetype", "unknown-theme"} <= warn_codes
+    assert {"legacy-archetype", "unknown-theme"} <= warn_codes
     error_codes = {i.code for i in rep.errors}
-    assert not {"unknown-archetype", "unknown-theme"} & error_codes
+    assert not {"legacy-archetype", "unknown-theme"} & error_codes
+
+    # A legacy value no board would know warns louder -- it has been counting
+    # for nothing -- but it is still a warning, never an error.
+    junk = Deck.from_text(
+        "slug: x\nname: X\narchetype: zoo\ncards: []\n")
+    [issue] = [i for i in validate(junk, None).warnings
+               if i.code == "legacy-archetype"]
+    assert "counts for nothing" in issue.message
 
     bare = Deck.from_text("slug: x\nname: X\ncards: []\n")
     assert not {i.code for i in validate(bare, None).issues} & \
-        {"unknown-archetype", "unknown-theme"}
+        {"legacy-archetype", "unknown-theme"}
+
+
+def test_the_archetype_is_a_reading_of_the_themes():
+    """ADR 37's rule, pinned at the model: among declared class words the
+    worst-Forge-piloted wins, identity-only strategy words feed nothing, and
+    a legacy `archetype:` key answers only while the themes are silent."""
+    def deck(themes: str = "", legacy: str = "") -> Deck:
+        text = "slug: x\nname: X\ncards: []\n"
+        if legacy:
+            text += f"archetype: {legacy}\n"
+        if themes:
+            text += "themes:\n" + "".join(
+                f"  - {t}\n" for t in themes.split(","))
+        return Deck.from_text(text)
+
+    # Worst-piloted wins: control + combo reads combo, aggro + control reads
+    # control -- the caveat can only ever err toward more warning.
+    assert deck("control,combo").archetype == "combo"
+    assert deck("combo,control").archetype == "combo"
+    assert deck("aggro,control").archetype == "control"
+    assert deck("midrange").archetype == "midrange"
+
+    # `cedh` and `tempo` are identity, not boards.
+    assert deck("cedh,tempo").archetype == ""
+
+    # The legacy key is a fallback, not a vote: it answers alone, is shadowed
+    # by any declared class word, and a value no board knows counts for
+    # nothing rather than becoming a board of one.
+    assert deck(legacy="midrange").archetype == "midrange"
+    assert deck("combo", legacy="midrange").archetype == "combo"
+    assert deck(legacy="zoo").archetype == ""
+    assert deck().archetype == ""
+
+
+def test_a_legacy_archetype_round_trips_until_shadowed():
+    """The self-cleaning migration: `dump` writes the legacy key back while
+    it is load-bearing -- a round trip must not eat a line `validate` is
+    still warning about -- and drops it the moment a declared class word
+    shadows it, the same round trip `commander_art` uses."""
+    bearing = Deck.from_text(
+        "slug: x\nname: X\narchetype: midrange\nthemes:\n  - cats\n"
+        "cards: []\n")
+    assert "archetype: midrange" in bearing.dump()
+
+    # Junk is preserved too, not laundered away: the file's own line outlives
+    # the round trip for as long as the warning about it does.
+    junk = Deck.from_text("slug: x\nname: X\narchetype: zoo\ncards: []\n")
+    assert "archetype: zoo" in junk.dump()
+
+    shadowed = Deck.from_text(
+        "slug: x\nname: X\narchetype: midrange\nthemes:\n  - combo\n"
+        "cards: []\n")
+    assert "archetype" not in shadowed.dump()
+    assert shadowed.archetype == "combo"
 
 
 # The two tests that used to live here reading the maintainer's real decks —

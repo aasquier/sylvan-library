@@ -494,8 +494,9 @@ def _tiles(decks: list[Deck], con: Any, *, writable: bool,
             "commander": deck.commander,
             "companion": deck.companion,
             "bracket": deck.bracket,
-            # The two labelling axes, on the shelf because the shelf is where
-            # filtering by them will live. Empty means undeclared, not zero.
+            # The labels, on the shelf because the shelf is where filtering
+            # by them will live. `archetype` is the ADR 37 reading of the
+            # declared themes; empty means undeclared, not zero.
             "archetype": deck.archetype,
             "themes": deck.themes,
             "total_cards": deck.total_cards,
@@ -958,9 +959,10 @@ def get_deck(slug: str, *, source: DeckSource | None = None,
             "commander": deck.commander,
             "companion": deck.companion,
             "bracket": deck.bracket,
-            # The labelling axes (model.THEMES / model.ARCHETYPES): declared
-            # in deck.yaml, snapshotted by the match ledger, edited through
-            # `set_deck_field` like the deck's other own fields.
+            # The labelling axis (model.THEMES) and its reading (ADR 37):
+            # `themes` is declared in deck.yaml and edited through
+            # `set_deck_field`; `archetype` is derived from it, worst-piloted
+            # declared class word winning, and is read-only on the wire.
             "archetype": deck.archetype,
             "themes": deck.themes,
             "strategy": deck.strategy,

@@ -441,14 +441,14 @@ def cmd_decks_set(args: argparse.Namespace) -> None:
                     if args.art is not None and args.card else None))
     deck_fields = (("stage", args.stage), ("status", args.status),
                    ("bracket", args.bracket), ("pilot", args.pilot),
-                   ("archetype", args.archetype), ("themes", args.themes),
+                   ("themes", args.themes),
                    ("commander_art", _art_id(args)
                     if args.art is not None and not args.card else None))
     chosen = [(f, v) for f, v in card_fields + deck_fields if v is not None]
     if len(chosen) != 1:
         sys.exit("choose exactly one of --why, --category, --qty, --art (with "
                  "--card) or --stage, --status, --bracket, --pilot, "
-                 "--archetype, --themes, --art (without)")
+                 "--themes, --art (without)")
     field, value = chosen[0]
     on_a_card = field in dict(card_fields)
 
@@ -2367,13 +2367,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     st.add_argument("--pilot",
                     help="who sleeves this deck up — a name, or '' to untag "
                          "(second 2026-08-15 punch list, item 10)")
-    st.add_argument("--archetype",
-                    help=f"the rating boards' class: one of "
-                         f"{', '.join(ARCHETYPES)}, or '' to clear")
     st.add_argument("--themes",
                     help="what the deck is about, comma-separated from the "
                          "hand-curated vocabulary (see `decks/model.py`); "
-                         "'' clears the list")
+                         "'' clears the list. Strategy words included -- "
+                         f"declare {', '.join(ARCHETYPES)} here and the "
+                         "worst-piloted becomes the deck's rating board "
+                         "(ADR 37)")
     st.add_argument("--art", metavar="SET",
                     help="which printing's art the deck shows for its "
                          "commander: a set code, or a printing id when a set "

@@ -22,10 +22,13 @@ Three rules, inherited deliberately:
   game keeps the winner line Forge printed after giving up; `wins` below is
   the reference reading — a clock-out counts for nobody — and quoting the raw
   rows without that rule is quoting the measurement's surrender as a trophy.
-- **Seats snapshot the deck's declared labels.** `archetype` and `themes`
-  are copied from the deck at match time, never joined from the live deck at
-  read time: the boards group by the class a deck wore when it played, and
-  relabelling a deck must not rewrite its history.
+- **Seats snapshot the deck's labels.** `archetype` and `themes` are copied
+  from the deck at match time, never joined from the live deck at read time:
+  the boards group by the class a deck wore when it played, and relabelling
+  a deck must not rewrite its history. Since ADR 37 the archetype copied is
+  a *reading* of the declared themes (worst-piloted declared class word
+  wins) rather than a second declaration; the snapshot rule is unchanged,
+  and rows written before the rule moved mean exactly what they did.
 
 This imports `auth/db.py` for the same single reason `sim/cache.py` does:
 that module is the `app.db` connection helper and migration ladder, and a

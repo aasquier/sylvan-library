@@ -1192,15 +1192,22 @@ the only non-curated deck is adrix; the only decks failing the gate are
 goreclaw (banned card) and adrix (no cards). Re-run that check rather than
 trusting this sentence — it is exactly the kind that has rotted twice before.
 
-A deck may also declare its two labelling axes (ADR 36, decided 2026-08-20):
-an open `themes` list (identity — several per deck, from the hand-curated
-vocabulary in `model.THEMES`, which grows only by editing it, never by
-scraping) and a closed `archetype` (aggro | midrange | control | combo — the
-class the rating boards group by, coarse on purpose). Both are declared, never
-derived: a derived class would launder Forge's pilot bias into the boards. The
-match ledger snapshots both at match time, so relabelling a deck changes its
-next match and never its history. Absent means unlabelled, which is where all
-six start — declaring theirs is Aaron's call, deck by deck.
+A deck may also declare its labels (ADR 37, superseding ADR 36's second
+axis): one open `themes` list — identity, several per deck, strategy words
+included, from the hand-curated vocabulary in `model.THEMES`, which grows
+only by somebody *reading* and editing it, never by scraping (EDHREC's own
+Terms of Use forbid automated queries, read 2026-08-22, so that door is shut
+twice). The `archetype` the rating boards group by is a **reading** of the
+declared themes, not a second declaration: among the four class words
+declared (aggro | midrange | control | combo), the worst-Forge-piloted wins,
+so a control deck with a combo finish can finally say both and wears combo's
+caveat. Deriving a class from the *decklist* is still banned — that would
+launder Forge's pilot bias into the boards; the themes are the human's own
+words. A legacy `archetype:` key still answers while a file's themes name no
+class word, and the next write drops it once shadowed. The match ledger
+snapshots the reading at match time, so relabelling a deck changes its next
+match and never its history. Absent means unlabelled, which is where all six
+start — declaring theirs is Aaron's call, deck by deck.
 
 **One** deck currently fails the gate, and it is Goreclaw, on Primeval Titan.
 Picking the replacement is Aaron's call; the deck is `theoretical`, so nothing

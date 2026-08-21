@@ -21,10 +21,10 @@ from mtglab.sim.tier3 import ledger, parse
 from mtglab.sim.tier3.run import SimRun
 
 
-def _deck(slug: str, archetype: str = "", themes: list[str] | None = None) -> Deck:
+def _deck(slug: str, themes: list[str] | None = None) -> Deck:
     return Deck(slug=slug, name=f"Deck {slug}",
                 commander=["Gyome, Master Chef"],
-                archetype=archetype, themes=themes or [],
+                themes=themes or [],
                 cards=[CardEntry(name="Sol Ring", category="ramp", why="x")])
 
 
@@ -61,8 +61,10 @@ def test_the_migration_builds_the_three_tables(tmp_path):
 
 def test_a_match_is_recorded_and_read_back(tmp_path):
     db = tmp_path / "app.db"
-    decks = [_deck("deck-a", "midrange", ["food", "aristocrats"]),
-             _deck("deck-b", "aggro", ["cats"])]
+    # The class word rides in the themes and the seat snapshots its reading
+    # (ADR 37): what lands in the `archetype` column is the derived class.
+    decks = [_deck("deck-a", ["food", "aristocrats", "midrange"]),
+             _deck("deck-b", ["cats", "aggro"])]
     match_id = ledger.record(_run(), decks, seed=42, clock=300,
                              games_requested=3, hosted=True, path=db)
     assert match_id is not None
@@ -78,9 +80,9 @@ def test_a_match_is_recorded_and_read_back(tmp_path):
 
     a, b = match["seats"]
     assert (a["slug"], a["archetype"], a["themes"]) == \
-        ("deck-a", "midrange", ["food", "aristocrats"])
+        ("deck-a", "midrange", ["food", "aristocrats", "midrange"])
     assert (b["slug"], b["archetype"], b["themes"]) == \
-        ("deck-b", "aggro", ["cats"])
+        ("deck-b", "aggro", ["cats", "aggro"])
     assert a["commander"] == ["Gyome, Master Chef"]
     assert a["owner_id"] is None and b["owner_id"] is None
 

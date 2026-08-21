@@ -1540,7 +1540,7 @@ def test_sim_forge_records_into_the_match_ledger(decks, monkeypatch):
 def test_sim_matches_renders_the_ledger(decks, capsys):
     from mtglab.decks.model import Deck
     from mtglab.sim.tier3 import ledger
-    deck = Deck(slug="mini", name="Mini", archetype="aggro", themes=["cats"])
+    deck = Deck(slug="mini", name="Mini", themes=["cats", "aggro"])
     ledger.record(_forge_sim_run(), [deck, deck], seed=7, clock=300,
                   games_requested=1, hosted=False)
     code, _ = run(["sim", "matches"])
