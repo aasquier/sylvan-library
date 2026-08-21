@@ -28,7 +28,9 @@ import {
 } from '../components/lazycharts'
 import { DataTable } from '../components/datatable'
 import { MatchTheater } from '../components/theater'
-import { ClosedForm, DeckVerdict, PolicyReport } from '../components/closedform'
+import {
+  ClosedForm, DeckVerdict, ManaCurvePanel, PolicyReport,
+} from '../components/closedform'
 import { theaterRows } from '../lib/theater'
 import { HelpTip, Term } from '../components/term'
 
@@ -132,6 +134,11 @@ export default function Simulator() {
   // not honour.
   const [policyGames, setPolicyGames] = useState(2000)
   const [target, setTarget] = useState(90)
+  // The mana curve's two dials (Aaron's ruling, 2026-08-21). `targetMana` is
+  // the one that makes the advice mean anything: at the turn number lands
+  // always win, and above it they cannot help at all.
+  const [targetTurn, setTargetTurn] = useState(4)
+  const [targetMana, setTargetMana] = useState(4)
   const [error, setError] = useState<string | null>(null)
   const cancelRef = useRef<null | (() => void)>(null)
 
@@ -203,7 +210,10 @@ export default function Simulator() {
     if (mode === 'shelf') {
       setShelfBusy(true)
       try {
-        setShelf(await api.simShelf({ slug, owner, target: target / 100 }))
+        setShelf(await api.simShelf({
+          slug, owner, target: target / 100,
+          target_turn: targetTurn, target_mana: targetMana,
+        }))
       } catch (e) {
         setError(errorMessage(e))
       } finally {
@@ -354,8 +364,16 @@ export default function Simulator() {
           </>
         )}
         {mode === 'shelf' && (
-          <NumberField label="Consistency %" value={target} onChange={setTarget}
-                       min={50} max={99} help={help('sim.target')} />
+          <>
+            <NumberField label="Consistency %" value={target} onChange={setTarget}
+                         min={50} max={99} help={help('sim.target')} />
+            <NumberField label="Target turn" value={targetTurn}
+                         onChange={setTargetTurn} min={1} max={10}
+                         help={help('sim.target_turn')} />
+            <NumberField label="Mana wanted" value={targetMana}
+                         onChange={setTargetMana} min={1} max={12}
+                         help={help('sim.target_mana')} />
+          </>
         )}
         {mode === 'mana' && (
           <>
@@ -428,6 +446,7 @@ export default function Simulator() {
       {shelf && (
         <section className="card-surface space-y-3 rounded-xl p-5">
           <DeckVerdict check={shelf.deck_check} />
+          {shelf.mana_curve && <ManaCurvePanel curve={shelf.mana_curve} />}
           <ClosedForm shelf={shelf} />
           <Caveat>{shelf.caveat}</Caveat>
         </section>

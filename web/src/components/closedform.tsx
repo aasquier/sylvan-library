@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type {
-  CardOddsRow, ColorRequirementRow, DeckCheck, PolicyResult, ShelfResult,
+  CardOddsRow, ColorRequirementRow, DeckCheck, ManaCurve, PolicyResult,
+  ShelfResult,
 } from '../lib/api'
 import { Badge, ManaCost, StatTile } from './ui'
 import { HelpTip, Term } from './term'
@@ -450,5 +451,138 @@ export function DeckVerdict({ check }: { check: DeckCheck | undefined }) {
         </ul>
       )}
     </div>
+  )
+}
+
+/**
+ * The mana curve: do you have the mana you want, when you want it.
+ *
+ * Two controls upstream of this — a turn and an amount — and the second one is
+ * what makes the advice mean anything. Asked for "four mana on turn four" the
+ * answer is always lands, because a land is one mana a turn and you may play
+ * one a turn; nothing beats that at exactly the curve. Ask for *more* than the
+ * turn and a land is worth nothing at all, because you cannot play a fifth one
+ * on turn four — and ramp becomes the only answer.
+ *
+ * That rule is the thing this panel is really teaching, so it is stated in
+ * words rather than left to be inferred from two percentages.
+ */
+export function ManaCurvePanel({ curve }: { curve: ManaCurve }) {
+  const a = curve.advice
+  const peak = Math.max(...curve.turns.map((t) => t.expected_mana), 1)
+
+  const verdict =
+    a.recommend === 'none'
+      ? `You already make ${a.target_mana} mana on turn ${a.target_turn} often enough.`
+      : a.recommend === 'ramp'
+        ? 'Add ramp, not lands.'
+        : a.recommend === 'lands'
+          ? 'Add lands.'
+          : 'Lands or ramp — they buy the same thing here.'
+
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-semibold">
+        The mana curve<HelpTip name="stat.mana_curve" />
+      </h3>
+
+      <div className="rounded-lg p-4"
+           style={{
+             background: a.recommend === 'none'
+               ? 'color-mix(in srgb, var(--status-good) 12%, transparent)'
+               : 'var(--gridline)',
+           }}>
+        <div className="text-sm font-semibold">{verdict}</div>
+        <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+          You make {a.target_mana} mana on turn {a.target_turn} in{' '}
+          <strong>{(a.odds * 100).toFixed(0)}%</strong> of games. One more land
+          takes that to {(a.odds_per_land * 100).toFixed(0)}%; one more
+          accelerant, to {(a.odds_per_ramp * 100).toFixed(0)}%.
+          {a.slots !== null && a.recommend !== 'none' && <>
+            {' '}Reaching {(curve.target * 100).toFixed(0)}% would take about{' '}
+            <strong>{a.slots}</strong>{' '}
+            {a.recommend === 'ramp' ? 'more accelerants' : 'more lands'}.
+          </>}
+          {a.slots === null && a.recommend !== 'none' && <>
+            {' '}Nothing you could reasonably add gets this deck to{' '}
+            {(curve.target * 100).toFixed(0)}% — that is a target to move, not
+            a deck to fix.
+          </>}
+        </p>
+        {a.beyond_the_curve && (
+          <p className="mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+            <strong>You asked for more mana than the turn number.</strong> A
+            land cannot help with that — you may only play one a turn, so a
+            fifth land does nothing on turn four. This is precisely what ramp
+            is for.
+          </p>
+        )}
+        {a.ramp_is_generic && (
+          <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            This deck runs no acceleration, so the comparison uses a plain
+            two-mana rock as a stand-in.
+          </p>
+        )}
+      </div>
+
+      {/* Lands and ramp stacked, so where the mana comes from is the shape of
+          the bar rather than a second number to cross-reference. */}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[28rem] border-collapse text-xs">
+          <thead>
+            <tr style={{ color: 'var(--text-muted)' }}>
+              <th className="px-2 py-1 text-left font-medium">Turn</th>
+              <th className="px-2 py-1 text-left font-medium">Where the mana comes from</th>
+              <th className="px-2 py-1 text-right font-medium">Expected</th>
+              <th className="px-2 py-1 text-right font-medium">On curve</th>
+              <th className="px-2 py-1 text-right font-medium">All drops</th>
+            </tr>
+          </thead>
+          <tbody>
+            {curve.turns.map((t) => (
+              <tr key={t.turn}
+                  style={{ fontWeight: t.turn === a.target_turn ? 600 : undefined }}>
+                <td className="px-2 py-1">T{t.turn}</td>
+                <td className="px-2 py-1">
+                  <div className="flex h-3 overflow-hidden rounded-sm"
+                       style={{ background: 'var(--gridline)' }}
+                       title={`${t.from_lands.toFixed(2)} from lands, `
+                            + `${t.from_ramp.toFixed(2)} from ramp`}>
+                    <div style={{ width: `${(t.from_lands / peak) * 100}%`,
+                                  background: 'var(--vine)' }} />
+                    <div style={{ width: `${(t.from_ramp / peak) * 100}%`,
+                                  background: 'var(--heat-ink)' }} />
+                  </div>
+                </td>
+                <td className="px-2 py-1 text-right tabular-nums">
+                  {t.expected_mana.toFixed(2)}
+                </td>
+                <td className="px-2 py-1 text-right tabular-nums">
+                  {(t.odds * 100).toFixed(0)}%
+                </td>
+                <td className="px-2 py-1 text-right tabular-nums"
+                    style={{ color: 'var(--text-muted)' }}>
+                  {(t.land_drop_odds * 100).toFixed(0)}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+        <span style={{ color: 'var(--vine)' }}>■</span> lands{' '}
+        <span style={{ color: 'var(--heat-ink)' }}>■</span> ramp.{' '}
+        <strong>“All drops”</strong> is the chance of making a land drop every
+        single turn up to that point, and it is the answer to the question
+        everybody asks first
+        {a.lands_for_every_drop !== null && <>
+          {' '}— to get it to {(curve.target * 100).toFixed(0)}% on turn{' '}
+          {a.target_turn} you would need{' '}
+          <strong>{a.lands_for_every_drop} lands</strong>, which is why that is
+          not the question worth asking
+        </>}.
+      </p>
+    </section>
   )
 }

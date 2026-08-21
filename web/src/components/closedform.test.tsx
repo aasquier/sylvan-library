@@ -19,10 +19,14 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { DeckCheck, PolicyResult, ShelfResult } from '../lib/api'
+import type {
+  DeckCheck, ManaCurve, PolicyResult, ShelfResult,
+} from '../lib/api'
 import { resetGlossaryCache } from '../lib/glossary'
 import { heatPercent } from '../lib/heat'
-import { ClosedForm, DeckVerdict, PolicyReport } from './closedform'
+import {
+  ClosedForm, DeckVerdict, ManaCurvePanel, PolicyReport,
+} from './closedform'
 
 vi.mock('../lib/api', async () => {
   const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api')
@@ -309,5 +313,80 @@ describe('the deck verdict', () => {
       errors: [{ code: 'banned', message: 'nope', card: 'A' }],
     })} />)
     expect(screen.getByText(/and 19 more/)).toBeTruthy()
+  })
+})
+
+function curveOf(over: Partial<ManaCurve['advice']> = {},
+                 top: Partial<ManaCurve> = {}): ManaCurve {
+  return {
+    deck_size: 99, lands: 34, accelerants: 12,
+    target_turn: 4, target_mana: 4, target: 0.9,
+    turns: Array.from({ length: 10 }, (_, i) => ({
+      turn: i + 1, from_lands: i + 1, from_ramp: i * 0.3,
+      expected_mana: i + 1 + i * 0.3,
+      land_drop_odds: 0.9 - i * 0.08, odds: 0.85 - i * 0.05,
+    })),
+    advice: {
+      target_turn: 4, target_mana: 4, odds: 0.71,
+      odds_per_land: 0.73, odds_per_ramp: 0.73,
+      recommend: 'either', slots: 13, ramp_is_generic: false,
+      beyond_the_curve: false, lands_for_every_drop: 54,
+      ...over,
+    },
+    caveat: 'these odds assume you keep your opening seven',
+    ...top,
+  }
+}
+
+describe('the mana curve', () => {
+  it('says add ramp, in words, when the server says ramp', () => {
+    render(<ManaCurvePanel curve={curveOf({ recommend: 'ramp',
+                                            beyond_the_curve: true })} />)
+    expect(screen.getByText('Add ramp, not lands.')).toBeTruthy()
+  })
+
+  it('explains why a land cannot help past the curve', () => {
+    // The rule the whole feature teaches: you may play one land a turn, so a
+    // fifth land does nothing on turn four. Left unsaid, the recommendation
+    // reads as an opinion instead of arithmetic.
+    render(<ManaCurvePanel curve={curveOf({ recommend: 'ramp',
+                                            target_mana: 6,
+                                            beyond_the_curve: true })} />)
+    expect(screen.getByText(/more mana than the turn number/)).toBeTruthy()
+    expect(screen.getByText(/fifth land does nothing/)).toBeTruthy()
+  })
+
+  it('stays quiet about the cap when the target is on curve', () => {
+    render(<ManaCurvePanel curve={curveOf({ beyond_the_curve: false })} />)
+    expect(screen.queryByText(/more mana than the turn number/)).toBeNull()
+  })
+
+  it('reports a tie as a tie rather than picking one', () => {
+    render(<ManaCurvePanel curve={curveOf({ recommend: 'either' })} />)
+    expect(screen.getByText(/they buy the same thing here/)).toBeTruthy()
+  })
+
+  it('congratulates rather than advising when the target is already met', () => {
+    render(<ManaCurvePanel curve={curveOf({ recommend: 'none', slots: 0 })} />)
+    expect(screen.getByText(/often enough/)).toBeTruthy()
+  })
+
+  it('says a target is unreachable instead of printing a slot count', () => {
+    render(<ManaCurvePanel curve={curveOf({ recommend: 'ramp', slots: null })} />)
+    expect(screen.getByText(/a target to move, not a deck to fix/)).toBeTruthy()
+  })
+
+  it('admits when the ramp comparison is a stand-in', () => {
+    render(<ManaCurvePanel curve={curveOf({ ramp_is_generic: true })} />)
+    expect(screen.getByText(/stand-in/)).toBeTruthy()
+  })
+
+  it('shows the absurd land count, because that is the point of it', () => {
+    // 54 lands is the answer to "a land drop every turn", and the panel
+    // carries it to talk the reader out of the question rather than to
+    // recommend it.
+    render(<ManaCurvePanel curve={curveOf()} />)
+    expect(screen.getByText(/54 lands/)).toBeTruthy()
+    expect(screen.getByText(/not the question worth asking/)).toBeTruthy()
   })
 })

@@ -37,13 +37,19 @@ from mtglab.api.simruns import (
 )
 from mtglab.decks.model import Deck
 from mtglab.decks.source import DeckSource
-from mtglab.sim import cache, karsten, mulligan
+from mtglab.sim import cache, curve, karsten, mulligan
 from mtglab.sim.tier1.engine import KeepRule, SimCard
 
 SHELF_CAVEAT = (
     "The closed form asks whether the mana would be there, assuming the card "
     "is in your hand. It does not ask whether you drew it, and it cannot see "
     "ramp. Read it beside the simulation, not instead of it."
+)
+
+CURVE_CAVEAT = (
+    "These odds assume you keep your opening seven. Mulliganing digs for "
+    "lands, and against Tier 1 it is worth about six points at turn four on "
+    "these decks — so read a slot count as the pessimistic end."
 )
 
 POLICY_CAVEAT = (
@@ -93,11 +99,22 @@ def shelf_result(slug: str, payload: dict[str, Any], *,
     on_the_play = bool(payload.get("on_the_play", True))
     target = float(payload.get("target", karsten.TARGET))
     target = max(0.5, min(target, 0.99))
+    target_turn = int(payload.get("target_turn", curve.DEFAULT_TARGET_TURN))
+    raw_mana = payload.get("target_mana")
+    target_mana = None if raw_mana in (None, "") else int(raw_mana)
 
     deck, report, check = _compile_checked(slug, source=source)
     computed = karsten.shelf(report.library, report.commander, target=target,
                              on_the_play=on_the_play)
-    return dict(_shelf_payload(slug, deck, computed), deck_check=check)
+    # The curve rides on the shelf rather than on a route of its own: it is
+    # the same arithmetic over the same compiled deck, it costs about as much
+    # as the shelf does, and a second round trip for a second closed form
+    # would be two spinners where the page needs none.
+    mana = curve.curve(report.library, target_turn=target_turn,
+                       target_mana=target_mana, target=target,
+                       on_the_play=on_the_play)
+    return dict(_shelf_payload(slug, deck, computed),
+                deck_check=check, mana_curve=_curve_payload(mana))
 
 
 def _shelf_payload(slug: str, deck: Deck,
@@ -136,6 +153,50 @@ def _shelf_payload(slug: str, deck: Deck,
         ],
         "approximated": list(computed.approximated),
         "caveat": SHELF_CAVEAT,
+    }
+
+
+def _curve_payload(mc: curve.ManaCurve) -> dict[str, Any]:
+    """The mana curve, shaped for a screen.
+
+    `advice.recommend` is the server's verdict and the client must not
+    re-derive it. The rule behind it -- lands up to the curve, ramp past it --
+    is arithmetic the client has no business re-implementing, and a second
+    copy in TypeScript would be a second chance to get its *direction* wrong,
+    which is the one error nobody would spot from a screenshot.
+    """
+    a = mc.advice
+    return {
+        "deck_size": mc.deck_size,
+        "lands": mc.lands,
+        "accelerants": mc.accelerants,
+        "target_turn": mc.target_turn,
+        "target_mana": mc.target_mana,
+        "target": mc.target,
+        "turns": [
+            {
+                "turn": t.turn,
+                "from_lands": round(t.from_lands, 2),
+                "from_ramp": round(t.from_ramp, 2),
+                "expected_mana": round(t.expected_mana, 2),
+                "land_drop_odds": round(t.land_drop_odds, 4),
+                "odds": round(t.odds, 4),
+            }
+            for t in mc.turns
+        ],
+        "advice": {
+            "target_turn": a.target_turn,
+            "target_mana": a.target_mana,
+            "odds": a.odds,
+            "odds_per_land": a.odds_per_land,
+            "odds_per_ramp": a.odds_per_ramp,
+            "recommend": a.recommend,
+            "slots": a.slots,
+            "ramp_is_generic": a.ramp_is_generic,
+            "beyond_the_curve": a.beyond_the_curve,
+            "lands_for_every_drop": a.lands_for_every_drop,
+        },
+        "caveat": CURVE_CAVEAT,
     }
 
 

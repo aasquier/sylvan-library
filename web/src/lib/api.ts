@@ -401,6 +401,54 @@ export interface DeckCheck {
   simulated_size: number
 }
 
+/** One turn of the mana curve. */
+export interface CurveTurnRow {
+  turn: number
+  from_lands: number
+  from_ramp: number
+  expected_mana: number
+  /** P(a land available every turn up to and including this one). */
+  land_drop_odds: number
+  /** P(at least `turn` mana on `turn`). The headline. */
+  odds: number
+}
+
+/** What to add, and which kind.
+ *
+ * `recommend` is the server's verdict and must not be re-derived here. The
+ * rule behind it — lands up to the curve, ramp past it — is arithmetic, and a
+ * second copy in TypeScript would be a second chance to get its *direction*
+ * wrong, which is the one error nobody spots from a screenshot.
+ */
+export interface CurveAdvice {
+  target_turn: number
+  target_mana: number
+  odds: number
+  odds_per_land: number
+  odds_per_ramp: number
+  recommend: 'lands' | 'ramp' | 'either' | 'none'
+  slots: number | null
+  ramp_is_generic: boolean
+  /** True when the mana target exceeds the turn — where a land is worth
+   *  nothing at all and only ramp can help. */
+  beyond_the_curve: boolean
+  /** Lands that would make every land drop through the target turn. Almost
+   *  always absurd, and carried for exactly that reason. */
+  lands_for_every_drop: number | null
+}
+
+export interface ManaCurve {
+  deck_size: number
+  lands: number
+  accelerants: number
+  target_turn: number
+  target_mana: number
+  target: number
+  turns: CurveTurnRow[]
+  advice: CurveAdvice
+  caveat: string
+}
+
 /** Tier 1.5, the closed form. One rung of a colour's ladder.
  *
  * A colour is reported as a ladder of these rather than as one verdict: a
@@ -460,6 +508,7 @@ export interface LandEstimate {
  *  nothing to be cached-and-stale about. */
 export interface ShelfResult {
   deck_check?: DeckCheck
+  mana_curve?: ManaCurve
   slug: string
   deck_name: string
   deck_size: number

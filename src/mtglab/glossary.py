@@ -542,6 +542,39 @@ TERMS: tuple[Term, ...] = (
         "this cannot; read them together.",
         "simulator", ("stat.argmax_lands", "flood", "tier-1.5")),
     Term(
+        "stat.mana_curve", "The mana curve",
+        "Whether you have the mana you want on the turn you want it, and "
+        "whether lands or acceleration is the way to get there.",
+        "Two things decide it, and the second surprises people. Up to the "
+        "turn number, lands are the most reliable answer there is: a land is "
+        "one mana, it needs no casting, and you may play one every turn. Past "
+        "the turn number a land is worth nothing at all — you cannot play a "
+        "fifth one on turn four — so acceleration is the only thing that can "
+        "help. That is why this asks how much mana you want as well as when.",
+        "simulator", ("sim.target_turn", "sim.target_mana", "tier-1.5",
+                      "ramp")),
+    Term(
+        "sim.target_turn", "Target turn",
+        "The turn you are building toward. Everything else on this panel is "
+        "measured against it.",
+        "A cut-throat deck is trying to do something on turn two and a "
+        "battlecruiser deck on turn six, and the right mana base is a "
+        "different shape for each — so this is a dial rather than an "
+        "assumption. Moving it later makes every target easier, because you "
+        "have seen more cards and played more lands by then.",
+        "simulator", ("stat.mana_curve", "sim.target_mana")),
+    Term(
+        "sim.target_mana", "Mana wanted",
+        "How much mana you want available on the target turn. Set it above "
+        "the turn number to ask what acceleration buys you.",
+        "Left equal to the turn, this is the ordinary on-curve question and "
+        "lands answer it best. Raised above the turn, it becomes a question "
+        "only acceleration can answer, because the one-land-per-turn rule "
+        "caps what lands alone can ever give you. Watching the "
+        "recommendation flip as you raise it is the clearest way to see what "
+        "ramp is actually for.",
+        "simulator", ("stat.mana_curve", "sim.target_turn", "ramp")),
+    Term(
         "stat.policy_gain", "Policy gain",
         "Extra spells deployed through turn 8 by the best mulligan rule, "
         "against the one the simulator uses by default.",
