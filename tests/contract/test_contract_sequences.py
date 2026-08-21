@@ -368,4 +368,8 @@ def test_admin_sequence(instance, goldens):
     for name in ("system", "storage", "claude", "activity", "traffic", "fly"):
         r = _expect(client.get(f"/api/admin/stats/{name}"), (200, 503),
                     f"stats/{name}")
-        goldens.check(g, f"stats-{name}", observed(r))
+        # `memory.available_bytes` is read from /proc/meminfo, which a Mac
+        # has not got: null here, a number on CI and on the instance. Present
+        # is the contract; the kind is the platform's.
+        goldens.check(g, f"stats-{name}",
+                      observed(r, volatile=("available_bytes",)))

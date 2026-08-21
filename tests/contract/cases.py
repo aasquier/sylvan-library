@@ -51,13 +51,15 @@ JOB_VOLATILE = ("status", "done", "total", "percent", "partial", "result",
 NO_ORACLE = "0aae2e33-0000-4000-8000-000000000000"
 
 
-def _first_bundle_asset() -> str:
+def _first_bundle_asset(extension: str = "js") -> str:
     """One file of the committed bundle, so the static mount is pinned by a
     path that exists -- the hashed filename changes with every rebuild, the
-    record's name does not."""
+    record's name does not. The JS and the WOFF2 are the two whose content
+    type turned out to depend on the host until `api/app.py` registered
+    them, which is why both are pinned."""
     from mtglab.api.app import WEB_DIST
-    assets = sorted(p.name for p in (WEB_DIST / "assets").glob("*.js"))
-    return assets[0] if assets else "index.js"
+    assets = sorted(p.name for p in (WEB_DIST / "assets").glob(f"*.{extension}"))
+    return assets[0] if assets else f"index.{extension}"
 
 
 @dataclass(frozen=True)
@@ -146,6 +148,8 @@ def _reads() -> tuple[Case, ...]:
         Case(r, "spa-client-route", "GET", f"/decks/{DECK_OWNER}/{DECK_SLUG}",
              user=None),
         Case(r, "spa-asset", "GET", f"/assets/{_first_bundle_asset()}",
+             user=None),
+        Case(r, "spa-font", "GET", f"/assets/{_first_bundle_asset('woff2')}",
              user=None),
         Case(r, "tarot-asset", "GET", "/tarot/00-fool.webp", user=None),
         Case(r, "api-unknown-anonymous", "GET", "/api/no-such-route",

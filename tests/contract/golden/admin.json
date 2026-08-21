@@ -189,7 +189,7 @@
         "number"
       ],
       "memory": {
-        "available_bytes": "null",
+        "available_bytes": "*",
         "total_bytes": "number"
       },
       "process": {
