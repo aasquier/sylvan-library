@@ -168,3 +168,28 @@ that polls every 30 s. And the **RSS during a Tier 1 run** was not taken:
 it needs a signed-in request on the instance and the harness holds no
 credentials there; the measurement belongs with Phase 5, where the GIL
 dividend is measured on the same machine anyway.
+
+## 2026-08-21, later still — the pair, deployed (Phase 2, release v156)
+
+The first "during" block rather than a "before" one: the Go front door in
+front of the Python server, as the container has run since PR #220 merged
+(22:27 UTC; v156 live 22:33). Read the same way as the block above — the
+registry manifest via `fly image show`, and `/proc` on the instance over
+`fly ssh console` with a base64'd script, since the image has no `ps` — a
+few minutes after the release, with nothing restarted to get them. The
+interim is larger than the outcome, as PLAN §4 said it would be.
+
+| Metric | Measured | How |
+| --- | ---: | --- |
+| App image (flyctl's figure) | **347 MB** | `fly image show`; ~325 MB before — +22 MB, the 11.3 MB static door binary among it and a `golang` build stage that ships nothing |
+| Idle RSS, the door | **31.6 MB** (8 threads) | `/proc/<pid>/status` of `/opt/door/mtglab`, uid 10001, the container's pid 652 |
+| Idle RSS, the Python server behind it | **104 MB** (VmHWM 105.6 MB) | same, the supervised child |
+| Idle RSS, the pair | **≈136 MB** | the two above, against 127 MB for Python alone in the block above |
+| Merge → release live | **≈6 min** | 22:27 → 22:33 (the PR's CI had already run; main's run re-ran the five and deployed) |
+| Pool on the instance at the read | 35,393 oracle cards, 7 decks | `/api/health` through the door |
+
+Two notes. Fly's edge compresses door-served assets (`app.js` arrived
+`content-encoding: gzip` from a door that sends no gzip of its own), so the
+door carries no compressor for the duration. And the door's RSS is the
+reference-prose-free Phase 2 binary; Phase 3 embeds ~230 KB of JSON and,
+with the pool, links libduckdb — the next block measures that.

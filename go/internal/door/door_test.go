@@ -15,7 +15,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aasquier/sylvan-library/go/internal/api"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/reference"
 	"github.com/aasquier/sylvan-library/go/internal/routes"
 )
 
@@ -554,5 +556,142 @@ func TestTheRealResolverReadsAppDB(t *testing.T) {
 	}
 	if resp := get(t, srv, "GET", "/api/decks", "nobody"); resp.StatusCode != 401 {
 		t.Fatalf("an unknown token answered %d", resp.StatusCode)
+	}
+}
+
+// ------------------------------------------------------- the ported routes
+
+func TestAPortedRouteIsAnsweredByTheDoorAndNotTheUpstream(t *testing.T) {
+	srv := build(t, true, fakeResolver{})
+	for path, want := range map[string][]byte{
+		"/api/colors":   reference.ColorsJSON(),
+		"/api/glossary": reference.GlossaryJSON(),
+		"/api/themes":   reference.ThemesJSON(),
+	} {
+		resp := get(t, srv, "GET", path, "alice")
+		if resp.StatusCode != 200 {
+			t.Fatalf("%s answered %d", path, resp.StatusCode)
+		}
+		if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
+			t.Fatalf("%s: content-type %q", path, ct)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if string(body) != string(want) {
+			t.Fatalf("%s: the door did not answer the embedded payload (got %d bytes, want %d)", path, len(body), len(want))
+		}
+		// The echo upstream would have answered with a `path` key; this is
+		// the door's own answer, and it carries the hardening headers.
+		if resp.Header.Get("X-Content-Type-Options") != "nosniff" {
+			t.Fatalf("%s: no security headers on a door-served route", path)
+		}
+		// And it is still behind the middleware: anonymous is refused.
+		if anon := get(t, srv, "GET", path, ""); anon.StatusCode != 401 {
+			t.Fatalf("%s answered %d to anonymous", path, anon.StatusCode)
+		}
+	}
+}
+
+func TestOnlyACanonicalRequestIsTheDoors(t *testing.T) {
+	// Everything that is not exactly `GET /api/glossary` goes to Python as
+	// it arrived: another method (Python answers its 405), a HEAD, a doubled
+	// or trailing slash, a dotted segment, an escaped slash. `routes.go`
+	// argues each of these; the echo upstream makes them visible.
+	srv := build(t, true, fakeResolver{})
+	proxied := []struct{ method, path string }{
+		{"POST", "/api/glossary"}, {"HEAD", "/api/glossary"}, {"DELETE", "/api/themes"},
+		{"GET", "//api/glossary"}, {"GET", "/api/glossary/"}, {"GET", "/api/./glossary"},
+		{"GET", "/api/x/../glossary"}, {"GET", "/api/glossary%2F"}, {"GET", "/api/colors/G"},
+	}
+	for _, c := range proxied {
+		resp := get(t, srv, c.method, c.path, "alice")
+		if c.method == "HEAD" {
+			if resp.StatusCode != 200 {
+				t.Errorf("HEAD %s: %d", c.path, resp.StatusCode)
+			}
+			continue
+		}
+		var echo map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&echo); err != nil || echo["path"] == nil {
+			t.Errorf("%s %s was not proxied (status %d, echo %v)", c.method, c.path, resp.StatusCode, echo)
+		}
+	}
+}
+
+func TestEveryPortedRouteIsInTheSharedTable(t *testing.T) {
+	// A Go-only /api route would be a ghost to `tests/test_isolation.py`,
+	// which requires every classified route to exist in FastAPI's table; so
+	// the door may only answer paths `routes.json` already knows, under the
+	// template it knows them by.
+	table, err := routes.Load(routes.DefaultPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	known := map[string]bool{}
+	for _, p := range table.Every() {
+		known[p] = true
+	}
+	compiled, err := newRouteTable(api.New(api.Config{}).Routes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range compiled.Patterns() {
+		_, pattern, _ := strings.Cut(entry, " ")
+		if !known[pattern] {
+			t.Errorf("the door serves %s, which tests/contract/routes.json does not classify", entry)
+		}
+	}
+}
+
+func TestTheRouteTableRefusesAnAmbiguousPair(t *testing.T) {
+	h := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	if _, err := newRouteTable([]api.Route{
+		{Method: "GET", Pattern: "/api/colors/{key}", Handler: h},
+		{Method: "GET", Pattern: "/api/colors/progress", Handler: h},
+	}); err == nil {
+		t.Fatal("a literal and a parameter in the same slot were accepted; FastAPI resolves that by declaration order and this table must not have to")
+	}
+	for _, bad := range []api.Route{
+		{Method: "GET", Pattern: "/not/api", Handler: h},
+		{Method: "GET", Pattern: "/api/x/", Handler: h},
+		{Method: "GET", Pattern: "/api/{}", Handler: h},
+		{Method: "GET", Pattern: "/api/{half", Handler: h},
+		{Method: "GET", Pattern: "/api/ok"},
+	} {
+		if _, err := newRouteTable([]api.Route{bad}); err == nil {
+			t.Errorf("accepted %+v", bad)
+		}
+	}
+	// Different methods on one shape are fine: that is the coexistence case.
+	if _, err := newRouteTable([]api.Route{
+		{Method: "GET", Pattern: "/api/decks/{owner}/{slug}", Handler: h},
+		{Method: "PATCH", Pattern: "/api/decks/{owner}/{slug}", Handler: h},
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPathValuesReachTheHandler(t *testing.T) {
+	var got string
+	table, err := newRouteTable([]api.Route{{Method: "GET", Pattern: "/api/decks/{owner}/{slug}/validate",
+		Handler: func(_ http.ResponseWriter, r *http.Request) {
+			got = r.PathValue("owner") + "/" + r.PathValue("slug")
+		}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest("GET", "/api/decks/local/mono-green/validate", nil)
+	h, ok := table.match(req)
+	if !ok {
+		t.Fatal("no match")
+	}
+	h.ServeHTTP(httptest.NewRecorder(), req)
+	if got != "local/mono-green" {
+		t.Fatalf("path values %q", got)
+	}
+	for _, miss := range []string{"/api/decks/local/mono-green", "/api/decks/local/mono-green/validate/",
+		"/api/decks/local//validate", "/api/decks/local/mono-green/stats"} {
+		if _, ok := table.match(httptest.NewRequest("GET", miss, nil)); ok {
+			t.Errorf("%s matched", miss)
+		}
 	}
 }

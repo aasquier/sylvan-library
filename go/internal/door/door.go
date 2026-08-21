@@ -13,9 +13,11 @@
 //  2. Serves the built frontend and the tarot pictures itself -- the shell,
 //     `/assets/*`, `/tarot/*` -- with the same content types, the same
 //     `Cache-Control: no-cache`, and the same refusals Python's mounts give.
-//  3. Proxies everything under `/api` to the Python server on loopback, and
-//     will keep doing so for a shrinking set of prefixes as the route families
-//     move across.
+//  3. Answers the routes that have moved across (`internal/api`, the port
+//     board in docs/go-migration/PLAN.md section 10) itself, and proxies
+//     everything else under `/api` to the Python server on loopback -- a
+//     shrinking set as the families move; `routes.go` is the rule for which
+//     request is whose.
 //
 // Every response the door writes itself carries the hardening headers
 // `api/app.py:security_headers` sets, so the middleware's own refusals look
@@ -29,7 +31,6 @@ package door
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -38,7 +39,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/aasquier/sylvan-library/go/internal/api"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
 // Config is what a door needs to stand.
@@ -70,6 +73,7 @@ type Door struct {
 	db       *sql.DB
 	static   *staticSite
 	proxy    http.Handler
+	table    *routeTable
 }
 
 // New builds a door. It opens `app.db` read-only when auth is required (and
@@ -98,6 +102,11 @@ func New(cfg Config) (*Door, error) {
 	}
 	d.static = site
 	d.proxy = newProxy(cfg.Upstream, cfg.Logger)
+	table, err := newRouteTable(api.New(api.Config{Logger: cfg.Logger}).Routes())
+	if err != nil {
+		return nil, err
+	}
+	d.table = table
 	return d, nil
 }
 
@@ -129,8 +138,9 @@ func (d *Door) Handler() http.Handler {
 // three things a path is. The API check is made on the *normalised* path,
 // exactly as the auth middleware and the SPA catch-all make it in Python, so
 // `//api/decks` and `/api/./decks` go to the runtime that will refuse them as
-// JSON rather than being served the shell. The static mounts match the raw
-// path, as Starlette's `Mount` does.
+// JSON rather than being served the shell. Under /api the ported routes are
+// asked first (`routes.go` says on what terms) and the proxy takes the rest.
+// The static mounts match the raw path, as Starlette's `Mount` does.
 func (d *Door) dispatch(w http.ResponseWriter, r *http.Request) {
 	raw := r.URL.Path
 	if raw == DoorHealthPath {
@@ -138,6 +148,10 @@ func (d *Door) dispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if isAPI(NormalisePath(raw)) {
+		if h, ok := d.table.match(r); ok {
+			h.ServeHTTP(w, r)
+			return
+		}
 		d.proxy.ServeHTTP(w, r)
 		return
 	}
@@ -220,17 +234,10 @@ func setDefault(h http.Header, name, value string) {
 
 // writeJSON answers in FastAPI's envelope: `application/json`, and for an
 // error a body with `detail`, which `web/src/lib/api.ts` reads off every
-// non-2xx response.
+// non-2xx response. `wire` is the one encoder for both the door's own
+// refusals and the ported routes' answers.
 func writeJSON(w http.ResponseWriter, status int, body any) {
-	raw, err := json.Marshal(body)
-	if err != nil {
-		raw = []byte(`{"detail":"internal error"}`)
-		status = http.StatusInternalServerError
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Length", fmt.Sprint(len(raw)))
-	w.WriteHeader(status)
-	_, _ = w.Write(raw)
+	wire.JSON(w, status, body)
 }
 
 // Flag reads an on/off environment variable the way `config._flag` does:
