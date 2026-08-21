@@ -189,6 +189,15 @@ USER_SCOPED = {
     # route resolves its source through `Library`, so a private deck's log is
     # a 404 for the same reason and by the same code path the deck itself is.
     "/api/decks/{owner}/{slug}/log": "item",
+    # The deliverables reach exactly as far as the deck does, both ways. The
+    # GETs are user-scoped rather than SHARED even though the artifacts are
+    # "the shareable surface": shareable means shareable *with the deck*, and
+    # a primer for a private deck names its whole 99. The POST is a deck write
+    # in every sense that matters here -- it is refused by `_for_writing`, so
+    # a stranger's build attempt raises `ReadOnlySource` (403) on a shared
+    # deck and `DeckNotFound` (404) on a private one, like every other write.
+    "/api/decks/{owner}/{slug}/artifacts": "item",
+    "/api/decks/{owner}/{slug}/artifacts/{name}": "item",
     "/api/decks/{owner}/{slug}/swap": "item",
     "/api/decks/{owner}/{slug}/cards": "item",
     "/api/decks/{owner}/{slug}/cards/{name}": "item",

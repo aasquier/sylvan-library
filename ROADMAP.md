@@ -278,15 +278,34 @@ purchase. Carts are staged for a human to confirm.
 
 ## 5. Five artifacts per deck or refactor
 
-**done** — `artifacts/generate.py`, via `mtglab decks build <slug>`:
-`primer-quick.md`, `primer-advanced.md`, `decklist-annotated.md`,
-`moxfield.txt`, and `swaps.md` when something changed.
+**done** — `artifacts/generate.py`, via `mtglab decks build <slug>` **or the
+deck page's Artifacts tab** (2026-08-21). Both call the same `render_all`, so
+the two cannot produce different files: `primer-quick.md`,
+`primer-advanced.md`, `decklist-annotated.md`, `moxfield.txt`, and `swaps.md`
+when something changed.
 
-Run for the four decks that pass the gate; Goreclaw and Atla Palani are
-blocked on their banned card. `swaps.md` is the exception — it is a diff, so
-it only appears once a deck changes against a baseline. Since ADR 30 the
-baseline is the last build's own snapshot (`artifacts/deck.last-built.yaml`)
-rather than a git revision, because decks are live app data and not in git.
+Run for the five decks that pass the gate; **only Goreclaw is blocked**, on
+Primeval Titan. This paragraph said "the four decks" and named Atla Palani for
+a banned card until 2026-08-21 — Atla runs *Emrakul, the Promised End*, which
+is legal in Commander. That is the third file to carry that error, after
+CLAUDE.md and README, and the lesson is the one already written in both: a
+sentence asserting a count is a claim to re-check against
+`mtglab decks validate`, not a fact to inherit.
+
+`swaps.md` is the exception — it is a diff, so it only appears once a deck has
+a baseline to change against. Since ADR 30 that baseline is the last build's
+own snapshot (`artifacts/deck.last-built.yaml`) rather than a git revision,
+because decks are live app data and not in git. A rebuild now **removes** a
+swap list it did not produce, which it did not until 2026-08-21.
+
+**The hosted half was the gap the `mtglab ui` ruling opened.** Once the
+deployed instance is the product and `mtglab ui` is a development harness,
+"the CLI can build it" stops being a design and becomes a missing feature:
+refreshing the library's artifacts meant `fly ssh console`. Three routes and a
+tab close it, as a **plain route** — 70-83ms measured on the instance, under
+what a job's submit and poll would cost. It also answers what nothing could
+ask before: whether a deck's artifacts still match the deck. Every one on the
+volume was eight days stale when the tab was built.
 
 ## 6. Scan upcoming sets against curated decks
 

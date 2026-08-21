@@ -662,6 +662,40 @@ export interface DeckLog {
   entries: DeckLogEntry[]
 }
 
+/** One generated deliverable, as the library holds it. */
+export interface DeckArtifact {
+  name: string
+  /** Bytes, not characters. */
+  size: number
+  /** ISO-8601 UTC — the store's own timestamp, so it can be compared to
+   *  anything else about the deck. */
+  built_at: string
+}
+
+/** What a deck has been built into, and whether that is still true.
+ *
+ * `baseline` is the field this whole surface exists for. Three states rather
+ * than a `stale` boolean because the third one is honest and a boolean would
+ * have to lie about it: a deck built before ADR 30's snapshot mechanism has
+ * artifacts and no baseline, so nothing can say whether they match. Every
+ * artifact on the volume was in exactly that position on 2026-08-21.
+ *
+ * Never recomputed here. The server compares the stored snapshot against the
+ * deck and this renders the answer — the readout rule the stance dial and the
+ * labels editor already follow, for the same reason: a second copy of the
+ * comparison in TypeScript would disagree with the Python one silently.
+ */
+export interface DeckArtifacts {
+  artifacts: DeckArtifact[]
+  baseline: 'current' | 'different' | 'unknown'
+  /** False for a draft: ADR 13 keeps the artifacts shut until promotion. */
+  buildable: boolean
+  stage: string
+  /** Present only on a build's own response. */
+  issues?: ValidationReport
+  forced?: boolean
+}
+
 /** What Claude made of one photographed card (ADR 34).
  *
  * `transcribed` is what it actually read off the card — carried beside the
@@ -1948,6 +1982,20 @@ export const api = {
   // the same 404.
   deckLog: (ref: DeckRef, limit?: number) =>
     get<DeckLog>(deckPath(ref, `/log${limit ? `?limit=${limit}` : ''}`)),
+  // The five deliverables (rule 3). Reading follows the deck — they are the
+  // shareable surface — and building is a deck write like any other, so a
+  // reader gets the list and a 403 on the POST.
+  deckArtifacts: (ref: DeckRef) =>
+    get<DeckArtifacts>(deckPath(ref, '/artifacts')),
+  deckArtifact: (ref: DeckRef, name: string) =>
+    get<{ name: string; text: string }>(
+      deckPath(ref, `/artifacts/${encodeURIComponent(name)}`)),
+  /** Regenerate them. A plain POST rather than a job: measured at 70-83ms on
+   *  the instance, which is under what a submit and a poll would cost.
+   *  `force` overrides the gate's errors only — a draft is refused outright
+   *  and no flag here reaches it. */
+  buildArtifacts: (ref: DeckRef, force = false) =>
+    post<DeckArtifacts>(deckPath(ref, '/artifacts'), force ? { force } : {}),
   upcomingSets: () => get<{ sets: UpcomingSet[]; as_of: string }>('/api/sets/upcoming'),
   searchCards: (params: Record<string, string | number>) => {
     const qs = new URLSearchParams()

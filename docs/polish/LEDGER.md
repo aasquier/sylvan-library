@@ -3333,8 +3333,15 @@ instruction that a blank stays queued.
   lost. This is the general lesson and it is not about this file: **a
   documentation move is a change to a citation graph, and in this repo part
   of that graph is immutable.**
-- **3 — unmarked, stays queued.** CLAUDE.md's Workflow section still does not
-  say that a local `decks import` writes a scratch deck.
+- **3 — ruled and done.** CLAUDE.md's Workflow section now says it: a local
+  `decks import` writes a **scratch deck, never a library entry**, because
+  `decks/` in a checkout is the gitignored data directory and the library is
+  the volume. The paragraph names what the local import is *for* (rehearsing
+  an import, asking the gate about a list, driving the UI against something
+  disposable) rather than only forbidding it, and points at
+  `POST /api/decks/import` — the instance route the app's import screen
+  drives, running the same `service.import_deck` the CLI does — as how a deck
+  actually joins the library.
 - **4 — dev harness plus contributor engine.** README no longer sells
   `mtglab ui` as "the app": the deployed instance is the product, and
   `mtglab ui` is named as the development harness (commandment 16's walking
@@ -3351,15 +3358,94 @@ instruction that a blank stays queued.
   were touched, and the scratch extraction was wiped afterwards because it
   held real account data. **The tarball itself is not deleted** — disposal of
   personal data stays Aaron's hand on the key.
-- **6 — unmarked, stays queued, and the evidence was wrong.** The directory
-  is **not empty**: it holds `node_modules/.vite/vitest/`, a stray Vitest
-  cache. The sweep that queued it used `ls` without `-a`, so a dotfile hid
-  from it and "empty, one `rmdir` to clear" was never true — it is `rm -rf`.
-  Two things worth keeping. **A sweep that reads a directory must read the
-  hidden entries too**, which is the same class as the completeness claims
-  this ledger keeps catching, one layer down in the tooling. And the stray
-  cache says some Vitest invocation ran from the repo root rather than under
-  `web/`, which is the actual defect the empty directory was a symptom of.
+- **6 — ruled and done, and the chase found something worth more than the
+  directory.** `rm -rf` cleared it, as the corrected evidence required. The
+  sweep that queued it used `ls` without `-a`, so a dotfile hid from it and
+  "empty, one `rmdir` to clear" was never true — **a sweep that reads a
+  directory must read the hidden entries too**, the same class as the
+  completeness claims this ledger keeps catching, one layer down in the
+  tooling.
+
+  Then the actual defect, reproduced 2026-08-21 rather than reasoned about.
+  Running the vitest binary with the **repo root** as cwd
+  (`./web/node_modules/.bin/vitest run web/src/...`) recreates that cache at
+  byte-identical path and key, and vitest announces its root as the
+  repository rather than `web/`. The key is the tell: `da39a3ee…` is the
+  SHA-1 of the empty string, i.e. **no config file was found**. So such a run
+  silently discards every setting in `web/vitest.config.ts` — `jsdom`,
+  `setupFiles`, `pool: 'threads'`, and `testTimeout` reverting from 20 000ms
+  to vitest's 5 000ms default.
+
+  **That last one manufactures the flake it then gets blamed for.** The
+  raised timeout is the *containment* for the intermittent failures recorded
+  on main and on branches, argued in that config from a measured p95 of
+  1 270ms and a slowest single test of 5 804ms — past the default on its own.
+  A root-cwd run puts the bound back below the known worst case.
+
+  The stale cache corroborates it exactly. Its frozen record is four failures
+  and two passes, and the split is not random: the four are component files
+  (`theme`, `Import`, `DeckDetail`, `closedform`) and the two are pure logic
+  (`cardframe`, `reader`). Driving one component file from the root reproduces
+  the reason — `ReferenceError: document is not defined`, no jsdom. Six for
+  six.
+
+  Two acquittals, both checked rather than assumed. **`npm --prefix web run
+  test` is innocent**: it runs with root `…/web` and creates no stray cache,
+  so the documented command in CLAUDE.md and CONTRIBUTING is correct as
+  written. **CI is innocent**: every web step in `ci.yml` sets
+  `working-directory: web`. The culprit is an ad-hoc invocation from the
+  repository root, which nothing in the repo tells anyone to make. The
+  general lesson: **a green or red vitest result is only about this suite if
+  vitest found this suite's config**, and the cheapest check is the root path
+  it prints on the `RUN` line.
+
+**The hosted-first gap item 4 named is closed** (2026-08-21, the same day it
+became one). `mtglab decks build` had no API route, which was CLI territory by
+design until the `mtglab ui` ruling made the deployed instance the product;
+after it, rebuilding the library's artifacts meant `fly ssh console`. Three
+routes on `/api/decks/{owner}/{slug}/artifacts` and an Artifacts tab on the
+deck page close it. Four things are worth keeping from the build.
+
+**It is a plain route, and that was measured rather than argued from
+precedent.** The sibling-duration rule has put four surfaces into jobs; asked
+here it answered the other way. Timed on the instance itself against four real
+decks — load, pool, gate and render — the warm cost is **70-83ms**, the
+shelf's order of magnitude, where a submit and a poll cost more than the work.
+The 1.5s a cold `mtglab decks build` takes is almost entirely interpreter
+start-up, which a served process has already paid. **Measuring is what
+distinguishes a sibling that needs a job from one that does not**, and the
+1.5s figure is exactly the number that would have bought a job nobody needed.
+
+**The feature's real product was a question nobody could ask.** Every artifact
+on the volume was **eight days older than its deck** and nothing in the app
+could say so. `baseline` is that answer, and it has **three states, not a
+`stale` boolean** — `current`, `different`, `unknown` — because the third is
+honest: a deck built before ADR 30's snapshot mechanism has artifacts and no
+baseline, so nothing can say whether they match, and every deck on the volume
+was in exactly that position. It compares the stored snapshot against the deck
+rather than file timestamps, which is why reverting an edit correctly returns
+the artifacts to `current`.
+
+**A parity test across the deck sources found a bug that predated the
+feature.** A build with no baseline writes no `swaps.md`, and a rebuild used to
+leave the *previous* build's swap list in place — describing a diff that no
+longer exists, and indistinguishable from a current one. The memory tier
+replaced the artifact set and the file tier merged into it; only one could be
+right, and `mtglab decks build` had been merging since it was written. Fixed in
+the one place both now share (`generate.store`). **Two implementations of one
+protocol are a differential test nobody wrote down**, and this is the second
+thing that came out of pointing them at each other.
+
+**And the protocol had four implementations, not two.** `SqlDeckSource` and
+`_SharedOnly` were invisible to the whole test suite and to `source.py`'s own
+docstring ("today there is exactly one answer"); **mypy is what found them**,
+not a failing test, because a protocol gap is a type error before it is a
+runtime one. The SQL tier's shelf is schema **12**, `user_deck_artifacts` —
+the most disposable table in `app.db`, since every row is derived from a
+`user_decks.yaml` still sitting beside it, which is why it carries no history.
+Its `write_artifacts` needed the explicit `con.commit()` every other write in
+that module makes; without it the writes did not fail, they **discarded**,
+which reads exactly like a build that produced nothing.
 
 **Found while acting on 4, and fixed on the same branch: README's Status
 section had drifted past its quickstart.** The Blue entry above scoped the

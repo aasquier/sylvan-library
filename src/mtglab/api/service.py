@@ -17,6 +17,8 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+import yaml
+
 from mtglab import caches, colors, config, lore
 from mtglab import glossary as gloss
 from mtglab.cards import db, identify
@@ -1861,6 +1863,14 @@ class SwapRejected(EditRejected):
     """The swap was refused, and nothing was written."""
 
 
+class BuildRejected(Exception):
+    """Artifacts were refused, and nothing was written.
+
+    Not an `EditRejected`: a build does not touch `deck.yaml`, so a refusal
+    here has not prevented an edit and must not be reported as though it had.
+    """
+
+
 def _issues(report: ValidationReport) -> dict[str, list[dict[str, Any]]]:
     """The gate's verdict, flattened for JSON."""
     return {
@@ -2773,3 +2783,144 @@ def upcoming_sets(*, force: bool = False) -> dict[str, Any]:
     data = {"sets": sorted(out, key=lambda s: s["released_at"]), "as_of": today}
     _SETS_CACHE.update(day=today, data=data)
     return data
+
+
+# ------------------------------------------------------------------ artifacts
+
+#: How a build's output compares to the deck as it stands now. Three states
+#: rather than a `stale` boolean, because the honest third answer exists and a
+#: boolean would have to lie about it: a deck built before ADR 30's snapshot
+#: mechanism has artifacts and no baseline, so nothing can say whether they
+#: match. Every deck on the volume was in exactly that position on 2026-08-21.
+BASELINE_STATES = ("current", "different", "unknown")
+
+#: What a corrupt snapshot can raise on the way through `Deck.from_text`.
+#: Named rather than caught blind, so a genuine bug in the parser surfaces as
+#: a 500 instead of being quietly reported as "no baseline" -- which would be
+#: the same shape of silence the stale-artifact problem already was.
+_UNPARSEABLE = (yaml.YAMLError, AttributeError, TypeError, ValueError)
+
+
+def _baseline_state(deck: Deck, baseline: str | None) -> str:
+    """Compare this deck against the snapshot the last build stashed.
+
+    A normalised `dump()` on both sides rather than a text diff, for the reason
+    `SNAPSHOT` is a dump in the first place: the question is whether the deck
+    changed, and a reflowed comment is not a change. This is the same
+    comparison `swap_list` makes, asked as a yes/no.
+    """
+    if baseline is None:
+        return "unknown"
+    try:
+        previous = Deck.from_text(baseline, slug=deck.slug)
+    except _UNPARSEABLE:
+        # A snapshot that will not parse is a baseline that cannot answer.
+        # Not an error: the next build simply overwrites it.
+        return "unknown"
+    return "current" if previous.dump() == deck.dump() else "different"
+
+
+def _artifacts_json(source: DeckSource, deck: Deck) -> dict[str, Any]:
+    """What this deck has been built into, and whether that is still true."""
+    held = source.artifacts(deck.slug)
+    return {
+        "artifacts": [{"name": a.name, "size": a.size,
+                       "built_at": a.built_at.isoformat()} for a in held],
+        "baseline": _baseline_state(deck, source.read_baseline(deck.slug)),
+        "buildable": deck.stage != "draft",
+        "stage": deck.stage,
+    }
+
+
+def list_artifacts(slug: str, *, source: DeckSource | None = None) -> dict[str, Any]:
+    """The five deliverables this deck has, and how current they are.
+
+    A plain read, so it answers for a deck nobody may write: the artifacts are
+    the *shareable* surface, and hiding them from a reader who can already see
+    the deck would be the wrong way round.
+    """
+    decks = _source(source)
+    return _artifacts_json(decks, decks.get(slug))
+
+
+def read_artifact(slug: str, name: str, *,
+                  source: DeckSource | None = None) -> str:
+    """One deliverable's text, verbatim. Raises `ArtifactNotFound`.
+
+    Text rather than a parsed anything: these are the files a person copies
+    into Moxfield or reads on the train, and the app's job is to hand them
+    over unchanged.
+    """
+    decks = _source(source)
+    decks.get(slug)             # raises DeckNotFound before anything else
+    return decks.read_artifact(slug, name)
+
+
+def build_artifacts(slug: str, *, force: bool = False,
+                    source: DeckSource | None = None) -> dict[str, Any]:
+    """Generate the five deliverables and store them. Raises `BuildRejected`.
+
+    The hosted half of `mtglab decks build`, and it exists because the ruling
+    that made `mtglab ui` a development harness turned "the CLI can do it" into
+    a gap rather than a design. Until 2026-08-21 the only way to rebuild a
+    deployed deck's artifacts was to open a shell on the instance, which is the
+    laptop coupling the volume ruling was meant to end.
+
+    **A plain route, not a job, and that was measured rather than assumed.**
+    Four real decks on the deployed instance: 70-83ms warm, end to end --
+    load, pool, gate and render. That is the shelf's order of magnitude
+    (`api/shelfruns.py`, 0.03-0.04s), where the argument against a job is that
+    submitting and polling costs more than the work. The 1.5s a cold
+    `mtglab decks build` takes is almost all interpreter start-up, which a
+    served process has already paid.
+
+    Two refusals, and only one of them is forceable. A **draft** is refused by
+    `render_all` and cannot be forced from here any more than from the CLI --
+    the way out is to write the rationales and promote it (ADR 13). **Gate
+    errors** are refused by default and `force` overrides them, which mirrors
+    `mtglab decks build --force` exactly; Goreclaw's banned card is the live
+    example, and a theoretical deck whose author knows about it is the case
+    the flag is for.
+
+    **Deliberately not recorded in the activity log.** ADR 28 logs edits to
+    `deck.yaml` from one call site, and a build changes no deck field -- it
+    derives files *from* the deck. Logging it would mean a second call site
+    outside `_commit`, which CLAUDE.md names as a decision to take
+    deliberately rather than by drift. This is that decision, taken: no.
+    """
+    from mtglab.artifacts.generate import DraftDeck, render_all
+
+    decks = _for_writing(source, slug)
+    deck = decks.get(slug)
+
+    con = _connect()
+    try:
+        cards = _pool_for(deck, con)
+    finally:
+        if con is not None:
+            con.close()
+
+    report = validate(deck, cards)
+    if report.errors and not force:
+        raise BuildRejected(
+            f"the gate reports {len(report.errors)} error(s) on {slug}. "
+            "Fix them, or build again with force if you know better.")
+
+    # Resolved before anything is written, because `write_artifacts` replaces
+    # the snapshot this reads.
+    baseline = decks.read_baseline(slug)
+    previous = None
+    if baseline is not None:
+        with contextlib.suppress(*_UNPARSEABLE):
+            previous = Deck.from_text(baseline, slug=slug)
+
+    try:
+        files = render_all(deck, cards=cards, previous=previous)
+    except DraftDeck as exc:
+        raise BuildRejected(str(exc)) from exc
+
+    decks.write_artifacts(slug, files)
+    out = _artifacts_json(decks, deck)
+    out["issues"] = _issues(report)
+    out["forced"] = bool(report.errors and force)
+    return out

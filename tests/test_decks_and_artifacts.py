@@ -202,6 +202,40 @@ def test_write_all_omits_swaps_when_nothing_changed():
     assert len(written) == 5
 
 
+def test_a_rebuild_removes_a_swaps_file_it_did_not_produce():
+    """A stale `swaps.md` is not merely old -- it describes a diff that no
+    longer exists, and it looks exactly like a current one.
+
+    This is the bug the two deck sources disagreed about on 2026-08-21: the
+    memory tier replaced the artifact set, the file tier merged into it, and
+    `mtglab decks build` had been merging since it was written.
+    """
+    deck = make_deck(99)
+    prev = make_deck(99)
+    prev.cards[0] = CardEntry(name="Old Card", category="threat", why="was here")
+    with tempfile.TemporaryDirectory() as tmp:
+        write_all(deck, tmp, cards=pool_for(deck), previous=prev)
+        assert (Path(tmp) / "swaps.md").exists()
+
+        # Rebuilt with no baseline, so this build produces no swap list.
+        written = write_all(deck, tmp, cards=pool_for(deck))
+        assert "swaps.md" not in {p.name for p in written}
+        assert not (Path(tmp) / "swaps.md").exists()
+        # The snapshot is written by this same build and must survive it.
+        assert (Path(tmp) / "deck.last-built.yaml").exists()
+
+
+def test_a_rebuild_leaves_files_that_are_not_deliverables_alone():
+    """`artifacts/` is generated, but pruning is still narrow on purpose."""
+    deck = make_deck(99)
+    with tempfile.TemporaryDirectory() as tmp:
+        stray = Path(tmp) / "notes-from-the-playtest.md"
+        stray.parent.mkdir(parents=True, exist_ok=True)
+        stray.write_text("kept", encoding="utf-8")
+        write_all(deck, tmp, cards=pool_for(deck))
+        assert stray.read_text(encoding="utf-8") == "kept"
+
+
 def test_the_snapshot_round_trips_as_the_next_baseline():
     """What `deck.last-built.yaml` is for: `Deck.load` of it must equal the
     deck that was built, or the next bare build's swaps.md lies."""

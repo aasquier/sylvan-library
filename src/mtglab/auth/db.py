@@ -39,7 +39,7 @@ from mtglab import config
 
 # Bumped when `_MIGRATIONS` grows. Stored in SQLite's own `user_version`, which
 # costs no table and cannot be forgotten in a schema dump.
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 # One entry per version, applied in order to whatever the file is at. A fresh
 # database runs all of them; an existing one runs the tail. The invite and
@@ -529,6 +529,33 @@ _MIGRATIONS: tuple[str, ...] = (
         draw         INTEGER NOT NULL,
         timed_out    INTEGER NOT NULL,
         PRIMARY KEY (match_id, game_index)
+    );
+    """,
+    # -- 12 -----------------------------------------------------------------
+    # The SQL tier's artifact shelf. The file tier keeps the five deliverables
+    # in `<slug>/artifacts/`; a row-backed deck has no directory, so this is
+    # the same shelf for the same protocol methods (`DeckSource.artifacts`,
+    # `read_artifact`, `write_artifacts`, `read_baseline`).
+    #
+    # **The most disposable table in this file, and deliberately so.** Every
+    # row is derived from a `user_decks.yaml` that is still sitting right
+    # there, so losing the whole table costs one rebuild and nobody's words --
+    # the opposite of `forge_games` above, which records events that cannot be
+    # recomputed. That is why it carries no history: one row per (deck, name),
+    # replaced in place, with no version chain to prune.
+    #
+    # `name` is unconstrained here on purpose. `generate.DELIVERABLES` is the
+    # whitelist and it is enforced on *reading*, in one place, for every tier;
+    # a CHECK constraint duplicating that list is a second copy that would
+    # drift, and drift silently, since a rejected write would look like a
+    # failed build.
+    """
+    CREATE TABLE user_deck_artifacts (
+        deck_id  INTEGER NOT NULL REFERENCES user_decks(id) ON DELETE CASCADE,
+        name     TEXT    NOT NULL,
+        body     TEXT    NOT NULL,
+        built_at TEXT    NOT NULL,
+        PRIMARY KEY (deck_id, name)
     );
     """,
 )

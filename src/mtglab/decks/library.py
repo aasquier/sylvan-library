@@ -29,11 +29,17 @@ which exception the source will raise.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from mtglab.auth import db, users
 from mtglab.decks.model import Deck
-from mtglab.decks.source import DeckNotFound, DeckSource, FileDeckSource
+from mtglab.decks.source import (
+    Artifact,
+    DeckNotFound,
+    DeckSource,
+    FileDeckSource,
+)
 from mtglab.decks.sqlsource import SqlDeckSource, shared_decks
 
 # The owner segment for a laptop with auth off. There is one person, they own
@@ -316,6 +322,26 @@ class _SharedOnly:
     def set_shared(self, slug: str, shared: bool) -> None:
         self._visible(slug)
         self._inner.set_shared(slug, shared)
+
+    # The artifacts are the shareable surface, but "shareable" means shareable
+    # *with the deck*: a primer names the whole 99, so a hidden deck's
+    # deliverables are hidden by the same `_visible` gate as its YAML. The
+    # write raises through the inner source, which is read-only.
+    def artifacts(self, slug: str) -> list[Artifact]:
+        self._visible(slug)
+        return self._inner.artifacts(slug)
+
+    def read_artifact(self, slug: str, name: str) -> str:
+        self._visible(slug)
+        return self._inner.read_artifact(slug, name)
+
+    def read_baseline(self, slug: str) -> str | None:
+        self._visible(slug)
+        return self._inner.read_baseline(slug)
+
+    def write_artifacts(self, slug: str, files: Mapping[str, str]) -> list[str]:
+        self._visible(slug)
+        return self._inner.write_artifacts(slug, files)
 
     @property
     def writable(self) -> bool:

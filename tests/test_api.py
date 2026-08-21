@@ -4298,3 +4298,126 @@ def test_two_presses_on_one_photograph_are_one_job(client, no_worker,
     assert first.key == again.key
     assert first.key != other.key
 
+
+
+# -------------------------------------------------------------- artifacts
+#
+# The hosted half of `mtglab decks build`. These run against an in-memory
+# source for the reason the swap tests do -- a build writes files, and the
+# seam exists so it does not write them into anybody's library.
+
+BUILD = "/api/decks/local/mono-green/artifacts"
+
+
+def test_a_deck_that_has_never_been_built_says_so(clean_client):
+    with clean_client as client:
+        body = client.get(BUILD).json()
+    assert body["artifacts"] == []
+    # Not `stale`: nothing has been built, so there is nothing to be stale.
+    assert body["baseline"] == "unknown"
+    assert body["buildable"] is True
+
+
+def test_building_produces_the_deliverables_and_a_current_baseline(clean_client):
+    with clean_client as client:
+        assert client.post(BUILD, json={}).status_code == 200
+        body = client.get(BUILD).json()
+    assert [a["name"] for a in body["artifacts"]] == [
+        "primer-quick.md", "primer-advanced.md",
+        "decklist-annotated.md", "moxfield.txt"]
+    # No `swaps.md` on a first build: there was nothing to diff against.
+    assert body["baseline"] == "current"
+
+
+def test_an_edited_deck_reports_its_artifacts_as_different(clean_client):
+    with clean_client as client:
+        client.post(BUILD, json={})
+        assert client.get(BUILD).json()["baseline"] == "current"
+        # Any edit through the ordinary route, so the baseline moves the way
+        # it would in life rather than by reaching into the source.
+        client.patch("/api/decks/local/mono-green",
+                     json={"field": "bracket", "value": 3})
+        assert client.get(BUILD).json()["baseline"] == "different"
+        # ...and a rebuild now has a baseline, so it writes a swap list.
+        client.post(BUILD, json={})
+        body = client.get(BUILD).json()
+    assert "swaps.md" in [a["name"] for a in body["artifacts"]]
+    assert body["baseline"] == "current"
+
+
+def test_a_deliverable_is_served_verbatim(clean_client):
+    with clean_client as client:
+        client.post(BUILD, json={})
+        r = client.get(f"{BUILD}/moxfield.txt")
+    assert r.status_code == 200
+    assert r.json()["name"] == "moxfield.txt"
+    assert "Forest" in r.json()["text"]
+
+
+@pytest.mark.parametrize("name", [
+    "../../../etc/passwd", "../deck.yaml", "deck.yaml",
+    "deck.last-built.yaml", "swaps.md", "nonsense.md",
+])
+def test_only_the_deliverables_are_reachable_by_name(clean_client, name):
+    """The snapshot and a traversal are the same answer: there is no such
+    artifact. Note `swaps.md` is in here — a real deliverable this build did
+    not produce is a 404 too, and for the reader that is the same fact."""
+    with clean_client as client:
+        client.post(BUILD, json={})
+        assert client.get(f"{BUILD}/{name}").status_code == 404
+
+
+def test_the_gate_refuses_a_build_and_force_overrides_it(swappable):
+    """`swappable`'s deck holds one banned card, which is Goreclaw's live
+    situation: a theoretical deck whose author knows about the Titan."""
+    with swappable as client:
+        refused = client.post(BUILD, json={})
+        assert refused.status_code == 422
+        assert "gate" in refused.json()["detail"]
+        assert client.get(BUILD).json()["artifacts"] == []
+
+        forced = client.post(BUILD, json={"force": True})
+        assert forced.status_code == 200
+        assert forced.json()["forced"] is True
+        assert forced.json()["issues"]["errors"]
+        assert client.get(BUILD).json()["artifacts"]
+
+
+def test_a_draft_is_refused_and_force_does_not_reach_it(in_memory_client, pool):
+    """ADR 13: the way out of a draft is to write the rationales, not a flag.
+    The CLI has no `--force` for this either, and the refusal lives in
+    `render_all` so both callers inherit it."""
+    draft = tiny_pool.mono_green_deck(clean=True)
+    draft.stage = "draft"
+    draft.cards[0].why = ""
+    with in_memory_client([draft]) as client:
+        assert client.get(BUILD).json()["buildable"] is False
+        for payload in ({}, {"force": True}):
+            r = client.post(BUILD, json=payload)
+            assert r.status_code == 422
+            assert "draft" in r.json()["detail"]
+        assert client.get(BUILD).json()["artifacts"] == []
+
+
+def test_a_reader_may_see_the_artifacts_but_not_rebuild_them(pool):
+    """The artifacts are the shareable surface, so reading follows the deck.
+    Building is a write and answers 403 like every other one."""
+    source = MemoryDeckSource([tiny_pool.mono_green_deck(clean=True)])
+    source.write_artifacts("mono-green", {"moxfield.txt": "1 Forest\n"})
+
+    read_only = MemoryDeckSource(source.all(), writable=False)
+    read_only._artifacts = source._artifacts
+    app = create_app()
+    app.dependency_overrides[deck_source] = lambda: read_only
+    app.dependency_overrides[library] = lambda: library_over(read_only)
+    with TestClient(app) as client:
+        assert client.get(BUILD).status_code == 200
+        assert client.get(f"{BUILD}/moxfield.txt").status_code == 200
+        assert client.post(BUILD, json={}).status_code == 403
+
+
+def test_artifacts_of_a_deck_this_scope_never_had_are_a_404(clean_client):
+    with clean_client as client:
+        assert client.get("/api/decks/local/ghost/artifacts").status_code == 404
+        assert client.post("/api/decks/local/ghost/artifacts",
+                           json={}).status_code == 404

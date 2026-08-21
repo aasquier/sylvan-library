@@ -23,17 +23,50 @@ therefore open and close a connection per call rather than holding one open.
 from __future__ import annotations
 
 import shutil
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from mtglab import config
+from mtglab.artifacts.generate import DELIVERABLES, SNAPSHOT, store
 from mtglab.decks.model import Deck
 
 
 class DeckNotFound(Exception):
     """Raised so the route layer can turn it into a 404 without guessing."""
+
+
+#: Stands in for "built, but this source never recorded when" -- only
+#: reachable if an implementation stores artifacts without a timestamp, which
+#: neither of the two here does.
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+
+
+class ArtifactNotFound(Exception):
+    """Raised for a deliverable this deck has not got.
+
+    Distinct from `DeckNotFound` because the two are different 404s to a
+    reader: the deck may be perfectly real and simply never built, or built
+    before it had anything to diff, which is the ordinary state of a first
+    build and the reason `swaps.md` is so often absent.
+    """
+
+
+@dataclass(frozen=True)
+class Artifact:
+    """One generated deliverable, as the library holds it.
+
+    `built_at` is the store's own timestamp rather than anything inside the
+    file, so it answers the question a reader actually has -- *is this older
+    than the deck?* On 2026-08-21 every artifact on the volume was eight days
+    older than its `deck.yaml`, and nothing in the app could say so.
+    """
+
+    name: str
+    size: int
+    built_at: datetime
 
 
 @runtime_checkable
@@ -100,6 +133,50 @@ class DeckSource(Protocol):
         tier in `deck.yaml`, the SQL tier in a column it treats as the truth --
         and a caller should not have to know which. Raises `DeckNotFound` or
         `ReadOnlySource`.
+        """
+
+    def artifacts(self, slug: str) -> list[Artifact]:
+        """Which deliverables this deck has, in `DELIVERABLES` order.
+
+        Absence is normal and is not an error: a deck that has never been
+        built has none, and one built with nothing to diff has no `swaps.md`.
+        Raises `DeckNotFound` for a deck that is not there at all.
+        """
+
+    def read_artifact(self, slug: str, name: str) -> str:
+        """One deliverable's text.
+
+        `name` is whatever arrived in the URL, so an implementation must
+        refuse anything outside `DELIVERABLES` *before* it resolves the name
+        against storage -- which for the file tier is the whole path-traversal
+        story, and for a SQL tier is a `WHERE` clause it would want anyway.
+        Raises `ArtifactNotFound`, or `DeckNotFound` for an unknown deck.
+        """
+
+    def read_baseline(self, slug: str) -> str | None:
+        """The last build's snapshot, or None if there has never been one.
+
+        Its own method rather than `read_artifact(slug, SNAPSHOT)` because the
+        baseline is not a deliverable and `DELIVERABLES` refuses it -- which is
+        the point of that tuple. This is the build's own bookkeeping being read
+        back by the next build, so it is internal on both ends.
+
+        None is ordinary, not exceptional: a deck built for the first time has
+        no baseline, and so gets no `swaps.md`. Decks built before the
+        snapshot mechanism existed (ADR 30) are in the same position.
+        """
+
+    def write_artifacts(self, slug: str, files: Mapping[str, str]) -> list[str]:
+        """Store a build's output, and say what was stored.
+
+        Takes rendered text rather than a deck, because generating and storing
+        are different jobs and only one of them is the source's (see
+        `artifacts.generate.render_all`). The mapping is stored whole,
+        including the snapshot -- `DELIVERABLES` governs what may be *read*,
+        not what a build may write, and the baseline is part of the build.
+
+        Names are returned rather than paths: a SQL tier has no paths, and no
+        caller needs one. Raises `DeckNotFound` or `ReadOnlySource`.
         """
 
     @property
@@ -249,6 +326,55 @@ class FileDeckSource:
         shutil.move(str(path.parent), str(trash))
         return str(trash)
 
+    def _artifact_dir(self, slug: str) -> Path:
+        """`<slug>/artifacts/`, once the deck itself is known to exist.
+
+        `_path` first, so a missing deck is `DeckNotFound` rather than an
+        empty artifact list -- "this deck has never been built" and "there is
+        no such deck" are answers a caller must be able to tell apart.
+        """
+        return self._path(slug).parent / "artifacts"
+
+    def artifacts(self, slug: str) -> list[Artifact]:
+        out = self._artifact_dir(slug)
+        found = []
+        for name in DELIVERABLES:
+            path = out / name
+            if not path.is_file():
+                continue
+            stat = path.stat()
+            found.append(Artifact(
+                name=name, size=stat.st_size,
+                built_at=datetime.fromtimestamp(stat.st_mtime, UTC)))
+        return found
+
+    def read_artifact(self, slug: str, name: str) -> str:
+        # Membership first, and it is the only check that matters: `name`
+        # comes from a URL, and a name that is not one of the five never
+        # becomes a path at all. No normalising, no `..` stripping, no
+        # resolve-and-compare against the root -- all of which are ways of
+        # being careful with a path this never constructs.
+        if name not in DELIVERABLES:
+            raise ArtifactNotFound(name)
+        path = self._artifact_dir(slug) / name       # raises DeckNotFound
+        if not path.is_file():
+            raise ArtifactNotFound(name)
+        return path.read_text(encoding="utf-8")
+
+    def read_baseline(self, slug: str) -> str | None:
+        path = self._artifact_dir(slug) / SNAPSHOT   # raises DeckNotFound
+        if not path.is_file():
+            return None
+        return path.read_text(encoding="utf-8")
+
+    def write_artifacts(self, slug: str, files: Mapping[str, str]) -> list[str]:
+        self._writable_or_raise(slug)
+        out = self._artifact_dir(slug)               # raises DeckNotFound
+        # `generate.store` rather than a loop here, so this tier and
+        # `mtglab decks build` cannot disagree about what a rebuild leaves
+        # behind -- which they did until 2026-08-21, over a stale `swaps.md`.
+        return [p.name for p in store(files, out)]
+
     def set_shared(self, slug: str, shared: bool) -> None:
         """Write `shared:` into the deck file. The YAML is this tier's truth.
 
@@ -288,6 +414,8 @@ class MemoryDeckSource:
         self._decks = {d.slug: d for d in decks}
         self._text: dict[str, str] = {}
         self._trash: dict[str, str] = {}
+        self._artifacts: dict[str, dict[str, str]] = {}
+        self._built: dict[str, datetime] = {}
         self._writable = writable
 
     def slugs(self) -> list[str]:
@@ -329,10 +457,45 @@ class MemoryDeckSource:
         self._trash[slug] = self.read_text(slug)
         del self._decks[slug]
         self._text.pop(slug, None)
+        # The file tier moves the directory whole, artifacts included; this
+        # tier has to say so itself or the two would disagree about what a
+        # deleted deck leaves behind.
+        self._artifacts.pop(slug, None)
+        self._built.pop(slug, None)
         # Kept rather than dropped, so this source models the same promise the
         # file-backed one makes: a delete is recoverable, and the return value
         # names where from.
         return f"memory:.trash/{slug}"
+
+    def artifacts(self, slug: str) -> list[Artifact]:
+        self.get(slug)          # raises DeckNotFound for an unknown deck
+        held = self._artifacts.get(slug, {})
+        return [Artifact(name=n, size=len(held[n].encode("utf-8")),
+                         built_at=self._built.get(slug, _EPOCH))
+                for n in DELIVERABLES if n in held]
+
+    def read_artifact(self, slug: str, name: str) -> str:
+        if name not in DELIVERABLES:
+            raise ArtifactNotFound(name)
+        self.get(slug)          # raises DeckNotFound for an unknown deck
+        try:
+            return self._artifacts[slug][name]
+        except KeyError:
+            raise ArtifactNotFound(name) from None
+
+    def read_baseline(self, slug: str) -> str | None:
+        self.get(slug)          # raises DeckNotFound for an unknown deck
+        return self._artifacts.get(slug, {}).get(SNAPSHOT)
+
+    def write_artifacts(self, slug: str, files: Mapping[str, str]) -> list[str]:
+        if not self._writable:
+            raise ReadOnlySource(slug)
+        self.get(slug)          # raises DeckNotFound for an unknown deck
+        # Replaced rather than merged, which is what a rebuild does on disk
+        # too: a `swaps.md` from an older build is not part of this one.
+        self._artifacts[slug] = dict(files)
+        self._built[slug] = datetime.now(UTC)
+        return list(files)
 
     def set_shared(self, slug: str, shared: bool) -> None:
         if not self._writable:
