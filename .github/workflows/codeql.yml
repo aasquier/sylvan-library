@@ -50,16 +50,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # `build-mode: none` for both: Python and TypeScript are analysed
+        # `build-mode: none` for Python and TypeScript: both are analysed
         # from source, no build required — which also keeps this job from
-        # ever needing the pool, Node, or a virtualenv.
-        language: [python, javascript-typescript]
+        # ever needing the pool, Node, or a virtualenv. Go (the front door,
+        # ADR 38) is compiled, so its autobuilder runs; the module is small
+        # and its one CGO dependency is not in the binary the autobuilder
+        # needs to see.
+        include:
+          - language: python
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          - language: go
+            build-mode: autobuild
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd  # v4
         with:
           languages: ${{ matrix.language }}
-          build-mode: none
+          build-mode: ${{ matrix.build-mode }}
           # The committed bundle is generated output — minified, and already
           # measured at 75–88% of any tool's read of this repo (ENGINEERING
           # §5's review re-price). Scanning it would bury every real finding

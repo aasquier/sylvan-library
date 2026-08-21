@@ -269,6 +269,125 @@ jobs:
       - name: The contract suite, over TCP against a live mtglab ui
         run: pytest tests/contract --live -q -p no:cacheprovider
 
+      # And the same suite through the Go front door -- the migration's
+      # Phase 2 exit gate (docs/go-migration/PLAN.md section 7), on every
+      # pull request from now on. Python is started on a scratch the
+      # harness seeded, the door is built from `go/` and stood in front of it
+      # on another port, and `--base-url` points at the door. A shape the door
+      # answers itself -- the shell, the assets, the middleware's own 401 and
+      # 403 -- is held to exactly the goldens Python recorded; a shape it
+      # proxies is proven to pass through untouched. The first local run of
+      # this found the door doubling Python's security headers, which is the
+      # whole argument for running it here rather than trusting the unit tests.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Build the front door
+        run: go build -o "$RUNNER_TEMP/mtglab-door" ./cmd/mtglab
+        working-directory: go
+      - name: The contract suite, through the front door
+        run: |
+          set -euo pipefail
+          PAIR="$RUNNER_TEMP/pair"; mkdir -p "$PAIR"
+          # Seed first, exactly as --live does, with the harness's own seeder.
+          PYTHONPATH=tests python - "$PAIR" <<'PY'
+          import sys
+          from pathlib import Path
+          from contract import harness
+          harness.seed(harness.make_scratch(Path(sys.argv[1])))
+          PY
+          # The environment the harness gives its own child server
+          # (contract.harness.SERVER_ENV), so nothing can spend or send.
+          export MTGLAB_REQUIRE_AUTH=1 MTGLAB_SECURE_COOKIES=0 MTGLAB_ADMIN_EMAIL= \
+                 MTGLAB_ADMIN_USERNAME= ANTHROPIC_API_KEY= ANTHROPIC_AUTH_TOKEN= \
+                 RESEND_API_KEY= FLY_METRICS_TOKEN= MTGLAB_FORGE_WORKER= \
+                 MTGLAB_FLY_API_TOKEN= MTGLAB_CLIENT_IP_HEADER= MTGLAB_BASE_URL= \
+                 PYTHONUNBUFFERED=1 MTGLAB_DATA_DIR="$PAIR/data" \
+                 MTGLAB_DECKS_DIR="$PAIR/decks" MTGLAB_FORGE_HOME="$PAIR/no-forge-here"
+          (cd "$PAIR" && python -m mtglab.cli ui --no-open --host 127.0.0.1 --port 8766 \
+              > "$PAIR/python.log" 2>&1 &)
+          "$RUNNER_TEMP/mtglab-door" ui --host 127.0.0.1 --port 8765 \
+              --upstream http://127.0.0.1:8766 \
+              --web-dist src/mtglab/web_dist --tarot src/mtglab/assets/tarot \
+              > "$PAIR/door.log" 2>&1 &
+          for _ in $(seq 1 120); do
+            curl -fsS http://127.0.0.1:8765/api/health >/dev/null 2>&1 && break
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:8765/door/health; echo
+          pytest tests/contract --base-url http://127.0.0.1:8765 \
+                 --data-dir "$PAIR/data" --decks-dir "$PAIR/decks" -q -p no:cacheprovider
+      - name: The pair's logs, on failure
+        if: failure()
+        run: |
+          echo "--- python"; tail -60 "$RUNNER_TEMP/pair/python.log" || true
+          echo "--- door";   tail -60 "$RUNNER_TEMP/pair/door.log" || true
+
+  # The Go module (docs/go-migration/PLAN.md; ADR 38): `go vet`, the
+  # race-detected tests, and a tidy check, on both architectures the image is
+  # built for. Both, because the module carries a CGO dependency -- the DuckDB
+  # driver links a prebuilt libduckdb per platform -- and "it builds" has to
+  # mean both, the same reason `image-arm64` exists. Coverage is printed and
+  # not yet gated: the floor is set from Phase 3's measured baseline (PLAN
+  # section 8), not guessed here.
+  #
+  # Adding these was the plan's two steps -- written here, and required on
+  # `main`. ENGINEERING section 5 keeps the list and the read-back command.
+  go:
+    name: go (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - run: go mod verify
+      - run: go vet ./...
+      # The binary the image ships is built CGO-free (see the Dockerfile's
+      # door stage); prove here that it still can be, so an import of the
+      # DuckDB package into the door fails on a pull request rather than in
+      # the image build.
+      - name: The front door builds without CGO
+        run: CGO_ENABLED=0 go build -o /dev/null ./cmd/mtglab
+      - name: Tests, race-detected
+        run: go test -race -count=1 -cover ./...
+      - name: go.mod and go.sum are tidy
+        run: |
+          go mod tidy
+          if ! git diff --quiet -- go.mod go.sum; then
+            echo "::error::go.mod/go.sum are not tidy -- run 'go mod tidy' in go/"
+            git diff -- go.mod go.sum
+            exit 1
+          fi
+
+  go-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a  # v9.3.0
+        with:
+          version: v2.13.1
+          working-directory: go
+
   # The container image. This job is not decoration: the maintainer's machine is
   # macOS 12 on Intel, where Docker Desktop will not install (it supports the
   # three most recent macOS releases) and Homebrew is too stale to build Colima.
@@ -418,6 +537,18 @@ jobs:
           grep -q '"pool": *false' health.json
           echo "health reports an unseeded instance, as it should"
 
+      # PID 1 is the Go front door now (ADR 38), with the Python server
+      # supervised behind it on loopback. Its own liveness path answers, and
+      # an asset it serves itself carries the content type the *door* names
+      # rather than whatever the host's mime table would have said -- the
+      # same property the contract suite found Python needed on 2026-08-21.
+      - name: The front door answers, and serves the bundle itself
+        run: |
+          curl -fsS http://127.0.0.1:8080/door/health; echo
+          ct=$(curl -sS -o /dev/null -w '%{content_type}' http://127.0.0.1:8080/assets/app.js)
+          [ "$ct" = "text/javascript; charset=utf-8" ] || { echo "::error::app.js served as '$ct'"; exit 1; }
+          echo "the door serves app.js as $ct"
+
       # The gate is a gate. If this ever returns 200 the middleware has stopped
       # refusing before routing, which is the whole of ADR 5's protection.
       - name: A protected route refuses without a session
@@ -565,7 +696,7 @@ jobs:
   # that failed one -- rather than relying on branch protection, which governs
   # merging and has nothing to say about a workflow_dispatch run.
   deploy:
-    needs: [test, frontend, no-secrets-or-card-data, contract, image, image-arm64]
+    needs: [test, frontend, no-secrets-or-card-data, contract, go, go-lint, image, image-arm64]
     # Two conditions, and the ref one is deliberately outside the event check.
     #
     # Never from a pull request: a fork's PR must not be able to reach the

@@ -126,7 +126,9 @@ feature) and `dev` (the first three, plus the test tooling). A bare
 neither an account nor a network.
 
 Full setup, the command reference and the deck workflow are in
-**[CONTRIBUTING.md](CONTRIBUTING.md)**.
+**[CONTRIBUTING.md](CONTRIBUTING.md)** — including the Go front door
+(`go/`), which is what the deployed instance runs in front of the Python
+server while the backend is ported ([ADR 38](docs/adr/0038-the-served-backend-is-rewritten-in-go.md)).
 
 ## Status
 

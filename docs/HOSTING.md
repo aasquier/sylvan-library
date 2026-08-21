@@ -166,6 +166,19 @@ the tracked-file check is about the repository, this one is about the artifact.
 The frontend bundle *is* committed to `src/mtglab/web_dist`, so the image needs
 no Node toolchain.
 
+**Three stages since 2026-08-21**, the third being the Go front door
+([ADR 38](adr/0038-the-served-backend-is-rewritten-in-go.md)): `golang:1.26-trixie`
+builds `go/cmd/mtglab` with CGO off into a static binary, the runtime stage
+copies it to `/opt/door/mtglab` — **off PATH on purpose**, so `fly ssh
+console -C "mtglab …"` still finds the Python CLI for every runbook command
+below — and the CMD runs the door on :8080 with the Python server as its
+supervised child on loopback (`--upstream http://127.0.0.1:8765 -- mtglab ui
+--no-open --host 127.0.0.1 --port 8765`). PID 1 is the door, still `mtglab`
+(uid 10001) through the entrypoint; the door serves the bundle and the tarot
+pictures from symlinks to the installed package's copies, refuses before
+routing what `api/auth.py` refuses, and proxies the rest. The image is larger
+for the duration of the migration, as the plan says out loud.
+
 Five things differ from the draft, each for a reason:
 
 - **Two stages, and still no Node.** `docs/ENGINEERING.md` §3 asks both that
@@ -1032,6 +1045,17 @@ fly logs
 fly status
 fly machine list
 ```
+
+Since 2026-08-21 `fly logs` shows **two** processes' lines interleaved — the
+Go front door's (`level=INFO msg=…`) and uvicorn's behind it — because the
+container runs the pair (ADR 38). Two health paths, and the difference is the
+point: `/api/health` is the **pair's** — answered by the Python half *through*
+the door, so it is what Fly, the image's `HEALTHCHECK` and the deploy's smoke
+test ask; `/door/health` is the door's own liveness and answers `{"ok": true}`
+whether or not the Python half is up. A `502` with `detail: the library is not
+answering right now` on an `/api` path is the door reporting that its child is
+not listening yet (or has died — in which case the door exits too and the
+machine restarts); a connection refused is the door itself being down.
 
 Memory is the number to watch. If you see OOM kills, the likely causes in order
 are: a 25,000-game sweep, Argon2 memory during a login burst, or `data refresh`

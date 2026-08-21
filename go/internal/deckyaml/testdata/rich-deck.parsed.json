@@ -1,0 +1,102 @@
+{
+  "archetype": "midrange",
+  "bracket": 3,
+  "cards": [
+    {
+      "category": "ramp",
+      "name": "Sol Ring",
+      "why": "Two mana on turn one, and it always has been: the single most played card in the format, the first thing every primer tells a newcomer to find, and the card this line exists to make room for -- which is why it is first."
+    },
+    {
+      "category": "equipment",
+      "name": "Embercleave",
+      "scryfall_id": "c3a4b2d1-1111-4222-8333-444455556666",
+      "tags": [
+        "finisher",
+        "flash"
+      ],
+      "why": "It's the card with the apostrophe -- and the one that ends games: flash, trample, double strike."
+    },
+    {
+      "art": "deadbeef-0000-4000-8000-000000000001",
+      "category": "utility",
+      "mana_cost": "{1}",
+      "name": "Æther Vial",
+      "why": "Unicode in the name: Æ — é — ü."
+    },
+    {
+      "category": "land",
+      "name": "Forest",
+      "qty": 12,
+      "why": "* starts with a star, which must be quoted"
+    },
+    {
+      "category": "land",
+      "name": "Plains",
+      "qty": 13,
+      "why": "#not a comment"
+    },
+    {
+      "category": "equipment",
+      "name": "Lightning Greaves",
+      "why": "yes"
+    },
+    {
+      "category": "hate",
+      "name": "Null Rod",
+      "why": "null"
+    },
+    {
+      "category": "interaction",
+      "name": "Counterspell",
+      "why": "12"
+    },
+    {
+      "category": "interaction",
+      "name": "Swords to Plowshares",
+      "why": "1.5 mana, in effect"
+    },
+    {
+      "category": "ramp",
+      "mana_cost": "{1}{W}{W}",
+      "name": "Knight of the White Orchid",
+      "why": "cost {1}{W}{W} -- braces again, inside a longer sentence that also runs past the hundred-character fold so both rules fire at once."
+    }
+  ],
+  "commander": [
+    "Syr Gwyn, Hero of Ashvale"
+  ],
+  "commander_art": "0aae2e33-0000-4000-8000-000000000000",
+  "companion": "Kaheera, the Orphanguard",
+  "graveyard": [
+    {
+      "category": "ramp",
+      "name": "Gilded Lotus",
+      "why": "Entombed: too slow for a deck that wants its mana on turn two."
+    }
+  ],
+  "name": "Rich Fixture: Every Shape the Dumper Writes",
+  "notes": {
+    "mulligan": "Keep any seven with two lands and an equipment; ship a hand\nwith no knight by turn three.",
+    "politics": "The table forgets Ashvale until it is too late: say nothing.",
+    "weird": "colon: and # hash, plus braces {G}{W} and a trailing space "
+  },
+  "pilot": "Mark's wife",
+  "shared": false,
+  "slug": "rich-fixture",
+  "stage": "curated",
+  "status": "built",
+  "strategy": "Suit up a knight and swing: Syr Gwyn's trigger draws a card and the equipment costs nothing, so every turn after the third is a cantrip with a sword attached -- panache *and* martial prowess.",
+  "swap_board": [
+    {
+      "category": "equipment",
+      "name": "Sword of Feast and Famine",
+      "why": "Waiting on a slot."
+    }
+  ],
+  "themes": [
+    "knights",
+    "equipment",
+    "voltron"
+  ]
+}

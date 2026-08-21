@@ -144,6 +144,21 @@ both directions. A base install has the gate, the mana solver and Tier 1, and
 needs neither a network nor an account. `claude check` needs
 `ANTHROPIC_API_KEY`; see `.env.example`.
 
+**The Go toolchain, since the port began (2026-08-21):** `go 1.26`, pinned in
+`go/go.mod` and pinned there by `tests/test_packaging.py`, because Go 1.27
+requires macOS 13 and this Mac is macOS 12 (ADR 38 decision 5); on this
+machine it is `~/sdk/go1.26.7/bin/go` (the stock `/usr/local/go` is 1.20 and
+too old). CGO needs the Xcode command-line tools (Apple clang 12 is enough;
+the DuckDB driver links with harmless weak-symbol warnings). golangci-lint
+is `CGO_ENABLED=0 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1`
+-- with CGO on, the link fails on this Mac. The three Go gates, run from `go/`:
+`go vet ./... && go test -race ./... && golangci-lint run ./...`; CI runs
+them on both Linux architectures. To run the pair locally: start `mtglab ui`
+(Python) on one port, then `go run ./cmd/mtglab ui --upstream http://127.0.0.1:<that port>`
+from `go/` on another, with the same `MTGLAB_*` environment exported (the
+door has no `.env` reader); `tests/contract/README.md` has the exact
+commands, including how to run the contract suite through it.
+
 **That paragraph has been wrong twice.** "Includes all of it" was false until
 2026-08-16 (`dev` lacked `fastapi` and `uvicorn`; the omission cost 474 tests,
 silently), and the *list* was false until 2026-08-19 — four extras named where
@@ -407,6 +422,29 @@ tests/contract/           the contract suite: what the served app promises over
                           against an external server; routes.json is the one
                           route table and golden/ the recorded shapes. The Go
                           migration's referee (docs/go-migration/, ADR 38)
+go/                       the Go module (ADR 38; module path
+                          github.com/aasquier/sylvan-library/go, go 1.26 --
+                          the last Go that runs on this Mac). cmd/mtglab is
+                          the binary, cobra throughout, one command so far:
+                          `ui`, the FRONT DOOR (internal/door) -- since
+                          2026-08-21 the process the container runs. It takes
+                          the port, refuses before routing exactly what
+                          api/auth.py refuses (401 outside PUBLIC_PATHS, 403
+                          under /api/admin, same normalisation; its PublicPaths
+                          is held equal to tests/contract/routes.json by a Go
+                          test), serves web_dist and /tarot itself with the
+                          container's content types, proxies everything under
+                          /api to uvicorn on loopback, and supervises that
+                          server as a child. /door/health is its own liveness
+                          (outside /api on purpose); /api/health stays the
+                          pair's. internal/auth reads app.db READ-ONLY
+                          (sessions + argon2id, proven against Python's own
+                          vectors and a Python-minted session) -- Python still
+                          owns every write and the schema ladder; internal/pool
+                          (go-duckdb, CGO) and internal/deckyaml (goccy) are
+                          the spikes as packages. The contract suite runs
+                          through the door locally and in CI; PLAN §10 is the
+                          port board
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
                           this one included — normally holds no decks at all
@@ -1126,6 +1164,9 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
 - Reserved List is allowed or forbidden **per deck** — check the deck file.
 - Every bug fix gets a test. `mana.py` is subtle; `tests/test_mana.py` pins the
   cases where naive source-counting gives the wrong answer.
+- Go, from `go/`: `go vet ./... && go test -race ./... && golangci-lint run
+  ./...` before pushing — the three checks CI requires. `gofmt -l .` should
+  print nothing. Package comments carry the argument, like docstrings do here.
 - `ruff check src tests` and `mypy` before pushing. mypy is strict by default
   with one named exception in `pyproject.toml` (`cli.py`, since `cards/db.py`
   graduated 2026-08-16); that list is meant to shrink,
@@ -1156,19 +1197,24 @@ merging and takes no part in the deploy, whose `needs` list is `ci.yml`'s five.
 It also cannot be run locally in any useful form. See ENGINEERING §5.
 
 There is a **seventh job**, `image-arm64`, added 2026-08-19 when the arm64
-build moved off QEMU onto a native runner — and it is deliberately described
-here as a job rather than as a seventh required check, because it **is not
-one**. It gates the *deploy* (`deploy` needs it, and `tests/test_packaging.py`
-forces that), so a red `image-arm64` stops a release; it does not stop a
-merge until somebody adds it to the required list, which is a repository
-setting and not a file in this repo. ENGINEERING §5 is where that list lives
-and why writing an aspirational one there is worse than writing none.
+build moved off QEMU onto a native runner. This paragraph said it was not a
+required check; **read back from the API on 2026-08-21, it is** — Aaron
+required it — so the count of required checks is not six any more, and the
+list in ENGINEERING §5 is the one to trust over any number written here.
 
-**And an eighth job, `contract`**, added 2026-08-21 with the Go migration's
-Phase 1: it runs `tests/contract` with `--live` — the harness seeds a
-scratch, starts `mtglab ui` on it and drives it over TCP — and it too
-gates the deploy through `needs` and is **not yet required**; requiring it
-is a repository setting, owed to Aaron (ENGINEERING §5 has the command).
+**An eighth job, `contract`**, added 2026-08-21 with the Go migration's
+Phase 1, runs `tests/contract` with `--live` — the harness seeds a scratch,
+starts `mtglab ui` on it and drives it over TCP — and, since Phase 2, runs
+the same suite once more **through the Go front door**, built from `go/` in
+the same job and stood in front of a second Python server. It gates the
+deploy through `needs` and is **still not required**; requiring it is a
+repository setting, owed to Aaron (ENGINEERING §5 has the command).
+
+**And three Go jobs, `go (amd64)`, `go (arm64)` and `go-lint`**, added with
+Phase 2 (2026-08-21): `go vet`, the CGO-free door build, race-detected tests
+and a tidy check on both architectures the image is built for, and
+golangci-lint. All three gate the deploy and **are required on `main`** —
+both steps taken in the same change, read back the same day.
 
 **Merging deploys.** Since 2026-08-14 a push to `main` whose `ci.yml` checks
 are green deploys itself ([ADR 23](docs/adr/0023-a-green-main-deploys-itself.md));

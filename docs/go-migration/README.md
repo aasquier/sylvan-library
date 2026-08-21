@@ -9,9 +9,10 @@ Read in this order:
 
 1. **[PLAN.md](PLAN.md)** — scope, the honest case, the strangler mechanism,
    the phases, the risk register, and the decisions Aaron owns. **Status:
-   ratified in substance 2026-08-21** — the seven §11 rulings are recorded
-   inline; ADR 38 (Appendix A) lands with the Phase 1 branch and makes it
-   formal.
+   ratified 2026-08-21** — the seven §11 rulings are recorded inline and
+   ADR 38 is in `docs/adr/`. **Phases 0–2 are done** (the contract harness,
+   then the Go front door in front of both runtimes); **§10 holds the port
+   board**, which is the frontier a fresh session reads first.
 2. **[BASELINE.md](BASELINE.md)** — the Python side measured, 2026-08-21.
    The numbers the finished Go backend is compared against. **Append-only**:
    a re-measurement gets a new dated block, never an edit, the same rule
@@ -19,9 +20,9 @@ Read in this order:
 
 Two rules for this folder:
 
-- **The ADR is not here.** When the plan is ratified, ADR 38 lands in
-  `docs/adr/` on the first work branch (per the no-doc-only-PR rule), and
-  PLAN.md's appendix is its draft. Until then this folder is a proposal.
+- **The ADR is not here.** ADR 38 is in `docs/adr/` (landed with the
+  Phase 1 branch, per the no-doc-only-PR rule); PLAN.md's Appendix A is the
+  record of its draft. The Go code is in `go/` at the repository root.
 - **The comparison is the deliverable.** Aaron asked for Python-vs-Go numbers
   when the port is done. BASELINE.md is the "before"; PLAN.md appendix B is
   the empty "after" table waiting to be filled. A migration that cannot show

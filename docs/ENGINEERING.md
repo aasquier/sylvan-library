@@ -643,6 +643,21 @@ proof is `tests/test_contract_harness.py`: every assertion is run against a
 deliberately broken app and shown to fail, and the whole suite is run once
 in a subprocess against one such app and shown to go red.
 
+**The Go jobs, added 2026-08-21** with the migration's Phase 2
+([ADR 38](adr/0038-the-served-backend-is-rewritten-in-go.md)): `go (amd64)`
+and `go (arm64)` run `go mod verify`, `go vet`, a CGO-free build of the
+front door (the binary the image ships is built that way, and an import of
+the DuckDB driver into it should fail on a pull request rather than in the
+image build), `go test -race -cover` and a tidy check, on the two native
+runners the image is built for, because the module carries one CGO
+dependency and "it builds" has to mean both; `go-lint` runs golangci-lint
+v2.13.1 with `go/.golangci.yml`. Coverage is printed and not yet gated — the
+floor is set from Phase 3's measured baseline, the same rule as pyproject's.
+And the `contract` job grew a second half: it builds the door, starts Python
+on a scratch the harness seeded with the door in front, and runs the suite
+`--base-url` against the door — the Phase 2 exit gate, run on every pull
+request rather than once at the end.
+
 Two details worth keeping. `needs` is not redundant with branch protection —
 protection governs *merging* and says nothing about a `workflow_dispatch` run,
 whereas `needs` makes the job structurally unable to start on a red suite
@@ -756,7 +771,7 @@ The settings on `main`, recorded so they can be rebuilt:
 | Setting | Value | Why |
 | --- | --- | --- |
 | Pull request required | yes, **0 approvals** | A solo maintainer cannot approve their own PR, so requiring 1 would deadlock the repo |
-| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-card-data`, `image`, `dependency-review` | Read back from the API 2026-08-19 and correct as listed. **`image-arm64` is a `ci.yml` job and is *not* on this list** — it gates `deploy` through `needs`, not merging. **Neither is `contract`** (added 2026-08-21, the Go migration's Phase 1): it gates `deploy` the same way and is owed the second step — `gh api -X POST repos/aasquier/sylvan-library/branches/main/protection/required_status_checks/contexts -f 'contexts[]=contract'` — which is a setting, not a file, and Aaron's to make. Renaming a CI job silently stops gating until this list is updated |
+| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-card-data`, `image`, `dependency-review`, `image-arm64`, `go (amd64)`, `go (arm64)`, `go-lint` | Read back from the API 2026-08-21 (the Go migration's Phase 2) and correct as listed. `image-arm64` had joined since the 2026-08-19 read-back — Aaron required it — and the three Go jobs were written and required in the same change. **`contract` is still not on this list** (added 2026-08-21, the Go migration's Phase 1, and since Phase 2 the job that runs the suite through the front door): it gates `deploy` through `needs` and is owed the second step — `gh api -X POST repos/aasquier/sylvan-library/branches/main/protection/required_status_checks/contexts -f 'contexts[]=contract'` — which is a setting, not a file, and Aaron's to make. Renaming a CI job silently stops gating until this list is updated |
 | Strict (branch up to date) | yes | Checks that passed against a stale base did not test what is being merged |
 | Enforce for admins | **yes** | Off, it does not apply to the only contributor, which makes it decorative |
 | Force pushes, deletions | blocked | |
