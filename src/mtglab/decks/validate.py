@@ -108,16 +108,25 @@ def validate(deck: Deck, cards: dict[str, CardRecord] | None = None, *,
                 f"stage {deck.stage!r} is not one of {', '.join(DECK_STAGES)}")
     drafting = deck.stage == "draft"
 
-    # The labelling axes warn rather than block, the same bargain as
+    # The labels warn rather than block, the same bargain as
     # `unknown-category` below: the warning is for a hand-written file, while
     # an edit through the app chooses from the vocabulary and is refused
     # outright by `edit.set_deck_field`. Absent is fine -- an unlabelled deck
     # is undeclared, not wrong -- but a label outside the vocabulary would
     # silently fragment the very grouping it exists for.
-    if deck.archetype and deck.archetype not in ARCHETYPES:
-        rep.add("warn", "unknown-archetype",
-                f"archetype {deck.archetype!r} is not one of "
-                f"{', '.join(ARCHETYPES)}")
+    if deck.legacy_archetype:
+        # A pre-ADR-37 `archetype:` key. While the themes name no class word
+        # it still answers for the deck's board, so the message says where
+        # the label lives now -- and says so louder when the value is one no
+        # board would ever have known, because that line has been counting
+        # for nothing since before the rule changed.
+        detail = (f"archetype {deck.legacy_archetype!r} is not a class the "
+                  f"boards know, so it counts for nothing; "
+                  if deck.legacy_archetype not in ARCHETYPES else "")
+        rep.add("warn", "legacy-archetype",
+                f"{detail}`archetype:` is a legacy key (ADR 37): declare a "
+                f"strategy word in `themes` instead -- "
+                f"{', '.join(ARCHETYPES)} -- and the next write drops it")
     for theme in deck.themes:
         if theme not in THEMES:
             rep.add("warn", "unknown-theme",

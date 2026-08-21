@@ -77,8 +77,10 @@ SETTABLE_FIELDS = ("category", "qty", "why", "art")
 # what the whole deck is legal to contain and are a rebuild, not a field edit.
 # `themes` is the one non-scalar -- a list, but a list of vocabulary keys, so
 # it edits like an enum with a plural rather than like the card blocks.
+# `archetype` is deliberately absent: since ADR 37 it is a reading of the
+# themes, and the way to change a reading is to change what it reads.
 SETTABLE_DECK_FIELDS = ("stage", "status", "bracket", "commander_art", "pilot",
-                        "archetype", "themes")
+                        "themes")
 
 # The most anybody's name needs. A pilot is a person at a table, not a bio.
 PILOT_MAX = 40
@@ -895,6 +897,13 @@ def set_deck_field(text: str, *, field: str, value: Any) -> str:
     sleeved up` is the author's note about the vocabulary, not about the value,
     and ADR 12 rule 1 says an edit touches only what it changes.
     """
+    if field == "archetype":
+        # Named specially because it *was* settable before ADR 37, so the
+        # refusal has to say where the label went, not just what exists.
+        raise EditFailed(
+            "the archetype is a reading of the themes now (ADR 37): declare "
+            f"a strategy word there instead -- {', '.join(ARCHETYPES)} -- "
+            "and the worst-piloted one declared becomes the deck's board")
     if field not in SETTABLE_DECK_FIELDS:
         raise EditFailed(f"{field!r} is not a settable deck field; choose one of "
                          f"{', '.join(SETTABLE_DECK_FIELDS)}")
@@ -932,15 +941,6 @@ def set_deck_field(text: str, *, field: str, value: Any) -> str:
                 f"a UUID; the deck page's art picker sets this for you, and "
                 f"`mtglab decks set <slug> --art <set-code>` takes a set code "
                 f"and looks the id up.")
-    elif field == "archetype":
-        # The closed Forge-pilotability class (see `model.ARCHETYPES` for why
-        # it is closed and small). Emptying it is a real operation -- it means
-        # "this deck sits on no rating board" -- so a blank passes through.
-        value = str(value or "").strip().lower()
-        if value and value not in ARCHETYPES:
-            raise EditFailed(
-                f"{value!r} is not an archetype; choose one of "
-                f"{', '.join(ARCHETYPES)}, or clear it")
     elif field == "themes":
         # The open identity list. A comma-separated string or a list both
         # arrive here (the CLI sends the former, JSON the latter); either way

@@ -544,19 +544,16 @@ def test_a_pilot_is_a_name_with_its_case_kept(tmp_path):
         set_deck_field(DECK, field="pilot", value="x" * 41)
 
 
-def test_an_archetype_comes_from_the_closed_class():
-    """The rating boards' axis (ADR 36): closed, coarse, and refused outside
-    the vocabulary -- a typo accepted here would fragment the grouping the
-    class exists for."""
-    out = set_deck_field(DECK, field="archetype", value="Midrange")
-    assert yaml.safe_load(out)["archetype"] == "midrange"
-
-    with pytest.raises(EditFailed, match="not an archetype"):
-        set_deck_field(DECK, field="archetype", value="tempo")
-
-    # Clearing is a real operation: the deck sits on no board.
-    cleared = set_deck_field(out, field="archetype", value="")
-    assert not yaml.safe_load(cleared).get("archetype")
+def test_the_archetype_is_not_settable_and_the_refusal_says_where_it_went():
+    """ADR 37 retired the declared class: the archetype is a reading of the
+    themes, so the write path refuses it -- and because it *was* settable
+    under ADR 36, the refusal names the new home rather than just listing
+    what exists."""
+    with pytest.raises(EditFailed, match="reading of the themes"):
+        set_deck_field(DECK, field="archetype", value="midrange")
+    # Clearing is refused the same way; there is no field left to clear.
+    with pytest.raises(EditFailed, match="ADR 37"):
+        set_deck_field(DECK, field="archetype", value="")
 
 
 def test_themes_come_from_the_vocabulary_deduped_in_order():
@@ -581,17 +578,19 @@ def test_themes_come_from_the_vocabulary_deduped_in_order():
 
 def test_labels_round_trip_through_the_model():
     """Written only when declared: the six curated files must not grow lines
-    asserting the default they already had."""
+    asserting the default they already had. Since ADR 37 the archetype rides
+    inside the themes, so one declared list carries both the identity and
+    the board."""
     from mtglab.decks.model import Deck as DeckModel
 
-    out = set_deck_field(
-        set_deck_field(DECK, field="archetype", value="aggro"),
-        field="themes", value="cats,tribal")
+    out = set_deck_field(DECK, field="themes", value="cats,aggro")
     deck = DeckModel.from_text(out, slug="mini")
-    assert (deck.archetype, deck.themes) == ("aggro", ["cats", "tribal"])
+    assert (deck.archetype, deck.themes) == ("aggro", ["cats", "aggro"])
     dumped = deck.dump()
-    assert "archetype: aggro" in dumped
     assert "- cats" in dumped
+    # The reading is derived, never written: a dumped file asserts only what
+    # was declared.
+    assert "archetype" not in dumped
 
     bare = DeckModel.from_text(DECK, slug="mini").dump()
     assert "archetype" not in bare
