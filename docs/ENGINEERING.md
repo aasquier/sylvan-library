@@ -645,10 +645,11 @@ in a subprocess against one such app and shown to go red.
 
 **The Go jobs, added 2026-08-21** with the migration's Phase 2
 ([ADR 38](adr/0038-the-served-backend-is-rewritten-in-go.md)): `go (amd64)`
-and `go (arm64)` run `go mod verify`, `go vet`, a CGO-free build of the
-front door (the binary the image ships is built that way, and an import of
-the DuckDB driver into it should fail on a pull request rather than in the
-image build), `go test -race -cover` and a tidy check, on the two native
+and `go (arm64)` run `go mod verify`, `go vet`, a build of the front door
+as the image builds it (CGO-free through Phase 2; a CGO build since Phase 3
+made the door read the card pool through the DuckDB driver, so a link that
+fails on one architecture fails on a pull request rather than in the image
+build), `go test -race -cover` and a tidy check, on the two native
 runners the image is built for, because the module carries one CGO
 dependency and "it builds" has to mean both; `go-lint` runs golangci-lint
 v2.13.1 with `go/.golangci.yml`. Coverage is printed and not yet gated — the

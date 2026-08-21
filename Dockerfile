@@ -29,8 +29,9 @@
 #
 # `golang:1.26-trixie`: 1.26 because go.mod pins it (the last Go that runs
 # on the maintainer's macOS 12, ADR 38 decision 5), trixie because that is
-# the Debian the runtime stage's `python:3.12-slim` is built on. It does not
-# matter much: the binary is built with CGO off and is static.
+# the Debian the runtime stage's `python:3.12-slim` is built on -- and since
+# the door became a CGO build that match is load-bearing rather than tidy:
+# the binary links the builder's glibc and must find the same one at run.
 FROM golang:1.26-trixie AS door
 
 WORKDIR /build
@@ -41,13 +42,17 @@ RUN go mod download
 
 COPY go ./
 
-# CGO off, deliberately, and it is asserted in CI too (`The front door
-# builds without CGO` in ci.yml). The door's dependencies are pure Go --
-# modernc.org/sqlite reads `app.db` -- and the DuckDB driver, the module's one
-# CGO dependency, is not imported by this binary until Phase 3 lands the read
-# spine. The day it is, this line changes with a C toolchain beside it, and
-# this comment is where the decision gets made rather than discovered.
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/mtglab ./cmd/mtglab
+# CGO **on** since Phase 3 of the migration (2026-08-21): the door reads the
+# card pool, and the DuckDB driver links a prebuilt libduckdb per platform --
+# a static archive, so the C toolchain is needed here and nowhere else. It was
+# off through Phase 2, deliberately, and this line is where the decision was
+# made rather than discovered: `golang:1.26-trixie` carries gcc and libc6-dev
+# for exactly this, and the binary comes out linked against glibc and
+# libstdc++, both of which the runtime stage's `python:3.12-slim` (trixie)
+# already carries -- `libstdc++.so.6.0.33` was read off the instance before
+# this changed, not assumed. CI proves the same build on both architectures
+# (`The front door builds as the image builds it` in ci.yml).
+RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/mtglab ./cmd/mtglab
 
 # ------------------------------------------------------------------ builder
 

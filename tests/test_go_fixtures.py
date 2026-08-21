@@ -134,3 +134,30 @@ def test_the_tarot_payload_is_every_fact_deck_tier_first():
     assert [f["id"] for f in payload["facts"]] == [f.id for f in tarotlore.ALL]
     assert payload["facts"][0]["card"] == ""          # the deck tier leads
     assert all(f["source"] for f in payload["facts"])  # no fact without one
+
+
+# ------------------------------------------------------------- the pool
+
+def test_the_committed_schema_is_the_pools_schema():
+    """`go/internal/pool/schema.sql` is what `cards/db.py` runs to create a
+    pool; the Go tests build theirs from it and the Go `data refresh` will."""
+    assert go_fixtures.SCHEMA_PATH.read_text(encoding="utf-8") == \
+        go_fixtures.render_schema(), (
+            f"{go_fixtures.SCHEMA_PATH} is stale; regenerate with "
+            "`python tests/go_fixtures.py`")
+
+
+def test_the_committed_tiny_pool_is_the_fixture_as_loaded():
+    """The 21 cards and their printings, as the rows the loaders insert."""
+    assert go_fixtures.TINY_POOL_PATH.read_text(encoding="utf-8") == \
+        go_fixtures.render_tiny_pool(), (
+            f"{go_fixtures.TINY_POOL_PATH} is stale; regenerate with "
+            "`python tests/go_fixtures.py`")
+    payload = json.loads(go_fixtures.render_tiny_pool())
+    assert len(payload["oracle_columns"]) == len(payload["oracle_cards"][0])
+    assert len(payload["printing_columns"]) == len(payload["printings"][0])
+    names = {row[payload["oracle_columns"].index("name")]
+             for row in payload["oracle_cards"]}
+    # The two cards the gate and the reader exist for are in it.
+    assert "Primeval Titan" in names
+    assert "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger" in names

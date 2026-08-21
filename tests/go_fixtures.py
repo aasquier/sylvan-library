@@ -24,6 +24,16 @@ labelling vocabulary -- as the JSON the Go module embeds and serves
 (`go/internal/reference/data/`, rendered by `mtglab.reference`). Same
 command, same drift test, same rule: the committed bytes are what Python
 renders now, or the suite says so and names this command.
+
+**And the pool's shape.** `go/internal/pool/schema.sql` is `cards/db.py`'s
+`SCHEMA` verbatim, embedded by the Go module so its tests can build a pool
+of their own and so the Go `data refresh` (Phase 8) creates the file Python
+creates; and `go/internal/pool/pooltest/testdata/tiny_pool.json` is the 21-card
+`tiny_pool` -- `CARDS` and `PRINTINGS` as the rows `load_oracle` and
+`load_printings` would insert, column names beside them -- so the Go pool
+tests read real cards in CI, where there is no Python and no DuckDB file.
+This is the same fixture `tiny_pool.py` already commits, in a second
+encoding; it is not a card pool redistribution (ADR 6, rule 5).
 """
 
 from __future__ import annotations
@@ -45,6 +55,10 @@ YAML_PATH = TESTDATA / "rich-deck.yaml"
 JSON_PATH = TESTDATA / "rich-deck.parsed.json"
 #: Where the Go module embeds the reference prose from (`go:embed data/*`).
 REFERENCE_DIR = ROOT / "go" / "internal" / "reference" / "data"
+#: The pool's schema and the 21-card fixture, for the Go pool tests.
+POOL_DIR = ROOT / "go" / "internal" / "pool"
+SCHEMA_PATH = POOL_DIR / "schema.sql"
+TINY_POOL_PATH = POOL_DIR / "pooltest" / "testdata" / "tiny_pool.json"
 
 
 def rich_deck() -> Deck:
@@ -112,6 +126,34 @@ def render() -> tuple[str, str]:
                             ensure_ascii=False) + "\n"
 
 
+def render_schema() -> str:
+    """`cards/db.py:SCHEMA`, exactly -- the text Python runs to create a pool."""
+    from mtglab.cards import db
+    return db.SCHEMA.strip("\n") + "\n"
+
+
+def render_tiny_pool() -> str:
+    """`tiny_pool`'s cards and printings as the rows the loaders insert.
+
+    The same filters `load_oracle` and `load_printings` apply (no tokens or
+    art-series rows; no digital printings), the same row builders, and the
+    column names beside the rows so the Go loader binds by name rather than
+    by a position counted in two languages.
+    """
+    import tiny_pool
+    from mtglab.cards import db
+    cards = [db._oracle_row(c) for c in tiny_pool.CARDS
+             if c.get("layout") not in {"art_series", "token", "double_faced_token"}]
+    printings = [db._printing_row(p) for p in tiny_pool.PRINTINGS
+                 if not p.get("digital")]
+    return json.dumps({
+        "oracle_columns": list(db._ORACLE_COLUMNS),
+        "oracle_cards": cards,
+        "printing_columns": list(db._PRINTING_COLUMNS),
+        "printings": printings,
+    }, indent=1, ensure_ascii=False) + "\n"
+
+
 def write() -> None:
     TESTDATA.mkdir(parents=True, exist_ok=True)
     text, parsed = render()
@@ -122,6 +164,10 @@ def write() -> None:
     for name, body in reference.render().items():
         (REFERENCE_DIR / name).write_text(body, encoding="utf-8")
         print(f"wrote {REFERENCE_DIR / name}")
+    TINY_POOL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SCHEMA_PATH.write_text(render_schema(), encoding="utf-8")
+    TINY_POOL_PATH.write_text(render_tiny_pool(), encoding="utf-8")
+    print(f"wrote {SCHEMA_PATH}\nwrote {TINY_POOL_PATH}")
 
 
 if __name__ == "__main__":

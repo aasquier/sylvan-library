@@ -76,3 +76,22 @@ func TestUnprocessableIsFastAPIsValidationList(t *testing.T) {
 		t.Fatalf("empty = %s", rec.Body.String())
 	}
 }
+
+func TestPyReprWritesWhatPythonWrites(t *testing.T) {
+	for in, want := range map[string]string{
+		"nope":     `'nope'`,
+		"no'pe":    `"no'pe"`,
+		`say "hi"`: `'say "hi"'`,
+		`it's "x"`: `'it\'s "x"'`,
+		"a\\b":     `'a\\b'`,
+		"a\nb\tc":  `'a\nb\tc'`,
+		"café":     `'café'`,
+		"x\x01y":   `'x\x01y'`,
+		"":         `''`,
+		"Æon — é":  `'Æon — é'`,
+	} {
+		if got := PyRepr(in); got != want {
+			t.Errorf("PyRepr(%q) = %s, want %s", in, got, want)
+		}
+	}
+}

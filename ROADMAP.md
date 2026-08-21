@@ -96,7 +96,12 @@ Where it stands, kept here so a fresh session knows the frontier:
   (`go/internal/door/routes.go`, `go/internal/api`, `go/internal/wire`) and
   the pool-free prose family — `/api/colors`, `/api/glossary`, `/api/themes`
   served by Go from `go/internal/reference/data/`, the JSON `mtglab.reference`
-  renders and `tests/test_go_fixtures.py` keeps current.
+  renders and `tests/test_go_fixtures.py` keeps current. **Then the pool:**
+  `go/internal/pool` (leased, stamp-checked, the door a CGO build from here),
+  the partners port and the camera reader, and the second family —
+  `/api/cards/search`, `/api/cards/identify`, `/api/colors/{key}`,
+  `/api/lore` — with `/api/colors/progress` reserved for Python until the
+  deck reads move.
 
 ### The next phase — the Simulator learns (decided 2026-08-20)
 

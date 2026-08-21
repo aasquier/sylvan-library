@@ -16,7 +16,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/door"
+	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
 // uiCommand is `mtglab ui`: the front door on --host:--port, everything
@@ -29,9 +31,10 @@ import (
 //	    -- mtglab ui --no-open --host 127.0.0.1 --port 8765
 //
 // Auth follows MTGLAB_REQUIRE_AUTH and MTGLAB_SECURE_COOKIES exactly as
-// `config.py` reads them, and `app.db` is found under MTGLAB_DATA_DIR; the
-// door has no `.env` reader, so on a laptop export what the Python server
-// reads from its `.env`, or leave auth off, which is the local default.
+// `config.py` reads them, and `app.db` and the card pool are found under
+// MTGLAB_DATA_DIR (`internal/config`); the door has no `.env` reader, so on
+// a laptop export what the Python server reads from its `.env`, or leave
+// auth off, which is the local default.
 func uiCommand() *cobra.Command {
 	var (
 		host, port, upstream, webDist, tarot string
@@ -78,15 +81,18 @@ func serve(host, port, upstream, webDist, tarot string, child []string) error {
 	if err != nil || up.Scheme == "" || up.Host == "" {
 		return fmt.Errorf("--upstream must be a URL like http://127.0.0.1:8765, got %q", upstream)
 	}
-	requireAuth := door.Flag("MTGLAB_REQUIRE_AUTH", false)
+	requireAuth := config.RequireAuth()
 	d, err := door.New(door.Config{
 		RequireAuth:   requireAuth,
-		SecureCookies: door.Flag("MTGLAB_SECURE_COOKIES", requireAuth),
-		AppDB:         door.AppDBPath(),
+		SecureCookies: config.SecureCookies(),
+		AppDB:         config.AppDBPath(),
 		WebDist:       webDist,
 		TarotDir:      tarot,
 		Upstream:      up,
-		Logger:        log,
+		// The pool, on a lease: opened at the first ask, handed back when
+		// idle, re-opened when `data refresh` replaces the file.
+		Pool:   pool.New(config.DBPath(), log),
+		Logger: log,
 	})
 	if err != nil {
 		return err

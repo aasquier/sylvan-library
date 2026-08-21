@@ -417,6 +417,36 @@ that follow. The door test `TestEveryPortedRouteIsInTheSharedTable` is the
 ghost guard for this direction: Go may serve only a path `routes.json`
 already classifies.
 
+**The pool came second, and the door became a CGO build.** `go/internal/pool`
+is `cards/db.py`'s read side over `github.com/duckdb/duckdb-go`: the file
+opened read-only **on a lease** — opened at the first ask, handed back after
+ten idle seconds (`service._KEEPER_IDLE`, shorter than the platform health
+check's cadence for the reason `api/service.py:_pin` argues: a held read-only
+handle is a held shared lock, and a door that kept the pool open forever
+would refuse every `data refresh` on the instance), re-opened when the file's
+stamp moves, with `get_cards` memoised per open the way Python memoises it
+per stamp. `GetCards` keeps Python's precedence (exact full name over a face
+name; Ajani, Nacatl Pariah by its white front still reports {R}{W}), and the
+schema Python runs is embedded verbatim (`pool.Schema`, written by
+`tests/go_fixtures.py` beside the 21-card `tiny_pool` as rows, so the Go
+tests build a real pool in CI where there is no Python). `go/internal/gate`
+opened with `partners.py` (search's `commanders_only` decides with the same
+`CanBeCommander` the gate will), `go/internal/cards` is the camera reader
+(`identify.py`: a corner resolves, a title only offers), and the second
+family flipped: `/api/cards/search`, `/api/cards/identify`,
+`/api/colors/{key}` and `/api/lore`. Two things the flip surfaced. The route
+table learned that a literal Python still owns can sit beside a template Go
+answers — FastAPI declares `/api/colors/progress` before `/api/colors/{key}`
+— so the table matches the most specific pattern and the API **reserves**
+the literals it has not ported (`api.Proxied`), both held to `routes.json`
+by the door's test. And on this Mac the CGO door needs
+`CGO_LDFLAGS="-Wl,-U,_SecTrustCopyCertificateChain"` to link at all: Go's
+`crypto/x509` references a macOS 12 Security API the Xcode 12 SDK here does
+not declare, which the CGO-free door never asked clang about (the same
+missing symbol that made golangci-lint a `CGO_ENABLED=0` install in Phase
+2). Linux — CI and the image — never sees it; CLAUDE.md's toolchain
+paragraph carries the flag.
+
 **Phase 4 — Writes and the log** *(~¾–1 day).* The edit operations
 (text surgery + oracle verification, ADR 12's five rules re-proven),
 `_commit` + the activity log (ADR 28: one call site, `record` never raises,
@@ -557,8 +587,10 @@ There is more than one Claude in this house now. Rules for the duration:
   | `auth/sessions.py`, `auth/passwords.py` (read side: resolve a token, verify a hash) | **go** | `go/internal/auth`; read-only, Python still owns every write and the schema ladder |
   | the route classification (`tests/contract/routes.json`) | shared | read by `tests/test_isolation.py`, `tests/contract/`, and `go/internal/routes` |
   | `GET /api/colors`, `GET /api/glossary`, `GET /api/themes` — the reference prose with no pool behind it | **go** | `go/internal/api` over `go/internal/reference`, 2026-08-21 — the first family flipped, and the flip mechanism (`go/internal/door/routes.go`) with it |
+  | `cards/db.py` (read side: open read-only, `get_cards`, `search`, the column fill, `art_crop_from`), `config.py` (paths and flags), `decks/partners.py`, `cards/identify.py` | **go** | `go/internal/pool` (leased, stamp-checked; `pool.Schema` is `SCHEMA` verbatim), `go/internal/config`, `go/internal/gate` (partners first), `go/internal/cards`, 2026-08-21 — the door is a CGO build from here |
+  | `GET /api/cards/search`, `POST /api/cards/identify`, `GET /api/colors/{key}`, `GET /api/lore` — the pool behind the prose and the pool's own two doors | **go** | `go/internal/api`, 2026-08-21 — the second family; `/api/colors/progress` stays Python's and is reserved (`api.Proxied`) until the deck family moves |
   | `colors.py`, `glossary.py`, `lore.py`, `tarotlore.py`, `decks/model.py:THEMES` — the prose itself | shared | authored in Python, rendered by `mtglab.reference` into `go/internal/reference/data/` (written by `tests/go_fixtures.py`, held current by `tests/test_go_fixtures.py`), embedded and served by Go; the JSON becomes authoritative at Phase 8 |
-  | everything else under `/api` — `api/`, `decks/`, `cards/`, `sim/`, `claude/`, `artifacts/`, `mana.py`, `tarot.py`, `symbols.py`, `ocr.py`, `config.py`, `cli.py` | python | proxied to uvicorn on loopback; the read spine continues with the pool (CGO), then the deck reads, then the shelves |
+  | everything else under `/api` — `api/`, `decks/` (model, gate, analyze, suggest, the sources, the log), `sim/`, `claude/`, `artifacts/`, `mana.py`, `tarot.py`, `symbols.py`, `ocr.py`, `cli.py` | python | proxied to uvicorn on loopback; the read spine continues with the deck reads, then the shelves |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
   walked before the next flip starts (main deploys itself; every flip is a
