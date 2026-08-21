@@ -126,7 +126,8 @@ def validate(deck: Deck, cards: dict[str, CardRecord] | None = None, *,
         rep.add("warn", "legacy-archetype",
                 f"{detail}`archetype:` is a legacy key (ADR 37): declare a "
                 f"strategy word in `themes` instead -- "
-                f"{', '.join(ARCHETYPES)} -- and the next write drops it")
+                f"{', '.join(ARCHETYPES)} -- and the edit that does will "
+                f"drop this key itself")
     for theme in deck.themes:
         if theme not in THEMES:
             rep.add("warn", "unknown-theme",

@@ -544,6 +544,22 @@ def test_a_pilot_is_a_name_with_its_case_kept(tmp_path):
         set_deck_field(DECK, field="pilot", value="x" * 41)
 
 
+def test_a_themes_edit_that_shadows_the_legacy_key_removes_it():
+    """Deck writes are surgical (ADR 12), so `Deck.dump`'s once-shadowed-
+    dropped rule never runs on the app's write path -- the themes edit that
+    declares a class word is the only chance the dead key gets to leave the
+    file. An edit declaring no class word must leave it: it is still the
+    deck's board until shadowed."""
+    legacy = DECK.replace("commander:", "archetype: midrange\ncommander:")
+
+    kept = set_deck_field(legacy, field="themes", value="cats,lifegain")
+    assert yaml.safe_load(kept)["archetype"] == "midrange"
+
+    cleaned = set_deck_field(legacy, field="themes", value="cats,aggro")
+    assert "archetype" not in yaml.safe_load(cleaned)
+    assert "archetype" not in cleaned
+
+
 def test_the_archetype_is_not_settable_and_the_refusal_says_where_it_went():
     """ADR 37 retired the declared class: the archetype is a reading of the
     themes, so the write path refuses it -- and because it *was* settable

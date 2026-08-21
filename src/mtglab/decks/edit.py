@@ -1016,6 +1016,23 @@ def set_deck_field(text: str, *, field: str, value: Any) -> str:
 
     expected = copy.deepcopy(doc)
     expected[field] = value
+
+    if field == "themes" and any(a in value for a in ARCHETYPES):
+        # The edit that shadows a pre-ADR-37 `archetype:` key is the edit
+        # that removes it. Deck writes are surgical (ADR 12) -- nothing on
+        # the app's write path ever calls `Deck.dump` on an existing file --
+        # so `dump`'s own once-shadowed-dropped rule would never fire here
+        # and the dead key would outlive the migration it warns about. A
+        # themes edit that declares no class word leaves the key alone: it
+        # is still the deck's only board, load-bearing until shadowed.
+        shadowed = updated.split("\n")
+        span = _top_level_span(shadowed, "archetype")
+        if span is not None:
+            start, end = span
+            _content, tail = _split_tail(shadowed[start:end], 0)
+            updated = "\n".join(shadowed[:start] + tail + shadowed[end:])
+            expected.pop("archetype", None)
+
     return _verified(updated, expected)
 
 
