@@ -280,7 +280,15 @@ src/mtglab/
                           never what a rationale says
   decks/wheel.py          the Wheel of Fortune: a seeded spin picks one of
                           four fates and a card that answers it; no model
-  sim/compile.py          deck.yaml + pool -> SimCards
+  sim/compile.py          deck.yaml + pool -> SimCards, and a `CompileReport`
+                          saying what the pool could *not* resolve -- a
+                          dropped card used to shrink the deck silently, which
+                          for Tier 1.5 is the population every probability is
+                          computed over. `mana_produced` reads the amount off
+                          the oracle text, because Scryfall's `produced_mana`
+                          names colours and never amounts: until 2026-08-21
+                          **Sol Ring produced one mana** and every deck's
+                          acceleration was understated
   sim/cache.py            memoised Tier 1 results, keyed on compiled input
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/karsten.py          Tier 1.5, the closed form: hypergeometric coloured
@@ -977,6 +985,27 @@ State that caveat when quoting its numbers.
 speed.** Commander speed rises monotonically with land count, so optimising it
 alone always recommends more lands. Deployment peaks and then falls as flood
 sets in. That peak is the answer.
+
+**An invalid deck is simulated, not refused -- and every result says so.**
+Decided 2026-08-21 with Aaron. Refusing was the obvious call and is the wrong
+one: two of the six decks here deliberately fail the gate on a banned card, a
+deck mid-import fails it by construction, and the simulator is the tool
+somebody reaches for to *fix* a deck, so refusing removes the diagnosis at
+exactly the moment it is wanted (commandment 2). Instead every Tier 1 and
+Tier 1.5 result carries `deck_check` -- the gate's verdict, attached after the
+cache because the numbers are keyed on the compiled deck and the verdict is
+not. `MOVES_THE_NUMBERS` in `api/simruns.py` splits failures that change what
+was computed (a banned card is in the 99 being shuffled; an unresolved card
+was dropped, so the deck shrank) from failures that do not (a missing
+rationale blocks a curated deck and has nothing to do with mana), because the
+screen says something different about each.
+
+**One state is refused**: a deck that compiles to no cards raises
+`NothingToSimulate`. An empty deck used to answer with a 100% mulligan rate,
+zero spells through turn 8, and a shelf demanding coloured sources against a
+library of nought -- every figure arithmetically correct and none of them
+about anything. `adrix-and-nev-twincasters` was in that state on the deployed
+instance.
 
 **Tier 1.5** (`sim/karsten.py`, `mtglab sim shelf`) answers with arithmetic
 what Tier 1 answers by sampling -- exactly, and about a simpler game. It
