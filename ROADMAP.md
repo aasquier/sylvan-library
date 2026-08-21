@@ -84,6 +84,33 @@ its own branch or few, in this order because each drinks from the one before:
      always wide; four of the six decks correctly report "your default is
      already right", and then name the rule that deploys the same while
      mulliganing 14% of hands instead of 43%.
+3b. **The mana curve** (designed 2026-08-21, *awaiting two rulings*). Aaron
+   asked for a land count giving a statistically guaranteed land drop every
+   turn. **Computed, the answer is unusable and that is the finding**: 54
+   lands to make every drop through turn 4 at 90%, because you need T lands
+   out of 6+T cards and that ratio climbs toward 100%. "Every turn" is only
+   answerable as "through turn *what*", and at a real 34-36 lands every deck
+   here makes all its drops through T4 about half the time.
+
+   So the question is reframed as **do I have T mana on turn T**, where ramp
+   substitutes for the drop and carries most of the weight — worth +28 to +58
+   points by turn 6 across the six decks, and the spread between them is the
+   actionable part. The closed form is validated against Tier 1 at a mean
+   absolute error of **0.25 mana** over six decks and six turns:
+
+       E[mana on turn T] = E[min(T, lands drawn)] + Σ accelerants online
+
+   Two details are load-bearing. The one-land-per-turn cap goes **inside** the
+   expectation, not outside. And a land-fetch spell is not a mana rock: it has
+   no `produces` at all and does not use the land drop, so it adds on top of
+   the cap — omitting it was a −0.54 mana bias, and the *pattern* of the error
+   named it (Esper Tivit accurate, every green deck ~0.9 low).
+
+   **Two rulings before it is built**: whether the target turn is a control or
+   fixed, and whether the recommendation may say *add ramp, not lands* — which
+   for Atla Palani is the honest answer and is a different kind of advice than
+   this tool has given before.
+
 4. **Ratings, then the regression** — TrueSkill-style posteriors per
    archetype class and **never across** (goal 7's engine, goal 9's honest
    shape), then a win-probability logistic regression over compiled-deck

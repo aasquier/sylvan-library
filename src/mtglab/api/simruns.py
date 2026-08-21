@@ -46,8 +46,9 @@ from mtglab.api.jobs import Plan, Progress
 from mtglab.api.service import _connect, _pool_for, _source
 from mtglab.decks.model import Deck
 from mtglab.decks.source import DeckSource
+from mtglab.decks.validate import ValidationReport, validate
 from mtglab.sim import cache
-from mtglab.sim.compile import compile_deck
+from mtglab.sim.compile import CompileReport, compile_report
 from mtglab.sim.tier1.engine import KeepRule, SimCard, run
 
 TIER1_CAVEAT = (
@@ -77,18 +78,85 @@ __all__ = ["DEFAULT_SEED", "LAND_SWEEP_CAVEAT", "TIER1_CAVEAT", "Plan",
 
 def _compile(slug: str, *, source: DeckSource | None = None
              ) -> tuple[Deck, list[SimCard], SimCard | None]:
+    """The compiled deck, for callers that do not report a number."""
+    deck, report, _check = _compile_checked(slug, source=source)
+    return deck, report.library, report.commander
+
+
+def _compile_checked(slug: str, *, source: DeckSource | None = None
+                     ) -> tuple[Deck, CompileReport, dict[str, Any]]:
+    """Compile, and run the gate over the same deck and the same pool.
+
+    Both halves happen here because they need the same open connection, and
+    because **every number this module reports has to be able to say whether
+    the deck it describes is legal.** The alternative was refusing to simulate
+    an invalid deck, and that is the wrong call: two of the six decks in this
+    library deliberately fail the gate on a banned card, a deck mid-import
+    fails it by construction, and the simulator is the tool you would reach
+    for to *fix* a deck. Refusing takes the diagnosis away at exactly the
+    moment somebody wants it, which is commandment 2 with the sign flipped.
+
+    So nothing is blocked except the one state with no answer in it -- a deck
+    that compiles to no cards, which `compile_report` refuses -- and
+    everything else is reported **with its verdict attached**, the way every
+    Tier 1 result already carries its caveat and its provenance.
+    """
     deck = _source(source).get(slug)
     con = _connect()
     try:
         cards = _pool_for(deck, con)
+        if not cards:
+            raise RuntimeError(
+                "simulation needs the card pool -- run `mtglab data refresh`")
+        report = compile_report(deck, cards)
+        verdict = validate(deck, cards)
     finally:
         if con is not None:
             con.close()
-    if not cards:
-        raise RuntimeError(
-            "simulation needs the card pool -- run `mtglab data refresh`")
-    library, commander = compile_deck(deck, cards)
-    return deck, library, commander
+    return deck, report, _check_payload(report, verdict)
+
+
+#: Gate failures that change what a simulation computes, as opposed to
+#: failures that are real but do not touch these numbers. A missing rationale
+#: blocks a curated deck and has no effect whatsoever on mana; a banned card
+#: is sitting in the 99 being shuffled. The client says something different
+#: about each, so the split is decided here rather than guessed there.
+MOVES_THE_NUMBERS = frozenset({
+    "deck-size",        # the population every probability is computed over
+    "banned",           # a card in the 99 that should not be there
+    "color-identity",   # demands a colour the mana base was never built for
+    "unknown-card",     # dropped by the compiler, so the deck silently shrinks
+    "no-commander",     # nothing to measure "commander by turn N" against
+    "not-a-commander",
+    "too-many-commanders",
+})
+
+
+def _check_payload(report: CompileReport,
+                   verdict: ValidationReport) -> dict[str, Any]:
+    """The gate's answer, shaped for a client that must not re-derive it."""
+    material = [i for i in verdict.errors if i.code in MOVES_THE_NUMBERS]
+    return {
+        "ok": verdict.ok,
+        "error_count": len(verdict.errors),
+        "warning_count": len(verdict.warnings),
+        # Capped: a deck failing on ninety-nine rationales would otherwise
+        # send ninety-nine strings to render a sentence that says "99".
+        "errors": [
+            {"code": i.code, "message": i.message, "card": i.card}
+            for i in verdict.errors[:6]
+        ],
+        # Whether any of those failures actually moves these numbers. It is
+        # the difference between "this deck is illegal, and the figures below
+        # describe it as written" and "this deck is illegal in a way that
+        # makes the figures below describe a different deck".
+        "affects_numbers": bool(material) or not report.complete,
+        "unresolved": list(report.unresolved[:6]),
+        "unresolved_count": len(report.unresolved),
+        "commander_unresolved": report.commander_unresolved,
+        "declared_size": report.declared_size,
+        "simulated_size": report.simulated_size,
+    }
 
 
 def _keep_rule(payload: dict[str, Any]) -> KeepRule:
@@ -223,7 +291,8 @@ def plan_mana(slug: str, payload: dict[str, Any],
     label = f"{slug}: mana, {games:,} games"
 
     try:
-        deck, library, commander = _compile(slug, source=source)
+        deck, report, check = _compile_checked(slug, source=source)
+        library, commander = report.library, report.commander
     except Exception as exc:                                        # noqa: BLE001
         # Planning is an optimisation, and a deck that cannot compile has to
         # fail the way it failed before this existed: inside the job, reported
@@ -233,14 +302,20 @@ def plan_mana(slug: str, payload: dict[str, Any],
     key = _mana_key(library, commander, games, turns, keep, seed)
     hit = cache.get(key)
     if hit is not None:
+        # The verdict is attached *after* the cache, deliberately: the cached
+        # numbers are keyed on the compiled deck, but whether that deck passes
+        # the gate can change without the compiled cards moving -- a rationale
+        # written, a `stage` promoted. A stale verdict on fresh-looking numbers
+        # is exactly the failure this whole field exists to prevent.
         answer = _stamp(hit.result, cached=True, computed_at=hit.created_at)
+        answer["deck_check"] = check
         return Plan("sim.mana", label, answer, lambda _progress: answer)
 
     def compute(progress: Progress) -> dict[str, Any]:
         result = _mana_result(slug, deck, library, commander, games, turns,
                               keep, seed, progress)
         cache.put(key, "sim.mana", result)
-        return _stamp(result, cached=False)
+        return dict(_stamp(result, cached=False), deck_check=check)
 
     return Plan("sim.mana", label, None, compute)
 
@@ -367,7 +442,8 @@ def plan_lands(slug: str, payload: dict[str, Any],
     label = f"{slug}: land sweep {counts[0]}-{counts[-1]}"
 
     try:
-        deck, library, commander = _compile(slug, source=source)
+        deck, report, check = _compile_checked(slug, source=source)
+        library, commander = report.library, report.commander
         resized = {count: _resize(library, count) for count in counts}
     except Exception as exc:                                        # noqa: BLE001
         # As in `plan_mana`, plus one failure of its own: `_resize` refuses a
@@ -388,10 +464,13 @@ def plan_lands(slug: str, payload: dict[str, Any],
                           games, seed),
             cached=True,
             computed_at=min(hit.created_at for hit in found if hit is not None))
+        answer["deck_check"] = check
         return Plan("sim.lands", label, answer, lambda _progress: answer)
 
     return Plan("sim.lands", label, None,
-                lambda progress: _sweep(slug, deck, commander, resized, games,
-                                        turns, keep, seed, progress))
+                lambda progress: dict(
+                    _sweep(slug, deck, commander, resized, games, turns, keep,
+                           seed, progress),
+                    deck_check=check))
 
 

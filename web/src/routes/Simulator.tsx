@@ -28,7 +28,7 @@ import {
 } from '../components/lazycharts'
 import { DataTable } from '../components/datatable'
 import { MatchTheater } from '../components/theater'
-import { ClosedForm, PolicyReport } from '../components/closedform'
+import { ClosedForm, DeckVerdict, PolicyReport } from '../components/closedform'
 import { theaterRows } from '../lib/theater'
 import { HelpTip, Term } from '../components/term'
 
@@ -426,14 +426,16 @@ export default function Simulator() {
           answer different questions in one column is how a screen lies with
           correct numbers. `karsten.py`'s docstring carries the measurement. */}
       {shelf && (
-        <section className="card-surface space-y-2 rounded-xl p-5">
+        <section className="card-surface space-y-3 rounded-xl p-5">
+          <DeckVerdict check={shelf.deck_check} />
           <ClosedForm shelf={shelf} />
           <Caveat>{shelf.caveat}</Caveat>
         </section>
       )}
 
       {policy && (
-        <section className="card-surface space-y-2 rounded-xl p-5">
+        <section className="card-surface space-y-3 rounded-xl p-5">
+          <DeckVerdict check={policy.deck_check} />
           <PolicyReport policy={policy} />
           <Provenance seed={policy.seed} cached={policy.cached}
                       computed_at={policy.computed_at} />
@@ -443,6 +445,10 @@ export default function Simulator() {
 
       {mana && (
         <div className="space-y-6">
+          {/* The same rule as the closed form's: a number about an illegal
+              deck is honest only when it says so, and Tier 1's figures are
+              no more exempt than Tier 1.5's. */}
+          <DeckVerdict check={mana.deck_check} />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <StatTile label="Mulligan rate" value={percent(mana.mulligan_rate)}
                       hint={`avg ${mana.avg_mulligans.toFixed(2)} per game`}
@@ -527,6 +533,7 @@ export default function Simulator() {
 
       {lands && (
         <div className="space-y-6">
+          <DeckVerdict check={lands.deck_check} />
           <div className="grid gap-3 sm:grid-cols-3">
             <StatTile label="Deployment spread"
                       value={lands.deployment_spread.toFixed(2)}

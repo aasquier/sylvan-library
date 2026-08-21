@@ -30,7 +30,11 @@ from __future__ import annotations
 from typing import Any
 
 from mtglab.api.jobs import Plan, Progress
-from mtglab.api.simruns import DEFAULT_SEED, _compile, _deferred_failure
+from mtglab.api.simruns import (
+    DEFAULT_SEED,
+    _compile_checked,
+    _deferred_failure,
+)
 from mtglab.decks.model import Deck
 from mtglab.decks.source import DeckSource
 from mtglab.sim import cache, karsten, mulligan
@@ -90,10 +94,10 @@ def shelf_result(slug: str, payload: dict[str, Any], *,
     target = float(payload.get("target", karsten.TARGET))
     target = max(0.5, min(target, 0.99))
 
-    deck, library, commander = _compile(slug, source=source)
-    computed = karsten.shelf(library, commander, target=target,
+    deck, report, check = _compile_checked(slug, source=source)
+    computed = karsten.shelf(report.library, report.commander, target=target,
                              on_the_play=on_the_play)
-    return _shelf_payload(slug, deck, computed)
+    return dict(_shelf_payload(slug, deck, computed), deck_check=check)
 
 
 def _shelf_payload(slug: str, deck: Deck,
@@ -200,7 +204,8 @@ def plan_policy(slug: str, payload: dict[str, Any],
     label = f"{slug}: mulligan policies, {games:,} games each"
 
     try:
-        deck, library, commander = _compile(slug, source=source)
+        deck, report, check = _compile_checked(slug, source=source)
+        library, commander = report.library, report.commander
     except Exception as exc:                                        # noqa: BLE001
         # Same contract as `plan_mana`: planning is an optimisation, and a
         # deck that cannot compile must fail as a job in state `error` rather
@@ -221,13 +226,16 @@ def plan_policy(slug: str, payload: dict[str, Any],
                            "flat": mulligan.FLAT})
     hit = cache.get(key)
     if hit is not None:
-        answer = dict(hit.result, cached=True, computed_at=hit.created_at)
+        # Attached after the cache, for the reason `plan_mana` records: the
+        # numbers are keyed on the compiled deck, and the verdict is not.
+        answer = dict(hit.result, cached=True, computed_at=hit.created_at,
+                      deck_check=check)
         return Plan("sim.policy", label, answer, lambda _progress: answer)
 
     def compute(progress: Progress) -> dict[str, Any]:
         result = _policy_result(slug, deck, library, commander, games, turns,
                                 seed, progress)
         cache.put(key, "sim.policy", result)
-        return dict(result, cached=False, computed_at=None)
+        return dict(result, cached=False, computed_at=None, deck_check=check)
 
     return Plan("sim.policy", label, None, compute)

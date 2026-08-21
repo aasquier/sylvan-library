@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type {
-  CardOddsRow, ColorRequirementRow, PolicyResult, ShelfResult,
+  CardOddsRow, ColorRequirementRow, DeckCheck, PolicyResult, ShelfResult,
 } from '../lib/api'
 import { Badge, ManaCost, StatTile } from './ui'
 import { HelpTip, Term } from './term'
@@ -374,6 +374,81 @@ export function PolicyReport({ policy }: { policy: PolicyResult }) {
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+/**
+ * The gate's verdict, shown above the numbers it applies to.
+ *
+ * The simulator does not refuse an invalid deck, so this is what keeps that
+ * honest. Two registers, and the server decides which one applies rather than
+ * this file guessing from the error codes: a deck that is illegal in a way
+ * that leaves the figures describing *the deck as written*, and one that is
+ * illegal in a way that makes the figures describe **a different deck** — a
+ * card the pool never resolved was dropped, so every probability below is
+ * over a smaller library than the one on the page.
+ *
+ * Renders nothing at all for a clean deck. A banner that always says
+ * something is a banner people stop reading.
+ */
+export function DeckVerdict({ check }: { check: DeckCheck | undefined }) {
+  if (!check || (check.ok && check.unresolved_count === 0)) return null
+
+  const dropped = check.unresolved_count > 0 || check.commander_unresolved
+  const tone = check.affects_numbers ? 'var(--status-critical)' : 'var(--status-warning)'
+
+  return (
+    <div className="rounded-lg p-3 text-xs"
+         style={{
+           background: `color-mix(in srgb, ${tone} 10%, transparent)`,
+           borderLeft: `2px solid ${tone}`,
+         }}>
+      <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+        {dropped
+          ? `${check.simulated_size} of ${check.declared_size} cards were simulated`
+          : 'This deck does not pass the gate'}
+      </div>
+      <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>
+        {dropped ? (
+          <>
+            {check.unresolved_count > 0 && <>
+              {check.unresolved_count} card
+              {check.unresolved_count === 1 ? ' is' : 's are'} not in the card
+              pool and {check.unresolved_count === 1 ? 'was' : 'were'} left
+              out ({check.unresolved.join(', ')}
+              {check.unresolved_count > check.unresolved.length && ', and others'}).{' '}
+            </>}
+            {check.commander_unresolved && <>The commander did not resolve either.{' '}</>}
+            Every figure below is worked out over the {check.simulated_size} cards
+            that did resolve, so read them as being about that deck rather than
+            about yours.
+          </>
+        ) : check.affects_numbers ? (
+          <>
+            The figures below describe the deck exactly as written — which is
+            not a deck you can legally play. Fixing the gate’s complaint will
+            move them.
+          </>
+        ) : (
+          <>
+            The gate’s complaints are about the deck’s paperwork rather than its
+            mana, so the figures below are unaffected by them.
+          </>
+        )}
+      </p>
+      {check.errors.length > 0 && (
+        <ul className="mt-1.5 ml-4 list-disc" style={{ color: 'var(--text-muted)' }}>
+          {check.errors.map((e) => (
+            <li key={`${e.code}-${e.card ?? ''}`}>
+              {e.card ? `${e.card}: ${e.message}` : e.message}
+            </li>
+          ))}
+          {check.error_count > check.errors.length && (
+            <li>and {check.error_count - check.errors.length} more</li>
+          )}
+        </ul>
+      )}
     </div>
   )
 }

@@ -19,10 +19,10 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { PolicyResult, ShelfResult } from '../lib/api'
+import type { DeckCheck, PolicyResult, ShelfResult } from '../lib/api'
 import { resetGlossaryCache } from '../lib/glossary'
 import { heatPercent } from '../lib/heat'
-import { ClosedForm, PolicyReport } from './closedform'
+import { ClosedForm, DeckVerdict, PolicyReport } from './closedform'
 
 vi.mock('../lib/api', async () => {
   const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api')
@@ -234,5 +234,80 @@ describe('the cell percentage', () => {
     // which is what a turn before the card's own mana value actually is.
     expect(heatPercent(0)).toBe('·')
     expect(heatPercent(1)).toBe('100')
+  })
+})
+
+function checkOf(over: Partial<DeckCheck> = {}): DeckCheck {
+  return {
+    ok: true, error_count: 0, warning_count: 0, errors: [],
+    affects_numbers: false, unresolved: [], unresolved_count: 0,
+    commander_unresolved: false, declared_size: 99, simulated_size: 99,
+    ...over,
+  }
+}
+
+describe('the deck verdict', () => {
+  it('says nothing at all about a clean deck', () => {
+    const { container } = render(<DeckVerdict check={checkOf()} />)
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('says nothing when the server sent no verdict', () => {
+    const { container } = render(<DeckVerdict check={undefined} />)
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('warns that the figures describe the deck as written when a card is banned', () => {
+    render(<DeckVerdict check={checkOf({
+      ok: false, error_count: 1, affects_numbers: true,
+      errors: [{ code: 'banned', message: 'not legal in Commander',
+                 card: 'Primeval Titan' }],
+    })} />)
+    expect(screen.getByText(/not a deck you can legally play/)).toBeTruthy()
+    expect(screen.getByText(/Primeval Titan/)).toBeTruthy()
+  })
+
+  it('says a paperwork failure leaves the figures alone', () => {
+    // A missing rationale blocks a curated deck and has nothing to do with
+    // mana. Telling somebody their numbers are suspect because of it would
+    // train them to ignore the banner that matters.
+    render(<DeckVerdict check={checkOf({
+      ok: false, error_count: 1, affects_numbers: false,
+      errors: [{ code: 'missing-rationale', message: 'no why', card: 'Forest' }],
+    })} />)
+    expect(screen.getByText(/paperwork rather than its mana/)).toBeTruthy()
+    expect(screen.queryByText(/legally play/)).toBeNull()
+  })
+
+  it('leads with the size when cards were dropped, because that is worse', () => {
+    // An unresolved card is not merely a legality complaint: it shrinks the
+    // population every probability was computed over, so the figures are
+    // about a different deck rather than about an illegal one.
+    render(<DeckVerdict check={checkOf({
+      ok: false, error_count: 3, affects_numbers: true,
+      unresolved: ['Berserk', 'Rancor'], unresolved_count: 2,
+      declared_size: 99, simulated_size: 97,
+      errors: [{ code: 'unknown-card', message: 'not in the pool',
+                 card: 'Berserk' }],
+    })} />)
+    expect(screen.getByText(/97 of 99 cards were simulated/)).toBeTruthy()
+    expect(screen.getByText(/Berserk, Rancor/)).toBeTruthy()
+    expect(screen.getByText(/about that deck rather than about yours/)).toBeTruthy()
+  })
+
+  it('mentions a commander that did not resolve', () => {
+    render(<DeckVerdict check={checkOf({
+      ok: false, error_count: 1, affects_numbers: true,
+      commander_unresolved: true, declared_size: 99, simulated_size: 99,
+    })} />)
+    expect(screen.getByText(/commander did not resolve/)).toBeTruthy()
+  })
+
+  it('caps the error list and says how many it left out', () => {
+    render(<DeckVerdict check={checkOf({
+      ok: false, error_count: 20, affects_numbers: true,
+      errors: [{ code: 'banned', message: 'nope', card: 'A' }],
+    })} />)
+    expect(screen.getByText(/and 19 more/)).toBeTruthy()
   })
 })

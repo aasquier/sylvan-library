@@ -10,7 +10,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from mtglab.sim.compile import compile_deck, enters_tapped, fetches_lands
+from mtglab.sim.compile import (
+    compile_deck,
+    enters_tapped,
+    fetches_lands,
+    mana_produced,
+)
 
 # ------------------------------------------------------------- enters tapped
 
@@ -174,6 +179,120 @@ def test_instants_do_not_become_permanent_mana_sources():
     library, _ = compile_deck(deck, pool)
     assert library[0].produces == ()
     assert not library[0].is_ramp
+
+
+# --------------------------------------------------------- mana produced
+#
+# Every oracle text below is quoted from the real pool, checked on 2026-08-21
+# rather than recalled -- which is rule 1 applied to the tests as well as to
+# the code. The bug these defend against is that Scryfall's `produced_mana`
+# names colours and never amounts, so **Sol Ring produced one mana** until
+# this function existed, and every deck's acceleration was understated.
+
+
+def test_sol_ring_makes_two():
+    """The card the whole function is named after in the docstring."""
+    assert mana_produced("{T}: Add {C}{C}.") == 2
+
+
+def test_a_plain_source_still_makes_one():
+    assert mana_produced("{T}: Add {G}.") == 1
+    assert mana_produced("({T}: Add {G}.)") == 1
+    assert mana_produced("") == 1
+    assert mana_produced("Flying\n{T}: Add one mana of any color.") == 1
+
+
+def test_a_bigger_rock_makes_what_it_says():
+    assert mana_produced("{T}: Add {C}{C}{C}.") == 3
+    assert mana_produced(
+        "You may spend mana as though it were mana of any color.\n"
+        "{T}: Add {C}{C}{C}{C}{C}.\n"
+        "{5}, {T}: Draw a card for each color among permanents you control."
+    ) == 5, "the {5} draw ability must not be charged against the mana ability"
+
+
+def test_an_alternative_is_not_a_sum():
+    """Talisman of Progress adds one mana, not two.
+
+    Summing an "or" would report every filter land and every Talisman as
+    double what it makes, which is the wrong direction: it would tell a deck
+    its mana base is better than it is.
+    """
+    assert mana_produced(
+        "{T}: Add {C}.\n"
+        "{T}: Add {W} or {U}. This artifact deals 1 damage to you."
+    ) == 1
+
+
+def test_comma_separated_alternatives_are_alternatives_too():
+    """A triome reads "Add {R}, {G}, or {W}" and makes one.
+
+    Splitting on "or" alone reads that as two, and Wooded Bastion's
+    "Add {G}{G}, {G}{W}, or {W}{W}" as four. Both were wrong in the first
+    draft of this function and both are real cards in Aaron's decks.
+    """
+    assert mana_produced("This land enters tapped.\n{T}: Add {R}, {G}, or {W}.") == 1
+    assert mana_produced(
+        "{T}: Add {C}.\n{G/W}, {T}: Add {G}{G}, {G}{W}, or {W}{W}."
+    ) == 1, "two mana for a cost of one is a net of one"
+
+
+def test_an_activation_cost_is_subtracted_but_only_its_own_ability():
+    """Arcane Signet nets one; Grim Monolith's untap cost is not a mana cost.
+
+    The second half is the subtle one: `{4}: Untap this artifact` lives on its
+    own line and has nothing to do with the ability that adds three.
+    """
+    assert mana_produced("{1}, {T}: Add {W}{U}.") == 1
+    assert mana_produced(
+        "This artifact doesn't untap during your untap step.\n"
+        "{T}: Add {C}{C}{C}.\n"
+        "{4}: Untap this artifact."
+    ) == 3
+
+
+def test_a_written_out_amount_is_read():
+    """Gilded Lotus contains no mana symbol at all.
+
+    And "any one color" later in the same sentence is not the amount -- only
+    the first number word after "add" is.
+    """
+    assert mana_produced("{T}: Add three mana of any one color.") == 3
+    assert mana_produced(
+        "{T}: Add one mana of any color in your commander's color identity."
+    ) == 1
+
+
+def test_an_amount_this_cannot_know_falls_through_to_one():
+    """Nykthos. Guessing a devotion count would be worse than the floor."""
+    assert mana_produced(
+        "{T}: Add {C}.\n"
+        "{2}, {T}: Choose a color. Add an amount of mana of that color equal "
+        "to your devotion to that color."
+    ) == 1
+
+
+def test_adding_something_that_is_not_mana_is_ignored():
+    """"Add" is not a mana word on its own, and a counter is not mana."""
+    assert mana_produced("Whenever this creature attacks, add a +1/+1 counter "
+                         "on it.") == 1
+
+
+def test_the_amount_reaches_the_compiled_card():
+    """The wiring, not just the parser.
+
+    A function that returns 2 and a compiler that ignores it is the bug
+    unfixed, and nothing above would catch that.
+    """
+    from mtglab.decks.model import CardEntry, Deck
+
+    deck = Deck(slug="d", name="D", commander=[],
+                cards=[CardEntry(name="Sol Ring", qty=1, category="ramp",
+                                 why="fast mana")])
+    pool = {"Sol Ring": _Rec("Sol Ring", "Artifact", "{1}", "{T}: Add {C}{C}.",
+                             ("C",))}
+    library, _ = compile_deck(deck, pool)
+    assert [s.amount for s in library[0].produces] == [2]
 
 
 if __name__ == "__main__":

@@ -1418,6 +1418,111 @@ def test_land_sweep_returns_a_row_per_count_and_reports_the_spread(sim_client):
 # the thing a client depends on is a 200 with a body, not a job id.
 
 
+def test_a_simulation_carries_the_gate_verdict(sim_client):
+    """Every reported number must be able to say whether its deck is legal.
+
+    The simulator deliberately does not refuse an invalid deck -- see
+    `_compile_checked` for why -- so this field is the whole of what keeps
+    that honest. A result without it is a number about a possibly-illegal deck
+    with no way to know.
+    """
+    for path, payload in (("/api/sim/shelf", {"slug": "mono-green"}),):
+        body = sim_client.post(path, json=payload).json()
+        check = body["deck_check"]
+        assert set(check) >= {"ok", "error_count", "affects_numbers",
+                              "unresolved", "declared_size", "simulated_size"}
+        assert check["declared_size"] == check["simulated_size"], (
+            "the fixture deck resolves entirely, so nothing should be dropped")
+
+
+def test_the_mana_job_carries_the_gate_verdict_too(sim_client):
+    submitted = sim_client.post("/api/sim/mana",
+                                json={"slug": "mono-green", "games": 200}).json()
+    body = await_job(sim_client, submitted["id"])
+    assert body["status"] == "done", body
+    assert "deck_check" in body["result"]
+
+
+def test_an_invalid_deck_is_simulated_rather_than_refused(sim_client, monkeypatch):
+    """The design decision, pinned as a decision.
+
+    Two of the library's decks fail the gate on a banned card by choice, and a
+    deck mid-import fails it by construction. Refusing to simulate those would
+    take the diagnosis away at exactly the moment somebody wants it, so an
+    invalid deck answers with numbers **and** a verdict rather than with an
+    error. If this ever starts refusing, that was a decision to make
+    deliberately rather than to arrive at.
+    """
+    from mtglab.api import simruns
+    from mtglab.decks.validate import Issue
+
+    real = simruns.validate
+
+    def failing(deck, cards=None, **kw):
+        rep = real(deck, cards, **kw)
+        rep.issues.append(
+            Issue("error", "banned", "not legal in Commander", "Black Lotus"))
+        return rep
+
+    monkeypatch.setattr(simruns, "validate", failing)
+    body = sim_client.post("/api/sim/shelf", json={"slug": "mono-green"})
+    assert body.status_code == 200, "an illegal deck must still be measurable"
+    check = body.json()["deck_check"]
+    assert check["ok"] is False
+    assert check["affects_numbers"] is True, (
+        "a banned card sits in the 99 being shuffled, so it moves the numbers")
+    assert any(e["card"] == "Black Lotus" for e in check["errors"])
+
+
+def test_a_paperwork_failure_is_marked_as_not_moving_the_numbers(sim_client,
+                                                                 monkeypatch):
+    """A missing rationale blocks a curated deck and changes nothing about mana.
+
+    The client says something different for this than for a banned card, so
+    the split has to be real rather than "any error is scary".
+    """
+    from mtglab.api import simruns
+    from mtglab.decks.validate import Issue
+
+    real = simruns.validate
+
+    def failing(deck, cards=None, **kw):
+        rep = real(deck, cards, **kw)
+        rep.issues.append(
+            Issue("error", "missing-rationale", "no why", "Forest"))
+        return rep
+
+    monkeypatch.setattr(simruns, "validate", failing)
+    check = sim_client.post("/api/sim/shelf",
+                            json={"slug": "mono-green"}).json()["deck_check"]
+    assert check["ok"] is False
+    assert check["affects_numbers"] is False
+
+
+def test_a_deck_with_nothing_in_it_is_refused_rather_than_answered(sim_client):
+    """The one state that IS blocked, and the reason the rest are not.
+
+    An empty deck used to simulate perfectly happily: a 100% mulligan rate,
+    zero spells through turn 8, and a shelf demanding coloured sources against
+    a library of nought. Every figure arithmetically correct, none of them
+    about anything. `adrix-and-nev-twincasters` was in that state on the
+    deployed instance.
+    """
+    from mtglab.decks.model import Deck
+    from mtglab.sim.compile import NothingToSimulate, compile_report
+
+    # A pool that is present but does not hold this deck's cards, which is
+    # the shape a half-finished import actually has.
+    empty = Deck(slug="hollow", name="Hollow", commander=["Cmd"], cards=[])
+    try:
+        compile_report(empty, {"Some Other Card": None})
+    except NothingToSimulate as exc:
+        assert "nothing to simulate" in str(exc)
+        assert "hollow" in str(exc)
+        return
+    raise AssertionError("an empty deck must be refused, not answered")
+
+
 def test_the_shelf_answers_in_the_request_rather_than_handing_back_a_job(sim_client):
     """The one simulation route that is not a job, asserted as not a job.
 

@@ -1345,8 +1345,10 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except RuntimeError as exc:
-            # No pool, or a deck that cannot compile. 422 rather than 500:
-            # this is a fact about the request's deck, not a broken server.
+            # No pool, a deck that cannot compile, or a deck with nothing in
+            # it (`NothingToSimulate`, which is a RuntimeError). 422 rather
+            # than 500: every one of those is a fact about the request's deck,
+            # not a broken server.
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/api/sim/policy")

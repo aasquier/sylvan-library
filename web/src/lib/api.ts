@@ -336,6 +336,7 @@ export interface SimProvenance {
 }
 
 export interface ManaResult extends SimProvenance {
+  deck_check?: DeckCheck
   slug: string
   deck_name: string
   games: number
@@ -361,6 +362,7 @@ export interface LandRow {
 }
 
 export interface LandResult extends SimProvenance {
+  deck_check?: DeckCheck
   slug: string
   deck_name: string
   games: number
@@ -369,6 +371,34 @@ export interface LandResult extends SimProvenance {
   argmax_lands: number
   flat: boolean
   caveat: string
+}
+
+/** The gate's verdict on the deck a simulation just described.
+ *
+ * Carried on every Tier 1 and Tier 1.5 result, because a number about an
+ * illegal deck is only honest if it says so. The simulator deliberately does
+ * **not** refuse an invalid deck — two of the library's decks fail the gate on
+ * a banned card by choice, and a deck mid-import fails it by construction, so
+ * refusing would take the diagnosis away exactly when somebody wants it. The
+ * one refused state is a deck with no cards in it, which has no answer.
+ *
+ * `affects_numbers` is the field that decides what to say. A missing rationale
+ * blocks a curated deck and changes nothing about mana; a banned card is
+ * sitting in the 99 being shuffled, and an unresolved card was dropped, which
+ * shrinks the very population every probability is computed over. The server
+ * decides which is which — see `MOVES_THE_NUMBERS` in `api/simruns.py`.
+ */
+export interface DeckCheck {
+  ok: boolean
+  error_count: number
+  warning_count: number
+  errors: { code: string; message: string; card: string | null }[]
+  affects_numbers: boolean
+  unresolved: string[]
+  unresolved_count: number
+  commander_unresolved: boolean
+  declared_size: number
+  simulated_size: number
 }
 
 /** Tier 1.5, the closed form. One rung of a colour's ladder.
@@ -429,6 +459,7 @@ export interface LandEstimate {
  *  computed in the request every time, so there is no seed to report and
  *  nothing to be cached-and-stale about. */
 export interface ShelfResult {
+  deck_check?: DeckCheck
   slug: string
   deck_name: string
   deck_size: number
@@ -464,6 +495,7 @@ export interface PolicyRow {
  * it wrong.
  */
 export interface PolicyResult extends SimProvenance {
+  deck_check?: DeckCheck
   slug: string
   deck_name: string
   games: number
