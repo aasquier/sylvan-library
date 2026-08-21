@@ -106,6 +106,7 @@ SHARED = {
     "/api/colors/progress": "scored over the shared library",
     "/api/colors/{key}": "a fixed taxonomy plus public pool cards",
     "/api/glossary": "fixed reference prose, no data at all",
+    "/api/themes": "the fixed labelling vocabulary, no data at all",
     "/api/lore": "fixed reference prose plus public pool cards",
     "/api/claude": "whether the surface is configured on this instance",
     # The persona roster and the deal. Both are the same class of thing as

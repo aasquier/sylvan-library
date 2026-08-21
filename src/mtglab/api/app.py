@@ -1138,6 +1138,26 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
                 status_code=404,
                 detail=f"no colour combination {key!r}") from exc
 
+    @app.get("/api/themes")
+    def themes() -> dict[str, Any]:
+        """The labelling vocabulary, so the deck page's editor can offer it.
+
+        Reference data of the same class as `/api/colors` and
+        `/api/claude/personas`: a checked-in tuple, no card pool, no deck
+        source, no network. It is a route rather than a table copied into
+        TypeScript for the reason `SIMULATOR_KEYS` exists -- TypeScript cannot
+        check a string against a Python table, so a copy drifts silently, and
+        here a drifted copy would offer a theme `set_deck_field` then refuses.
+
+        `archetypes` rides along because the editor has to *show* which words
+        are class words: ADR 37 makes the archetype a reading of the declared
+        themes, so ticking `combo` is what gives a deck its rating board, and
+        an editor that did not say so would hide the one consequence a label
+        carries. It is read-only here, as it is on the wire everywhere.
+        """
+        from mtglab.decks.model import ARCHETYPES, THEMES
+        return {"themes": list(THEMES), "archetypes": list(ARCHETYPES)}
+
     @app.get("/api/glossary")
     def glossary() -> dict[str, Any]:
         """The vocabulary. Reference data, like `/api/colors` -- no card pool, no

@@ -78,6 +78,11 @@ const DECK = {
   commander: ['Goreclaw, Terror of Qal Sisma'],
   companion: null,
   bracket: 4,
+  // ADR 37's labels. Present and empty rather than absent: the wire always
+  // carries both, and this fixture is cast (`as unknown as Deck`), so a
+  // missing field is not a type error here — it is a crash at render time.
+  themes: [],
+  archetype: null,
   total_cards: 99,
   land_count: 34,
   strategy: 'Mono-green big stompy.',

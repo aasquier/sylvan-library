@@ -26,7 +26,8 @@ function tile(owner: string, slug: string): DeckTile {
     owner, slug, name: `${owner}/${slug}`, shared: true,
   pilot: '', showcase: false,
     status: 'built', stage: 'curated', writable: false, needs_rationale: 0,
-    commander: [], companion: null, bracket: null, total_cards: 99,
+    commander: [], companion: null, bracket: null, themes: [], archetype: null,
+    total_cards: 99,
     land_count: 34, strategy: '', art_crop: null, color_identity: [],
     errors: 0, warnings: 0,
   }

@@ -83,14 +83,23 @@ its own branch or few, in this order because each drinks from the one before:
    library's one standing copy, the laptop copies were pushed there,
    tarballed and deleted, and CLAUDE.md's "Decks do not live in git" section
    carries the new rule: local work pulls from the instance and cleans up
-   after itself. **Two follow-ups the migration exposed, both queued:** the
-   deck page needs a labels editor — the web UI never grew a themes control,
-   so the only label editor is the CLI, which is exactly the laptop coupling
-   the ruling ended (until it exists, relabels run through `fly ssh console`)
-   — and the polish skill grew the audit for the pattern: Green's new
-   hosted-first-alignment facet (capabilities that exist only as laptop
-   workflows) and Colorless's relic sweep (early-dev leftovers that no
-   longer fit the current shape).
+   after itself. **Two follow-ups the migration exposed. The first is now
+   built:** the deck page has a labels editor (2026-08-21) — the web UI never
+   grew a themes control, so the only label editor was the CLI, which is
+   exactly the laptop coupling the ruling ended, and relabelling the deployed
+   library meant `fly ssh console`. `GET /api/themes` serves the vocabulary
+   rather than a copy living in TypeScript, for the reason `SIMULATOR_KEYS`
+   exists; the chips are `.chip-toggle`; and **the archetype is not predicted
+   while you edit.** That last one is the stance dial's rule applied again —
+   the reading is the server's, and a second copy of worst-piloted-wins in
+   TypeScript would disagree silently — so the editor names which ticked
+   words are class words and the deck re-reads its archetype on save. The
+   four class words render in the served `ARCHETYPES` order, easiest to
+   hardest to pilot, because that gradient is the only thing their order
+   carries. **The second stands:** the polish skill grew the audit for the
+   pattern — Green's hosted-first-alignment facet (capabilities that exist
+   only as laptop workflows) and Colorless's relic sweep (early-dev leftovers
+   that no longer fit the current shape).
 2. **The match theater** — #203's stream carries only a count; extend the
    shim's NDJSON to carry each parsed row (winner, turns, seconds), let the
    job expose partial rows, and the Simulator renders the match live:

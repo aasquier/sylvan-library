@@ -76,6 +76,14 @@ export interface DeckSummary {
   commander: string[]
   companion: string | null
   bracket: number | null
+  /** What this deck is about, declared in `deck.yaml` from the vocabulary
+   *  `GET /api/themes` serves. Several per deck; empty means undeclared,
+   *  which is not the same as "about nothing". */
+  themes: string[]
+  /** ADR 37's *reading* of `themes`, never a separate declaration: the
+   *  worst-Forge-piloted class word among those declared, or null when none
+   *  is. Read-only on the wire — writing `themes` is what changes it. */
+  archetype: string | null
   total_cards: number
   land_count: number
   strategy: string
@@ -1293,6 +1301,25 @@ export interface Glossary {
   terms: Term[]
 }
 
+/**
+ * The labelling vocabulary, from `GET /api/themes`. Mirrors
+ * `mtglab.decks.model.THEMES` and `ARCHETYPES`.
+ *
+ * Served rather than copied into this file: TypeScript cannot check a string
+ * against a Python tuple, so a copy would drift silently and start offering
+ * labels the server refuses.
+ *
+ * `archetypes` is the subset of `themes` that are *class* words. It is not a
+ * second thing to declare — ADR 37 derives a deck's archetype by reading the
+ * class words out of its declared themes, worst-Forge-piloted winning — but
+ * the editor needs to know which chips carry that consequence in order to say
+ * so as they are ticked.
+ */
+export interface ThemeVocabulary {
+  themes: string[]
+  archetypes: string[]
+}
+
 /** One fact from the shelves. Mirrors `mtglab.lore.Fact`, with the named
  *  cards already resolved through the pool (or dropped and counted). */
 export interface LoreFact {
@@ -1966,7 +1993,12 @@ export const api = {
   // refuses it while any card is blank rather than writing a deck the gate
   // would immediately reject. `commander_art` goes through here too, and is
   // refused unless the id is a printing of *this* deck's commander.
-  setDeckField: (ref: DeckRef, field: string, value: string | number) =>
+  // `string[]` is here for `themes`, the one settable field that is a list
+  // rather than a scalar. The server validates every entry against its own
+  // vocabulary and refuses the whole edit on an unknown one, so a stale client
+  // fails loudly rather than writing a label nothing will ever match.
+  setDeckField: (ref: DeckRef, field: string,
+                 value: string | number | string[]) =>
     send<EditResult>('PATCH', deckPath(ref), { field, value }),
   // Put a deck on display to other accounts, or take it off (ADR 22).
   //
@@ -2014,6 +2046,10 @@ export const api = {
   // The vocabulary. Memoised below rather than here, because a tooltip may ask
   // for it from anywhere and asking twice on one screen is the normal case.
   glossary: () => get<Glossary>('/api/glossary'),
+  /** The labelling vocabulary, for the deck page's editor. Checked-in data:
+   *  no pool, no network, and the same for every viewer, so it is fetched
+   *  once and held. */
+  themes: () => get<ThemeVocabulary>('/api/themes'),
   lore: () => get<LoreShelves>('/api/lore'),
   // The only call here that can lose work. `confirm` must be a word somebody
   // typed — `bury`, or the slug itself — which a mis-aimed click cannot
