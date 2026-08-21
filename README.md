@@ -97,7 +97,7 @@ decks/<slug>/deck.yaml   the source of truth
 | Monte Carlo, result cache, the Forge bridge | `sim/` |
 | The five generated documents | `artifacts/generate.py` |
 | Colour and vocabulary reference prose | `colors.py`, `glossary.py` |
-| Client, stance, personas, and the five modes | `claude/` |
+| Client, stance, personas, and the seven modes | `claude/` |
 | Accounts, sessions, invites, admin bootstrap | `auth/` |
 | HTTP API, background jobs, request scope | `api/` |
 | React frontend (source, and committed build) | `web/`, `web_dist/` |
@@ -114,7 +114,7 @@ load in the browser straight from Scryfall's CDN.
 python3.12 -m venv .venv && source .venv/bin/activate   # any 3.11+ will do
 pip install -e ".[dev,api]"
 mtglab data refresh          # Scryfall bulk -> DuckDB; ~28 minutes, measured
-mtglab ui                    # the app, at http://127.0.0.1:8765
+mtglab ui                    # run it locally, at http://127.0.0.1:8765
 ```
 
 macOS ships a Python older than 3.11; [uv](https://docs.astral.sh/uv/) is the
@@ -132,25 +132,34 @@ Full setup, the command reference and the deck workflow are in
 
 In daily use against six curated Commander decks. A hosted instance is
 deployed and running — invite-only, because accounts exist to share decks with
-a playgroup rather than to sign the public up.
-[docs/HOSTING.md](docs/HOSTING.md) is the guide to standing up your own.
+a playgroup rather than to sign the public up. **That instance is the product.**
+`mtglab ui` runs the same app on a laptop, and is two things rather than one: a
+development harness (the surface a change is walked in before it lands) and the
+engine of the contributor story below, where a stranger runs sylvan-library over
+their own local decks. [docs/HOSTING.md](docs/HOSTING.md) is the guide to
+standing up your own.
 
 **Built:** the gate, the mana solver, Tier 1 with a result cache, the Tier 3
 Forge bridge, the artifact generator, the web app, accounts with invites and
 email password resets, admin authorization, deck ownership and sharing, the
-stance dial, and five Claude modes across four features — the rationale
-interview, the slot argument, the commander dossier, and the theme interview's
-two halves.
+stance dial, and seven Claude modes across six features — the rationale
+interview, the slot argument, research, the commander dossier, the theme
+interview's two halves, and the card scan behind the camera door.
 
 **Not built**, stated plainly so nothing here reads as a promise: the Tier 2
-pod simulator, the deck tier list that depends on a pod measurement, the two
-Claude modes [ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md)
-names that remain (research and deck conversation), card-level spoiler
-scanning, and deal-watching or cart generation.
+pod simulator, the deck tier list that depends on a pod measurement, deck
+conversation — the one mode
+[ADR 15](docs/adr/0015-claude-surfaces-are-modes-with-capabilities.md) names
+that remains, and which
+[ADR 26](docs/adr/0026-research-answers-about-magic-not-about-your-deck.md)
+deliberately keeps out of reach — card-level spoiler scanning, and
+deal-watching or cart generation.
 
-Two decks deliberately fail the gate on one card each — Goreclaw runs Primeval
-Titan and Atla Palani runs Emrakul, the Aeons Torn, both banned in Commander.
-That is the gate working, and picking the replacement is a human's call.
+One deck deliberately fails the gate: Goreclaw runs Primeval Titan, banned in
+Commander. That is the gate working, and picking the replacement is a human's
+call. This paragraph said *two* until 2026-08-21, naming Atla Palani for
+Emrakul — the deck runs **Emrakul, the Promised End**, which is legal, and the
+gate had been passing it for as long as the claim had been wrong.
 
 ### Known limits
 
@@ -171,11 +180,12 @@ That is the gate working, and picking the replacement is a human's call.
 | File | What it is |
 | --- | --- |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, the command reference, the deck workflow, and the two rules |
-| [ROADMAP.md](ROADMAP.md) | Goals versus reality, and the open decisions |
+| [ROADMAP.md](ROADMAP.md) | Goals versus reality, what is being built next, and the open decisions |
 | [docs/ENGINEERING.md](docs/ENGINEERING.md) | Testing rigor, containers, CI/CD — with the measurements behind each call, including the ones that say *don't* |
-| [docs/HOSTING.md](docs/HOSTING.md) | Deploying a shared instance: auth, per-user data, costs, and a Fly.io runbook |
+| [docs/HOSTING.md](docs/HOSTING.md) | The maintainer's runbook: the Fly.io setup guide, and deploying, refreshing, backing up and rolling back |
+| [docs/HISTORY.md](docs/HISTORY.md) | How it was designed and built — the auth and cost analyses, and the phase-by-phase account. Kept for the reasoning, not as a changelog |
 | [docs/FORGE.md](docs/FORGE.md) | The Tier 3 bridge: setup, coverage checking, measured timings |
-| [docs/adr/](docs/adr/) | 25 architecture decision records — context, options, decision, consequences. Immutable once accepted |
+| [docs/adr/](docs/adr/) | 37 architecture decision records — context, options, decision, consequences. Immutable once accepted |
 
 ## Licence and fan content
 

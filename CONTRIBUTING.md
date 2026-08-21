@@ -147,7 +147,7 @@ mtglab claude check                   # one real API call -- is the key live?
 mtglab claude interview <slug> --card X   # questions about a slot
 mtglab claude dossier <slug>          # who the commander is (ADR 19)
 
-mtglab ui [--port 8765] [--dev]       # the local app
+mtglab ui [--port 8765] [--dev]       # the app on your own machine
 
 mtglab users invite <email>           # an account, and a link to claim it
 mtglab users add <name> [--admin]     # prompts twice; there is no --password
@@ -160,7 +160,18 @@ mtglab users promote|demote <name>    # admin, and never the last one
 The `users` commands are for a **hosted** instance and do nothing to a local
 one: authentication is off unless `MTGLAB_REQUIRE_AUTH` is set, so `mtglab ui`
 on your own machine has no login and never will. See
-[docs/HOSTING.md](docs/HOSTING.md) §1.
+[docs/HISTORY.md](docs/HISTORY.md) §1, which is where that design is written
+up; `docs/HOSTING.md` §1 is a stub pointing at it.
+
+**What `mtglab ui` is.** Two things, and neither is "the product" — the
+deployed instance is that. It is the **development harness**: the surface a
+user-visible change is walked in before it lands, and what `--dev` exists for
+(it runs the API alongside a Vite dev server). And it is the **contributor
+engine**: the whole app, running over decks you keep locally, which is the
+story this file tells. Aaron's own library lives on the deployed volume and
+his laptop keeps no copy of it ([ADR 30](docs/adr/0030-decks-are-live-app-data.md)
+and the 2026-08-21 ruling above it) — but a stranger's checkout is exactly the
+local-first shape, so `decks/` being your own app data is still true here.
 
 ## Reading the simulator honestly
 
@@ -232,7 +243,10 @@ first real feedback on a container change rather than as a surprise.
 
 `ROADMAP.md`, `docs/ENGINEERING.md` and `docs/HOSTING.md` are kept current
 deliberately — read them before proposing direction, and update them when
-direction changes. `docs/adr/` is different: **an ADR is immutable once
+direction changes. `docs/HISTORY.md` is the opposite and is **not** kept
+current: it holds the landed narrative those two files used to carry, moved
+out on 2026-08-21 so a live head was not buried under it. Add to it only when
+something finishes. `docs/adr/` is different again: **an ADR is immutable once
 accepted.** A decision that changes gets a new ADR that supersedes the old one,
 and the old one stays.
 
