@@ -34,6 +34,7 @@ import {
 } from '../components/deckedit'
 import { ArtPicker, CardArtPicker } from '../components/artpicker'
 import { CategoryGlyph } from '../components/categoryglyphs'
+import { DeckArtifactsPanel } from '../components/artifacts'
 import { CommanderDossierPanel } from '../components/dossier'
 import { DeckReviewPanel } from '../components/review'
 import { SwapComposer } from '../components/swap'
@@ -41,7 +42,7 @@ import { StanceReadout } from '../components/stance'
 import { DeckLabels } from '../components/labels'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 
-type Tab = 'cards' | 'stats' | 'validation' | 'notes' | 'history'
+type Tab = 'cards' | 'stats' | 'validation' | 'notes' | 'artifacts' | 'history'
 
 /** What the action bar can do to a card (punch list item 9). */
 type CardAction = 'ask' | 'argue' | 'why' | 'art' | 'entomb'
@@ -963,6 +964,7 @@ export default function DeckDetail() {
     { id: 'stats', label: 'Stats' },
     { id: 'validation', label: 'Validation' },
     { id: 'notes', label: 'Notes' },
+    { id: 'artifacts', label: 'Artifacts' },
     { id: 'history', label: 'History' },
   ]
 
@@ -1770,6 +1772,10 @@ export default function DeckDetail() {
                          onDone={() => void refresh()} />
           )}
         </div>
+      )}
+
+      {tab === 'artifacts' && (
+        <DeckArtifactsPanel deck={deck} deckRef={deckRef} />
       )}
 
       {tab === 'history' && <DeckHistory entries={history} />}

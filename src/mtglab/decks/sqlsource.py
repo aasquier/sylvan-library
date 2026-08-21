@@ -26,12 +26,20 @@ be worse than the dependency.
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import cast
 
+from mtglab.artifacts.generate import DELIVERABLES, SNAPSHOT
 from mtglab.auth import db
 from mtglab.decks.model import Deck
-from mtglab.decks.source import DeckExists, DeckNotFound, ReadOnlySource
+from mtglab.decks.source import (
+    Artifact,
+    ArtifactNotFound,
+    DeckExists,
+    DeckNotFound,
+    ReadOnlySource,
+)
 
 
 def _now() -> str:
@@ -196,6 +204,75 @@ class SqlDeckSource:
                 "UPDATE user_decks SET yaml = ?, name = ?, updated_at = ? "
                 "WHERE owner_id = ? AND slug = ? AND deleted_at IS NULL",
                 (text, deck.name, now, self._owner_id, slug))
+
+    # ------------------------------------------------------------ artifacts
+    #
+    # The file tier's `<slug>/artifacts/` directory, as rows. Everything about
+    # what a deliverable *is* stays in `artifacts/generate.py`; this only
+    # stores and returns text, which is the same division `yaml` already has.
+
+    def artifacts(self, slug: str) -> list[Artifact]:
+        with db.connection() as con:
+            row = self._row(con, slug)      # raises DeckNotFound
+            held = {
+                str(r["name"]): r for r in con.execute(
+                    "SELECT name, LENGTH(CAST(body AS BLOB)) AS size, built_at "
+                    "FROM user_deck_artifacts WHERE deck_id = ?", (row["id"],))
+            }
+        # Ordered here rather than in SQL: `DELIVERABLES` is the reader's
+        # order and the database has no reason to know it.
+        return [Artifact(name=n, size=int(held[n]["size"]),
+                         built_at=datetime.fromisoformat(str(held[n]["built_at"])))
+                for n in DELIVERABLES if n in held]
+
+    def read_artifact(self, slug: str, name: str) -> str:
+        # Membership before the query, exactly as the file tier checks it
+        # before building a path: one whitelist, enforced per tier at the same
+        # point in the call.
+        if name not in DELIVERABLES:
+            raise ArtifactNotFound(name)
+        return self._body(slug, name)
+
+    def read_baseline(self, slug: str) -> str | None:
+        try:
+            return self._body(slug, SNAPSHOT)
+        except ArtifactNotFound:
+            return None
+
+    def _body(self, slug: str, name: str) -> str:
+        with db.connection() as con:
+            row = self._row(con, slug)      # raises DeckNotFound
+            got = con.execute(
+                "SELECT body FROM user_deck_artifacts "
+                "WHERE deck_id = ? AND name = ?", (row["id"], name)).fetchone()
+        if got is None:
+            raise ArtifactNotFound(name)
+        return str(got["body"])
+
+    def write_artifacts(self, slug: str, files: Mapping[str, str]) -> list[str]:
+        self._writable_or_raise(slug)
+        now = _now()
+        with db.connection() as con:
+            row = self._row(con, slug)      # raises DeckNotFound
+            # Deleted then inserted, in one transaction, so a rebuild leaves
+            # exactly what this build produced -- the same pruning
+            # `generate.store` does to the directory, and for the same reason:
+            # a `swaps.md` from an older build describes a diff that no longer
+            # exists. Only `DELIVERABLES` are swept, so the snapshot survives
+            # a build that writes no swap list, as it must.
+            con.executemany(
+                "DELETE FROM user_deck_artifacts WHERE deck_id = ? AND name = ?",
+                [(row["id"], n) for n in DELIVERABLES if n not in files])
+            con.executemany(
+                "INSERT INTO user_deck_artifacts (deck_id, name, body, built_at) "
+                "VALUES (?, ?, ?, ?) ON CONFLICT(deck_id, name) DO UPDATE SET "
+                "body = excluded.body, built_at = excluded.built_at",
+                [(row["id"], n, body, now) for n, body in files.items()])
+            # `db.connection()` closes but does not commit, so every write in
+            # this module says so itself. Omitting it does not fail -- it
+            # discards, which reads exactly like a build that produced nothing.
+            con.commit()
+        return list(files)
 
     def set_shared(self, slug: str, shared: bool) -> None:
         """Put the deck on display, or take it off. The owner's call alone."""

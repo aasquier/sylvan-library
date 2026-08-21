@@ -27,7 +27,12 @@ from mtglab.auth import bootstrap
 from mtglab.auth.mail import EmailSender
 from mtglab.decks import log
 from mtglab.decks.library import Library
-from mtglab.decks.source import DeckNotFound, DeckSource, ReadOnlySource
+from mtglab.decks.source import (
+    ArtifactNotFound,
+    DeckNotFound,
+    DeckSource,
+    ReadOnlySource,
+)
 
 # The request scope, as one annotation. Every deck-facing route takes it, so
 # when auth arrives the change is to `deps.deck_source` and nowhere else.
@@ -269,6 +274,23 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         return JSONResponse(status_code=404,
                             content={"detail": f"no deck '{exc}'"})
 
+    @app.exception_handler(ArtifactNotFound)
+    async def _artifact_missing(_request: Request,
+                                exc: ArtifactNotFound) -> JSONResponse:
+        """A deliverable this deck has not got.
+
+        A handler rather than a per-route catch, for the reason the two below
+        are: the refusal happens inside the source, so every present and future
+        reader inherits it by raising nothing itself.
+
+        404 covers three different causes on purpose -- never built, built with
+        no `swaps.md` to write, and a name that is not a deliverable at all --
+        because to a reader they are one answer, and separating them would
+        report whether an unknown name *would* have been valid.
+        """
+        return JSONResponse(status_code=404,
+                            content={"detail": f"no artifact '{exc}'"})
+
     @app.exception_handler(ReadOnlySource)
     async def _deck_read_only(_request: Request, exc: ReadOnlySource) -> JSONResponse:
         """A deck this caller may read but not change.
@@ -434,6 +456,63 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         return service.history_for(slug, source=lib.source_for(owner),
                                    limit=limit)
 
+    @app.get("/api/decks/{owner}/{slug}/artifacts")
+    def deck_artifacts(owner: str, slug: str, lib: Lib) -> dict[str, Any]:
+        """The five deliverables this deck has, and how current they are.
+
+        A GET beside `log` and `validate`, user-scoped the same way: whoever
+        may see the deck may see what it was built into. The artifacts are the
+        *shareable* surface, so a rule that hid them from a reader holding the
+        deck would be pointing the wrong way.
+
+        `baseline` is the field worth reading — `current`, `different` or
+        `unknown` — and it is why this route exists at all. Every artifact on
+        the volume was eight days older than its deck on 2026-08-21 and
+        nothing in the app could say so.
+        """
+        return service.list_artifacts(slug, source=lib.source_for(owner))
+
+    @app.get("/api/decks/{owner}/{slug}/artifacts/{name}")
+    def deck_artifact(owner: str, slug: str, name: str,
+                      lib: Lib) -> dict[str, Any]:
+        """One deliverable, verbatim.
+
+        `name` arrives from the URL and is refused unless it is one of
+        `generate.DELIVERABLES`, inside the source, before it is resolved
+        against any storage — so there is no path here to traverse.
+        """
+        return {"name": name,
+                "text": service.read_artifact(slug, name,
+                                              source=lib.source_for(owner))}
+
+    @app.post("/api/decks/{owner}/{slug}/artifacts")
+    def build_artifacts(owner: str, slug: str, payload: dict[str, Any],
+                        lib: Lib) -> dict[str, Any]:
+        """Generate the five deliverables and store them.
+
+        **A plain route rather than a job, and the number is why**: 70-83ms
+        warm across four real decks measured on the instance itself, which is
+        the shelf's order of magnitude (`api/shelfruns.py`) — where the
+        argument is that a submit and a poll cost more than the work. The
+        sibling-duration rule that put the dossier and the theme turn into jobs
+        was asked here and answered the other way, which is what measuring is
+        for.
+
+        POST to the collection because that is what this is: the deliverables
+        are derived from the deck, so building them replaces the set rather
+        than editing a member of it.
+
+        `force` mirrors `mtglab decks build --force` and overrides the gate's
+        errors only. A draft is refused by `render_all` and no flag here
+        reaches it (ADR 13) — the way out is to write the rationales.
+        """
+        try:
+            return service.build_artifacts(
+                slug, force=bool(payload.get("force", False)),
+                source=lib.source_for(owner))
+        except service.BuildRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     @app.post("/api/decks/{owner}/{slug}/swap")
     def swap_card(owner: str, slug: str, payload: dict[str, Any], lib: Lib) -> dict[str, Any]:
         """Carry out a swap the caller has already decided on.
@@ -549,7 +628,15 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     @app.patch("/api/decks/{owner}/{slug}")
     def set_deck_field(owner: str, slug: str, payload: dict[str, Any],
                        lib: Lib) -> dict[str, Any]:
-        """Change one of the deck's own fields: stage, status or bracket.
+        """Change one of the deck's own fields.
+
+        `decks.edit.SETTABLE_DECK_FIELDS` is the list, and is deliberately
+        not repeated here: this docstring named three fields until
+        2026-08-21, by which time the tuple held six. A prose copy of a
+        list that grows is a claim to re-check, not a fact to inherit.
+        `archetype` is absent from that tuple on purpose -- since ADR 37 it
+        is a reading of `themes`, and a reading is changed by changing what
+        it reads.
 
         `stage` to `curated` is promotion, the last step of an import. It is
         refused while any card still lacks a rationale, so the deck is never

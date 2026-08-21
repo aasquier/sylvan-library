@@ -18,8 +18,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import pytest
 
 from mtglab import config
+from mtglab.artifacts.generate import SNAPSHOT
 from mtglab.decks.model import Deck
 from mtglab.decks.source import (
+    ArtifactNotFound,
     DeckExists,
     DeckNotFound,
     DeckSource,
@@ -606,3 +608,233 @@ def test_one_cache_entry_per_deck_file_however_often_it_is_edited(tmp_path):
 
     mine = [k for k in model._PARSED if k.startswith(str(tmp_path))]
     assert len(mine) == 1, f"twelve edits left {len(mine)} entries behind"
+
+
+# -------------------------------------------------------------- artifacts
+
+# Both implementations, because the artifact operations are the newest place
+# the "a source need not be a filesystem" claim could quietly stop being true.
+# The file tier stores five files in a directory; the memory tier stores a
+# dict; every assertion below is written against the protocol and passes for
+# both, which is the claim.
+@pytest.fixture(params=["file", "memory"])
+def both(request, decks_root):
+    if request.param == "file":
+        return FileDeckSource(decks_root)
+    return MemoryDeckSource([Deck.from_text(DECK_YAML, slug="mini")])
+
+
+BUILT = {
+    "primer-quick.md": "# Mini\n",
+    "moxfield.txt": "98 Swamp\n1 Sol Ring\n",
+    SNAPSHOT: DECK_YAML,
+}
+
+
+def test_an_unbuilt_deck_has_no_artifacts_and_that_is_not_an_error(both):
+    assert both.artifacts("mini") == []
+    assert both.read_baseline("mini") is None
+
+
+def test_artifacts_round_trip_through_either_source(both):
+    both.write_artifacts("mini", BUILT)
+    assert [a.name for a in both.artifacts("mini")] == [
+        "primer-quick.md", "moxfield.txt"]
+    assert both.read_artifact("mini", "moxfield.txt") == BUILT["moxfield.txt"]
+
+
+def test_artifacts_are_listed_in_deliverables_order_not_write_order(both):
+    # Written moxfield-first on purpose: the reader's order is the module's
+    # numbering, not whatever order the build happened to produce.
+    both.write_artifacts("mini", {"moxfield.txt": "x", "primer-quick.md": "y"})
+    assert [a.name for a in both.artifacts("mini")] == [
+        "primer-quick.md", "moxfield.txt"]
+
+
+def test_the_snapshot_is_stored_but_never_served(both):
+    """`DELIVERABLES` governs reading; a build still writes its baseline."""
+    both.write_artifacts("mini", BUILT)
+    assert both.read_baseline("mini") == DECK_YAML
+    with pytest.raises(ArtifactNotFound):
+        both.read_artifact("mini", SNAPSHOT)
+
+
+@pytest.mark.parametrize("name", [
+    "../../etc/passwd",
+    "../deck.yaml",
+    "/etc/passwd",
+    "primer-quick.md/../../../deck.yaml",
+    "deck.yaml",
+    "",
+])
+def test_a_name_outside_deliverables_is_refused_before_it_becomes_a_path(
+        both, name):
+    """The traversal guard is membership, so there is no path to sanitise."""
+    both.write_artifacts("mini", BUILT)
+    with pytest.raises(ArtifactNotFound):
+        both.read_artifact("mini", name)
+
+
+def test_a_deliverable_this_build_did_not_write_is_absent_not_empty(both):
+    """A first build has no `swaps.md`, and that is a 404 rather than ''."""
+    both.write_artifacts("mini", BUILT)
+    with pytest.raises(ArtifactNotFound):
+        both.read_artifact("mini", "swaps.md")
+
+
+def test_never_built_and_no_such_deck_are_different_answers(both):
+    """`DeckNotFound` beats `ArtifactNotFound`: a caller must tell them apart."""
+    assert both.artifacts("mini") == []          # real deck, never built
+    for call in (lambda: both.artifacts("ghost"),
+                 lambda: both.read_baseline("ghost"),
+                 lambda: both.read_artifact("ghost", "moxfield.txt"),
+                 lambda: both.write_artifacts("ghost", BUILT)):
+        with pytest.raises(DeckNotFound):
+            call()
+
+
+def test_a_rebuild_replaces_the_set_rather_than_merging_it(both):
+    """A `swaps.md` from an older build is not part of this one."""
+    both.write_artifacts("mini", {**BUILT, "swaps.md": "old"})
+    assert "swaps.md" in [a.name for a in both.artifacts("mini")]
+    both.write_artifacts("mini", BUILT)
+    assert "swaps.md" not in [a.name for a in both.artifacts("mini")]
+
+
+def test_a_read_only_source_refuses_to_build(decks_root):
+    ro_file = FileDeckSource(decks_root, writable=False)
+    ro_mem = MemoryDeckSource([Deck.from_text(DECK_YAML, slug="mini")],
+                              writable=False)
+    for source in (ro_file, ro_mem):
+        with pytest.raises(ReadOnlySource):
+            source.write_artifacts("mini", BUILT)
+        # ...and reading stays open: the artifacts are the shareable surface.
+        assert source.artifacts("mini") == []
+
+
+def test_a_read_only_refusal_does_not_depend_on_the_deck_existing(decks_root):
+    """Same argument as `_writable_or_raise`: no probing the library."""
+    source = FileDeckSource(decks_root, writable=False)
+    with pytest.raises(ReadOnlySource):
+        source.write_artifacts("ghost", BUILT)
+
+
+def test_deleting_a_deck_takes_its_artifacts_with_it(both):
+    both.write_artifacts("mini", BUILT)
+    both.delete("mini")
+    with pytest.raises(DeckNotFound):
+        both.artifacts("mini")
+
+
+def test_size_is_bytes_not_characters(both):
+    """A primer full of em dashes is longer than its character count."""
+    both.write_artifacts("mini", {"moxfield.txt": "—" * 10})
+    assert both.artifacts("mini")[0].size == 30
+
+
+# ------------------------------------------------- artifacts, the SQL tier
+#
+# A row-backed deck has no directory, so the file tier's `artifacts/` folder
+# is `user_deck_artifacts` (schema 12). These assert the same properties the
+# `both` fixture asserts of the other two implementations -- one protocol,
+# four implementations, and this is the one where a stale row would survive a
+# rebuild rather than a stale file.
+
+def test_sql_source_stores_and_serves_artifacts(sql_owner):
+    from mtglab.decks.sqlsource import SqlDeckSource
+    src = SqlDeckSource(sql_owner, writable=True)
+    src.create("theirs", SQL_DECK)
+
+    assert src.artifacts("theirs") == []
+    assert src.read_baseline("theirs") is None
+
+    src.write_artifacts("theirs", BUILT)
+    assert [a.name for a in src.artifacts("theirs")] == [
+        "primer-quick.md", "moxfield.txt"]
+    assert src.read_artifact("theirs", "moxfield.txt") == BUILT["moxfield.txt"]
+    assert src.read_baseline("theirs") == DECK_YAML
+
+
+def test_sql_source_refuses_a_name_outside_deliverables(sql_owner):
+    from mtglab.decks.sqlsource import SqlDeckSource
+    src = SqlDeckSource(sql_owner, writable=True)
+    src.create("theirs", SQL_DECK)
+    src.write_artifacts("theirs", BUILT)
+    for name in ("../deck.yaml", SNAPSHOT, "deck.yaml", "swaps.md"):
+        with pytest.raises(ArtifactNotFound):
+            src.read_artifact("theirs", name)
+
+
+def test_sql_source_rebuild_prunes_what_it_did_not_produce(sql_owner):
+    """The row-backed half of the stale-`swaps.md` bug."""
+    from mtglab.decks.sqlsource import SqlDeckSource
+    src = SqlDeckSource(sql_owner, writable=True)
+    src.create("theirs", SQL_DECK)
+
+    src.write_artifacts("theirs", {**BUILT, "swaps.md": "old"})
+    assert "swaps.md" in [a.name for a in src.artifacts("theirs")]
+
+    src.write_artifacts("theirs", BUILT)
+    assert "swaps.md" not in [a.name for a in src.artifacts("theirs")]
+    # ...and the snapshot, which is not a deliverable, is not swept with it.
+    assert src.read_baseline("theirs") == DECK_YAML
+
+
+def test_sql_source_rebuild_replaces_a_body_rather_than_duplicating_it(sql_owner):
+    from mtglab.decks.sqlsource import SqlDeckSource
+    src = SqlDeckSource(sql_owner, writable=True)
+    src.create("theirs", SQL_DECK)
+    src.write_artifacts("theirs", {"moxfield.txt": "first"})
+    src.write_artifacts("theirs", {"moxfield.txt": "second"})
+    assert len(src.artifacts("theirs")) == 1
+    assert src.read_artifact("theirs", "moxfield.txt") == "second"
+
+
+def test_a_stranger_cannot_read_a_private_decks_artifacts(sql_owner):
+    """A primer names the whole 99, so it hides exactly when the deck does."""
+    from mtglab.decks.sqlsource import SqlDeckSource
+    mine = SqlDeckSource(sql_owner, writable=True)
+    mine.create("theirs", SQL_DECK)
+    mine.write_artifacts("theirs", BUILT)
+
+    stranger = SqlDeckSource(sql_owner, writable=False, shared_only=True)
+    # Every one of these is `DeckNotFound`, the *write* included. ADR 22's
+    # 404-not-403: to this caller the deck is not read-only, it is absent, and
+    # a 403 on the build would confirm it exists. That is the opposite order
+    # from the file tier, which refuses a read-only write before looking at
+    # anything -- there the argument is that a refusal must not depend on
+    # state; here the row never arrives, so there is no state to depend on.
+    for call in (lambda: stranger.artifacts("theirs"),
+                 lambda: stranger.read_baseline("theirs"),
+                 lambda: stranger.read_artifact("theirs", "moxfield.txt"),
+                 lambda: stranger.write_artifacts("theirs", BUILT)):
+        with pytest.raises(DeckNotFound):
+            call()
+
+    # ...and once the deck is shared, the reads open and only the write is
+    # refused -- now as `ReadOnlySource`, because the deck is no longer a
+    # secret and 403 is the honest answer (ADR 17's exception).
+    mine.set_shared("theirs", True)
+    assert [a.name for a in stranger.artifacts("theirs")] == [
+        "primer-quick.md", "moxfield.txt"]
+    with pytest.raises(ReadOnlySource):
+        stranger.write_artifacts("theirs", BUILT)
+
+
+def test_deleting_a_sql_deck_takes_its_artifacts_with_it(sql_owner):
+    from mtglab.decks.sqlsource import SqlDeckSource
+    src = SqlDeckSource(sql_owner, writable=True)
+    src.create("theirs", SQL_DECK)
+    src.write_artifacts("theirs", BUILT)
+    src.delete("theirs")
+    with pytest.raises(DeckNotFound):
+        src.artifacts("theirs")
+
+
+def test_sql_artifact_size_is_bytes_not_characters(sql_owner):
+    """`LENGTH()` on TEXT counts characters in SQLite; the cast is why."""
+    from mtglab.decks.sqlsource import SqlDeckSource
+    src = SqlDeckSource(sql_owner, writable=True)
+    src.create("theirs", SQL_DECK)
+    src.write_artifacts("theirs", {"moxfield.txt": "—" * 10})
+    assert src.artifacts("theirs")[0].size == 30

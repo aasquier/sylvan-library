@@ -336,7 +336,13 @@ src/mtglab/
                           app.db from the two places one finishes -- the API
                           job and the CLI, never the worker; games stored as
                           parsed, labels snapshotted, `record` never raises)
-  artifacts/generate.py   the five deliverables
+  artifacts/generate.py   the five deliverables. `render_all` returns them as
+                          text and `store` writes them somewhere -- split when
+                          the API learned to build, because a `DeckSource` may
+                          not be a disk. `DELIVERABLES` is the served set and
+                          the path-traversal guard in one; `SNAPSHOT` is
+                          deliberately outside it, being the build's own
+                          baseline rather than anything anybody asked for
   claude/                 client, tools, stance, persona, and seven modes
                           across six features: interview.py (a card's `why`),
                           argue.py (the case against a slot), dossier.py (the
@@ -358,6 +364,14 @@ src/mtglab/
   api/jobs.py             the job registry; two pools, CPU and NET, and a
                           `key` that makes asking twice at once one job
   api/simruns.py          Tier 1 planned in the request, run in a job
+  api/app.py:artifacts    the five deliverables, hosted (2026-08-21). Three
+                          routes on `/api/decks/{owner}/{slug}/artifacts` --
+                          GET the shelf, GET one by name, POST to rebuild --
+                          and a **plain route, measured**: 70-83ms warm across
+                          four real decks on the instance, the shelf's order of
+                          magnitude, so a submit and a poll would cost more
+                          than the work. The sibling-duration rule was asked
+                          here and answered the other way
   api/shelfruns.py        Tier 1.5's two, shaped differently on purpose: the
                           shelf is a **plain route** (measured at 0.03-0.04s,
                           so a job would add a submit and a poll to a call
@@ -603,7 +617,18 @@ and land types.
 **3. Five artifacts for every new deck or refactor**, no exceptions:
 `primer-quick.md`, `primer-advanced.md`, `decklist-annotated.md`,
 `moxfield.txt`, and `swaps.md` when anything changed. Generate them with
-`mtglab decks build <slug>`. Never hand-write them.
+`mtglab decks build <slug>`, or from the deck page's Artifacts tab — the same
+`render_all`, so the two cannot produce different files. Never hand-write them.
+
+**The deck page is how a deployed deck gets rebuilt** (2026-08-21). Until then
+the only builder was the CLI, so refreshing the library's artifacts meant
+`fly ssh console` — the laptop coupling the volume ruling ended, and a real gap
+once `mtglab ui` became a development harness rather than the product. The tab
+also answers the question nobody could ask before: **every artifact on the
+volume was eight days older than its deck**, and nothing said so. `baseline` is
+that answer — `current`, `different`, or `unknown` — computed by comparing the
+stored snapshot against the deck, never a file timestamp, so reverting an edit
+correctly makes the artifacts current again.
 
 **4. Every card carries a `why`.** Validation fails without one. A card that
 cannot justify its slot is a card to cut. **Never write one on the user's
@@ -656,6 +681,17 @@ mtglab sim matches                # the match ledger: every Forge match recorded
 mtglab decks build <slug>         # before a refactor, so swaps.md can diff it
 ```
 
+**A local `decks import` writes a scratch deck, never a library entry.** The
+library is the deployed volume, and `decks/` in a checkout is the gitignored
+data directory the app happens to read -- so a deck imported here exists on
+this laptop and nowhere else. That is the right place to rehearse an import,
+ask the gate what it makes of a list, or drive the UI against something
+disposable. It is not a way to add a deck to the library, and leaving one
+there is the second standing copy the 2026-08-21 ruling ended. Delete it when
+the rehearsal is over. A deck joins the library through the instance --
+`POST /api/decks/import`, which the app's import screen drives and which runs
+the same `service.import_deck` the CLI does.
+
 Site imagery goes through the animist (ADR 29) — never hand-place a binary:
 
 ```bash
@@ -683,6 +719,13 @@ mtglab decks delete <slug>        # confirm by typing the slug; moves to decks/.
 mtglab decks log <slug>           what has been done to it, and by whom
 mtglab decks build <slug>         # diffs against the last build's snapshot
 ```
+
+A rebuild now **prunes the deliverables it did not produce**, which it did not
+until 2026-08-21: a build with no baseline writes no `swaps.md`, so the
+previous build's swap list used to sit in the directory describing a diff that
+no longer existed — stale in the one way that is indistinguishable from
+current. Found by a parity test across the deck sources, since the two tiers
+disagreed about it, and fixed in the one place they share.
 
 Measuring, before optimising or before trusting the suite:
 

@@ -19,6 +19,7 @@ instead of being retyped each time.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -266,15 +267,83 @@ class DraftDeck(Exception):
 #: `Deck.load` is all the baseline it needs.
 SNAPSHOT = "deck.last-built.yaml"
 
+#: The deliverables themselves, in the order the module docstring numbers them.
+#: `SNAPSHOT` is deliberately *not* in here and the separation now carries
+#: weight: since the API serves artifacts by name, this tuple is the set a
+#: reader may ask for, so "is this a deliverable" and "may this be served" are
+#: one question with one answer. The snapshot is the build's own bookkeeping --
+#: the baseline the next `swaps.md` diffs against -- and nobody asked for a
+#: copy of the deck they already have.
+#:
+#: It doubles as the path-traversal guard on `DeckSource.read_artifact`: a
+#: name that is not in this tuple is refused before anything touches a
+#: filesystem, so there is no `..` to sanitise.
+DELIVERABLES = ("primer-quick.md", "primer-advanced.md",
+                "decklist-annotated.md", "moxfield.txt", "swaps.md")
+
+
+def render_all(deck: Deck, *, cards: dict[str, CardRecord] | None = None,
+               previous: Deck | None = None, prices: dict[str, float] | None = None,
+               stats: dict[str, Any] | None = None) -> dict[str, str]:
+    """The deliverables as text, written nowhere. Raises `DraftDeck`.
+
+    Split out of `write_all` when the API learned to build (the gap that
+    function's own docstring predicted). The API may not write to a filesystem
+    -- deck-facing endpoints go through a `DeckSource`, which is a locator and
+    may not be a disk at all -- so generation had to stop being the same act as
+    storage. Everything above this line is a pure function of the deck; below
+    it is somebody's storage.
+
+    `swaps.md` is present only when `previous` is, which is why the return is a
+    dict rather than a fixed tuple: a first build has nothing to diff.
+
+    The snapshot is placed last, and `write_all` relies on dict order to write
+    it last. That ordering used to be the whole guard -- a refusal partway
+    through left the old baseline in place -- and it is now belt and braces,
+    because rendering raises before a single byte is stored.
+    """
+    if deck.stage == "draft":
+        _refuse_draft(deck)
+
+    files = {
+        "primer-quick.md": quick_primer(deck, stats),
+        "primer-advanced.md": advanced_primer(deck, stats),
+        "decklist-annotated.md": annotated_decklist(deck, cards),
+        "moxfield.txt": moxfield_txt(deck),
+    }
+    if previous is not None:
+        files["swaps.md"] = swap_list(deck, previous, cards, prices)
+    files[SNAPSHOT] = deck.dump()
+    return files
+
+
+def _refuse_draft(deck: Deck) -> None:
+    """Name the cards still owed a rationale, then refuse."""
+    pending = deck.unjustified
+    shown = ", ".join(c.name for c in pending[:8])
+    more = f", and {len(pending) - 8} more" if len(pending) > 8 else ""
+    detail = (f"{len(pending)} card(s) still need a `why`: {shown}{more}"
+              if pending else
+              "every card is justified -- set `stage: curated` to promote it")
+    raise DraftDeck(
+        f"{deck.slug} is a draft, and the artifacts are the shareable "
+        f"surface. {detail}")
+
 
 def write_all(deck: Deck, outdir: str | Path, *, cards: dict[str, CardRecord] | None = None,
               previous: Deck | None = None, prices: dict[str, float] | None = None,
               stats: dict[str, Any] | None = None) -> list[Path]:
-    """Write the five deliverables. Raises `DraftDeck` for a draft.
+    """Write the five deliverables to a directory. Raises `DraftDeck` for a draft.
 
-    The refusal is checked here rather than in the CLI so that every caller
-    inherits it -- the API will generate artifacts eventually, and a rule that
-    only the terminal enforces is a rule with a hole in it.
+    The filesystem half, and since the API learned to build, the CLI's half
+    alone. The refusal now lives in `render_all` so that both callers still
+    inherit it -- that was always the reason it was not in the CLI ("the API
+    will generate artifacts eventually, and a rule that only the terminal
+    enforces is a rule with a hole in it"), and the prediction came true on
+    2026-08-21. It was right about the hole and wrong about where the rule
+    would have to sit: the API stores through a `DeckSource`, not a path, so
+    the shared rule had to move up into the part that renders rather than the
+    part that writes.
 
     This is deliberately *not* something `--force` can override, and the
     distinction is worth being precise about. `--force` overrides the gate's
@@ -285,38 +354,42 @@ def write_all(deck: Deck, outdir: str | Path, *, cards: dict[str, CardRecord] | 
     reasoned about is worse than no primer, because it looks exactly like one
     for a deck somebody did.
     """
-    if deck.stage == "draft":
-        pending = deck.unjustified
-        shown = ", ".join(c.name for c in pending[:8])
-        more = f", and {len(pending) - 8} more" if len(pending) > 8 else ""
-        detail = (f"{len(pending)} card(s) still need a `why`: {shown}{more}"
-                  if pending else
-                  "every card is justified -- set `stage: curated` to promote it")
-        raise DraftDeck(
-            f"{deck.slug} is a draft, and the artifacts are the shareable "
-            f"surface. {detail}")
+    # Rendered first, entirely, before anything is written: a `DraftDeck` or a
+    # failure inside any one deliverable now leaves the directory exactly as it
+    # was, including the old baseline the next `swaps.md` diffs against.
+    files = render_all(deck, cards=cards, previous=previous, prices=prices,
+                       stats=stats)
+    return store(files, outdir)
 
+
+def store(files: Mapping[str, str], outdir: str | Path) -> list[Path]:
+    """Write a rendered build into a directory, and prune what it did not make.
+
+    The pruning is the part worth explaining. A build with no baseline writes
+    no `swaps.md`, so a rebuild used to leave the *previous* build's swap list
+    sitting in the directory, describing a diff that no longer exists -- an
+    artifact that is not merely stale but wrong, and indistinguishable from a
+    current one. Found on 2026-08-21 by the parity test across the two deck
+    sources: the memory tier replaced the set and the file tier merged into
+    it, and only one of them could be right.
+
+    Only `DELIVERABLES` are pruned. Anything else a person has put in that
+    directory is theirs and is left alone -- the snapshot included, which is
+    written by this same call and must survive a build that produces no
+    `swaps.md`.
+
+    Shared by `write_all` and `decks.source.FileDeckSource.write_artifacts` so
+    the CLI and the API cannot disagree about what a rebuild leaves behind.
+    """
     out = Path(outdir)
     out.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
-
-    files = {
-        "primer-quick.md": quick_primer(deck, stats),
-        "primer-advanced.md": advanced_primer(deck, stats),
-        "decklist-annotated.md": annotated_decklist(deck, cards),
-        "moxfield.txt": moxfield_txt(deck),
-    }
-    if previous is not None:
-        files["swaps.md"] = swap_list(deck, previous, cards, prices)
-
+    # `render_all` places the snapshot last and this loop preserves that order.
     for name, content in files.items():
         path = out / name
         path.write_text(content, encoding="utf-8")
         written.append(path)
-
-    # Last, so a refusal above leaves the old baseline in place: a build that
-    # wrote nothing has no business moving what the next swaps.md diffs against.
-    snapshot = out / SNAPSHOT
-    snapshot.write_text(deck.dump(), encoding="utf-8")
-    written.append(snapshot)
+    for name in DELIVERABLES:
+        if name not in files:
+            (out / name).unlink(missing_ok=True)
     return written
