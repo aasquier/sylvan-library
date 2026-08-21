@@ -266,3 +266,35 @@ settings.register_profile(
 settings.load_profile(
     os.environ.get("HYPOTHESIS_PROFILE") or ("ci" if os.environ.get("CI") else "dev")
 )
+
+
+# ------------------------------------------------------ the contract suite
+#
+# `tests/contract/` is the one part of the suite that can run against a
+# server it did not build in-process (docs/go-migration/PLAN.md, section 5).
+# Its options are registered here rather than in its own conftest because
+# pytest only reads `pytest_addoption` from the conftests it loads *before*
+# parsing the command line, and with `testpaths = ["tests"]` a bare `pytest`
+# loads this one and not the package's. The fixtures that read them live in
+# `tests/contract/conftest.py`.
+
+def pytest_addoption(parser):
+    group = parser.getgroup("contract", "the contract suite (tests/contract)")
+    group.addoption(
+        "--live", action="store_true", default=False,
+        help="start `mtglab ui` on a seeded scratch directory and drive it "
+             "over TCP, instead of an in-process TestClient")
+    group.addoption(
+        "--base-url", default=None, metavar="URL",
+        help="drive a server somebody else started at URL; needs --data-dir "
+             "and --decks-dir, which the harness seeds")
+    group.addoption(
+        "--data-dir", default=None, metavar="DIR",
+        help="the MTGLAB_DATA_DIR the --base-url server was started with")
+    group.addoption(
+        "--decks-dir", default=None, metavar="DIR",
+        help="the MTGLAB_DECKS_DIR the --base-url server was started with")
+    group.addoption(
+        "--update-golden", action="store_true", default=False,
+        help="re-record tests/contract/golden/ from what the server answers, "
+             "instead of comparing against it")

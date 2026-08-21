@@ -50,6 +50,33 @@ Two things this section is *not*. It is not a changelog — git holds what
 changed, and the account in HISTORY survives only because it carries the
 reasoning that a diff does not. And it is not the current list; when it
 disagrees with the ledger, the ledger is right.
+### The main line — the Go migration (ruled 2026-08-21)
+
+The served backend ports from Python to Go
+([ADR 38](docs/adr/0038-the-served-backend-is-rewritten-in-go.md)); the
+plan, the measured baseline and the seven rulings live in
+[`docs/go-migration/`](docs/go-migration/README.md) and are not repeated
+here. What this file owes is the sequencing: **the port is the main line
+for about one build-week** (~4–7 working days at the measured cadence,
+re-priced on Phase 2's actuals), and **simulator rungs 4–5 below pause
+for it.** The dev bench — animist, cardmotion build, bench, mutate — stays
+Python, renamed `mtglab-bench` at retirement.
+
+Where it stands, kept here so a fresh session knows the frontier:
+
+- **Phase 0, done 2026-08-21** — baseline captured (BASELINE.md, two
+  dated blocks), Go-on-this-Mac verified (Go 1.26 is the last release for
+  macOS 12; `go1.26.7` runs here), ADR 38 landed.
+- **Phase 1, done 2026-08-21** — the contract harness: `tests/contract/`
+  runs in-process, live over TCP against a child `mtglab ui`, or against an
+  external `--base-url`; the route classification is one shared
+  `routes.json`; golden wire shapes for every family; mutation-proven; a
+  `contract` CI job. **One step owed to Aaron:** requiring `contract` on
+  `main` (a repository setting — ENGINEERING §5).
+- **Phase 2 is next** — the `go/` module, the CGO spikes, the front door on
+  :8080 with the auth middleware in front of both runtimes, the pair
+  deployed. The estimate meets reality at its exit.
+
 ### The next phase — the Simulator learns (decided 2026-08-20)
 
 ADR 35 finished and proven, the direction was researched the same day (the

@@ -16,7 +16,7 @@ they differ.
 | --- | --- | --- |
 | [1](0001-deck-yaml-in-git-is-the-source-of-truth.md) | `deck.yaml` in git is the source of truth, and deck history is git history | Accepted — the *location* half superseded by [30](0030-decks-are-live-app-data.md) |
 | [2](0002-duckdb-for-the-card-corpus.md) | DuckDB for the card corpus — not SQLite, not Postgres, not the API | Accepted |
-| [3](0003-tier-1-stays-python.md) | Tier 1 stays Python; a compiled port is deferred with a written trigger | Accepted |
+| [3](0003-tier-1-stays-python.md) | Tier 1 stays Python; a compiled port is deferred with a written trigger | Accepted — the *served-app* frame superseded by [38](0038-the-served-backend-is-rewritten-in-go.md); the hot-loop reasoning stands |
 | [4](0004-two-embedded-databases.md) | Two embedded databases when hosting, and two tiers of deck | Proposed |
 | [5](0005-sessions-over-jwts-and-no-self-signup.md) | Sessions over JWTs, and no self-signup | Proposed — "no self-signup" superseded by [16](0016-accounts-are-invited-and-passwords-are-self-served.md) |
 | [6](0006-never-redistribute-scryfall-bulk-data.md) | Never redistribute Scryfall bulk data; refresh it in place, on demand | Accepted |
@@ -50,6 +50,8 @@ they differ.
 | [34](0034-claude-reads-a-photograph-and-the-pool-names-the-card.md) | Claude reads a photograph, and the pool names the card | Accepted |
 | [35](0035-the-forge-joins-the-simulator-and-a-worker-runs-it-hosted.md) | The Forge joins the Simulator, and a worker runs it hosted | Accepted |
 | [36](0036-the-match-ledger-records-declared-labels.md) | The match ledger records real games, and the labels it snapshots are declared | Accepted |
+| [37](0037-the-archetype-is-a-reading-of-the-themes.md) | The archetype is a reading of the themes, not a second declaration | Accepted — supersedes the labelling half of 36 |
+| [38](0038-the-served-backend-is-rewritten-in-go.md) | The served backend is rewritten in Go, and the bench stays Python | Accepted |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the
@@ -200,6 +202,25 @@ had owners and a purpose-built history, git was the third-best record of both,
 and the two-copies question HOSTING had to document is resolved by there being
 one copy per instance. The removal does not rewrite history; the curated six
 as of 2026-08-16 stay readable in old revisions, deliberately.
+
+37 was never added to this table when it landed (2026-08-21, the archetype
+as a reading of the themes); it is there now, with the row saying what it
+superseded.
+
+38 is the directory's second decision about a compiled backend, and it is
+written to be read *with* 3 rather than instead of it. 3 asked whether the
+hot loop should be ported for speed and said no, with a trigger; 38 asks
+whether the whole served app should be a compiled service and says yes, and
+says in its first paragraph that the trigger never fired — the owner's
+durability, typing and parallelism call, with the measurements cast as the
+equivalence evidence rather than the justification. Read its Options
+section for the shape that was refused (a long branch, on a repository whose
+`main` deploys itself), and its Decision for the two things most likely to
+be relitigated: the asset pipeline staying Python, which is the one real
+"Python gains us something", and cobra as a requirement rather than a
+proposal. The plan, the baseline and the rulings behind it are in
+[`docs/go-migration/`](../go-migration/README.md), which is the working
+document; the ADR is the decision.
 
 ## Where the longer arguments live
 

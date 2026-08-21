@@ -1,0 +1,255 @@
+{
+  "delete-user": {
+    "content_type": "application/json",
+    "shape": {
+      "jobs_dropped": "number",
+      "revoked": "number",
+      "username": "string"
+    },
+    "status": 200
+  },
+  "delete-user-refused": {
+    "content_type": "application/json",
+    "shape": {
+      "detail": "string"
+    },
+    "status": 422
+  },
+  "invite-refused": {
+    "content_type": "application/json",
+    "shape": {
+      "detail": "string"
+    },
+    "status": 422
+  },
+  "invite-unsendable": {
+    "content_type": "application/json",
+    "shape": {
+      "detail": "string"
+    },
+    "status": 503
+  },
+  "patch-last-admin": {
+    "content_type": "application/json",
+    "shape": {
+      "detail": "string"
+    },
+    "status": 409
+  },
+  "patch-user": {
+    "content_type": "application/json",
+    "shape": {
+      "created_at": "string",
+      "disabled": "bool",
+      "email": "null",
+      "id": "number",
+      "is_admin": "bool",
+      "model_tier": "string",
+      "sessions": "number",
+      "state": "string",
+      "username": "string"
+    },
+    "status": 200
+  },
+  "patch-user-missing": {
+    "content_type": "application/json",
+    "shape": {
+      "detail": "string"
+    },
+    "status": 404
+  },
+  "reset-unsendable": {
+    "content_type": "application/json",
+    "shape": {
+      "detail": "string"
+    },
+    "status": 503
+  },
+  "sessions-revoked": {
+    "content_type": "application/json",
+    "shape": {
+      "revoked": "number",
+      "username": "string"
+    },
+    "status": 200
+  },
+  "stats-activity": {
+    "content_type": "application/json",
+    "shape": {
+      "accounts": {
+        "active": "number"
+      },
+      "deck_edits_by_day": [
+        {
+          "day": "string",
+          "edits": "number"
+        }
+      ],
+      "jobs": {
+        "done": "number",
+        "error": "number"
+      },
+      "sessions": {
+        "seen_day": "number",
+        "seen_week": "number",
+        "total": "number"
+      },
+      "sim_cache_rows": "number"
+    },
+    "status": 200
+  },
+  "stats-claude": {
+    "content_type": "application/json",
+    "shape": {
+      "caveat": "string",
+      "prices": {
+        "checked": "string",
+        "note": "string",
+        "source": "string"
+      },
+      "windows": {
+        "all": {
+          "by_mode": [],
+          "by_model": [],
+          "estimated_usd": {
+            "checked": "string",
+            "complete": "bool",
+            "unpriced": "number",
+            "unpriced_models": [],
+            "usd": "number"
+          }
+        },
+        "month": {
+          "by_mode": [],
+          "by_model": [],
+          "estimated_usd": {
+            "checked": "string",
+            "complete": "bool",
+            "unpriced": "number",
+            "unpriced_models": [],
+            "usd": "number"
+          }
+        },
+        "week": {
+          "by_mode": [],
+          "by_model": [],
+          "estimated_usd": {
+            "checked": "string",
+            "complete": "bool",
+            "unpriced": "number",
+            "unpriced_models": [],
+            "usd": "number"
+          }
+        }
+      }
+    },
+    "status": 200
+  },
+  "stats-fly": {
+    "content_type": "application/json",
+    "shape": {
+      "configured": "bool",
+      "ok": "bool",
+      "values": {}
+    },
+    "status": 200
+  },
+  "stats-storage": {
+    "content_type": "application/json",
+    "shape": {
+      "app_db_bytes": "number",
+      "cache": {
+        "cardmotion_bytes": "null",
+        "ocr_bytes": "null",
+        "other_bytes": "null",
+        "symbols_bytes": "null"
+      },
+      "cache_bytes": "null",
+      "decks": {
+        "bytes": "number",
+        "count": "number",
+        "trashed": "number"
+      },
+      "pool_bytes": "number",
+      "scryfall_bulk_bytes": "null"
+    },
+    "status": 200
+  },
+  "stats-system": {
+    "content_type": "application/json",
+    "shape": {
+      "cpus": "number",
+      "disk": {
+        "free_bytes": "number",
+        "path": "string",
+        "total_bytes": "number",
+        "used_bytes": "number"
+      },
+      "load": [
+        "number"
+      ],
+      "memory": {
+        "available_bytes": "*",
+        "total_bytes": "number"
+      },
+      "process": {
+        "bytes": "number",
+        "kind": "string"
+      },
+      "schema": {
+        "applied": "number",
+        "expected": "number"
+      }
+    },
+    "status": 200
+  },
+  "stats-traffic": {
+    "content_type": "application/json",
+    "shape": {
+      "days": [
+        {
+          "2xx": "number",
+          "4xx": "number",
+          "5xx": "number",
+          "day": "string",
+          "total": "number"
+        }
+      ],
+      "note": "string",
+      "top_routes": [
+        {
+          "count": "number",
+          "route": "string"
+        }
+      ]
+    },
+    "status": 200
+  },
+  "users": {
+    "content_type": "application/json",
+    "shape": {
+      "admins": "number",
+      "tiers": [
+        {
+          "blurb": "string",
+          "key": "string",
+          "label": "string"
+        }
+      ],
+      "users": [
+        {
+          "created_at": "string",
+          "disabled": "bool",
+          "email": "null",
+          "id": "number",
+          "is_admin": "bool",
+          "model_tier": "string",
+          "sessions": "number",
+          "state": "string",
+          "username": "string"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

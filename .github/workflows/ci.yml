@@ -234,6 +234,41 @@ jobs:
           fi
           echo "no keys in tracked files"
 
+  # The contract suite, against a *real* server (docs/go-migration/PLAN.md,
+  # section 5). `tests/contract/` runs in-process inside `test` above like
+  # every other HTTP test; this job runs the same files with `--live`, which
+  # seeds a scratch directory, starts `mtglab ui` on it in a child process --
+  # the exact command the container's `CMD` runs -- and drives it over TCP.
+  # Nothing on the far side of the socket is stubbed. That is the mode the Go
+  # migration needs: from Phase 2 the same suite runs against the Go front
+  # door with Python behind it, and at retirement against Go alone, and a
+  # harness that had only ever been exercised in-process would be proven for
+  # the first time on the day it mattered.
+  #
+  # One job rather than a step in `test`, so a red contract reads as "the
+  # wire changed" and not as "some test failed", and so the matrix does not
+  # run it twice. Python 3.12 only, for the same reason `test` type-checks on
+  # one interpreter: the wire does not depend on which one served it.
+  #
+  # Adding this job was two steps here and is three in all (the `image` job's
+  # note, and `tests/test_packaging.py`): it is in the deploy's `needs`
+  # below, and it is **not yet a required check on main** -- that is a
+  # repository setting, ENGINEERING section 5 has the read-back command, and it
+  # is Aaron's to set.
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev,api]"
+      - name: The contract suite, over TCP against a live mtglab ui
+        run: pytest tests/contract --live -q -p no:cacheprovider
+
   # The container image. This job is not decoration: the maintainer's machine is
   # macOS 12 on Intel, where Docker Desktop will not install (it supports the
   # three most recent macOS releases) and Homebrew is too stale to build Colima.
@@ -525,12 +560,12 @@ jobs:
   # running instance quietly disagree. The card pool rename is exactly that
   # shape: `/api/health` answers a different field name on either side of it.
   #
-  # `needs` is the whole safety argument. This job cannot start until all four
-  # checks above are green, so it is *structurally* unable to deploy something
+  # `needs` is the whole safety argument. This job cannot start until every
+  # check above is green, so it is *structurally* unable to deploy something
   # that failed one -- rather than relying on branch protection, which governs
   # merging and has nothing to say about a workflow_dispatch run.
   deploy:
-    needs: [test, frontend, no-secrets-or-card-data, image, image-arm64]
+    needs: [test, frontend, no-secrets-or-card-data, contract, image, image-arm64]
     # Two conditions, and the ref one is deliberately outside the event check.
     #
     # Never from a pull request: a fork's PR must not be able to reach the

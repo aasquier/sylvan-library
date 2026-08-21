@@ -68,9 +68,22 @@ TAROT = Path(__file__).resolve().parent.parent / "assets" / "tarot"
 # production too. That is not a reason to leave it. One
 # `X-Content-Type-Options: nosniff`, one strict proxy or one CDN image rule
 # and every card in the deck fails at once, in production only, with a green
-# suite behind it. `.js`, `.css` and `.html` are in Python's own built-in
-# table and need no help; `.webp` is not, in 3.12.
+# suite behind it. `.css` and `.html` are in Python's own built-in table and
+# need no help; `.webp` is not, in 3.12.
 mimetypes.add_type("image/webp", ".webp")
+# Two more, found by the contract suite on 2026-08-21 (the Go migration's
+# Phase 1) when the same golden was checked on a Mac, on CI's Ubuntu and
+# against the instance. `.js` *is* in the built-in table, but the host's own
+# database is read on top of it and the hosts disagree -- this Mac says
+# `application/javascript`, Ubuntu and the deployed container say
+# `text/javascript` (the IANA registration since RFC 9239) -- so the header
+# depended on where the server ran. And the instance was serving the
+# bundle's `.woff2` fonts as `application/octet-stream`: browsers load a
+# font regardless, which is why nobody saw it. Registered here, both are
+# the same on every host, which is what lets one recorded shape be the
+# contract.
+mimetypes.add_type("text/javascript", ".js")
+mimetypes.add_type("font/woff2", ".woff2")
 
 #: Revalidate before reuse, every time.
 #:
