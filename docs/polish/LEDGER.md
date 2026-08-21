@@ -1017,6 +1017,15 @@ spirit of Magic*
   then invokes `python`). `test_the_setup_section_names_every_extra` reads
   CLAUDE.md only; the durable fix is widening that test over all three files
   rather than patching three sentences that will drift again.
+  **Fixed 2026-08-21, same day, out of turn** (the queued relic rulings came
+  back blank, so the session took this instead): the test is parametrized over
+  `SETUP_SECTIONS` — CLAUDE.md's `## Setup`, README's `## Running it`,
+  CONTRIBUTING's `## Getting set up` — and the prose in all three now names
+  five extras, quotes the measured ~28 minutes, and opens with an interpreter
+  that exists (`python3.12` in README, `python3` on CONTRIBUTING's
+  already-version-checked branch). CONTRIBUTING's "roughly 500MB" download
+  claim corrected to ~100MB compressed (500MB is the loaded pool, not the
+  download) and it now carries the do-not-interrupt warning.
 - **Deferred:**
   - **`printings.illustration_id`, the column that would have caught the
     miscount above.** Scryfall's stable id for a *painting*, as distinct from a
