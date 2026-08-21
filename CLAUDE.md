@@ -1175,7 +1175,22 @@ match ledger snapshots both at match time, so relabelling a deck changes its
 next match and never its history. Absent means unlabelled, which is where all
 six start — declaring theirs is Aaron's call, deck by deck.
 
-Two decks currently fail the gate on one card each, deliberately and not as a
-bug to route around: **Goreclaw** runs Primeval Titan and **Atla Palani** runs
-Emrakul, the Aeons Torn, both banned in Commander. Picking the replacement is
-the user's call.
+**One** deck currently fails the gate, and it is Goreclaw, on Primeval Titan.
+Picking the replacement is Aaron's call; the deck is `theoretical`, so nothing
+physical is blocked by it.
+
+This paragraph said *two* until 2026-08-21, naming Atla Palani for running
+Emrakul, the Aeons Torn. **Atla runs Emrakul, the Promised End, which is legal
+in Commander**, and the gate has been passing that deck for however long the
+claim has been wrong. It is the third time a completeness claim in this file
+has been false — see the `dev` extra above — and the lesson is the one already
+written there: *a sentence in this file asserting a fact about the decks is a
+claim to re-check against `mtglab decks validate`, not a fact to inherit.*
+These are recorded as prose precisely because no test can read the deck files
+(ADR 30), which is exactly why they rot.
+
+**Goreclaw's banned card is not a test fixture and cannot be one.** `decks/`
+is not in git, so CI has never seen that deck; the invalid-deck path is
+covered by in-git tests over `tiny_pool`'s deck instead. Keeping the Titan
+buys a convenient live example when walking the deployed UI, and nothing
+else — do not let a test depend on it.
