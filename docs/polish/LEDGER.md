@@ -1001,6 +1001,22 @@ spirit of Magic*
      planning document. The deferred item below used to pair the ledger's own
      trim to this ruling; **that pairing is cut here**, because the two files
      are long for different reasons and the answer is not the same for both.
+- **Filed by Colorless, 2026-08-21 (relic sweep) — for the next Blue run:**
+  README.md and CONTRIBUTING.md carry the drift CLAUDE.md's Setup section was
+  cured of, and no test reads either file. Three claims, checked tonight:
+  both say `data refresh` takes "several minutes" against the ~28 minutes
+  measured 2026-08-19 (CLAUDE.md corrected the same day); both enumerate the
+  install extras as `api`, `claude` and `dev` — three named where
+  `pyproject.toml` declares five, with `dev` described as "both" when it
+  vendors three, and `depth`'s deliberate exclusion (the very fact
+  `test_packaging.py` pins) unnamed in the one file a stranger reads first;
+  and README's quickstart still opens `python -m venv .venv`, the line #186
+  removed from CLAUDE.md because no `python` exists on this machine
+  (CONTRIBUTING is fairer — uv-first, with `python -m venv` only on an
+  explicit "otherwise" branch, though even that branch checks `python3` and
+  then invokes `python`). `test_the_setup_section_names_every_extra` reads
+  CLAUDE.md only; the durable fix is widening that test over all three files
+  rather than patching three sentences that will drift again.
 - **Deferred:**
   - **`printings.illustration_id`, the column that would have caught the
     miscount above.** Scryfall's stable id for a *painting*, as distinct from a
@@ -2745,8 +2761,10 @@ degradation, not a new fault.
 *The pass auditing itself: last cycle's findings · are the checklists still
 finding things · the developer tooling · cross-color leftovers*
 
-- **Last run:** 2026-08-19 (rainbow) — the first colorless run to have five
-  colors to audit. Previous: 2026-08-19 (the run that created this section).
+- **Last run:** 2026-08-21 (scoped — the relic sweep only; see the dated
+  subsection at the end of this file). Last full run: 2026-08-19 (rainbow) —
+  the first colorless run to have five colors to audit. Previous: 2026-08-19
+  (the run that created this section).
 - **Fixed this run (2026-08-19, rainbow):**
   1. **The mutation catalogue held 19 sites no test could ever kill, and they
      were 22% of one whole class.** White handed this over as an observation
@@ -3183,3 +3201,116 @@ re-checkable with one command.
   only ones a newcomer meets first (commandment 2) and both need Aaron's own
   hardware. After the stragglers pass, re-read this line rather than inheriting
   it — a pass that clears half the list changes the answer.
+
+### The relic sweep — 2026-08-21 (scoped run)
+
+Part four's newest bullet, run on Aaron's invocation two days after it was
+written into the reference (#212, the night the laptop deck copies were
+retired). **Scoped deliberately**: parts one to three ran in full on
+2026-08-19 and are not re-audited here, so the standing questions above still
+wait on the next full colorless run. Every verdict below was checked against
+the tree tonight rather than inherited from the invocation that named the
+candidates, and `date -u` was read before any date here was written — the
+harness's own header claimed 08-20 while the clock said 08-21, which is ADR
+37's day-ahead mistake pointing the other way.
+
+**Queued for Aaron — keep/retire on each. A relic is a decision, never a
+silent deletion; nothing below was touched.**
+
+1. **The deck template exists in three places, and only one is referenced.**
+   `docs/deck-template.yaml` is tracked and is CONTRIBUTING.md's front door
+   ("Start from `docs/deck-template.yaml`"); `decks/_template/deck.yaml` on
+   this laptop is byte-identical and referenced by nothing (`config.py:280`
+   skips underscore-prefixed directories, and every test wanting a
+   `_template` builds its own fixture); the volume carries a third copy at
+   `/data/decks/_template`, which the app equally skips. Hand-writing
+   `deck.yaml` is the workflow the surgical edit routes, `decks import` and
+   the camera door replaced — but the *tracked* copy has a live job, because
+   CONTRIBUTING's framing of local decks ("your app data, not repository
+   content") is still true for a stranger's checkout: the volume ruling was
+   about Aaron's library, not theirs. **Recommendation: keep
+   `docs/deck-template.yaml`, retire the laptop and volume `_template`
+   copies** — two unreferenced duplicates of a tracked file are the
+   divergence-waiting-to-be-discovered shape the volume ruling just killed
+   for decks, in miniature.
+
+2. **HOSTING.md and ROADMAP.md are one `docs/HISTORY.md` decision, not two.**
+   The candidate said HOSTING's opening still narrates the pre-ADR-30 era in
+   present tense; checked, that is half right. §0 was corrected by #212 and
+   tells the story straight — but the document's *frame* is still the
+   planning era ("what has to change in the app, how login and per-user
+   isolation **should** work"), §6 is a build order whose steps are
+   strikethrough-Done, and §7 is a readiness list for a deploy day that
+   happened 2026-08-13. §§4–5 are the live runbook CLAUDE.md points into
+   (§4 step 6 for filling a fresh library, §5 for the rollback) and must
+   stay. That is exactly ROADMAP's shape — landed narrative over a live head
+   — and ROADMAP's queued HISTORY split (Blue 7, half-answered in #194)
+   should widen to one ruling over both files: goals and runbook stay,
+   landed narrative moves. **Recommendation: one decision, both files, one
+   branch when Aaron says go.**
+
+3. **CLAUDE.md's Workflow section fronts `decks import --from list.txt`; a
+   person's real import door is the camera.** Not mechanically a relic: the
+   camera flow (ADR 34) and the paste flow both converge on
+   `decks/importer.py`, so the CLI importer is the engine either way — and
+   CLAUDE.md's workflow is Claude-facing session tooling, and a session
+   imports from text. What moved under it is the volume ruling: a local
+   `decks import` now writes a *scratch* deck by definition, and nothing in
+   the section says so. **Recommendation: keep the command, add the one
+   sentence** ("local imports are scratch; the library's door is the app's
+   `/import`") — a reframing, not a retirement, cheap enough to ride any
+   branch.
+
+4. **`mtglab ui` + the committed `web_dist` — the ruling Aaron named, with
+   the evidence assembled.** Two facts sharpen the question. First, **the
+   committed bundle is not `mtglab ui`'s to retire**: the Dockerfile
+   deliberately has no Node stage and copies `src/` whole, so the deployed
+   instance's frontend *is* the committed bundle — retiring the commit is a
+   deploy-pipeline redesign (a Node stage, or a CI artifact), a different
+   and bigger decision than the one asked. Second, post-volume-ruling a
+   fresh checkout's `mtglab ui` opens on an empty library, so its remaining
+   jobs are (a) the dev harness — commandment 16's walks, `--dev` CORS for
+   Vite — and (b) CONTRIBUTING's contributor story, a stranger running the
+   app over their own local decks, for whom local-first is still the true
+   shape. Meanwhile the five artifacts have no route — `decks build` is
+   CLI-only, so the hosted library regenerates artifacts through
+   `fly ssh console` (the capability half is Green's hosted-first facet;
+   it is cited here as evidence the CLI is load-bearing, not a relic).
+   **The ruling wanted: README sells `mtglab ui` as "the app" — is it that,
+   or a dev harness plus the contributor engine?** Nothing is deleted either
+   way; the answer decides how README and CONTRIBUTING frame it, and whether
+   hosted-first gaps like artifact builds are gaps to close or CLI territory
+   by design.
+
+5. **`backups/*.db` — four pre-deployment `app.db` snapshots, dated
+   2026-08-13/14, laptop-local, gitignored.** Taken during the schema-v5
+   danger work (the users-table rebuild whose `DROP TABLE` cascaded sessions
+   away); the real `app.db` has lived on the volume since deploy day, so
+   these are backups of a database that stopped being the real one about two
+   days after they were taken. They hold that era's real account data — the
+   first personal data this project ever stored. **Recommendation: retire —
+   delete, or fold into the same drawer as
+   `~/decks-laptop-final-2026-08-21.tar.gz`; personal-data disposal is
+   Aaron's call, which is why four gitignored files are queued rather than
+   removed.**
+
+6. **An empty `node_modules/` at the repo root** — a stray from an npm
+   invocation that forgot `--prefix web`; empty, gitignored, referenced by
+   nothing, one `rmdir` to clear. Queued anyway, because the sweep's rule is
+   a decision for everything, and the cheap ones are how the rule stays one.
+
+**Confirmed, no action.** The `~/Downloads` deck markdown is still present
+(the Atla pilot guides, the swap lists, the lot) and CLAUDE.md's sentence
+about it — historical, never edited or re-imported — is still true and
+stays. `scripts/fetch_forge.py` is live, copied and run by
+`Dockerfile.forge`. `.venv-depth` self-ignores — uv writes `*` into the
+venv's own `.gitignore`, which is why it never appears in `git status`
+despite matching nothing in the repo's — and is documented in the
+environment memory. The deck tarball in `~` is the sanctioned copy of
+record, documented in CLAUDE.md.
+
+**Filed to Blue, not fixed here** (a colorless run's diff belongs to the
+skill, the ledger and the tooling): README/CONTRIBUTING quickstart drift —
+the entry sits in Blue's own section, dated tonight. It is the same
+completeness-claim class this project has caught three times, in the two
+files `test_the_setup_section_names_every_extra` does not read.
