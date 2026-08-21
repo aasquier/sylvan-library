@@ -41,7 +41,7 @@ def load_yaml(text: str) -> Any:
 
 # The deck-labelling axis is `themes`, and the archetype is a reading of it
 # (ADR 37, superseding ADR 36's second declared axis; Aaron's call,
-# 2026-08-22). Strategy words -- aggro, control, combo, stax, voltron -- are
+# 2026-08-21). Strategy words -- aggro, control, combo, stax, voltron -- are
 # themes like any other: a deck declares as many as are true, which is what
 # lets a control deck with a combo finish say both, as the community's own
 # tagging does and as ADR 36's single slot forbade.

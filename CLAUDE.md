@@ -1,7 +1,8 @@
 # sylvan-library
 
-Local-first Commander toolkit: deck files on disk, Monte Carlo simulation,
-Scryfall-validated decklists, generated primers.
+Commander toolkit: deck files on disk, Monte Carlo simulation,
+Scryfall-validated decklists, generated primers. The library lives on the
+deployed instance's volume; a checkout carries the engine, never the decks.
 
 Python 3.11+ · DuckDB · numpy. The package and CLI are named `mtglab`; the repo
 is `sylvan-library`. That mismatch is intentional and not a bug to fix.
@@ -387,22 +388,32 @@ src/mtglab/
   cli.py
 web/                      frontend source (React + Vite); `npm test` is Vitest,
                           and web/README.md is the conventions map
-decks/<slug>/deck.yaml    SOURCE OF TRUTH — live app data, NOT in git (ADR 30)
+decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
+                          lives on the instance's volume, and a checkout —
+                          this one included — normally holds no decks at all
 decks/<slug>/artifacts/   GENERATED — never edit by hand
 Dockerfile                two stages, no Node; app runs non-root
 docker-entrypoint.sh      fixes the volume's ownership, then drops privileges
 fly.toml                  the only Fly-specific file; no secrets, ever
 ```
 
-**Decks do not live in git** (ADR 30). `decks/` is the local app's data
-directory — gitignored, like the pool and `app.db` — and deployed, decks live
-on the volume at `/data/decks`, which is the only copy that instance has: the
-app's editing routes write `deck.yaml`, so decks baked into a layer would lose
-every edit at the next deploy. The image carries no decks and no pool at all;
-`docs/HOSTING.md` §4 step 6 says how a fresh instance's library fills (a
-backup, your laptop, or an import). Deck history is the activity log (ADR 28),
-and `swaps.md` diffs against the last build's own snapshot
-(`artifacts/deck.last-built.yaml`), not against a git revision.
+**Decks do not live in git** (ADR 30), **and since 2026-08-21 they do not
+live on the laptop either** (Aaron's ruling, the day ADR 37's relabels made
+the divergence visible: labels applied to the laptop copies had never reached
+the volume, and only a hand diff caught it). The library's one standing copy
+is the deployed volume at `/data/decks`, where the app's editing routes write
+`deck.yaml` — a second standing copy anywhere else is a fork waiting to be
+discovered. `decks/` in a checkout is just the app's gitignored data
+directory, normally empty: `mtglab ui` works on whatever is put there, and
+work that needs the real decks — an overnight Forge round-robin, a migration
+rehearsal — pulls them from the instance first (`fly ssh sftp get`), treats
+them as scratch, and deletes them after. The last laptop copies were pushed
+to the volume, tarballed to `~/decks-laptop-final-2026-08-21.tar.gz`, and
+deleted. The image carries no decks and no pool at all; `docs/HOSTING.md` §4
+step 6 says how a fresh instance's library fills (a backup or an import).
+Deck history is the activity log (ADR 28), and `swaps.md` diffs against the
+last build's own snapshot (`artifacts/deck.last-built.yaml`), not against a
+git revision.
 
 Layering: `api/` must not import from `cli.py`. Anything both need lives in
 `config.py` or the relevant package — that rule is why `deck_paths` and the
@@ -1168,10 +1179,14 @@ coloured sources against a library of nought). Fill it, or delete it; until
 then, "the six" below means the six named above and the count of directories
 is seven.
 
-All six live as `decks/<slug>/deck.yaml` — Aaron's app data on this machine
-and on the instance's volume, **not in git** (ADR 30), so a fresh checkout has
-none of them and nothing in the suite may assume otherwise. The original
-markdown in `~/Downloads` is historical and should not be edited or
+All six live on the instance's volume as `/data/decks/<slug>/deck.yaml` —
+Aaron's app data, **not in git** (ADR 30) **and not on the laptop** (ruling
+2026-08-21: the last laptop copies were pushed to the volume, tarballed, and
+deleted), so a checkout has none of them and nothing in the suite may assume
+otherwise. Local work that needs them pulls from the instance and cleans up
+after itself; checking one of the facts below means asking the instance
+(`fly ssh console -C "mtglab decks validate <slug>"`), not the laptop. The
+original markdown in `~/Downloads` is historical and should not be edited or
 re-imported. `ROADMAP.md` records what the migration turned up. The facts
 below (statuses, stages, the two banned cards) are recorded here as prose
 precisely because no test can read the files to check them.
@@ -1196,7 +1211,7 @@ A deck may also declare its labels (ADR 37, superseding ADR 36's second
 axis): one open `themes` list — identity, several per deck, strategy words
 included, from the hand-curated vocabulary in `model.THEMES`, which grows
 only by somebody *reading* and editing it, never by scraping (EDHREC's own
-Terms of Use forbid automated queries, read 2026-08-22, so that door is shut
+Terms of Use forbid automated queries, read 2026-08-21, so that door is shut
 twice). The `archetype` the rating boards group by is a **reading** of the
 declared themes, not a second declaration: among the four class words
 declared (aggro | midrange | control | combo), the worst-Forge-piloted wins,

@@ -1,9 +1,9 @@
 # 37. The archetype is a reading of the themes, not a second declaration
 
-**Status:** Accepted · **Decided:** 2026-08-22 with Aaron · Supersedes the
+**Status:** Accepted · **Decided:** 2026-08-21 with Aaron · Supersedes the
 labelling half of ADR 36 (the ledger's snapshot rule and everything else in
 that ADR stand); informed by a survey of EDHREC's tag taxonomy
-(https://edhrec.com/tags/themes, read 2026-08-22) and by the six decks' own
+(https://edhrec.com/tags/themes, read 2026-08-21) and by the six decks' own
 primers.
 
 ## Context
@@ -116,7 +116,7 @@ column comment says what the value now is.
 
 Aaron asked whether EDHREC's tag data could be fetched at deck build or
 import, or by a future refresh feature. **No — their own Terms of Use settle
-it** (read 2026-08-22): the licence is personal and noncommercial, content
+it** (read 2026-08-21): the licence is personal and noncommercial, content
 may not be republished, and the Acceptable Use Policy expressly forbids
 using "software or automated agents or scripts … to generate automated
 searches, requests, or queries to the Site". Commandment 9 makes that
