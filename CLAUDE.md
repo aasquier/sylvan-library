@@ -1235,8 +1235,32 @@ launder Forge's pilot bias into the boards; the themes are the human's own
 words. A legacy `archetype:` key still answers while a file's themes name no
 class word, and the next write drops it once shadowed. The match ledger
 snapshots the reading at match time, so relabelling a deck changes its next
-match and never its history. Absent means unlabelled, which is where all six
-start — declaring theirs is Aaron's call, deck by deck.
+match and never its history. Absent means unlabelled.
+
+**The deck page edits them** (2026-08-21), which closed the follow-up the
+migration exposed: the only label editor had been the CLI, so relabelling the
+deployed library meant `fly ssh console` — the laptop coupling the volume
+ruling ended. `components/labels.tsx` is the control and `GET /api/themes`
+serves the vocabulary, a route rather than a tuple copied into TypeScript for
+the reason `SIMULATOR_KEYS` exists: a copy drifts silently and would offer a
+label `set_deck_field` then refuses. Two things about it are load-bearing.
+**The archetype is never predicted while editing** — it is a readout of what
+the server resolved, the stance dial's rule applied again, because a second
+copy of worst-piloted-wins living in TypeScript would disagree with the
+Python one and nobody would learn which was right; the editor names which
+ticked words are *class* words and stops. And **the four class words render
+in `ARCHETYPES` order, easiest to hardest to pilot**, not alphabetically —
+that gradient is the only thing their order carries, and the copy beside them
+("the board reads the hardest of them to pilot") is unreadable without it.
+
+**All six decks are labelled**, verified against the volume 2026-08-21:
+arahbo (cats, aggro), atla (dinosaurs, sacrifice, tokens, midrange), goreclaw
+(stompy, big-mana, ramp, midrange), gyome (food, aristocrats, sacrifice,
+midrange), tivit (treasure, clues, politics, control, combo, cedh), trostani
+(tokens, lifegain, midrange). This sentence said they were where "all six
+start" — unlabelled — until the editor was built and the volume was actually
+read. Re-check it there rather than here; it is the same class of claim as
+the two above it.
 
 **One** deck currently fails the gate, and it is Goreclaw, on Primeval Titan.
 Picking the replacement is Aaron's call; the deck is `theoretical`, so nothing

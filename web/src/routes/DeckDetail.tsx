@@ -38,6 +38,7 @@ import { CommanderDossierPanel } from '../components/dossier'
 import { DeckReviewPanel } from '../components/review'
 import { SwapComposer } from '../components/swap'
 import { StanceReadout } from '../components/stance'
+import { DeckLabels } from '../components/labels'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 
 type Tab = 'cards' | 'stats' | 'validation' | 'notes' | 'history'
@@ -347,6 +348,13 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
               a household tag, not an account. Editable inline on your own
               decks; on somebody else's it is a fact, or absent. */}
           <PilotLine deck={deck} deckRef={deckRef} onRefresh={onRefresh} />
+
+          {/* What the deck says it is (ADR 37). Declared themes, and the
+              archetype read out of them — never predicted here while
+              editing, because the reading is the server's. Until this
+              existed the only label editor was the CLI, which meant
+              relabelling the deployed library over `fly ssh`. */}
+          <DeckLabels deck={deck} deckRef={deckRef} onRefresh={onRefresh} />
 
           {/* The identity, loud — it constrains all 99 other cards and it used
               to be a row of 12px dots. The mana cost deliberately sits on the

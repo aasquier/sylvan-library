@@ -33,6 +33,11 @@ function deck(overrides: Partial<DeckTile> & { slug: string }): DeckTile {
     // tab's subject is `writable: false, showcase: false`.
     owner: 'aasquier',
     pilot: '',
+    // Unlabelled by default (ADR 37): declaring themes is a deliberate act,
+    // so the fixture that describes "a deck" describes one nobody has
+    // labelled yet.
+    themes: [],
+    archetype: null,
     shared: true,
     showcase: true,
     status: 'built',
