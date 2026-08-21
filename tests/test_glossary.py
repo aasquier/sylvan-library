@@ -97,6 +97,7 @@ SIMULATOR_KEYS = (
     # Tier 1.5, the closed form (the Karsten shelf).
     "tier-1.5", "sim.target", "stat.sources_needed", "stat.card_lag",
     "stat.regression_lands", "stat.policy_gain",
+    "stat.mana_curve", "sim.target_turn", "sim.target_mana",
     # The Forge mode (ADR 35).
     "sim.forge_games", "stat.forge_wins", "stat.forge_length",
     "stat.forge_timed_out",

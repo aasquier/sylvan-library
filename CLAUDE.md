@@ -305,6 +305,18 @@ src/mtglab/
                           tapped lands and colour screw the arithmetic
                           ignores), which is why it renders beside the
                           simulation and never instead of it
+  sim/curve.py            the mana curve (Tier 1.5): P(N mana on turn T),
+                          decomposed into lands and ramp, plus advice on
+                          which to add. **A land drop every turn is 54 lands
+                          at 90% through turn four** -- the requirement grows
+                          without bound, so that question is answered only to
+                          talk somebody out of it. The live question takes two
+                          dials, a turn *and* an amount, because at N == T a
+                          land always wins (one mana, no cast, no sickness)
+                          and at N > T a land is worth **nothing** -- you may
+                          play one a turn -- so only ramp can help. Measured:
+                          six decks x five turns, ramp never won at N == T;
+                          at N > T it won every time
   sim/mulligan.py         the keep-rule grid search: 33 rules, one seed,
                           judged on spells through T8 like the land sweep.
                           Its verdict is `flat` measured **against the

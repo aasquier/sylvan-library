@@ -84,7 +84,8 @@ its own branch or few, in this order because each drinks from the one before:
      always wide; four of the six decks correctly report "your default is
      already right", and then name the rule that deploys the same while
      mulliganing 14% of hands instead of 43%.
-3b. **The mana curve** (designed 2026-08-21, *awaiting two rulings*). Aaron
+3b. **The mana curve** — *built 2026-08-21* (`sim/curve.py`, on the shelf
+   route, two new Simulator controls). Aaron
    asked for a land count giving a statistically guaranteed land drop every
    turn. **Computed, the answer is unusable and that is the finding**: 54
    lands to make every drop through turn 4 at 90%, because you need T lands
@@ -106,10 +107,15 @@ its own branch or few, in this order because each drinks from the one before:
    the cap — omitting it was a −0.54 mana bias, and the *pattern* of the error
    named it (Esper Tivit accurate, every green deck ~0.9 low).
 
-   **Two rulings before it is built**: whether the target turn is a control or
-   fixed, and whether the recommendation may say *add ramp, not lands* — which
-   for Atla Palani is the honest answer and is a different kind of advice than
-   this tool has given before.
+   **Both rulings came back**: the target turn is a control, and the tool may
+   say *add ramp, not lands*. Building it turned up the rule that decides
+   which: **at N == T a land always wins** — one mana, no cast cost, no
+   summoning sickness — and **at N > T a land is worth nothing at all**,
+   because you may only play one a turn. Six decks by five turns, ramp never
+   won the on-curve comparison; past the curve it won every time. That is why
+   the surface asks *how much* mana as well as *when*, and why watching the
+   recommendation flip as you raise the amount is the clearest lesson the
+   Simulator teaches about what ramp is for.
 
 4. **Ratings, then the regression** — TrueSkill-style posteriors per
    archetype class and **never across** (goal 7's engine, goal 9's honest
