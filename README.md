@@ -111,16 +111,19 @@ load in the browser straight from Scryfall's CDN.
 ## Running it
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python3.12 -m venv .venv && source .venv/bin/activate   # any 3.11+ will do
 pip install -e ".[dev,api]"
-mtglab data refresh          # Scryfall bulk -> DuckDB, several minutes
+mtglab data refresh          # Scryfall bulk -> DuckDB; ~28 minutes, measured
 mtglab ui                    # the app, at http://127.0.0.1:8765
 ```
 
 macOS ships a Python older than 3.11; [uv](https://docs.astral.sh/uv/) is the
-quickest fix. Install extras are `api` (the app), `claude` (the Anthropic SDK)
-and `dev` (both, plus test tooling) — a bare `pip install -e .` still gets the
-gate, the mana solver and Tier 1, which need neither an account nor a network.
+quickest fix. Five install extras: `api` (the app), `claude` (the Anthropic
+SDK), `animist` (the asset pipeline), `depth` (the depth-model loader —
+deliberately not part of `dev`, being ~800MB of torch for a maintainer-only
+feature) and `dev` (the first three, plus the test tooling). A bare
+`pip install -e .` still gets the gate, the mana solver and Tier 1, which need
+neither an account nor a network.
 
 Full setup, the command reference and the deck workflow are in
 **[CONTRIBUTING.md](CONTRIBUTING.md)**.

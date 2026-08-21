@@ -211,15 +211,27 @@ def test_the_depth_extra_is_deliberately_not_in_dev():
     )
 
 
-def setup_section() -> str:
-    """CLAUDE.md's `## Setup` section, which is the documented bootstrap."""
-    text = CLAUDE_MD.read_text(encoding="utf-8")
-    start = text.index("\n## Setup\n")
+# The documents that walk somebody through installing this, and the section in
+# each that does the walking. CLAUDE.md is what a fresh session reads; README
+# is what a stranger reads first; CONTRIBUTING is where README sends them.
+SETUP_SECTIONS = {
+    "CLAUDE.md": (CLAUDE_MD, "\n## Setup\n"),
+    "README.md": (ROOT / "README.md", "\n## Running it\n"),
+    "CONTRIBUTING.md": (ROOT / "CONTRIBUTING.md", "\n## Getting set up\n"),
+}
+
+
+def setup_section(doc: str) -> str:
+    """The named document's setup section, which is its documented bootstrap."""
+    path, heading = SETUP_SECTIONS[doc]
+    text = path.read_text(encoding="utf-8")
+    start = text.index(heading)
     end = text.index("\n## ", start + 1)
     return text[start:end]
 
 
-def test_the_setup_section_names_every_extra():
+@pytest.mark.parametrize("doc", sorted(SETUP_SECTIONS))
+def test_the_setup_section_names_every_extra(doc):
     """The last seam in this file, and the one that had nothing holding it.
 
     Everything above pins `pyproject.toml` against the `Dockerfile` and against
@@ -233,17 +245,23 @@ def test_the_setup_section_names_every_extra():
     one was `depth`, the single deliberate exception to the rule the sentence
     was stating. An enumeration nobody counts stops being an enumeration.
 
+    Widened 2026-08-21 over README.md and CONTRIBUTING.md, which the relic
+    sweep found carrying the same drift CLAUDE.md was cured of -- three extras
+    named where five were declared, in the two files this test did not read.
+    The fourth instance of the completeness-claim failure, and the reason the
+    fix is a wider test rather than three corrected sentences.
+
     Deliberately one-directional: an extra must be named, but the section may
     name other things freely. Prose is not a table, and a check that forbade
     the word `dev` appearing twice would be a check nobody could satisfy.
     """
-    section = setup_section()
+    section = setup_section(doc)
     unmentioned = {extra for extra in declared_extras()
                    if f"`{extra}`" not in section}
     assert not unmentioned, (
-        f"pyproject declares {sorted(unmentioned)} and CLAUDE.md's Setup "
-        "section never names it. That section is what a fresh session is "
-        "handed; an extra it omits is an extra nobody installs."
+        f"pyproject declares {sorted(unmentioned)} and {doc}'s setup "
+        "section never names it. That section is somebody's documented "
+        "bootstrap; an extra it omits is an extra nobody installs."
     )
 
 

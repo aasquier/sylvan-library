@@ -42,19 +42,24 @@ Otherwise the usual path works:
 
 ```bash
 git clone https://github.com/aasquier/sylvan-library && cd sylvan-library
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,api]"
-mtglab data refresh          # Scryfall bulk -> DuckDB, several minutes
+mtglab data refresh          # Scryfall bulk -> DuckDB; ~28 minutes, measured
 pytest -q
 ```
 
 `data refresh` needs network access to `api.scryfall.com` and
-`data.scryfall.io`, and downloads roughly 500MB. `--oracle-only` is much
-smaller and covers everything except pricing.
+`data.scryfall.io`, and downloads roughly 100MB compressed. Budget about half
+an hour — loading the printings is the slow half — and do not interrupt it: a
+killed refresh leaves the pool with no printings until the next one finishes.
+`--oracle-only` is much smaller and covers everything except pricing.
 
-Install extras: `api` (FastAPI and the app), `claude` (the Anthropic SDK), and
-`dev` (both, plus the test tooling). A bare `pip install -e .` gets the gate,
-the mana solver and Tier 1, which need neither a network nor an account.
+Five install extras: `api` (FastAPI and the app), `claude` (the Anthropic
+SDK), `animist` (Pillow and the asset pipeline's video encoders), `depth`
+(CPU torch and the depth-model loader — deliberately not vendored by `dev`:
+~800MB of wheels for a loader no test may import), and `dev` (the first three,
+plus the test tooling). A bare `pip install -e .` gets the gate, the mana
+solver and Tier 1, which need neither a network nor an account.
 
 ### Working on the frontend
 
