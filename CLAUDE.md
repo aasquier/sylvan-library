@@ -1160,6 +1160,14 @@ only), Atla Palani dinosaurs (Naya), Goreclaw mono-green stompy (bracket 4),
 Tivit (Esper cEDH, bracket 5), Gyome food (Golgari, bracket 4), and Trostani
 tokens (Selesnya — an older token deck retooled into this list).
 
+**There is a seventh directory**, `adrix-and-nev-twincasters`, and it is not
+one of the six: it is an empty draft — no cards at all — left over from an
+import. It is why `compile_report` refuses a deck with nothing in it (a
+simulation of it answered with a 100% mulligan rate and a shelf demanding
+coloured sources against a library of nought). Fill it, or delete it; until
+then, "the six" below means the six named above and the count of directories
+is seven.
+
 All six live as `decks/<slug>/deck.yaml` — Aaron's app data on this machine
 and on the instance's volume, **not in git** (ADR 30), so a fresh checkout has
 none of them and nothing in the suite may assume otherwise. The original
@@ -1171,11 +1179,18 @@ precisely because no test can read the files to check them.
 Each deck declares `status: built | theoretical`. **Goreclaw and Tivit are
 theoretical** — lists under consideration, not boxes of cards; the other four
 are built. Absent means theoretical, so nothing is ever silently claimed as
-owned.
+owned. (Adrix is theoretical too, being empty.)
 
 Separately, each declares `stage: draft | curated` — whether it has been
-reasoned about, as opposed to whether it exists. **All six are curated.** A
-deck brought in with `decks import` starts as a draft; see rule 4.
+reasoned about, as opposed to whether it exists. **All six are curated**, and
+Adrix is the only draft. A deck brought in with `decks import` starts as a
+draft; see rule 4.
+
+**Verified 2026-08-21** against `validate` and the deck files, not inherited:
+built = arahbo, atla, gyome, trostani; theoretical = goreclaw, tivit, adrix;
+the only non-curated deck is adrix; the only decks failing the gate are
+goreclaw (banned card) and adrix (no cards). Re-run that check rather than
+trusting this sentence — it is exactly the kind that has rotted twice before.
 
 A deck may also declare its two labelling axes (ADR 36, decided 2026-08-20):
 an open `themes` list (identity — several per deck, from the hand-curated
