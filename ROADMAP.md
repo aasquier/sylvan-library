@@ -73,9 +73,21 @@ Where it stands, kept here so a fresh session knows the frontier:
   `routes.json`; golden wire shapes for every family; mutation-proven; a
   `contract` CI job. **One step owed to Aaron:** requiring `contract` on
   `main` (a repository setting — ENGINEERING §5).
-- **Phase 2 is next** — the `go/` module, the CGO spikes, the front door on
-  :8080 with the auth middleware in front of both runtimes, the pair
-  deployed. The estimate meets reality at its exit.
+- **Phase 2, done 2026-08-21** — the `go/` module; the three spikes green
+  on this Mac and both CI architectures (the DuckDB driver moved to
+  `github.com/duckdb/duckdb-go/v2`; SQLite is modernc, pure Go; goccy reads
+  PyYAML's output value for value); the front door (`go/internal/door`,
+  `mtglab ui` in Go) in front of both runtimes — the middleware ported and
+  held to `routes.json`, static served, `/api` proxied, the Python server
+  supervised as a child; `go (amd64)`, `go (arm64)` and `go-lint` jobs
+  written and required; the image's third stage; and **the contract suite
+  green through the door, 169/169, locally and as a step of the `contract`
+  job on every pull request.** PLAN §7 has the actuals against the estimate
+  (about three hours of one session against ½–1 day) and §10 the port board.
+- **Phase 3 is next** — the read spine: `config`, `cards/db` reads, the
+  `DeckSource` tiers, the gate, `analyze`/`suggest`/search, the reference
+  prose as generated JSON, the shelves; read-only families flipped off the
+  proxy list one at a time, each with the contract run attached.
 
 ### The next phase — the Simulator learns (decided 2026-08-20)
 

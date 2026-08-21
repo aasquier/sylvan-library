@@ -27,3 +27,11 @@ updates:
     groups:
       frontend:
         patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /go
+    schedule:
+      interval: weekly
+    groups:
+      go:
+        patterns: ["*"]

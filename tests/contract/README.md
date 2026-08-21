@@ -22,7 +22,23 @@ The in-process mode runs inside the ordinary suite and CI's `test` job. The
 nothing on the far side of the socket is stubbed. The external mode is for
 the coexistence pair from Phase 2 on — the Go front door on one port,
 uvicorn behind it, both started against a directory this harness seeded —
-and, at retirement, for Go alone.
+and, at retirement, for Go alone. **The `contract` job runs that too**,
+since Phase 2 (2026-08-21): it builds the door from `go/`, seeds a scratch
+with this harness, starts the pair, and runs the suite `--base-url` against
+the door. To do the same by hand:
+
+```bash
+# 1. seed a scratch the way --live does
+PYTHONPATH=tests python -c 'from pathlib import Path; from contract import harness; harness.seed(harness.make_scratch(Path("/tmp/pair")))'
+# 2. the environment the harness gives its child (contract.harness.SERVER_ENV), plus the dirs
+export MTGLAB_REQUIRE_AUTH=1 MTGLAB_SECURE_COOKIES=0 MTGLAB_DATA_DIR=/tmp/pair/data MTGLAB_DECKS_DIR=/tmp/pair/decks MTGLAB_FORGE_HOME=/tmp/pair/no-forge-here
+export MTGLAB_ADMIN_EMAIL= ANTHROPIC_API_KEY= RESEND_API_KEY= MTGLAB_FORGE_WORKER= MTGLAB_CLIENT_IP_HEADER= MTGLAB_BASE_URL=
+# 3. Python behind, the door in front (from go/; cwd outside the repo for Python so .env cannot leak in)
+(cd /tmp/pair && python -m mtglab.cli ui --no-open --host 127.0.0.1 --port 8766 &)
+(cd go && go run ./cmd/mtglab ui --host 127.0.0.1 --port 8765 --upstream http://127.0.0.1:8766 --web-dist ../src/mtglab/web_dist --tarot ../src/mtglab/assets/tarot &)
+# 4. the suite, through the door
+pytest tests/contract --base-url http://127.0.0.1:8765 --data-dir /tmp/pair/data --decks-dir /tmp/pair/decks
+```
 
 ## What is in here
 
@@ -88,3 +104,7 @@ carries the same list beside the table.
 4. If a new kind of refusal or header joins the wire, add a mutation to
    `harness.MUTATIONS` and its proof to `tests/test_contract_harness.py`;
    `test_every_mutation_is_proven` holds the two lists equal.
+5. If it is public, the Go front door's `PublicPaths` (`go/internal/door/auth.go`)
+   must name it too — `TestTheCodeMatchesTheSharedTable` holds that map equal
+   to this file, as `test_isolation.py` holds `api/auth.py`. Three readers,
+   one table.

@@ -17,6 +17,38 @@
 # Nothing compiles today — every dependency publishes manylinux wheels — but
 # the day one stops, it compiles over there rather than here.
 
+# ------------------------------------------------------------------- door
+#
+# The Go front door (ADR 38; docs/go-migration/PLAN.md section 4). From
+# Phase 2 of the migration the process the container runs is this binary:
+# it takes :8080, refuses before routing what `api/auth.py` refuses, serves
+# the bundle and the tarot art itself, proxies everything under /api to the
+# Python server on loopback, and supervises that server as a child. Three
+# stages now, and the image is larger for the duration -- the plan says so
+# out loud so the interim is never read as the outcome.
+#
+# `golang:1.26-trixie`: 1.26 because go.mod pins it (the last Go that runs
+# on the maintainer's macOS 12, ADR 38 decision 5), trixie because that is
+# the Debian the runtime stage's `python:3.12-slim` is built on. It does not
+# matter much: the binary is built with CGO off and is static.
+FROM golang:1.26-trixie AS door
+
+WORKDIR /build
+
+# Modules first, so the download layer caches across source edits.
+COPY go/go.mod go/go.sum ./
+RUN go mod download
+
+COPY go ./
+
+# CGO off, deliberately, and it is asserted in CI too (`The front door
+# builds without CGO` in ci.yml). The door's dependencies are pure Go --
+# modernc.org/sqlite reads `app.db` -- and the DuckDB driver, the module's one
+# CGO dependency, is not imported by this binary until Phase 3 lands the read
+# spine. The day it is, this line changes with a C toolchain beside it, and
+# this comment is where the decision gets made rather than discovered.
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/mtglab ./cmd/mtglab
+
 # ------------------------------------------------------------------ builder
 
 FROM python:3.12-slim AS builder
@@ -114,6 +146,26 @@ COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /app
 
+# The door, **off PATH on purpose**. The venv's `mtglab` stays the one a
+# `fly ssh console -C "mtglab decks validate ..."` finds, because during
+# coexistence the runbook surface is Python's; the Go binary takes the name
+# on PATH at Phase 8, when it carries those commands itself. Until then it is
+# reached by absolute path from CMD and nowhere else.
+COPY --from=door /out/mtglab /opt/door/mtglab
+
+# What the door serves itself, pointed at the *installed package's* copies
+# rather than a second COPY: one source for the bundle and the 78 tarot
+# pictures, so the door and the Python server cannot disagree about a byte.
+# Resolved through Python at build time because the site-packages path
+# carries the interpreter version, and asserted so a rename fails the build
+# rather than the first page load.
+RUN ln -s "$(python -c 'import mtglab, pathlib; print(pathlib.Path(mtglab.__file__).parent / "web_dist")')" /app/web_dist \
+ && ln -s "$(python -c 'import mtglab, pathlib; print(pathlib.Path(mtglab.__file__).parent / "assets" / "tarot")')" /app/tarot \
+ && test -f /app/web_dist/index.html \
+ && test -d /app/tarot
+ENV MTGLAB_WEB_DIST=/app/web_dist \
+    MTGLAB_TAROT_DIR=/app/tarot
+
 COPY docker-entrypoint.sh /usr/local/bin/
 # `setpriv` is how the entrypoint drops privileges; it ships in util-linux,
 # which is Priority: required in Debian and so present in -slim. Asserted at
@@ -153,4 +205,17 @@ ENTRYPOINT ["docker-entrypoint.sh"]
 # a 404 (ADR 5, never a 403). The failure is a running simulation reported as
 # gone, at random, half the time. Sessions and the login rate limiter are both
 # in `app.db` and would be fine; the jobs are not.
-CMD ["mtglab", "ui", "--no-open", "--host", "0.0.0.0", "--port", "8080"]
+#
+# **The door is PID 1 and the Python server is its child** (ADR 38). The
+# entrypoint still drops privileges and `exec`s -- into the door now -- so
+# the process on the port is `mtglab` (uid 10001), as CI asserts; the door
+# starts the command after `--`, relays SIGTERM to it, and exits when it
+# exits, so a crashed half is a restart rather than a door answering 502 to
+# everyone forever. `--upstream` and the child's `--port` name the same
+# loopback port (a test holds them equal); the one-worker rule above is
+# unchanged, and so is the HEALTHCHECK: `/api/health` is answered by the
+# Python half *through* the door, which is what makes it the pair's health
+# rather than the door's own.
+CMD ["/opt/door/mtglab", "ui", "--host", "0.0.0.0", "--port", "8080", \
+     "--upstream", "http://127.0.0.1:8765", \
+     "--", "mtglab", "ui", "--no-open", "--host", "127.0.0.1", "--port", "8765"]

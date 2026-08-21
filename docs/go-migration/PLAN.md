@@ -7,7 +7,8 @@ changed.*
 with Aaron the same day the plan was drafted; each ruling is recorded
 inline there, and [ADR 38](../adr/0038-the-served-backend-is-rewritten-in-go.md)
 made them formal on the Phase 1 branch the same day (Appendix A was its
-draft). **Phases 0 and 1 are done**; Phase 2 is next. Written by Claude from a
+draft). **Phases 0, 1 and 2 are done**; Phase 3 is next, and the port board
+in §10 is the frontier. Written by Claude from a
 measured read of the tree (see [BASELINE.md](BASELINE.md)); the judgment
 calls were argued, then ruled.
 
@@ -235,16 +236,16 @@ should be nothing) goes before his eye first.
 | Concern | Choice | Why |
 | --- | --- | --- |
 | Go version | current stable at Phase 2 | **Spike caveat:** this Mac is at its OS ceiling (macOS 12, Intel). Go's minimum macOS has been climbing (1.23 required 11+; the floor has since moved again). Verify current Go runs on this Mac in Phase 0; if the floor has passed 12, pin the newest Go that supports it and note the runway. CI is Linux either way. **Answered 2026-08-21:** the floor has passed 12 — Go 1.27 (August 2026) requires macOS 13, and the 1.26 release notes say 1.26 is the last that runs on macOS 12 (both read from go.dev the same day). So the module pins **`go 1.26`**; `go1.26.7` was installed here via the official per-version installer (`~/sdk/go1.26.7`, the stock `/usr/local/go` 1.20.7 untouched) and runs. The runway is roughly until Go 1.28 ships (~February 2027), after which 1.26 leaves support and this Mac's Go work moves to the CI/container loop or a newer machine. |
-| Module layout | `go/` at repo root | Mirrors `web/`: a source directory beside the Python package, building an artifact the image ships. One module, packages inside mirroring today's map (`go/internal/mana`, `go/internal/sim`, …). |
+| Module layout | `go/` at repo root | Mirrors `web/`: a source directory beside the Python package, building an artifact the image ships. One module, packages inside mirroring today's map (`go/internal/mana`, `go/internal/sim`, …). **Built 2026-08-21:** module path `github.com/aasquier/sylvan-library/go`; `cmd/mtglab` (cobra root, one command: `ui`, the front door), `internal/door` (the door), `internal/auth` (app.db read-only, sessions, argon2id), `internal/routes` (the reader of `tests/contract/routes.json`), `internal/pool` and `internal/deckyaml` (the two spikes, as packages). |
 | HTTP | stdlib `net/http` (1.22+ mux) | The dependency-light ethos, applied. The deny-before-route middleware is a handler wrapper; no framework earns its place here. |
-| DuckDB | `github.com/marcboeker/go-duckdb` | The community-standard driver; CGO with bundled libduckdb. Spike in Phase 2 for macOS-12 dev + CI arm64. Its Appender is the bulk path the 16-minute `load_printings` wants anyway — the refresh fix rides along. |
-| SQLite | decide at spike: `modernc.org/sqlite` (pure Go) vs `mattn/go-sqlite3` (CGO) | CGO is already required by DuckDB, so either works; modernc keeps DB-free unit tests CGO-free. Whichever is chosen, WAL + busy_timeout from day one (two processes share `app.db` during coexistence). |
-| YAML | `github.com/goccy/go-yaml` for the *oracle parse only* | The load-bearing discovery: `decks/edit.py` is hand-rolled **text surgery**, ruamel was measured and rejected in its own docstring, and text surgery ports language-neutrally. Go needs YAML only to parse (validate/oracle-check), never to serialize a deck. Spike a golden-deck round-trip against PyYAML's parse early anyway — parser equivalence (folded scalars, anchors) is the residual risk. |
-| Argon2id | `alexedwards/argon2id` (PHC parse + verify over `x/crypto`) | Existing hashes carry the OWASP parameters in-string; verification is compatibility, not migration. |
+| DuckDB | `github.com/marcboeker/go-duckdb` | The community-standard driver; CGO with bundled libduckdb. Spike in Phase 2 for macOS-12 dev + CI arm64. Its Appender is the bulk path the 16-minute `load_printings` wants anyway — the refresh fix rides along. **Spiked 2026-08-21, and the driver has moved:** it is `github.com/duckdb/duckdb-go/v2` now (the same project, under the DuckDB organisation; marcboeker's path last published October 2025). v2.10505.0 bundles libduckdb **1.5.5, the same version the venv's `duckdb` is**, links on this Mac (Apple clang 12 prints weak-symbol warnings against the prebuilt static library — harmless, the tests pass), reads a pool Python wrote (`MTGLAB_TEST_POOL=… go test ./internal/pool`), and builds on both CI architectures in the `go` job. The front door does not import it yet and is built CGO-free (the Dockerfile's door stage says why); the `go` job proves that build stays possible. |
+| SQLite | decide at spike: `modernc.org/sqlite` (pure Go) vs `mattn/go-sqlite3` (CGO) | CGO is already required by DuckDB, so either works; modernc keeps DB-free unit tests CGO-free. Whichever is chosen, WAL + busy_timeout from day one (two processes share `app.db` during coexistence). **Decided at the spike, 2026-08-21: modernc.org/sqlite** (v1.57.0). It makes the front door a static binary with no C toolchain in its build, keeps the auth tests race-detected without one, and the cost — modernc is slower than mattn on heavy work — is nothing at a primary-key session lookup. The door opens `app.db` **read-only** (`mode=ro`, busy_timeout 5000): Python's middleware behind it still does the session touch and the expired-row delete, so during coexistence there is still one writer and risk 6 is deferred rather than taken. |
+| YAML | `github.com/goccy/go-yaml` for the *oracle parse only* | The load-bearing discovery: `decks/edit.py` is hand-rolled **text surgery**, ruamel was measured and rejected in its own docstring, and text surgery ports language-neutrally. Go needs YAML only to parse (validate/oracle-check), never to serialize a deck. Spike a golden-deck round-trip against PyYAML's parse early anyway — parser equivalence (folded scalars, anchors) is the residual risk. **Spiked 2026-08-21, and it agrees:** `tests/go_fixtures.py` writes a deck built to carry every shape `Deck.dump` can emit (single-quoted scalars folded at width 100 with doubled apostrophes, plain multi-line scalars with braces in them, quoted look-alikes of `yes`/`null`/`12`, a newline inside a quoted scalar, unicode), plus PyYAML's reading of it as JSON; `go/internal/deckyaml` parses the text with goccy (v1.19.2) and matches value for value. `tests/test_go_fixtures.py` holds the committed pair current against the dumper. |
+| Argon2id | `alexedwards/argon2id` (PHC parse + verify over `x/crypto`) | Existing hashes carry the OWASP parameters in-string; verification is compatibility, not migration. **Proven 2026-08-21** (`go/internal/auth`): hashes argon2-cffi wrote verify, hashes Go writes are in the PHC form Python reads, the token hash is the same SHA-256 hex, `isoformat` timestamps parse, and — the strongest form — a session `mtglab.auth.sessions.create` minted resolves in Go (`MTGLAB_PYTHON=.venv/bin/python go test ./internal/auth`), which the `contract` job then proves over the wire on every pull request. |
 | Anthropic | official `anthropic-sdk-go` | Verified current: tool use, structured outputs, `web_search_20260209`, caching, manual `pause_turn` loop. Model stays `claude-sonnet-5` with per-account tiers — the port changes no model decision. Load the claude-api skill before writing the integration, same rule as ever. |
 | CLI | `spf13/cobra` | `mtglab` has ~40 subcommands; stdlib flag-wrangling at that scale is its own framework, worse. The one heavyweight dependency argued for, not defaulted to. **Ratified 2026-08-21 as Aaron's explicit call: cobra for any CLI work, full stop.** |
 | Tests | stdlib `testing` + `google/go-cmp`; native fuzzing | Ethos again. Table-driven ports of the pinned cases. |
-| Lint/CI | `golangci-lint` (errcheck, staticcheck, govet, revive) + `go test -race` + `go vet`, as **required checks** | And the recorded lesson applies verbatim: *adding a CI job is two steps* — writing it and requiring it in branch protection, which has no artifact in the repo (ENGINEERING §5). Phase 2's exit gate includes reading the protection list back. |
+| Lint/CI | `golangci-lint` (errcheck, staticcheck, govet, revive) + `go test -race` + `go vet`, as **required checks** | And the recorded lesson applies verbatim: *adding a CI job is two steps* — writing it and requiring it in branch protection, which has no artifact in the repo (ENGINEERING §5). Phase 2's exit gate includes reading the protection list back. **Done 2026-08-21:** three jobs — `go (amd64)` and `go (arm64)` (vet, the CGO-free door build, race-detected tests, a tidy check, on native runners) and `go-lint` (golangci-lint v2.13.1, config in `go/.golangci.yml`) — written and required; ENGINEERING §5's table is the read-back. One trap for this Mac: `go install` of golangci-lint fails at link with CGO on (Apple clang 12 against Go 1.26's cgo), and `CGO_ENABLED=0 go install …@v2.13.1` works. |
 
 ## 7. Phases
 
@@ -328,6 +329,39 @@ sessions/argon2id verify compat proven against fixtures Python wrote; new CI
 jobs written *and required*; third Dockerfile stage; deploy of the pair.
 *Gate: contract suite green through the front door on the deployed instance;
 a session minted by Python authenticates a Go-served request.*
+
+*Done 2026-08-21, in one session (branch `go-front-door`).* The three
+spikes passed on this Mac in the first hour (§6 records each, with the one
+surprise: the DuckDB driver had moved house). The door is `go/internal/door`
+and the binary is `go/cmd/mtglab ui`: the ported middleware (deny before
+route, 401/403, the same path normalisation, `PublicPaths` held equal to
+`routes.json` by a Go test the way `test_isolation.py` holds Python's), the
+shell and the two static mounts served with the container's content types
+and Python's exact refusals (a JSON `Not Found`, a 405 on a `HEAD /`, the
+shell for `/assets` without its slash), a reverse proxy that preserves
+`Host` and the raw query and **drops client-supplied `X-Forwarded-*`**
+(uvicorn trusts loopback, and the door is loopback now), `/door/health`
+for the door's own liveness (outside `/api`, because a Go-only `/api` route
+would be a ghost to `test_isolation.py`; `/api/health` stays the *pair's*
+health and stays proxied), and a supervisor that runs the Python server as a
+child and exits with it. The **contract suite runs through the door**: 169
+of 169 locally, and the `contract` CI job now builds the door and runs the
+suite `--base-url` against it on every pull request — which is where the one
+real bug of the phase was found, on the first run: the door pre-set the
+security headers and the proxy appended Python's copies, so the wire said
+`nosniff, nosniff`. Fixed by applying them at `WriteHeader` time; the Go
+test now asserts single values rather than `Get`'s first. The image gained
+its third stage (`golang:1.26-trixie`, CGO off, the binary at
+`/opt/door/mtglab` — off PATH, so `fly ssh console -C "mtglab …"` still
+finds Python's for the runbook) and its CMD runs the door with the Python
+server after `--`; `tests/test_packaging.py` pins the CMD's shape, the
+`go 1.26` pin, and that the Go reader points at the one route table.
+**Actuals against the estimate:** the estimate was ½–1 day and the work to a
+green contract run through the door, locally and in CI, took about three
+hours of one session; the deploy and the walk on the instance follow the
+merge. The remaining phases are re-priced against that in the paragraph
+above §7's table of phases: no change to the band's shape, and the low end
+is the one this phase supports.
 
 **Phase 3 — The read spine** *(~¾–1 day).* `config`, `cards/db` reads,
 `DeckSource` (file + SQL tiers), the gate (`validate`, companion, partners),
@@ -467,11 +501,19 @@ Ordered by expected pain, each with the mitigation already in the plan:
 
 There is more than one Claude in this house now. Rules for the duration:
 
-- **The port board is in this folder** (a table in PLAN.md once Phase 2
-  starts): per module — `python | porting | go`. A module marked `porting`
-  is frozen for feature work; a change that cannot wait lands on the Python
-  side **and** is flagged in the PR body as owed to the port, which does not
-  merge its family until the change is mirrored.
+- **The port board is the table below**: per module — `python | porting |
+  go`. A module marked `porting` is frozen for feature work; a change that
+  cannot wait lands on the Python side **and** is flagged in the PR body as
+  owed to the port, which does not merge its family until the change is
+  mirrored.
+
+  | Module / surface | State | Where, and what moved |
+  | --- | --- | --- |
+  | the listening port, static `web_dist` and `/tarot`, the auth middleware (deny-before-route, 401/403, the admin prefix) | **go** | `go/internal/door`, 2026-08-21 — in front of *both* runtimes; Python's middleware stays on behind it as the second wall |
+  | `auth/sessions.py`, `auth/passwords.py` (read side: resolve a token, verify a hash) | **go** | `go/internal/auth`; read-only, Python still owns every write and the schema ladder |
+  | the route classification (`tests/contract/routes.json`) | shared | read by `tests/test_isolation.py`, `tests/contract/`, and `go/internal/routes` |
+  | everything under `/api` — `api/`, `decks/`, `cards/`, `sim/`, `claude/`, `artifacts/`, the reference prose, `mana.py`, `tarot.py`, `symbols.py`, `ocr.py`, `config.py`, `cli.py` | python | proxied to uvicorn on loopback; Phase 3 starts the read spine |
+  | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
   walked before the next flip starts (main deploys itself; every flip is a
   release).

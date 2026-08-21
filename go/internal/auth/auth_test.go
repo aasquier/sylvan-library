@@ -1,0 +1,324 @@
+package auth
+
+import (
+	"context"
+	"database/sql"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+// Vectors Python wrote (2026-08-21, `.venv` argon2-cffi 25.1.0, CPython
+// 3.12), with the commands that produce them so they can be regenerated:
+//
+//	from argon2 import PasswordHasher
+//	PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1).hash(pw)
+//
+//	import hashlib; hashlib.sha256(token.encode()).hexdigest()
+//
+// These are the fixture passwords `tests/contract/harness.py` seeds; the
+// hashes are of known strings and are not secrets.
+const (
+	alicePassword = "correct-horse-battery-staple"
+	aliceHash     = "$argon2id$v=19$m=19456,t=2,p=1$fzytJABNZ+uVVawoDerNkQ$r7JnoQumok+cn4Jr9hWi8WqNSWV5kpxT6n5y8j044iY"
+	bobPassword   = "a-different-long-passphrase"
+	bobHash       = "$argon2id$v=19$m=19456,t=2,p=1$uFbjsIOh9O/qVtgX5lZHYA$/zCCj7IIw2IxHgjYEHpEaf7BC7gDvjaDsi0hVFsHxKE"
+
+	fixtureToken     = "fixture-token-AAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	fixtureTokenHash = "25db52bb467767ed987f3a5d32af58aaf9e632df182f26b4e23014977d248bd7"
+)
+
+// The first rung of `auth/db.py`'s ladder, verbatim, for `users` and
+// `sessions` -- the two tables the door reads. (`users` is rebuilt with
+// AUTOINCREMENT at rung 5; the columns the door reads are the same in both.)
+const schemaV1 = `
+CREATE TABLE users (
+    id            INTEGER PRIMARY KEY,
+    username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash TEXT,
+    email         TEXT UNIQUE COLLATE NOCASE,
+    is_admin      INTEGER NOT NULL DEFAULT 0,
+    disabled_at   TEXT,
+    created_at    TEXT NOT NULL
+);
+CREATE TABLE sessions (
+    token_hash   TEXT PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at   TEXT NOT NULL,
+    expires_at   TEXT NOT NULL,
+    last_seen_at TEXT
+);
+CREATE INDEX sessions_by_user ON sessions(user_id);
+`
+
+// isoformat is what `datetime.now(UTC).isoformat()` writes.
+func isoformat(t time.Time) string {
+	t = t.UTC()
+	if t.Nanosecond() == 0 {
+		return t.Format("2006-01-02T15:04:05") + "+00:00"
+	}
+	return t.Format("2006-01-02T15:04:05.000000") + "+00:00"
+}
+
+// fixtureDB writes an app.db the way Python would have (WAL, the v1 tables),
+// with alice (admin), bob, and a disabled account, and returns a read-only
+// handle the way the door opens one.
+func fixtureDB(t *testing.T) (*sql.DB, *sql.DB) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "app.db")
+	writer, err := sql.Open("sqlite", "file:"+path+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { writer.Close() })
+	if _, err := writer.Exec(schemaV1); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	for _, row := range []struct {
+		id       int64
+		name     string
+		hash     string
+		admin    int
+		disabled string
+	}{
+		{1, "alice", aliceHash, 1, ""},
+		{2, "bob", bobHash, 0, ""},
+		{3, "mallory", bobHash, 0, isoformat(now)},
+	} {
+		var disabled any
+		if row.disabled != "" {
+			disabled = row.disabled
+		}
+		if _, err := writer.Exec(
+			"INSERT INTO users (id, username, password_hash, is_admin, disabled_at, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+			row.id, row.name, row.hash, row.admin, disabled, isoformat(now)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reader, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { reader.Close() })
+	return writer, reader
+}
+
+func mint(t *testing.T, writer *sql.DB, token string, userID int64, expires time.Time) {
+	t.Helper()
+	if _, err := writer.Exec(
+		"INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_seen_at) VALUES (?, ?, ?, ?, ?)",
+		HashToken(token), userID, isoformat(time.Now()), isoformat(expires), isoformat(time.Now())); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTokenHashMatchesPython(t *testing.T) {
+	if got := HashToken(fixtureToken); got != fixtureTokenHash {
+		t.Fatalf("HashToken = %s, Python wrote %s", got, fixtureTokenHash)
+	}
+}
+
+func TestParsesWhatIsoformatWrites(t *testing.T) {
+	for _, s := range []string{
+		"2026-08-21T12:00:00.123456+00:00",
+		"2026-08-21T12:00:00+00:00",
+		"2026-08-21T12:00:00.123456", // naive; read as UTC
+	} {
+		got, err := ParseTimestamp(s)
+		if err != nil {
+			t.Fatalf("%s: %v", s, err)
+		}
+		if got.UTC().Year() != 2026 || got.UTC().Hour() != 12 {
+			t.Fatalf("%s parsed as %v", s, got)
+		}
+	}
+	if _, err := ParseTimestamp("yesterday"); err == nil {
+		t.Fatal("a non-timestamp parsed")
+	}
+}
+
+func TestResolvesASessionWrittenInPythonsShape(t *testing.T) {
+	ctx := context.Background()
+	writer, reader := fixtureDB(t)
+	mint(t, writer, fixtureToken, 1, time.Now().Add(Lifetime))
+
+	scope, err := Resolve(ctx, reader, fixtureToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !scope.Authenticated || scope.Username != "alice" || !scope.IsAdmin || scope.UserID != 1 {
+		t.Fatalf("alice's session resolved to %+v", scope)
+	}
+
+	// bob is not an admin.
+	mint(t, writer, "bob-token", 2, time.Now().Add(Lifetime))
+	scope, err = Resolve(ctx, reader, "bob-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !scope.Authenticated || scope.IsAdmin || scope.Username != "bob" {
+		t.Fatalf("bob's session resolved to %+v", scope)
+	}
+}
+
+func TestAnUnknownExpiredOrDisabledSessionIsAnonymous(t *testing.T) {
+	ctx := context.Background()
+	writer, reader := fixtureDB(t)
+	mint(t, writer, "expired", 1, time.Now().Add(-time.Minute))
+	mint(t, writer, "disabled-account", 3, time.Now().Add(Lifetime))
+	for _, token := range []string{"", "never-minted", "expired", "disabled-account"} {
+		scope, err := Resolve(ctx, reader, token)
+		if err != nil {
+			t.Fatalf("%q: %v", token, err)
+		}
+		if scope != Anonymous {
+			t.Fatalf("%q resolved to %+v, want anonymous", token, scope)
+		}
+	}
+}
+
+func TestTheReaderCannotWrite(t *testing.T) {
+	_, reader := fixtureDB(t)
+	if _, err := reader.Exec("DELETE FROM sessions"); err == nil {
+		t.Fatal("the door's handle wrote to app.db; it must be read-only")
+	}
+}
+
+func TestOpenDoesNotCreateAMissingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "absent.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := Ping(context.Background(), db); err == nil {
+		t.Fatal("Ping succeeded against a file that does not exist")
+	}
+	if _, err := os.Stat(path); err == nil {
+		t.Fatal("Open created app.db; Python owns that file")
+	}
+}
+
+func TestVerifiesPythonsArgon2Hashes(t *testing.T) {
+	for _, v := range []struct{ pw, hash string }{{alicePassword, aliceHash}, {bobPassword, bobHash}} {
+		h := v.hash
+		if !Verify(&h, v.pw) {
+			t.Fatalf("a hash argon2-cffi wrote did not verify: %s", v.hash)
+		}
+		if Verify(&h, v.pw+"x") {
+			t.Fatal("a wrong password verified")
+		}
+	}
+	if NeedsRehash(aliceHash) {
+		t.Fatal("Python's hash at the pinned parameters reads as needing a rehash")
+	}
+}
+
+func TestHashesInTheShapePythonReads(t *testing.T) {
+	h, err := HashPassword(alicePassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(h, "$argon2id$v=19$m=19456,t=2,p=1$") {
+		t.Fatalf("hash is not in argon2-cffi's PHC form: %s", h)
+	}
+	if !Verify(&h, alicePassword) {
+		t.Fatal("round trip failed")
+	}
+	if NeedsRehash(h) {
+		t.Fatal("a fresh hash needs a rehash")
+	}
+	weak := "$argon2id$v=19$m=4096,t=1,p=1$fzytJABNZ+uVVawoDerNkQ$r7JnoQumok+cn4Jr9hWi8WqNSWV5kpxT6n5y8j044iY"
+	if !NeedsRehash(weak) {
+		t.Fatal("a weaker hash does not need a rehash")
+	}
+}
+
+func TestEveryFailureIsFalse(t *testing.T) {
+	for _, h := range []string{"", "not-a-hash", "$argon2i$v=19$m=19456,t=2,p=1$abc$def", "$2b$12$bcrypt"} {
+		h := h
+		if Verify(&h, alicePassword) {
+			t.Fatalf("%q verified", h)
+		}
+	}
+	if Verify(nil, alicePassword) {
+		t.Fatal("an account with no password verified")
+	}
+}
+
+func TestStrengthFloorMatchesPython(t *testing.T) {
+	if err := CheckStrength("short"); err == nil {
+		t.Fatal("an 11-character password was accepted")
+	}
+	if err := CheckStrength(strings.Repeat("a", MinPasswordLength)); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckStrength(strings.Repeat("a", MaxPasswordBytes+1)); err == nil {
+		t.Fatal("a 1025-byte password was accepted")
+	}
+	if _, err := HashPassword("short"); err == nil {
+		t.Fatal("HashPassword stored a weak password")
+	}
+}
+
+// The strongest form of the fixture proof: Python itself writes an app.db with
+// `mtglab.auth` and mints a session, and Go resolves it. Needs a Python with
+// the package installed -- set MTGLAB_PYTHON to one (the repo's `.venv`) --
+// so it runs on the maintainer's machine and is skipped by CI's Go jobs,
+// which have no Python. The same fact is proven there over the wire instead:
+// the `contract` job runs the suite through the front door against an
+// `app.db` the Python harness seeded.
+func TestResolvesASessionPythonMinted(t *testing.T) {
+	python := os.Getenv("MTGLAB_PYTHON")
+	if python == "" {
+		t.Skip("MTGLAB_PYTHON not set")
+	}
+	dir := t.TempDir()
+	script := `
+import sys
+from mtglab import config
+from mtglab.auth import db, users, sessions
+with config.use_paths(data_dir=sys.argv[1]):
+    con = db.connect()
+    alice = users.create(con, "alice", password="correct-horse-battery-staple", is_admin=True)
+    bob = users.create(con, "bob", password="a-different-long-passphrase")
+    print(sessions.create(con, alice.id))
+    print(sessions.create(con, bob.id))
+    con.close()
+`
+	out, err := exec.Command(python, "-c", script, dir).Output()
+	if err != nil {
+		t.Fatalf("python: %v", err)
+	}
+	tokens := strings.Fields(string(out))
+	if len(tokens) != 2 {
+		t.Fatalf("python printed %q", out)
+	}
+	reader, err := Open(filepath.Join(dir, "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	ctx := context.Background()
+	alice, err := Resolve(ctx, reader, tokens[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !alice.Authenticated || !alice.IsAdmin || alice.Username != "alice" {
+		t.Fatalf("alice resolved to %+v", alice)
+	}
+	bob, err := Resolve(ctx, reader, tokens[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bob.Authenticated || bob.IsAdmin || bob.Username != "bob" {
+		t.Fatalf("bob resolved to %+v", bob)
+	}
+	if s, _ := Resolve(ctx, reader, "not-minted"); s != Anonymous {
+		t.Fatalf("an unminted token resolved to %+v", s)
+	}
+}

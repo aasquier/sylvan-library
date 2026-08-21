@@ -1,0 +1,62 @@
+# golangci-lint, for the Go module (docs/go-migration/PLAN.md section 6;
+# ADR 38 decision 5 names the linters). Version 2 configuration.
+#
+# The set is the plan's -- errcheck, staticcheck (which absorbed gosimple and
+# stylecheck in v2), govet, revive -- plus the small honest ones that cost
+# nothing: unused code, ineffectual assignments, misspellings, and gosec for
+# the class of bug a front door must not have.
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - revive
+    - unused
+    - ineffassign
+    - misspell
+    - gosec
+    - bodyclose
+    - errorlint
+    - unconvert
+    - unparam
+    - nilerr
+  settings:
+    errcheck:
+      # Closing a response body or a file on the way out is a best effort
+      # whose failure nothing could act on; the door's writes are checked.
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (*database/sql.DB).Close
+    gosec:
+      excludes:
+        # G204: the supervised command is the operator's own argv.
+        - G204
+        # G304: the static file paths are built from a trusted listing and a
+        # cleaned, re-rooted path; the test for it is the guard.
+        - G304
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - bodyclose
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

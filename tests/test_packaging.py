@@ -546,3 +546,83 @@ def test_no_first_party_module_is_exempt_from_strict_mypy():
         "in the comment above the override, not one to take because a new "
         "function was quicker to leave unannotated."
     )
+
+
+# ------------------------------------------------------ what stands at the door
+
+GO_MOD = ROOT / "go" / "go.mod"
+
+
+def dockerfile_cmd() -> list[str]:
+    """The runtime stage's CMD, as the JSON array it is written as.
+
+    Read as text, like `fly_env` and `deploy_condition`: the point is a check
+    somebody can audit against the file without a Dockerfile parser.
+    """
+    import json
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    found = re.search(r"^CMD (\[.*?\])\s*$", text, re.MULTILINE | re.DOTALL)
+    assert found, "no CMD in the Dockerfile"
+    # A JSON array may be continued across lines with backslashes.
+    return json.loads(found.group(1).replace("\\\n", ""))
+
+
+def test_the_container_runs_the_front_door_with_the_library_behind_it():
+    """ADR 38, decision 2: the Go binary takes the port and the Python server
+    runs behind it on loopback, for the whole of the migration.
+
+    Three things about the CMD, each of which a one-token edit could undo
+    while the image still built and still answered `/api/health`: it is the
+    door that is PID 1 (the entrypoint `exec`s into argv[0]); it proxies to a
+    loopback upstream and supervises a command after `--`; and the supervised
+    command is the Python `mtglab ui` bound to that same loopback port --
+    a mismatch here is a door answering 502 to every API request with a
+    healthy-looking container behind it.
+    """
+    cmd = dockerfile_cmd()
+    assert cmd[0] == "/opt/door/mtglab" and cmd[1] == "ui", cmd
+    assert "--" in cmd, "the door supervises nothing; the Python server would never start"
+    door, child = cmd[: cmd.index("--")], cmd[cmd.index("--") + 1:]
+    assert "--host" in door and door[door.index("--host") + 1] == "0.0.0.0"
+    assert "--port" in door and door[door.index("--port") + 1] == "8080", \
+        "fly.toml's internal_port is 8080"
+    upstream = door[door.index("--upstream") + 1]
+    assert child[:2] == ["mtglab", "ui"], child
+    assert "--no-open" in child
+    assert child[child.index("--host") + 1] == "127.0.0.1", \
+        "the Python server must bind loopback only; the door is the public face"
+    child_port = child[child.index("--port") + 1]
+    assert upstream == f"http://127.0.0.1:{child_port}", (
+        f"the door proxies to {upstream} but the child listens on {child_port}")
+
+
+def test_the_go_module_pins_the_last_go_that_runs_on_this_mac():
+    """ADR 38, decision 5: `go 1.26`, because Go 1.27 requires macOS 13 and
+    the maintainer's machine is macOS 12 -- a runway, named so nobody is
+    surprised, and a pin a `go mod tidy` on a newer toolchain could quietly
+    bump. The Dockerfile's door stage is held to the same minor, so the
+    image never builds with a Go the module does not claim to support."""
+    text = GO_MOD.read_text(encoding="utf-8")
+    found = re.search(r"^go (\S+)$", text, re.MULTILINE)
+    assert found, "go.mod has no `go` directive"
+    assert found.group(1) == "1.26", (
+        f"go.mod says go {found.group(1)}; 1.26 is the last release for this "
+        "Mac (ADR 38). Re-read the decision before moving it.")
+    assert not re.search(r"^toolchain ", text, re.MULTILINE), (
+        "go.mod grew a `toolchain` line, which would make the build reach for "
+        "a Go newer than the one this Mac can run")
+    docker = DOCKERFILE.read_text(encoding="utf-8")
+    found = re.search(r"^FROM golang:(\d+\.\d+)\S* AS door$", docker, re.MULTILINE)
+    assert found, "the Dockerfile has no `golang:<minor>` door stage"
+    assert found.group(1) == "1.26", (
+        f"the door stage builds with golang:{found.group(1)} while go.mod "
+        "pins 1.26")
+
+
+def test_the_route_table_is_read_by_both_doors():
+    """`tests/contract/routes.json` is the one classification (PLAN section
+    8); the Go module's reader must point at that file and nowhere else, or
+    the Go middleware's sweep silently runs against a copy."""
+    reader = (ROOT / "go" / "internal" / "routes" / "routes.go").read_text(encoding="utf-8")
+    assert 'const File = "tests/contract/routes.json"' in reader
+

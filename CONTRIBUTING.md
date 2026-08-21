@@ -75,6 +75,32 @@ npm --prefix web run build   # rebuild the committed bundle -- required if you
                              # touched anything under web/src
 ```
 
+### The Go front door
+
+Since the port began ([ADR 38](docs/adr/0038-the-served-backend-is-rewritten-in-go.md),
+[`docs/go-migration/`](docs/go-migration/README.md)) the deployed process is
+a Go binary — `go/cmd/mtglab ui` — that takes the port, enforces the login in
+front of everything, serves the bundle, and proxies `/api` to the Python
+server running behind it. You do not need Go to run the app locally:
+`mtglab ui` (Python) alone is still the whole app on a laptop. You need it to
+change the door:
+
+```bash
+# Go 1.26 -- the last release that runs on the maintainer's macOS 12; the
+# module pins it, so use a 1.26.x toolchain (https://go.dev/dl/)
+cd go
+go vet ./... && go test -race ./... && golangci-lint run ./...   # what CI requires
+mtglab ui --port 8766 --no-open &        # the Python server, on another port
+go run ./cmd/mtglab ui --upstream http://127.0.0.1:8766 \
+    --web-dist ../src/mtglab/web_dist --tarot ../src/mtglab/assets/tarot
+                                         # the door, on :8765 -- the app's usual address
+```
+
+golangci-lint is `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1`
+(with `CGO_ENABLED=0` on an old macOS, where the cgo link fails).
+`tests/contract/README.md` shows how to run the contract suite through the
+door, which is the check every change to it is held to.
+
 ## Adding your own decks
 
 Decks live at `decks/<slug>/deck.yaml` — your app data, not repository

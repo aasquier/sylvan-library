@@ -1,0 +1,259 @@
+// Package door is the front door: the one binary that takes the listening
+// port, and in front of *both* runtimes for the whole of the migration
+// (docs/go-migration/PLAN.md section 4, ADR 38 decision 2).
+//
+// What it does, in request order:
+//
+//  1. Resolves the caller from the `sid` cookie and refuses, before anything
+//     is routed, what `api/auth.py`'s middleware refuses: 401 outside the
+//     public list without a session, 403 under the admin prefix without an
+//     admin. Same sentences, same JSON envelope, same normalisation of the
+//     path -- the contract suite (`tests/contract/`) holds the two doors to
+//     one table, `tests/contract/routes.json`.
+//  2. Serves the built frontend and the tarot pictures itself -- the shell,
+//     `/assets/*`, `/tarot/*` -- with the same content types, the same
+//     `Cache-Control: no-cache`, and the same refusals Python's mounts give.
+//  3. Proxies everything under `/api` to the Python server on loopback, and
+//     will keep doing so for a shrinking set of prefixes as the route families
+//     move across.
+//
+// Every response the door writes itself carries the hardening headers
+// `api/app.py:security_headers` sets, so the middleware's own refusals look
+// the same from either runtime.
+//
+// Python's middleware stays on behind the door for the duration -- defence
+// in depth, costing microseconds -- and is the one that writes the session
+// touch; this door never writes `app.db` (see `internal/auth`).
+package door
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/aasquier/sylvan-library/go/internal/auth"
+)
+
+// Config is what a door needs to stand.
+type Config struct {
+	// RequireAuth mirrors MTGLAB_REQUIRE_AUTH: off, every caller is LOCAL and
+	// nothing is refused; on, the middleware in auth.go runs on every request.
+	RequireAuth bool
+	// SecureCookies mirrors MTGLAB_SECURE_COOKIES and decides HSTS, exactly as
+	// it does in Python: TLS fronts the app, so the header is safe to send.
+	SecureCookies bool
+	// AppDB is the path to `app.db`; read-only, and only when RequireAuth.
+	AppDB string
+	// WebDist is the built frontend directory; empty or missing means the door
+	// serves no shell, as `api/app.py` registers no SPA route without one.
+	WebDist string
+	// TarotDir is the packaged tarot art; same rule.
+	TarotDir string
+	// Upstream is where everything under /api goes.
+	Upstream *url.URL
+	// Logger, or slog.Default().
+	Logger *slog.Logger
+}
+
+// Door is a built handler and the things it holds open.
+type Door struct {
+	cfg      Config
+	log      *slog.Logger
+	resolver Resolver
+	db       *sql.DB
+	static   *staticSite
+	proxy    http.Handler
+}
+
+// New builds a door. It opens `app.db` read-only when auth is required (and
+// proves it can read the users table, so a wrong data directory fails at
+// start rather than as a 401 on every request), lists the bundle's root
+// files once from the trusted directory, and wires the proxy.
+func New(cfg Config) (*Door, error) {
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
+	}
+	if cfg.Upstream == nil {
+		return nil, fmt.Errorf("door: no upstream configured")
+	}
+	d := &Door{cfg: cfg, log: cfg.Logger}
+	if cfg.RequireAuth {
+		db, err := auth.Open(cfg.AppDB)
+		if err != nil {
+			return nil, err
+		}
+		d.db = db
+		d.resolver = dbResolver{db: db}
+	}
+	site, err := newStaticSite(cfg.WebDist, cfg.TarotDir, cfg.Logger)
+	if err != nil {
+		return nil, err
+	}
+	d.static = site
+	d.proxy = newProxy(cfg.Upstream, cfg.Logger)
+	return d, nil
+}
+
+// Check proves the door can do its job before it takes the port: `app.db`
+// readable when auth is on. Called by the command after New; separate so a
+// test can build a door against a file that appears later.
+func (d *Door) Check(ctx context.Context) error {
+	if d.db == nil {
+		return nil
+	}
+	return auth.Ping(ctx, d.db)
+}
+
+// Close releases what New opened.
+func (d *Door) Close() error {
+	if d.db != nil {
+		return d.db.Close()
+	}
+	return nil
+}
+
+// Handler is the whole door as one http.Handler, outermost layer first:
+// security headers, then the auth middleware, then dispatch.
+func (d *Door) Handler() http.Handler {
+	return d.securityHeaders(d.authenticate(http.HandlerFunc(d.dispatch)))
+}
+
+// dispatch is the router, and deliberately a small one: it decides which of
+// three things a path is. The API check is made on the *normalised* path,
+// exactly as the auth middleware and the SPA catch-all make it in Python, so
+// `//api/decks` and `/api/./decks` go to the runtime that will refuse them as
+// JSON rather than being served the shell. The static mounts match the raw
+// path, as Starlette's `Mount` does.
+func (d *Door) dispatch(w http.ResponseWriter, r *http.Request) {
+	raw := r.URL.Path
+	if raw == DoorHealthPath {
+		d.health(w, r)
+		return
+	}
+	if isAPI(NormalisePath(raw)) {
+		d.proxy.ServeHTTP(w, r)
+		return
+	}
+	d.static.ServeHTTP(w, r)
+}
+
+// DoorHealthPath is the door's own liveness answer -- outside `/api`, where
+// both runtimes agree every path is public, and therefore not a route the
+// shared classification has to carry. `/api/health` is the *pair's* health
+// (the pool, the decks, the Python half answering) and stays proxied: the
+// platform's check, the image's HEALTHCHECK and the deploy's smoke test all
+// ask it, and a door that answered it alone would report a healthy instance
+// with nothing behind it.
+const DoorHealthPath = "/door/health"
+
+func (d *Door) health(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"detail": "Method Not Allowed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// securityHeaders is `api/app.py:security_headers`, setdefault semantics
+// included: an explicit header on a particular response wins over the
+// blanket one, and a proxied response already carrying Python's is left as
+// it is.
+//
+// Applied at WriteHeader time, not before the handler runs -- the contract
+// suite caught the difference on the first run through the door: the
+// reverse proxy copies the upstream's headers with Add, so a value set here
+// beforehand met Python's copy and the wire said `nosniff, nosniff`.
+func (d *Door) securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hw := &headerWriter{ResponseWriter: w, apply: func(h http.Header) {
+			setDefault(h, "X-Content-Type-Options", "nosniff")
+			setDefault(h, "X-Frame-Options", "DENY")
+			setDefault(h, "Referrer-Policy", "same-origin")
+			setDefault(h, "Permissions-Policy", "camera=(self), microphone=(), geolocation=()")
+			if d.cfg.SecureCookies {
+				setDefault(h, "Strict-Transport-Security", "max-age=31536000")
+			}
+		}}
+		next.ServeHTTP(hw, r)
+	})
+}
+
+// headerWriter runs `apply` over the headers once, at the moment they are
+// committed, so whatever the handler (or the proxied upstream) set is already
+// there to be deferred to. Unwrap keeps http.ResponseController -- and so the
+// proxy's Flush and Hijack -- working through it.
+type headerWriter struct {
+	http.ResponseWriter
+	apply func(http.Header)
+	wrote bool
+}
+
+func (h *headerWriter) WriteHeader(code int) {
+	if !h.wrote {
+		h.wrote = true
+		h.apply(h.Header())
+	}
+	h.ResponseWriter.WriteHeader(code)
+}
+
+func (h *headerWriter) Write(b []byte) (int, error) {
+	if !h.wrote {
+		h.WriteHeader(http.StatusOK)
+	}
+	return h.ResponseWriter.Write(b)
+}
+
+func (h *headerWriter) Unwrap() http.ResponseWriter { return h.ResponseWriter }
+
+func setDefault(h http.Header, name, value string) {
+	if h.Get(name) == "" {
+		h.Set(name, value)
+	}
+}
+
+// writeJSON answers in FastAPI's envelope: `application/json`, and for an
+// error a body with `detail`, which `web/src/lib/api.ts` reads off every
+// non-2xx response.
+func writeJSON(w http.ResponseWriter, status int, body any) {
+	raw, err := json.Marshal(body)
+	if err != nil {
+		raw = []byte(`{"detail":"internal error"}`)
+		status = http.StatusInternalServerError
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", fmt.Sprint(len(raw)))
+	w.WriteHeader(status)
+	_, _ = w.Write(raw)
+}
+
+// Flag reads an on/off environment variable the way `config._flag` does:
+// unset or blank is the default; otherwise one of 1/true/yes/on,
+// case-insensitively, is on and anything else is off.
+func Flag(name string, fallback bool) bool {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return fallback
+	}
+	switch strings.ToLower(raw) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
+// AppDBPath is `config.APP_DB_PATH`: `app.db` inside MTGLAB_DATA_DIR, which
+// defaults to `data`.
+func AppDBPath() string {
+	dir := strings.TrimSpace(os.Getenv("MTGLAB_DATA_DIR"))
+	if dir == "" {
+		dir = "data"
+	}
+	return filepath.Join(dir, "app.db")
+}
