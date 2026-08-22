@@ -20,7 +20,12 @@ price at all"* now has an actual beside it. **Phase 5 itself began the same
 day with the registry** (`go/internal/jobs`) — the engine only, no route
 flipped, and the gate everything else in the phase waits behind: the CPU pool
 is a semaphore over goroutines at last, which is the one thing §1 names as
-what Go buys. Written by Claude from a
+what Go buys — **banked rather than realised, since the instance has one
+core** (`nproc` answers 1, measured 2026-08-22). The two *generic* job routes
+were examined the same day and deliberately left with Python: they own no
+state, being the view over a registry the eight job-submitting families still
+write from the uvicorn process, so **a view flips last, not first**.
+Written by Claude from a
 measured read of the tree (see [BASELINE.md](BASELINE.md)); the judgment
 calls were argued, then ruled.
 
@@ -59,6 +64,14 @@ What Go buys, concretely, on this app's own recorded facts:
   Tier 1 is GIL-bound (CLAUDE.md says so in as many words), and `fly.toml`
   documents why a second process is unsafe. In Go the CPU pool is a
   semaphore over goroutines; N sims use N cores of whatever machine exists.
+  **Built 2026-08-22, and on today's machine N is 1** — `nproc` on the
+  instance answers 1 and `shared-cpu-1x` is a 1-vCPU microVM, so the lane is
+  currently exactly as wide as Python's single worker. What this buys is
+  therefore **banked, not realised**: the width follows the machine, so
+  scaling the instance collects it with no code change and no second process
+  to keep a registry in step. Quoting it as a throughput win today would be
+  quoting a measurement nobody has taken — see Appendix B's `all cores` row,
+  which cannot be filled from `shared-cpu-1x`.
 - **The 1GB machine stops being tight.** `fly.toml` records 512MB as "too
   tight: DuckDB, numpy, an Argon2id hash… all want headroom at once." A Go
   binary + DuckDB comfortably fits where CPython + numpy + uvicorn did not.
@@ -245,9 +258,15 @@ suite read. The port gets four instruments, cheapest first:
    *"does not price at all"*; §7's Phase 5 paragraph and §11's risk 3 are
    rewritten accordingly, and §10 carries its row.
 
-   **The fallback was not taken and is no longer needed.** What is proved is
-   the generator, not yet Tier 1: the engine is still Phase 5's own work, so
-   `REFERENCE_DIGEST` is not reproduced here. What replaces it is stronger
+   **The fallback was not taken and is no longer needed.** What is proved
+   here is the generator, not yet Tier 1: the engine was still Phase 5's own
+   work when this was written, so `REFERENCE_DIGEST` was not reproduced in
+   that change. **It was reproduced later the same day**, by
+   `go/internal/sim/tier1` — see Phase 5 below, and note which half of the
+   work each instrument did: the engine matched on its first run because the
+   draw stream was already a checked fact, and the one bug the port did have
+   was found by a *second* corpus, not by the digest. What replaces it is
+   stronger
    than a spot check and was possible because of a fact worth recording —
    **Tier 1 consumes randomness through exactly one call**, `rng.shuffle(deck)`
    in `simulate_game`, and through nothing else. So a run's whole entropy
@@ -734,11 +753,52 @@ the tolerance came out at zero** — see §10's row and the note in §5 item
 4), the mulligan grid,
 land sweeps, the sim cache (ADR 18 keys with a Go-source fingerprint;
 `deck_check` attached after the cache exactly as today), `NothingToSimulate`,
-and the job families flipped. **The GIL dividend lands here and gets
-measured** — same machine, N-core Tier 1 scaling into Appendix B. *Gate:
+and the job families flipped. **The GIL dividend is banked here, and cannot
+be measured on the instance as it stands** — that sentence read *"lands here
+and gets measured — same machine, N-core Tier 1 scaling into Appendix B"*
+until 2026-08-22, when somebody asked the machine. `fly ssh console -C nproc`
+answers **1**: `shared-cpu-1x` is a 1-vCPU Firecracker microVM, not a
+cgroup-limited slice of a bigger host, so the deployed CPU lane is exactly as
+wide as Python's single worker and an N-core scaling curve has no N to sweep.
+The capability is real and follows the machine — scaling the instance
+collects it with no code change — but Appendix B's `all cores` row needs a
+bigger machine, or it is filled from this Mac and labelled as such. Deciding
+which is Aaron's, and it is a question about what the comparison is *for*,
+not a blocker on the phase. *Gate:
 `REFERENCE_DIGEST` reproduced (or the statistical fallback consciously taken
 and re-pinned — an ADR-worthy divergence, not a shrug); the mana oracle's
 13,944 cases match the pinned digest; contract green.*
+
+**The digest is reproduced, 2026-08-22.** `go/internal/sim/tier1` computes
+`c3e278e3…22d4` — the same sha256, over the same text, from a simulator
+written in another language. The fallback was not taken and no number moved.
+Three things about how it went are worth the next session's time.
+
+**It came out right on the first run, and that is `pyrand`'s doing rather
+than luck.** The engine was written against the Python line by line and the
+digest matched before any debugging, because the one thing that could not
+have been debugged from the outside — the draw stream — had already been
+proved. This is what pulling a tail risk forward buys: not a faster port, a
+port whose failures are all in the half you can read.
+
+**Reproducing the numbers is not reproducing the digest.** The gate hashes
+`repr()`, so CPython's float formatting is inside it: `100.0` is not `100`,
+`1e-05` is not `0.00001`, and `median_commander_turn` is an *int* for an
+odd-length list because `statistics.median` returns one — its `float | None`
+annotation is simply wrong, and the digest is not. So the package renders
+Python's `repr` (`repr.go`), held to CPython by 527 recorded floats.
+
+**And the digest is one run, which is exactly its weakness.** It covers a
+deck whose 99 cards all have distinct names and a policy that mulligans at
+most three times — so it is blind to `list.remove` taking out an equal card
+rather than the one it was handed, and blind to the hand-size cap on
+bottoming. A second corpus was written for that (a deck of repeated cards,
+policies that mulligan to nine), and it **caught a real bug the digest could
+not see**: Go re-evaluates a `for` condition every pass where Python's
+`range(min(mulligans, len(hand) - 1))` is computed once, so at four or more
+mulligans the port bottomed one card too few. Nine of ten deliberate
+mutations die against the corpus; the tenth is an equivalent mutant and is
+argued as one in the code.
 
 **Phase 6 — The Claude surfaces** *(~¾–1 day; **re-priced ~½ day** — a
 couple of hours of porting, plus a real conversation driven through all
@@ -890,9 +950,11 @@ There is more than one Claude in this house now. Rules for the duration:
   | `DELETE /api/admin/users/{username}` | python | **blocked behind the jobs registry, not deferred by choice.** Deleting an account also calls `jobs.forget_owner`, and `api/jobs.py` holds its jobs **in memory in the uvicorn process** — which the door cannot reach. The reason it must not be skipped is arithmetic rather than tidiness: `users.id` is `INTEGER PRIMARY KEY` without `AUTOINCREMENT`, so SQLite re-issues a deleted account's rowid, and jobs left keyed on that integer would be handed to whoever is created next. The response says `jobs_dropped`, so a Go handler could not even report an honest number. It flips with the jobs family — **and the registry it waits on landed 2026-08-22** (`jobs.ForgetOwner` included, guarded so owner zero, which is the local user, can never be mistaken for a deleted account), so what is left here is the route, not the engine. `go/internal/api/admin_test.go`'s `TestDeletingAnAccountIsStillPythons` is the tripwire and is meant to fail when somebody flips it on purpose |
   | `/api/admin/stats/*` (the six), `api/traffic.py`, `api/flymetrics.py` | python | **not part of Phase 4, despite the prefix.** `adminstats.py` is coupled to two families that have not moved: `stats/system` reads the same in-memory job registry *and* `_rss()`, the process's own resident size — which is the worse of the two, because a Go handler would answer it *successfully* with the door's RSS and the number would keep rendering while quietly changing meaning; and `stats/claude` reads `claude/prices.py` and `claude/tiers.py`, so porting it now would drag slices of `claude/` across ahead of its family, which §7's "a route family moves whole" forbids. It flips behind the jobs registry and the Claude family |
   | CPython's `random.Random` — MT19937, `init_by_array` seeding, `random()`, `getrandbits`, `_randbelow`, `randrange`, `shuffle`, `choice` | **go** | `go/internal/pyrand`, 2026-08-22 — **Phase 5's named tail risk, pulled forward and closed** (§5 item 3, §11 risk 3). A library, not a route: nothing calls it yet and nothing flipped. Held to CPython by `testdata/draws.json` (20 seeds, the raw word stream recorded apart from every consumer, `random()` compared as bits) plus a replay of the reference run's full 99,274-draw stream, so Tier 1's randomness is a checked fact before the engine that consumes it exists. `sample()` had no caller and was not written |
-  | `api/jobs.py` — the registry: two pools, the `key` dedupe, born-finished jobs, the bound, `forget_owner` | **go** | `go/internal/jobs`, 2026-08-22 — **Phase 5's first half, and the engine only: no route has flipped**, so Python still owns every job a request creates. The CPU lane is the semaphore over goroutines ADR 38 promised, sized from `GOMAXPROCS` (8 here, and 1 on a `shared-cpu-1x` — a `Config` knob, not a constant); `NET` stays at two and `FORGE` at one, because neither of those bounds is a fact about the machine. Two differences are Go's rather than the design's and both are argued in the package comment: the mutable half of a `Job` is **guarded**, where Python's worker writes `status` and `done` with no lock and the GIL absorbs it, and a **panicking worker is a failed job** rather than a dead process. Held to Python by a ninth generated oracle (`jobs/testdata/jobs.json`), which caught three divergences a careful implementation would have shipped: `percent` **rounds half to even** (1 of 8 is 12.5, and Python answers 12 where `math.Round` answers 13), `created_at` **drops its fraction entirely** when the microsecond is zero and is spelled `+00:00` rather than `Z` — and it is the *sort key*, as text — and the lane refusal quotes with `repr`, which prefers single quotes. The concurrency is proven by the race detector, six killed mutations and a fuzz target over submit/dedupe (126k executions under `-race`); the mutation that dropped the owner from the match **found a weak test** rather than a weak implementation, because the fixture's keys and owners had been varied together. One constraint falls out of it for every family still to flip: **a ported job result must be a struct with its fields in Python's order, never a `map[string]any`**, since encoding/json sorts map keys and a dict does not |
+  | `api/jobs.py` — the registry: two pools, the `key` dedupe, born-finished jobs, the bound, `forget_owner` | **go** | `go/internal/jobs`, 2026-08-22 — **Phase 5's first half, and the engine only: no route has flipped**, so Python still owns every job a request creates. The CPU lane is the semaphore over goroutines ADR 38 promised, sized from `GOMAXPROCS` (8 here, and 1 on a `shared-cpu-1x` — a `Config` knob, not a constant); `NET` stays at two and `FORGE` at one, because neither of those bounds is a fact about the machine. Two differences are Go's rather than the design's and both are argued in the package comment: the mutable half of a `Job` is **guarded**, where Python's worker writes `status` and `done` with no lock and the GIL absorbs it, and a **panicking worker is a failed job** rather than a dead process. Held to Python by a ninth generated oracle (`jobs/testdata/jobs.json`), which caught three divergences a careful implementation would have shipped: `percent` **rounds half to even** (1 of 8 is 12.5, and Python answers 12 where `math.Round` answers 13), `created_at` **drops its fraction entirely** when the microsecond is zero and is spelled `+00:00` rather than `Z` — and it is the *sort key*, as text — and the lane refusal quotes with `repr`, which prefers single quotes. The concurrency is proven by the race detector, six killed mutations and a fuzz target over submit/dedupe (126k executions under `-race`); the mutation that dropped the owner from the match **found a weak test** rather than a weak implementation, because the fixture's keys and owners had been varied together. One constraint falls out of it for every family still to flip: **a ported job result must be a struct with its fields in Python's order, never a `map[string]any`**, since encoding/json sorts map keys and a dict does not. The lane's width was **measured on the instance 2026-08-22 and the code comment explaining it was wrong**: `nproc` answers 1 and `/sys/fs/cgroup/cpu.max` does not exist, because a Fly machine is a 1-vCPU Firecracker microVM on cgroup **v1** with every controller at the root — so Go 1.25's quota reader never fires, GOMAXPROCS falls back to `NumCPU`, and the two agree. `NumCPU` would not "count cores nobody gave us" here; it would answer the same. The call stands, the reason given for it did not, and §1's dividend is **banked rather than realised** until the machine is scaled |
   | `sim/karsten.py` and `sim/curve.py` — Tier 1.5, the closed forms | **go** | `go/internal/sim/karsten` and `go/internal/sim/curve` over the shared `go/internal/sim`, 2026-08-22 — **the engine only; no route has flipped**, so `/api/decks/{owner}/{slug}/shelf` and its siblings are still Python's. Checkable, per the rule below: `grep -rn 'sim/karsten\|sim/curve' go/internal/api go/internal/door go/cmd` prints **nothing** at this commit — the engine has no caller in the served path — and stays that way until the jobs family moves. (The obvious `grep -c 'shelf' go/internal/api/api.go` is *not* that command and was written first: it answers **3**, all of them comments about the runtime shelves and the artifacts shelf. A row's command has to be run, which is the rule below, and running it is what caught this.) §5 item 4 asked for agreement "to within an epsilon pinned per function"; every epsilon is pinned at **zero** and the corpora compare `Float64bits`, because exact was affordable — `math/big` binomials where Python has `math.comb`, and CPython's own `math.fsum` and `round` reproduced in `go/internal/sim`. Exactness is not decoration: `required_sources`, `reliable_turn` and `_slots_to_target` all scan a float against `>=`, so one ulp is a different land count or a different recommendation. Two findings the port made rather than inherited, both fixed in **both** runtimes: arm64 fuses `t += a*b` into one `FMADDD` and rounds once where CPython rounds twice (guarded by `sim.Rounded`, an explicit conversion the Go spec blesses for exactly this), and **`sim/curve.py` answered differently on Python 3.11 and 3.12** because CPython 3.12 gave `sum()` over floats compensated accumulation — two lines, now `fsum`, and the corpus is byte-identical under both interpreters, verified |
-  | everything else under `/api` — `api/` (the job *routes*, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the wheel), `sim/`, `claude/`, `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback |
+  | `sim/tier1/engine.py` — the goldfish itself: `KeepRule`, `simulate_game`, `run`, `sweep_land_counts`, `_consume` | **go** | `go/internal/sim/tier1`, 2026-08-22 — **the engine only; no route has flipped**, so Python still serves every simulation. **`REFERENCE_DIGEST` is reproduced** — `go test -run TestTheReferenceRunReproducesThePinnedDigest ./internal/sim/tier1`, and the digest is a literal in `tier1_test.go` so a regenerated fixture cannot re-pin the gate. Reproducing the numbers was not enough: the gate hashes `repr()`, so `repr.go` is CPython's float and string rendering, and `median_commander_turn` is an **int** for an odd-length list because `statistics.median` returns one — its `float | None` annotation is wrong and the digest is not. It matched on the first run, which is `pyrand`'s doing rather than luck. But **the digest is one deck and one seed**: `build_golgari`'s 99 names are all distinct, so it never exercises `list.remove` taking out an *equal* card, and its policy mulligans three times at most. The second corpus that covers both (`testdata/tier1.json`: 18 games, 7 runs, 390 castability cases, 527 floats) **caught the port's one real bug** — a `for` condition Go re-reads where `range(min(mulligans, len(hand) - 1))` is computed once, invisible below four mulligans. Nine of ten deliberate mutations die against it; the tenth is an equivalent mutant and is argued as one in the code. Two things it deliberately does not carry: `SimSummary.report()`, which is `cli.py`'s text table and no route reads, and `spells_through`'s value — that sums floats, and CPython's `sum` is compensated from 3.12 and naive before it, so Go answers as 3.12 does (what the image runs) and the corpus stays byte-identical on both legs of the matrix |
+  | `GET /api/jobs`, `GET /api/jobs/{job_id}` — the caller's own jobs, and one by id | python | **blocked behind the eight families that write the registry, and it is the first row where being a *read* made a route harder rather than easier.** Examined 2026-08-22 and deliberately not flipped. Neither route owns any state: they are the **view** over a registry whose contents are submitted by `simruns`, `shelfruns`, `dossierruns`, `themeruns`, `researchruns`, `argueruns`, `scanruns` and `forgeruns`, every one of them still Python's and every one of them writing to `api/jobs.py`'s module-level registry inside the uvicorn process. A registry is per-process, so a Go handler would answer from a registry the app never writes to — `/api/jobs` empty forever, `/api/jobs/{job_id}` a 404 for every id the app hands out — and `followJob` reads a 404 as *"the server restarted and the run died with it"*, so all seven of its call sites (review, dossier, both theme halves, camera, research, the simulator) would report every long job lost the instant it was submitted. Two escapes were considered and refused. **Reserving them to the proxy** (`api.Proxied`) is a no-op: reservation exists for a literal a Go *template* would otherwise capture, and no registered pattern captures `/api/jobs` or `/api/jobs/{id}` — an entry there would guard nothing while falsifying `Proxied`'s own doc comment. **Answer-when-Go-owns-the-id, proxy otherwise** is a handler whose every live branch is the proxy, it inverts the door's dependency (the proxy is chosen in `door` when `match` misses; `door` imports `api`, not the reverse), and for the *list* it is not expressible at all — a list must be the **union**, re-sorted on `created_at` as text, for a half that is always empty. The rule this row exists to record: **a route can only flip when the state it reads has flipped, so a view flips last, not first.** `go/internal/api/api_test.go`'s `TestTheGenericJobRoutesAreStillPythons` is the tripwire and is meant to fail when somebody flips them on purpose. **And one consequence for whoever flips the families, because §7's rhythm does not anticipate it:** every job, whichever family submitted it, is polled through the *same* `GET /api/jobs/{job_id}` (`followJob` → `api.job(id)`; there is no per-family poll), so that one route couples all eight together. Flip `simruns` alone and its Go-submitted ids are invisible to Python's poll route; flip the poll route alone and Python's ids are invisible to Go's. **There is no partial order that works**, which leaves exactly two shapes and the choice is a real one: either all eight families and both generic routes move in **one** change, and these two routes stay as simple as they read; or the **hybrid** poll handler (answer from Go's registry, proxy on a miss; the list a merged union) is built *with the first family flip*, where both of its branches are finally live. That is the argument against building the hybrid **today** rather than against it ever — today it is all fall-through, and a mechanism whose every live branch is the proxy is written the day the change that needs it lands, not before |
+  | everything else under `/api` — `api/` (the eight job-submitting families, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the wheel), `sim/compile.py` and `sim/mulligan.py`, `claude/`, `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback; the two generic job routes have their own row above, since the reason they stay is not the reason these do |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
   walked before the next flip starts (main deploys itself; every flip is a
@@ -998,7 +1060,7 @@ kept as the record of the draft)
 | `/api/health` warm p50 | 7.3 ms | |
 | card search warm p50 (DuckDB-bound) | 43.8 ms (37.9 in DB) | |
 | Tier 1: one 20k-game run, 1 core | ~18 s (ENGINEERING §1) | |
-| Tier 1: same run, all cores | n/a (GIL; single worker by design) | |
+| Tier 1: same run, all cores | n/a (GIL; single worker by design) | **needs a machine with cores.** `nproc` on the instance answers 1 (2026-08-22), so the Go lane is one wide there too — this row is filled from a scaled machine, or from the dev Mac and labelled as the dev Mac; it is not a fact about the deployment either way |
 | `data refresh` (`load_printings`) | ~16 min / 107,355 rows | |
 | Idle RSS on the instance | 127 MB (peak 215 MB, 8 threads; 2026-08-21, 2h39m after deploy) | |
 | Image size (compressed) | 121.3 MB, 10 layers (registry manifest); ~325 MB unpacked, 219 MB of it the venv | |

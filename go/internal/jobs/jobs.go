@@ -16,8 +16,19 @@
 // holds. Neither reason survives the crossing. Here the CPU lane is a
 // **semaphore over goroutines**, sized from the machine (see [Lane] and
 // [Config.CPUWorkers]), so two sweeps genuinely run at once on a machine with
-// two cores to run them on. ADR 38 named this as what Go buys; it is bought
-// here.
+// two cores to run them on.
+//
+// **The instance has one core, so the dividend is banked and not yet
+// realised.** `nproc` on the deployed machine answers 1 (measured
+// 2026-08-22, and `shared-cpu-1x` is a 1-vCPU microVM rather than a quota),
+// which makes the CPU lane today exactly as wide as Python's single worker:
+// the same one-at-a-time queueing, reached by a better road. ADR 38 named
+// this as what Go buys, and what is bought here is the *capability* -- the
+// width follows the machine, so scaling the instance widens the lane with no
+// code change and no second process to keep a registry in step. Until then,
+// quoting it as a throughput win would be quoting a measurement nobody has
+// taken, and the plan's promised N-core Tier 1 scaling cannot be measured on
+// `shared-cpu-1x` at all.
 //
 // Three things that widening it changes downstream, written here because the
 // next session will meet them and not here:

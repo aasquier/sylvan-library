@@ -30,14 +30,30 @@ type Config struct {
 
 	// CPUWorkers is how many CPU-lane jobs may run at once. **Zero asks the
 	// machine**, which is [runtime.GOMAXPROCS] rather than [runtime.NumCPU]:
-	// GOMAXPROCS is what this process may actually use, and since Go 1.25 it
-	// reads the container's CPU quota, so on the 1-vCPU `shared-cpu-1x` the
-	// app runs on it answers what the machine really grants rather than what
-	// the host happens to have. NumCPU would count cores nobody gave us.
+	// GOMAXPROCS is what this process may actually *use*, so it honours a
+	// `GOMAXPROCS=` in the environment and, since Go 1.25, a cgroup v2 CPU
+	// quota -- the two ways a deployment grants fewer cores than it owns.
+	//
+	// **Neither of them fires on the instance, and this comment used to say
+	// one did.** It argued that GOMAXPROCS reads the container's quota, so on
+	// the 1-vCPU `shared-cpu-1x` it answers what the machine really grants
+	// rather than what the host happens to have, and that NumCPU "would count
+	// cores nobody gave us". That is the reasoning for a cgroup-limited
+	// container sharing a host, and a Fly machine is not one: it is a
+	// Firecracker microVM whose guest kernel boots with exactly the vCPUs the
+	// size grants. Measured on the instance 2026-08-22 -- `nproc` answers 1,
+	// and `/sys/fs/cgroup/cpu.max` does not exist, because the machine runs
+	// cgroup **v1** with every controller mounted at the root, so Go's reader
+	// has no file to find and falls back to NumCPU, which is also 1. The two
+	// agree here; NumCPU would not over-count, it would answer the same. The
+	// code is unchanged and still right -- GOMAXPROCS is what this process may
+	// use, wherever it runs -- but it is not rescuing this deployment from a
+	// wrong number, and it is not buying width on the instance either; this
+	// package's own comment says what is banked and what is realised.
 	//
 	// It is a knob rather than a constant because the right answer is a fact
-	// about a deployment: eight here, expected one on the instance until it
-	// is scaled, and dialable without a code change if a measurement
+	// about a deployment: eight here, **one on the instance, measured** rather
+	// than expected, and dialable without a code change if a measurement
 	// disagrees. Nothing is reserved for the door's own request handling --
 	// Go's scheduler is preemptive, so a saturated CPU lane slows the door
 	// rather than silencing it, and a reservation would floor the pool at one
