@@ -1,11 +1,15 @@
-// Package deck is `decks/model.py`: the deck file, parsed -- and only parsed.
-// `deck.yaml` is the source of truth, and since ADR 30 the app's own data
-// rather than anything git tracks; the five deliverables are generated from
-// it and the activity log is its history. Go reads a deck to validate it, to
-// analyse it, to render it to the wire and to compare it against the last
-// build's snapshot; it never serialises one (ADR 12's surgery stays text
-// surgery, in Python until Phase 4 and then in Go as text surgery again),
-// which is why `Payload` below is a projection to compare and not a dumper.
+// Package deck is `decks/model.py`: the deck file, parsed. `deck.yaml` is the
+// source of truth, and since ADR 30 the app's own data rather than anything
+// git tracks; the five deliverables are generated from it and the activity log
+// is its history. Go reads a deck to validate it, to analyse it, to render it
+// to the wire and to compare it against the last build's snapshot.
+//
+// **Parsed, and in one place written** -- `dump.go`, which arrived with Phase
+// 4 and which this comment said would never exist. ADR 12's surgery is still
+// text surgery and still lives in `deckedit`, so `Dump` is not a general way
+// to write a deck: it serves the three callers that produce a *whole* file
+// (a deck created, a deck imported, and the artifacts snapshot), and `Payload`
+// beside it stays a projection to compare rather than a second dumper.
 //
 // `FromText` is `Deck.from_text`, field for field, default for default: a
 // missing `status` is theoretical and a missing `stage` is curated (the
@@ -59,8 +63,12 @@ type Deck struct {
 	// Strategy and Notes pass through as the file holds them: a string (or
 	// null, if a hand-edited file says `strategy:` and nothing), a mapping
 	// of note keys to values. Neither is read by the gate.
+	//
+	// Notes keeps the file's order, which is the one thing about a deck that
+	// is nobody's to reorder: these keys are the author's prose, and both
+	// `Dump` and the wire write them back in the order they were read.
 	Strategy  any
-	Notes     map[string]any
+	Notes     deckyaml.Map
 	Cards     []CardEntry
 	SwapBoard []CardEntry
 	Graveyard []CardEntry
@@ -71,17 +79,22 @@ type Deck struct {
 // wins over nothing and loses to the file's own `slug:`, exactly as Python
 // orders it (`raw.get("slug") or slug`).
 func FromText(text string, slug string) (*Deck, error) {
-	raw, err := deckyaml.Parse([]byte(text))
+	// Ordered, and then flattened for everything except `notes:`. Every other
+	// field is named here one at a time, so a map serves them; the notes are
+	// the author's own keys and the snapshot `swaps.md` diffs against is a
+	// dump of this parse, so their order has to survive the round trip.
+	ordered, err := deckyaml.ParseOrdered([]byte(text))
 	if err != nil {
 		// An empty document parses to nothing in Python (`or {}`); goccy
 		// reports an empty document as an error rather than a nil map, so
 		// the one case is told apart here.
 		if strings.TrimSpace(text) == "" {
-			raw = map[string]any{}
+			ordered = deckyaml.Map{}
 		} else {
 			return nil, err
 		}
 	}
+	raw := ordered.Plain()
 	d := &Deck{}
 	d.Slug = firstString(raw["slug"], slug)
 	d.Name = firstString(raw["name"], slug)
@@ -142,10 +155,10 @@ func FromText(text string, slug string) (*Deck, error) {
 	} else {
 		d.Strategy = ""
 	}
-	d.Notes = map[string]any{}
-	if notes, ok := raw["notes"].(map[string]any); ok {
-		for k, v := range notes {
-			d.Notes[k] = v
+	d.Notes = deckyaml.Map{}
+	if notes, present := ordered.Get("notes"); present {
+		if m, ok := notes.(deckyaml.Map); ok {
+			d.Notes = append(d.Notes, m...)
 		}
 	}
 	for _, section := range []struct {
@@ -342,6 +355,22 @@ func (d *Deck) CardNames(includeCommander bool) []string {
 	return names
 }
 
+// NoteText is `deck.notes.get(key)` for the values a note actually holds:
+// prose, or nothing. A note that is present but is not a string reads as
+// absent here, which is what the wire already did with
+// `d.Notes["commander_why"].(string)` and its dropped second return.
+//
+// `artifacts` asks the same question a stricter way and refuses instead,
+// because there the answer is a document rather than one field of a payload.
+func (d *Deck) NoteText(key string) string {
+	v, ok := d.Notes.Get(key)
+	if !ok {
+		return ""
+	}
+	text, _ := v.(string)
+	return text
+}
+
 // HasClassWord reports whether any declared theme is one of the four class
 // words -- the condition under which `dump` drops the legacy key.
 func (d *Deck) HasClassWord() bool {
@@ -417,11 +446,12 @@ func (d *Deck) Payload() map[string]any {
 		p["strategy"] = d.Strategy
 	}
 	if len(d.Notes) > 0 {
-		notes := map[string]any{}
-		for k, v := range d.Notes {
-			notes[k] = v
-		}
-		p["notes"] = notes
+		// The order is part of the comparison, because in Python it is part
+		// of the text: `_baseline_state` asks whether two dumps are the same
+		// string, and two note mappings holding the same pairs in a different
+		// order dump to different files. A Go map here would have called that
+		// `current` and quietly said the artifacts were up to date.
+		p["notes"] = append(deckyaml.Map{}, d.Notes...)
 	}
 	draft := d.Stage == "draft"
 	cards := make([]map[string]any, 0, len(d.Cards))

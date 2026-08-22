@@ -109,4 +109,99 @@ func TestRefusesANonMapping(t *testing.T) {
 	if _, err := Parse([]byte("slug: [unterminated\n")); err == nil {
 		t.Fatal("malformed YAML parsed")
 	}
+	if _, err := ParseOrdered([]byte("- just\n- a list\n")); err == nil {
+		t.Fatal("a list parsed as an ordered deck")
+	}
+}
+
+// The order survives at every depth, and `Plain` is the same parse with the
+// order thrown away -- which is what every caller that only looks keys up
+// still gets from `Parse`.
+//
+// Written backwards through the alphabet on purpose. A Go map iterated at
+// random passes an in-order assertion often enough to be no assertion at all,
+// and a *reversed* one about once in n!.
+func TestParseOrderedKeepsTheDocumentsOrder(t *testing.T) {
+	const text = `zebra: last in the file, first in nothing
+notes:
+  wincons: win
+  pitfalls: lose
+  mulligan: keep
+  nested:
+    third: 3
+    second: 2
+    first: 1
+alpha: 1
+`
+	doc, err := ParseOrdered([]byte(text))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got := keysOf(doc); !equal(got, []string{"zebra", "notes", "alpha"}) {
+		t.Fatalf("top level %v", got)
+	}
+	notes, ok := doc.Get("notes")
+	if !ok {
+		t.Fatal("no notes")
+	}
+	inner, ok := notes.(Map)
+	if !ok {
+		t.Fatalf("notes is %T, not an ordered mapping", notes)
+	}
+	if got := keysOf(inner); !equal(got, []string{"wincons", "pitfalls", "mulligan", "nested"}) {
+		t.Fatalf("notes %v", got)
+	}
+	nested, _ := inner.Get("nested")
+	if got := keysOf(nested.(Map)); !equal(got, []string{"third", "second", "first"}) {
+		t.Fatalf("nested %v", got)
+	}
+
+	// JSON in the file's order, which is what a Python dict gives for free and
+	// Go's map encoder does not.
+	raw, err := json.Marshal(inner)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	const want = `{"wincons":"win","pitfalls":"lose","mulligan":"keep",` +
+		`"nested":{"third":3,"second":2,"first":1}}`
+	if string(raw) != want {
+		t.Errorf("json is %s\n    want %s", raw, want)
+	}
+
+	// And `Parse` is this with the order dropped: same values, plain maps all
+	// the way down, which is what `deckedit` reads.
+	plain, err := Parse([]byte(text))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	flat, ok := plain["notes"].(map[string]any)
+	if !ok {
+		t.Fatalf("Parse gave notes as %T; every caller of it expects a map", plain["notes"])
+	}
+	if _, ok := flat["nested"].(map[string]any); !ok {
+		t.Fatalf("Parse left an ordered mapping nested inside: %T", flat["nested"])
+	}
+	if diff := cmp.Diff(plain, doc.Plain()); diff != "" {
+		t.Errorf("Parse and ParseOrdered().Plain() disagree (-parse +plain):\n%s", diff)
+	}
+}
+
+func keysOf(m Map) []string {
+	out := make([]string, 0, len(m))
+	for _, p := range m {
+		out = append(out, p.Key)
+	}
+	return out
+}
+
+func equal(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

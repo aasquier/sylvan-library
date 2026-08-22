@@ -34,6 +34,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aasquier/sylvan-library/go/internal/artifacts"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 )
 
@@ -52,20 +53,17 @@ func (e ErrArtifactNotFound) Error() string { return "no artifact '" + e.Name + 
 
 // Deliverables is `artifacts.generate.DELIVERABLES`: the served set and the
 // path-traversal guard in one. `Snapshot` is deliberately outside it.
-var Deliverables = []string{"primer-quick.md", "primer-advanced.md",
-	"decklist-annotated.md", "moxfield.txt", "swaps.md"}
+//
+// Both are the renderer's, and named again here for the reason `source.py`
+// imports them from `artifacts.generate` rather than restating them: the set a
+// reader may ask for and the set a rebuild prunes have to be the same list, and
+// the only way to guarantee that is for there to be one.
+var Deliverables = artifacts.Deliverables
 
 // Snapshot is `artifacts.generate.SNAPSHOT`: the build's own baseline.
-const Snapshot = "deck.last-built.yaml"
+const Snapshot = artifacts.Snapshot
 
-func isDeliverable(name string) bool {
-	for _, d := range Deliverables {
-		if d == name {
-			return true
-		}
-	}
-	return false
-}
+func isDeliverable(name string) bool { return artifacts.IsDeliverable(name) }
 
 // Artifact is one generated deliverable, as the library holds it.
 type Artifact struct {

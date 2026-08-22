@@ -3,6 +3,7 @@ package deck
 import (
 	"fmt"
 
+	"github.com/aasquier/sylvan-library/go/internal/deckyaml"
 	"github.com/aasquier/sylvan-library/go/internal/pyyaml"
 )
 
@@ -21,20 +22,17 @@ const DumpWidth = 100
 // no comments to destroy, no folded blocks to reflow and no diff to keep
 // small.
 //
-// **A deck carrying notes is refused rather than written**, and the refusal is
-// the honest answer rather than a missing feature. `sort_keys=False` means the
-// payload's order *is* the file's order, and this package holds notes in a Go
-// map, which has none -- so dumping one would write a file whose key order
-// changed between two runs of the same code. Neither caller can reach it: a
-// created deck has no notes and an imported one carries none across. The day
-// something dumps a parsed deck -- the artifacts snapshot is the candidate --
-// ordering the notes is that flip's first job.
+// **There is a third caller now, and it is the reason the notes are ordered.**
+// This function used to refuse a deck carrying notes outright: `sort_keys=False`
+// means the payload's order *is* the file's order, the package held notes in a
+// Go map, and neither lifecycle caller could reach the case -- a created deck
+// has no notes and an imported one carries none across. The refusal named its
+// own expiry ("the day something dumps a parsed deck -- the artifacts snapshot
+// is the candidate -- ordering the notes is that flip's first job"), and the
+// artifacts flip is that day. `deckyaml.ParseOrdered` keeps the order and
+// `Deck.Notes` is a `deckyaml.Map`, so a note mapping now survives
+// parse -> mutate -> dump exactly as PyYAML's dict does.
 func (d *Deck) Dump() (string, error) {
-	if len(d.Notes) > 0 {
-		return "", fmt.Errorf(
-			"deck %q carries notes, and dumping a whole file cannot order them; "+
-				"edit the file surgically instead", d.Slug)
-	}
 	if _, ok := d.Strategy.(string); !ok && d.Strategy != nil {
 		// Same argument one field over: `strategy` is a string in every deck
 		// the model describes, but a hand-written file may hold anything and
@@ -83,6 +81,13 @@ func (d *Deck) Dump() (string, error) {
 	}
 	if text, _ := d.Strategy.(string); text != "" {
 		payload = append(payload, pyyaml.Pair{Key: "strategy", Value: text})
+	}
+	if len(d.Notes) > 0 {
+		notes, err := yamlNode(d.Notes)
+		if err != nil {
+			return "", fmt.Errorf("deck %q: notes: %w", d.Slug, err)
+		}
+		payload = append(payload, pyyaml.Pair{Key: "notes", Value: notes})
 	}
 	// The draft rule reaches the 99 and nothing else. `swap_board` and
 	// `graveyard` are outside the deck -- the board is a list of cards under
@@ -148,6 +153,50 @@ func cardObject(c CardEntry, draft bool) pyyaml.Map {
 		obj = append(obj, pyyaml.Pair{Key: "why", Value: ""})
 	}
 	return obj
+}
+
+// yamlNode carries a parsed value across into the emitter's node model: an
+// ordered mapping becomes a `pyyaml.Map`, a sequence a `pyyaml.List`, and a
+// scalar is left for `scalarOf` to judge.
+//
+// The two are separate types on purpose -- one is what a file said, the other
+// is what a dumper is about to write -- and this is the seam. It exists for
+// `notes:` alone, which is the only mapping in a deck whose *shape* is the
+// author's rather than the model's: everything else `Dump` writes it builds
+// itself, key by key, from a typed field.
+//
+// A value the emitter cannot write comes back as an error rather than as
+// something plausible, the same answer `Dump` already gives a strategy that
+// is not prose. In Python the equivalent is not a refusal but a traceback --
+// `generate._note` calls `.strip()` on whatever the note holds -- so a 500 on
+// both sides is the honest match for a hand-edited file nobody meant to write.
+func yamlNode(v any) (any, error) {
+	switch t := v.(type) {
+	case deckyaml.Map:
+		out := make(pyyaml.Map, 0, len(t))
+		for _, p := range t {
+			value, err := yamlNode(p.Value)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", p.Key, err)
+			}
+			out = append(out, pyyaml.Pair{Key: p.Key, Value: value})
+		}
+		return out, nil
+	case []any:
+		out := make(pyyaml.List, 0, len(t))
+		for i, item := range t {
+			value, err := yamlNode(item)
+			if err != nil {
+				return nil, fmt.Errorf("[%d]: %w", i, err)
+			}
+			out = append(out, value)
+		}
+		return out, nil
+	case string, int, int64, bool:
+		return t, nil
+	default:
+		return nil, fmt.Errorf("a %T cannot be written back into a deck file", v)
+	}
 }
 
 func stringList(items []string) pyyaml.List {

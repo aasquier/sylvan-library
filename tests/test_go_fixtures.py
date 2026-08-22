@@ -17,6 +17,7 @@ the JSON cannot say one thing while `/api/colors` says another.
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -98,6 +99,7 @@ _ORACLES = [
     ("the whole-file dumps", "DUMPS_PATH", "render_dump_cases"),
     ("the decklist grammar", "DECKLIST_PATH", "render_decklist_cases"),
     ("the importer", "IMPORT_PATH", "render_import_cases"),
+    ("the five deliverables", "ARTIFACTS_PATH", "render_artifact_cases"),
 ]
 
 
@@ -109,6 +111,33 @@ def test_the_committed_oracle_is_what_python_answers_now(what, path_name, render
     assert path.read_text(encoding="utf-8") == fresh, (
         f"{path} ({what}) is stale; regenerate with "
         f"`python tests/go_fixtures.py`")
+
+
+def test_the_artifacts_oracle_does_not_expire_at_midnight():
+    """The five deliverables each end in `_Generated <today>_`.
+
+    An oracle that asked the clock would be a fixture that passed all day and
+    failed overnight -- the sort of red build that gets rerun rather than read,
+    and the sort of green one that means nothing. So `render_artifact_cases`
+    pins `generate.date`, and this is the assertion that it did: every
+    generated line names the recorded day rather than this one.
+
+    It also checks the pin was *undone*. The freeze is a module attribute
+    swapped in place, so a `finally` that ever stopped running would leave
+    every later test in the session rendering artifacts dated 2026-08-22.
+    """
+    from mtglab.artifacts import generate
+
+    committed = json.loads(go_fixtures.ARTIFACTS_PATH.read_text(encoding="utf-8"))
+    frozen = go_fixtures.ARTIFACTS_DATE.isoformat()
+    assert committed["today"] == frozen
+    generated = [line for case in committed["cases"] for file in case.get("files", [])
+                 for line in file["text"].splitlines() if line.startswith("_Generated ")]
+    assert generated, "no deliverable carries a generated-on line any more"
+    assert all(frozen in line for line in generated), (
+        "a deliverable is dated something other than the oracle's own day")
+    assert generate.date.today() == date.today(), (
+        "the frozen date outlived the render that installed it")
 
 
 def test_every_oracle_this_module_writes_is_checked_for_drift():

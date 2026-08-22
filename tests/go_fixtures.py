@@ -51,6 +51,7 @@ from __future__ import annotations
 import json
 import sys
 import tempfile
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -59,8 +60,9 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from mtglab import reference
+from mtglab.cards.db import CardRecord
 from mtglab.decks.decklist import MAX_LINE
-from mtglab.decks.model import CardEntry, Deck
+from mtglab.decks.model import CATEGORIES, CardEntry, Deck
 
 ROOT = Path(__file__).resolve().parents[1]
 TESTDATA = ROOT / "go" / "internal" / "deckyaml" / "testdata"
@@ -85,6 +87,11 @@ IMPORT_PATH = ROOT / "go" / "internal" / "deckimport" / "testdata" / "imports.js
 #: deck lifecycle can produce, beside the exact bytes PyYAML writes for it.
 #: Reached by `create` and `import` only -- every other write is surgical.
 DUMPS_PATH = ROOT / "go" / "internal" / "deck" / "testdata" / "dumps.json"
+#: The artifacts oracle: `render_all` over every fixture deck, beside the
+#: exact markdown Python writes for it -- the five deliverables in the order
+#: they are built, `swaps.md` when there is a baseline, the snapshot last, and
+#: the refusal's own sentence for a draft.
+ARTIFACTS_PATH = ROOT / "go" / "internal" / "artifacts" / "testdata" / "artifacts.json"
 #: The activity log's oracle: every sentence `log.describe` writes, and
 #: `app.db`'s schema as the ladder leaves it, so the Go log tests have a real
 #: table to insert into in CI where there is no Python (Phase 4).
@@ -728,9 +735,75 @@ cards:
 """
 
 
+#: The notes fixture, and the one hand-written deck that exists for the
+#: *dumper* rather than for the editor.
+#:
+#: `notes:` is the only mapping in a deck file whose keys are the author's
+#: rather than the model's, and `sort_keys=False` means the file's order is
+#: what a dump writes back. Nothing needed that until the artifacts snapshot,
+#: which is `deck.dump()` of a **parsed** deck -- so this deck's notes are
+#: deliberately out of alphabetical order (a map iterated at random passes an
+#: in-order assertion far too often) and hold every value shape a person can
+#: type: folded prose, a literal block that keeps its line breaks, a scalar
+#: that has to be quoted to read back as itself, a nested mapping and a list.
+#:
+#: The exotic values are filed under keys the primers never ask for.
+#: `generate._note` calls `.strip()` on whatever it finds, so a mapping under
+#: `mulligan` would be a traceback rather than a fixture -- which is a true
+#: fact about the Python and not one worth recording as an oracle case.
+NOTED = """\
+slug: noted
+name: Written With Notes
+status: built
+stage: curated
+commander:
+  - Gyome, Master Chef
+themes:
+  - food
+  - midrange
+
+notes:
+  wincons: >-
+    Feed the table until somebody is the only one left who can afford to
+    stop eating.
+  pitfalls: >-
+    The deck folds to graveyard hate it cannot rebuild through.
+  mulligan: >-
+    Keep any seven with two lands and a sacrifice outlet.
+  gameplan: Cook, and keep cooking.
+  curve_plan: |
+    T2 outlet.
+    T3 Gyome.
+    T4 the table starts asking for food.
+  commander_why: 'yes'
+  shopping:
+    cheapest: Bag End Banquet
+    dearest: Sword of Feast and Famine
+  sources:
+    - The primer nobody wrote
+    - A conversation at the kitchen table
+
+cards:
+
+  # ---- RAMP 1
+  - name: Sol Ring
+    category: ramp
+    why: >-
+      Two mana on turn one, and it always has been.
+
+  # ---- LANDS 98
+  - name: Forest
+    category: land
+    qty: 98
+    why: >-
+      Green, and there is nothing else to be.
+"""
+
+
 def handwritten_decks() -> dict[str, str]:
     """name -> deck text, written the way a person writes one."""
-    return {"handwritten": HANDWRITTEN, "wide": WIDE, "tight": TIGHT}
+    return {"handwritten": HANDWRITTEN, "wide": WIDE, "tight": TIGHT,
+            "noted": NOTED}
 
 
 # ------------------------------------------------------- the edit operations
@@ -1168,14 +1241,240 @@ def dump_cases() -> dict[str, Deck]:
                              why="- a leading dash, and *an asterisk*"),
                    CardEntry(name="Erase (Not the Urza's Legacy One)",
                              category="interaction", why="1996")]),
+        # The notes, which `dump` could not write at all until the artifacts
+        # flip: `sort_keys=False` makes the payload's order the file's order,
+        # and a Go map has none. Deliberately not alphabetical, and holding a
+        # value long enough to fold, one that must be quoted to read back as a
+        # string, and one carrying its own line breaks.
+        "notes": Deck(
+            slug="notes", name="Noted", status="built", stage="curated",
+            commander=["Gyome, Master Chef"],
+            notes={
+                "wincons": "Feed the table until somebody is the only one left "
+                           "who can afford to stop eating, which takes longer "
+                           "than a hundred characters to say.",
+                "gameplan": "Cook.",
+                "mulligan": "yes",
+                "curve_plan": "T2 outlet.\nT3 Gyome.\nT4 the table asks for food.",
+            },
+            cards=[CardEntry(name="Forest", category="land", qty=99,
+                             why="Green, and there is nothing else to be.")]),
     }
 
 
+#: The dump cases whose *source* is a file a person typed rather than the
+#: dumper's own output. The round trip the Go test drives -- parse this, dump
+#: it, compare with what Python's parse dumped -- only proves anything about
+#: reading a hand-written file when one is the thing being read: a recorded
+#: dump fed back in has already been through PyYAML's choices once, so both
+#: parsers see the tidied version and a disagreement about the untidied one
+#: never surfaces.
+def dump_from_text() -> dict[str, str]:
+    """Hand-written deck text -> what Python's parse of it dumps to."""
+    return handwritten_decks()
+
+
 def render_dump_cases() -> str:
-    """Each deck above, as the dumper writes it."""
-    return json.dumps(
-        {name: deck.dump() for name, deck in dump_cases().items()},
-        indent=1, ensure_ascii=False) + "\n"
+    """Each deck above, as the dumper writes it, beside what it was dumped from."""
+    out: dict[str, dict[str, str]] = {}
+    for name, deck in dump_cases().items():
+        # A constructed deck has no source text of its own; its dump is both
+        # sides, which is exactly the round trip this oracle has always run.
+        text = deck.dump()
+        out[name] = {"source": text, "want": text}
+    for name, source in dump_from_text().items():
+        # Loudly, because the two halves are named in different functions and
+        # a collision would silently drop a case rather than fail.
+        assert name not in out, f"{name} is both a constructed and a written case"
+        out[name] = {"source": source,
+                     "want": Deck.from_text(source, slug=name).dump()}
+    return json.dumps(out, indent=1, ensure_ascii=False) + "\n"
+
+
+# ----------------------------------------------------- the artifacts oracle
+#
+# The five deliverables, and the bytes are the product: a primer is markdown a
+# person reads and `moxfield.txt` is pasted into a website, so the Go port has
+# to reproduce `render_all` character for character rather than approximately.
+#
+# Two things this oracle does that the others do not. It records the **order**
+# of the files as well as their contents, because `store` writes them in that
+# order and relies on the snapshot being last. And it **freezes the date**:
+# every deliverable ends in `_Generated <today>_`, so an oracle that asked the
+# clock would be a fixture that failed at midnight. Go takes the same date
+# through `Options.Today`.
+
+#: The day the oracle was rendered on. Any date will do; what matters is that
+#: it is written down rather than asked for.
+ARTIFACTS_DATE = date(2026, 8, 22)
+
+
+class _FrozenDate:
+    """`generate.date`, with today pinned to ARTIFACTS_DATE."""
+
+    @staticmethod
+    def today() -> date:
+        return ARTIFACTS_DATE
+
+
+def _record(name: str, mana_cost: str | None) -> CardRecord:
+    """A pool record with the one field the annotated list reads."""
+    return CardRecord(name=name, mana_cost=mana_cost, cmc=0.0, type_line="",
+                      oracle_text="", color_identity=frozenset(),
+                      produced_mana=(), legal_commander=False, reserved=False,
+                      edhrec_rank=None, image_normal=None)
+
+
+#: The mana costs the annotated list prints, for the cards the fixtures use.
+#: A card missing from here renders with no cost, which is the ordinary state
+#: of a deck built on a machine with no pool.
+ARTIFACT_CARDS = {"Sol Ring": "{1}", "Forest": None,
+                  "Swords to Plowshares": "{W}",
+                  "Cultivator Colossus": "{5}{G}{G}",
+                  "Vorinclex, Voice of Hunger": "{6}{G}{G}"}
+
+
+def artifact_decks() -> dict[str, Deck]:
+    """Decks built for the renderer's own branches rather than the gate's."""
+    every = Deck(
+        slug="every-category", name="One Of Everything", status="built",
+        stage="curated", commander=["Gyome, Master Chef"],
+        companion="Kaheera, the Orphanguard", bracket=4,
+        strategy="A card in every category, so every heading renders.",
+        cards=[CardEntry(name=f"Card {i}", category=cat,
+                         why=f"The {cat} slot.")
+               for i, cat in enumerate(CATEGORIES)],
+        swap_board=[CardEntry(name="Bag End Banquet", category="payoff",
+                              why="Waiting on a slot."),
+                    CardEntry(name="Aetherflux Reservoir", category="win-con",
+                              why="")])
+    # Two categories the model does not declare, so the "sorted, and after the
+    # declared ones" branch has something to sort and `str.title()` has
+    # something to capitalise -- and lands still end up last.
+    every.cards += [
+        CardEntry(name="Stax Piece", category="stax-piece", why="Invented."),
+        CardEntry(name="Aggro Plan", category="aggro-plan", why="Invented too."),
+        CardEntry(name="Forest", category="land", qty=30,
+                  why="Green, and there is nothing else to be."),
+        CardEntry(name="Sol Ring", category="ramp", qty=2, why=""),
+    ]
+    return {
+        "every-category": every,
+        # Every note key both primers ask for, with the whitespace `_note`
+        # strips still on them.
+        "full-notes": Deck(
+            slug="full-notes", name="Fully Noted", status="built",
+            stage="curated", commander=["Trostani, Selesnya's Voice"],
+            bracket=3,
+            strategy="Make more creatures than anybody can answer.",
+            notes={key: f"  What {key} has to say, with space around it.  "
+                   for key in ("gameplan", "mulligan", "curve_plan", "pitfalls",
+                               "engine_detail", "lines", "wincons", "manabase",
+                               "matchups", "politics", "failure_modes",
+                               "swap_philosophy", "rules_corners",
+                               "commander_why")},
+            cards=[CardEntry(name="Sol Ring", category="ramp", why="Fast."),
+                   CardEntry(name="Forest", category="land", qty=40,
+                             why="Green.")]),
+        # No commander, no companion, no bracket: the header's other branch.
+        # A bracket of nought is *falsy* in Python, so it is not written --
+        # which is a real difference from "no bracket" and looks identical.
+        "bare": Deck(slug="bare", name="Bare", status="theoretical",
+                     stage="curated", commander=[], bracket=0,
+                     cards=[CardEntry(name="Forest", category="land", qty=99,
+                                      why="Green.")]),
+        # A draft, refused -- with more than eight cards owing a rationale, so
+        # the "and N more" tail renders.
+        "draft-owing": Deck(
+            slug="draft-owing", name="Owing", status="theoretical",
+            stage="draft", commander=["Goreclaw, Terror of Qal Sisma"],
+            cards=[CardEntry(name=f"Card {i}", category="utility", why="")
+                   for i in range(11)]),
+        # A draft that owes nothing, which is the other half of the refusal:
+        # the way out is `stage: curated`, not a flag.
+        "draft-settled": Deck(
+            slug="draft-settled", name="Settled", status="built",
+            stage="draft", commander=["Goreclaw, Terror of Qal Sisma"],
+            cards=[CardEntry(name="Forest", category="land", qty=99,
+                             why="Green.")]),
+    }
+
+
+def artifact_cases() -> list[dict[str, Any]]:
+    """Every deck the renderer can be handed, and what Python renders for it."""
+    from mtglab.artifacts import generate
+
+    sources: dict[str, Deck] = dict(artifact_decks())
+    sources.update(dump_cases())
+    for name, text in handwritten_decks().items():
+        sources[f"hand-{name}"] = Deck.from_text(text, slug=name)
+
+    cards = {name: _record(name, cost) for name, cost in ARTIFACT_CARDS.items()}
+
+    # The three kwargs `render_all` takes beyond the deck, each on one case:
+    # a baseline (so `swaps.md` exists at all), prices (so it grows a shopping
+    # list), and stats (so both primers grow a block). Neither the CLI nor the
+    # API passes prices or stats today; the shape is ported, so the shape is
+    # proven.
+    previous = Deck(
+        slug="every-category", name="One Of Everything", status="built",
+        stage="curated", commander=["Gyome, Master Chef"],
+        cards=[CardEntry(name="Card 0", category="land", why="The land slot."),
+               CardEntry(name="Cut With A Reason", category="ramp",
+                         why="It was here and now it is not."),
+               CardEntry(name="Cut With None", category="ramp", why=""),
+               CardEntry(name="Forest", category="land", qty=30, why="Green.")])
+    extras: dict[str, dict[str, Any]] = {
+        "every-category": {
+            "previous": previous,
+            # Two cards at the same price, so the dearest-first sort has a tie
+            # to keep stable, and one with no price at all.
+            "prices": {"Card 1": 12.5, "Card 2": 12.5, "Card 3": 0.25,
+                       "Sol Ring": 1.995},
+            "stats": {"mulligan rate": "12.4%", "spells through T8": "9.1"},
+        },
+        "full-notes": {"previous": previous},
+    }
+
+    out: list[dict[str, Any]] = []
+    for name in sorted(sources):
+        deck = sources[name]
+        extra = extras.get(name, {})
+        case: dict[str, Any] = {
+            "name": name,
+            "deck": deck.dump(),
+            "previous": extra["previous"].dump() if "previous" in extra else None,
+            "prices": extra.get("prices"),
+            "stats": list((extra.get("stats") or {}).items()) or None,
+        }
+        try:
+            rendered = generate.render_all(
+                deck, cards=cards, previous=extra.get("previous"),
+                prices=extra.get("prices"), stats=extra.get("stats"))
+            case["ok"] = True
+            case["files"] = [{"name": n, "text": t} for n, t in rendered.items()]
+        except generate.DraftDeck as exc:
+            # The refusal is half of what this module does, and its sentence
+            # reaches the wire as the 422's `detail`.
+            case["ok"] = False
+            case["error"] = str(exc)
+        out.append(case)
+    return out
+
+
+def render_artifact_cases() -> str:
+    """Every case above, with the date pinned so the oracle does not expire."""
+    from mtglab.artifacts import generate
+
+    original = generate.date
+    generate.date = _FrozenDate            # type: ignore[assignment]
+    try:
+        cases = artifact_cases()
+    finally:
+        generate.date = original           # type: ignore[assignment]
+    return json.dumps({"today": ARTIFACTS_DATE.isoformat(),
+                       "cards": ARTIFACT_CARDS, "cases": cases},
+                      indent=1, ensure_ascii=False) + "\n"
 
 
 def render_edit_cases() -> str:
@@ -1240,7 +1539,11 @@ def write() -> None:
     print(f"wrote {EDITS_PATH}")
     DUMPS_PATH.parent.mkdir(parents=True, exist_ok=True)
     DUMPS_PATH.write_text(render_dump_cases(), encoding="utf-8")
-    print(f"wrote {len(dump_cases())} dump cases into {DUMPS_PATH}")
+    print(f"wrote {len(dump_cases()) + len(dump_from_text())} dump cases "
+          f"into {DUMPS_PATH}")
+    ARTIFACTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ARTIFACTS_PATH.write_text(render_artifact_cases(), encoding="utf-8")
+    print(f"wrote {len(artifact_cases())} artifact cases into {ARTIFACTS_PATH}")
     DECKLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
     DECKLIST_PATH.write_text(render_decklist_cases(), encoding="utf-8")
     print(f"wrote {len(decklist_cases())} decklist cases into {DECKLIST_PATH}")
