@@ -227,6 +227,20 @@ func TestAnInviteRefusesOnTheStatusEachReasonEarns(t *testing.T) {
 	}{
 		{"no address at all", `{}`, 422, "an invite needs an email address"},
 		{"not shaped like an address", `{"email":"nope"}`, 422, "does not look like an email"},
+		// **Not a string at all**, which answered 500 in Python until
+		// 2026-08-22: `payload.get("email")` went to `normalise_email` raw, and
+		// `.strip()` on an int raises `AttributeError`, which is not the
+		// `InvalidEmail` the route catches. The door has always coerced here and
+		// so has always answered 422; both runtimes now say the same sentence,
+		// which is why the quoted forms are pinned rather than just the status.
+		// `0` and `false` are the interesting pair -- they are what a
+		// `str(... or "")` coercion would fold into "absent", reporting a
+		// missing address for a body that plainly supplied one.
+		{"a number", `{"email":123}`, 422, "'123' does not look like an email"},
+		{"a zero", `{"email":0}`, 422, "'0' does not look like an email"},
+		{"a true", `{"email":true}`, 422, "'True' does not look like an email"},
+		{"a false", `{"email":false}`, 422, "'False' does not look like an email"},
+		{"an explicit null", `{"email":null}`, 422, "an invite needs an email address"},
 		{"an address already claimed", `{"email":"alice@example.com"}`, 409,
 			"already claimed that address"},
 		{"a handle nobody could hold", `{"email":"x@example.com","username":"a b"}`, 422,
@@ -250,7 +264,8 @@ func TestAnInviteRefusesOnTheStatusEachReasonEarns(t *testing.T) {
 		t.Errorf("the refusal does not point anywhere: %q", detail(t, rec))
 	}
 	if len(rig.sender.messages()) != 0 {
-		t.Errorf("%d messages went out for six refusals", len(rig.sender.messages()))
+		t.Errorf("%d messages went out for a table of nothing but refusals",
+			len(rig.sender.messages()))
 	}
 }
 

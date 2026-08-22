@@ -242,19 +242,19 @@ func (a *API) inviteAccount(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// **A known divergence, measured 2026-08-22 and deliberately not
-	// reproduced.** Python hands `payload.get("email")` to `normalise_email`
+	// **A divergence the port declined to reproduce, and it has since been
+	// ruled on.** Python handed `payload.get("email")` to `normalise_email`
 	// *raw*, so a body carrying `{"email": 0}` -- or `true`, or a list --
-	// reaches `.strip()` on something that has not got one and becomes a
-	// **500**. This answers 422 with the shape sentence instead, which is what
-	// the route means and what every other field on it already does.
+	// reached `.strip()` on something that has not got one and became a
+	// **500**. This answered 422 with the shape sentence instead, on the
+	// grounds that reproducing a crash is not equivalence, and reported it
+	// rather than ruling on it, the share toggle being the precedent: the port
+	// finds it, Aaron rules, both runtimes are fixed at once.
 	//
-	// Reproducing a crash is not equivalence, and fixing `api/admin.py` is a
-	// change to Python's wire on a route the contract suite covers -- so it is
-	// reported rather than ruled on here. The precedent is the share toggle
-	// (2026-08-22): the port found it, Aaron ruled, and both runtimes were
-	// fixed at once. The route is admin-only and the input is one no client
-	// sends, so nothing is urgent about it.
+	// `api/admin.py` now coerces the same way, and the sentences match, which
+	// is what the case table beside this pins. `str` and not `field`: `field`
+	// folds `0` and `false` to the empty string, which would report a *missing*
+	// address for a body that supplied one.
 	address, err := auth.NormaliseEmail(str(body, "email"))
 	if err != nil {
 		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())

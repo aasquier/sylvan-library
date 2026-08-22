@@ -66,23 +66,23 @@ func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
 	// which of two spellings Python meant.
 	slug := r.PathValue("slug")
 
-	// **Empty and not nil, which is a difference Python makes and this has to
-	// make with it.** `service.validate_deck` writes `_pool_for(deck, con) if
-	// con is not None else None`, so with no pool the gate is handed `None`,
-	// takes its early return and reports one `unverified` warning.
-	// `service.build_artifacts` writes `_pool_for(deck, con)` with no guard,
-	// and `_pool_for` answers `{}` for a missing connection -- which is *not*
-	// `None`, so the gate runs its card checks against an empty pool and every
-	// card in the deck comes back `unknown-card`.
+	// **Nil and not empty, which is a difference the gate makes and this has to
+	// make with it.** `gate.Validate` reads a nil map and an empty one the same
+	// way everywhere except its own early return: nil means the pool was never
+	// consulted, so it warns `unverified` once and stops, where an empty map is
+	// a pool that has never heard of any of these cards and every one of them
+	// comes back `unknown-card`.
 	//
-	// The two routes therefore disagree about an instance with no pool: one
-	// warns, the other refuses the build outright unless it is forced. That
-	// looks like an oversight rather than a decision, and a flip is not where
-	// it gets decided -- so the behaviour is reproduced exactly and reported
-	// as a finding. `gate.Validate` reads a nil map and an empty one the same
-	// way everywhere except its own early return, which is precisely the
-	// branch at issue.
-	cards := map[string]*pool.CardRecord{}
+	// This built an empty map until 2026-08-22, deliberately, because
+	// `service.build_artifacts` wrote `_pool_for(deck, con)` where
+	// `service.validate_deck` wrote `_pool_for(deck, con) if con is not None
+	// else None` and `_pool_for` answered `{}` for a missing connection -- so on
+	// a pool-less instance the validate route warned and this one refused the
+	// build outright. The flip reproduced that rather than ruling on it, which
+	// is the rule; it has since been ruled on, `_pool_for` answers `None`, and
+	// the shape here is the ordinary one every other gate caller in this package
+	// already used.
+	var cards map[string]*pool.CardRecord
 	err := a.withPool(r.Context(), func(c *pool.Conn) error {
 		if c == nil {
 			return nil

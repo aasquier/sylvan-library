@@ -144,9 +144,28 @@ def install(app: FastAPI, *,
         whether the address resolves to an account and so cannot report a
         delivery failure; here the caller is an authorised admin who is owed the
         truth about whether the message went.
+
+        **The coercion below is not decoration.** `payload` is a bare JSON
+        object, so `payload["email"]` is whatever the caller sent, while
+        `users.normalise_email` is annotated `str | None` and takes that at its
+        word -- it calls `.strip()`. A body of `{"email": 123}` therefore raised
+        `AttributeError` rather than `InvalidEmail`, walked straight past the
+        `except` below, and answered **500** for a request that is merely
+        malformed. The sibling field a few lines down has been coercing since it
+        was written; the inconsistency was inside one function.
+
+        Spelled `str(raw) if raw is not None else None` rather than the
+        `str(... or "")` that `field()` uses, and the difference is the point:
+        `or ""` folds `0` and `false` into "absent", which would answer *an
+        invite needs an email address* for a body that plainly supplied one.
+        This says *that does not look like an email address* instead, and it is
+        what `internal/api`'s `str()` helper already does -- the door serves this
+        route, so the two have to agree sentence for sentence, not merely
+        status for status.
         """
+        raw = payload.get("email")
         try:
-            address = users.normalise_email(payload.get("email"))
+            address = users.normalise_email(str(raw) if raw is not None else None)
         except users.InvalidEmail as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         if address is None:
