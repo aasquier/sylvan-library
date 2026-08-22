@@ -59,11 +59,21 @@ func TestTheProseRoutesAnswerTheEmbeddedPayloads(t *testing.T) {
 // simulator) would report every long job lost the instant it was submitted.
 //
 // Answering-when-Go-owns-the-id-and-proxying-otherwise was considered and
-// refused: today it is a handler whose every live branch is the proxy, it
-// inverts the door's dependency (the proxy is chosen in `door` when `match`
-// misses, and `door` imports `api`, not the reverse), and for the *list* it
-// is not even expressible -- a list must be the union of both registries,
-// re-sorted on `created_at` as text, for a half that is always empty.
+// refused **for today**: it is a handler whose every live branch is the
+// proxy, since Go owns no ids at all, and for the *list* it is not even
+// expressible -- a list must be the union of both registries, re-sorted on
+// `created_at` as text, for a half that is always empty.
+//
+// It is refused today and not forever, because of how the families must
+// move. Every job, whichever family submitted it, is polled through this one
+// route (`followJob` -> `api.job(id)`; there is no per-family poll), so it
+// couples all eight together: flip `simruns` alone and its Go-submitted ids
+// are invisible to Python's poll route, flip this route alone and Python's
+// ids are invisible to Go's. No partial order works. So either all eight
+// families and both routes move in one change -- and these routes stay as
+// simple as they read -- or that hybrid is built *with the first family
+// flip*, which is the moment both of its branches are finally live. PLAN
+// section 10 carries the choice.
 //
 // The general rule, and the reason this is a test rather than a line in a
 // commit message: **a route can only flip when the state it reads has
