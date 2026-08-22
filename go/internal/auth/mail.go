@@ -90,6 +90,15 @@ type Message struct {
 }
 
 // EmailSender is anything that can send a Message. The seam ADR 16 asks for.
+//
+// **Send may be called from more than one goroutine at a time**, and that is
+// not a hypothetical: `POST /api/auth/reset` does its lookup and its send
+// *after* the response has gone (which is the whole of its timing defence), so
+// two resets in flight are two senders running at once. Both implementations
+// below are safe -- `ResendSender` holds nothing that changes and
+// `ConsoleSender` writes one buffered string per call -- and the race detector
+// found this contract by breaking a *test* double that was not, which is the
+// cheapest place it could have been found.
 type EmailSender interface {
 	Send(message Message) error
 }

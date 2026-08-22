@@ -75,6 +75,11 @@ type Config struct {
 	// through app.db when a caller is signed in (ADR 17, ADR 22); never
 	// rendered.
 	AdminEmail string
+	// EmailSender is ADR 16's seam, handed to the account routes. Nil is what
+	// a real process wants -- the sender is decided from the environment when
+	// a message is actually being sent -- and a test passes a recorder, which
+	// is how no test in this module sends mail.
+	EmailSender auth.EmailSender
 	// Logger, or slog.Default().
 	Logger *slog.Logger
 }
@@ -133,7 +138,17 @@ func New(cfg Config) (*Door, error) {
 	}
 	ported := api.New(api.Config{Logger: cfg.Logger, Pool: cfg.Pool, AppDB: d.db,
 		AppDBPath: cfg.AppDB, DecksDir: cfg.DecksDir, AdminEmail: cfg.AdminEmail,
-		Shelves: shelf, AppWriteDB: d.writeDB, Recorder: d.recorder})
+		Shelves: shelf, AppWriteDB: d.writeDB, Recorder: d.recorder,
+		// The two switches the account routes read, passed rather than looked
+		// up so the door and the routes it serves cannot disagree about what
+		// this process is: `me` reports RequireAuth, `logout` deletes a
+		// session row only when it is on, and the session cookie carries
+		// `Secure` exactly when Python's would.
+		RequireAuth: cfg.RequireAuth, SecureCookies: cfg.SecureCookies,
+		// ADR 16's seam. Nil is the real process's answer -- decide from the
+		// environment when a message is actually being sent -- and a test
+		// passes a recorder, which is how no test here sends mail.
+		EmailSender: cfg.EmailSender})
 	table, err := newRouteTable(ported.Routes(), ported.Proxied())
 	if err != nil {
 		return nil, err
