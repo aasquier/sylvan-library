@@ -245,9 +245,15 @@ suite read. The port gets four instruments, cheapest first:
    *"does not price at all"*; §7's Phase 5 paragraph and §11's risk 3 are
    rewritten accordingly, and §10 carries its row.
 
-   **The fallback was not taken and is no longer needed.** What is proved is
-   the generator, not yet Tier 1: the engine is still Phase 5's own work, so
-   `REFERENCE_DIGEST` is not reproduced here. What replaces it is stronger
+   **The fallback was not taken and is no longer needed.** What is proved
+   here is the generator, not yet Tier 1: the engine was still Phase 5's own
+   work when this was written, so `REFERENCE_DIGEST` was not reproduced in
+   that change. **It was reproduced later the same day**, by
+   `go/internal/sim/tier1` — see Phase 5 below, and note which half of the
+   work each instrument did: the engine matched on its first run because the
+   draw stream was already a checked fact, and the one bug the port did have
+   was found by a *second* corpus, not by the digest. What replaces it is
+   stronger
    than a spot check and was possible because of a fact worth recording —
    **Tier 1 consumes randomness through exactly one call**, `rng.shuffle(deck)`
    in `simulate_game`, and through nothing else. So a run's whole entropy
@@ -740,6 +746,37 @@ measured** — same machine, N-core Tier 1 scaling into Appendix B. *Gate:
 and re-pinned — an ADR-worthy divergence, not a shrug); the mana oracle's
 13,944 cases match the pinned digest; contract green.*
 
+**The digest is reproduced, 2026-08-22.** `go/internal/sim/tier1` computes
+`c3e278e3…22d4` — the same sha256, over the same text, from a simulator
+written in another language. The fallback was not taken and no number moved.
+Three things about how it went are worth the next session's time.
+
+**It came out right on the first run, and that is `pyrand`'s doing rather
+than luck.** The engine was written against the Python line by line and the
+digest matched before any debugging, because the one thing that could not
+have been debugged from the outside — the draw stream — had already been
+proved. This is what pulling a tail risk forward buys: not a faster port, a
+port whose failures are all in the half you can read.
+
+**Reproducing the numbers is not reproducing the digest.** The gate hashes
+`repr()`, so CPython's float formatting is inside it: `100.0` is not `100`,
+`1e-05` is not `0.00001`, and `median_commander_turn` is an *int* for an
+odd-length list because `statistics.median` returns one — its `float | None`
+annotation is simply wrong, and the digest is not. So the package renders
+Python's `repr` (`repr.go`), held to CPython by 527 recorded floats.
+
+**And the digest is one run, which is exactly its weakness.** It covers a
+deck whose 99 cards all have distinct names and a policy that mulligans at
+most three times — so it is blind to `list.remove` taking out an equal card
+rather than the one it was handed, and blind to the hand-size cap on
+bottoming. A second corpus was written for that (a deck of repeated cards,
+policies that mulligan to nine), and it **caught a real bug the digest could
+not see**: Go re-evaluates a `for` condition every pass where Python's
+`range(min(mulligans, len(hand) - 1))` is computed once, so at four or more
+mulligans the port bottomed one card too few. Nine of ten deliberate
+mutations die against the corpus; the tenth is an equivalent mutant and is
+argued as one in the code.
+
 **Phase 6 — The Claude surfaces** *(~¾–1 day; **re-priced ~½ day** — a
 couple of hours of porting, plus a real conversation driven through all
 seven modes on the deployed pair, which is wall-clock the compiler does not
@@ -892,7 +929,8 @@ There is more than one Claude in this house now. Rules for the duration:
   | CPython's `random.Random` — MT19937, `init_by_array` seeding, `random()`, `getrandbits`, `_randbelow`, `randrange`, `shuffle`, `choice` | **go** | `go/internal/pyrand`, 2026-08-22 — **Phase 5's named tail risk, pulled forward and closed** (§5 item 3, §11 risk 3). A library, not a route: nothing calls it yet and nothing flipped. Held to CPython by `testdata/draws.json` (20 seeds, the raw word stream recorded apart from every consumer, `random()` compared as bits) plus a replay of the reference run's full 99,274-draw stream, so Tier 1's randomness is a checked fact before the engine that consumes it exists. `sample()` had no caller and was not written |
   | `api/jobs.py` — the registry: two pools, the `key` dedupe, born-finished jobs, the bound, `forget_owner` | **go** | `go/internal/jobs`, 2026-08-22 — **Phase 5's first half, and the engine only: no route has flipped**, so Python still owns every job a request creates. The CPU lane is the semaphore over goroutines ADR 38 promised, sized from `GOMAXPROCS` (8 here, and 1 on a `shared-cpu-1x` — a `Config` knob, not a constant); `NET` stays at two and `FORGE` at one, because neither of those bounds is a fact about the machine. Two differences are Go's rather than the design's and both are argued in the package comment: the mutable half of a `Job` is **guarded**, where Python's worker writes `status` and `done` with no lock and the GIL absorbs it, and a **panicking worker is a failed job** rather than a dead process. Held to Python by a ninth generated oracle (`jobs/testdata/jobs.json`), which caught three divergences a careful implementation would have shipped: `percent` **rounds half to even** (1 of 8 is 12.5, and Python answers 12 where `math.Round` answers 13), `created_at` **drops its fraction entirely** when the microsecond is zero and is spelled `+00:00` rather than `Z` — and it is the *sort key*, as text — and the lane refusal quotes with `repr`, which prefers single quotes. The concurrency is proven by the race detector, six killed mutations and a fuzz target over submit/dedupe (126k executions under `-race`); the mutation that dropped the owner from the match **found a weak test** rather than a weak implementation, because the fixture's keys and owners had been varied together. One constraint falls out of it for every family still to flip: **a ported job result must be a struct with its fields in Python's order, never a `map[string]any`**, since encoding/json sorts map keys and a dict does not |
   | `sim/karsten.py` and `sim/curve.py` — Tier 1.5, the closed forms | **go** | `go/internal/sim/karsten` and `go/internal/sim/curve` over the shared `go/internal/sim`, 2026-08-22 — **the engine only; no route has flipped**, so `/api/decks/{owner}/{slug}/shelf` and its siblings are still Python's. Checkable, per the rule below: `grep -rn 'sim/karsten\|sim/curve' go/internal/api go/internal/door go/cmd` prints **nothing** at this commit — the engine has no caller in the served path — and stays that way until the jobs family moves. (The obvious `grep -c 'shelf' go/internal/api/api.go` is *not* that command and was written first: it answers **3**, all of them comments about the runtime shelves and the artifacts shelf. A row's command has to be run, which is the rule below, and running it is what caught this.) §5 item 4 asked for agreement "to within an epsilon pinned per function"; every epsilon is pinned at **zero** and the corpora compare `Float64bits`, because exact was affordable — `math/big` binomials where Python has `math.comb`, and CPython's own `math.fsum` and `round` reproduced in `go/internal/sim`. Exactness is not decoration: `required_sources`, `reliable_turn` and `_slots_to_target` all scan a float against `>=`, so one ulp is a different land count or a different recommendation. Two findings the port made rather than inherited, both fixed in **both** runtimes: arm64 fuses `t += a*b` into one `FMADDD` and rounds once where CPython rounds twice (guarded by `sim.Rounded`, an explicit conversion the Go spec blesses for exactly this), and **`sim/curve.py` answered differently on Python 3.11 and 3.12** because CPython 3.12 gave `sum()` over floats compensated accumulation — two lines, now `fsum`, and the corpus is byte-identical under both interpreters, verified |
-  | everything else under `/api` — `api/` (the job *routes*, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the wheel), `sim/`, `claude/`, `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback |
+  | `sim/tier1/engine.py` — the goldfish itself: `KeepRule`, `simulate_game`, `run`, `sweep_land_counts`, `_consume` | **go** | `go/internal/sim/tier1`, 2026-08-22 — **the engine only; no route has flipped**, so Python still serves every simulation. **`REFERENCE_DIGEST` is reproduced** — `go test -run TestTheReferenceRunReproducesThePinnedDigest ./internal/sim/tier1`, and the digest is a literal in `tier1_test.go` so a regenerated fixture cannot re-pin the gate. Reproducing the numbers was not enough: the gate hashes `repr()`, so `repr.go` is CPython's float and string rendering, and `median_commander_turn` is an **int** for an odd-length list because `statistics.median` returns one — its `float | None` annotation is wrong and the digest is not. It matched on the first run, which is `pyrand`'s doing rather than luck. But **the digest is one deck and one seed**: `build_golgari`'s 99 names are all distinct, so it never exercises `list.remove` taking out an *equal* card, and its policy mulligans three times at most. The second corpus that covers both (`testdata/tier1.json`: 18 games, 7 runs, 390 castability cases, 527 floats) **caught the port's one real bug** — a `for` condition Go re-reads where `range(min(mulligans, len(hand) - 1))` is computed once, invisible below four mulligans. Nine of ten deliberate mutations die against it; the tenth is an equivalent mutant and is argued as one in the code. Two things it deliberately does not carry: `SimSummary.report()`, which is `cli.py`'s text table and no route reads, and `spells_through`'s value — that sums floats, and CPython's `sum` is compensated from 3.12 and naive before it, so Go answers as 3.12 does (what the image runs) and the corpus stays byte-identical on both legs of the matrix |
+  | everything else under `/api` — `api/` (the job *routes*, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the wheel), `sim/compile.py` and `sim/mulligan.py`, `claude/`, `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
   walked before the next flip starts (main deploys itself; every flip is a

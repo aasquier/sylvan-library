@@ -700,7 +700,54 @@ go/                       the Go module (ADR 38; module path
                           `curve.on_curve_odds` answered differently
                           depending on the Python underneath -- both are
                           `fsum` now, and the corpus was rendered under 3.11
-                          and 3.12 and diffed to prove the fix. The contract
+                          and 3.12 and diffed to prove the fix.
+                          **Tier 1 followed the same day, and
+                          `REFERENCE_DIGEST` is reproduced**:
+                          internal/sim/tier1 is the goldfish -- the London
+                          mulligan, the land heuristic, `_consume`'s Kuhn
+                          matching, the timing table and its sort -- over the
+                          same shared `internal/sim` the closed forms brought,
+                          which gained one thing for it: `Card.Equal`. That is
+                          not decoration. `list.remove` takes out the first
+                          card **equal** to its argument rather than the one it
+                          was handed, and a compiled deck repeats one object
+                          per `qty`, so which basic leaves a hand reorders the
+                          rest and picks the next land. It flipped no route;
+                          Python still serves every simulation. The gate is
+                          `tests/test_determinism.py`'s sha256 over `repr()` of
+                          one game, one 300-game run and a three-point sweep,
+                          and Go computes the same one -- which meant
+                          reproducing CPython's `repr` too (repr.go), since the
+                          digest hashes text: `100.0` is not `100`, and
+                          `median_commander_turn` is an **int** for an
+                          odd-length list because `statistics.median` returns
+                          one, its `float | None` annotation notwithstanding.
+                          The digest matched on the first run, which is
+                          pyrand's doing -- the one half that could not have
+                          been debugged from outside was already proved. But
+                          **the digest is one deck and one seed**, and its
+                          blind spots are real: `build_golgari`'s 99 names are
+                          all distinct, so nothing in it exercises
+                          `list.remove` taking out an *equal* card, and its
+                          policy mulligans at most three times. A second corpus
+                          covers both (a deck of repeated cards, policies that
+                          mulligan to nine) and **caught the port's one real
+                          bug**: Go re-reads a `for` condition every pass where
+                          `range(min(mulligans, len(hand) - 1))` is computed
+                          once, so at four or more mulligans it bottomed a card
+                          too few. Nine of ten deliberate mutations die against
+                          the corpus; the tenth is an equivalent mutant and
+                          says so in the code. Two absences are deliberate:
+                          `SimSummary.report()` is `cli.py`'s text table, which
+                          no route reads; and `spells_through` is **not** in
+                          the corpus, because it sums floats and CPython's
+                          `sum` is compensated from 3.12 and naive before it --
+                          so the value is a fact about the interpreter, Go
+                          answers as 3.12 does (what the image runs), and the
+                          corpus stays byte-identical on both legs of the
+                          matrix. That is the same trap the closed forms hit in
+                          `curve.py`, found twice in one day from opposite
+                          directions. The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
