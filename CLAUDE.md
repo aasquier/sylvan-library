@@ -527,9 +527,27 @@ go/                       the Go module (ADR 38; module path
                           Create/Delete/SetShared complete the write side --
                           so create, import, delete and sharing answer from
                           the door. None of the four is in the activity log,
-                          because none of them is in `_commit` (ADR 28). The
-                          artifacts rebuild is deliberately NOT in it and is
-                          its own flip. The contract
+                          because none of them is in `_commit` (ADR 28).
+                          **Then the renderer, 2026-08-22, and it flipped
+                          nothing either**: internal/artifacts is
+                          artifacts/generate.py -- RenderAll returns the five
+                          deliverables as text, Store writes them and prunes
+                          the ones this build did not make, Deliverables is
+                          the served set and the path guard in one, and a
+                          draft is refused in its own words. Held to Python by
+                          an oracle of 18 decks, byte for byte and in the
+                          order Store writes, with the date pinned so it does
+                          not expire at midnight. Its first job was the
+                          notes: deckyaml.ParseOrdered keeps every mapping's
+                          key order and Deck.Notes is one, because the
+                          snapshot is a dump of a *parsed* deck and
+                          `sort_keys=False` makes the file's order the
+                          payload's. Dump refused a deck carrying notes until
+                          that landed, which is the expiry that refusal named
+                          for itself. The rebuild ROUTE is its own flip, and
+                          stays outside the activity log when it lands -- a
+                          build derives files from a deck rather than editing
+                          one. The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —

@@ -486,7 +486,7 @@ func (a *API) getDeck(w http.ResponseWriter, r *http.Request) {
 		}
 		var commanderCard any
 		if commanderRec != nil {
-			why, _ := d.Notes["commander_why"].(string)
+			why := d.NoteText("commander_why")
 			row := cardRow(deck.CardEntry{Name: d.Commander[0], Category: "commander", Why: why, Qty: 1},
 				commanderRec, true)
 			// The oracle id rides here: the motion tier is keyed on it.

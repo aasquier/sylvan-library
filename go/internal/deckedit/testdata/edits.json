@@ -10,7 +10,8 @@
   "rich": "slug: rich-fixture\nname: 'Rich Fixture: Every Shape the Dumper Writes'\nstatus: built\nstage: curated\ncommander:\n  - Syr Gwyn, Hero of Ashvale\nshared: false\npilot: Mark's wife\ncommander_art: 0aae2e33-0000-4000-8000-000000000000\ncompanion: Kaheera, the Orphanguard\nbracket: 3\narchetype: midrange\nthemes:\n  - knights\n  - equipment\n  - voltron\nstrategy: 'Suit up a knight and swing: Syr Gwyn''s trigger draws a card and the equipment costs nothing,\n  so every turn after the third is a cantrip with a sword attached -- panache *and* martial prowess.'\nnotes:\n  mulligan: 'Keep any seven with two lands and an equipment; ship a hand\n\n    with no knight by turn three.'\n  politics: 'The table forgets Ashvale until it is too late: say nothing.'\n  weird: 'colon: and # hash, plus braces {G}{W} and a trailing space '\ncards:\n  - name: Sol Ring\n    category: ramp\n    why: 'Two mana on turn one, and it always has been: the single most played card in the format, the\n      first thing every primer tells a newcomer to find, and the card this line exists to make room for\n      -- which is why it is first.'\n  - name: Embercleave\n    category: equipment\n    why: 'It''s the card with the apostrophe -- and the one that ends games: flash, trample, double strike.'\n    scryfall_id: c3a4b2d1-1111-4222-8333-444455556666\n    tags:\n      - finisher\n      - flash\n  - name: Æther Vial\n    category: utility\n    why: 'Unicode in the name: Æ — é — ü.'\n    mana_cost: '{1}'\n    art: deadbeef-0000-4000-8000-000000000001\n  - name: Forest\n    category: land\n    why: '* starts with a star, which must be quoted'\n    qty: 12\n  - name: Plains\n    category: land\n    why: '#not a comment'\n    qty: 13\n  - name: Lightning Greaves\n    category: equipment\n    why: 'yes'\n  - name: Null Rod\n    category: hate\n    why: 'null'\n  - name: Counterspell\n    category: interaction\n    why: '12'\n  - name: Swords to Plowshares\n    category: interaction\n    why: 1.5 mana, in effect\n  - name: Knight of the White Orchid\n    category: ramp\n    why: cost {1}{W}{W} -- braces again, inside a longer sentence that also runs past the hundred-character\n      fold so both rules fire at once.\n    mana_cost: '{1}{W}{W}'\nswap_board:\n  - name: Sword of Feast and Famine\n    category: equipment\n    why: Waiting on a slot.\ngraveyard:\n  - name: Gilded Lotus\n    category: ramp\n    why: 'Entombed: too slow for a deck that wants its mana on turn two.'\n",
   "handwritten": "slug: handwritten\nname: Written By Hand\nstatus: built  # the cards are sleeved up\narchetype: midrange\ncommander:\n  - Goreclaw, Terror of Qal Sisma\nbracket: 4\nstrategy: >-\n  Cast the biggest thing that will still resolve, and then cast a bigger one.\n  The commander is the discount; everything else is the payoff.\n\nnotes:\n  mulligan: >-\n    Keep any seven with two lands and a way to spend the third turn. Ship a\n    hand that cannot cast the commander by turn five.\n  pitfalls: >-\n    The deck folds to a wrath it cannot rebuild through, so hold one threat\n    back once the board is ahead.\n\ncards:\n\n  # ---- RAMP 2\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  - name: Cultivator Colossus\n    category: ramp\n    why: >-\n      Draws the land drops the curve is built on.\n\n  # ---- THREATS 2\n  - name: Regal Behemoth\n    category: threat\n    why: >-\n      A monarch that also doubles the mana.\n\n  - name: Vorinclex, Voice of Hunger\n    category: threat\n    why: >-\n      The mana denial the deck wins through.\n\n  # ---- LANDS 95\n  - name: Forest\n    category: land\n    qty: 95\n    why: >-\n      Green, and there is nothing else to be.\n\nswap_board: []\n\ngraveyard: []\n",
   "wide": "slug: wide\nname: Wide Indentation\nstatus: theoretical\nstage: draft\ncommander:\n    - Goreclaw, Terror of Qal Sisma\nthemes:\n    - stompy\n    - big-mana\ncards:\n    - name: Sol Ring\n      category: ramp\n      scryfall_id: c3a4b2d1-1111-4222-8333-444455556666\n      mana_cost: \"{1}\"\n      why: >-\n        An override on each side, so a swap has both to drop.\n    - name: Regal Behemoth\n      category: threat\n      why: ''\n    - name: Forest\n      category: land\n      qty: 97\n      why: >-\n        Green, and there is nothing else to be.\nswap_board:\n    - name: Rhystic Study\n      category: card-advantage\n      why: >-\n        Waiting on a slot it will never get in mono-green.\ngraveyard:\n    - name: Gilded Lotus\n      category: ramp\n      why: >-\n        Entombed: too slow for a deck that wants its mana on turn two.\n",
-  "tight": "slug: tight\nname: Tight Dash\nstatus: built\nstage: curated\ncommander:\n  - Goreclaw, Terror of Qal Sisma\ncards:\n  -  name: Sol Ring\n     category: ramp\n     why: >-\n       Two mana on turn one, and it always has been.\n  -  name: Regal Behemoth\n     category: threat\n     why: >-\n       A monarch that also doubles the mana.\n  -  name: Forest\n     category: land\n     qty: 97\n     why: >-\n       Green, and there is nothing else to be.\n"
+  "tight": "slug: tight\nname: Tight Dash\nstatus: built\nstage: curated\ncommander:\n  - Goreclaw, Terror of Qal Sisma\ncards:\n  -  name: Sol Ring\n     category: ramp\n     why: >-\n       Two mana on turn one, and it always has been.\n  -  name: Regal Behemoth\n     category: threat\n     why: >-\n       A monarch that also doubles the mana.\n  -  name: Forest\n     category: land\n     qty: 97\n     why: >-\n       Green, and there is nothing else to be.\n",
+  "noted": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
  },
  "cases": [
   {
@@ -7698,6 +7699,689 @@
      },
      "ok": true,
      "want": "slug: tight\nname: Tight Dash\nstatus: built\nstage: curated\ncommander:\n  - Goreclaw, Terror of Qal Sisma\ncards:\n  -  name: Sol Ring\n     category: ramp\n     why: >-\n       Two mana on turn one, and it always has been.\n  -  name: Regal Behemoth\n     category: threat\n     why: >-\n       A monarch that also doubles the mana.\n  -  name: Forest\n     category: land\n     qty: 97\n     why: >-\n       Green, and there is nothing else to be.\n"
+    }
+   ]
+  },
+  {
+   "deck": "noted",
+   "chain": 0,
+   "steps": [
+    {
+     "op": "add_card",
+     "args": {
+      "name": "Llanowar Reborn",
+      "category": "ramp",
+      "why": "Filed beside the cards it belongs with."
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n  - name: Llanowar Reborn\n    category: ramp\n    why: Filed beside the cards it belongs with.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "add_card",
+     "args": {
+      "name": "Rhystic Study",
+      "category": "card-advantage",
+      "why": "A category this deck did not have, so it lands at the end."
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n  - name: Llanowar Reborn\n    category: ramp\n    why: Filed beside the cards it belongs with.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n  - name: Rhystic Study\n    category: card-advantage\n    why: A category this deck did not have, so it lands at the end.\n"
+    },
+    {
+     "op": "add_card",
+     "args": {
+      "name": "Black Lotus",
+      "category": "ramp",
+      "why": "Onto the board, not into the 99.",
+      "list_key": "swap_board"
+     },
+     "ok": false,
+     "error": "no `swap_board:` block in this deck file"
+    },
+    {
+     "op": "add_card",
+     "args": {
+      "name": "Snow-Covered Forest",
+      "category": "land",
+      "why": "Several of them.",
+      "qty": 4
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n  - name: Llanowar Reborn\n    category: ramp\n    why: Filed beside the cards it belongs with.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n  - name: Snow-Covered Forest\n    category: land\n    qty: 4\n    why: Several of them.\n  - name: Rhystic Study\n    category: card-advantage\n    why: A category this deck did not have, so it lands at the end.\n"
+    }
+   ]
+  },
+  {
+   "deck": "noted",
+   "chain": 1,
+   "steps": [
+    {
+     "op": "add_card",
+     "args": {
+      "name": "Sol Ring",
+      "category": "ramp",
+      "why": "Twice."
+     },
+     "ok": false,
+     "error": "'Sol Ring' is already in the deck; change its quantity or rationale instead of adding a second entry"
+    },
+    {
+     "op": "add_card",
+     "args": {
+      "name": "Gyome, Master Chef",
+      "category": "threat",
+      "why": "The commander is outside the 99."
+     },
+     "ok": false,
+     "error": "'Gyome, Master Chef' is the commander, which sits outside the 99"
+    },
+    {
+     "op": "add_card",
+     "args": {
+      "name": "",
+      "category": "ramp",
+      "why": "No name."
+     },
+     "ok": false,
+     "error": "a card needs a name"
+    },
+    {
+     "op": "add_card",
+     "args": {
+      "name": "Mox Emerald",
+      "category": "",
+      "why": "No category."
+     },
+     "ok": false,
+     "error": "a card needs a category"
+    },
+    {
+     "op": "add_card",
+     "args": {
+      "name": "Mox Jet",
+      "category": "ramp",
+      "why": ""
+     },
+     "ok": false,
+     "error": "a card in a curated deck needs a `why`; refusing to invent one"
+    },
+    {
+     "op": "add_card",
+     "args": {
+      "name": "Mox Ruby",
+      "category": "ramp",
+      "why": "Zero.",
+      "qty": 0
+     },
+     "ok": false,
+     "error": "quantity must be at least 1"
+    },
+    {
+     "op": "add_card",
+     "args": {
+      "name": "Mox Pearl",
+      "category": "ramp",
+      "why": "Elsewhere.",
+      "list_key": "sideboard"
+     },
+     "ok": false,
+     "error": "cards live in cards or swap_board, not 'sideboard'"
+    }
+   ]
+  },
+  {
+   "deck": "noted",
+   "chain": 2,
+   "steps": [
+    {
+     "op": "remove_card",
+     "args": {
+      "name": "Sol Ring"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "remove_card",
+     "args": {
+      "name": "Forest"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards: []\n\n  # ---- RAMP 1\n\n  # ---- LANDS 98\n"
+    },
+    {
+     "op": "remove_card",
+     "args": {
+      "name": "Forest"
+     },
+     "ok": false,
+     "error": "no card entry named 'Forest'"
+    },
+    {
+     "op": "remove_card",
+     "args": {
+      "name": "Not In This Deck"
+     },
+     "ok": false,
+     "error": "no card entry named 'Not In This Deck'"
+    }
+   ]
+  },
+  {
+   "deck": "noted",
+   "chain": 3,
+   "steps": [
+    {
+     "op": "entomb_card",
+     "args": {
+      "name": "Sol Ring"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\ngraveyard:\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n"
+    },
+    {
+     "op": "return_card",
+     "args": {
+      "name": "Sol Ring"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n"
+    },
+    {
+     "op": "entomb_card",
+     "args": {
+      "name": "Sol Ring"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\ngraveyard:\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n"
+    },
+    {
+     "op": "entomb_card",
+     "args": {
+      "name": "Forest"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards: []\n\n  # ---- RAMP 1\n\n  # ---- LANDS 98\ngraveyard:\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n"
+    },
+    {
+     "op": "exile_card",
+     "args": {
+      "name": "Sol Ring"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards: []\n\n  # ---- RAMP 1\n\n  # ---- LANDS 98\ngraveyard:\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "return_card",
+     "args": {
+      "name": "Forest"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n\n  # ---- RAMP 1\n\n  # ---- LANDS 98\n"
+    },
+    {
+     "op": "return_card",
+     "args": {
+      "name": "Forest"
+     },
+     "ok": false,
+     "error": "'Forest' is not in the graveyard"
+    },
+    {
+     "op": "exile_card",
+     "args": {
+      "name": "Forest"
+     },
+     "ok": false,
+     "error": "'Forest' is not in the graveyard"
+    }
+   ]
+  },
+  {
+   "deck": "noted",
+   "chain": 4,
+   "steps": [
+    {
+     "op": "set_card_field",
+     "args": {
+      "name": "Sol Ring",
+      "field": "category",
+      "value": "utility"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: utility\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_card_field",
+     "args": {
+      "name": "Sol Ring",
+      "field": "qty",
+      "value": 3
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: utility\n    why: >-\n      Two mana on turn one, and it always has been.\n    qty: 3\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_card_field",
+     "args": {
+      "name": "Sol Ring",
+      "field": "qty",
+      "value": 1
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: utility\n    why: >-\n      Two mana on turn one, and it always has been.\n    qty: 1\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_card_field",
+     "args": {
+      "name": "Sol Ring",
+      "field": "why",
+      "value": "A rewritten rationale, long enough that PyYAML has to fold it across more than one line and pick its own quoting."
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: utility\n    why: A rewritten rationale, long enough that PyYAML has to fold it across more than one line and\n      pick its own quoting.\n    qty: 1\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_card_field",
+     "args": {
+      "name": "Sol Ring",
+      "field": "why",
+      "value": "yes"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: utility\n    why: 'yes'\n    qty: 1\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_card_field",
+     "args": {
+      "name": "Sol Ring",
+      "field": "art",
+      "value": "0aae2e33-0000-4000-8000-000000000000"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: utility\n    why: 'yes'\n    qty: 1\n    art: 0aae2e33-0000-4000-8000-000000000000\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_card_field",
+     "args": {
+      "name": "Sol Ring",
+      "field": "art",
+      "value": ""
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: utility\n    why: 'yes'\n    qty: 1\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_card_field",
+     "args": {
+      "name": "Sol Ring",
+      "field": "art",
+      "value": "not-a-uuid"
+     },
+     "ok": false,
+     "error": "'not-a-uuid' is not a Scryfall printing id. It should look like a UUID; the deck page's art picker sets this for you."
+    },
+    {
+     "op": "set_card_field",
+     "args": {
+      "name": "Sol Ring",
+      "field": "qty",
+      "value": 0
+     },
+     "ok": false,
+     "error": "quantity must be at least 1; remove the card instead"
+    },
+    {
+     "op": "set_card_field",
+     "args": {
+      "name": "Sol Ring",
+      "field": "name",
+      "value": "Nope"
+     },
+     "ok": false,
+     "error": "'name' is not settable; choose one of category, qty, why, art"
+    },
+    {
+     "op": "set_card_field",
+     "args": {
+      "name": "Sol Ring",
+      "field": "category",
+      "value": "  "
+     },
+     "ok": false,
+     "error": "a card needs a category"
+    }
+   ]
+  },
+  {
+   "deck": "noted",
+   "chain": 5,
+   "steps": [
+    {
+     "op": "replace_card",
+     "args": {
+      "old_name": "Sol Ring",
+      "new_name": "Mana Crypt",
+      "why": "Faster, and the damage is a cost this deck can pay."
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Mana Crypt\n    category: ramp\n    why: Faster, and the damage is a cost this deck can pay.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "replace_card",
+     "args": {
+      "old_name": "Mana Crypt",
+      "new_name": "Mana Vault",
+      "why": "Moved as well as swapped.",
+      "category": "utility"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Mana Vault\n    category: utility\n    why: Moved as well as swapped.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "replace_card",
+     "args": {
+      "old_name": "Mana Vault",
+      "new_name": "Sol Ring",
+      "why": "   "
+     },
+     "ok": false,
+     "error": "a replacement needs a `why`; refusing to invent one"
+    },
+    {
+     "op": "replace_card",
+     "args": {
+      "old_name": "Not Here",
+      "new_name": "Sol Ring",
+      "why": "Missing."
+     },
+     "ok": false,
+     "error": "no card entry named 'Not Here'"
+    }
+   ]
+  },
+  {
+   "deck": "noted",
+   "chain": 6,
+   "steps": [
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "status",
+      "value": "built"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "bracket",
+      "value": 4
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nbracket: 4\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "pilot",
+      "value": "Aaron"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\npilot: Aaron\nbracket: 4\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "pilot",
+      "value": ""
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\npilot: ''\nbracket: 4\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "commander_art",
+      "value": "0aae2e33-0000-4000-8000-000000000000"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\npilot: ''\ncommander_art: 0aae2e33-0000-4000-8000-000000000000\nbracket: 4\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "themes",
+      "value": [
+       "stompy",
+       "ramp"
+      ]
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\npilot: ''\ncommander_art: 0aae2e33-0000-4000-8000-000000000000\nbracket: 4\nthemes:\n  - stompy\n  - ramp\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "themes",
+      "value": "stompy, midrange, stompy"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\npilot: ''\ncommander_art: 0aae2e33-0000-4000-8000-000000000000\nbracket: 4\nthemes:\n  - stompy\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "themes",
+      "value": []
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\npilot: ''\ncommander_art: 0aae2e33-0000-4000-8000-000000000000\nbracket: 4\nthemes: []\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "stage",
+      "value": "draft"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: draft\ncommander:\n  - Gyome, Master Chef\npilot: ''\ncommander_art: 0aae2e33-0000-4000-8000-000000000000\nbracket: 4\nthemes: []\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "stage",
+      "value": "curated"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\npilot: ''\ncommander_art: 0aae2e33-0000-4000-8000-000000000000\nbracket: 4\nthemes: []\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    }
+   ]
+  },
+  {
+   "deck": "noted",
+   "chain": 7,
+   "steps": [
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "archetype",
+      "value": "combo"
+     },
+     "ok": false,
+     "error": "the archetype is a reading of the themes now (ADR 37): declare a strategy word there instead -- aggro, midrange, control, combo -- and the worst-piloted one declared becomes the deck's board"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "commander",
+      "value": "Somebody Else"
+     },
+     "ok": false,
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "bracket",
+      "value": 9
+     },
+     "ok": false,
+     "error": "bracket runs from 1 to 5"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "bracket",
+      "value": "four"
+     },
+     "ok": false,
+     "error": "bracket must be a number, not 'four'"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "status",
+      "value": "shelved"
+     },
+     "ok": false,
+     "error": "status must be one of built, theoretical, not 'shelved'"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "pilot",
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+     },
+     "ok": false,
+     "error": "a pilot name runs at most 40 characters; 'xxxxxxxxxxxxxxxxxxxx'… is 41"
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "commander_art",
+      "value": "nope"
+     },
+     "ok": false,
+     "error": "'nope' is not a Scryfall printing id. It should look like a UUID; the deck page's art picker sets this for you, and `mtglab decks set <slug> --art <set-code>` takes a set code and looks the id up."
+    },
+    {
+     "op": "set_deck_field",
+     "args": {
+      "field": "themes",
+      "value": [
+       "not-a-theme"
+      ]
+     },
+     "ok": false,
+     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+    }
+   ]
+  },
+  {
+   "deck": "noted",
+   "chain": 8,
+   "steps": [
+    {
+     "op": "set_note",
+     "args": {
+      "key": "mulligan",
+      "value": "Keep any seven with two lands and something to do with them; ship a hand that cannot cast the commander by turn five."
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and something to do with them; ship a hand\n    that cannot cast the commander by turn five.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_note",
+     "args": {
+      "key": "mulligan",
+      "value": "Shorter now."
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Shorter now.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_note",
+     "args": {
+      "key": "politics",
+      "value": "Say nothing about the commander until it is already resolved."
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Shorter now.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n  politics: >-\n    Say nothing about the commander until it is already resolved.\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_note",
+     "args": {
+      "key": "weird",
+      "value": "colon: and # hash, plus braces {G}{W}"
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Shorter now.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n  politics: >-\n    Say nothing about the commander until it is already resolved.\n  weird: >-\n    colon: and # hash, plus braces {G}{W}\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_note",
+     "args": {
+      "key": "",
+      "value": "No key."
+     },
+     "ok": false,
+     "error": "a note needs a key"
+    },
+    {
+     "op": "set_note",
+     "args": {
+      "key": "not a key",
+      "value": "Spaces."
+     },
+     "ok": false,
+     "error": "'not a key' is not a usable note key; use letters, digits and underscores"
+    },
+    {
+     "op": "set_note",
+     "args": {
+      "key": "empty",
+      "value": "   "
+     },
+     "ok": false,
+     "error": "a note needs text"
+    }
+   ]
+  },
+  {
+   "deck": "noted",
+   "chain": 9,
+   "steps": [
+    {
+     "op": "set_shared",
+     "args": {
+      "shared": false
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nshared: false\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_shared",
+     "args": {
+      "shared": false
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nshared: false\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_shared",
+     "args": {
+      "shared": true
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
+    },
+    {
+     "op": "set_shared",
+     "args": {
+      "shared": true
+     },
+     "ok": true,
+     "want": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\n\nnotes:\n  wincons: >-\n    Feed the table until somebody is the only one left who can afford to\n    stop eating.\n  pitfalls: >-\n    The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: >-\n    Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: |\n    T2 outlet.\n    T3 Gyome.\n    T4 the table starts asking for food.\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\n\ncards:\n\n  # ---- RAMP 1\n  - name: Sol Ring\n    category: ramp\n    why: >-\n      Two mana on turn one, and it always has been.\n\n  # ---- LANDS 98\n  - name: Forest\n    category: land\n    qty: 98\n    why: >-\n      Green, and there is nothing else to be.\n"
     }
    ]
   }

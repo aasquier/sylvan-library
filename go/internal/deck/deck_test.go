@@ -43,8 +43,16 @@ func TestFromTextReadsTheRichFixtureAsPythonDoes(t *testing.T) {
 	if d.Archetype() != "midrange" { // no class word among the themes: the legacy key answers
 		t.Fatalf("archetype %q", d.Archetype())
 	}
-	if len(d.Notes) != 3 || d.Notes["weird"] != "colon: and # hash, plus braces {G}{W} and a trailing space " {
+	if len(d.Notes) != 3 || d.NoteText("weird") != "colon: and # hash, plus braces {G}{W} and a trailing space " {
 		t.Fatalf("notes %v", d.Notes)
+	}
+	// The keys arrive in the file's order. This fixture cannot *prove* that --
+	// mulligan, politics, weird is alphabetical, so a map would pass it too --
+	// which is why the proof lives in `TestNotesKeepTheFilesOrder`, on a deck
+	// whose notes are deliberately out of alphabetical order.
+	if keys := []string{d.Notes[0].Key, d.Notes[1].Key, d.Notes[2].Key}; keys[0] != "mulligan" ||
+		keys[1] != "politics" || keys[2] != "weird" {
+		t.Fatalf("notes out of the file's order: %v", keys)
 	}
 	if len(d.Cards) != 10 || len(d.SwapBoard) != 1 || len(d.Graveyard) != 1 {
 		t.Fatalf("%d %d %d", len(d.Cards), len(d.SwapBoard), len(d.Graveyard))
