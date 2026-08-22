@@ -41,6 +41,48 @@ def test_the_committed_json_is_pyyamls_reading_of_it():
     assert committed == json.loads(parsed)
 
 
+def test_the_committed_render_oracle_is_what_pyyaml_writes_now():
+    """The Go emitter's whole gate is byte equality against this file."""
+    fresh = go_fixtures.render_render_cases()
+    assert go_fixtures.RENDER_PATH.read_text(encoding="utf-8") == fresh, (
+        f"{go_fixtures.RENDER_PATH} is stale; regenerate with "
+        "`python tests/go_fixtures.py`")
+
+
+def test_the_render_oracle_covers_every_group_it_claims_to():
+    """A corpus that quietly lost a group still passes every case left in it.
+
+    The groups are the argument for the corpus: each names a way PyYAML's
+    emitter can be reproduced wrongly, and dropping one would leave the Go
+    side proving less while reporting the same green.
+    """
+    cases = go_fixtures.render_cases()
+    groups = {c["group"] for c in cases}
+    assert groups == {
+        "resolver-lookalikes", "resolver-near-misses", "indicators",
+        "whitespace", "prose", "names", "control", "width-sweep",
+        "unicode-width", "int", "list", "bool"}
+    # Breadth, not just presence: the sweep is what catches a fold point one
+    # column out, and it is the group most likely to be trimmed for size.
+    assert sum(c["group"] == "width-sweep" for c in cases) >= 500
+    assert len(cases) >= 2000
+
+
+def test_the_render_oracle_records_both_sides_of_the_resolver():
+    """Quoting everything would pass the look-alikes and fail the near misses.
+
+    `why: 'yes'` and `why: 1e3` are both correct and they differ only in what
+    PyYAML's resolver says about the value; a corpus holding only the first
+    kind would accept a port that never asked.
+    """
+    rendered = {(c["key"], c["value"], c["fold"]): c["want"]
+                for c in go_fixtures.render_cases() if c["kind"] == "str"}
+    assert rendered[("why", "yes", False)] == ["      why: 'yes'"]
+    assert rendered[("why", "1e3", False)] == ["      why: 1e3"]
+    assert rendered[("why", "12", False)] == ["      why: '12'"]
+    assert rendered[("why", "12a", False)] == ["      why: 12a"]
+
+
 def test_the_fixture_round_trips_through_the_deck_model():
     """The fixture is a real deck to the model, not only to the parser."""
     from mtglab.decks.model import Deck
