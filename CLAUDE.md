@@ -570,7 +570,38 @@ go/                       the Go module (ADR 38; module path
                           lives now: three packages had each transcribed the
                           ladder by hand and frozen it at a different rung,
                           and two of them broke the day `model_tier` was
-                          first read. The contract
+                          first read. **internal/pyrand is CPython's
+                          `random.Random`, bit for bit** (2026-08-22) --
+                          Phase 5's named tail risk pulled forward and
+                          closed, and a library rather than a route: it
+                          flips nothing and nothing calls it yet. It exists
+                          because a seed is a promise -- Tier 1's every run,
+                          the tarot deal the browser holds a seed for, the
+                          Wheel's spin -- and a backend that merely shuffled
+                          *well* would deal a newcomer a different spread
+                          across the cutover. The three things a
+                          reimplementation gets wrong are all documented and
+                          all skippable: `random.Random(n)` seeds through
+                          `abs(n)` and `init_by_array` (NOT `init_genrand`,
+                          and the key grows a word at 2**32 and at 2**64),
+                          `getrandbits` fills words least-significant-first,
+                          and `_randbelow` rejects on `n.bit_length()` --
+                          not `(n-1)`'s. Held to CPython by
+                          `testdata/draws.json`, which `tests/go_fixtures.py`
+                          writes from a real interpreter: 20 seeds, the raw
+                          `genrand_uint32` stream recorded APART from every
+                          method that consumes it (so a failure says which
+                          half is wrong), `random()` compared as
+                          `Float64bits` rather than to a tolerance, and a
+                          replay of the reference run's whole 99,274-draw
+                          stream -- Tier 1 draws through `shuffle` and
+                          nothing else, so its randomness is checked before
+                          the engine that consumes it is written.
+                          Byte-identical under 3.11 and 3.12, and CI
+                          re-proves that on every matrix leg because nothing
+                          in the corpus names an interpreter. `sample()` is
+                          named in the plan and has NO CALLER; it is not
+                          there. The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
