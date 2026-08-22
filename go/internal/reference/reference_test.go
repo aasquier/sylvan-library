@@ -127,6 +127,20 @@ func TestTheModelVocabularyIsWhatTheGateSpeaks(t *testing.T) {
 	}
 }
 
+func TestTheShelvesAreWhatTheModulesHold(t *testing.T) {
+	sh := Runtime()
+	if sh.Symbols.CDN == "" || sh.Symbols.Code != "[0-9A-Z]{1,10}" || sh.Symbols.MaxBytes != 65536 {
+		t.Fatalf("symbols %+v", sh.Symbols)
+	}
+	if len(sh.OCR.Assets) != 4 || sh.OCR.CacheStamp == "" || sh.OCR.Assets["worker.min.js"].Digest == "" {
+		t.Fatalf("ocr %+v", sh.OCR)
+	}
+	if len(sh.Cardmotion.Effects) != 3 || len(sh.Cardmotion.Effects["depth-drift"].Fingerprint) != 16 ||
+		len(sh.Cardmotion.Servable) != 4 {
+		t.Fatalf("cardmotion %+v", sh.Cardmotion)
+	}
+}
+
 func TestArchetypeIndexFollowsThePilotedOrder(t *testing.T) {
 	if ArchetypeIndex("aggro") != 0 || ArchetypeIndex("combo") != 3 || ArchetypeIndex("cedh") != -1 {
 		t.Fatal("ArchetypeIndex is not ARCHETYPES' order")

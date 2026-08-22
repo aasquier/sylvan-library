@@ -28,6 +28,7 @@ import (
 	"sync"
 
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/shelves"
 )
 
 // Config is what the ported routes need. It grew with the families: the
@@ -47,6 +48,9 @@ type Config struct {
 	// AdminEmail is MTGLAB_ADMIN_EMAIL, resolved to the maintainer's handle
 	// through app.db for a signed-in caller (ADR 17, ADR 22); never rendered.
 	AdminEmail string
+	// Shelves are the three runtime caches under the data directory; nil is
+	// an instance with none, where every shelf route is a 404.
+	Shelves *shelves.Shelves
 }
 
 // API holds the ported routes' dependencies.
@@ -57,6 +61,7 @@ type API struct {
 	dbPath     string
 	decksDir   string
 	adminEmail string
+	shelves    *shelves.Shelves
 
 	lazy   sync.Mutex
 	lazyDB *sql.DB
@@ -68,7 +73,7 @@ func New(cfg Config) *API {
 		cfg.Logger = slog.Default()
 	}
 	return &API{log: cfg.Logger, pool: cfg.Pool, db: cfg.AppDB, dbPath: cfg.AppDBPath,
-		decksDir: cfg.DecksDir, adminEmail: cfg.AdminEmail}
+		decksDir: cfg.DecksDir, adminEmail: cfg.AdminEmail, shelves: cfg.Shelves}
 }
 
 // Route is one ported route: a method, a path template in the syntax
@@ -113,6 +118,13 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/artifacts", Handler: a.deckArtifacts},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/artifacts/{name}", Handler: a.deckArtifact},
 		{Method: http.MethodGet, Pattern: "/api/colors/progress", Handler: a.challengeProgress},
+		// The runtime shelves (the fourth family, the read spine's last): a
+		// mana symbol, a reading-engine file, a card-art derivative's status
+		// and one of its files.
+		{Method: http.MethodGet, Pattern: "/api/symbols/{code}.svg", Handler: a.symbolSVG},
+		{Method: http.MethodGet, Pattern: "/api/ocr/{name}", Handler: a.ocrAsset},
+		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}", Handler: a.artMotionStatus},
+		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}/{filename}", Handler: a.artMotionFile},
 	}
 }
 

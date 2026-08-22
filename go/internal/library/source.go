@@ -150,7 +150,16 @@ func (f *FileSource) Slugs(context.Context) ([]string, error) {
 	return out, nil
 }
 
+// path is `<root>/<slug>/deck.yaml`, or ErrNotFound. A slug is one path
+// segment by construction -- the door proxies any request whose path is
+// not already canonical, so `..` never arrives -- and it is held to that
+// here too, so a source used from somewhere other than a route cannot be
+// walked out of its root: anything with a separator, or that is only dots,
+// is simply not a deck.
 func (f *FileSource) path(slug string) (string, error) {
+	if slug == "" || strings.Trim(slug, ".") == "" || strings.ContainsAny(slug, `/\`) {
+		return "", ErrNotFound{Slug: slug}
+	}
 	p := filepath.Join(f.Root, slug, "deck.yaml")
 	if info, err := os.Stat(p); err != nil || !info.Mode().IsRegular() {
 		return "", ErrNotFound{Slug: slug}

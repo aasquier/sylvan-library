@@ -39,6 +39,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/api"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/shelves"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -65,6 +66,9 @@ type Config struct {
 	Pool *pool.Pool
 	// DecksDir is the file tier's root (MTGLAB_DECKS_DIR).
 	DecksDir string
+	// DataDir is MTGLAB_DATA_DIR: the three runtime shelves live under its
+	// `cache/`. Empty means no shelves, and every shelf route a 404.
+	DataDir string
 	// AdminEmail is MTGLAB_ADMIN_EMAIL, resolved to the maintainer's handle
 	// through app.db when a caller is signed in (ADR 17, ADR 22); never
 	// rendered.
@@ -110,8 +114,12 @@ func New(cfg Config) (*Door, error) {
 	}
 	d.static = site
 	d.proxy = newProxy(cfg.Upstream, cfg.Logger)
+	var shelf *shelves.Shelves
+	if cfg.DataDir != "" {
+		shelf = shelves.New(cfg.DataDir, nil, cfg.Logger)
+	}
 	ported := api.New(api.Config{Logger: cfg.Logger, Pool: cfg.Pool, AppDB: d.db,
-		AppDBPath: cfg.AppDB, DecksDir: cfg.DecksDir, AdminEmail: cfg.AdminEmail})
+		AppDBPath: cfg.AppDB, DecksDir: cfg.DecksDir, AdminEmail: cfg.AdminEmail, Shelves: shelf})
 	table, err := newRouteTable(ported.Routes(), ported.Proxied())
 	if err != nil {
 		return nil, err

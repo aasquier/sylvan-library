@@ -721,4 +721,29 @@ func TestPathValuesReachTheHandler(t *testing.T) {
 			t.Errorf("%s matched", miss)
 		}
 	}
+	// A parameter with a literal suffix: `/api/symbols/{code}.svg`.
+	var code string
+	suffixed, err := newRouteTable([]api.Route{{Method: "GET", Pattern: "/api/symbols/{code}.svg",
+		Handler: func(_ http.ResponseWriter, r *http.Request) { code = r.PathValue("code") }}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req = httptest.NewRequest("GET", "/api/symbols/W.svg", nil)
+	if h, ok := suffixed.match(req); !ok {
+		t.Fatal("W.svg did not match")
+	} else {
+		h.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	if code != "W" {
+		t.Fatalf("code %q", code)
+	}
+	for _, miss := range []string{"/api/symbols/W", "/api/symbols/.svg", "/api/symbols/W.png", "/api/symbols/W.svg/x"} {
+		if _, ok := suffixed.match(httptest.NewRequest("GET", miss, nil)); ok {
+			t.Errorf("%s matched the suffixed parameter", miss)
+		}
+	}
+	if _, err := newRouteTable([]api.Route{{Method: "GET", Pattern: "/api/x/{a}{b}",
+		Handler: func(http.ResponseWriter, *http.Request) {}}}, nil); err == nil {
+		t.Error("two parameters in one segment were accepted")
+	}
 }

@@ -106,8 +106,11 @@ Where it stands, kept here so a fresh session knows the frontier:
   suggest, the mana parser, the file and SQL tiers behind `Library`
   (ADR 22), the log's read side — and the third family: `/api/decks`, the
   deck and its `validate`/`stats`/`suggestions`/`commander`/`printings`/
-  `log`/`artifacts` reads, and `/api/colors/progress`. Left for the read
-  spine: the shelves (symbols, OCR, cardmotion).
+  `log`/`artifacts` reads, and `/api/colors/progress`. **Then the shelves**
+  (`go/internal/shelves`: the symbols, the pinned OCR files, the card-art
+  derivatives, configured by the generated `shelves.json`) — the fourth
+  family, and the read spine whole: every read-only route under `/api` is
+  the door's. **Next: Phase 4, the writes and the log.**
 
 ### The next phase — the Simulator learns (decided 2026-08-20)
 

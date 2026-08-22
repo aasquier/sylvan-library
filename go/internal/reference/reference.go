@@ -47,6 +47,9 @@ var tarotloreFile []byte
 //go:embed data/model.json
 var modelFile []byte
 
+//go:embed data/shelves.json
+var shelvesFile []byte
+
 // Color is one of the five, and what it wants.
 type Color struct {
 	Code  string `json:"code"`
@@ -194,6 +197,43 @@ type Model struct {
 	GameChangerLimits map[string]*int  `json:"game_changer_limits"`
 }
 
+// OCRAsset is one file of the reading engine, pinned by digest (`ocr.Asset`).
+type OCRAsset struct {
+	URL       string `json:"url"`
+	Digest    string `json:"digest"`
+	Size      int64  `json:"size"`
+	MediaType string `json:"media_type"`
+}
+
+// Effect is one card-art effect as the serving tier needs it: the
+// fingerprint the build wrote into `attribution.json`, computed by Python
+// (`cardmotion/effects.py:Effect.fingerprint`) and not re-derived here.
+type Effect struct {
+	Fingerprint string `json:"fingerprint"`
+	NeedsDepth  bool   `json:"needs_depth"`
+}
+
+// RuntimeShelves is the three runtime shelves' configuration (`symbols.py`, `ocr.py`,
+// `cardmotion/cache.py` + `effects.py`): where the mana symbols come from
+// and the shape a code may take, the reading engine's pinned files and its
+// versioned cache stamp, and the effects table with Python's fingerprints.
+type RuntimeShelves struct {
+	Symbols struct {
+		CDN      string `json:"cdn"`
+		Code     string `json:"code"`
+		MaxBytes int64  `json:"max_bytes"`
+	} `json:"symbols"`
+	OCR struct {
+		CacheStamp string              `json:"cache_stamp"`
+		MaxBytes   int64               `json:"max_bytes"`
+		Assets     map[string]OCRAsset `json:"assets"`
+	} `json:"ocr"`
+	Cardmotion struct {
+		Servable []string          `json:"servable"`
+		Effects  map[string]Effect `json:"effects"`
+	} `json:"cardmotion"`
+}
+
 var (
 	colorsJSON, glossaryJSON, themesJSON []byte
 
@@ -203,6 +243,7 @@ var (
 	shelves    Shelves
 	tarot      TarotLore
 	model      Model
+	shelf      RuntimeShelves
 	byKey      = map[string]*Combination{}
 )
 
@@ -213,6 +254,7 @@ func init() {
 	mustCompact("lore.json", loreFile, &shelves)
 	mustCompact("tarotlore.json", tarotloreFile, &tarot)
 	mustCompact("model.json", modelFile, &model)
+	mustCompact("shelves.json", shelvesFile, &shelf)
 	for i := range taxonomy.Combinations {
 		c := &taxonomy.Combinations[i]
 		if _, dup := byKey[c.Key]; dup {
@@ -264,6 +306,9 @@ func Tarot() *TarotLore { return &tarot }
 
 // Deck is the deck model's vocabulary, typed. Read-only.
 func Deck() *Model { return &model }
+
+// Runtime is the runtime shelves' configuration. Read-only.
+func Runtime() *RuntimeShelves { return &shelf }
 
 // IsCategory is `category in model.CATEGORIES`.
 func IsCategory(word string) bool {
