@@ -333,8 +333,13 @@ src/mtglab/
                           the oracle text, because Scryfall's `produced_mana`
                           names colours and never amounts: until 2026-08-21
                           **Sol Ring produced one mana** and every deck's
-                          acceleration was understated
-  sim/cache.py            memoised Tier 1 results, keyed on compiled input
+                          acceleration was understated. Ported to
+                          go/internal/sim/compile 2026-08-22, engine only --
+                          Python still compiles every deck a route simulates
+  sim/cache.py            memoised Tier 1 results, keyed on compiled input.
+                          Ported to go/internal/sim/cache 2026-08-22, engine
+                          only, and the two runtimes' rows deliberately SIT
+                          APART -- see the go/ entry below
   sim/tier1/engine.py     Monte Carlo goldfish
   sim/karsten.py          Tier 1.5, the closed form: hypergeometric coloured
                           source requirements, a regression land count and a
@@ -375,7 +380,8 @@ src/mtglab/
                           Its verdict is `flat` measured **against the
                           default**, never against the grid's range -- the
                           grid deliberately holds rules nobody would play, so
-                          a spread-based verdict would never fire
+                          a spread-based verdict would never fire. Ported to
+                          go/internal/sim/mulligan 2026-08-22, engine only
   sim/tier3/              the Forge bridge: .dck export, coverage, run, parse;
                           plus the hosted half (ADR 35) -- wire.py (what
                           crosses the private network, decks as deck.yaml
@@ -749,19 +755,104 @@ go/                       the Go module (ADR 38; module path
                           once, so at four or more mulligans it bottomed a card
                           too few. Nine of ten deliberate mutations die against
                           the corpus; the tenth is an equivalent mutant and
-                          says so in the code. Two absences are deliberate:
+                          says so in the code. One absence is deliberate:
                           `SimSummary.report()` is `cli.py`'s text table, which
-                          no route reads; and `spells_through` is **not** in
-                          the corpus. **That absence's stated reason expired
-                          the same day it was written** and is corrected here:
-                          it was "the value is a fact about the interpreter",
-                          which was true while the method said `sum`, and #240
-                          made it `fsum` in the same change. It is correctly
-                          rounded now, so it is the same number everywhere and
-                          the corpus could take it; the absence is an absence.
-                          That is the same trap the closed forms hit in
-                          `curve.py`, found twice in one day from opposite
-                          directions.
+                          no route reads. **This paragraph named a second
+                          absence and was wrong twice, in two directions, on
+                          the same day.** It first said `spells_through` was
+                          kept out of the corpus *because* it sums floats and
+                          CPython's `sum` is compensated from 3.12 and naive
+                          before it -- true of the old code, and #240 changed
+                          the code in the same session, making it `math.fsum`
+                          (the fix `curve.py` took the same day from the
+                          opposite direction). #249 then corrected the reason
+                          and kept the absence: *"it is the same number
+                          everywhere and the corpus could take it; the absence
+                          is an absence."* **It is not.** `spells_through`'s
+                          value is in `tier1.json` -- 42 totals across seven
+                          runs, under `runs[].through[].spells`, recorded as
+                          `repr` text, and the generator's own comment says it
+                          "can be recorded at all only because that sum is
+                          `fsum` now". Since `sim/mulligan` crossed there are
+                          258 more, as Float64bits. Both renderings are
+                          byte-identical under 3.11 and 3.12, verified by
+                          rendering under each and diffing -- which is the
+                          claim the original reason was protecting, now
+                          checked rather than arranged. Two lessons, and the
+                          second is the sharper: **a reason for an absence
+                          expires when the code it describes is fixed**, and
+                          **correcting a claim's reason is not the same as
+                          re-checking the claim** -- the second pass read the
+                          sentence and the diff, never the corpus.
+                          **The rest of the simulator engine followed the same
+                          day, and flipped nothing either.**
+                          internal/sim/compile is `sim/compile.py` -- the
+                          package `internal/sim`'s own comment was written
+                          around ("when it is ported it lands here"). Both of
+                          its contract behaviours cross intact: a dropped card
+                          **shrinks the deck silently** unless the report says
+                          so, and `ManaProduced` reads the amount off the
+                          **oracle text**. Held to Python by 60 oracle texts
+                          (every real one read out of the pool and pasted
+                          verbatim), nine hand-built pool records, and nine
+                          decks compiled against the 21-card pool. Three
+                          things it found. **A deck where not one name
+                          resolves is refused as `PoolRequired`, not
+                          `NothingToSimulate`** -- `get_cards` returns only
+                          what it found, so an empty mapping cannot be told
+                          from an absent pool; a wart, reproduced rather than
+                          fixed, and pinned in both runtimes. **`category` is
+                          "utility" and Go's zero value is ""** -- invisible
+                          to every tier, visible in the ADR 18 cache key
+                          alone. And **four mutations survived the deck
+                          corpus outright**, because the pool holds no
+                          artifact-fronted DFC with a creature back, no land
+                          that is also a creature, no fetchland, and nothing
+                          whose `produced_mana` carries a string Scryfall
+                          would never send -- the hand-built records exist for
+                          exactly those four. internal/sim/mulligan is the
+                          33-rule grid, whose `Flat` verdict is measured
+                          **against the default** and never against the
+                          spread; its corpus needed **two decks built for it**,
+                          because across ten real decks at seven sample sizes
+                          and six seeds the winner was never once tied, so
+                          nothing could observe which way the mulligan-rate
+                          tie-break runs. internal/sim/cache is ADR 18, and it
+                          answers the question this phase had to answer
+                          deliberately: **with both runtimes live, a
+                          Go-computed row and a Python-computed row for the
+                          same deck and seed SIT APART.** Different keys, both
+                          in `sim_cache`, neither able to serve the other --
+                          which is the fingerprint doing its job, since two
+                          runtimes are the most extreme engine change there
+                          is and a colliding key would serve the other
+                          runtime's number under this one's name. The
+                          mechanical half is stronger than the prudential
+                          one: a collision could not be arranged honestly,
+                          because Go would have to hash `engine.py`'s bytes
+                          and the container has no Python after Phase 8. Go's
+                          fingerprint is a hash of **embedded Go source** --
+                          five packages, each carrying a `source.go`: tier1,
+                          mana, sim, pyfloat and pyrand. The last three are
+                          named here where Python's list names nothing: the
+                          compiled card sits inside `engine.py`, which Python
+                          covers by hashing that one file, and `random` and
+                          `math.fsum` are CPython's own and cannot change
+                          under a running interpreter. **That sentence said
+                          four packages on the day it was written**, drafted
+                          while `pyfloat` still sat inside `internal/sim`
+                          (#249 moved it out) -- the fourth completeness
+                          claim in this file to rot, in a file carrying three
+                          warnings about them. The only guard is
+                          `engineSources` itself, since a package's own embed
+                          test is satisfied on BOTH sides when a file leaves
+                          it, so `tests/test_packaging.py` now fails when a
+                          fingerprinted package is not named here. The
+                          corpus records the **payload string** beside the
+                          key, because all three ways `encoding/json` differs
+                          from `json.dumps` present as the same opaque digest
+                          -- HTML escaping, `ensure_ascii` (the pool holds
+                          Bösium Strip and Déjà Vu), and float rendering.
                           **The two generic job routes did NOT follow the
                           registry** (examined 2026-08-22): GET /api/jobs and
                           GET /api/jobs/{job_id} own no state -- they are the
@@ -1538,7 +1629,7 @@ sets in. That peak is the answer.
 
 **An invalid deck is simulated, not refused -- and every result says so.**
 Decided 2026-08-21 with Aaron. Refusing was the obvious call and is the wrong
-one: two of the six decks here deliberately fail the gate on a banned card, a
+one: one of the six decks here deliberately fails the gate on a banned card, a
 deck mid-import fails it by construction, and the simulator is the tool
 somebody reaches for to *fix* a deck, so refusing removes the diagnosis at
 exactly the moment it is wanted (commandment 2). Instead every Tier 1 and
@@ -1861,6 +1952,14 @@ written there: *a sentence in this file asserting a fact about the decks is a
 claim to re-check against `mtglab decks validate`, not a fact to inherit.*
 These are recorded as prose precisely because no test can read the deck files
 (ADR 30), which is exactly why they rot.
+
+**And the correction itself only landed here**, which is worth one more
+sentence because it is a different failure from the one above. The simulator
+section said *"two of the six decks here deliberately fail the gate"* for a
+further day (fixed 2026-08-22), because 2026-08-21 corrected the paragraph that
+*owns* the fact and not the paragraph that merely *cites* it. So: **a fact
+corrected in one place is a fact to grep for**, and this file cites its own
+counts across sections that never mention each other.
 
 **Goreclaw's banned card is not a test fixture and cannot be one.** `decks/`
 is not in git, so CI has never seen that deck; the invalid-deck path is

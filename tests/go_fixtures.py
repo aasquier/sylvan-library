@@ -49,6 +49,7 @@ encoding; it is not a card pool redistribution (ADR 6, rule 5).
 from __future__ import annotations
 
 import base64
+import dataclasses
 import hashlib
 import json
 import math
@@ -1952,6 +1953,7 @@ def write() -> None:
     castability = mana_cases()
     MANA_PATH.write_text(_compact_json(castability) + "\n", encoding="utf-8")
     print(f"wrote {castability['cases']} castability cases into {MANA_PATH}")
+    write_sim_engine()
 
 
 # ------------------------------------------------------------------ pyrand
@@ -3995,6 +3997,873 @@ def mana_cases() -> dict[str, Any]:
 
 def render_mana_cases() -> str:
     return _compact_json(mana_cases()) + "\n"
+
+
+# ---------------------------------------------------------- the compiler
+#
+# `sim/compile.py`, held to Go by two corpora in one file: the three text
+# readers on their own, and whole decks compiled against the 21-card pool.
+#
+# The text cases matter more than they look. `mana_produced` is the function
+# that made Sol Ring produce one mana for the life of this project, and it is
+# read off prose -- so the corpus is prose, and **every string below marked
+# with a card name was read out of the real pool on 2026-08-22 and pasted
+# verbatim**, never typed from memory (rule 1 applies to test data; see
+# `tiny_pool`'s own docstring making the same commitment). The generator needs
+# no pool of its own, which is what lets it run in CI.
+
+COMPILE_PATH = ROOT / "go" / "internal" / "sim" / "compile" / "testdata" / "compile.json"
+
+#: `(card, oracle_text)` read from the pool. The cards are the ones
+#: `mana_produced`'s docstring argues about, plus the land shapes
+#: `enters_tapped` distinguishes and the ramp shapes `fetches_lands` does.
+POOL_TEXTS: list[tuple[str, str]] = [
+    ("Sol Ring", "{T}: Add {C}{C}."),
+    ("Mana Vault",
+     ("This artifact doesn't untap during your untap step.\n"
+     "At the beginning of your upkeep, you may pay {4}. If you do, untap this "
+     "artifact.\nAt the beginning of your draw step, if this artifact is "
+     "tapped, it deals 1 damage to you.\n{T}: Add {C}{C}{C}.")),
+    ("Gilded Lotus", "{T}: Add three mana of any one color."),
+    ("Arcane Signet",
+     "{T}: Add one mana of any color in your commander's color identity."),
+    ("Talisman of Progress",
+     "{T}: Add {C}.\n{T}: Add {W} or {U}. This artifact deals 1 damage to you."),
+    ("Wooded Bastion", "{T}: Add {C}.\n{G/W}, {T}: Add {G}{G}, {G}{W}, or {W}{W}."),
+    ("Ketria Triome",
+     ("({T}: Add {G}, {U}, or {R}.)\nThis land enters tapped.\n"
+     "Cycling {3} ({3}, Discard this card: Draw a card.)")),
+    ("Grim Monolith",
+     ("This artifact doesn't untap during your untap step.\n"
+     "{T}: Add {C}{C}{C}.\n{4}: Untap this artifact.")),
+    ("Nykthos, Shrine to Nyx",
+     ("{T}: Add {C}.\n{2}, {T}: Choose a color. Add an amount of mana of that "
+     "color equal to your devotion to that color. (Your devotion to a color is "
+     "the number of mana symbols of that color in the mana costs of permanents "
+     "you control.)")),
+    ("Ashnod's Altar", "Sacrifice a creature: Add {C}{C}."),
+    ("Phyrexian Tower", "{T}: Add {C}.\n{T}, Sacrifice a creature: Add {B}{B}."),
+    ("Deadly Dispute",
+     ("As an additional cost to cast this spell, sacrifice an artifact or "
+     "creature.\nDraw two cards and create a Treasure token. (It's an artifact "
+     "with \"{T}, Sacrifice this token: Add one mana of any color.\")")),
+    ("Cultivate",
+     ("Search your library for up to two basic land cards, reveal those cards, "
+     "put one onto the battlefield tapped and the other into your hand, then "
+     "shuffle.")),
+    ("Nature's Lore",
+     ("Search your library for a Forest card, put that card onto the "
+     "battlefield, then shuffle.")),
+    ("Three Visits",
+     ("Search your library for a Forest card, put it onto the battlefield, then "
+     "shuffle.")),
+    ("Skyshroud Claim",
+     ("Search your library for up to two Forest cards, put them onto the "
+     "battlefield, then shuffle.")),
+    ("Sakura-Tribe Elder",
+     ("Sacrifice this creature: Search your library for a basic land card, put "
+     "that card onto the battlefield tapped, then shuffle.")),
+    ("Rampant Growth",
+     ("Search your library for a basic land card, put that card onto the "
+     "battlefield tapped, then shuffle.")),
+    ("Temple of Plenty",
+     ("This land enters tapped.\nWhen this land enters, scry 1. (Look at the "
+     "top card of your library. You may put that card on the bottom.)\n"
+     "{T}: Add {G} or {W}.")),
+    ("Hallowed Fountain",
+     ("({T}: Add {W} or {U}.)\nAs this land enters, you may pay 2 life. If you "
+     "don't, it enters tapped.")),
+    ("Rootbound Crag",
+     ("This land enters tapped unless you control a Mountain or a Forest.\n"
+     "{T}: Add {R} or {G}.")),
+    ("Birds of Paradise", "Flying\n{T}: Add one mana of any color."),
+    ("Llanowar Elves", "{T}: Add {G}."),
+    ("Command Tower",
+     "{T}: Add one mana of any color in your commander's color identity."),
+    ("Wastes", "{T}: Add {C}."),
+    ("Dark Ritual", "Add {B}{B}{B}."),
+    ("Black Lotus", "{T}, Sacrifice this artifact: Add three mana of any one color."),
+    ("Chromatic Lantern",
+     ("Lands you control have \"{T}: Add one mana of any color.\"\n"
+     "{T}: Add one mana of any color.")),
+    ("Ancient Tomb", "{T}: Add {C}{C}. This land deals 2 damage to you."),
+    ("City of Brass",
+     ("Whenever this land becomes tapped, it deals 1 damage to you.\n"
+     "{T}: Add one mana of any color.")),
+    ("Sanctum of Eternity",
+     ("{T}: Add {C}.\n{2}, {T}: Return target commander you own from the "
+     "battlefield to your hand. Activate only during your turn.")),
+]
+
+#: Strings nobody printed on a card, each aimed at a branch the real texts
+#: cannot reach. They are labelled `constructed` in the corpus so nothing here
+#: can be mistaken for a claim about a card.
+CONSTRUCTED_TEXTS: list[tuple[str, str]] = [
+    ("empty", ""),
+    ("no add at all", "Flying, trample"),
+    ("add but not mana", "{T}: Add a +1/+1 counter to target creature."),
+    ("add with no colon and no period", "Add {R}{R}"),
+    ("colon at the very end", "Sacrifice this artifact:"),
+    ("the cost is dearer than the mana", "{G}{G}{G}, {T}: Add {G}."),
+    ("a second ability out-produces the first",
+     "{T}: Add {W}.\n{T}: Add {W}{W}{W}{W}."),
+    ("an amount word past the first token", "{T}: Add mana three of any color."),
+    ("an amount word that is not in the table",
+     "{T}: Add six mana of any one color."),
+    ("the tapped clause with old templating",
+     "Bloodstained Mire enters the battlefield tapped."),
+    ("tapped, and a shock clause on another line",
+     "This land enters tapped.\nYou may pay 2 life instead."),
+    ("tapped unless, upper case",
+     "THIS LAND ENTERS TAPPED UNLESS YOU CONTROL A SWAMP."),
+    ("a fetch that names no land", ("Search your library for a card, put it "
+                                  "onto the battlefield, then shuffle.")),
+    ("a fetch to the hand only",
+     "Search your library for a Forest card, put it into your hand, then shuffle."),
+    ("a fetch that says up to two",
+     ("Search your library for up to two Plains cards, put them onto the "
+     "battlefield, then shuffle.")),
+    ("a symbol that is not mana", "{T}, {Q}: Add {C}."),
+    # The substring test, above the floor. A single such symbol is invisible
+    # -- one mana and zero mana both floor to one -- so each of these has to
+    # move a number that is already above it. A mutation survived without
+    # them, which is the whole reason they are here.
+    ("a hybrid half that is a substring of WUBRGC", "{T}: Add {WU}{WU}."),
+    ("a hybrid half that is not", "{T}: Add {UW}{UW}."),
+    ("a substring-ish symbol in the activation cost",
+     "{WU}, {T}: Add {C}{C}{C}."),
+    # `{}` matches nothing -- the pattern wants one character or more -- so
+    # the only way to reach an EMPTY half is a symbol that is just the
+    # separator, where `"" in "WUBRGC"` is Python's answer and `part == "W"`
+    # would not be.
+    ("a symbol that is only a separator", "{T}: Add {/}{/}{/}."),
+    ("a separator symbol in the activation cost", "{/}, {T}: Add {C}{C}."),
+    ("a braces pair with nothing in it", "{}, {T}: Add {C}{C}."),
+    ("a numeric symbol in the add clause", "{T}: Add {2}."),
+    ("a run with no comma beats the alternatives",
+     "{T}: Add {C}{C}, {G}, or {W}."),
+]
+
+
+def compile_text_cases() -> list[dict[str, Any]]:
+    """Every text reader's answer for every string above.
+
+    All three in one record per string, because they read the same text and a
+    corpus split three ways would let a case be dropped from one of them
+    silently.
+    """
+    from mtglab.sim import compile as sim_compile
+    out = []
+    for source, texts in (("pool", POOL_TEXTS), ("constructed", CONSTRUCTED_TEXTS)):
+        for label, text in texts:
+            out.append({
+                "source": source,
+                "label": label,
+                "text": text,
+                "enters_tapped": sim_compile.enters_tapped(text),
+                "mana_produced": sim_compile.mana_produced(text),
+                "fetches_lands": sim_compile.fetches_lands(text),
+            })
+    return out
+
+
+def _compiled_card_json(card: SimCard) -> dict[str, Any]:
+    """A compiled card with **every** field written, defaults included.
+
+    `_card_json` above omits a field holding its default, which is right for a
+    corpus of decks somebody wrote by hand. This one is the compiler's own
+    output, and the field that makes the difference is `category`: Python's
+    `SimCard` defaults it to "utility" and `compile_one` never assigns it, so
+    the natural Go port leaves the zero value "" -- invisible to every tier,
+    and visible in the ADR 18 cache key, which serialises it. Writing it out
+    is what makes the corpus able to say so.
+    """
+    return {
+        "name": card.name,
+        "cost": {
+            "generic": card.cost.generic,
+            "pips": [sorted(p) for p in card.cost.pips],
+            "phyrexian": [sorted(p) for p in card.cost.phyrexian],
+            "has_x": card.cost.has_x,
+        },
+        "category": card.category,
+        "is_land": card.is_land,
+        "enters_tapped": card.enters_tapped,
+        "produces": [{"colors": sorted(s.colors), "amount": s.amount}
+                     for s in card.produces],
+        "produce_delay": card.produce_delay,
+        "fetches_lands": card.fetches_lands,
+    }
+
+
+def compile_deck_cases() -> list[dict[str, Any]]:
+    """Whole decks compiled against the 21-card pool, and the refusals.
+
+    Each case is the deck's YAML text plus Python's report, so the Go test
+    parses the same text, builds the same pool from `pooltest`, and must
+    produce the same library in the same order -- the order being real input,
+    since `qty` expansion and Tier 1's shuffle both read it.
+    """
+    import tiny_pool
+    from mtglab.cards import db
+    from mtglab.sim import compile as sim_compile
+
+    def nothing_resolves() -> Deck:
+        """Every card invented, and a commander the pool DOES know.
+
+        The commander is what makes this `NothingToSimulate` rather than
+        `PoolRequired`: `get_cards` returns only what it found, so a deck where
+        not one single name resolves hands the compiler an **empty mapping**,
+        and `if not cards` cannot tell that from "this machine has no pool".
+        See `empty-lookup` below, which is that case and reports the other
+        error. A wart, reproduced rather than fixed -- the two runtimes have to
+        agree, and changing which exception a deck raises is a decision for the
+        surface that renders it.
+        """
+        d = tiny_pool.mono_green_deck(clean=True)
+        d.slug, d.name = "nothing-resolves", "Nothing In The 99 Resolves"
+        d.cards = [CardEntry(f"Invented Card {i}", "utility", "Nothing knows it.")
+                   for i in range(5)]
+        return d
+
+    def empty_lookup() -> Deck:
+        d = tiny_pool.mono_green_deck(clean=True)
+        d.slug, d.name = "empty-lookup", "Not One Name Resolves"
+        d.commander = ["Not A Real Commander"]
+        d.cards = [CardEntry(f"Invented Card {i}", "utility", "Nothing knows it.")
+                   for i in range(5)]
+        return d
+
+    def half_unknown() -> Deck:
+        d = tiny_pool.mono_green_deck(clean=True)
+        d.slug, d.name = "half-unknown", "Half Unknown"
+        d.cards.insert(2, CardEntry("Invented Card A", "ramp", "Absent."))
+        d.cards.insert(9, CardEntry("Invented Card B", "threat", "Absent too."))
+        return d
+
+    def unknown_commander() -> Deck:
+        d = tiny_pool.mono_green_deck(clean=True)
+        d.slug, d.name = "unknown-commander", "Unknown Commander"
+        d.commander = ["Not A Real Commander"]
+        return d
+
+    def no_commander() -> Deck:
+        d = tiny_pool.mono_green_deck(clean=True)
+        d.slug, d.name = "no-commander", "No Commander At All"
+        d.commander = []
+        return d
+
+    def commander_in_the_99() -> Deck:
+        """The gate refuses this; the compiler has no opinion about it.
+
+        It is here for the one thing no legal deck can show: the commander is
+        compiled **again**, as its own object, even when a card of the same
+        name is in the library. Tier 1 asks `chosen is commander`, so a port
+        that reused the library card would silently stop the commander being
+        castable from the command zone.
+        """
+        d = tiny_pool.mono_green_deck(clean=True)
+        d.slug, d.name = "commander-in-the-99", "Commander In The 99"
+        d.cards.insert(1, CardEntry(d.commander[0], "threat",
+                                    "The commander, again."))
+        return d
+
+    cases: list[tuple[str, str, Deck, bool]] = [
+        ("mono-green", ("the 21-card pool's own legal 99, every name resolving "
+                       "and `qty` expanding the basics"),
+         tiny_pool.mono_green_deck(clean=True), True),
+        ("banned", ("the same deck with the banned card in it -- the compiler "
+                   "has no opinion, which is the gate's job"),
+         tiny_pool.mono_green_deck(), True),
+        ("half-unknown", ("two names the pool lacks: the deck SHRINKS, and the "
+                         "report is the only thing that says so"),
+         half_unknown(), True),
+        ("unknown-commander", ("the commander alone is missing, which is its "
+                              "own field because every commander-speed figure "
+                              "is then about nothing"),
+         unknown_commander(), True),
+        ("no-commander", ("a deck declaring no commander: `commander` is None "
+                         "and `commander_unresolved` is FALSE, which is the "
+                         "distinction a `!= nil` check loses"),
+         no_commander(), True),
+        ("commander-in-the-99", ("illegal, and the only shape that shows the "
+                                "commander being compiled a second time "
+                                "rather than aliased out of the library"),
+         commander_in_the_99(), True),
+        ("nothing-resolves", ("no card in the 99 resolves, so "
+                             "`NothingToSimulate` -- named with the DECLARED "
+                             "size, which is the number that makes it "
+                             "diagnosable"),
+         nothing_resolves(), True),
+        ("empty-lookup", ("not one name resolves, so the pool mapping comes "
+                         "back EMPTY and the compiler cannot tell that from "
+                         "having no pool: `PoolRequired`, which is the wrong "
+                         "word and the right behaviour to reproduce"),
+         empty_lookup(), True),
+        ("rich", "the hand-written fixture, whose names the pool mostly lacks",
+         rich_deck(), True),
+        ("no-pool", ("the same legal 99 with no pool at all: `PoolRequired`, "
+                    "and it is checked BEFORE emptiness, because a broken "
+                    "machine and an empty deck want different answers"),
+         tiny_pool.mono_green_deck(clean=True), False),
+    ]
+
+    out = []
+    with tempfile.TemporaryDirectory() as tmp:
+        pool_path = tiny_pool.build(Path(tmp) / "mtg.duckdb")
+        con = db.connect_readonly(pool_path)
+        try:
+            for name, why, deck, with_pool in cases:
+                text = deck.dump()
+                parsed = Deck.from_text(text, slug=deck.slug)
+                names = parsed.commander + [c.name for c in parsed.cards]
+                cards = db.get_cards(con, names) if with_pool else None
+                case: dict[str, Any] = {"name": name, "why": why,
+                                        "with_pool": with_pool, "yaml": text}
+                try:
+                    report = sim_compile.compile_report(parsed, cards)
+                except sim_compile.NothingToSimulate as exc:
+                    case["error"] = "nothing_to_simulate"
+                    case["message"] = str(exc)
+                except sim_compile.PoolRequired as exc:
+                    case["error"] = "pool_required"
+                    case["message"] = str(exc)
+                else:
+                    case["report"] = {
+                        "library": [_compiled_card_json(c) for c in report.library],
+                        "commander": (None if report.commander is None
+                                      else _compiled_card_json(report.commander)),
+                        "unresolved": list(report.unresolved),
+                        "declared_size": report.declared_size,
+                        "simulated_size": report.simulated_size,
+                        "commander_unresolved": report.commander_unresolved,
+                        "complete": report.complete,
+                    }
+                out.append(case)
+        finally:
+            con.close()
+    return out
+
+
+#: Card shapes the 21-card pool does not hold, each of which decides one line
+#: of `compile_one` and none of which any deck fixture can reach. Written as
+#: pool records rather than as decks, because what they exercise is the
+#: *reading of a record* and building a deck around each would be four more
+#: 99-card fixtures to say four things.
+#:
+#: Every one is here because a mutation survived without it. The type lines are
+#: shaped like Scryfall's -- a `//` between faces -- and the oracle text is
+#: from the real cards named in the label where there is one.
+COMPILE_RECORDS: list[tuple[str, dict[str, Any]]] = [
+    ("a creature on the BACK of a mana artifact",
+     {"name": "Front Rock // Back Beast", "mana_cost": "{2}",
+      "type_line": "Artifact // Creature — Beast", "layout": "transform",
+      "oracle_text": "{T}: Add {C}{C}.", "produced_mana": ("C",)}),
+    ("a mana creature, front and back",
+     {"name": "Elf Front // Elf Back", "mana_cost": "{G}",
+      "type_line": "Creature — Elf Druid // Creature — Elf Warrior",
+      "layout": "transform", "oracle_text": "{T}: Add {G}.",
+      "produced_mana": ("G",)}),
+    ("a land that is also a creature (Dryad Arbor's shape)",
+     {"name": "Arbor Shape", "mana_cost": None,
+      "type_line": "Land Creature — Forest Dryad",
+      "oracle_text": "{T}: Add {G}.", "produced_mana": ("G",)}),
+    ("a fetchland, which is net ZERO lands",
+     {"name": "Fetch Shape", "mana_cost": None, "type_line": "Land",
+      "oracle_text": "{T}, Pay 1 life, Sacrifice this land: Search your "
+                     "library for a Forest or Plains card, put it onto the "
+                     "battlefield, then shuffle.",
+      "produced_mana": ()}),
+    ("a sorcery that makes Treasure, so Scryfall reports produced mana",
+     {"name": "Treasure Maker", "mana_cost": "{1}{B}", "type_line": "Sorcery",
+      "oracle_text": "Create a Treasure token.",
+      "produced_mana": ("W", "U", "B", "R", "G")}),
+    ("an instant that makes mana",
+     {"name": "Ritual Shape", "mana_cost": "{B}", "type_line": "Instant",
+      "oracle_text": "Add {B}{B}{B}.", "produced_mana": ("B",)}),
+    ("an enchantment that makes mana, which IS a permanent",
+     {"name": "Enchanted Source", "mana_cost": "{2}{G}",
+      "type_line": "Enchantment", "oracle_text": "{T}: Add {G}{G}.",
+      "produced_mana": ("G",)}),
+    ("a modal DFC whose back is a land",
+     {"name": "Spell Front // Land Back", "mana_cost": "{1}{U}",
+      "type_line": "Instant // Land", "layout": "modal_dfc",
+      "oracle_text": "Draw a card.\n{T}: Add {U}.", "produced_mana": ("U",)}),
+    # `p in "WUBRGC"` is a SUBSTRING test in Python, not set membership, so an
+    # empty string passes it and "X" does not. Scryfall never sends either;
+    # this records what the filter actually is, because the natural Go port
+    # (`p == "W" || ...`) would answer differently and no real card would say
+    # so.
+    ("a produced-mana list with an empty entry and an unproducible one",
+     {"name": "Odd Producer", "mana_cost": "{3}", "type_line": "Artifact",
+      "oracle_text": "{T}: Add {C}.", "produced_mana": ("C", "", "X")}),
+]
+
+
+def compile_record_cases() -> list[dict[str, Any]]:
+    """`compile_one` over records the pool cannot supply.
+
+    A one-card deck each, so the answer is the compiled card itself and the
+    reader can see which field the label is about.
+    """
+    import dataclasses as _dc
+
+    from mtglab.sim import compile as sim_compile
+
+    out = []
+    for label, fields in COMPILE_RECORDS:
+        rec = _dc.replace(
+            _record(fields["name"], fields.get("mana_cost")),
+            type_line=fields["type_line"],
+            oracle_text=fields["oracle_text"],
+            produced_mana=tuple(fields.get("produced_mana", ())),
+            layout=fields.get("layout", "normal"),
+        )
+        deck = Deck(slug="one-card", name="One Card", commander=[],
+                    cards=[CardEntry(rec.name, "utility", "The only card.")])
+        library, _ = sim_compile.compile_deck(deck, {rec.name: rec})
+        out.append({
+            "label": label,
+            "record": {
+                "name": rec.name,
+                "mana_cost": rec.mana_cost,
+                "type_line": rec.type_line,
+                "oracle_text": rec.oracle_text,
+                "produced_mana": list(rec.produced_mana),
+                "layout": rec.layout,
+                "is_land": rec.is_land,
+            },
+            "card": _compiled_card_json(library[0]),
+        })
+    return out
+
+
+def compile_cases() -> dict[str, Any]:
+    return {
+        "note": ("`sim/compile.py`, written by `python tests/go_fixtures.py`. "
+                 "Every `pool` text was read out of the real card pool and "
+                 "pasted verbatim; every `constructed` one is a string nobody "
+                 "printed, aimed at a branch the real ones cannot reach."),
+        "texts": compile_text_cases(),
+        "records": compile_record_cases(),
+        "decks": compile_deck_cases(),
+    }
+
+
+def render_compile_cases() -> str:
+    return _rows_json(compile_cases()) + "\n"
+
+
+# ---------------------------------------------------------- the mulligan grid
+#
+# `sim/mulligan.py`. The grid itself is arithmetic and cheap to check; the
+# sweeps are 33 seeded Tier 1 runs apiece, which is why `games` is small here
+# -- the corpus is proving that Go ranks the same rules in the same order, not
+# re-proving Tier 1, which `tier1.json` and REFERENCE_DIGEST already did.
+
+MULLIGAN_PATH = ROOT / "go" / "internal" / "sim" / "mulligan" / "testdata" / "mulligan.json"
+
+
+def _policy_row_json(row: Any) -> dict[str, Any]:
+    """One `PolicyRow`, with every float as its bits.
+
+    Bits rather than a tolerance for the reason `karsten.json` gives: the
+    verdict is a `<` against `FLAT` and the ranking is a sort on these
+    numbers, so one ulp is a different recommended rule rather than a
+    different last decimal.
+    """
+    median = row.median_commander_turn
+    return {
+        "min_lands": row.min_lands,
+        "max_lands": row.max_lands,
+        "min_pieces": row.min_pieces,
+        "spells_through_t8": _float_bits(row.spells_through_t8),
+        "mulligan_rate": _float_bits(row.mulligan_rate),
+        "avg_mulligans": _float_bits(row.avg_mulligans),
+        # `statistics.median` answers an int for an odd count, so the type is
+        # part of the answer -- `tier1.Number` is Go's word for that.
+        "median_commander_turn": None if median is None else {
+            "is_int": isinstance(median, int) and not isinstance(median, bool),
+            "value": median if isinstance(median, int) and not isinstance(median, bool)
+            else _float_bits(median),
+        },
+        "color_screw_rate": _float_bits(row.color_screw_rate),
+        "stalled_turns": _float_bits(row.stalled_turns),
+        "describe": row.describe,
+    }
+
+
+def mulligan_extra_decks() -> dict[str, dict[str, Any]]:
+    """Decks built for this module's tie-breakers, not for the closed forms.
+
+    Kept out of `closed_form_decks` deliberately: `karsten.json` and
+    `curve.json` compute every function over every deck there, so adding two
+    would grow both corpora to say nothing about either module.
+
+    **Both exist because a mutation survived without them.** The grid's
+    ordering rules -- `max` keeping the first extreme, the sort's secondary
+    key, and `gentlest`'s half-open band -- can only be observed when two rules
+    *tie* on deployment, and across ten real decks at seven sample sizes and
+    six seeds, none ever did: the winner was always alone at the top. A
+    corpus of real decks proves the arithmetic and cannot reach the
+    comparators.
+    """
+    lands = [_sim_land(f"Forest {i}", "G") for i in range(40)]
+    return {
+        "uncastable": {
+            "why": ("40 lands and 59 spells nobody can cast inside the "
+                    "horizon, so EVERY rule deploys exactly 0.0 and the "
+                    "ranking is decided entirely by the mulligan-rate "
+                    "tie-break -- which is the only way to see which "
+                    "direction it breaks in"),
+            "library": lands + [_sim_spell(f"Colossus {i}", "{20}")
+                                for i in range(59)],
+            "commander": None,
+        },
+        "quarter-steps": {
+            "why": ("34 lands and a handful of one-drops. Run at FOUR games, "
+                    "so every deployment figure is a whole number of spells "
+                    "over four and therefore an exact multiple of 0.25 -- "
+                    "which puts rows exactly `FLAT` apart, where `< FLAT` and "
+                    "`<= FLAT` choose different `gentlest` rules. The same "
+                    "trick as `tie-breaker` in the closed forms' decks, aimed "
+                    "at a different boundary"),
+            "library": ([_sim_land(f"Forest {i}", "G") for i in range(34)]
+                        + [_sim_spell(f"One Drop {i}", "{G}") for i in range(6)]
+                        + [_sim_spell(f"Colossus {i}", "{20}")
+                           for i in range(59)]),
+            "commander": None,
+        },
+    }
+
+
+def _mulligan_sweeps() -> list[dict[str, Any]]:
+    from mtglab.sim import mulligan
+    from mtglab.sim.tier1.engine import KeepRule
+
+    decks = dict(closed_form_decks(), **mulligan_extra_decks())
+
+    # A grid that deliberately EXCLUDES the default rule, so `search`'s
+    # baseline fallback -- the branch that runs a thirty-fourth simulation --
+    # is exercised. Nothing in the standard grid can reach it.
+    off_grid = [KeepRule(min_lands=1, max_lands=6, min_mana_pieces=2),
+                KeepRule(min_lands=3, max_lands=4, min_mana_pieces=4),
+                KeepRule(min_lands=2, max_lands=6, min_mana_pieces=5)]
+
+    plan: list[tuple[str, str, str, dict[str, Any]]] = [
+        ("naya", "naya",
+         ("a real three-colour deck with a commander, where colour screw and "
+         "ramp both move the ranking"),
+         {"games": 150, "turns": 10, "seed": 7}),
+        ("esper-rocks", "esper-rocks",
+         ("rocks rather than lands, so the `min_mana_pieces` axis is the one "
+         "that separates the rules"),
+         {"games": 150, "turns": 10, "seed": 7}),
+        ("mono-green-poor", "mono-green-poor",
+         ("a deck the grid cannot rescue: most rules land within `FLAT` of the "
+         "default, which is the `flat` verdict and the `gentlest` answer"),
+         {"games": 150, "turns": 8, "seed": 11}),
+        ("all-lands", "all-lands",
+         ("every hand keeps under every rule, so every row ties and `best` is "
+         "decided purely by the grid's ORDER -- Python's `max` keeps the "
+         "first, and a sort would keep the last"),
+         {"games": 60, "turns": 6, "seed": 3}),
+        ("no-lands", "no-lands",
+         ("no hand is ever keepable, so every rule mulligans to the floor and "
+         "the whole grid ties at the bottom"),
+         {"games": 60, "turns": 6, "seed": 3}),
+        ("naya-off-grid", "naya",
+         ("an explicit rule list with the default NOT in it, which is the only "
+         "way to reach the baseline fallback"),
+         {"games": 120, "turns": 9, "seed": 5, "rules": off_grid}),
+        ("uncastable", "uncastable",
+         ("every rule deploys 0.0, so the whole ranking is the mulligan-rate "
+         "tie-break and nothing else"),
+         {"games": 120, "turns": 10, "seed": 7}),
+        ("quarter-steps", "quarter-steps",
+         ("four games, so every deployment is an exact multiple of 0.25 and "
+         "rows land exactly `FLAT` apart. The seed is 2 and it was SEARCHED "
+         "for: at that seed a row exactly `FLAT` below the best mulligans "
+         "half as often as anything inside the band, so `< FLAT` and "
+         "`<= FLAT` name different `gentlest` rules -- which is the only way "
+         "that boundary is visible from outside"),
+         {"games": 4, "turns": 10, "seed": 2}),
+    ]
+
+    out = []
+    for label, deck_name, why, kwargs in plan:
+        spec = decks[deck_name]
+        sweep = mulligan.search(spec["library"], spec["commander"], **kwargs)
+        rules = kwargs.get("rules")
+        out.append({
+            "label": label,
+            "deck": deck_name,
+            "why": why,
+            "games": sweep.games,
+            "turns": sweep.turns,
+            "seed": sweep.seed,
+            "rules": None if rules is None else [
+                {"min_lands": r.min_lands, "max_lands": r.max_lands,
+                 "min_mana_pieces": r.min_mana_pieces,
+                 "cheap_ramp_mv": r.cheap_ramp_mv,
+                 "max_mulligans": r.max_mulligans} for r in rules],
+            "rows": [_policy_row_json(r) for r in sweep.rows],
+            "best": _policy_row_json(sweep.best),
+            "baseline": _policy_row_json(sweep.baseline),
+            "spread": _float_bits(sweep.spread),
+            "gain": _float_bits(sweep.gain),
+            "flat": sweep.flat,
+            "gentlest": _policy_row_json(sweep.gentlest),
+        })
+    return out
+
+
+#: Which of `closed_form_decks` the sweeps below run over. Named here so the
+#: corpus carries those decks and only those: the file is already 33 rows per
+#: sweep, and fourteen decks nobody simulates would be most of its bytes.
+MULLIGAN_DECKS = ("naya", "esper-rocks", "mono-green-poor", "all-lands",
+                  "no-lands", "uncastable", "quarter-steps")
+
+
+def mulligan_cases() -> dict[str, Any]:
+    from mtglab.sim import mulligan
+    decks = dict(closed_form_decks(), **mulligan_extra_decks())
+    return {
+        "note": ("`sim/mulligan.py`, written by `python tests/go_fixtures.py`. "
+                 "Floats are Float64bits: the verdict is a `<` against FLAT "
+                 "and the table is a sort, so one ulp is a different "
+                 "recommendation."),
+        "decks": [
+            {"name": name,
+             "why": decks[name]["why"],
+             "library": [_card_json(c) for c in decks[name]["library"]],
+             "commander": (None if decks[name]["commander"] is None
+                           else _card_json(decks[name]["commander"]))}
+            for name in MULLIGAN_DECKS],
+        "through": mulligan.THROUGH,
+        "flat": _float_bits(mulligan.FLAT),
+        "min_lands": list(mulligan.MIN_LANDS),
+        "max_lands": list(mulligan.MAX_LANDS),
+        "min_pieces": list(mulligan.MIN_PIECES),
+        "candidates": [
+            {"min_lands": r.min_lands, "max_lands": r.max_lands,
+             "min_mana_pieces": r.min_mana_pieces,
+             "cheap_ramp_mv": r.cheap_ramp_mv, "max_mulligans": r.max_mulligans,
+             "describe": r.describe()}
+            for r in mulligan.candidates()],
+        "sweeps": _mulligan_sweeps(),
+    }
+
+
+def render_mulligan_cases() -> str:
+    return _rows_json(mulligan_cases()) + "\n"
+
+
+# ------------------------------------------------------------- the sim cache
+#
+# ADR 18's key, and the one place in this port where "equivalent JSON" is not
+# equivalent at all: the key is a sha256 over the serialised payload, so the
+# bytes are the contract. The corpus records **the payload string itself**
+# beside the key, because a mismatch in the hash alone says nothing about
+# where, and every one of the three ways Go's `encoding/json` differs from
+# Python's `json.dumps` would show up as the same opaque digest.
+#
+# It also records Python's live engine fingerprint. That makes this corpus
+# regenerate whenever `engine.py` or `mana.py` moves, which is not a nuisance
+# but the point: such an edit re-keys every stored row in `app.db`, and having
+# to run the generator is the reminder.
+
+CACHE_PATH = ROOT / "go" / "internal" / "sim" / "cache" / "testdata" / "cache.json"
+
+#: Real card names carrying non-ASCII, read out of the pool on 2026-08-22.
+#: `ensure_ascii=True` escapes each of these to `\uXXXX` and Go's encoder does
+#: not, so a library holding one would key differently in the two runtimes --
+#: which is the difference nobody would have gone looking for.
+NON_ASCII_NAMES = ["Bösium Strip", "Déjà Vu", "Círdan the Shipwright", "Dandân"]
+
+
+def _cache_inputs() -> list[dict[str, Any]]:
+    """The `(kind, run arguments)` pairs the key is computed over."""
+    from mtglab.mana import ManaCost, ManaSource
+    from mtglab.sim.tier1.engine import KeepRule, SimCard
+
+    plain = [
+        SimCard(name="Forest", cost=ManaCost(), is_land=True,
+                produces=(ManaSource(frozenset({"G"}), 1),)),
+        SimCard(name="Sol Ring", cost=ManaCost(generic=1),
+                produces=(ManaSource(frozenset({"C"}), 2),)),
+        SimCard(name="Beast", cost=ManaCost(generic=2, pips=(frozenset({"G"}),))),
+    ]
+    commander = SimCard(name="Goreclaw, Terror of Qal Sisma",
+                        cost=ManaCost(generic=3, pips=(frozenset({"G"}),)))
+    exotic = [
+        # Every escape `encode_basestring_ascii` knows, in one name.
+        SimCard(name="quote \" backslash \\ tab \t newline \n bell \x07 del \x7f"),
+        # Above the BMP, which Python writes as a surrogate PAIR.
+        SimCard(name="astral \U0001f600 and \U0010ffff"),
+        *[SimCard(name=n) for n in NON_ASCII_NAMES],
+    ]
+    shapes = [
+        SimCard(name="Hybrid", cost=ManaCost(pips=(frozenset({"G", "W"}),))),
+        SimCard(name="Phyrexian", cost=ManaCost(generic=2,
+                                                phyrexian=(frozenset({"U"}),))),
+        SimCard(name="X Spell", cost=ManaCost(generic=1, has_x=True)),
+        SimCard(name="Rainbow", produces=(ManaSource(frozenset("WUBRG"), 1),
+                                          ManaSource(frozenset({"C"}), 3))),
+        SimCard(name="Tapland", is_land=True, enters_tapped=True,
+                produces=(ManaSource(frozenset({"W", "U"}), 1),)),
+        SimCard(name="Sickly Rock", produces=(ManaSource(frozenset({"G"}), 1),),
+                produce_delay=1),
+        SimCard(name="Cultivate", cost=ManaCost(generic=2,
+                                                pips=(frozenset({"G"}),)),
+                fetches_lands=2),
+        SimCard(name="Categorised", category="ramp"),
+    ]
+    grid = sorted((r.min_lands, r.max_lands, r.min_mana_pieces)
+                  for r in _mulligan_module().candidates())
+    return [
+        {"label": "the plain shape",
+         "why": "three cards, a commander, and no extras",
+         "kind": "sim.mana", "library": plain, "commander": commander,
+         "games": 20000, "turns": 12, "keep_rule": KeepRule(), "seed": 4242,
+         "extra": None},
+        {"label": "no commander",
+         "why": "`None` renders as `null`, not as an absent field",
+         "kind": "sim.mana", "library": plain, "commander": None,
+         "games": 2000, "turns": 10, "keep_rule": KeepRule(), "seed": 7,
+         "extra": None},
+        {"label": "an empty library",
+         "why": "the compiler refuses this, and the key must still be a key",
+         "kind": "sim.lands.count", "library": [], "commander": None,
+         "games": 1, "turns": 1, "keep_rule": KeepRule(), "seed": 0,
+         "extra": None},
+        {"label": "every cost shape",
+         "why": "hybrid, Phyrexian, X, several sources, a delay, a fetch, and "
+                "the one card carrying a category the compiler never sets",
+         "kind": "sim.mana", "library": shapes, "commander": None,
+         "games": 2000, "turns": 10,
+         "keep_rule": KeepRule(min_lands=1, max_lands=6, min_mana_pieces=5,
+                               cheap_ramp_mv=3, max_mulligans=6),
+         "seed": -1, "extra": None},
+        {"label": "names JSON has to escape",
+         "why": "the ensure_ascii difference, which is the one `SetEscapeHTML` "
+                "does not cover and the one real card names actually hit",
+         "kind": "sim.mana", "library": exotic, "commander": exotic[0],
+         "games": 2000, "turns": 10, "keep_rule": KeepRule(), "seed": 1,
+         "extra": None},
+        {"label": "the policy sweep's extra",
+         "why": "`sim.policy`'s real key, carrying the whole grid, an int and "
+                "a FLOAT -- 0.25 renders through `float.__repr__`",
+         "kind": "sim.policy", "library": plain, "commander": commander,
+         "games": 2000, "turns": 10, "keep_rule": KeepRule(), "seed": 7,
+         "extra": {"grid": [list(g) for g in grid],
+                   "through": _mulligan_module().THROUGH,
+                   "flat": _mulligan_module().FLAT}},
+        {"label": "an extra whose keys are not in order",
+         "why": "`sort_keys=True` sorts them, and a Go map walk is random",
+         "kind": "sim.policy", "library": plain, "commander": None,
+         "games": 2000, "turns": 10, "keep_rule": KeepRule(), "seed": 7,
+         "extra": {"zebra": True, "alpha": None, "Middle": "text",
+                   "nested": {"b": [1, 2, 3], "a": 0.5}}},
+    ]
+
+
+def _mulligan_module() -> Any:
+    from mtglab.sim import mulligan
+    return mulligan
+
+
+def cache_cases() -> dict[str, Any]:
+    """Python's payload and key for each input, plus its engine fingerprint.
+
+    The Go test uses the recorded fingerprint to reproduce the payload byte for
+    byte, which is what makes the *other* claim precise: the two runtimes'
+    keys differ in exactly one field, deliberately, and not because two JSON
+    encoders quietly disagreed.
+    """
+    import json as _json
+
+    from mtglab.sim import cache
+
+    engine = cache.fingerprint()
+    if engine is None:
+        raise AssertionError(
+            "sim/cache.fingerprint() is None, so this corpus cannot record "
+            "what Python keys on. That means engine.py or mana.py could not "
+            "be read, which is a broken checkout rather than a fixture bug.")
+
+    cases = []
+    for spec in _cache_inputs():
+        key = cache.key(spec["kind"], library=spec["library"],
+                        commander=spec["commander"], games=spec["games"],
+                        turns=spec["turns"], keep_rule=spec["keep_rule"],
+                        seed=spec["seed"], extra=spec["extra"])
+        # The payload itself, assembled exactly as `cache.key` assembles it.
+        # Duplicated deliberately rather than exported from the module: the
+        # corpus records what the key *is*, and a helper both sides called
+        # would make a shared mistake invisible.
+        payload = {
+            "version": cache.SIM_VERSION,
+            "engine": engine,
+            "kind": spec["kind"],
+            "library": [cache._card_form(c) for c in spec["library"]],
+            "commander": (None if spec["commander"] is None
+                          else cache._card_form(spec["commander"])),
+            "games": spec["games"],
+            "turns": spec["turns"],
+            "keep_rule": dataclasses.asdict(spec["keep_rule"]),
+            "seed": spec["seed"],
+            **({"extra": dict(spec["extra"])} if spec["extra"] else {}),
+        }
+        blob = _json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                           ensure_ascii=True)
+        assert hashlib.sha256(blob.encode("utf-8")).hexdigest() == key, (
+            "this corpus reassembles the payload and no longer agrees with "
+            "`cache.key`; the two have drifted")
+        cases.append({
+            "label": spec["label"],
+            "why": spec["why"],
+            "kind": spec["kind"],
+            "library": [_compiled_card_json(c) for c in spec["library"]],
+            "commander": (None if spec["commander"] is None
+                          else _compiled_card_json(spec["commander"])),
+            "games": spec["games"],
+            "turns": spec["turns"],
+            "keep_rule": dataclasses.asdict(spec["keep_rule"]),
+            "seed": spec["seed"],
+            "extra": spec["extra"],
+            "payload": blob,
+            "key": key,
+        })
+    return {
+        "note": ("ADR 18's cache key, written by `python tests/go_fixtures.py`. "
+                 "`payload` is the exact string sha256 is taken over -- "
+                 "recorded because a digest mismatch alone cannot say WHICH of "
+                 "the three encoder differences caused it."),
+        "sim_version": cache.SIM_VERSION,
+        "max_rows": cache.MAX_ROWS,
+        "run_inputs": sorted(cache.RUN_INPUTS),
+        "run_non_inputs": sorted(cache.RUN_NON_INPUTS),
+        "engine_sources": list(cache._ENGINE_SOURCES),
+        "python_fingerprint": engine,
+        "cases": cases,
+    }
+
+
+def render_cache_cases() -> str:
+    return _rows_json(cache_cases()) + "\n"
+
+
+def write_sim_engine() -> None:
+    """The three files Phase 5's engine tail is held to. Called by `write`."""
+    for path, body, what in (
+        (COMPILE_PATH, render_compile_cases(), "the compiler"),
+        (MULLIGAN_PATH, render_mulligan_cases(), "the mulligan grid"),
+        (CACHE_PATH, render_cache_cases(), "the sim cache's key"),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body, encoding="utf-8")
+        print(f"wrote {what} into {path}")
 
 
 if __name__ == "__main__":

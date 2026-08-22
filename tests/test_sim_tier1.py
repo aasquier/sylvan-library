@@ -211,6 +211,49 @@ def test_first_spell_and_stalled_turns_are_sane():
     assert hungry.avg_stalled_turns > summary.avg_stalled_turns
 
 
+def test_median_commander_turn_is_an_int_for_an_odd_count():
+    """`statistics.median` answers two types, and both are in the digest.
+
+    An odd-length list gives `data[n // 2]` -- the element itself, an **int**
+    here, because commander turns are turn numbers. An even one gives the mean
+    of the middle pair, a float. The annotation said `float | None` until
+    2026-08-22 and mypy never caught it, because `statistics.median`'s stub is
+    loose enough to accept the claim.
+
+    Nothing asserted the runtime type until this test, which is how it went
+    unnoticed -- and the type matters rather than being pedantry:
+    `SimSummary.__repr__` renders it and `tests/test_determinism`'s
+    REFERENCE_DIGEST hashes that text, so `4` and `4.0` are different digests.
+    Coercing the value to match the old annotation would have been a change to
+    Tier 1's output disguised as a type fix. `go/internal/sim/tier1`'s
+    `Number` is the same duality, and it reproduces the digest with it.
+
+    The two counts are chosen by *how many games cast the commander at all*,
+    not by `games`, so each is asserted rather than assumed.
+    """
+    lib, cmd = build_golgari(36)
+    parities = {}
+    for games in range(20, 60):
+        summary = run(lib, cmd, games=games, turns=10, seed=3)
+        assert summary.median_commander_turn is not None
+        cast = round(games * (1 - summary.never_cast_commander))
+        parities.setdefault(cast % 2, summary.median_commander_turn)
+        if len(parities) == 2:
+            break
+    assert set(parities) == {0, 1}, (
+        "no run reached both parities, so only one branch of `median` was "
+        "exercised")
+    assert isinstance(parities[1], int) and not isinstance(parities[1], bool), (
+        f"an odd count gave {parities[1]!r}, which is not an int")
+    assert isinstance(parities[0], float), (
+        f"an even count gave {parities[0]!r}, which is not a float")
+    # And a deck that never casts its commander reports None rather than 0.
+    starved, _ = build_golgari(24)
+    empty = run(starved, SimCard(name="Uncastable", cost=parse_mana_cost("{20}")),
+                games=20, turns=3, seed=3)
+    assert empty.median_commander_turn is None
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):

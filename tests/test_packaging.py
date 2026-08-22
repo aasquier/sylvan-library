@@ -551,6 +551,7 @@ def test_no_first_party_module_is_exempt_from_strict_mypy():
 # ------------------------------------------------------ what stands at the door
 
 GO_MOD = ROOT / "go" / "go.mod"
+GO_PLAN = ROOT / "docs" / "go-migration" / "PLAN.md"
 
 
 def dockerfile_cmd() -> list[str]:
@@ -617,6 +618,71 @@ def test_the_go_module_pins_the_last_go_that_runs_on_this_mac():
     assert found.group(1) == "1.26", (
         f"the door stage builds with golang:{found.group(1)} while go.mod "
         "pins 1.26")
+
+
+def test_claude_md_names_every_fingerprinted_go_package():
+    """ADR 18's fingerprint is a list, and CLAUDE.md describes it in prose.
+
+    `sim/cache.Fingerprint` hashes one package's embedded source per entry in
+    `engineSources`, and the go/ section names them. That prose said **four**
+    packages while the code held five, from the moment it was written: it was
+    drafted while `pyfloat` still sat inside `internal/sim`, #249 moved it to
+    a package of its own, the code followed and the sentence did not.
+
+    That makes it the fourth completeness claim in a file which already
+    carries three warnings that such a claim is "a claim to re-check against
+    the code, not a fact to inherit" -- so this is the same cure the `dev`
+    extra got: the sentence is now checked rather than remembered.
+
+    It matters more here than the count suggests. `engineSources` is the
+    **only** guard against a file walking out of the key, because each
+    package's embed is held complete against its own directory, and a file
+    that leaves the package satisfies both sides of that check -- gone from
+    the directory and gone from the list -- while quietly ceasing to be
+    fingerprinted. Prose a person actually reads is the second guard, and a
+    second guard that has rotted is not one.
+    """
+    source = (ROOT / "go" / "internal" / "sim" / "cache" / "cache.go").read_text(
+        encoding="utf-8")
+    block = re.search(r"var engineSources = \[\]engineSource\{(.*?)\n\}",
+                      source, re.DOTALL)
+    assert block, "cache.go has no `engineSources` list to read"
+    packages = re.findall(r'\{"internal/(\S+?)",', block.group(1))
+    assert packages, "the `engineSources` list parsed to nothing"
+
+    want = {pkg.rsplit("/", 1)[-1] for pkg in packages}
+    spelled = {3: "three", 4: "four", 5: "five", 6: "six", 7: "seven"}
+
+    # **Both** documents, because the sentence rotted in both at once and
+    # curing one would have left the other saying four. They are phrased the
+    # same way on purpose, so one reading serves for both.
+    for label, path in (("CLAUDE.md", CLAUDE_MD),
+                        ("docs/go-migration/PLAN.md", GO_PLAN)):
+        text = path.read_text(encoding="utf-8")
+        start = text.index("fingerprint is a hash of **embedded Go source**")
+        passage = text[start:start + 1200]
+
+        # Read the ENUMERATION, not the paragraph. The prose names a package
+        # by its last path segment (`internal/sim/tier1` is "tier1"), and the
+        # surrounding sentences discuss those names too -- so a window-wide
+        # substring search passes even when the list itself has dropped one,
+        # which is exactly the mutation that proved this needed writing twice.
+        listed = re.search(r"`source\.go`:(.+?)\.\s", passage, re.DOTALL)
+        assert listed, f"{label} no longer enumerates the fingerprinted packages"
+        named = set(re.findall(r"\w+", listed.group(1).replace("\n", " "))) - {"and"}
+        assert named == want, (
+            f"`engineSources` fingerprints {sorted(want)} and {label}'s list "
+            f"names {sorted(named)}. Adding a package under the engine is a "
+            "decision to take deliberately -- say so there as well as in the "
+            "code.")
+
+        # And the count it spells out, which is the half a reader trusts
+        # without counting the names.
+        written = re.search(r"\b(three|four|five|six|seven) packages\b", passage)
+        assert written, f"{label} no longer spells out how many packages there are"
+        assert written.group(1) == spelled[len(packages)], (
+            f"{label} says {written.group(1)} packages; `engineSources` holds "
+            f"{len(packages)}")
 
 
 def test_the_route_table_is_read_by_both_doors():

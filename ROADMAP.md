@@ -118,8 +118,20 @@ Where it stands, kept here so a fresh session knows the frontier:
   and the artifacts rebuild, the renderer and its route, which is outside
   the log for a sharper reason still: a build changes no deck field, it
   derives files *from* one; and the accounts **engine**, the whole of
-  `mtglab/auth` beside its read side. **Next: the account routes**, and
-  Phase 4 is done bar the two the jobs registry blocks.
+  `mtglab/auth` beside its read side — and then the account routes,
+  eleven of the twelve, leaving Phase 4 done bar the two the jobs
+  registry blocks. **Then Phase 5, the simulator** (2026-08-22), which
+  is engine work throughout and has flipped **nothing**: the jobs
+  registry, `pyrand` (CPython's `random.Random`, bit for bit), the
+  mana solver, Tier 1.5's two closed forms, Tier 1 itself —
+  `REFERENCE_DIGEST` reproduced — and finally the compiler, the
+  mulligan grid and the ADR 18 cache, whose Go rows and Python rows
+  deliberately **sit apart**. **Next: the flips, and they are a
+  decision rather than a port.** Every job is polled through one
+  route, `GET /api/jobs/{job_id}`, so it couples all eight
+  job-submitting families and no partial order works: either all
+  eight move in one change, or the hybrid poll handler is built with
+  the first family flip. Aaron's call.
 
 ### The next phase — the Simulator learns (decided 2026-08-20)
 

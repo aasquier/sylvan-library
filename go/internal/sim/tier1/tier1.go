@@ -58,6 +58,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/aasquier/sylvan-library/go/internal/mana"
 	"github.com/aasquier/sylvan-library/go/internal/pyrand"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 )
@@ -274,28 +275,44 @@ func consume(cost sim.Cost, sources []sim.Source) ([]sim.Source, bool) {
 }
 
 // canPay is `mana.can_pay(cost, sources)` at Tier 1's one call site, inside
-// `_pick_land`'s scoring.
+// `_pick_land`'s scoring -- and since 2026-08-22 it really is that call.
 //
-// It is deliberately not a second solver. `can_pay` and `_consume` run the
-// same matching over the same units, and they agree by construction: both
-// refuse when there are fewer units than `generic + len(pips)`; both then ask
-// for a perfect matching of the pips, and failing an augmenting search for
-// any one pip is exactly "no perfect matching exists" (if no augmenting path
-// reaches a free pip, some maximum matching leaves it unmatched, so no
-// matching saturates every pip). `_consume`'s extra `len(leftovers) >=
-// generic` is implied by its own opening check, since a perfect matching uses
-// exactly `len(pips)` units. So `_consume(...) is not None` is `can_pay(...)`
-// with x_value 0, which is the only way Tier 1 asks.
+// It used to answer through `consume` instead, with an argument attached: the
+// two run the same matching over the same units and agree by construction.
+// The argument was sound and the comment ended *"when `internal/mana` grows
+// the ported `can_pay`, this becomes a call to it"*. #243 grew it, so it has,
+// and the reason for taking the trigger seriously is worth keeping: Python's
+// `_pick_land` calls `mana.can_pay`, so **delegating is the faithful port and
+// the local answer was the deviation**, however well argued. Two solvers each
+// checked against Python and neither against the other is one line of
+// reasoning away from a silent divergence.
 //
-// That is an argument, and an argument about equivalence is a thing to check
-// rather than a thing to believe -- so testdata's `consume` cases record
-// Python's `can_pay` beside Python's `_consume` for every one of them, and
-// the Go test holds this function to both. When `internal/mana` grows the
-// ported `can_pay`, this becomes a call to it and those cases become the
-// differential test between the two.
+// The equivalence it used to assert has not been thrown away -- it has been
+// promoted from an argument to a **property test**. `consume` still solves the
+// same problem for every other call site (it has to: it returns the
+// leftovers), and `TestConsumeAgreesWithCanPay` holds the two to each other
+// over random costs and pools, which is `tests/test_mana_properties.py`'s
+// `test_consume_agrees_with_can_pay` in Go.
+//
+// The conversion is the whole of the seam and it is free by design: #243 laid
+// `mana.Source` out field for field like `sim.Source`, in order, so the two
+// convert directly. `Cost` does not -- `mana.Cost` puts `HasX` before
+// `Phyrexian` -- so that one is written out.
 func canPay(cost sim.Cost, sources []sim.Source) bool {
-	_, ok := consume(cost, sources)
-	return ok
+	pool := make([]mana.Source, len(sources))
+	for i, s := range sources {
+		// Legal because the fields match name for name and type for type;
+		// Go's conversion rule ignores the struct tags `sim.Source` carries.
+		pool[i] = mana.Source(s)
+	}
+	// xValue 0: Tier 1 never casts for X, which is why `SimCard` carries
+	// `has_x` and the engine never reads it.
+	return mana.CanPay(mana.Cost{
+		Generic:   cost.Generic,
+		Pips:      cost.Pips,
+		HasX:      cost.HasX,
+		Phyrexian: cost.Phyrexian,
+	}, pool, 0)
 }
 
 // removeFirstEqual is `list.remove(card)`.
