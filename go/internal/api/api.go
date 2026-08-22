@@ -176,8 +176,9 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPost, Pattern: "/api/decks/import", Handler: a.importDeck},
 		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}", Handler: a.deleteDeck},
 		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/shared", Handler: a.setDeckShared},
-		// The artifacts rebuild (Phase 4's third flip): the five deliverables,
-		// derived from the deck rather than edited into it. A **plain route**
+		// The artifacts rebuild, and with it every route under `/api/decks` is
+		// the door's: the five deliverables, derived from the deck rather than
+		// edited into it. A **plain route**
 		// and not a job, which was measured rather than assumed -- 70-83ms
 		// warm across four real decks on the instance. Like the lifecycle
 		// above it does not go through `commit`, and for a sharper reason:

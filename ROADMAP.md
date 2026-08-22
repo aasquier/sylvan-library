@@ -117,7 +117,9 @@ Where it stands, kept here so a fresh session knows the frontier:
   delete and sharing, none of them in the log because none is in `_commit`;
   and the artifacts rebuild, the renderer and its route, which is outside
   the log for a sharper reason still: a build changes no deck field, it
-  derives files *from* one. **Next: the accounts**, and Phase 4 is done.
+  derives files *from* one; and the accounts **engine**, the whole of
+  `mtglab/auth` beside its read side. **Next: the account routes**, and
+  Phase 4 is done bar the two the jobs registry blocks.
 
 ### The next phase — the Simulator learns (decided 2026-08-20)
 

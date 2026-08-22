@@ -343,7 +343,7 @@ func TestARebuildPrunesAStaleSwapList(t *testing.T) {
 	if files["notes-of-my-own.md"] != "from before" {
 		t.Error("the rebuild swept away a file that was not a deliverable")
 	}
-	if _, present := files[artifactsSnapshot]; !present {
+	if _, present := files[artifacts.Snapshot]; !present {
 		t.Error("the snapshot is not a deliverable and must not be pruned")
 	}
 
@@ -358,8 +358,6 @@ func TestARebuildPrunesAStaleSwapList(t *testing.T) {
 		t.Errorf("the swap list is not a diff of nothing:\n%s", swaps)
 	}
 }
-
-const artifactsSnapshot = artifacts.Snapshot
 
 // `baseline` is computed by comparing the stored snapshot against the deck,
 // never a file timestamp -- so an edit makes it `different` and reverting the
