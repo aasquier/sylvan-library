@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/aasquier/sylvan-library/go/internal/deckread"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/reference"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
@@ -126,7 +127,7 @@ func (a *API) combination(w http.ResponseWriter, r *http.Request) {
 			"SELECT count(*) FROM oracle_cards WHERE "+
 				"json_extract_string(legalities, 'commander') = 'legal' AND "+
 				"len(list_filter(color_identity, x -> x NOT IN (%s))) = 0 "+
-				"AND len(color_identity) = %d", quotedList(combo.Colors), combo.Size)).Scan(&total); err != nil {
+				"AND len(color_identity) = %d", deckread.QuotedList(combo.Colors), combo.Size)).Scan(&total); err != nil {
 			return err
 		}
 		out.Pool = true

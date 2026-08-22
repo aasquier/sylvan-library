@@ -446,7 +446,7 @@ func (a *API) commanderPrintings(w http.ResponseWriter, r *http.Request) {
 				printings = append(printings, wire.OrderedMap([]wire.KV{{Key: "id", Value: id}, {Key: "set_code", Value: strings.ToUpper(pool.AsString(v[1]))},
 					{Key: "set_name", Value: pool.AsStringPtr(v[2])}, {Key: "collector_number", Value: pool.AsStringPtr(v[3])},
 					{Key: "rarity", Value: pool.AsStringPtr(v[4])}, {Key: "released_at", Value: released}, {Key: "promo", Value: pool.AsBool(v[6])},
-					{Key: "image", Value: image}, {Key: "art_crop", Value: pool.ArtCropFrom(image)}, {Key: "price_usd", Value: asFloatPtr(v[8])},
+					{Key: "image", Value: image}, {Key: "art_crop", Value: pool.ArtCropFrom(image)}, {Key: "price_usd", Value: deckread.AsFloatPtr(v[8])},
 					{Key: "selected", Value: id == selected}}))
 			}
 			return rows.Err()
