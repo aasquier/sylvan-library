@@ -481,14 +481,31 @@ go/                       the Go module (ADR 38; module path
                           tests/go_fixtures.py writes), internal/analyze,
                           internal/suggest, internal/mana (the parser),
                           internal/library (the file and SQL tiers, read
-                          side, and ADR 22's Library), internal/decklog,
-                          internal/cards (the camera reader),
+                          side, and ADR 22's Library), internal/decklog
+                          (ADR 28, both sides since Phase 4 -- and Record
+                          never fails the edit that produced it, so the loud
+                          failure is at startup and app.db is opened
+                          mode=rw, never rwc: Python owns the ladder until
+                          Phase 8), internal/cards (the camera reader),
                           internal/shelves (the three runtime caches:
                           symbols, the pinned OCR files, the card-art
                           derivatives -- configured by the generated
                           shelves.json, Python's fingerprints included),
-                          and internal/config. The contract suite runs through
-                          the door locally and in CI
+                          and internal/config. **Phase 4's engine landed
+                          2026-08-22 and flipped nothing**: internal/deckedit
+                          is decks/edit.py's nine operations, text surgery
+                          and the parse-mutate-dump oracle intact, over
+                          internal/pyyaml -- which is not a YAML writer but
+                          a *reproduction* of PyYAML's emitter, implicit
+                          resolver included, because swaps.md is a diff of
+                          deck.yaml and a differently-quoted scalar is a
+                          differently-sized edit. Both are held to Python by
+                          generated corpora (2,051 render cases, 514
+                          operation steps over eleven fixture decks, three
+                          of them written by hand because the rules that
+                          keep Goreclaw's section banners intact cannot be
+                          exercised by a machine-dumped deck). The contract
+                          suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
                           this one included — normally holds no decks at all

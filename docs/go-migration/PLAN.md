@@ -302,12 +302,23 @@ first read of the tree 2026-08-21 23:10 UTC, the fourth flip merged 00:49
 and live-and-walked between 00:55 and 01:00 — **about 1 hour 45 minutes**,
 four pull requests (#224 the prose, #225 the pool, #226 the deck reads,
 #227 the shelves), four releases, four walks on the instance. The estimate
-was ¾ of a day. What moved inside it, counted rather than felt: **~9,000
-lines of hand-written Go and ~4,000 of Go tests** across seventeen
-packages, plus ~3,000 lines of generated differential fixtures and ~230KB
-of generated JSON, against a Python read surface of the same order. The
-rate is real, it is roughly **3½–4× the ¾-day figure**, and it was measured
-on the phase this plan nominated in advance as the place to measure it.
+was ¾ of a day. What moved inside it, counted rather than felt — the Go
+module went from **1,541 lines of hand-written Go and 1,172 of tests** at
+Phase 2's merge to **9,236 and 4,051** at Phase 3's, so the phase itself
+added **~7,700 lines of Go and ~2,900 of tests** across thirteen new
+packages, beside ~3,000 lines of generated differential fixtures and
+~230KB of generated JSON, against a Python read surface of the same order.
+The rate is real, it is roughly **3½–4× the ¾-day figure**, and it was
+measured on the phase this plan nominated in advance as the place to
+measure it.
+
+(That paragraph said "~9,000 lines of hand-written Go" until it was checked
+against `git ls-tree` rather than against the working tree. Nine thousand
+is what the module *stood at* after Phase 3, Phase 2's door and spikes
+included — a cumulative figure quoted as a delta, which is the same class
+of error as the completeness claims CLAUDE.md has had to correct three
+times. The numbers above are both endpoints, so the subtraction is the
+reader's to check.)
 
 Two things stop that from licensing a smaller number for everything left.
 First, **the unit that held is the per-PR shape, not the hour** — a
