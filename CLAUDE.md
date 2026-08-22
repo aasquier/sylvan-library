@@ -1617,6 +1617,22 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
   enforced rather than remembered: `tests/test_float_sums.py` is the register
   of every float sum in the package and every integer one, exact in both
   directions, and a new `sum()` fails there until somebody says which it is.
+- **Changing how a number is computed changes the tests that recompute it.**
+  The `fsum` sweep failed CI on a test that built its own expectation with a
+  bare `sum` and compared it with `==`, so the fix broke its own test by one
+  ulp — the exact quantity the fix was about, one level up. A test that
+  compares with a **tolerance** is asking a different question and is right to
+  keep `sum`; a test that asserts **equality** has to compute the value the
+  same way the code does. `git grep` for the changed function under `tests/`
+  is the cheap check.
+- **And run the suite under `python3.11` as well, not only 3.12**, whenever
+  float arithmetic moves. That failure was invisible on 3.12 — at three terms
+  3.12's compensated `sum` already *equals* `fsum`, so the stale test passed
+  locally and went red only on CI's 3.11 leg, which then fail-fast-cancelled
+  3.12 and made a one-legged failure look like two. Rendering the Go corpora
+  under both interpreters is **not** this check: that exercises
+  `tests/go_fixtures.py`, never `tests/`. A second venv is the whole cost —
+  `uv venv --python 3.11 .venv311 && uv pip install --python .venv311/bin/python -e ".[dev]"`.
 - Go, from `go/`: `go vet`, `go test -race` and `golangci-lint run` before
   pushing — the three checks CI requires, and on this Mac all three want the
   environment the Setup section spells out (CGO on, the 1.26 toolchain on
