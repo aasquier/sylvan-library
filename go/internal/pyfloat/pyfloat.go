@@ -1,24 +1,49 @@
-package sim
-
-import (
-	"math"
-	"math/big"
-)
-
-// The three CPython float behaviours the closed forms depend on, reproduced
-// rather than approximated.
+// Package pyfloat is CPython's float arithmetic, reproduced rather than
+// approximated: `math.fsum`, both of `round`'s spellings, and the explicit
+// conversion that stops this machine improving on either.
 //
-// The reason to reproduce them at all is not tidiness. Every integer this port
-// has to agree with comes out of a `>=` against a float: `required_sources`
-// scans until `hypergeometric_at_least(...) >= target`, `reliable_turn` scans
-// until `castable_odds >= TARGET`, `_slots_to_target` scans until
-// `on_curve_odds >= target`, and `curve`'s advice branches on
+// The third of the `py*` packages, after `pyrand` (CPython's `random.Random`)
+// and `pyyaml` (PyYAML's emitter), and here for the same reason both of those
+// are: a value crosses the wire, so the port has to answer in Python's
+// dialect rather than in a better one. It lived in `internal/sim` until
+// 2026-08-22, when the float-sum sweep found the same trap in three packages
+// that are not the simulator -- `artifacts` renders a money total, `analyze`
+// sums three hypergeometrics into a served payload, `suggest` sums four
+// weighted products into a ranking key. Importing `internal/sim` from the
+// deliverables renderer would have said the renderer depends on the
+// simulator, which is false; a second transcription of Shewchuk's algorithm
+// would have been worse than either.
+//
+// The reason to reproduce these at all is not tidiness. Every integer this
+// port has to agree with comes out of a `>=` against a float:
+// `required_sources` scans until `hypergeometric_at_least(...) >= target`,
+// `reliable_turn` scans until `castable_odds >= TARGET`, `_slots_to_target`
+// scans until `on_curve_odds >= target`, and `curve`'s advice branches on
 // `abs(per_land - per_ramp) < TOO_CLOSE`. A one-ulp disagreement in any of
 // them is not a rounding difference on a screen -- it is a different land
 // count, a different reliable turn, a different row order in the shelf, or a
 // different recommendation. So the float arithmetic is matched exactly, and
 // the epsilons the differential tests pin are consequences of that rather than
 // allowances made for it.
+//
+// # Which Python, when there is more than one
+//
+// `Fsum` is the answer to a question that only has one, which is the point of
+// reaching for it. **`sum()` is not**: CPython 3.12 gave `sum()` over floats
+// compensated (Neumaier) accumulation where 3.11 adds them left to right, and
+// this project supports both, tests both in CI, and ships 3.12 in the image.
+// A Go `for ... { total += x }` reproduces **3.11**, so a port written the
+// obvious way agrees with the interpreter the container is not running. Every
+// Python site that summed floats was moved to `math.fsum` on 2026-08-22, and
+// every Go site that mirrored one was moved to `Fsum`; a naive accumulation
+// loop over floats in this module is now a bug wherever it appears beside a
+// Python `fsum`.
+package pyfloat
+
+import (
+	"math"
+	"math/big"
+)
 
 // Fsum is CPython's `math.fsum`: the correctly-rounded sum of a sequence,
 // Shewchuk's algorithm with the final half-even fix-up CPython applies.
@@ -172,7 +197,7 @@ func sign(n *big.Int) int {
 
 // Rounded is the guard against a fused multiply-add, and it is the reason
 // every `total += a * b` in these two packages is written `total +=
-// sim.Rounded(a * b)`.
+// pyfloat.Rounded(a * b)`.
 //
 // The Go specification permits an implementation to "combine multiple
 // floating-point operations into a single fused operation, possibly across

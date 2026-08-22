@@ -29,6 +29,30 @@ Similarity is a weighted sum, each part in 0..1:
 then a popularity nudge of up to 0.10 from EDHREC rank, as a tiebreak only. It
 is last and it is small on purpose: popular is not the same as correct, and a
 scorer that leads with it just recommends staples.
+
+That weighted sum is `fsum` and not `sum`, since 2026-08-22
+---------------------------------------------------------
+It was `sum`, and **`sum()` over floats is not the same function on every
+interpreter**: CPython 3.12 gave it compensated (Neumaier) accumulation where
+3.11 adds left to right. This project supports both, tests both in CI, and
+runs 3.12 in the container -- so the shortlist on the instance and the
+shortlist on a laptop were scored by two different arithmetics.
+
+One ulp of a similarity would be nothing if this were a number somebody reads.
+It is not: the score is **rounded to four places and then sorted on**, so the
+difference lands where it can be seen twice over. Swept across the reachable
+scores -- three type values, four curve values, and the small rationals the
+keyword and text overlaps can produce -- 48,350 quadruples differ between the
+two accumulations and **814 of them change `round(similarity, 4)` outright**.
+`rank` sorts on `(-score, name)`, so a changed score at the boundary either
+prints a different fourth decimal or moves a card past the one above it, and
+`limit=5` means the fifth candidate can simply vanish.
+
+`fsum` rather than pinning either interpreter's answer, for the reason
+`sim/curve.py` sets out at length: it is correctly rounded, so it is not one
+interpreter's answer at all. `_popularity`'s nudge is added outside the sum
+and always was -- one addition has nothing to accumulate -- so it is
+untouched. Found by the Go port, which had to reproduce these bytes.
 """
 
 from __future__ import annotations
@@ -36,6 +60,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
+from math import fsum
 
 from mtglab.cards import db
 from mtglab.cards.db import CardRecord, Connection
@@ -172,7 +197,10 @@ def score(target: CardRecord, candidate: CardRecord, *, why: str = "") -> Candid
         (0.15, _keyword_score(target, candidate)),
         (0.35, _text_score(target_tokens, candidate)),
     )
-    similarity = sum(weight * value for weight, value in parts)
+    # `fsum`, not `sum`: see the module docstring. This is a ranking key that
+    # is rounded to four places, so an interpreter-dependent last bit is a
+    # different fourth decimal and, at a tie, a different shortlist.
+    similarity = fsum(weight * value for weight, value in parts)
     total = similarity + 0.10 * _popularity(candidate)
 
     reasons: list[str] = []

@@ -102,6 +102,7 @@ _ORACLES = [
     ("the decklist grammar", "DECKLIST_PATH", "render_decklist_cases"),
     ("the importer", "IMPORT_PATH", "render_import_cases"),
     ("the five deliverables", "ARTIFACTS_PATH", "render_artifact_cases"),
+    ("the scorer", "SCORE_PATH", "render_score_cases"),
     ("the draw corpus", "PYRAND_PATH", "render_pyrand_cases"),
     ("the job registry", "JOBS_PATH", "render_jobs_cases"),
     ("CPython's float floor", "PYFLOAT_PATH", "render_pyfloat_cases"),

@@ -794,7 +794,43 @@ carrying into the rest of the phase. **A ported result may not be a
 insertion order, so every job result still to cross owes itself a struct with
 the fields in Python's order. And **the arithmetic on the way out is not
 neutral** — `percent` rounds half to even, which `math.Round` does not, and
-one job in eight lands on a tie. Then `pyrand`, then Tier 1
+one job in eight lands on a tie.
+
+**Its sibling hazard, and the one that has now cost three lanes in a day:
+`sum()` over floats is not the same function on every interpreter.** CPython
+3.12 gave it compensated (Neumaier) accumulation where 3.11 adds left to
+right — `sum([0.1] * 10)` is `1.0` under 3.12.13 and `0.9999999999999999`
+under 3.11.15 — and this project supports both, tests both in CI, and runs
+3.12 in the container. So the obvious Go transcription, `for … { total += x }`,
+reproduces **3.11**, which is the Python the image is not running. Read it as
+the exact counterpart of the rounding rule above: `math.Round` is not
+CPython's `round`, and a `+=` loop is not CPython's `sum`. Both are cases
+where Go's plainest spelling is a *different function*, not a worse one.
+
+Three things about it are worth carrying rather than rediscovering. **Fix it
+in Python rather than reproducing it in Go** — `math.fsum` is correctly
+rounded, so it is not either interpreter's dialect, and `pyfloat.Fsum` is
+already CPython's own algorithm on this side; a port that faithfully
+reproduced `sum` would have to pick an interpreter and be wrong on the other
+leg of the matrix. **The corpora will not find it for you**: when the sweep
+ran on 2026-08-22, three byte-exact oracles were green against naive Go —
+`artifacts.json` priced only exact halves and quarters, and all eight gate
+decks sat at land counts where the two arithmetics happen to agree — so each
+one needed a fixture *cut for the edge* (`last-bit`, `half-cent`, a new scorer
+corpus) plus a test asserting the corpus still separates `Fsum` from a running
+total, in the idiom `pyfloat_test.go` already had. And **the proof is a
+diff**: render the corpora under 3.11 and under 3.12 and compare bytes. With
+the fix reverted, exactly three files differ; with it in place, none does, and
+CI re-checks that forever because nothing in a corpus names an interpreter.
+
+`pyfloat` moved out of `internal/sim` in the same change, and the reason
+generalises: **the CPython-reproduction packages are not owned by whichever
+family needed them first.** `artifacts`, `analyze` and `suggest` all need
+`Fsum` and none of them is the simulator, so it sits beside `pyrand` and
+`pyyaml` as `go/internal/pyfloat`. A fourth family reaching for one of these
+should find a package, not a dependency on somebody else's tier.
+
+Then `pyrand`, then Tier 1
 against `REFERENCE_DIGEST`, karsten + curve to tolerance (**done 2026-08-22, and
 the tolerance came out at zero** — see §10's row and the note in §5 item
 4), the mulligan grid,

@@ -69,7 +69,7 @@
 //
 // # One ulp, and the interpreter it came from
 //
-// The two float sums in this package go through `sim.Fsum`, and the Python
+// The two float sums in this package go through `pyfloat.Fsum`, and the Python
 // they are ported from says `fsum` for the same reason -- **since
 // 2026-08-22, and the port is why**. Both said `sum` before that, and
 // CPython 3.12 gave `sum()` compensated (Neumaier) accumulation over floats
@@ -92,6 +92,7 @@ package curve
 import (
 	"math"
 
+	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 	"github.com/aasquier/sylvan-library/go/internal/sim/karsten"
 )
@@ -178,7 +179,7 @@ func ExpectedLandsInPlay(deckSize, lands, turn int, onThePlay bool) float64 {
 	if lands < top {
 		top = lands
 	}
-	// `sim.Fsum`, matching Python's `fsum` -- and that line was `sum` on both
+	// `pyfloat.Fsum`, matching Python's `fsum` -- and that line was `sum` on both
 	// sides until 2026-08-22. `sum` over floats is compensated on CPython 3.12
 	// and left to right on 3.11, so this expectation answered differently
 	// depending on the interpreter underneath it. The port found it and both
@@ -190,9 +191,9 @@ func ExpectedLandsInPlay(deckSize, lands, turn int, onThePlay bool) float64 {
 		if turn < capped {
 			capped = turn
 		}
-		terms = append(terms, sim.Rounded(float64(capped)*karsten.Exactly(deckSize, lands, seen, k)))
+		terms = append(terms, pyfloat.Rounded(float64(capped)*karsten.Exactly(deckSize, lands, seen, k)))
 	}
-	return sim.Fsum(terms)
+	return pyfloat.Fsum(terms)
 }
 
 // ExpectedRamp is mana from accelerants that are online on `turn`.
@@ -215,7 +216,7 @@ func ExpectedRamp(library []sim.Card, turn int, onThePlay bool) float64 {
 			continue
 		}
 		seen := karsten.CardsSeen(turn-p.Delay, onThePlay)
-		total += sim.Rounded(float64(p.Output) * atMostOne(float64(seen)/float64(deckSize)))
+		total += pyfloat.Rounded(float64(p.Output) * atMostOne(float64(seen)/float64(deckSize)))
 	}
 	return total
 }
@@ -302,8 +303,8 @@ func RampDistribution(library []sim.Card, turn int, onThePlay bool, extra *Piece
 			if weight == 0.0 {
 				continue
 			}
-			next[total] += sim.Rounded(weight * (1.0 - prob))
-			next[total+p.Output] += sim.Rounded(weight * prob)
+			next[total] += pyfloat.Rounded(weight * (1.0 - prob))
+			next[total+p.Output] += pyfloat.Rounded(weight * prob)
 		}
 		dist = next
 	}
@@ -380,7 +381,7 @@ func OnCurveOdds(library []sim.Card, turn int, need *int, onThePlay bool, extra 
 			// The inner sum is `Fsum` for the interpreter reason above. The
 			// outer accumulation is a loop in Python too, so it never had the
 			// problem and stays a running total.
-			total += sim.Rounded(lw * sim.Fsum(rampDist[short:]))
+			total += pyfloat.Rounded(lw * pyfloat.Fsum(rampDist[short:]))
 		}
 	}
 	return atMostOne(total)
@@ -436,9 +437,9 @@ func TypicalAccelerant(library []sim.Card, turn int) (Piece, bool) {
 		sumDelay += p.Delay
 	}
 	n := float64(len(usable))
-	cost := sim.Round(float64(sumCost) / n)
-	output := sim.Round(float64(sumOutput) / n)
-	delay := sim.Round(float64(sumDelay) / n)
+	cost := pyfloat.Round(float64(sumCost) / n)
+	output := pyfloat.Round(float64(sumOutput) / n)
+	delay := pyfloat.Round(float64(sumDelay) / n)
 	if cost < 0 {
 		cost = 0
 	}
@@ -661,9 +662,9 @@ func Curve(library []sim.Card, opts Options) ManaCurve {
 			TargetTurn:        targetTurn,
 			TargetMana:        want,
 			Target:            target,
-			Odds:              sim.RoundTo(odds, 4),
-			OddsPerLand:       sim.RoundTo(perLand, 4),
-			OddsPerRamp:       sim.RoundTo(perRamp, 4),
+			Odds:              pyfloat.RoundTo(odds, 4),
+			OddsPerLand:       pyfloat.RoundTo(perLand, 4),
+			OddsPerRamp:       pyfloat.RoundTo(perRamp, 4),
 			Recommend:         recommend,
 			Slots:             slots,
 			RampIsGeneric:     generic,

@@ -55,6 +55,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/reference"
 )
 
@@ -584,10 +585,18 @@ func SwapList(d, previous *deck.Deck, o Options) string {
 				unknown = append(unknown, name)
 			}
 		}
-		total := 0.0
+		// `pyfloat.Fsum`, matching the `math.fsum` Python spells this with --
+		// and both of them said `sum` until 2026-08-22. A `+=` loop here is
+		// CPython 3.11's `sum()`, which is not CPython 3.12's: 3.12 gave
+		// `sum()` over floats compensated accumulation, and 3.12 is what the
+		// image runs. The bytes of these five files are the product, so a
+		// total that depends on which interpreter rendered it is a defect
+		// whether or not today's prices happen to expose it.
+		amounts := make([]float64, 0, len(known))
 		for _, k := range known {
-			total += k.price
+			amounts = append(amounts, k.price)
 		}
+		total := pyfloat.Fsum(amounts)
 		lines = append(lines, "", "## Shopping list", "",
 			"| Card | Cheapest non-foil (USD) |", "| --- | ---: |")
 		// `sorted(known, key=lambda x: -x[1])` -- dearest first, and stable,

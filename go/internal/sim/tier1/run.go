@@ -3,6 +3,7 @@ package tier1
 import (
 	"sort"
 
+	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/pyrand"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 )
@@ -122,13 +123,13 @@ func (s SimSummary) WastedThrough(turn int) float64 {
 // `sim/curve.py` hit the same trap from the other direction on the same day
 // and fixed it the same way, fsum rather than pinning either interpreter's
 // answer; this follows that call rather than inventing a second one, and
-// `sim.Fsum` is already CPython's `math_fsum_impl` in Go.
+// `pyfloat.Fsum` is already CPython's `math_fsum_impl` in Go.
 func sumPrefix(xs []float64, turn int) float64 {
 	if turn < 0 {
 		turn = len(xs) + turn
 	}
 	turn = min(max(turn, 0), len(xs))
-	return sim.Fsum(xs[:turn])
+	return pyfloat.Fsum(xs[:turn])
 }
 
 // Options is `engine.run`'s keyword arguments.

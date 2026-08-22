@@ -1,0 +1,193 @@
+{
+ "note": "`suggest.score` over synthetic records, component by component. Written by `python tests/go_fixtures.py`.",
+ "why": "The weighted sum is `math.fsum` and each product is rounded on its own. A chain of `+` is CPython 3.11's `sum` rather than 3.12's, and `a*b + c*d` is what arm64 fuses into one FMADDD -- and the value is rounded to four places and then sorted on, so either difference is a different shortlist.",
+ "cases": [
+  {
+   "note": "identical everything, rank 1",
+   "target": {"name":"Target Card","type_line":"Creature — Elf","cmc":3.0,"oracle_text":"zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj","keywords":["shared00","shared01","shared02"],"edhrec_rank":null},
+   "candidate": {
+    "name": "Candidate Card",
+    "type_line": "Creature — Beast",
+    "cmc": 3.0,
+    "oracle_text": "zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zztg zzth zzti zztj",
+    "keywords": ["shared00","shared01","shared02"],
+    "edhrec_rank": 1
+   },
+   "parts": [1.0,1.0,1.0,1.0],
+   "weights": [0.3,0.2,0.15,0.35],
+   "popularity": 1.0,
+   "score": 1.1,
+   "reasons": ["same card type (Creature)","same mana value (3)","shares shared00, shared01, shared02","text: zzaa, zzab, zzac, zzad, zzae, zzaf","EDHREC rank 1"]
+  },
+  {
+   "note": "permanent for permanent, nothing shared",
+   "target": {"name":"Target Card","type_line":"Creature — Elf","cmc":4.0,"oracle_text":"zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zzak zzal","keywords":["onlytarget00","onlytarget01"],"edhrec_rank":null},
+   "candidate": {"name":"Candidate Card","type_line":"Artifact","cmc":4.0,"oracle_text":"zztg zzth zzti zztj","keywords":["onlycand00","onlycand01"],"edhrec_rank":null},
+   "parts": [0.4,1.0,0.0,0.0],
+   "weights": [0.3,0.2,0.15,0.35],
+   "popularity": 0.0,
+   "score": 0.32,
+   "reasons": ["same mana value (4)"]
+  },
+  {
+   "note": "no target keywords, curve three apart",
+   "target": {"name":"Target Card","type_line":"Instant","cmc":2.0,"oracle_text":"zzaa zzab zzac zzad zzae zzaf zzag zzah","keywords":[],"edhrec_rank":null},
+   "candidate": {"name":"Candidate Card","type_line":"Creature — Elf","cmc":5.0,"oracle_text":"zzaa zzab zzac zzad zztg zzth zzti zztj","keywords":["onlycand00","onlycand01","onlycand02"],"edhrec_rank":500},
+   "parts": [0.0,0.0,0.0,0.5],
+   "weights": [0.3,0.2,0.15,0.35],
+   "popularity": 0.46020599913279625,
+   "score": 0.221,
+   "reasons": ["text: zzaa, zzab, zzac, zzad","EDHREC rank 500"]
+  },
+  {
+   "note": "same type, one off the curve",
+   "target": {
+    "name": "Target Card",
+    "type_line": "Sorcery",
+    "cmc": 6.0,
+    "oracle_text": "zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zzak zzal zzam zzan zzao zzap zzaq zzar zzas zzat",
+    "keywords": ["shared00","onlytarget00","onlytarget01","onlytarget02"],
+    "edhrec_rank": null
+   },
+   "candidate": {"name":"Candidate Card","type_line":"Sorcery","cmc":5.0,"oracle_text":"zzaa zzab zzac zzad zzae zzaf zzag zztg zzth zzti zztj","keywords":["shared00","onlycand00"],"edhrec_rank":12345},
+   "parts": [1.0,0.6666666666666667,0.2,0.35],
+   "weights": [0.3,0.2,0.15,0.35],
+   "popularity": 0.18170178114640978,
+   "score": 0.604,
+   "reasons": ["same card type (Sorcery)","mana value 5 vs 6","shares shared00","text: zzaa, zzab, zzac, zzad, zzae, zzaf","EDHREC rank 12,345"]
+  },
+  {
+   "note": "lands, and the rank floor",
+   "target": {"name":"Target Card","type_line":"Land","cmc":0.0,"oracle_text":"zzaa zzab zzac","keywords":["shared00"],"edhrec_rank":null},
+   "candidate": {"name":"Candidate Card","type_line":"Land","cmc":0.0,"oracle_text":"zzaa zzab zzac zztg zzth zzti zztj","keywords":["shared00"],"edhrec_rank":99999},
+   "parts": [1.0,1.0,1.0,1.0],
+   "weights": [0.3,0.2,0.15,0.35],
+   "popularity": 8.68593306835308e-07,
+   "score": 1.0,
+   "reasons": ["same card type (Land)","same mana value (0)","shares shared00","text: zzaa, zzab, zzac","EDHREC rank 99,999"]
+  },
+  {
+   "note": "curve four apart, so curve scores zero",
+   "target": {
+    "name": "Target Card",
+    "type_line": "Enchantment",
+    "cmc": 5.0,
+    "oracle_text": "zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zzak zzal zzam zzan zzao",
+    "keywords": ["shared00","onlytarget00"],
+    "edhrec_rank": null
+   },
+   "candidate": {"name":"Candidate Card","type_line":"Instant","cmc":1.0,"oracle_text":"zzaa zzab zzac zzad zzae zztg zzth zzti zztj","keywords":["shared00","onlycand00"],"edhrec_rank":null},
+   "parts": [0.0,0.0,0.3333333333333333,0.3333333333333333],
+   "weights": [0.3,0.2,0.15,0.35],
+   "popularity": 0.0,
+   "score": 0.1667,
+   "reasons": ["shares shared00","text: zzaa, zzab, zzac, zzad, zzae"]
+  },
+  {
+   "note": "two permanents, two off the curve",
+   "target": {
+    "name": "Target Card",
+    "type_line": "Planeswalker",
+    "cmc": 4.0,
+    "oracle_text": "zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zzak zzal zzam zzan zzao zzap zzaq zzar zzas zzat zzau zzav zzaw zzax zzay zzaz zzba zzbb zzbc zzbd",
+    "keywords": ["shared00","shared01","onlytarget00","onlytarget01","onlytarget02"],
+    "edhrec_rank": null
+   },
+   "candidate": {
+    "name": "Candidate Card",
+    "type_line": "Battle",
+    "cmc": 6.0,
+    "oracle_text": "zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zzak zztg zzth zzti zztj",
+    "keywords": ["shared00","shared01","onlycand00","onlycand01","onlycand02"],
+    "edhrec_rank": 3
+   },
+   "parts": [0.4,0.33333333333333337,0.25,0.36666666666666664],
+   "weights": [0.3,0.2,0.15,0.35],
+   "popularity": 0.9045757490560675,
+   "score": 0.443,
+   "reasons": ["shares shared00, shared01","text: zzaa, zzab, zzac, zzad, zzae, zzaf","EDHREC rank 3"]
+  },
+  {
+   "note": "an empty type line scores zero",
+   "target": {"name":"Target Card","type_line":"Creature — Elf","cmc":3.0,"oracle_text":"zzaa zzab zzac zzad zzae zzaf","keywords":["shared00","shared01"],"edhrec_rank":null},
+   "candidate": {"name":"Candidate Card","type_line":"","cmc":3.0,"oracle_text":"zzaa zzab zzac zzad zzae zzaf zztg zzth zzti zztj","keywords":["shared00","shared01"],"edhrec_rank":250},
+   "parts": [0.0,1.0,1.0,1.0],
+   "weights": [0.3,0.2,0.15,0.35],
+   "popularity": 0.5204119982655925,
+   "score": 0.752,
+   "reasons": ["same mana value (3)","shares shared00, shared01","text: zzaa, zzab, zzac, zzad, zzae, zzaf","EDHREC rank 250"]
+  },
+  {
+   "note": "type 0, curve 1, keywords 1/12, text 13/40 -- differs at four places",
+   "target": {
+    "name": "Target Card",
+    "type_line": "Instant",
+    "cmc": 3.0,
+    "oracle_text": "zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zzak zzal zzam zzan zzao zzap zzaq zzar zzas zzat zzau zzav zzaw zzax zzay zzaz zzba zzbb zzbc zzbd zzbe zzbf zzbg zzbh zzbi zzbj zzbk zzbl zzbm zzbn",
+    "keywords": ["shared00","onlytarget00","onlytarget01","onlytarget02","onlytarget03","onlytarget04"],
+    "edhrec_rank": null
+   },
+   "candidate": {
+    "name": "Candidate Card",
+    "type_line": "Sorcery",
+    "cmc": 3.0,
+    "oracle_text": "zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zzak zzal zzam zztg zzth zzti zztj",
+    "keywords": ["shared00","onlycand00","onlycand01","onlycand02","onlycand03","onlycand04","onlycand05"],
+    "edhrec_rank": null
+   },
+   "parts": [0.0,1.0,0.08333333333333333,0.325],
+   "weights": [0.3,0.2,0.15,0.35],
+   "popularity": 0.0,
+   "score": 0.3262,
+   "reasons": ["same mana value (3)","shares shared00","text: zzaa, zzab, zzac, zzad, zzae, zzaf"]
+  },
+  {
+   "note": "keywords 1/10, text 21/40, with the popularity nudge on top",
+   "target": {
+    "name": "Target Card",
+    "type_line": "Instant",
+    "cmc": 3.0,
+    "oracle_text": "zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zzak zzal zzam zzan zzao zzap zzaq zzar zzas zzat zzau zzav zzaw zzax zzay zzaz zzba zzbb zzbc zzbd zzbe zzbf zzbg zzbh zzbi zzbj zzbk zzbl zzbm zzbn",
+    "keywords": ["shared00","onlytarget00","onlytarget01","onlytarget02","onlytarget03"],
+    "edhrec_rank": null
+   },
+   "candidate": {
+    "name": "Candidate Card",
+    "type_line": "Sorcery",
+    "cmc": 3.0,
+    "oracle_text": "zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zzak zzal zzam zzan zzao zzap zzaq zzar zzas zzat zzau zztg zzth zzti zztj",
+    "keywords": ["shared00","onlycand00","onlycand01","onlycand02","onlycand03","onlycand04"],
+    "edhrec_rank": 620
+   },
+   "parts": [0.0,1.0,0.1,0.525],
+   "weights": [0.3,0.2,0.15,0.35],
+   "popularity": 0.44152166210034927,
+   "score": 0.4429,
+   "reasons": ["same mana value (3)","shares shared00","text: zzaa, zzab, zzac, zzad, zzae, zzaf","EDHREC rank 620"]
+  },
+  {
+   "note": "keywords 1/12, text 19/40",
+   "target": {
+    "name": "Target Card",
+    "type_line": "Instant",
+    "cmc": 2.0,
+    "oracle_text": "zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zzak zzal zzam zzan zzao zzap zzaq zzar zzas zzat zzau zzav zzaw zzax zzay zzaz zzba zzbb zzbc zzbd zzbe zzbf zzbg zzbh zzbi zzbj zzbk zzbl zzbm zzbn",
+    "keywords": ["shared00","onlytarget00","onlytarget01","onlytarget02","onlytarget03","onlytarget04"],
+    "edhrec_rank": null
+   },
+   "candidate": {
+    "name": "Candidate Card",
+    "type_line": "Sorcery",
+    "cmc": 2.0,
+    "oracle_text": "zzaa zzab zzac zzad zzae zzaf zzag zzah zzai zzaj zzak zzal zzam zzan zzao zzap zzaq zzar zzas zztg zzth zzti zztj",
+    "keywords": ["shared00","onlycand00","onlycand01","onlycand02","onlycand03","onlycand04","onlycand05"],
+    "edhrec_rank": null
+   },
+   "parts": [0.0,1.0,0.08333333333333333,0.475],
+   "weights": [0.3,0.2,0.15,0.35],
+   "popularity": 0.0,
+   "score": 0.3787,
+   "reasons": ["same mana value (2)","shares shared00","text: zzaa, zzab, zzac, zzad, zzae, zzaf"]
+  }
+ ]
+}
