@@ -110,7 +110,14 @@ Where it stands, kept here so a fresh session knows the frontier:
   (`go/internal/shelves`: the symbols, the pinned OCR files, the card-art
   derivatives, configured by the generated `shelves.json`) — the fourth
   family, and the read spine whole: every read-only route under `/api` is
-  the door's. **Next: Phase 4, the writes and the log.**
+  the door's. **Then Phase 4, the writes** (2026-08-22): the edit engine
+  (`deckedit` over `pyyaml`, PyYAML's emitter reproduced byte for byte) and
+  its nine editing routes, all going out through one `commit` so the gate's
+  verdict and ADR 28's entry are inherited; the lifecycle — create, import,
+  delete and sharing, none of them in the log because none is in `_commit`;
+  and the artifacts rebuild, the renderer and its route, which is outside
+  the log for a sharper reason still: a build changes no deck field, it
+  derives files *from* one. **Next: the accounts**, and Phase 4 is done.
 
 ### The next phase — the Simulator learns (decided 2026-08-20)
 
