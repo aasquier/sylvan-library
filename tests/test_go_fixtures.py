@@ -83,6 +83,50 @@ def test_the_render_oracle_records_both_sides_of_the_resolver():
     assert rendered[("why", "12a", False)] == ["      why: 12a"]
 
 
+def test_the_committed_log_oracle_is_what_describe_writes_now():
+    """The log's sentence is rendered once, at write time (ADR 28)."""
+    fresh = go_fixtures.render_log_cases()
+    committed = (go_fixtures.LOG_DIR / "describe.json").read_text(encoding="utf-8")
+    assert committed == fresh, (
+        f"{go_fixtures.LOG_DIR / 'describe.json'} is stale; regenerate with "
+        "`python tests/go_fixtures.py`")
+
+
+def test_the_log_oracle_keeps_a_rationale_in_it():
+    """The Go test that proves no `why` reaches a log line needs one to try.
+
+    A corpus that quietly stopped passing a rationale to `describe` would leave
+    that assertion passing against nothing, which is the exact shape of a guard
+    enforced by nothing.
+    """
+    cases = go_fixtures.log_cases()
+    carrying = [c for c in cases if "why" in c["extra"]]
+    assert carrying, "no case passes a `why` to describe; the Go guard is idle"
+    for case in carrying:
+        assert case["extra"]["why"] not in case["summary"]
+
+
+def test_the_committed_app_schema_is_what_the_ladder_leaves():
+    """Python owns `app.db`'s ladder until Phase 8; the Go tests read it.
+
+    The file is what `sqlite_master` held after `auth/db.py` migrated a fresh
+    database, so a new migration moves it here rather than leaving the Go log
+    tests inserting into a table that no longer looks like that.
+    """
+    fresh = go_fixtures.render_app_schema()
+    committed = (go_fixtures.LOG_DIR / "app_schema.sql").read_text(encoding="utf-8")
+    assert committed == fresh, (
+        f"{go_fixtures.LOG_DIR / 'app_schema.sql'} is stale; regenerate with "
+        "`python tests/go_fixtures.py`")
+    from mtglab.auth import db
+    assert f"PRAGMA user_version = {db.SCHEMA_VERSION};" in committed
+    assert "CREATE TABLE deck_log" in committed
+    # Schema only. This file is committed to a public repository, and rule 5
+    # is about what a tracked file may contain, not only about what is easy to
+    # forget.
+    assert "INSERT" not in committed.upper()
+
+
 def test_the_fixture_round_trips_through_the_deck_model():
     """The fixture is a real deck to the model, not only to the parser."""
     from mtglab.decks.model import Deck

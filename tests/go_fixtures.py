@@ -73,6 +73,10 @@ RENDER_PATH = ROOT / "go" / "internal" / "pyyaml" / "testdata" / "render.json"
 #: The edit-equivalence oracle: every operation applied over fixture decks,
 #: beside the exact bytes Python's operation yields (Phase 4's gate).
 EDITS_PATH = ROOT / "go" / "internal" / "deckedit" / "testdata" / "edits.json"
+#: The activity log's oracle: every sentence `log.describe` writes, and
+#: `app.db`'s schema as the ladder leaves it, so the Go log tests have a real
+#: table to insert into in CI where there is no Python (Phase 4).
+LOG_DIR = ROOT / "go" / "internal" / "decklog" / "testdata"
 #: The pool's schema and the 21-card fixture, for the Go pool tests.
 POOL_DIR = ROOT / "go" / "internal" / "pool"
 SCHEMA_PATH = POOL_DIR / "schema.sql"
@@ -454,6 +458,112 @@ def render_render_cases() -> str:
     return json.dumps(render_cases(), ensure_ascii=False, indent=1) + "\n"
 
 
+# --------------------------------------------------------- the activity log
+#
+# ADR 28's sentences. `describe` renders them once, at write time, so the CLI
+# and the deck panel cannot become two renderers of the same row in two
+# languages -- which means the Go port has to write the same sentence or the
+# panel's history changes wording the day a route flips.
+#
+# The schema travels with them: `app.db`'s DDL as the migration ladder leaves
+# it, so `go/internal/decklog`'s tests can build a real database in CI. Python
+# owns the ladder until Phase 8; this is a *reading* of what it produced, the
+# way `pool/schema.sql` is a reading of `cards/db.py`'s SCHEMA.
+
+def log_cases() -> list[dict[str, Any]]:
+    """Every shape `_commit` hands `describe`, and the sentence it gets back."""
+    from mtglab.decks import log
+
+    extras: list[dict[str, Any]] = [
+        {"added": "Sol Ring", "category": "ramp", "into": "cards"},
+        {"added": "Sol Ring", "category": "ramp", "into": "swap_board"},
+        {"added": "Sol Ring", "into": "cards"},
+        {"added": "Sol Ring"},
+        {"entombed": "Primeval Titan"},
+        {"entombed": ["Primeval Titan"]},
+        {"entombed": ["Primeval Titan", "Sol Ring"]},
+        {"entombed": ["a", "b", "c", "d", "e", "f"]},
+        {"entombed": ["a", "b", "c", "d", "e", "f", "g"]},
+        {"entombed": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]},
+        {"removed": "Rhystic Study"},
+        {"returned": "Gilded Lotus"},
+        {"exiled": "Gilded Lotus"},
+        {"swapped_out": "Primeval Titan", "swapped_in": "Cultivator Colossus"},
+        {"swapped_out": "Primeval Titan"},
+        # The rationale rides along and must never reach the sentence.
+        {"swapped_out": "Primeval Titan", "swapped_in": "Sol Ring",
+         "why": "A rationale that must not appear in any log line."},
+        {"note": "mulligan"},
+        {"card": "Sol Ring", "field": "why"},
+        {"card": "Sol Ring", "field": "qty"},
+        {"card": "Sol Ring", "field": "category"},
+        {"card": "Sol Ring", "field": "art"},
+        {"card": "Sol Ring", "field": ""},
+        {"card": "Sol Ring"},
+        {"field": "status", "value": "built"},
+        {"field": "stage", "value": "curated"},
+        {"field": "bracket", "value": 4},
+        {"field": "pilot", "value": "Aaron"},
+        {"field": "pilot", "value": ""},
+        {"field": "pilot", "value": None},
+        {"field": "pilot", "value": "   "},
+        {"field": "commander_art", "value": "0aae2e33-0000-4000-8000-000000000000"},
+        {"field": "commander_art", "value": ""},
+        {"field": "art", "value": "0aae2e33-0000-4000-8000-000000000000"},
+        {"field": "themes", "value": ["knights", "equipment", "voltron"]},
+        {"field": "themes", "value": []},
+        {"field": "themes", "value": ("aggro", "midrange")},
+        {"field": "newfangled", "value": "something"},
+        # Past forty characters the value is not printed, only named.
+        {"field": "pilot", "value": "x" * 41},
+        {"field": "pilot", "value": "x" * 40},
+        # The load-bearing fallback: an operation nobody taught it about.
+        {},
+        {"unheard_of": "yes"},
+    ]
+    out = []
+    for extra in extras:
+        action, summary = log.describe(extra)
+        # Tuples are a Python-only shape; the wire and the Go side see a list.
+        shown = {k: (list(v) if isinstance(v, tuple) else v)
+                 for k, v in extra.items()}
+        out.append({"extra": shown, "action": action, "summary": summary})
+    return out
+
+
+def render_log_cases() -> str:
+    return json.dumps(log_cases(), indent=1, ensure_ascii=False) + "\n"
+
+
+def render_app_schema() -> str:
+    """`app.db`'s DDL, as the migration ladder leaves it.
+
+    Read out of `sqlite_master` rather than transcribed, so it cannot drift
+    from the ladder that made it, and sorted so the file is stable.
+    `sqlite_%` names are excluded: `sqlite_sequence` is SQLite's own
+    bookkeeping for AUTOINCREMENT and it refuses to let anybody else create it.
+    """
+    from mtglab import config
+    from mtglab.auth import db
+    with tempfile.TemporaryDirectory() as tmp, \
+            config.use_paths(data_dir=Path(tmp)), db.connection() as con:
+        version = con.execute("PRAGMA user_version").fetchone()[0]
+        rows = con.execute(
+            "SELECT type, name, sql FROM sqlite_master"
+            " WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"
+            " ORDER BY type DESC, name").fetchall()
+    lines = [
+        "-- app.db, as `auth/db.py`'s migration ladder leaves it at schema",
+        f"-- version {version}. Written by `python tests/go_fixtures.py`; Python",
+        "-- owns the ladder until Phase 8 and this is a reading of what it made,",
+        "-- for the Go tests that need a real table in CI. Do not hand-edit.",
+        f"PRAGMA user_version = {version};",
+    ]
+    for row in rows:
+        lines.append(f"{row['sql']};")
+    return "\n".join(lines) + "\n"
+
+
 # ------------------------------------------------------- hand-written decks
 #
 # Every fixture above is what `Deck.dump` writes, and the six real decks are
@@ -797,6 +907,10 @@ def write() -> None:
     SCHEMA_PATH.write_text(render_schema(), encoding="utf-8")
     TINY_POOL_PATH.write_text(render_tiny_pool(), encoding="utf-8")
     print(f"wrote {SCHEMA_PATH}\nwrote {TINY_POOL_PATH}")
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    (LOG_DIR / "describe.json").write_text(render_log_cases(), encoding="utf-8")
+    (LOG_DIR / "app_schema.sql").write_text(render_app_schema(), encoding="utf-8")
+    print(f"wrote the log oracle and app.db's schema into {LOG_DIR}")
     EDITS_PATH.parent.mkdir(parents=True, exist_ok=True)
     EDITS_PATH.write_text(render_edit_cases(), encoding="utf-8")
     print(f"wrote {EDITS_PATH}")
