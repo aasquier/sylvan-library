@@ -166,6 +166,16 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPatch, Pattern: "/api/decks/{owner}/{slug}/cards/{name}", Handler: a.patchCard},
 		{Method: http.MethodPatch, Pattern: "/api/decks/{owner}/{slug}", Handler: a.patchDeck},
 		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/notes/{key}", Handler: a.setNote},
+		// The deck lifecycle (Phase 4's second flip): the moments a deck
+		// begins and ends. None of these goes through `commit` -- creation
+		// and deletion are outside `service._commit` in Python and therefore
+		// outside ADR 28's log, which is a decision to keep rather than one
+		// to drift out of. The two collection routes write into the caller's
+		// **own** library and never into an owner named in a path.
+		{Method: http.MethodPost, Pattern: "/api/decks", Handler: a.createDeck},
+		{Method: http.MethodPost, Pattern: "/api/decks/import", Handler: a.importDeck},
+		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}", Handler: a.deleteDeck},
+		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/shared", Handler: a.setDeckShared},
 	}
 }
 

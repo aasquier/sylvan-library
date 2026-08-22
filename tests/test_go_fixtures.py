@@ -17,7 +17,9 @@ the JSON cannot say one thing while `/api/colors` says another.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
+import pytest
 import yaml
 
 import go_fixtures
@@ -81,6 +83,49 @@ def test_the_render_oracle_records_both_sides_of_the_resolver():
     assert rendered[("why", "1e3", False)] == ["      why: 1e3"]
     assert rendered[("why", "12", False)] == ["      why: '12'"]
     assert rendered[("why", "12a", False)] == ["      why: 12a"]
+
+
+# The oracles that had no drift test at all until 2026-08-22 -- `edits.json`
+# among them, which is Phase 4's own gate and the largest corpus here. A stale
+# one is the worst kind of green: the Go side keeps agreeing with a Python that
+# no longer exists, and nothing anywhere says so. Parametrised rather than four
+# copies, because the fifth is the one somebody adds next year.
+#
+# Each is `(name, path, render)`. `render` is called, so a generator that
+# stopped being deterministic fails here rather than in a diff.
+_ORACLES = [
+    ("the edit operations", "EDITS_PATH", "render_edit_cases"),
+    ("the whole-file dumps", "DUMPS_PATH", "render_dump_cases"),
+    ("the decklist grammar", "DECKLIST_PATH", "render_decklist_cases"),
+    ("the importer", "IMPORT_PATH", "render_import_cases"),
+]
+
+
+@pytest.mark.parametrize(("what", "path_name", "render_name"), _ORACLES,
+                         ids=[o[0] for o in _ORACLES])
+def test_the_committed_oracle_is_what_python_answers_now(what, path_name, render_name):
+    path = getattr(go_fixtures, path_name)
+    fresh = getattr(go_fixtures, render_name)()
+    assert path.read_text(encoding="utf-8") == fresh, (
+        f"{path} ({what}) is stale; regenerate with "
+        f"`python tests/go_fixtures.py`")
+
+
+def test_every_oracle_this_module_writes_is_checked_for_drift():
+    """The list above is complete, and stays complete.
+
+    A corpus with no drift test is a corpus that can rot silently, which is
+    what `edits.json` did from the day it was written until this test existed.
+    So the check is on the *set*: every `*_PATH` the generator writes is either
+    checked by name above or by a test of its own.
+    """
+    named = {name for _what, name, _render in _ORACLES} | {
+        "YAML_PATH", "JSON_PATH", "RENDER_PATH", "SCHEMA_PATH", "TINY_POOL_PATH"}
+    writes = {name for name in dir(go_fixtures)
+              if name.endswith("_PATH") and isinstance(getattr(go_fixtures, name), Path)}
+    assert writes - named == set(), (
+        f"these fixtures have no drift test: {sorted(writes - named)}. Add "
+        f"them to _ORACLES, or give them one of their own.")
 
 
 def test_the_committed_log_oracle_is_what_describe_writes_now():

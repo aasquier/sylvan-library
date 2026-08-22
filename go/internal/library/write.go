@@ -7,18 +7,28 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/deckedit"
 )
 
 // The write side of a Source, Phase 4's addition to the read-only tiers.
 //
-// One verb only: replacing a deck's YAML. `create` and `delete` are a later
-// flip and are deliberately absent rather than stubbed -- they have opposite
-// safety requirements to an update (an update to a deck that has vanished is a
-// bug; a create over a deck that exists destroys somebody's work), and a
-// method that exists but refuses is a method somebody wires up.
+// Four verbs, and they arrived in two flips on purpose. `WriteText` came with
+// the nine editing routes; `Create`, `Delete` and `SetShared` came with the
+// lifecycle, because an update and a create have opposite safety requirements
+// -- an update to a deck that has vanished is a bug, a create over a deck that
+// exists destroys somebody's work -- and a method that exists but refuses is a
+// method somebody wires up.
+//
+// **`Delete` returns where the deck went, and that is the protocol's
+// requirement rather than a nicety.** A tier that can only answer "yes" has
+// destroyed the deck rather than removed it, and since ADR 30 no deck has a
+// revision behind it: the file tier's `.trash/` directory and the SQL tier's
+// `deleted_at` are the only things standing between a misclick and the work.
 //
 // **Who may write is decided by which Source you were handed**, never by a
 // branch in a handler: the shared-only view refuses because a deck you can see
@@ -31,14 +41,31 @@ import (
 // change them. The route layer turns it into a 403, which is the one refusal
 // in the deck family that is not a 404 -- because the caller has already been
 // shown the deck, so its existence is not the secret.
+//
+// **The message is `api/app.py`'s exception handler, not the exception's.**
+// Python raises the subject alone and a handler wraps it, which Go has no
+// place for; the sentence is assembled here so the two runtimes answer a 403
+// in the same words. It said something else until 2026-08-22, and the contract
+// suite could not see it -- a golden records `{"detail": "string"}` and a
+// user reads the string.
 type ErrReadOnly struct{ Slug string }
 
 func (e ErrReadOnly) Error() string {
-	if e.Slug == "" {
-		return "this library is read-only"
+	// `service._WHOLE_LIBRARY`, for a refusal about a deck that does not exist
+	// yet: a create has no slug to name.
+	subject := e.Slug
+	if subject == "" {
+		subject = "this library"
 	}
-	return "'" + e.Slug + "' is not yours to edit"
+	return "read-only: " + subject + " is not yours to change"
 }
+
+// ErrExists is `DeckExists`: raised rather than overwriting a deck that is
+// already there. The route layer turns it into the refusal `create` and
+// `import` both answer with, which names the slug and asks for another.
+type ErrExists struct{ Slug string }
+
+func (e ErrExists) Error() string { return "a deck called '" + e.Slug + "' already exists" }
 
 // Writer is the write half of a Source. Sources implement it; the interface is
 // separate so a handler that only reads cannot accidentally hold one.
@@ -46,11 +73,21 @@ type Writer interface {
 	// WriteText replaces the deck's YAML. ErrNotFound if the deck is not
 	// there, ErrReadOnly if the caller may not edit it.
 	WriteText(ctx context.Context, slug, text string) error
+	// Create adds a deck that does not exist yet. ErrExists rather than an
+	// overwrite; ErrReadOnly if the caller may not write here at all.
+	Create(ctx context.Context, slug, text string) error
+	// Delete removes a deck and says where it went. ErrNotFound or
+	// ErrReadOnly.
+	Delete(ctx context.Context, slug string) (string, error)
+	// SetShared puts the deck on display to other accounts, or takes it off
+	// (ADR 22). Its own verb rather than a field on WriteText, because the two
+	// tiers keep this fact in different places -- `deck.yaml` here, a column
+	// there -- and a caller should not have to know which.
+	SetShared(ctx context.Context, slug string, shared bool) error
 }
 
 // WriterFor is how a handler asks a Source for its write half. A Source that
-// cannot write at all -- there is none today, and there will be while
-// `create` and `delete` are still Python's -- refuses in the same words a
+// cannot write at all -- there is none today -- refuses in the same words a
 // read-only tier does, so the route layer has one path rather than two.
 func WriterFor(s Source, slug string) (Writer, error) {
 	w, ok := s.(Writer)
@@ -127,6 +164,135 @@ func writeAtomically(path, text string) error {
 	return nil
 }
 
+// Create writes `<root>/<slug>/deck.yaml`, refusing to overwrite one.
+//
+// The existence check is `os.OpenFile` with O_EXCL rather than a Stat followed
+// by a write: the two-step version has a window between the look and the
+// write, and this is the operation where landing in that window means one
+// person's deck arriving on top of another's.
+func (f *FileSource) Create(_ context.Context, slug, text string) error {
+	if !f.writable {
+		return ErrReadOnly{Slug: slug}
+	}
+	// The same guard `path` applies, and it has to be applied here too: `path`
+	// answers ErrNotFound for a slug with a separator in it because there is
+	// no such deck, and a create would happily make one outside the root.
+	if slug == "" || strings.Trim(slug, ".") == "" || strings.ContainsAny(slug, `/\`) {
+		return ErrExists{Slug: slug}
+	}
+	// 0755 and 0644 are what Python's `mkdir` and `write_text` leave under an
+	// 022 umask, which is what the container runs. Tighter modes would be
+	// safer in the abstract and are wrong here: both runtimes write this
+	// directory as the same user, nothing else reads it, and a library whose
+	// decks wear two different sets of permissions depending on which door
+	// made them is a difference somebody has to explain to a volume backup.
+	// `writeAtomically` preserves an existing file's mode for the same reason.
+	dir := filepath.Join(f.Root, slug)
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // matches Python's umask
+		return fmt.Errorf("create deck %q: %w", slug, err)
+	}
+	file, err := os.OpenFile(filepath.Join(dir, "deck.yaml"), //nolint:gosec // matches Python's umask
+		os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return ErrExists{Slug: slug}
+		}
+		return fmt.Errorf("create deck %q: %w", slug, err)
+	}
+	if _, err := file.WriteString(text); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("create deck %q: %w", slug, err)
+	}
+	return file.Close()
+}
+
+// Delete moves the deck's whole directory into `.trash/`, and says where.
+//
+// A move rather than an unlink, for one reason: since ADR 30 no deck is in
+// git, so no deck has a revision to restore from -- the draft imported ten
+// minutes ago and the curated deck of a year's thinking are equally gone.
+// Moving costs one rename and makes the mistake survivable.
+//
+// The directory goes whole -- `artifacts/` with it -- because the artifacts
+// are generated from the deck file and a folder of primers for a deck that no
+// longer exists is worse than no folder at all. `.trash` is dot-prefixed so
+// `deckPaths` cannot see it.
+func (f *FileSource) Delete(_ context.Context, slug string) (string, error) {
+	if !f.writable {
+		return "", ErrReadOnly{Slug: slug}
+	}
+	path, err := f.path(slug)
+	if err != nil {
+		return "", err
+	}
+	stamp := time.Now().UTC().Format("20060102T150405Z")
+	trash := filepath.Join(f.Root, ".trash", slug+"-"+stamp)
+	if err := os.MkdirAll(filepath.Dir(trash), 0o755); err != nil { //nolint:gosec // the deck's own directory mode
+		return "", fmt.Errorf("delete deck %q: %w", slug, err)
+	}
+	// Import, delete, re-import, delete again inside one second is a real
+	// sequence, and the stamp is only second-resolution. This matters more
+	// than it looks in Python, where `shutil.move` onto an existing directory
+	// moves the source *inside* it rather than failing, so a collision would
+	// bury the earlier deletion instead of reporting anything. `os.Rename`
+	// here would fail on a non-empty target instead, which is louder and
+	// still not what anybody wants.
+	if _, err := os.Stat(trash); err == nil {
+		for n := 2; ; n++ {
+			candidate := trash + "-" + strconv.Itoa(n)
+			if _, err := os.Stat(candidate); err != nil {
+				trash = candidate
+				break
+			}
+		}
+	}
+	// `filepath.Dir(path)`, not `path`: the deck is a directory, and leaving
+	// the artifacts behind would strand them beside a deck that is gone.
+	if err := os.Rename(filepath.Dir(path), trash); err != nil {
+		return "", fmt.Errorf("delete deck %q: %w", slug, err)
+	}
+	return trash, nil
+}
+
+// SetShared writes `shared:` into the deck file. The YAML is this tier's
+// truth.
+//
+// A **surgical** edit like every other write (ADR 12), through
+// `deckedit.SetShared`. It was a load-and-dump round trip in Python until
+// 2026-08-22 -- and the only thing on the write path that called `dump` on an
+// existing file -- so one press of the deck page's share toggle took a
+// hand-written deck's section banners, its trailing comments and its folded
+// blocks with it. This port had to reproduce the bytes and so had to ask what
+// they were; Aaron ruled, and both runtimes were fixed at once.
+//
+// Unchanged from Python: nothing is written when the flag already says what
+// was asked for, and `true` removes the key rather than asserting the default.
+func (f *FileSource) SetShared(ctx context.Context, slug string, shared bool) error {
+	if !f.writable {
+		return ErrReadOnly{Slug: slug}
+	}
+	text, err := f.ReadText(ctx, slug)
+	if err != nil {
+		return err
+	}
+	d, err := deck.FromText(text, slug)
+	if err != nil {
+		return fmt.Errorf("read deck %q: %w", slug, err)
+	}
+	if d.Shared == shared {
+		return nil
+	}
+	updated, err := deckedit.SetShared(text, shared)
+	if err != nil {
+		return err
+	}
+	path, err := f.path(slug)
+	if err != nil {
+		return err
+	}
+	return writeAtomically(path, updated)
+}
+
 // ---- the SQL tier ----------------------------------------------------------
 
 // WriteText stores the deck's YAML and re-derives the column that summarises
@@ -185,6 +351,92 @@ func nowISO() string {
 	return time.Now().UTC().Format("2006-01-02T15:04:05-07:00")
 }
 
+// Create inserts the row, refusing to bury one that is already there.
+//
+// **Private.** ADR 22's default for this tier, and the argument is `decks
+// import`: it writes a draft with an empty `why` on all 99 cards, and
+// publishing that the instant it exists is nobody's intent. `SetShared` is how
+// it goes on display.
+func (s *SQLSource) Create(ctx context.Context, slug, text string) error {
+	if !s.writable || s.write == nil {
+		return ErrReadOnly{Slug: slug}
+	}
+	d, err := deck.FromText(text, slug)
+	if err != nil {
+		return fmt.Errorf("the new deck does not parse: %w", err)
+	}
+	now := nowISO()
+	// The partial unique index is the real guard and this INSERT leans on it:
+	// a SELECT-then-INSERT would let two creates racing for one slug both pass
+	// the look. Python keeps the friendly SELECT as well and lands here when
+	// it loses; the answer is the same either way.
+	_, err = s.write.ExecContext(ctx,
+		"INSERT INTO user_decks"+
+			" (owner_id, slug, name, yaml, shared, created_at, updated_at)"+
+			" VALUES (?, ?, ?, ?, 0, ?, ?)",
+		s.ownerID, slug, d.Name, text, now, now)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return ErrExists{Slug: slug}
+		}
+		return fmt.Errorf("create deck %q: %w", slug, err)
+	}
+	return nil
+}
+
+// Delete marks the row and says where it went.
+//
+// A mark rather than a DELETE, which is the protocol's requirement and not a
+// preference: an implementation that cannot say where the deck went has
+// destroyed it rather than removed it.
+func (s *SQLSource) Delete(ctx context.Context, slug string) (string, error) {
+	if !s.writable || s.write == nil {
+		return "", ErrReadOnly{Slug: slug}
+	}
+	r, err := s.row(ctx, slug)
+	if err != nil {
+		return "", err
+	}
+	if _, err := s.write.ExecContext(ctx,
+		"UPDATE user_decks SET deleted_at = ? WHERE id = ?", nowISO(), r.id); err != nil {
+		return "", fmt.Errorf("delete deck %q: %w", slug, err)
+	}
+	return "user_decks:" + strconv.FormatInt(r.id, 10), nil
+}
+
+// SetShared flips the column this tier treats as the truth. The owner's call
+// alone.
+func (s *SQLSource) SetShared(ctx context.Context, slug string, shared bool) error {
+	if !s.writable || s.write == nil {
+		return ErrReadOnly{Slug: slug}
+	}
+	r, err := s.row(ctx, slug)
+	if err != nil {
+		return err
+	}
+	flag := 0
+	if shared {
+		flag = 1
+	}
+	if _, err := s.write.ExecContext(ctx,
+		"UPDATE user_decks SET shared = ?, updated_at = ? WHERE id = ?",
+		flag, nowISO(), r.id); err != nil {
+		return fmt.Errorf("share deck %q: %w", slug, err)
+	}
+	return nil
+}
+
+// isUniqueViolation asks the driver's error whether the partial unique index
+// refused. Matched on the message because `modernc.org/sqlite` reports its
+// codes through one error type and the constraint's name is what identifies
+// it; a wrong answer here reports a real failure as "already exists", which is
+// why the match is on the constraint word rather than on "unique" alone.
+func isUniqueViolation(err error) bool {
+	text := strings.ToLower(err.Error())
+	return strings.Contains(text, "unique constraint") ||
+		strings.Contains(text, "constraint failed: user_decks")
+}
+
 // ---- the shared-only view --------------------------------------------------
 
 // WriteText refuses. A deck somebody shared with you is a deck you may read.
@@ -194,6 +446,27 @@ func nowISO() string {
 // view entirely and every verb against it is already ErrNotFound, so no 403
 // here can reveal a private deck's existence.
 func (v *SharedOnly) WriteText(ctx context.Context, slug, _ string) error {
+	if err := v.visible(ctx, slug); err != nil {
+		return err
+	}
+	return ErrReadOnly{Slug: slug}
+}
+
+// Create refuses without asking what is there. This view is somebody else's
+// library seen through a keyhole, and a slug it does not show is one it must
+// not be able to test for -- so unlike the three below it does not look first.
+func (v *SharedOnly) Create(context.Context, string, string) error {
+	return ErrReadOnly{}
+}
+
+func (v *SharedOnly) Delete(ctx context.Context, slug string) (string, error) {
+	if err := v.visible(ctx, slug); err != nil {
+		return "", err
+	}
+	return "", ErrReadOnly{Slug: slug}
+}
+
+func (v *SharedOnly) SetShared(ctx context.Context, slug string, _ bool) error {
 	if err := v.visible(ctx, slug); err != nil {
 		return err
 	}

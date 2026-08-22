@@ -578,6 +578,78 @@ func SetDeckField(text, field string, value any) (string, error) {
 	return verified(updated, expected)
 }
 
+// SetShared puts the deck on display to other accounts, or takes it off
+// (ADR 22).
+//
+// The tenth operation, and it exists because the ninth's comment above made a
+// claim that was not true: *nothing on the app's write path ever calls
+// `Deck.dump` on an existing file*. `FileDeckSource.set_shared` did, and it
+// was the only thing that did. A load-and-dump round trip rewrites the whole
+// file -- so one press of the deck page's share toggle took a hand-written
+// curated deck's section banners, its trailing comments, its folded blocks
+// and its `swap_board: []` with it, and since ADR 30 there is no revision to
+// get them back from. Found by this port, which had to reproduce the bytes
+// and so had to ask what they were; ruled by Aaron 2026-08-22 and fixed in
+// both runtimes at once, so the two still write the same file.
+//
+// Deliberately not a SettableDeckFields entry. `shared` is the one deck fact
+// the two tiers keep in different places -- `deck.yaml` here, a column in the
+// SQL tier -- which is why it has its own route rather than riding the PATCH
+// beside it, and putting it in that list would publish it on that route as a
+// side effect.
+//
+// **True removes the key rather than writing it.** Absent already means
+// shared (`Deck.shared` defaults to true and `dump` omits it), so writing
+// `shared: true` would grow every curated file a line asserting the default
+// it already had -- the same self-cleaning round trip `commander_art` and the
+// shadowed `archetype:` use.
+func SetShared(text string, shared bool) (string, error) {
+	doc, lines, err := open(text)
+	if err != nil {
+		return "", err
+	}
+	start, end, found := topLevelSpan(lines, "shared")
+	expected := copyDoc(doc)
+
+	if shared {
+		delete(expected, "shared")
+		if !found {
+			return verified(text, expected)
+		}
+		_, tail := splitTail(lines[start:end], 0)
+		return verified(joinAround(lines, start, end, tail), expected)
+	}
+
+	expected["shared"] = false
+	rendered, err := render("shared", false, 0)
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		// Placed where `Deck.dump` would put it -- after the commander,
+		// before the pilot -- rather than at the end of the file, which is
+		// the rule SetDeckField follows for an absent `stage:`.
+		at := 0
+		for _, key := range deckKeyOrder {
+			if key == "shared" {
+				break
+			}
+			s, e, ok := topLevelSpan(lines, key)
+			if !ok {
+				continue
+			}
+			content, _ := splitTail(lines[s:e], 0)
+			at = max(at, s+len(content))
+		}
+		return verified(joinAround(lines, at, at, rendered), expected)
+	}
+	_, tail := splitTail(lines[start:end], 0)
+	if match := scalarLine.FindStringSubmatch(lines[start]); match != nil && match[3] != "" {
+		rendered = []string{rendered[0] + "  " + match[3]}
+	}
+	return verified(joinAround(lines, start, end, append(rendered, tail...)), expected)
+}
+
 // SetNote sets one deck-level note, the prose the advanced primer reads
 // directly.
 //

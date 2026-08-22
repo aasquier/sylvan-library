@@ -26,6 +26,7 @@ from mtglab.decks.edit import (
     set_card_field,
     set_deck_field,
     set_note,
+    set_shared,
 )
 
 DECK = """\
@@ -887,17 +888,6 @@ def test_first_difference_names_the_earliest_divergence():
     assert diff("x", "y") == "the document is 'y', expected 'x'"
 
 
-def test_unquote_survives_text_yaml_cannot_read():
-    from mtglab.decks.edit import _unquote
-
-    assert _unquote("plain words") == "plain words"
-    # A scalar YAML refuses to parse falls back to the text as typed.
-    assert _unquote("[unclosed") == "[unclosed"
-    # A scalar that parses to a non-string keeps the typed spelling too:
-    # `why: 42` means the text "42", not the number.
-    assert _unquote("42") == "42"
-
-
 def test_a_fold_that_would_not_read_back_falls_back_to_plain():
     """`_render(fold=True)` folds long prose -- but folding collapses single
     newlines, so a value it would damage is rendered unfolded instead."""
@@ -1035,3 +1025,51 @@ def test_entombing_the_last_card_leaves_a_readable_file():
     # And the way back works from the emptied state.
     back = return_card(text, name="Swamp")
     assert yaml.safe_load(back)["cards"][0]["name"] == "Swamp"
+
+
+# ------------------------------------------------------------- sharing
+
+def test_taking_a_hand_written_deck_off_display_costs_one_line():
+    """The operation that used to rewrite the file.
+
+    `FileDeckSource.set_shared` was a `Deck.load` / `Deck.dump` round trip
+    until 2026-08-22, so pressing the deck page's share toggle on a
+    hand-written deck reflowed every folded scalar, dropped every comment and
+    added the keys `dump` writes by default. Nothing said so, and since ADR 30
+    there is no revision to compare against.
+    """
+    out = set_shared(HAND_WRITTEN, shared=False)
+    lines = changed(HAND_WRITTEN, out)
+    assert all(line.startswith("+") for line in lines), lines
+    assert len(lines) == 1, lines
+    assert yaml.safe_load(out)["shared"] is False
+    # Placed where `Deck.dump` would put it: after the commander block, and
+    # not at the end of the file.
+    assert "  - Gnarly, Hand-Written\nshared: false\n" in out
+    assert "# an inline comment the editor must not eat" in out
+
+
+def test_putting_it_back_on_display_removes_the_key():
+    """Absent means shared, so `shared: true` would be a line asserting the
+    default -- the same self-cleaning round trip `commander_art` uses."""
+    private = set_shared(HAND_WRITTEN, shared=False)
+    assert set_shared(private, shared=True) == HAND_WRITTEN
+
+
+def test_sharing_a_deck_that_never_said_otherwise_changes_nothing():
+    assert set_shared(HAND_WRITTEN, shared=True) == HAND_WRITTEN
+
+
+def test_the_sharing_flag_keeps_its_trailing_comment():
+    text = HAND_WRITTEN.replace(
+        "commander:\n", "shared: false  # kept off the shelf for now\ncommander:\n")
+    out = set_shared(text, shared=False)
+    assert "shared: false  # kept off the shelf for now" in out
+    assert changed_lines(text, out) == 0
+
+
+def test_sharing_is_not_a_settable_deck_field():
+    """It has its own route because the two tiers keep it in different places,
+    and `SETTABLE_DECK_FIELDS` is what the PATCH beside it publishes."""
+    with pytest.raises(EditFailed):
+        set_deck_field(HAND_WRITTEN, field="shared", value=False)

@@ -1,11 +1,13 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"slices"
 	"strings"
@@ -172,26 +174,88 @@ func (a *API) answer(w http.ResponseWriter, r *http.Request, src library.Source,
 
 // ---- the bodies ------------------------------------------------------------
 
-// readBody parses a JSON object body. FastAPI answers a malformed one with its
-// own 422, and so does this -- the shape is `wire.Unprocessable`'s.
+// readBody parses a JSON object body, answering FastAPI's own 422 for
+// everything that is not one.
+//
+// It answered `missing` for all four failures until 2026-08-22, and the
+// contract suite is what said so: `POST /api/decks` with a body of `{` and no
+// content type is `dict_type` in FastAPI, because Starlette never parses a
+// body whose content type does not say JSON -- it hands the raw bytes through
+// as a string, and a string is not a dictionary. Nine flipped write routes
+// shared this function and none of their goldens sent anything but a valid
+// object, so the branch had never been asked a question.
+//
+// Starlette's decision procedure, in its order:
+//
+//  1. no body at all -> `missing`;
+//  2. a content type that is not `application/json` (or `application/…+json`),
+//     including none -> the raw body as a *string*, which is `dict_type`;
+//  3. JSON that will not parse -> `json_invalid`;
+//  4. JSON that parses to null -> `missing`, since a null body is an absent
+//     one;
+//  5. JSON that parses to anything but an object -> `dict_type`.
 func readBody(w http.ResponseWriter, r *http.Request) (map[string]any, bool) {
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
-	if err != nil {
+	if err != nil || len(raw) == 0 {
 		wire.Unprocessable(w, wire.Missing("body"))
 		return nil, false
 	}
-	if len(strings.TrimSpace(string(raw))) == 0 {
-		wire.Unprocessable(w, wire.Missing("body"))
+	if !isJSONRequest(r.Header.Get("Content-Type")) {
+		wire.Unprocessable(w, wire.DictType("body", string(raw)))
 		return nil, false
 	}
-	var body map[string]any
-	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
-	if err := decoder.Decode(&body); err != nil || body == nil {
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		wire.Unprocessable(w, wire.JSONInvalid("body", decodeOffset(err), err.Error()))
+		return nil, false
+	}
+	// `json.loads` reads the *whole* string, so anything after the first value
+	// is a decode error rather than something to ignore.
+	if decoder.More() {
+		wire.Unprocessable(w, wire.JSONInvalid("body", int(decoder.InputOffset())+1, "Extra data"))
+		return nil, false
+	}
+	if value == nil {
 		wire.Unprocessable(w, wire.Missing("body"))
+		return nil, false
+	}
+	body, ok := value.(map[string]any)
+	if !ok {
+		wire.Unprocessable(w, wire.DictType("body", value))
 		return nil, false
 	}
 	return body, true
+}
+
+// isJSONRequest is Starlette's test: maintype `application`, subtype `json` or
+// something ending `+json`. Parameters (`; charset=utf-8`) are ignored, and an
+// absent header is not JSON.
+func isJSONRequest(contentType string) bool {
+	media, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	maintype, subtype, found := strings.Cut(media, "/")
+	if !found || maintype != "application" {
+		return false
+	}
+	return subtype == "json" || strings.HasSuffix(subtype, "+json")
+}
+
+// decodeOffset is CPython's `e.pos`, one-based, from whichever error Go's
+// decoder raised.
+func decodeOffset(err error) int {
+	var syntax *json.SyntaxError
+	if errors.As(err, &syntax) {
+		return int(syntax.Offset)
+	}
+	var unmarshalType *json.UnmarshalTypeError
+	if errors.As(err, &unmarshalType) {
+		return int(unmarshalType.Offset)
+	}
+	return 1
 }
 
 func str(body map[string]any, key string) string {

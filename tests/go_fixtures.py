@@ -59,6 +59,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from mtglab import reference
+from mtglab.decks.decklist import MAX_LINE
 from mtglab.decks.model import CardEntry, Deck
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -73,6 +74,17 @@ RENDER_PATH = ROOT / "go" / "internal" / "pyyaml" / "testdata" / "render.json"
 #: The edit-equivalence oracle: every operation applied over fixture decks,
 #: beside the exact bytes Python's operation yields (Phase 4's gate).
 EDITS_PATH = ROOT / "go" / "internal" / "deckedit" / "testdata" / "edits.json"
+#: The decklist grammar's oracle: every dialect and every edge, beside the
+#: structure Python's parser gives back. `go/internal/decklist` must agree
+#: line for line, including which lines it could not read.
+DECKLIST_PATH = ROOT / "go" / "internal" / "decklist" / "testdata" / "lists.json"
+#: The importer's oracle: a paste, resolved against the 21-card pool, beside
+#: the draft `deck.yaml` Python writes for it.
+IMPORT_PATH = ROOT / "go" / "internal" / "deckimport" / "testdata" / "imports.json"
+#: The whole-file dump oracle: `Deck.dump` over every field combination the
+#: deck lifecycle can produce, beside the exact bytes PyYAML writes for it.
+#: Reached by `create` and `import` only -- every other write is surgical.
+DUMPS_PATH = ROOT / "go" / "internal" / "deck" / "testdata" / "dumps.json"
 #: The activity log's oracle: every sentence `log.describe` writes, and
 #: `app.db`'s schema as the ladder leaves it, so the Go log tests have a real
 #: table to insert into in CI where there is no Python (Phase 4).
@@ -837,6 +849,15 @@ def edit_steps(name: str, deck: Deck) -> list[list[dict[str, Any]]]:
          {"op": "set_note", "key": "", "value": "No key."},
          {"op": "set_note", "key": "not a key", "value": "Spaces."},
          {"op": "set_note", "key": "empty", "value": "   "}],
+        # Sharing, the tenth operation (2026-08-22): insert, no-op on a value
+        # already written, removal, and no-op on a key that is not there.
+        # Every one of these was a whole-file rewrite until the day this chain
+        # was added, which is what the hand-written decks in this corpus are
+        # for -- a reflow passes on a dumped deck and shows up only here.
+        [{"op": "set_shared", "shared": False},
+         {"op": "set_shared", "shared": False},
+         {"op": "set_shared", "shared": True},
+         {"op": "set_shared", "shared": True}],
     ]
     if deck.swap_board:
         chains.append([
@@ -855,6 +876,308 @@ def edit_steps(name: str, deck: Deck) -> list[list[dict[str, Any]]]:
     return chains
 
 
+# ----------------------------------------------------- the decklist oracle
+#
+# The parser is pure text in, structure out, which is what makes an exhaustive
+# corpus cheap: no pool, no filesystem, no database. What it is really pinning
+# is the three places Go's regexp is not Python's `re` -- `\s` (Python's
+# includes U+00A0 and the separators), `splitlines()` (Python breaks on eleven
+# characters), and `\d` (Python matches any Unicode decimal digit and `int()`
+# reads it). Each of those arrives in a real paste: a non-breaking space from a
+# web page, a lone `\r` from an old export, a U+2028 from a browser.
+
+def decklist_cases() -> dict[str, str]:
+    """Every dialect, and every edge the grammar has an opinion about."""
+    return {
+        "moxfield": "1 Arahbo, Roar of the World (C17) 27 *CMDR*\n"
+                    "1 Kaheera, the Orphanguard (IKO) 197\n"
+                    "1 Sol Ring (LTC) 284\n"
+                    "1 Branchloft Pathway // Boulderloft Pathway (ZNR) 258\n"
+                    "36 Forest (UNF) 235 *F*\n",
+        "archidekt": "1x Atla Palani, Nest Tender (M20) 191 [Commander{top}]\n"
+                     "1x Sol Ring (C21) 263 [Ramp]\n"
+                     "1x Cultivate (M21) 177 [Ramp{noDeck}]\n",
+        "arena": "Deck\n1 Gyome, Master Chef (CLB) 265\n30 Swamp (UNF) 239\n"
+                 "\nSideboard\n1 Reliquary Tower (M19) 254\n",
+        "tappedout": "Creatures (2)\n1x Goreclaw, Terror of Qal Sisma\n"
+                     "1x Craterhoof Behemoth\n\nLands (1)\n1x Ancient Tomb\n",
+        "deckstats": "//Commander\n1 [C17] Arahbo, Roar of the World\n"
+                     "//Creatures\n1 [M20] Craterhoof Behemoth\n"
+                     "# a real comment\n",
+        "headers": "COMMANDER (1)\n1 Gyome, Master Chef\nCommander:\n"
+                   "Commander: (1)\nCommander (1):\nMaybeboard\n1 Sol Ring\n"
+                   "Tokens\n1 Beast\nDeck--\nOther\n1 Skullclamp\n",
+        "quantities": "1 Sol Ring\n1x Sol Ring\n1 x Sol Ring\n1X Sol Ring\n"
+                      "36 Forest\n999 Forest\n1996 World Champion\n"
+                      "3 Steps Ahead\n1xSol Ring\n12\n0 Sol Ring\n",
+        "printings": "1 Sol Ring (2X2) 297 *F*\n1 Sol Ring (c21)\n"
+                     "1 Erase (Not the Urza's Legacy One)\n"
+                     "1 B.F.M. (Big Furry Monster)\n1 Ratchet Bomb (WAR) 25\u2605\n"
+                     "1 Sol Ring (NEO) 123s\n",
+        "unreadable": "(LTC) 284\n*CMDR*\n[Ramp]\n1 \n   \n1 [C17]\n",
+        "the-bound": "1 " + "A" * (MAX_LINE - 2) + "\n1 " + "A" * MAX_LINE + "\n",
+        # The three divergences, each in the form a paste actually delivers.
+        "unicode-space": "1\u00a0Sol Ring\n1 Sol\u00a0Ring\n\u00a0\n"
+                         "1 Sol Ring\u00a0\n1 Sol Ring (LTC)\u00a0284\n",
+        "line-breaks": "1 Sol Ring\r1 Mana Crypt\r\n1 Mana Vault\u2028"
+                       "1 Black Lotus\x0b1 Mox Jet\x0c1 Mox Pearl\x851 Mox Ruby",
+        "unicode-digits": "\u0663 Forest\n\u0669\u0669 Island\n"
+                          "\uff11 Sol Ring\n",
+        "empty": "",
+        "blank": "\n\n   \n\t\n",
+    }
+
+
+def render_decklist_cases() -> str:
+    """Each paste above, as Python's parser reads it."""
+    from mtglab.decks.decklist import parse
+
+    out: dict[str, Any] = {}
+    for name, text in decklist_cases().items():
+        parsed = parse(text)
+        out[name] = {
+            "text": text,
+            "cards": [{"name": c.name, "qty": c.qty, "section": c.section,
+                       "line_no": c.line_no} for c in parsed.cards],
+            "unreadable": [{"line_no": n, "text": s} for n, s in parsed.unreadable],
+            "skipped": [{"line_no": n, "text": s} for n, s in parsed.skipped],
+            "commander": parsed.commander,
+            "companion": parsed.companion,
+        }
+    return json.dumps(out, indent=1, ensure_ascii=False) + "\n"
+
+
+# ----------------------------------------------------- the importer's oracle
+#
+# One layer above the grammar: what the lines *mean* once the pool has been
+# asked. Run over `tiny_pool`, which is a real 21-card DuckDB on both sides, so
+# the two runtimes resolve the same names against the same records -- including
+# the two double-faced cards, which is where "the name as the pool spells it"
+# has an opinion.
+#
+# The header carries the day it was written, so the recorded YAML has that date
+# replaced by the literal `DATE` and the Go test does the same to its own
+# output before comparing. A Go side that formatted the date differently would
+# fail to substitute and the comparison would say so, which is the point.
+
+def import_cases() -> list[dict[str, Any]]:
+    """Every shape `build_deck` has an opinion about."""
+    return [
+        {"name": "explicit-commander", "slug": "explicit",
+         "commander": ["Goreclaw, Terror of Qal Sisma"], "bracket": 4,
+         "text": "1 Sol Ring (LTC) 284\n1 Cultivator Colossus\n38 Forest\n"
+                 "1 Rhystic Study\n"},
+        # The commander marked inline, Moxfield's plain export.
+        {"name": "inline-commander", "slug": "inline", "commander": [],
+         "text": "1 Goreclaw, Terror of Qal Sisma (M19) 176 *CMDR*\n"
+                 "1 Sol Ring (LTC) 284\n30 Forest\n"},
+        # A commander the list nominated and the caller overrode: the demoted
+        # card goes into the 99 rather than vanishing.
+        {"name": "demoted", "slug": "demoted",
+         "commander": ["Gyome, Master Chef"],
+         "text": "Commander\n1 Goreclaw, Terror of Qal Sisma\n"
+                 "Deck\n1 Sol Ring\n20 Swamp\n"},
+        # The commander sitting in the sideboard, which is where our own
+        # moxfield.txt artifact puts it.
+        {"name": "lifted-from-the-board", "slug": "lifted",
+         "commander": ["Goreclaw, Terror of Qal Sisma"],
+         "text": "Deck\n1 Sol Ring\n30 Forest\n"
+                 "Sideboard\n1 Goreclaw, Terror of Qal Sisma\n1 Black Lotus\n"},
+        # Casing corrected, a double-faced card written by its front face, and
+        # a name the pool has never heard of -- kept, not dropped.
+        {"name": "resolution", "slug": "resolution",
+         "commander": ["goreclaw, terror of qal sisma"],
+         "text": "1 sol ring\n1 Ajani, Nacatl Pariah\n"
+                 "1 Etali, Primal Conqueror // Etali, Primal Sickness\n"
+                 "1 Not A Real Card\n1 llanowar reborn\n"},
+        # The same name on more than one line.
+        {"name": "merged", "slug": "merged",
+         "commander": ["Gyome, Master Chef"],
+         "text": "1 Sol Ring\n2 Sol Ring\n10 Swamp\n20 Swamp\n"},
+        # A companion, given explicitly and taken from the list.
+        {"name": "companion", "slug": "companion",
+         "commander": ["Goreclaw, Terror of Qal Sisma"],
+         "companion": "Black Lotus",
+         "text": "1 Sol Ring\n10 Forest\n"},
+        # Every refusal.
+        {"name": "no-commander", "slug": "nobody", "commander": [],
+         "text": "1 Sol Ring\n10 Forest\n"},
+        {"name": "no-commander-with-a-board", "slug": "nobody2", "commander": [],
+         "text": "Deck\n1 Sol Ring\nSideboard\n1 Goreclaw, Terror of Qal Sisma\n"
+                 "1 Gyome, Master Chef\n"},
+        {"name": "three-commanders", "slug": "three",
+         "commander": ["Goreclaw, Terror of Qal Sisma", "Gyome, Master Chef",
+                       "Regal Behemoth"],
+         "text": "1 Sol Ring\n"},
+        # The empty paste: legal here, and refused one layer up in the service.
+        {"name": "no-cards", "slug": "bare",
+         "commander": ["Gyome, Master Chef"], "text": ""},
+        # Unreadable and skipped lines ride into the report unchanged.
+        {"name": "reported-lines", "slug": "reported",
+         "commander": ["Gyome, Master Chef"],
+         "text": "1 Sol Ring\nTokens\n1 Beast\n(LTC) 284\n*CMDR*\n"},
+    ]
+
+
+def render_import_cases() -> str:
+    """Each paste above, resolved against the 21-card pool by Python."""
+    import datetime
+
+    from mtglab.cards import db
+    from mtglab.decks import decklist, importer
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import tiny_pool
+
+    today = datetime.date.today().isoformat()
+    out: list[dict[str, Any]] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "tiny.duckdb"
+        tiny_pool.build(path)
+        con = db.connect(path)
+        try:
+            for case in import_cases():
+                parsed = decklist.parse(case["text"])
+                commander = case.get("commander") or []
+                companion = case.get("companion") or ""
+                cards = db.get_cards(con, importer.names_in(
+                    parsed, commander=commander, companion=companion or None))
+                record: dict[str, Any] = {
+                    "name": case["name"], "slug": case["slug"],
+                    "text": case["text"], "commander": commander,
+                    "companion": companion, "bracket": case.get("bracket"),
+                    "deck_name": case.get("deck_name", ""),
+                    "status": case.get("status", "theoretical"),
+                }
+                try:
+                    report = importer.build_deck(
+                        parsed, cards, slug=case["slug"],
+                        name=record["deck_name"] or None, commander=commander,
+                        companion=companion or None, bracket=case.get("bracket"),
+                        status=record["status"])
+                except importer.ImportRefused as exc:
+                    record["refused"] = str(exc)
+                    out.append(record)
+                    continue
+                record["yaml"] = report.yaml_text.replace(today, "DATE", 1)
+                record["unknown"] = report.unknown
+                record["notes"] = report.notes
+                record["unreadable"] = [{"line_no": n, "text": s}
+                                        for n, s in report.unreadable]
+                record["skipped"] = [{"line_no": n, "text": s}
+                                     for n, s in report.skipped]
+                record["needs_rationale"] = report.needs_rationale
+                out.append(record)
+        finally:
+            con.close()
+    return json.dumps(out, indent=1, ensure_ascii=False) + "\n"
+
+
+# --------------------------------------------------------- the dump oracle
+#
+# `Deck.dump` is the *other* way deck YAML gets written, and the only one that
+# writes a whole file. Two callers reach it and both are creating a file that
+# does not exist yet -- `create_deck` and `import_deck` -- which is what makes
+# a second writer defensible beside `edit.py`'s surgery: a deck being born has
+# no comments to destroy and no diff to keep small.
+#
+# The cases below are field combinations rather than decks anybody would play.
+# What they exercise is the payload's *order* (`sort_keys=False`, so the order
+# these keys are built in is the order the file has), the omissions that keep a
+# curated file from growing lines asserting defaults, the draft rule that
+# appends a blank `why:` **after** `qty` and `art` because Python's
+# `setdefault` appends, and the scalar shapes PyYAML has to choose quoting and
+# folding for at width 100.
+
+def dump_cases() -> dict[str, Deck]:
+    """Every shape the two lifecycle writers can hand the dumper."""
+    return {
+        # What `create_deck` writes: a commander and nothing else.
+        "created": Deck(slug="created", name="Gyome, Master Chef",
+                        status="theoretical", stage="draft",
+                        commander=["Gyome, Master Chef"]),
+        "created-paired": Deck(
+            slug="created-paired", name="Ishai and Kraum", status="built",
+            stage="draft", commander=["Ishai, Ojutai Dragonspeaker",
+                                      "Kraum, Ludevic's Opus"],
+            companion="Kaheera, the Orphanguard", bracket=5),
+        # What `import_deck` writes: a draft whose cards have no rationale,
+        # which is where the appended `why: ''` shows up -- after `qty`.
+        "imported": Deck(
+            slug="imported", name="Imported", status="theoretical",
+            stage="draft", commander=["Goreclaw, Terror of Qal Sisma"],
+            bracket=4,
+            cards=[CardEntry(name="Forest", category="land", qty=38, why=""),
+                   CardEntry(name="Sol Ring", category="ramp", why=""),
+                   CardEntry(name="Cultivator Colossus", category="ramp",
+                             why="", art="0aae2e33-0000-4000-8000-000000000000")],
+            swap_board=[CardEntry(name="Kaheera, the Orphanguard",
+                                  category="utility", why="")]),
+        # A curated deck omits the blank `why:` instead of pre-typing it, and
+        # every optional field is written here in the order `dump` builds it.
+        "curated-full": Deck(
+            slug="curated-full", name="Everything At Once", status="built",
+            stage="curated", shared=False, pilot="Aaron's sister",
+            commander_art="0aae2e33-1111-4000-8000-000000000000",
+            commander=["Trostani, Selesnya's Voice"],
+            companion="Kaheera, the Orphanguard", bracket=4,
+            themes=["tokens", "lifegain", "midrange"],
+            strategy="Make more creatures than anybody can answer, and then "
+                     "make each of them worth answering twice.",
+            cards=[CardEntry(name="Forest", category="land", qty=12,
+                             why="Green mana, and a great deal of it."),
+                   CardEntry(name="Sol Ring", category="ramp",
+                             why="Two mana on turn one, and it always has been.",
+                             scryfall_id="0aae2e33-2222-4000-8000-000000000000",
+                             mana_cost="{1}", tags=["fast", "colourless"])],
+            graveyard=[CardEntry(name="Primeval Titan", category="ramp",
+                                 why="Banned, and buried until it is not.")]),
+        # The legacy `archetype:` key: written back while it is load-bearing,
+        # and dropped the moment the themes name a class word.
+        "legacy-archetype": Deck(
+            slug="legacy-archetype", name="Pre-ADR-37", status="built",
+            stage="curated", commander=["Atla Palani, Nest Tender"],
+            legacy_archetype="midrange", themes=["dinosaurs", "sacrifice"]),
+        "legacy-shadowed": Deck(
+            slug="legacy-shadowed", name="Shadowed", status="built",
+            stage="curated", commander=["Atla Palani, Nest Tender"],
+            legacy_archetype="midrange",
+            themes=["dinosaurs", "sacrifice", "midrange"]),
+        # The empty shapes: `check_empty_sequence` sends both to the flow
+        # writer, so these are `[]` rather than a block with nothing under it.
+        "empty": Deck(slug="empty", name="empty", status="theoretical",
+                      stage="draft", commander=[]),
+        # The scalar shapes, at the width `dump` uses. Every one of these is a
+        # different branch of `choose_scalar_style`: a look-alike that must be
+        # quoted, an indicator that must be, prose long enough to fold, a name
+        # with an apostrophe, one with unicode, and one that would read back as
+        # a number.
+        "scalars": Deck(
+            slug="scalars", name="yes", status="built", stage="curated",
+            commander=["Ich-Tekik, Salvage Splicer"],
+            pilot="1.0e+3",
+            strategy="A strategy long enough that PyYAML has to fold it across "
+                     "more than one line at width one hundred, which is where "
+                     "the fold rule and the indent rule meet.",
+            cards=[CardEntry(name="Ætherling", category="threat",
+                             why="colon: and # hash, plus braces {G}{W} and a "
+                                 "trailing space "),
+                   CardEntry(name="Sword of Feast and Famine", category="threat",
+                             why="no"),
+                   CardEntry(name="Borrowing 100,000 Arrows", category="threat",
+                             why="- a leading dash, and *an asterisk*"),
+                   CardEntry(name="Erase (Not the Urza's Legacy One)",
+                             category="interaction", why="1996")]),
+    }
+
+
+def render_dump_cases() -> str:
+    """Each deck above, as the dumper writes it."""
+    return json.dumps(
+        {name: deck.dump() for name, deck in dump_cases().items()},
+        indent=1, ensure_ascii=False) + "\n"
+
+
 def render_edit_cases() -> str:
     """Every operation over every fixture deck, with Python's exact answer."""
     from mtglab.decks import edit
@@ -863,7 +1186,8 @@ def render_edit_cases() -> str:
            "remove_card": edit.remove_card, "entomb_card": edit.entomb_card,
            "return_card": edit.return_card, "exile_card": edit.exile_card,
            "set_card_field": edit.set_card_field,
-           "set_deck_field": edit.set_deck_field, "set_note": edit.set_note}
+           "set_deck_field": edit.set_deck_field, "set_note": edit.set_note,
+           "set_shared": edit.set_shared}
 
     sources: dict[str, str] = {name: deck.dump()
                               for name, deck in gate_cases().items()}
@@ -914,6 +1238,15 @@ def write() -> None:
     EDITS_PATH.parent.mkdir(parents=True, exist_ok=True)
     EDITS_PATH.write_text(render_edit_cases(), encoding="utf-8")
     print(f"wrote {EDITS_PATH}")
+    DUMPS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    DUMPS_PATH.write_text(render_dump_cases(), encoding="utf-8")
+    print(f"wrote {len(dump_cases())} dump cases into {DUMPS_PATH}")
+    DECKLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    DECKLIST_PATH.write_text(render_decklist_cases(), encoding="utf-8")
+    print(f"wrote {len(decklist_cases())} decklist cases into {DECKLIST_PATH}")
+    IMPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    IMPORT_PATH.write_text(render_import_cases(), encoding="utf-8")
+    print(f"wrote {len(import_cases())} import cases into {IMPORT_PATH}")
     RENDER_PATH.parent.mkdir(parents=True, exist_ok=True)
     RENDER_PATH.write_text(render_render_cases(), encoding="utf-8")
     print(f"wrote {len(render_cases())} render cases into {RENDER_PATH}")

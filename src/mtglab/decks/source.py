@@ -31,6 +31,7 @@ from typing import Protocol, runtime_checkable
 
 from mtglab import config
 from mtglab.artifacts.generate import DELIVERABLES, SNAPSHOT, store
+from mtglab.decks import edit
 from mtglab.decks.model import Deck
 
 
@@ -378,20 +379,25 @@ class FileDeckSource:
     def set_shared(self, slug: str, shared: bool) -> None:
         """Write `shared:` into the deck file. The YAML is this tier's truth.
 
-        A re-dump rather than a surgical edit, which is the one place this
-        tier departs from ADR 12 -- and it is departing from it for a field
-        ADR 12 was never about. `shared` is a single boolean with no prose
-        attached, so there is no comment to destroy and no folded block to
-        reflow; `dump` omits it entirely when true, so putting a deck back on
-        display leaves the file exactly as it was.
+        A surgical edit like every other write (ADR 12), through
+        `edit.set_shared`. It was a `Deck.load` / `Deck.dump` round trip until
+        2026-08-22, on the argument that `shared` is a single boolean with no
+        prose attached -- true of the field, and irrelevant, because `dump`
+        rewrites the whole file. One press of the deck page's share toggle
+        took a hand-written deck's section banners, its trailing comments, its
+        folded blocks and its `swap_board: []` with it. Found by the Go port,
+        which had to reproduce the bytes and asked what they were.
+
+        Unchanged: `dump` omits `shared` when true, so putting a deck back on
+        display removes the key rather than asserting the default.
         """
         self._writable_or_raise(slug)
         path = self._path(slug)                      # raises DeckNotFound
-        deck = Deck.load(path)
-        if deck.shared == shared:
+        if Deck.load(path).shared == shared:
             return
-        deck.shared = shared
-        deck.dump(path)
+        path.write_text(
+            edit.set_shared(path.read_text(encoding="utf-8"), shared=shared),
+            encoding="utf-8")
 
     @property
     def writable(self) -> bool:

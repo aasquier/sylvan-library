@@ -138,15 +138,6 @@ def _open(text: str) -> tuple[dict[str, Any], list[str]]:
     return doc, text.split("\n")
 
 
-def _unquote(value: str) -> str:
-    """Parse a YAML scalar the way the loader will, so quoting never matters."""
-    try:
-        parsed = load_yaml(value)
-    except yaml.YAMLError:
-        return value.strip()
-    return parsed if isinstance(parsed, str) else value.strip()
-
-
 def _requires_rationale(doc: dict[str, Any]) -> bool:
     """Whether this deck's cards must each carry a `why` (rule 4, ADR 13).
 
@@ -1032,6 +1023,68 @@ def set_deck_field(text: str, *, field: str, value: Any) -> str:
             _content, tail = _split_tail(shadowed[start:end], 0)
             updated = "\n".join(shadowed[:start] + tail + shadowed[end:])
             expected.pop("archetype", None)
+
+    return _verified(updated, expected)
+
+
+def set_shared(text: str, *, shared: bool) -> str:
+    """Put the deck on display to other accounts, or take it off (ADR 22).
+
+    The tenth operation, and it exists because the ninth's docstring made a
+    claim that was not true: *"nothing on the app's write path ever calls
+    `Deck.dump` on an existing file"*. `FileDeckSource.set_shared` did, and it
+    was the only thing that did. A load-and-dump round trip rewrites the whole
+    file -- so one press of the deck page's share toggle took a hand-written
+    curated deck's section banners, its trailing comments, its folded blocks
+    and its `swap_board: []` with it, and since ADR 30 there is no revision to
+    get them back from. Found by the Go port, ruled by Aaron 2026-08-22, and
+    fixed in both runtimes at once so the two still write the same bytes.
+
+    Deliberately not a `SETTABLE_DECK_FIELDS` entry. `shared` is the one deck
+    fact the two tiers keep in different places -- `deck.yaml` here, a column
+    in the SQL tier -- which is why it has its own route rather than riding the
+    PATCH beside it, and putting it in that tuple would publish it on that
+    route as a side effect.
+
+    **True removes the key rather than writing it.** Absent already means
+    shared (`Deck.shared` defaults to True and `dump` omits it), so writing
+    `shared: true` would grow every curated file a line asserting the default
+    it already had -- the same self-cleaning round trip `commander_art` and the
+    shadowed `archetype:` use.
+    """
+    doc, lines = _open(text)
+    span = _top_level_span(lines, "shared")
+
+    expected = copy.deepcopy(doc)
+    if shared:
+        expected.pop("shared", None)
+        if span is None:
+            return _verified(text, expected)
+        start, end = span
+        _content, tail = _split_tail(lines[start:end], 0)
+        updated = "\n".join(lines[:start] + tail + lines[end:])
+    else:
+        expected["shared"] = False
+        rendered = _render("shared", False, 0)
+        if span is None:
+            # Placed where `Deck.dump` would put it -- after the commander,
+            # before the pilot -- rather than at the end of the file, which is
+            # the rule `set_deck_field` follows for an absent `stage:`.
+            before = _DECK_KEY_ORDER[:_DECK_KEY_ORDER.index("shared")]
+            at = 0
+            for key in before:
+                found = _top_level_span(lines, key)
+                if found is not None:
+                    content, _tail = _split_tail(lines[found[0]:found[1]], 0)
+                    at = max(at, found[0] + len(content))
+            updated = "\n".join(lines[:at] + rendered + lines[at:])
+        else:
+            start, end = span
+            _content, tail = _split_tail(lines[start:end], 0)
+            match = _SCALAR.match(lines[start])
+            if match and match["comment"]:
+                rendered = [f"{rendered[0]}  {match['comment']}"]
+            updated = "\n".join(lines[:start] + rendered + tail + lines[end:])
 
     return _verified(updated, expected)
 
