@@ -1,0 +1,216 @@
+{
+ "note": "Generated from `mtglab.api.jobs` by `python tests/go_fixtures.py`. `want_json` is the body Starlette writes: compact separators, no ASCII escaping.",
+ "lanes": {"cpu": "cpu", "net": "net", "forge": "forge"},
+ "live": [
+  "queued",
+  "running"
+ ],
+ "max_jobs": 200,
+ "id_length": 12,
+ "unknown_lane": [
+  {"lane": "nope", "error": "unknown job lane 'nope'; expected one of ['cpu', 'forge', 'net']"},
+  {"lane": "", "error": "unknown job lane ''; expected one of ['cpu', 'forge', 'net']"},
+  {"lane": "CPU", "error": "unknown job lane 'CPU'; expected one of ['cpu', 'forge', 'net']"},
+  {"lane": "cpu ", "error": "unknown job lane 'cpu '; expected one of ['cpu', 'forge', 'net']"},
+  {"lane": "sim", "error": "unknown job lane 'sim'; expected one of ['cpu', 'forge', 'net']"},
+  {"lane": "it's", "error": "unknown job lane \"it's\"; expected one of ['cpu', 'forge', 'net']"},
+  {"lane": "say \"cpu\"", "error": "unknown job lane 'say \"cpu\"'; expected one of ['cpu', 'forge', 'net']"}
+ ],
+ "percent": [
+  {"done": 1, "total": 8, "want": 12},
+  {"done": 3, "total": 8, "want": 38},
+  {"done": 5, "total": 8, "want": 62},
+  {"done": 7, "total": 8, "want": 88},
+  {"done": 1, "total": 2, "want": 50},
+  {"done": 3, "total": 2, "want": 150},
+  {"done": 1, "total": 200, "want": 0},
+  {"done": 3, "total": 200, "want": 2},
+  {"done": 5, "total": 200, "want": 2},
+  {"done": 7, "total": 200, "want": 4},
+  {"done": 1, "total": 40, "want": 2},
+  {"done": 1, "total": 24, "want": 4},
+  {"done": 5, "total": 24, "want": 21},
+  {"done": 7, "total": 24, "want": 29},
+  {"done": 11, "total": 24, "want": 46},
+  {"done": 0, "total": 0, "want": 0},
+  {"done": 5, "total": 0, "want": 0},
+  {"done": 0, "total": 1, "want": 0},
+  {"done": 1, "total": 1, "want": 100},
+  {"done": 1, "total": 3, "want": 33},
+  {"done": 2, "total": 3, "want": 67},
+  {"done": 1, "total": 7, "want": 14},
+  {"done": 6, "total": 7, "want": 86},
+  {"done": 1, "total": 6, "want": 17},
+  {"done": 5, "total": 6, "want": 83},
+  {"done": 33, "total": 100, "want": 33},
+  {"done": 99, "total": 100, "want": 99},
+  {"done": 100, "total": 100, "want": 100},
+  {"done": 1, "total": 20000, "want": 0},
+  {"done": 19999, "total": 20000, "want": 100},
+  {"done": 20000, "total": 20000, "want": 100},
+  {"done": 1, "total": 33, "want": 3},
+  {"done": 17, "total": 33, "want": 52},
+  {"done": 2, "total": 16, "want": 12},
+  {"done": 6, "total": 16, "want": 38},
+  {"done": 10, "total": 16, "want": 62},
+  {"done": 14, "total": 16, "want": 88},
+  {"done": 1, "total": 80, "want": 1},
+  {"done": 3, "total": 80, "want": 4},
+  {"done": 1, "total": 800, "want": 0},
+  {"done": 399, "total": 800, "want": 50},
+  {"done": 401, "total": 800, "want": 50}
+ ],
+ "stamps": [
+  {
+   "at": [2026, 8, 22, 13, 10, 20, 936490],
+   "want": "2026-08-22T13:10:20.936490+00:00"
+  },
+  {
+   "at": [2026, 8, 22, 13, 10, 20, 0],
+   "want": "2026-08-22T13:10:20+00:00"
+  },
+  {
+   "at": [2026, 8, 22, 13, 10, 20, 1],
+   "want": "2026-08-22T13:10:20.000001+00:00"
+  },
+  {
+   "at": [2026, 8, 22, 13, 10, 20, 999999],
+   "want": "2026-08-22T13:10:20.999999+00:00"
+  },
+  {
+   "at": [2026, 8, 22, 13, 10, 20, 100000],
+   "want": "2026-08-22T13:10:20.100000+00:00"
+  },
+  {
+   "at": [2026, 1, 2, 3, 4, 5, 60],
+   "want": "2026-01-02T03:04:05.000060+00:00"
+  },
+  {
+   "at": [2026, 12, 31, 23, 59, 59, 999999],
+   "want": "2026-12-31T23:59:59.999999+00:00"
+  },
+  {
+   "at": [2027, 1, 1, 0, 0, 0, 0],
+   "want": "2027-01-01T00:00:00+00:00"
+  }
+ ],
+ "payloads": [
+  {
+   "name": "queued, nothing reported yet",
+   "job": {"id": "0f1e2d3c4b5a", "kind": "sim.mana", "status": "queued", "done": 0, "total": 0, "result_json": null, "partial_json": null, "error": null, "label": "Arahbo — mana", "owner": null, "key": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want": {"id": "0f1e2d3c4b5a", "kind": "sim.mana", "status": "queued", "done": 0, "total": 0, "percent": 0, "partial": null, "label": "Arahbo — mana", "result": null, "error": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want_json": "{\"id\":\"0f1e2d3c4b5a\",\"kind\":\"sim.mana\",\"status\":\"queued\",\"done\":0,\"total\":0,\"percent\":0,\"partial\":null,\"label\":\"Arahbo — mana\",\"result\":null,\"error\":null,\"created_at\":\"2026-08-22T13:10:20.936490+00:00\"}"
+  },
+  {
+   "name": "queued for somebody, with a dedupe key -- neither may serialise",
+   "job": {"id": "a1b2c3d4e5f6", "kind": "claude.dossier", "status": "queued", "done": 0, "total": 0, "result_json": null, "partial_json": null, "error": null, "label": "Goreclaw, Terror of Qal Sisma", "owner": 7, "key": "oracle:1234", "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want": {"id": "a1b2c3d4e5f6", "kind": "claude.dossier", "status": "queued", "done": 0, "total": 0, "percent": 0, "partial": null, "label": "Goreclaw, Terror of Qal Sisma", "result": null, "error": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want_json": "{\"id\":\"a1b2c3d4e5f6\",\"kind\":\"claude.dossier\",\"status\":\"queued\",\"done\":0,\"total\":0,\"percent\":0,\"partial\":null,\"label\":\"Goreclaw, Terror of Qal Sisma\",\"result\":null,\"error\":null,\"created_at\":\"2026-08-22T13:10:20.936490+00:00\"}"
+  },
+  {
+   "name": "running, and on a tie: 1 of 8 is 12.5",
+   "job": {"id": "112233445566", "kind": "sim.lands", "status": "running", "done": 1, "total": 8, "result_json": null, "partial_json": null, "error": null, "label": "Gyome — lands", "owner": null, "key": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want": {"id": "112233445566", "kind": "sim.lands", "status": "running", "done": 1, "total": 8, "percent": 12, "partial": null, "label": "Gyome — lands", "result": null, "error": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want_json": "{\"id\":\"112233445566\",\"kind\":\"sim.lands\",\"status\":\"running\",\"done\":1,\"total\":8,\"percent\":12,\"partial\":null,\"label\":\"Gyome — lands\",\"result\":null,\"error\":null,\"created_at\":\"2026-08-22T13:10:20.936490+00:00\"}"
+  },
+  {
+   "name": "running, with the theater's rows before the result exists",
+   "job": {"id": "66554433221a", "kind": "sim.forge", "status": "running", "done": 2, "total": 8, "result_json": null, "partial_json": "[{\"game\":1,\"winner\":\"arahbo\",\"turns\":9},{\"game\":2,\"winner\":null,\"turns\":14}]", "error": null, "label": "Cat vs Dino", "owner": null, "key": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want": {
+    "id": "66554433221a",
+    "kind": "sim.forge",
+    "status": "running",
+    "done": 2,
+    "total": 8,
+    "percent": 25,
+    "partial": [
+     {"game": 1, "winner": "arahbo", "turns": 9},
+     {"game": 2, "winner": null, "turns": 14}
+    ],
+    "label": "Cat vs Dino",
+    "result": null,
+    "error": null,
+    "created_at": "2026-08-22T13:10:20.936490+00:00"
+   },
+   "want_json": "{\"id\":\"66554433221a\",\"kind\":\"sim.forge\",\"status\":\"running\",\"done\":2,\"total\":8,\"percent\":25,\"partial\":[{\"game\":1,\"winner\":\"arahbo\",\"turns\":9},{\"game\":2,\"winner\":null,\"turns\":14}],\"label\":\"Cat vs Dino\",\"result\":null,\"error\":null,\"created_at\":\"2026-08-22T13:10:20.936490+00:00\"}"
+  },
+  {
+   "name": "done, with a result and the bar filled",
+   "job": {"id": "deadbeefcafe", "kind": "sim.mana", "status": "done", "done": 20000, "total": 20000, "result_json": "{\"games\":20000,\"mulligan_rate\":0.1732,\"cached\":false,\"computed_at\":null,\"caveat\":\"no opponents, no interaction\"}", "partial_json": null, "error": null, "label": "Trostani — mana", "owner": null, "key": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want": {
+    "id": "deadbeefcafe",
+    "kind": "sim.mana",
+    "status": "done",
+    "done": 20000,
+    "total": 20000,
+    "percent": 100,
+    "partial": null,
+    "label": "Trostani — mana",
+    "result": {"games": 20000, "mulligan_rate": 0.1732, "cached": false, "computed_at": null, "caveat": "no opponents, no interaction"},
+    "error": null,
+    "created_at": "2026-08-22T13:10:20.936490+00:00"
+   },
+   "want_json": "{\"id\":\"deadbeefcafe\",\"kind\":\"sim.mana\",\"status\":\"done\",\"done\":20000,\"total\":20000,\"percent\":100,\"partial\":null,\"label\":\"Trostani — mana\",\"result\":{\"games\":20000,\"mulligan_rate\":0.1732,\"cached\":false,\"computed_at\":null,\"caveat\":\"no opponents, no interaction\"},\"error\":null,\"created_at\":\"2026-08-22T13:10:20.936490+00:00\"}"
+  },
+  {
+   "name": "born finished, which is what a cache hit is",
+   "job": {"id": "000000000001", "kind": "sim.mana", "status": "done", "done": 1, "total": 1, "result_json": "{\"cached\":true}", "partial_json": null, "error": null, "label": "Tivit — mana", "owner": null, "key": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want": {
+    "id": "000000000001",
+    "kind": "sim.mana",
+    "status": "done",
+    "done": 1,
+    "total": 1,
+    "percent": 100,
+    "partial": null,
+    "label": "Tivit — mana",
+    "result": {"cached": true},
+    "error": null,
+    "created_at": "2026-08-22T13:10:20.936490+00:00"
+   },
+   "want_json": "{\"id\":\"000000000001\",\"kind\":\"sim.mana\",\"status\":\"done\",\"done\":1,\"total\":1,\"percent\":100,\"partial\":null,\"label\":\"Tivit — mana\",\"result\":{\"cached\":true},\"error\":null,\"created_at\":\"2026-08-22T13:10:20.936490+00:00\"}"
+  },
+  {
+   "name": "errored, and the string is a class name and a message",
+   "job": {"id": "ffffffffffff", "kind": "sim.mana", "status": "error", "done": 0, "total": 0, "result_json": null, "partial_json": null, "error": "DeckNotFound: no deck 'no-such-deck'", "label": "no-such-deck — mana", "owner": null, "key": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want": {"id": "ffffffffffff", "kind": "sim.mana", "status": "error", "done": 0, "total": 0, "percent": 0, "partial": null, "label": "no-such-deck — mana", "result": null, "error": "DeckNotFound: no deck 'no-such-deck'", "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want_json": "{\"id\":\"ffffffffffff\",\"kind\":\"sim.mana\",\"status\":\"error\",\"done\":0,\"total\":0,\"percent\":0,\"partial\":null,\"label\":\"no-such-deck — mana\",\"result\":null,\"error\":\"DeckNotFound: no deck 'no-such-deck'\",\"created_at\":\"2026-08-22T13:10:20.936490+00:00\"}"
+  },
+  {
+   "name": "a label carrying the characters an HTML-escaping encoder would eat",
+   "job": {"id": "3c3e26273c3e", "kind": "claude.argue", "status": "queued", "done": 0, "total": 0, "result_json": null, "partial_json": null, "error": null, "label": "<Ajani> & \"Nacatl\" — 'why' — 100% <cut>", "owner": null, "key": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want": {"id": "3c3e26273c3e", "kind": "claude.argue", "status": "queued", "done": 0, "total": 0, "percent": 0, "partial": null, "label": "<Ajani> & \"Nacatl\" — 'why' — 100% <cut>", "result": null, "error": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want_json": "{\"id\":\"3c3e26273c3e\",\"kind\":\"claude.argue\",\"status\":\"queued\",\"done\":0,\"total\":0,\"percent\":0,\"partial\":null,\"label\":\"<Ajani> & \\\"Nacatl\\\" — 'why' — 100% <cut>\",\"result\":null,\"error\":null,\"created_at\":\"2026-08-22T13:10:20.936490+00:00\"}"
+  },
+  {
+   "name": "a label and a result in scripts the wire must not \\u-escape",
+   "job": {"id": "000000c0ffee", "kind": "claude.theme.proposal", "status": "done", "done": 1, "total": 1, "result_json": "{\"note\":\"Ünsere Vorschläge — 火の玉 🜁\",\"score\":1.5}", "partial_json": null, "error": null, "label": "Ünsere Vorschläge", "owner": null, "key": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want": {
+    "id": "000000c0ffee",
+    "kind": "claude.theme.proposal",
+    "status": "done",
+    "done": 1,
+    "total": 1,
+    "percent": 100,
+    "partial": null,
+    "label": "Ünsere Vorschläge",
+    "result": {"note": "Ünsere Vorschläge — 火の玉 🜁", "score": 1.5},
+    "error": null,
+    "created_at": "2026-08-22T13:10:20.936490+00:00"
+   },
+   "want_json": "{\"id\":\"000000c0ffee\",\"kind\":\"claude.theme.proposal\",\"status\":\"done\",\"done\":1,\"total\":1,\"percent\":100,\"partial\":null,\"label\":\"Ünsere Vorschläge\",\"result\":{\"note\":\"Ünsere Vorschläge — 火の玉 🜁\",\"score\":1.5},\"error\":null,\"created_at\":\"2026-08-22T13:10:20.936490+00:00\"}"
+  },
+  {
+   "name": "a count with no bound, which is nought per cent and not a crash",
+   "job": {"id": "0b0b0b0b0b0b", "kind": "sim.policy", "status": "running", "done": 5, "total": 0, "result_json": null, "partial_json": null, "error": null, "label": "Atla — policy", "owner": null, "key": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want": {"id": "0b0b0b0b0b0b", "kind": "sim.policy", "status": "running", "done": 5, "total": 0, "percent": 0, "partial": null, "label": "Atla — policy", "result": null, "error": null, "created_at": "2026-08-22T13:10:20.936490+00:00"},
+   "want_json": "{\"id\":\"0b0b0b0b0b0b\",\"kind\":\"sim.policy\",\"status\":\"running\",\"done\":5,\"total\":0,\"percent\":0,\"partial\":null,\"label\":\"Atla — policy\",\"result\":null,\"error\":null,\"created_at\":\"2026-08-22T13:10:20.936490+00:00\"}"
+  },
+  {
+   "name": "a stamp with no fraction at all",
+   "job": {"id": "0a0a0a0a0a0a", "kind": "sim.mana", "status": "queued", "done": 0, "total": 0, "result_json": null, "partial_json": null, "error": null, "label": "Goreclaw — mana", "owner": null, "key": null, "created_at": "2026-08-22T13:10:20+00:00"},
+   "want": {"id": "0a0a0a0a0a0a", "kind": "sim.mana", "status": "queued", "done": 0, "total": 0, "percent": 0, "partial": null, "label": "Goreclaw — mana", "result": null, "error": null, "created_at": "2026-08-22T13:10:20+00:00"},
+   "want_json": "{\"id\":\"0a0a0a0a0a0a\",\"kind\":\"sim.mana\",\"status\":\"queued\",\"done\":0,\"total\":0,\"percent\":0,\"partial\":null,\"label\":\"Goreclaw — mana\",\"result\":null,\"error\":null,\"created_at\":\"2026-08-22T13:10:20+00:00\"}"
+  }
+ ]
+}
