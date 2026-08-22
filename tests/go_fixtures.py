@@ -48,6 +48,7 @@ encoding; it is not a card pool redistribution (ADR 6, rule 5).
 
 from __future__ import annotations
 
+import base64
 import json
 import sys
 import tempfile
@@ -1516,6 +1517,126 @@ def render_edit_cases() -> str:
                       indent=1, ensure_ascii=False) + "\n"
 
 
+CRYPTO_PATH = ROOT / "go" / "internal" / "auth" / "testdata" / "crypto.json"
+
+#: `app.db`'s DDL, embedded by `go/internal/auth/authtest` and handed to every
+#: Go test that needs a real one. It lived beside `internal/decklog`'s tests
+#: until 2026-08-22, when the accounts flip found that two *other* packages had
+#: each transcribed the ladder by hand and frozen it at a different rung; the
+#: package comment on `authtest` records what that cost.
+APP_SCHEMA_PATH = ROOT / "go" / "internal" / "auth" / "authtest" / "app_schema.sql"
+
+#: Passwords the Argon2 oracle records. Deliberately awkward: a short one the
+#: strength check would refuse but the *verifier* must still handle (an account
+#: whose hash predates the floor), an empty one, unicode above the BMP, a
+#: passphrase with the spaces the floor is written to encourage, and one at the
+#: 1024-byte ceiling. What is being proven is the encoding, and the encoding is
+#: where a length or a code point turns into a different byte string.
+_ARGON2_PASSWORDS: tuple[tuple[str, str], ...] = (
+    ("an ordinary passphrase", "correct horse battery staple"),
+    ("the shortest a route will store", "twelve chars"),
+    ("below the floor, still verifiable", "short"),
+    ("empty, which verify must not crash on", ""),
+    ("unicode above the BMP", "🜁 quicksilver 🜃 the alchemist's word"),
+    ("a colon and a dollar, which PHC delimits on", "a$b:c$d$e:f$gh"),
+    ("at the byte ceiling", "x" * 1024),
+)
+
+#: Salts, fixed so the fixture is reproducible and the *encoding* is what is
+#: under test rather than the entropy source. 16 bytes is argon2-cffi's default
+#: and therefore the project's.
+_ARGON2_SALTS: tuple[bytes, ...] = tuple(
+    bytes(((i * 37 + j * 11) % 256) for j in range(16))
+    for i in range(len(_ARGON2_PASSWORDS))
+)
+
+
+def crypto_cases() -> dict[str, Any]:
+    """The Argon2id and SHA-256 oracle: what `mtglab.auth` writes, exactly.
+
+    This is the fixture behind the migration's sharpest compatibility claim.
+    ADR 38 promises "Argon2id PHC hashes verify as-is", which the read side
+    proved in Phase 2 -- but Phase 4's accounts flip makes Go a *writer*, and a
+    hash Go writes has to be one `argon2-cffi` verifies for the rest of time,
+    including after a rollback to a Python-only door.
+
+    A round trip in one direction would not settle it. So the record is
+    stronger: each case pins the **exact PHC string** `argon2-cffi` produces
+    for a given password *and a given salt*, which turns the question from "do
+    both sides accept each other's output" into "are both sides the same
+    function". Go recomputes the string from the recorded salt and must match
+    it byte for byte; a Go-written hash then differs from a Python-written one
+    only in the random salt, which travels inside the string.
+
+    Two assertions run here rather than in a test, because a fixture that
+    records something the project does not itself produce would prove the wrong
+    thing: every encoded hash must verify under the project's own
+    `PasswordHasher`, and none may be reported as needing a rehash -- which is
+    what pins the parameters to `passwords.MEMORY_COST_KIB` and friends rather
+    than to numbers written twice.
+
+    The SHA-256 half is the token hash both `sessions.py` and `tokens.py`
+    store. It is a one-liner on both sides and it is recorded anyway, because
+    it is the other thing that would let a Go-minted session or invite be
+    invisible to Python -- and a fixture is cheaper than finding out.
+    """
+    from argon2.low_level import Type, hash_secret
+
+    from mtglab.auth import passwords, sessions, tokens
+
+    cases: list[dict[str, Any]] = []
+    for (note, password), salt in zip(_ARGON2_PASSWORDS, _ARGON2_SALTS,
+                                      strict=True):
+        encoded = hash_secret(
+            password.encode("utf-8"), salt,
+            time_cost=passwords.TIME_COST,
+            memory_cost=passwords.MEMORY_COST_KIB,
+            parallelism=passwords.PARALLELISM,
+            hash_len=32,          # argon2-cffi's DEFAULT_HASH_LENGTH
+            type=Type.ID,
+        ).decode("ascii")
+        # The fixture must be the project's own output, not merely valid
+        # Argon2: verify it through the hasher the app actually holds.
+        assert passwords.verify(encoded, password), note
+        assert not passwords.needs_rehash(encoded), (
+            f"{note}: the recorded parameters are not the ones "
+            "`passwords.py` asks for")
+        cases.append({
+            "note": note,
+            "password": password,
+            "salt_b64": base64.b64encode(salt).decode("ascii"),
+            "hash": encoded,
+        })
+
+    # Both modules hash a token the same way; recorded through both names so a
+    # divergence between them would fail here rather than in production.
+    token_inputs = ("", "a", "x" * 43, "🜂-a-token-with-unicode-in-it")
+    digests = [{"input": raw,
+                "digest": sessions._hash(raw)} for raw in token_inputs]
+    for entry in digests:
+        assert tokens._hash(entry["input"]) == entry["digest"]
+
+    return {
+        "argon2id": {
+            "params": {
+                "memory_cost_kib": passwords.MEMORY_COST_KIB,
+                "time_cost": passwords.TIME_COST,
+                "parallelism": passwords.PARALLELISM,
+                "salt_bytes": 16,
+                "hash_bytes": 32,
+            },
+            "min_password_length": passwords.MIN_PASSWORD_LENGTH,
+            "max_password_bytes": passwords.MAX_PASSWORD_BYTES,
+            "cases": cases,
+        },
+        "sha256_hex": digests,
+    }
+
+
+def render_crypto_cases() -> str:
+    return json.dumps(crypto_cases(), indent=1, ensure_ascii=False) + "\n"
+
+
 def write() -> None:
     TESTDATA.mkdir(parents=True, exist_ok=True)
     text, parsed = render()
@@ -1532,8 +1653,10 @@ def write() -> None:
     print(f"wrote {SCHEMA_PATH}\nwrote {TINY_POOL_PATH}")
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     (LOG_DIR / "describe.json").write_text(render_log_cases(), encoding="utf-8")
-    (LOG_DIR / "app_schema.sql").write_text(render_app_schema(), encoding="utf-8")
-    print(f"wrote the log oracle and app.db's schema into {LOG_DIR}")
+    print(f"wrote the log oracle into {LOG_DIR}")
+    APP_SCHEMA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    APP_SCHEMA_PATH.write_text(render_app_schema(), encoding="utf-8")
+    print(f"wrote app.db's schema into {APP_SCHEMA_PATH}")
     EDITS_PATH.parent.mkdir(parents=True, exist_ok=True)
     EDITS_PATH.write_text(render_edit_cases(), encoding="utf-8")
     print(f"wrote {EDITS_PATH}")
@@ -1557,6 +1680,9 @@ def write() -> None:
     for name, body in render_gate_cases().items():
         (GATE_DIR / name).write_text(body, encoding="utf-8")
     print(f"wrote {len(render_gate_cases())} gate cases into {GATE_DIR}")
+    CRYPTO_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CRYPTO_PATH.write_text(render_crypto_cases(), encoding="utf-8")
+    print(f"wrote the Argon2id and token-hash oracle into {CRYPTO_PATH}")
 
 
 if __name__ == "__main__":

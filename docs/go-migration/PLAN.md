@@ -8,9 +8,10 @@ with Aaron the same day the plan was drafted; each ruling is recorded
 inline there, and [ADR 38](../adr/0038-the-served-backend-is-rewritten-in-go.md)
 made them formal on the Phase 1 branch the same day (Appendix A was its
 draft). **Phases 0 to 3 are done and Phase 4 is in progress** — the edit
-engine, the nine editing routes and the four lifecycle routes have flipped,
-and what is left of it is the artifacts rebuild and the accounts; the port
-board in §10 is the frontier. Written by Claude from a
+engine, the nine editing routes, the four lifecycle routes and the accounts
+engine have flipped, and what is left of it is the account routes and the
+artifacts rebuild; the port board in §10 is the frontier, and it now also
+records what is **not** Phase 4's despite living under `/api/admin`. Written by Claude from a
 measured read of the tree (see [BASELINE.md](BASELINE.md)); the judgment
 calls were argued, then ruled.
 
@@ -603,10 +604,24 @@ and a wrong byte here lands in the file somebody's deck lives in).* The edit ope
 `_commit` + the activity log (ADR 28: one call site, `record` never raises,
 no rationale text), create/import/promote/delete, notes, labels (ADR 37's
 worst-piloted reading — server-side only, as the deck page already assumes),
-admin routes, invites/resets (EmailSender seam; no test sends mail),
+the **account** routes, invites/resets (EmailSender seam; no test sends mail),
 rate limiting. *Gate: golden-deck edit equivalence — every operation applied
 by Go over fixture decks yields byte-output Python's operation also yields;
 ADR 5/16/17 matrices green via the contract suite.*
+
+**What "admin routes" turned out to mean, recorded 2026-08-22 when the
+accounts were built.** This phase said "admin routes" without qualification
+and that sentence was false in both directions, so it now says *accounts*.
+The **stats** six under `/api/admin` are not Phase 4's: `adminstats.py` reads
+`api/jobs.py`'s in-memory registry and the process's own RSS, and
+`claude/prices.py` and `claude/tiers.py` besides — two families that have not
+moved. And one *account* route is not Phase 4's either: `DELETE
+/api/admin/users/{username}` calls `jobs.forget_owner` on that same in-memory
+registry, and it cannot be skipped, because `users.id` is re-issued by SQLite
+and jobs left keyed on a freed id would be handed to the next account
+created. Both flip behind the jobs registry, which is Phase 5. §10's board
+carries the detail; the lesson is the general one this plan keeps
+re-learning — **a prefix is not a family.**
 
 **Phase 5 — Jobs and the simulator** *(~1–1½ days; **re-priced ~½–1 day**
 — the line-driven half prices at Phase 3's rate; the `pyrand` digest chase
@@ -758,7 +773,11 @@ There is more than one Claude in this house now. Rules for the duration:
   | `POST /api/decks`, `POST /api/decks/import`, `DELETE /api/decks/{owner}/{slug}`, `PUT .../shared` | **go** | `go/internal/api/lifecycle.go`, 2026-08-22 — the sixth family: the moments a deck begins and ends. **None of them goes through `commit`**, because creation, deletion and sharing are outside `service._commit` in Python and therefore outside ADR 28's log; keeping them outside is the decision, since adding one means a second call site and one call site is the log's whole design |
   | `artifacts/generate.py` — the renderer, `store`, and the notes' file order under both | **go** | `go/internal/artifacts` over `go/internal/deckyaml`'s `ParseOrdered`, 2026-08-22 — the engine only; **the route has not flipped**, so Python still builds. Held to Python by an eighth generated oracle: 18 fixture decks, every deliverable byte for byte and in order, the draft refusal's own sentence included, with the date pinned so the corpus does not expire at midnight |
   | `POST /api/decks/{owner}/{slug}/artifacts` | python | **its own flip, decided 2026-08-22 rather than drifted into.** It is `render_all` — five markdown deliverables whose *bytes* are the product, `swaps.md` being a diff of `deck.yaml` — which is a rendering surface of the edit engine's weight and nothing to do with a lifecycle. A **plain route, and that was measured** (70–83ms warm across four real decks on the instance), so it stays one; and it is deliberately **outside ADR 28's log**, because a build derives files *from* a deck rather than editing one |
-  | everything else under `/api` — `api/` (the jobs, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the wheel), `sim/`, `claude/`, `mana.py` (the solver), `tarot.py`, `cli.py`, and all of `auth/`'s writes | python | proxied to uvicorn on loopback; Phase 4 finishes with the accounts (admin routes, invites and resets through the EmailSender seam, rate limiting) |
+  | `auth/users.py`, `auth/tokens.py`, `auth/invites.py`, `auth/ratelimit.py`, `auth/mail.py`, and the write sides of `auth/sessions.py` and `auth/passwords.py`; `claude/tiers.py`'s table | **go** | `go/internal/auth` (one Go package for one Python package, file for file) and `go/internal/tiers`, 2026-08-22 — the engine only; **no route has flipped**, so Python still serves every account request. The write handle is `mode=rw`, never `rwc`, and an absent `app.db` is **read as an empty one** — measured against Python, which creates the file on the first login and then answers 401 against it, because a reader cannot tell empty from absent. Held to Python by `go/internal/auth/testdata/crypto.json`: the exact PHC string argon2-cffi writes for a password **and a fixed salt**, which the Go encoder must reproduce byte for byte — a round trip in each direction would pass even if the two encoders disagreed about base64 padding for some salts and not others |
+  | `POST /api/auth/login`, `logout`, `reset`, `claim`, `claim/preview`, `GET /api/auth/me`; `GET` and `POST /api/admin/users`, `PATCH /api/admin/users/{username}`, `POST .../reset`, `DELETE .../sessions` | **go** | `go/internal/api`, 2026-08-22 — the seventh family, and the last of Phase 4 |
+  | `DELETE /api/admin/users/{username}` | python | **blocked behind the jobs registry, not deferred by choice.** Deleting an account also calls `jobs.forget_owner`, and `api/jobs.py` holds its jobs **in memory in the uvicorn process** — which the door cannot reach. The reason it must not be skipped is arithmetic rather than tidiness: `users.id` is `INTEGER PRIMARY KEY` without `AUTOINCREMENT`, so SQLite re-issues a deleted account's rowid, and jobs left keyed on that integer would be handed to whoever is created next. The response says `jobs_dropped`, so a Go handler could not even report an honest number. It flips with the jobs family |
+  | `/api/admin/stats/*` (the six), `api/traffic.py`, `api/flymetrics.py` | python | **not part of Phase 4, despite the prefix.** `adminstats.py` is coupled to two families that have not moved: `stats/system` reads the same in-memory job registry *and* `_rss()`, the process's own resident size — which is the worse of the two, because a Go handler would answer it *successfully* with the door's RSS and the number would keep rendering while quietly changing meaning; and `stats/claude` reads `claude/prices.py` and `claude/tiers.py`, so porting it now would drag slices of `claude/` across ahead of its family, which §7's "a route family moves whole" forbids. It flips behind the jobs registry and the Claude family |
+  | everything else under `/api` — `api/` (the jobs, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the wheel), `sim/`, `claude/`, `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
   walked before the next flip starts (main deploys itself; every flip is a

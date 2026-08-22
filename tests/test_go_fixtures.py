@@ -149,7 +149,8 @@ def test_every_oracle_this_module_writes_is_checked_for_drift():
     checked by name above or by a test of its own.
     """
     named = {name for _what, name, _render in _ORACLES} | {
-        "YAML_PATH", "JSON_PATH", "RENDER_PATH", "SCHEMA_PATH", "TINY_POOL_PATH"}
+        "YAML_PATH", "JSON_PATH", "RENDER_PATH", "SCHEMA_PATH", "TINY_POOL_PATH",
+        "APP_SCHEMA_PATH", "CRYPTO_PATH"}
     writes = {name for name in dir(go_fixtures)
               if name.endswith("_PATH") and isinstance(getattr(go_fixtures, name), Path)}
     assert writes - named == set(), (
@@ -188,17 +189,70 @@ def test_the_committed_app_schema_is_what_the_ladder_leaves():
     tests inserting into a table that no longer looks like that.
     """
     fresh = go_fixtures.render_app_schema()
-    committed = (go_fixtures.LOG_DIR / "app_schema.sql").read_text(encoding="utf-8")
+    committed = go_fixtures.APP_SCHEMA_PATH.read_text(encoding="utf-8")
     assert committed == fresh, (
-        f"{go_fixtures.LOG_DIR / 'app_schema.sql'} is stale; regenerate with "
+        f"{go_fixtures.APP_SCHEMA_PATH} is stale; regenerate with "
         "`python tests/go_fixtures.py`")
     from mtglab.auth import db
     assert f"PRAGMA user_version = {db.SCHEMA_VERSION};" in committed
     assert "CREATE TABLE deck_log" in committed
+    # The columns three Go packages had each transcribed by hand, and the one
+    # that broke two of them: `model_tier` arrives at rung 10, and a fixture
+    # frozen at rung 1 reports `no such column` rather than being obviously
+    # eight rungs behind. Named here so a rebuild of `users` that dropped it
+    # fails as a sentence rather than as somebody else's test.
+    assert "model_tier" in committed
     # Schema only. This file is committed to a public repository, and rule 5
     # is about what a tracked file may contain, not only about what is easy to
     # forget.
     assert "INSERT" not in committed.upper()
+
+
+def test_the_committed_crypto_oracle_is_what_argon2_writes_now():
+    """The migration's sharpest compatibility claim, and its one moving part.
+
+    Phase 4 makes Go a *writer* of password hashes, so a hash it stores has to
+    be one `argon2-cffi` verifies for the rest of the file's life -- after a
+    rollback to a Python-only door, and for `mtglab users` on the machine. The
+    Go test proves that by reproducing each recorded PHC string byte for byte
+    from the recorded salt; this holds the record itself to what Python writes
+    today, so an argon2-cffi upgrade that changed the encoding fails here with
+    the regeneration command rather than in production six weeks later.
+    """
+    fresh = go_fixtures.render_crypto_cases()
+    committed = go_fixtures.CRYPTO_PATH.read_text(encoding="utf-8")
+    assert committed == fresh, (
+        f"{go_fixtures.CRYPTO_PATH} is stale; regenerate with "
+        "`python tests/go_fixtures.py`")
+
+
+def test_the_crypto_oracle_records_this_builds_own_parameters():
+    """A corpus recorded under other parameters would prove the wrong thing.
+
+    `crypto_cases` already asserts every hash verifies and none needs a
+    rehash, which is the strong form; this is the cheap readable form, so a
+    change to `passwords.py` fails with the parameter's name in the message.
+    """
+    from mtglab.auth import passwords
+    recorded = json.loads(go_fixtures.render_crypto_cases())["argon2id"]
+    assert recorded["params"]["memory_cost_kib"] == passwords.MEMORY_COST_KIB
+    assert recorded["params"]["time_cost"] == passwords.TIME_COST
+    assert recorded["params"]["parallelism"] == passwords.PARALLELISM
+    assert recorded["min_password_length"] == passwords.MIN_PASSWORD_LENGTH
+    assert recorded["max_password_bytes"] == passwords.MAX_PASSWORD_BYTES
+    # The corpus is only as good as its awkward cases: an empty password, one
+    # under the storage floor that must still *verify*, and one carrying the
+    # `$` and `:` that PHC delimits on.
+    passwords_recorded = {c["password"] for c in recorded["cases"]}
+    assert "" in passwords_recorded
+    assert any(len(p) < passwords.MIN_PASSWORD_LENGTH and p
+               for p in passwords_recorded)
+    assert any("$" in p for p in passwords_recorded)
+    # And a salt whose base64 uses both characters the URL alphabet renames,
+    # because that substitution is the mistake that would produce a string
+    # Python accepts for some salts and rejects for others.
+    salts = "".join(c["salt_b64"] for c in recorded["cases"])
+    assert "+" in salts and "/" in salts
 
 
 def test_the_fixture_round_trips_through_the_deck_model():

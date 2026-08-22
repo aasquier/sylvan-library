@@ -1,11 +1,14 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/alexedwards/argon2id"
+	"golang.org/x/crypto/argon2"
 )
 
 // The OWASP minimum profile `auth/passwords.py` pins and argues: memory-hard
@@ -42,11 +45,11 @@ var params = &argon2id.Params{
 // CheckStrength refuses a password that must not be stored.
 func CheckStrength(password string) error {
 	if len(password) > MaxPasswordBytes {
-		return fmt.Errorf("%w: password is longer than %d bytes",
+		return failf("%w: password is longer than %d bytes",
 			ErrWeakPassword, MaxPasswordBytes)
 	}
 	if len([]rune(password)) < MinPasswordLength {
-		return fmt.Errorf("%w: password must be at least %d characters "+
+		return failf("%w: password must be at least %d characters "+
 			"-- length beats punctuation, so a short phrase is a fine answer",
 			ErrWeakPassword, MinPasswordLength)
 	}
@@ -56,11 +59,42 @@ func CheckStrength(password string) error {
 // HashPassword hashes for storage, in the PHC string form argon2-cffi writes
 // (`$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`), so a hash made here
 // verifies there and the other way round.
+//
+// The salt is drawn here and the encoding is `hashWithSalt` below rather than
+// the library's own `CreateHash`, and that is deliberate: it makes the salt an
+// *argument*, which is what lets `testdata/crypto.json` pin this function's
+// output against argon2-cffi's **byte for byte** instead of settling for a
+// round trip. Phase 2 only had to prove Go could read Python's hashes; the
+// accounts flip makes Go a writer, and a hash written here has to be one
+// `argon2-cffi` verifies for the rest of time -- including after a rollback to
+// a Python-only door.
 func HashPassword(password string) (string, error) {
 	if err := CheckStrength(password); err != nil {
 		return "", err
 	}
-	return argon2id.CreateHash(password, params)
+	salt := make([]byte, saltLength)
+	if _, err := rand.Read(salt); err != nil {
+		return "", fmt.Errorf("no entropy for a password salt: %w", err)
+	}
+	return hashWithSalt(password, salt), nil
+}
+
+// hashWithSalt is the encoder: Argon2id at the profile above, written as the
+// PHC string argon2-cffi writes.
+//
+// Every detail here is somebody else's format decision, copied rather than
+// chosen. The version field is `v=19` (0x13), the parameter order is `m,t,p`,
+// and the salt and digest are **unpadded** standard base64 -- not the URL
+// alphabet, which is the one mistake that would produce a string Python's
+// parser accepts for some salts and rejects for others, so the corpus carries
+// a salt with both `+` and `/` in it.
+func hashWithSalt(password string, salt []byte) string {
+	sum := argon2.IDKey([]byte(password), salt, TimeCost, MemoryCostKiB,
+		Parallelism, keyLength)
+	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
+		argon2.Version, MemoryCostKiB, TimeCost, Parallelism,
+		base64.RawStdEncoding.EncodeToString(salt),
+		base64.RawStdEncoding.EncodeToString(sum))
 }
 
 // Verify asks whether password is the one behind storedHash. A nil hash --
