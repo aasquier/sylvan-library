@@ -66,12 +66,40 @@ and why the surface asks for a mana target rather than assuming one.
 Where the two are within `TOO_CLOSE` the advice says "either" rather than
 resolving a tie with a coin.
 
-Stdlib only, and no model. Every number here has a right answer.
+## Why the two float sums here are `fsum` and not `sum`
+
+They were `sum` until 2026-08-22, and **that made this module answer
+differently on Python 3.11 and on Python 3.12.** CPython 3.12 gave `sum()`
+compensated (Neumaier) accumulation over floats; 3.11 adds them
+left to right. Same deck, same arithmetic, one ulp apart -- and this project
+supports both interpreters and tests both in CI, while the container runs
+3.12. So a figure computed on a laptop and the same figure computed on the
+instance were not the same number.
+
+One ulp of a probability is nothing on a screen at one decimal place. It is
+not nothing here, because `_slots_to_target` scans `on_curve_odds` against
+`>= target` and `curve` branches on `abs(per_land - per_ramp) < TOO_CLOSE`:
+the outputs of this module are an integer and a word, and both come out of a
+comparison. Found by the Go port, which had to reproduce the bytes and so had
+to ask what they were -- the same way the share toggle's rewrite was found.
+
+`fsum` rather than pinning either interpreter's answer, because it is the
+*correct* one rather than merely a stable one: it is correctly rounded, which
+neither `sum` is. `karsten.castable_odds` reached for it first and for the
+same reason, in the same words -- a hundred small products of probabilities is
+exactly the shape that accumulates float error worth avoiding. The two
+accumulations that are written as explicit loops (`expected_ramp`, and the two
+distributions) were never affected and are left alone; changing them would be
+changing numbers for tidiness.
+
+Stdlib only, and no model. Every number here has a right answer -- and, since
+this fix, the same right answer on every interpreter.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import fsum
 
 from mtglab.sim.karsten import _exactly, cards_seen, hypergeometric_at_least
 from mtglab.sim.tier1.engine import SimCard
@@ -138,8 +166,11 @@ def expected_lands_in_play(deck_size: int, lands: int, turn: int, *,
     if deck_size <= 0 or lands <= 0 or turn <= 0:
         return 0.0
     seen = min(cards_seen(turn, on_the_play=on_the_play), deck_size)
-    return sum(min(turn, k) * _exactly(deck_size, lands, seen, k)
-               for k in range(min(seen, lands) + 1))
+    # `fsum`, not `sum`: see the module docstring. `sum` over floats is
+    # compensated on 3.12 and left-to-right on 3.11, so this line used to
+    # answer differently depending on the interpreter underneath it.
+    return fsum(min(turn, k) * _exactly(deck_size, lands, seen, k)
+                for k in range(min(seen, lands) + 1))
 
 
 def expected_ramp(library: list[SimCard], turn: int, *,
@@ -265,7 +296,10 @@ def on_curve_odds(library: list[SimCard], turn: int, *,
         if short <= 0:
             total += lw
         elif short < len(ramp_dist):
-            total += lw * sum(ramp_dist[short:])
+            # The inner sum is `fsum` for the interpreter reason in the module
+            # docstring. The outer accumulation is a loop and always was, so
+            # it never had the problem and is not changed.
+            total += lw * fsum(ramp_dist[short:])
     return min(1.0, total)
 
 

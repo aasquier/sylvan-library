@@ -273,6 +273,43 @@ suite read. The port gets four instruments, cheapest first:
    `sim/curve.py` are `math.comb` hypergeometrics and expectations — no
    sampling; Go must agree to within an epsilon pinned per function.
 
+   **Done 2026-08-22, and every pinned epsilon is zero.** The tolerance
+   this item allowed for turned out not to be needed: `math/big` gives
+   the binomials exactly where Python has `math.comb`, one `big.Rat`
+   division is correctly rounded to the same definition CPython's
+   int/int division uses, and CPython's `math.fsum` and both `round`s
+   are reproduced in `go/internal/sim` rather than approximated. So the
+   corpora compare `Float64bits` and the per-function pins each record
+   *why* exact was affordable there — which is what a future drift will
+   name.
+
+   **Exactness is load-bearing here rather than tidy**, which is the
+   part worth carrying forward: every integer these two modules produce
+   comes out of a `>=` against a float. `required_sources` scans until
+   the odds clear the target, `CardOdds.reliable_turn` scans against
+   0.90 and feeds the shelf's sort key, `_slots_to_target` scans until
+   `on_curve_odds` clears, and `curve`'s advice branches on
+   `abs(per_land - per_ramp) < TOO_CLOSE`. A tolerance wide enough to
+   absorb a rounding difference is wide enough to hide a different land
+   count.
+
+   **Two divergences the port found rather than inherited**, both fixed
+   in both runtimes on the same branch, in the pattern the share toggle
+   set. *The arm64 fused multiply-add*: Go's spec lets an implementation
+   fuse `t += a*b` into one operation and the arm64 backend does, which
+   rounds once where CPython rounds twice — one ulp, on the architecture
+   the image ships, in exactly the accumulations these modules are made
+   of. The spec names one cure, an explicit conversion, and
+   `sim.Rounded` is it; the disassembly was read to confirm the guard
+   survives inlining. *And `sum()` is not the same function on every
+   interpreter*: CPython 3.12 gave `sum()` over floats compensated
+   (Neumaier) accumulation where 3.11 adds left to right, so
+   `curve.expected_lands_in_play` and `curve.on_curve_odds` answered
+   differently depending on the Python underneath them — on a project
+   whose CI tests both and whose container runs 3.12. Both are `fsum`
+   now, which is correctly rounded and therefore the same everywhere;
+   the corpus was rendered under 3.11 and 3.12 and diffed to prove it.
+
 Plus commandments 14 and 16 unchanged: every flip is walked on the deployed
 pair before it is called done, and anything Aaron's eye can see changed (there
 should be nothing) goes before his eye first.
@@ -692,7 +729,9 @@ insertion order, so every job result still to cross owes itself a struct with
 the fields in Python's order. And **the arithmetic on the way out is not
 neutral** — `percent` rounds half to even, which `math.Round` does not, and
 one job in eight lands on a tie. Then `pyrand`, then Tier 1
-against `REFERENCE_DIGEST`, karsten + curve to tolerance, the mulligan grid,
+against `REFERENCE_DIGEST`, karsten + curve to tolerance (**done 2026-08-22, and
+the tolerance came out at zero** — see §10's row and the note in §5 item
+4), the mulligan grid,
 land sweeps, the sim cache (ADR 18 keys with a Go-source fingerprint;
 `deck_check` attached after the cache exactly as today), `NothingToSimulate`,
 and the job families flipped. **The GIL dividend lands here and gets
@@ -852,6 +891,7 @@ There is more than one Claude in this house now. Rules for the duration:
   | `/api/admin/stats/*` (the six), `api/traffic.py`, `api/flymetrics.py` | python | **not part of Phase 4, despite the prefix.** `adminstats.py` is coupled to two families that have not moved: `stats/system` reads the same in-memory job registry *and* `_rss()`, the process's own resident size — which is the worse of the two, because a Go handler would answer it *successfully* with the door's RSS and the number would keep rendering while quietly changing meaning; and `stats/claude` reads `claude/prices.py` and `claude/tiers.py`, so porting it now would drag slices of `claude/` across ahead of its family, which §7's "a route family moves whole" forbids. It flips behind the jobs registry and the Claude family |
   | CPython's `random.Random` — MT19937, `init_by_array` seeding, `random()`, `getrandbits`, `_randbelow`, `randrange`, `shuffle`, `choice` | **go** | `go/internal/pyrand`, 2026-08-22 — **Phase 5's named tail risk, pulled forward and closed** (§5 item 3, §11 risk 3). A library, not a route: nothing calls it yet and nothing flipped. Held to CPython by `testdata/draws.json` (20 seeds, the raw word stream recorded apart from every consumer, `random()` compared as bits) plus a replay of the reference run's full 99,274-draw stream, so Tier 1's randomness is a checked fact before the engine that consumes it exists. `sample()` had no caller and was not written |
   | `api/jobs.py` — the registry: two pools, the `key` dedupe, born-finished jobs, the bound, `forget_owner` | **go** | `go/internal/jobs`, 2026-08-22 — **Phase 5's first half, and the engine only: no route has flipped**, so Python still owns every job a request creates. The CPU lane is the semaphore over goroutines ADR 38 promised, sized from `GOMAXPROCS` (8 here, and 1 on a `shared-cpu-1x` — a `Config` knob, not a constant); `NET` stays at two and `FORGE` at one, because neither of those bounds is a fact about the machine. Two differences are Go's rather than the design's and both are argued in the package comment: the mutable half of a `Job` is **guarded**, where Python's worker writes `status` and `done` with no lock and the GIL absorbs it, and a **panicking worker is a failed job** rather than a dead process. Held to Python by a ninth generated oracle (`jobs/testdata/jobs.json`), which caught three divergences a careful implementation would have shipped: `percent` **rounds half to even** (1 of 8 is 12.5, and Python answers 12 where `math.Round` answers 13), `created_at` **drops its fraction entirely** when the microsecond is zero and is spelled `+00:00` rather than `Z` — and it is the *sort key*, as text — and the lane refusal quotes with `repr`, which prefers single quotes. The concurrency is proven by the race detector, six killed mutations and a fuzz target over submit/dedupe (126k executions under `-race`); the mutation that dropped the owner from the match **found a weak test** rather than a weak implementation, because the fixture's keys and owners had been varied together. One constraint falls out of it for every family still to flip: **a ported job result must be a struct with its fields in Python's order, never a `map[string]any`**, since encoding/json sorts map keys and a dict does not |
+  | `sim/karsten.py` and `sim/curve.py` — Tier 1.5, the closed forms | **go** | `go/internal/sim/karsten` and `go/internal/sim/curve` over the shared `go/internal/sim`, 2026-08-22 — **the engine only; no route has flipped**, so `/api/decks/{owner}/{slug}/shelf` and its siblings are still Python's. Checkable, per the rule below: `grep -rn 'sim/karsten\|sim/curve' go/internal/api go/internal/door go/cmd` prints **nothing** at this commit — the engine has no caller in the served path — and stays that way until the jobs family moves. (The obvious `grep -c 'shelf' go/internal/api/api.go` is *not* that command and was written first: it answers **3**, all of them comments about the runtime shelves and the artifacts shelf. A row's command has to be run, which is the rule below, and running it is what caught this.) §5 item 4 asked for agreement "to within an epsilon pinned per function"; every epsilon is pinned at **zero** and the corpora compare `Float64bits`, because exact was affordable — `math/big` binomials where Python has `math.comb`, and CPython's own `math.fsum` and `round` reproduced in `go/internal/sim`. Exactness is not decoration: `required_sources`, `reliable_turn` and `_slots_to_target` all scan a float against `>=`, so one ulp is a different land count or a different recommendation. Two findings the port made rather than inherited, both fixed in **both** runtimes: arm64 fuses `t += a*b` into one `FMADDD` and rounds once where CPython rounds twice (guarded by `sim.Rounded`, an explicit conversion the Go spec blesses for exactly this), and **`sim/curve.py` answered differently on Python 3.11 and 3.12** because CPython 3.12 gave `sum()` over floats compensated accumulation — two lines, now `fsum`, and the corpus is byte-identical under both interpreters, verified |
   | everything else under `/api` — `api/` (the job *routes*, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the wheel), `sim/`, `claude/`, `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
