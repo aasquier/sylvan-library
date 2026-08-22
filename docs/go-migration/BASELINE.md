@@ -217,3 +217,17 @@ same cause (the CGO door binary links libduckdb's static archive). It is the int
 named (the image and the pair get bigger before they get smaller) and it is
 well inside the 1 GB machine; the door alone after Phase 8 is the number
 Appendix B wants, and this block is what it is compared against.
+
+## 2026-08-22 — the deck reads in the door (Phase 3, release v159)
+
+Read as the block above, right after the signed-in walk of the deck family
+(the shelf, a deck, its gate, stats, suggestions, commander panels).
+
+| Metric | Measured | How |
+| --- | ---: | --- |
+| RSS, the door, after the walk | **103.2 MB** (VmHWM 127.4 MB) | `/proc/<pid>/status` of `/opt/door/mtglab`, pid 652 |
+| App image, compressed | **147.7 MB** (12 layers) | the registry manifest, as above |
+
+Lower than v158's 119 MB at the same lease state, which says the number
+is the pool's instance and the moment it is read, not a trend; the
+comparison that matters is the door alone at Phase 8.

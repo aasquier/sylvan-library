@@ -42,7 +42,12 @@ func callCtx(t *testing.T, a *API, ctx context.Context, method, target, body str
 		matched := true
 		for i, seg := range segs {
 			if strings.HasPrefix(seg, "{") {
-				captured[strings.Trim(seg, "{}")] = parts[i]
+				name, suffix, _ := strings.Cut(seg[1:], "}")
+				if suffix != "" && (!strings.HasSuffix(parts[i], suffix) || len(parts[i]) == len(suffix)) {
+					matched = false
+					break
+				}
+				captured[name] = strings.TrimSuffix(parts[i], suffix)
 				continue
 			}
 			if seg != parts[i] {

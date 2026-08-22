@@ -93,6 +93,7 @@ func serve(host, port, upstream, webDist, tarot string, child []string) error {
 		// idle, re-opened when `data refresh` replaces the file.
 		Pool:       pool.New(config.DBPath(), log),
 		DecksDir:   config.DecksDir(),
+		DataDir:    config.DataDir(),
 		AdminEmail: config.AdminEmail(),
 		Logger:     log,
 	})

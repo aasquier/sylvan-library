@@ -3,6 +3,7 @@ package door
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -54,6 +55,11 @@ type compiledRoute struct {
 	handler  http.Handler
 }
 
+// paramRe is a parameter segment: `{name}`, or `{name}.svg` -- FastAPI's
+// `/api/symbols/{code}.svg`, where the parameter takes everything before a
+// literal suffix.
+var paramRe = regexp.MustCompile(`^\{([A-Za-z_][A-Za-z0-9_]*)\}([^{}/]*)$`)
+
 // newRouteTable compiles the API's routes, refusing a table that could match
 // one request two ways with nothing to choose between them: two patterns
 // with the same method and the same shape, literal for literal and
@@ -82,7 +88,7 @@ func newRouteTable(routes []api.Route, reserved []string) (*routeTable, error) {
 			if s == "" {
 				return nil, fmt.Errorf("route pattern %q has an empty segment", r.Pattern)
 			}
-			if strings.HasPrefix(s, "{") != strings.HasSuffix(s, "}") || s == "{}" {
+			if strings.ContainsAny(s, "{}") && !paramRe.MatchString(s) {
 				return nil, fmt.Errorf("route pattern %q has a malformed parameter %q", r.Pattern, s)
 			}
 		}
@@ -132,7 +138,25 @@ func literals(segments []string) int {
 }
 
 func isParam(seg string) bool {
-	return strings.HasPrefix(seg, "{") && strings.HasSuffix(seg, "}")
+	return paramRe.MatchString(seg)
+}
+
+// capture matches one request segment against a parameter segment: the
+// name it binds and the value, or false -- a suffix must be there and the
+// value before it must not be empty, as FastAPI's `[^/]+` requires.
+func capture(seg, part string) (string, string, bool) {
+	m := paramRe.FindStringSubmatch(seg)
+	if m == nil {
+		return "", "", false
+	}
+	name, suffix := m[1], m[2]
+	if suffix == "" {
+		return name, part, true
+	}
+	if !strings.HasSuffix(part, suffix) || len(part) == len(suffix) {
+		return "", "", false
+	}
+	return name, strings.TrimSuffix(part, suffix), true
 }
 
 // match finds the handler for r, setting its path values, or reports that
@@ -151,7 +175,12 @@ func (t *routeTable) match(r *http.Request) (http.Handler, bool) {
 		matched := true
 		for i, seg := range c.segments {
 			if isParam(seg) {
-				values[seg[1:len(seg)-1]] = parts[i]
+				name, value, ok := capture(seg, parts[i])
+				if !ok {
+					matched = false
+					break
+				}
+				values[name] = value
 				continue
 			}
 			if seg != parts[i] {

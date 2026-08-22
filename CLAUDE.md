@@ -482,8 +482,12 @@ go/                       the Go module (ADR 38; module path
                           internal/suggest, internal/mana (the parser),
                           internal/library (the file and SQL tiers, read
                           side, and ADR 22's Library), internal/decklog,
-                          internal/cards (the camera reader), and
-                          internal/config. The contract suite runs through
+                          internal/cards (the camera reader),
+                          internal/shelves (the three runtime caches:
+                          symbols, the pinned OCR files, the card-art
+                          derivatives -- configured by the generated
+                          shelves.json, Python's fingerprints included),
+                          and internal/config. The contract suite runs through
                           the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —

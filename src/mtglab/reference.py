@@ -28,7 +28,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from mtglab import colors, glossary, lore, tarotlore
+from mtglab import colors, glossary, lore, ocr, symbols, tarotlore
+from mtglab.cardmotion import cache as cardmotion_cache
+from mtglab.cardmotion.effects import EFFECTS
 from mtglab.decks import analyze, validate
 from mtglab.decks.model import (
     ARCHETYPES,
@@ -41,7 +43,7 @@ from mtglab.decks.model import (
 #: The files, in the order they are written. The names are the Go package's
 #: embed paths; a rename here is a rename there.
 FILES = ("colors.json", "glossary.json", "themes.json", "lore.json",
-         "tarotlore.json", "model.json")
+         "tarotlore.json", "model.json", "shelves.json")
 
 
 def colors_payload() -> dict[str, Any]:
@@ -143,6 +145,38 @@ def model_payload() -> dict[str, Any]:
     }
 
 
+def shelves_payload() -> dict[str, Any]:
+    """The three runtime shelves, as the routes over them need to know them
+    (ADR 32, ADR 33): the mana symbols' CDN and the shape a code may take,
+    the reading engine's pinned files -- url, SHA-256, size, media type, and
+    the versioned cache stamp -- and the card-art effects with the
+    **fingerprints Python computed**, so the Go serving tier matches a
+    derivative by the same sixteen hex digits the dev-machine build wrote
+    into its `attribution.json`, rather than re-deriving Python's
+    `json.dumps` byte for byte in a second language. Every value here is the
+    module's own, read, never typed."""
+    return {
+        "symbols": {
+            "cdn": symbols._CDN,
+            "code": symbols._CODE.pattern,
+            "max_bytes": symbols._MAX_BYTES,
+        },
+        "ocr": {
+            "cache_stamp": f"{ocr.CORE_VERSION}-{ocr.WORKER_VERSION}-{ocr.TESSDATA_VERSION}",
+            "max_bytes": ocr._MAX_BYTES,
+            "assets": {name: {"url": a.url, "digest": a.digest, "size": a.size,
+                              "media_type": a.media_type}
+                       for name, a in ocr.ASSETS.items()},
+        },
+        "cardmotion": {
+            "servable": sorted(cardmotion_cache.SERVABLE),
+            "effects": {key: {"fingerprint": e.fingerprint(),
+                              "needs_depth": e.needs_depth}
+                        for key, e in EFFECTS.items()},
+        },
+    }
+
+
 def payloads() -> dict[str, dict[str, Any]]:
     return {
         "colors.json": colors_payload(),
@@ -151,6 +185,7 @@ def payloads() -> dict[str, dict[str, Any]]:
         "lore.json": lore_payload(),
         "tarotlore.json": tarotlore_payload(),
         "model.json": model_payload(),
+        "shelves.json": shelves_payload(),
     }
 
 

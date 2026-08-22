@@ -478,7 +478,39 @@ the request context (`auth.WithScope`) for the ported routes; the third
 family flipped is `GET /api/decks`, the deck, `validate`, `stats`,
 `suggestions`, `commander`, `printings`, `log`, `artifacts` (the shelf and
 one deliverable) and `/api/colors/progress`, which left the reservation
-list the day it moved.
+list the day it moved. *Deployed as v159 and walked through the signed-in
+seat against the real library: seven tiles under the maintainer, the
+gate's counts on the shelf exactly CLAUDE.md's record (adrix 1, goreclaw 1
+— the banned Titan — the rest 0), Goreclaw's 75 known cards and the Titan's
+five suggested replacements, Tivit's and Goreclaw's commander panels; and
+uvicorn's access log silent for every one of them. The door's RSS read
+103 MB after the walk; the v159 image 147.7 MB compressed.*
+
+**The shelves came last, and closed the read spine.** `go/internal/shelves`
+is `symbols.py`, `ocr.py` and `cardmotion/cache.py`'s serving half over
+`data/cache/`: a mana symbol fetched from Scryfall's CDN on the first ask
+(size-capped, SVG-checked, written atomically, a 404 remembered), a
+reading-engine file fetched once and **refused unless its SHA-256 matches
+the pin** (loudly and stickily, as Python refuses it), and a card-art
+derivative found by scanning the small cache for an `attribution.json`
+naming the oracle id, the effect's fingerprint and — when the page says
+which painting it is showing — that painting's URL stem. The configuration
+moved as generated JSON too (`shelves.json`: the CDN and the code shape,
+the pinned files with their digests and the versioned cache stamp, the
+effects table **with the fingerprints Python computed**), because matching
+a derivative means matching the sixteen hex digits the dev-machine build
+wrote, and re-deriving Python's `json.dumps` byte for byte in a second
+language is the kind of cleverness a drift check exists to make
+unnecessary. The files serve with explicit media types (`text/javascript;
+charset=utf-8` as Starlette adds it, `image/svg+xml`, the four motion
+types), the caching policy `api/app.py` gives each, and Range requests a
+video element needs. The route table learned a parameter with a literal
+suffix (`/api/symbols/{code}.svg`, FastAPI's `[^/]+` before the dot). The
+fourth family flipped: `/api/symbols/{code}.svg`, `/api/ocr/{name}`,
+`/api/art/motion/{oracle_id}/{effect}` and its `/{filename}` — and with it
+**every read-only route under `/api` is the door's**; what still goes to
+Python is the writes, the jobs, the Claude surfaces, `/api/health`, the
+upcoming sets and the wheel (seeded `random.Random`, Phase 5's `pyrand`).
 
 **Phase 4 — Writes and the log** *(~¾–1 day).* The edit operations
 (text surgery + oracle verification, ADR 12's five rules re-proven),
@@ -624,8 +656,10 @@ There is more than one Claude in this house now. Rules for the duration:
   | `GET /api/cards/search`, `POST /api/cards/identify`, `GET /api/colors/{key}`, `GET /api/lore` — the pool behind the prose and the pool's own two doors | **go** | `go/internal/api`, 2026-08-21 — the second family; deployed as v158 |
   | `decks/model.py` (parse), `decks/validate.py`, `decks/companion.py`, `decks/analyze.py`, `decks/suggest.py`, `mana.py` (the parser), `decks/source.py` + `decks/sqlsource.py` + `decks/library.py` (reads), `decks/log.py` (reads), `auth/bootstrap.py:maintainer_username` | **go** | `go/internal/deck`, `gate`, `analyze`, `suggest`, `mana`, `library`, `decklog`, 2026-08-22 — held to Python by the differential cases in `go/internal/gate/testdata/` (written by `tests/go_fixtures.py`); Python still owns every write and the schema ladder |
   | `GET /api/decks`, `GET /api/decks/{owner}/{slug}` and its `validate`, `stats`, `suggestions`, `commander`, `printings`, `log`, `artifacts`, `artifacts/{name}`; `GET /api/colors/progress` | **go** | `go/internal/api`, 2026-08-22 — the third family, the deck reads |
+  | `symbols.py`, `ocr.py`, `cardmotion/cache.py` (serving) — the runtime shelves under `data/cache/` | **go** | `go/internal/shelves`, 2026-08-22; configured by the generated `shelves.json` (the pins, the CDN, the effects' fingerprints as Python computes them) |
+  | `GET /api/symbols/{code}.svg`, `GET /api/ocr/{name}`, `GET /api/art/motion/{oracle_id}/{effect}`, `GET .../{filename}` | **go** | `go/internal/api`, 2026-08-22 — the fourth family; the read spine is whole |
   | `colors.py`, `glossary.py`, `lore.py`, `tarotlore.py`, `decks/model.py:THEMES` — the prose itself | shared | authored in Python, rendered by `mtglab.reference` into `go/internal/reference/data/` (written by `tests/go_fixtures.py`, held current by `tests/test_go_fixtures.py`), embedded and served by Go; the JSON becomes authoritative at Phase 8 |
-  | everything else under `/api` — `api/` (the writes, the jobs, the Claude routes, health, the upcoming sets), `decks/` (the edits, import, create, delete, the wheel), `sim/`, `claude/`, `artifacts/` (rendering), `mana.py` (the solver), `tarot.py`, `symbols.py`, `ocr.py`, `cardmotion` serving, `cli.py` | python | proxied to uvicorn on loopback; the read spine's last family is the shelves (symbols, OCR, cardmotion), then Phase 4 |
+  | everything else under `/api` — `api/` (the writes, the jobs, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the edits, import, create, delete, the wheel), `sim/`, `claude/`, `artifacts/` (rendering), `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback; Phase 4 (the writes and the log) is next |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
   walked before the next flip starts (main deploys itself; every flip is a
