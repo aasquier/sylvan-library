@@ -689,13 +689,14 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   const [table, setTable] = useState<Table>(loadTable)
   const [reading, setReading] = useState<TarotReading | null>(null)
   const [shuffling, setShuffling] = useState(false)
-  const [settled, setSettled] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const timers = useRef<number[]>([])
   // Whether the last card was turned here, in front of somebody, or arrived
   // already face up from a stash. It decides whether the reveal gets its beat
-  // — see the settle effect below.
-  const turnedHere = useRef(false)
+  // — see the settle below. State rather than a ref because `settled` is read
+  // during render and is derived from this; turning a card re-renders the
+  // table anyway, so it costs nothing.
+  const [turnedHere, setTurnedHere] = useState(false)
 
   useEffect(() => {
     api.personas().then(setRoster).catch((e) => setError(String(e)))
@@ -737,12 +738,18 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   // turned over at a third of the size it started at. The wait is skipped
   // when the cards arrived already face up from a stash, because then there
   // is no reveal to land: they were read on a previous visit.
+  //
+  // Only the *waiting* is state; `settled` itself is arithmetic over it, so
+  // the stashed spread folds in the render it arrives in and never a beat
+  // later. The cleanup re-arms the wait, because a fresh deal un-completes
+  // the spread and the next reveal has earned the same beat this one got.
+  const [waited, setWaited] = useState(false)
   useEffect(() => {
-    if (!allTurned) { setSettled(false); return }
-    if (!turnedHere.current) { setSettled(true); return }
-    const t = window.setTimeout(() => setSettled(true), 1600)
-    return () => clearTimeout(t)
-  }, [allTurned])
+    if (!allTurned || !turnedHere) return
+    const t = window.setTimeout(() => setWaited(true), 1600)
+    return () => { clearTimeout(t); setWaited(false) }
+  }, [allTurned, turnedHere])
+  const settled = allTurned && (!turnedHere || waited)
 
   // Tell the page when the deal is the event. Computed here rather than
   // reusing `dealing` below because hooks cannot follow the early returns,
@@ -786,7 +793,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   }, [])
 
   const turn = (i: number) => {
-    turnedHere.current = true
+    setTurnedHere(true)
     // The sound outside the updater: React may re-run an updater, and a card
     // must not flip twice in the ear when it flips once on the table. The
     // shimmer rides under the flip — the ball noticing what was turned.

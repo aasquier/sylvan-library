@@ -39,8 +39,11 @@ export function LibraryWhisper() {
   // than re-rolling — a re-roll repeats itself often enough to feel broken.
   const [step, setStep] = useState(0)
   // One random offset per mount: a different first whisper each visit, the
-  // same one for the life of the page.
-  const offset = useRef(Math.floor(Math.random() * 997))
+  // same one for the life of the page. A lazy initialiser and not
+  // `useRef(…)` — useRef evaluates its argument on *every* render and throws
+  // all but the first away, so the one roll was really being made over and
+  // over for a value that never changed.
+  const [offset] = useState(() => Math.floor(Math.random() * 997))
   const panel = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -64,7 +67,7 @@ export function LibraryWhisper() {
 
   // A coprime stride visits every term before any repeats. 89 is prime and
   // the glossary is nowhere near a multiple of it.
-  const term = terms[(offset.current + step * 89) % terms.length]
+  const term = terms[(offset + step * 89) % terms.length]
   const section = glossary?.sections.find((s) => s.key === term?.section)
 
   return (

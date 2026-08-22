@@ -170,21 +170,21 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const refreshAuth = useCallback(async () => {
-    try {
-      // `is_admin` and not `user?.is_admin`: with auth off the caller is the
-      // local single user, who is an admin and is authenticated as nobody, so
-      // the nested flag is null exactly when the page is most usable.
-      setAuth(await api.me())
-    } catch {
+  // Still returns a promise -- signing out and signing in both wait on it --
+  // but written as one rather than with `await`, because the answer arrives
+  // over the wire and never in the effect below that asks for it.
+  const refreshAuth = useCallback(
+    // `is_admin` and not `user?.is_admin`: with auth off the caller is the
+    // local single user, who is an admin and is authenticated as nobody, so
+    // the nested flag is null exactly when the page is most usable.
+    () => api.me().then(setAuth)
       // An instance that cannot answer the public endpoint cannot be logged
       // into either. Falling through to the app is what it did before there
       // was a login screen, and the individual routes report their own errors.
-      setAuth(null)
-    } finally {
-      setChecked(true)
-    }
-  }, [])
+      .catch(() => setAuth(null))
+      .finally(() => setChecked(true)),
+    [],
+  )
 
   useEffect(() => {
     api.health().then(setHealth).catch(() => setHealth(null))

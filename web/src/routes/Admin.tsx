@@ -959,14 +959,16 @@ export default function Admin() {
   // no account to be signed in as and every row is somebody else's.
   const [me, setMe] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    try {
-      setData(await api.accounts())
-      setError(null)
-    } catch (e) {
-      setError(errorMessage(e))
-    }
-  }, [])
+  // A promise rather than `await`, and it still returns one: the row actions
+  // below await `onChanged` before they let go of their spinner. Written this
+  // way because the accounts land after a round trip and never in the effect
+  // that asked for them, which is the thing the `await` form hid.
+  const load = useCallback(
+    () => api.accounts()
+      .then((accounts) => { setData(accounts); setError(null) })
+      .catch((e: unknown) => { setError(errorMessage(e)) }),
+    [],
+  )
 
   useEffect(() => { void load() }, [load])
 

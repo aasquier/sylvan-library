@@ -94,8 +94,18 @@ function InterviewPanel({ deck, card, askNow = false }: {
 
   // A new card is a new interview. Without this the questions about the last
   // card linger beside the next one's empty box, which is the most misleading
-  // thing this panel could do.
-  useEffect(() => { setReport(null); setError(null) }, [card])
+  // thing this panel could do -- and an effect cleared them one render *after*
+  // that had already happened, so the misleading frame was shipped and then
+  // withdrawn. Adjusting during render is React's own answer to "reset state
+  // when a prop changes" and closes the window rather than shortening it. The
+  // rest of the panel's state survives on purpose: the stance readout is
+  // about the deck and the dial, neither of which changed.
+  const [interviewing, setInterviewing] = useState(card)
+  if (interviewing !== card) {
+    setInterviewing(card)
+    setReport(null)
+    setError(null)
+  }
 
   const askIt = useCallback(async () => {
     setBusy(true)

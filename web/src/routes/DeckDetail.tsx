@@ -608,7 +608,18 @@ export default function DeckDetail() {
   // copy exists so the status fetch below can depend on the pin — and so it can
   // clear one this build no longer serves.
   const [pin, setPinFor] = useStance()
+  // Which address each lazy panel has already asked for. Both live up here
+  // with the state they guard, rather than beside the effects that use them:
+  // `historyFor` used to be declared two hundred lines down, below three
+  // things that write it, which reads as a puzzle and analyses as one too.
+  //
+  // `historyFor` is its own ref rather than sharing `requested`, and that is
+  // not tidiness: one ref holding one key would make opening Validation and
+  // then History serve whichever was asked for second and cancel the other.
+  // `history` also has to be re-fetched after an edit, which is a thing the
+  // shortlist never does.
   const requested = useRef<string | null>(null)
+  const historyFor = useRef<string | null>(null)
   // The card the user is proposing to swap in. Null means no swap is being
   // composed; the composer itself (`SwapComposer`) owns the rationale text.
   const [swapping, setSwapping] = useState<{ out: string; into: string } | null>(null)
@@ -825,9 +836,35 @@ export default function DeckDetail() {
     }
   }
 
-  useEffect(() => {
+  // Walking from one deck to another keeps this component mounted — the route
+  // is the same, only its parameters moved — so everything the last deck put
+  // on screen has to be put down before the new one's name goes up. Done
+  // during the render that notices the address changed, which is React's own
+  // answer to "reset state when a prop changes" and the only one that closes
+  // the window rather than shortening it: clearing in an effect shipped a
+  // frame of the previous deck's 99, its stats and its trivia under the new
+  // deck's masthead, and then withdrew it.
+  //
+  // The two latches below stay in the effect. A ref written during render is a
+  // value the render after it cannot account for, and these two only ever need
+  // to be right by the time an effect reads them.
+  const address = `${owner}/${slug}`
+  const [showing, setShowing] = useState(address)
+  if (showing !== address) {
+    setShowing(address)
     setDeck(null)
     setError(null)
+    setDossier(null)
+    setSuggestions(null)
+    // The history belongs to *this* deck. Put down here as well as keyed by
+    // address below, so a slow fetch for the deck being left cannot land in
+    // the panel of the deck being opened.
+    setHistory(null)
+  }
+
+  useEffect(() => {
+    requested.current = null
+    historyFor.current = null
     Promise.all([api.deck(deckRef), api.stats(deckRef), api.validate(deckRef)])
       .then(([d, s, v]) => {
         setDeck(d)
@@ -835,15 +872,7 @@ export default function DeckDetail() {
         setReport(v)
       })
       .catch((e) => setError(errorMessage(e)))
-    setDossier(null)
     api.commander(deckRef).then(setDossier).catch(() => setDossier(null))
-    setSuggestions(null)
-    requested.current = null
-    // The history belongs to *this* deck. Cleared here as well as keyed by
-    // address below, so a slow fetch for the deck being left cannot land in
-    // the panel of the deck being opened.
-    setHistory(null)
-    historyFor.current = null
   }, [deckRef, owner, slug])
 
   // Its own effect, and keyed on the pin as well as the deck, because the
@@ -851,8 +880,19 @@ export default function DeckDetail() {
   // and re-asking is how the dial's readout shows what a pin actually bought
   // after the deployment ceiling has had its say. Nothing here recomputes that
   // — the clamp has one implementation and it is `stance.clamp`.
-  useEffect(() => {
+  //
+  // Put down during render for the reason the deck is, one line of state
+  // apiece: the question here is the address *and* the pin, since moving the
+  // dial re-asks, and a readout that kept the last answer up while the new one
+  // was on the wire would be reporting a setting nobody is on any more.
+  const asking = `${address}\n${pin ?? ''}`
+  const [asked, setAsked] = useState(asking)
+  if (asked !== asking) {
+    setAsked(asking)
     setClaude(null)
+  }
+
+  useEffect(() => {
     // `owner` alongside `slug`: this route takes its deck as a query parameter
     // rather than a path segment, so the URL says nothing about whose it is.
     fetchClaudeStatus({ slug, owner }, pin, () => setPinFor(null))
@@ -878,21 +918,22 @@ export default function DeckDetail() {
 
   // The history (ADR 28), on the same terms as the shortlist above: lazily,
   // for the tab that shows it, keyed on the whole address because two owners
-  // may both have a `goreclaw`.
+  // may both have a `goreclaw`. `historyFor` is declared with `requested`, up
+  // among the state.
   //
-  // Its own ref rather than sharing `requested`, and that is not tidiness: one
-  // ref holding one key would make opening Validation and then History serve
-  // whichever was asked for second and cancel the other. `history` also has to
-  // be re-fetched after an edit, which is a thing the shortlist never does.
-  const historyFor = useRef<string | null>(null)
+  // Claiming the address is the *effect's* business, not the fetch's: `refresh`
+  // below re-fetches a history it has already claimed, and a fetch that
+  // re-stamped the latch on every call would be writing a value its own caller
+  // had just read.
   const loadHistory = useCallback(() => {
-    historyFor.current = `${owner}/${slug}`
     api.deckLog(deckRef).then((l) => setHistory(l.entries))
       .catch(() => setHistory([]))
-  }, [deckRef, owner, slug])
+  }, [deckRef])
 
   useEffect(() => {
-    if (tab !== 'history' || historyFor.current === `${owner}/${slug}`) return
+    const key = `${owner}/${slug}`
+    if (tab !== 'history' || historyFor.current === key) return
+    historyFor.current = key
     loadHistory()
   }, [tab, owner, slug, loadHistory])
 
