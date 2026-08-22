@@ -157,12 +157,25 @@ build`/`go test` of a package that reaches `net/http`. The symbol is a macOS
 Xcode 12 SDK (macOS 11) does not declare; with CGO off Go links internally
 and never asks, with CGO on clang does the link and refuses. `-U` lets the
 symbol resolve at load time, where macOS 12 has it. Linux -- CI, the image
--- never sees the flag. golangci-lint
-is `CGO_ENABLED=0 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1`
--- the same missing symbol, the other way out. The three Go gates, run from `go/`:
-`go vet ./... && go test -race ./... && golangci-lint run ./...`; CI runs
-them on both Linux architectures. To run the pair locally: start `mtglab ui`
-(Python) on one port, then `go run ./cmd/mtglab ui --upstream http://127.0.0.1:<that port>`
+-- never sees the flag. golangci-lint is INSTALLED with
+`CGO_ENABLED=0 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1`
+-- the same missing symbol, the other way out -- and lands in `~/go/bin`.
+**Running it needs the opposite of that**, which cost a session finding out:
+CGO must be ON or `internal/pool` will not typecheck (`build constraints
+exclude all Go files in duckdb-go-bindings/lib/darwin-amd64`), and the 1.26
+toolchain has to be on `PATH` *and* `GOROOT` or it resolves the stock
+`/usr/local/go` 1.20 and reports `package log/slog is not in GOROOT`. Neither
+error mentions the linter. So the three Go gates, run from `go/`:
+
+```bash
+export PATH="$HOME/sdk/go1.26.7/bin:$PATH" GOROOT="$HOME/sdk/go1.26.7"
+export CGO_LDFLAGS="-Wl,-U,_SecTrustCopyCertificateChain"
+go vet ./... && go test -race ./... && ~/go/bin/golangci-lint run ./...
+```
+
+CI runs them on both Linux architectures, where none of this applies.
+
+To run the pair locally: start `mtglab ui` (Python) on one port, then `go run ./cmd/mtglab ui --upstream http://127.0.0.1:<that port>`
 from `go/` on another, with the same `MTGLAB_*` environment exported (the
 door has no `.env` reader); `tests/contract/README.md` has the exact
 commands, including how to run the contract suite through it.
@@ -1249,9 +1262,11 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
 - Reserved List is allowed or forbidden **per deck** — check the deck file.
 - Every bug fix gets a test. `mana.py` is subtle; `tests/test_mana.py` pins the
   cases where naive source-counting gives the wrong answer.
-- Go, from `go/`: `go vet ./... && go test -race ./... && golangci-lint run
-  ./...` before pushing — the three checks CI requires. `gofmt -l .` should
-  print nothing. Package comments carry the argument, like docstrings do here.
+- Go, from `go/`: `go vet`, `go test -race` and `golangci-lint run` before
+  pushing — the three checks CI requires, and on this Mac all three want the
+  environment the Setup section spells out (CGO on, the 1.26 toolchain on
+  `PATH` and `GOROOT`). `gofmt -l .` should print nothing. Package comments
+  carry the argument, like docstrings do here.
 - `ruff check src tests` and `mypy` before pushing. mypy is strict by default
   with one named exception in `pyproject.toml` (`cli.py`, since `cards/db.py`
   graduated 2026-08-16); that list is meant to shrink,
@@ -1264,10 +1279,17 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
 
 ## Landing work
 
-The repo is public and `main` is protected: pull request required, **all six**
-CI checks green, branch up to date, enforced for admins. A direct push to
-`main` is rejected — branch first, then open a PR. Squash merge; linear history
-is required.
+The repo is public and `main` is protected: pull request required, **every
+required CI check** green, branch up to date, enforced for admins. A direct
+push to `main` is rejected — branch first, then open a PR. Squash merge; linear
+history is required.
+
+**The count is deliberately not written here.** It said "all six" from
+2026-08-12 until 2026-08-22 and was wrong for the last three days of that,
+twice over — `image-arm64` joined, then the three Go jobs, then `contract`.
+The list lives in ENGINEERING §5, which records it as a **read-back from the
+API** rather than as something a session remembered; a number in this file is
+a claim to re-check, exactly like the ones about the decks.
 
 The fifth is `image`, added 2026-08-12 with containerisation. **It cannot be
 run locally** — this Mac is macOS 12 on Intel, where Docker Desktop will not
@@ -1281,19 +1303,23 @@ dependency graph between base and head, and a push has no base — so it gates
 merging and takes no part in the deploy, whose `needs` list is `ci.yml`'s five.
 It also cannot be run locally in any useful form. See ENGINEERING §5.
 
-There is a **seventh job**, `image-arm64`, added 2026-08-19 when the arm64
-build moved off QEMU onto a native runner. This paragraph said it was not a
-required check; **read back from the API on 2026-08-21, it is** — Aaron
-required it — so the count of required checks is not six any more, and the
-list in ENGINEERING §5 is the one to trust over any number written here.
+`image-arm64`, added 2026-08-19 when the arm64 build moved off QEMU onto a
+native runner, is required too — read back from the API on 2026-08-21, having
+been described here as optional until somebody asked.
 
-**An eighth job, `contract`**, added 2026-08-21 with the Go migration's
-Phase 1, runs `tests/contract` with `--live` — the harness seeds a scratch,
-starts `mtglab ui` on it and drives it over TCP — and, since Phase 2, runs
-the same suite once more **through the Go front door**, built from `go/` in
-the same job and stood in front of a second Python server. It gates the
-deploy through `needs` and is **still not required**; requiring it is a
-repository setting, owed to Aaron (ENGINEERING §5 has the command).
+**`contract`**, added 2026-08-21 with the Go migration's Phase 1, runs
+`tests/contract` with `--live` — the harness seeds a scratch, starts
+`mtglab ui` on it and drives it over TCP — and, since Phase 2, runs the same
+suite once more **through the Go front door**, built from `go/` in the same
+job and stood in front of a second Python server. It gates the deploy through
+`needs` **and is required on `main`** since 2026-08-22.
+
+It was written as "owed to Aaron" for three sessions, which was the wrong
+word: the setting is a `gh api` call and the `gh` CLI is Aaron's own, so
+nothing but a confirmation was ever missing. **Anything a session can do with
+his credentials and defers on is a question to ask, not a line to write in a
+document** — a note saying somebody else must do it reads like a permission
+boundary and outlives the moment it was true.
 
 **And three Go jobs, `go (amd64)`, `go (arm64)` and `go-lint`**, added with
 Phase 2 (2026-08-21): `go vet`, the door build as the image builds it (CGO since Phase 3), race-detected tests
