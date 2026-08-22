@@ -406,7 +406,11 @@ src/mtglab/
                           invite/reset tokens, the EmailSender seam
   api/                    FastAPI app, services, background jobs
   api/jobs.py             the job registry; two pools, CPU and NET, and a
-                          `key` that makes asking twice at once one job
+                          `key` that makes asking twice at once one job.
+                          Ported to go/internal/jobs 2026-08-22, engine
+                          only -- every job a request creates is still this
+                          module's, and its three thread pools are still
+                          what runs them
   api/simruns.py          Tier 1 planned in the request, run in a job
   api/app.py:artifacts    the five deliverables, hosted (2026-08-21). Three
                           routes on `/api/decks/{owner}/{slug}/artifacts` --
@@ -621,7 +625,42 @@ go/                       the Go module (ADR 38; module path
                           re-proves that on every matrix leg because nothing
                           in the corpus names an interpreter. `sample()` is
                           named in the plan and has NO CALLER; it is not
-                          there. The contract
+                          there. **Phase 5 opened with internal/jobs
+                          (2026-08-22), and it flipped nothing**:
+                          api/jobs.py's registry, where the CPU pool is at
+                          last the semaphore over goroutines ADR 38 promised
+                          -- sized from GOMAXPROCS (8 on this Mac, 1 on a
+                          shared-cpu-1x, a Config knob rather than a
+                          constant) where Python ran ONE worker because
+                          Tier 1 is GIL-bound. NET stays at two and FORGE at
+                          one, because neither of those bounds is a fact
+                          about the machine: two is what a Claude call costs
+                          per run, one is the shared `.dck` directory. The
+                          `key` dedupe is the same one locked step (per
+                          owner, ADR 5; live jobs only, so a failure stays
+                          retryable), a cache hit is still a job born `done`,
+                          and there is still NO cancellation -- `ForgetOwner`
+                          drops a running job without stopping it, exactly as
+                          Python does, and guards owner zero because that is
+                          how this port spells the local user. Two
+                          differences are Go's rather than the design's: the
+                          mutable half of a Job is **guarded** (Python's
+                          worker writes `status` and `done` unlocked and the
+                          GIL absorbs it; `-race` does not), and a
+                          **panicking worker is a failed job**, not a dead
+                          process. Held to Python by jobs/testdata/jobs.json,
+                          which caught three divergences a careful port would
+                          have shipped: `percent` **rounds half to even** (1
+                          of 8 is 12.5 -- Python 12, `math.Round` 13),
+                          `created_at` **loses its fraction entirely** at a
+                          zero microsecond and is spelled `+00:00` never `Z`
+                          -- and it is the sort key, as text -- and the lane
+                          refusal quotes with `repr`, which prefers single
+                          quotes. One rule for every family still to cross
+                          falls out of it: **a job result must be a struct
+                          with its fields in Python's order, never a
+                          `map[string]any`**, because encoding/json sorts map
+                          keys and a dict does not. The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —

@@ -101,6 +101,7 @@ _ORACLES = [
     ("the importer", "IMPORT_PATH", "render_import_cases"),
     ("the five deliverables", "ARTIFACTS_PATH", "render_artifact_cases"),
     ("the draw corpus", "PYRAND_PATH", "render_pyrand_cases"),
+    ("the job registry", "JOBS_PATH", "render_jobs_cases"),
 ]
 
 
@@ -490,3 +491,72 @@ def test_the_recorded_tier1_stream_is_the_reference_runs_own():
         assert len(generator["digest"]) == 64
     total = sum(g["draws"] for g in tier1["generators"])
     assert total > 10_000, f"the whole reference run drew only {total} times"
+
+
+# --------------------------------------------------------- the job registry
+
+
+def test_the_jobs_oracle_records_what_it_claims_to():
+    """A corpus is worth what it catches, and this one has three claims.
+
+    Each names a way `api/jobs.py` can be reproduced wrongly *and plausibly*:
+    a percentage rounded the other way at a tie, a timestamp that always
+    carries six digits, and a quoting rule taken from the wrong language. Drop
+    the cases that turn on them and the Go tests over the rest still pass,
+    which is the failure this file exists to stop.
+    """
+    cases = go_fixtures.jobs_cases()
+
+    # A tie is where Python's round-half-to-even and Go's `math.Round` part
+    # company. Without one, the Go rounding test proves only that division
+    # works -- asserted the same way `floor_div` is: at least one case where
+    # the naive implementation would answer differently.
+    ties = [c for c in cases["percent"]
+            if c["total"] and 200 * c["done"] % c["total"] == 0
+            and 100 * c["done"] % c["total"] != 0]
+    assert len(ties) >= 4, (
+        "no exact percentage ties in the corpus, so a port that rounded half "
+        "away from zero would match every case in it")
+
+    # `isoformat` drops the fraction entirely when the microsecond is zero and
+    # keeps six digits otherwise, trailing zeros included.
+    fractions = {c["want"].split("+")[0].partition(".")[2]
+                 for c in cases["stamps"]}
+    assert "" in fractions, "no stamp without a fraction"
+    assert "100000" in fractions, "no stamp whose trailing zeros must survive"
+    assert all(len(f) in (0, 6) for f in fractions), fractions
+
+    # `repr` prefers single quotes and switches to double only when the string
+    # holds a single quote and no double.
+    refusals = [c["error"] for c in cases["unknown_lane"]]
+    assert any(e.startswith('unknown job lane "') for e in refusals), (
+        "no lane forces repr's double-quote branch")
+    assert any(e.startswith("unknown job lane '") for e in refusals)
+
+    # Every status a job can be in, and both nested values -- otherwise the
+    # payload test is only exercising the empty shapes.
+    statuses = {c["job"]["status"] for c in cases["payloads"]}
+    assert statuses == {"queued", "running", "done", "error"}, statuses
+    assert any(c["job"]["result_json"] for c in cases["payloads"])
+    assert any(c["job"]["partial_json"] for c in cases["payloads"])
+    assert any(c["job"]["owner"] and c["job"]["key"]
+               for c in cases["payloads"]), (
+        "no payload case carries an owner and a key, so nothing proves the "
+        "two never serialise")
+
+
+def test_the_jobs_oracle_never_leaks_the_owner_or_the_key():
+    """`as_dict` publishes eleven fields and neither of those is among them.
+
+    Checked on Python's own side as well as Go's, because the claim is about
+    the payload rather than about either runtime: a caller who can see a job
+    already knows whose it is, and one who cannot must not learn it exists
+    (ADR 5).
+    """
+    for case in go_fixtures.job_payload_cases():
+        assert set(case["want"]) == {
+            "id", "kind", "status", "done", "total", "percent", "partial",
+            "label", "result", "error", "created_at"}
+        assert "owner" not in case["want_json"]
+        key = case["job"]["key"]
+        assert not key or key not in case["want_json"]

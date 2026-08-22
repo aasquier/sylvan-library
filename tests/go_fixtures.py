@@ -1689,6 +1689,9 @@ def write() -> None:
     PYRAND_PATH.parent.mkdir(parents=True, exist_ok=True)
     PYRAND_PATH.write_text(render_pyrand_cases(), encoding="utf-8")
     print(f"wrote the draw corpus for {len(PYRAND_SEEDS)} seeds into {PYRAND_PATH}")
+    JOBS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    JOBS_PATH.write_text(render_jobs_cases(), encoding="utf-8")
+    print(f"wrote the job registry oracle into {JOBS_PATH}")
 
 
 # ------------------------------------------------------------------ pyrand
@@ -2073,6 +2076,215 @@ def pyrand_cases() -> dict[str, Any]:
 
 def render_pyrand_cases() -> str:
     return _compact_json(pyrand_cases()) + "\n"
+
+
+# ---------------------------------------------------------- the job registry
+#
+# `api/jobs.py` ported to `go/internal/jobs` (Phase 5, the registry half).
+# Most of that module is *behaviour* -- a lock held across two steps, a lane
+# that runs one thing at a time -- which a corpus cannot hold and which the Go
+# tests and the race detector do instead. What a corpus can hold is the part
+# that is arithmetic and formatting, and that part is where the two runtimes
+# disagree by default:
+#
+#   - **`percent` rounds half to even**, because Python's `round` does and
+#     Go's `math.Round` rounds half away from zero. One job in eight lands on
+#     a tie -- 1 of 8 is 12.5 -- and a progress bar a point out is exactly the
+#     kind of wrongness nobody ever reports.
+#   - **`created_at` is `datetime.isoformat()`**, whose fractional part
+#     *vanishes* when the microsecond is zero and whose offset is spelled
+#     `+00:00`, never `Z`. It is also the key `all_jobs` sorts on, as text, so
+#     a differently-shaped stamp is a differently-ordered list.
+#   - **`as_dict` has a field order**, and Starlette writes a dict in
+#     insertion order, so the bytes are pinned rather than only the keys --
+#     which is also how `owner` and `key` are held out of the payload.
+#
+# The lane refusal is recorded for the reason the crypto oracle records a PHC
+# string: it is a sentence that reaches a caller today, and reproducing a
+# sentence is not a thing to do from memory.
+
+JOBS_PATH = ROOT / "go" / "internal" / "jobs" / "testdata" / "jobs.json"
+
+#: `(done, total)` pairs. The first block is ties -- every eighth, and the
+#: sixteenths and the halves, where half-to-even and half-away-from-zero part
+#: company -- and the rest is ordinary traffic plus the two degenerate totals a
+#: real job passes through: nothing reported yet, and a worker that reported a
+#: count without a bound.
+_PERCENT_CASES: tuple[tuple[int, int], ...] = (
+    (1, 8), (3, 8), (5, 8), (7, 8), (1, 2), (3, 2), (1, 200), (3, 200),
+    (5, 200), (7, 200), (1, 40), (1, 24), (5, 24), (7, 24), (11, 24),
+    (0, 0), (5, 0), (0, 1), (1, 1), (1, 3), (2, 3), (1, 7), (6, 7),
+    (1, 6), (5, 6), (33, 100), (99, 100), (100, 100), (1, 20000),
+    (19999, 20000), (20000, 20000), (1, 33), (17, 33), (2, 16), (6, 16),
+    (10, 16), (14, 16), (1, 80), (3, 80), (1, 800), (399, 800), (401, 800),
+)
+
+#: Instants as `(year, month, day, hour, minute, second, microsecond)`. The
+#: interesting field is the last: zero (the whole fraction disappears), one
+#: (six digits, five of them leading zeros), and a round number (whose
+#: trailing zeros stay, and which a "strip the zeros" formatter would eat).
+_STAMP_CASES: tuple[tuple[int, int, int, int, int, int, int], ...] = (
+    (2026, 8, 22, 13, 10, 20, 936490),
+    (2026, 8, 22, 13, 10, 20, 0),
+    (2026, 8, 22, 13, 10, 20, 1),
+    (2026, 8, 22, 13, 10, 20, 999999),
+    (2026, 8, 22, 13, 10, 20, 100000),
+    (2026, 1, 2, 3, 4, 5, 60),
+    (2026, 12, 31, 23, 59, 59, 999999),
+    (2027, 1, 1, 0, 0, 0, 0),
+)
+
+
+def _jobs_module() -> Any:
+    """`mtglab.api.jobs`, imported here rather than at the top of this file.
+
+    Every other oracle here imports its subject at module scope. This one does
+    not, because importing `api.jobs` builds three real thread pools at import
+    time -- three idle threads in a fixture generator that is otherwise pure,
+    and three more in every test that imports this module for something else.
+    """
+    from mtglab.api import jobs as module
+    return module
+
+
+def job_payload_cases() -> list[dict[str, Any]]:
+    """`Job.as_dict()` for the states a job actually passes through.
+
+    Every case fixes `id` and `created_at`, because what this records is the
+    shape *and* the bytes, and a random id makes the second unrecordable.
+    `owner` and `key` are set on some of them deliberately: neither may appear
+    in the output, and a port that serialised whatever struct it happened to
+    have would put them there.
+    """
+    jobs = _jobs_module()
+    stamp = "2026-08-22T13:10:20.936490+00:00"
+    theater = [{"game": 1, "winner": "arahbo", "turns": 9},
+               {"game": 2, "winner": None, "turns": 14}]
+    cases: list[tuple[str, Any]] = [
+        ("queued, nothing reported yet",
+         jobs.Job(id="0f1e2d3c4b5a", kind="sim.mana", label="Arahbo — mana",
+                  created_at=stamp)),
+        ("queued for somebody, with a dedupe key -- neither may serialise",
+         jobs.Job(id="a1b2c3d4e5f6", kind="claude.dossier",
+                  label="Goreclaw, Terror of Qal Sisma", owner=7,
+                  key="oracle:1234", created_at=stamp)),
+        ("running, and on a tie: 1 of 8 is 12.5",
+         jobs.Job(id="112233445566", kind="sim.lands", status="running",
+                  done=1, total=8, label="Gyome — lands", created_at=stamp)),
+        ("running, with the theater's rows before the result exists",
+         jobs.Job(id="66554433221a", kind="sim.forge", status="running",
+                  done=2, total=8, partial=theater, label="Cat vs Dino",
+                  created_at=stamp)),
+        ("done, with a result and the bar filled",
+         jobs.Job(id="deadbeefcafe", kind="sim.mana", status="done",
+                  done=20000, total=20000,
+                  result={"games": 20000, "mulligan_rate": 0.1732,
+                          "cached": False, "computed_at": None,
+                          "caveat": "no opponents, no interaction"},
+                  label="Trostani — mana", created_at=stamp)),
+        ("born finished, which is what a cache hit is",
+         jobs.Job(id="000000000001", kind="sim.mana", status="done",
+                  done=1, total=1, result={"cached": True},
+                  label="Tivit — mana", created_at=stamp)),
+        ("errored, and the string is a class name and a message",
+         jobs.Job(id="ffffffffffff", kind="sim.mana", status="error",
+                  done=0, total=0,
+                  error="DeckNotFound: no deck 'no-such-deck'",
+                  label="no-such-deck — mana", created_at=stamp)),
+        ("a label carrying the characters an HTML-escaping encoder would eat",
+         jobs.Job(id="3c3e26273c3e", kind="claude.argue",
+                  label="<Ajani> & \"Nacatl\" — 'why' — 100% <cut>",
+                  created_at=stamp)),
+        ("a label and a result in scripts the wire must not \\u-escape",
+         jobs.Job(id="000000c0ffee", kind="claude.theme.proposal",
+                  status="done", done=1, total=1,
+                  result={"note": "Ünsere Vorschläge — 火の玉 🜁",
+                          "score": 1.5},
+                  label="Ünsere Vorschläge", created_at=stamp)),
+        ("a count with no bound, which is nought per cent and not a crash",
+         jobs.Job(id="0b0b0b0b0b0b", kind="sim.policy", status="running",
+                  done=5, total=0, label="Atla — policy", created_at=stamp)),
+        ("a stamp with no fraction at all",
+         jobs.Job(id="0a0a0a0a0a0a", kind="sim.mana",
+                  label="Goreclaw — mana",
+                  created_at="2026-08-22T13:10:20+00:00")),
+    ]
+    def compact(value: Any) -> str | None:
+        """The bytes Starlette would write for one nested value.
+
+        Recorded apart from the payload because **Go cannot reproduce a
+        Python dict's key order through a `map[string]any`** -- encoding/json
+        sorts map keys, and `result` and `partial` are `Any`. So the corpus
+        hands the Go side the nested bytes as they stand, and the constraint
+        that finding puts on every family still to flip is stated in the
+        package comment: a ported result is a struct with its fields in
+        Python's order, or it is pre-encoded; it is never a map.
+        """
+        if value is None:
+            return None
+        return json.dumps(value, ensure_ascii=False, allow_nan=False,
+                          separators=(",", ":"))
+
+    return [
+        {"name": name,
+         "job": {"id": job.id, "kind": job.kind, "status": job.status,
+                 "done": job.done, "total": job.total,
+                 "result_json": compact(job.result),
+                 "partial_json": compact(job.partial), "error": job.error,
+                 "label": job.label, "owner": job.owner, "key": job.key,
+                 "created_at": job.created_at},
+         "want": job.as_dict(),
+         "want_json": json.dumps(job.as_dict(), ensure_ascii=False,
+                                 allow_nan=False, separators=(",", ":"))}
+        for name, job in cases
+    ]
+
+
+def jobs_cases() -> dict[str, Any]:
+    """The whole registry oracle, as the Go module reads it."""
+    import uuid
+    from datetime import UTC, datetime
+
+    jobs = _jobs_module()
+    messages: list[dict[str, str]] = []
+    # The last two are not lanes anybody could pass; they are there because
+    # the message quotes the lane with `repr`, and `repr` prefers single
+    # quotes and switches to double ones only when the string holds a single
+    # quote and no double. A port reaching for its own quoting would get the
+    # ordinary cases right and those two wrong.
+    for lane in ("nope", "", "CPU", "cpu ", "sim", "it's", 'say "cpu"'):
+        try:
+            jobs.submit("test", lambda _p: None, lane=lane)
+        except ValueError as exc:
+            messages.append({"lane": lane, "error": str(exc)})
+        else:                                              # pragma: no cover
+            raise AssertionError(f"lane {lane!r} was accepted")
+    # A refused lane records nothing, which is the whole point of checking it
+    # before the insert. Asserted here so the corpus cannot be generated from
+    # a module that had started queueing them.
+    assert jobs.all_jobs() == [], "a refused lane must record no job"
+    return {
+        "note": ("Generated from `mtglab.api.jobs` by "
+                 "`python tests/go_fixtures.py`. `want_json` is the body "
+                 "Starlette writes: compact separators, no ASCII escaping."),
+        "lanes": {"cpu": jobs.CPU, "net": jobs.NET, "forge": jobs.FORGE},
+        "live": list(jobs.LIVE),
+        "max_jobs": jobs.MAX_JOBS,
+        "id_length": len(uuid.uuid4().hex[:12]),
+        "unknown_lane": messages,
+        "percent": [{"done": d, "total": t,
+                     "want": jobs.Job(id="x", kind="k", done=d,
+                                      total=t).as_dict()["percent"]}
+                    for d, t in _PERCENT_CASES],
+        "stamps": [{"at": list(parts),
+                    "want": datetime(*parts, tzinfo=UTC).isoformat()}
+                   for parts in _STAMP_CASES],
+        "payloads": job_payload_cases(),
+    }
+
+
+def render_jobs_cases() -> str:
+    return _compact_json(jobs_cases()) + "\n"
 
 
 if __name__ == "__main__":
