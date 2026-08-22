@@ -5,7 +5,7 @@ go 1.26
 require (
 	github.com/alexedwards/argon2id v1.0.0
 	github.com/duckdb/duckdb-go/v2 v2.10505.0
-	github.com/goccy/go-yaml v1.17.1
+	github.com/goccy/go-yaml v1.19.2
 	github.com/google/go-cmp v0.7.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/crypto v0.55.0
