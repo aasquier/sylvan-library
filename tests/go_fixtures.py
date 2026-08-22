@@ -1700,6 +1700,10 @@ def write() -> None:
     TIER1_PATH.parent.mkdir(parents=True, exist_ok=True)
     TIER1_PATH.write_text(render_tier1_cases(), encoding="utf-8")
     print(f"wrote the Tier 1 corpus into {TIER1_PATH}")
+    MANA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    castability = mana_cases()
+    MANA_PATH.write_text(_compact_json(castability) + "\n", encoding="utf-8")
+    print(f"wrote {castability['cases']} castability cases into {MANA_PATH}")
 
 
 # ------------------------------------------------------------------ pyrand
@@ -3616,6 +3620,130 @@ def tier1_cases() -> dict[str, Any]:
 
 def render_tier1_cases() -> str:
     return _compact_json(tier1_cases()) + "\n"
+
+
+# -------------------------------------------------------------------- mana
+#
+# The castability solver's differential case set (PLAN section 5 item 2), and
+# the one corpus in this file that was **written before the port needed it**.
+# `tests/mana_oracle.py` has said since it was written that its cases yield
+# "the same cases in the same order in any language, on any machine, forever
+# -- which is what makes it usable as the differential case set for a compiled
+# port". This is that sentence cashed in, and it is shaped by taking the claim
+# literally: the corpus does not ship 13,944 rows, it ships the **enumeration**
+# and the **answers**, because a port that cannot rebuild the case set itself
+# has not honoured the claim -- it has only replayed a dump.
+#
+# So there are two digests rather than one, for the reason the draw corpus
+# above records the raw word stream apart from its consumers. `enumeration`
+# is a hash of the case *names* alone and says nothing about castability;
+# `answers` is the project's own pinned golden, hashed over `name=answer`.
+# A Go run that fails the first has an enumeration bug and its solver has not
+# been tested at all; one that passes the first and fails the second has a
+# solver bug and nothing else. Without the split, both present identically.
+#
+# `CASE_COSTS` and `CASE_POOLS` are the halves of `case_id`, in enumeration
+# order, so a mismatch names the exact case in the oracle's own vocabulary --
+# and comparing them is also what checks Go's `Cost.String()`, since the cost
+# half of a case name is a rendered cost. `ANSWERS` is one row per cost and
+# one column per pool, in that order, because the cross product is costs outer
+# and pools inner: a changed row names the cost that changed.
+#
+# Nothing here needs a pool, a deck or a network. It is `math` and `itertools`.
+
+#: Where the Go module reads the castability case set from.
+MANA_PATH = ROOT / "go" / "internal" / "mana" / "testdata" / "castability.json"
+
+
+def _mana_join(colors: frozenset[str]) -> str:
+    """A colour set as `case_id` writes it: sorted and run together."""
+    return "".join(sorted(colors))
+
+
+def mana_cases() -> dict[str, Any]:
+    """The enumeration, the answers, and both digests.
+
+    Two things are re-checked here rather than assumed, and both would
+    otherwise be able to write a corpus that is wrong in a way nothing
+    downstream could see.
+
+    **The three Python implementations are made to agree first.** `can_pay`,
+    the brute-force search and Hall's condition are asserted equal across the
+    whole case set before a byte is written, so a corpus can never be rendered
+    from a Python that disagrees with itself -- which would hand the Go side a
+    wrong answer to reproduce faithfully.
+
+    **The pinned golden is compared, never re-pinned.**
+    `CASES_ANSWER_DIGEST` in `tests/test_mana_properties.py` is the project's
+    own record of what castability means, and this refuses to write if the
+    digest it computes is not that one. Regenerating this corpus is therefore
+    not a way to move the golden; moving the golden is a deliberate edit to
+    that constant, with the reason in the commit message, exactly as its own
+    comment says.
+    """
+    import mana_oracle as oracle
+    import test_mana_properties as pinned
+    from mtglab.mana import can_pay
+
+    disagreements = [
+        oracle.case_id(cost, pool)
+        for cost, pool in oracle.all_cases()
+        if not (can_pay(cost, pool)
+                == oracle.brute_force_can_pay(cost, pool)
+                == oracle.hall_can_pay(cost, pool))
+    ]
+    if disagreements:
+        raise AssertionError(
+            f"{len(disagreements)} case(s) disagree between can_pay and the "
+            f"two oracles; first 10: {disagreements[:10]}. Refusing to write "
+            f"a corpus Python does not itself agree on.")
+
+    digest = oracle.cases_digest(can_pay)
+    if digest != pinned.CASES_ANSWER_DIGEST:
+        raise AssertionError(
+            f"castability answers hash to {digest}, but "
+            f"tests/test_mana_properties.py pins "
+            f"{pinned.CASES_ANSWER_DIGEST}. Regenerating this corpus does not "
+            f"move that golden -- decide whether the semantics really changed, "
+            f"then edit the constant deliberately.")
+
+    costs = list(oracle.case_costs())
+    pools = list(oracle.case_pools())
+    pool_ids = [
+        " ".join(_mana_join(s.colors) + (f"x{s.amount}" if s.amount != 1 else "")
+                 for s in pool)
+        for pool in pools
+    ]
+    answers = ["".join(str(int(can_pay(cost, pool))) for pool in pools)
+               for cost in costs]
+
+    enumeration = hashlib.sha256()
+    for cost, pool_id in ((c, p) for c in costs for p in pool_ids):
+        enumeration.update(f"{cost} <- [{pool_id}]\n".encode())
+
+    return {
+        "note": ("The castability case set of tests/mana_oracle.py, written by "
+                 "`python tests/go_fixtures.py`. Rebuild the enumeration rather "
+                 "than trusting the lists: `costs` and `pools` are here to say "
+                 "WHICH case disagreed, and to check the renderer that names "
+                 "it."),
+        "answers_digest": digest,
+        "enumeration_digest": enumeration.hexdigest(),
+        "max_pips": oracle.MAX_PIPS,
+        "max_generic": oracle.MAX_GENERIC,
+        "max_sources": oracle.MAX_SOURCES,
+        "case_pips": [_mana_join(p) for p in oracle.CASE_PIPS],
+        "case_units": [_mana_join(u) for u in oracle.CASE_UNITS],
+        "costs": [str(cost) for cost in costs],
+        "pools": pool_ids,
+        "answers": answers,
+        "cases": len(costs) * len(pools),
+        "payable": sum(row.count("1") for row in answers),
+    }
+
+
+def render_mana_cases() -> str:
+    return _compact_json(mana_cases()) + "\n"
 
 
 if __name__ == "__main__":
