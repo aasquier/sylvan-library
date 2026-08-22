@@ -302,12 +302,23 @@ first read of the tree 2026-08-21 23:10 UTC, the fourth flip merged 00:49
 and live-and-walked between 00:55 and 01:00 — **about 1 hour 45 minutes**,
 four pull requests (#224 the prose, #225 the pool, #226 the deck reads,
 #227 the shelves), four releases, four walks on the instance. The estimate
-was ¾ of a day. What moved inside it, counted rather than felt: **~9,000
-lines of hand-written Go and ~4,000 of Go tests** across seventeen
-packages, plus ~3,000 lines of generated differential fixtures and ~230KB
-of generated JSON, against a Python read surface of the same order. The
-rate is real, it is roughly **3½–4× the ¾-day figure**, and it was measured
-on the phase this plan nominated in advance as the place to measure it.
+was ¾ of a day. What moved inside it, counted rather than felt — the Go
+module went from **1,541 lines of hand-written Go and 1,172 of tests** at
+Phase 2's merge to **9,236 and 4,051** at Phase 3's, so the phase itself
+added **~7,700 lines of Go and ~2,900 of tests** across thirteen new
+packages, beside ~3,000 lines of generated differential fixtures and
+~230KB of generated JSON, against a Python read surface of the same order.
+The rate is real, it is roughly **3½–4× the ¾-day figure**, and it was
+measured on the phase this plan nominated in advance as the place to
+measure it.
+
+(That paragraph said "~9,000 lines of hand-written Go" until it was checked
+against `git ls-tree` rather than against the working tree. Nine thousand
+is what the module *stood at* after Phase 3, Phase 2's door and spikes
+included — a cumulative figure quoted as a delta, which is the same class
+of error as the completeness claims CLAUDE.md has had to correct three
+times. The numbers above are both endpoints, so the subtraction is the
+reader's to check.)
 
 Two things stop that from licensing a smaller number for everything left.
 First, **the unit that held is the per-PR shape, not the hour** — a
@@ -735,8 +746,9 @@ There is more than one Claude in this house now. Rules for the duration:
   | `GET /api/symbols/{code}.svg`, `GET /api/ocr/{name}`, `GET /api/art/motion/{oracle_id}/{effect}`, `GET .../{filename}` | **go** | `go/internal/api`, 2026-08-22 — the fourth family; the read spine is whole |
   | `colors.py`, `glossary.py`, `lore.py`, `tarotlore.py`, `decks/model.py:THEMES` — the prose itself | shared | authored in Python, rendered by `mtglab.reference` into `go/internal/reference/data/` (written by `tests/go_fixtures.py`, held current by `tests/test_go_fixtures.py`), embedded and served by Go; the JSON becomes authoritative at Phase 8 |
   | `decks/edit.py` (the nine operations and their text surgery), and PyYAML's emitter under it | **go** | `go/internal/deckedit` over `go/internal/pyyaml`, 2026-08-22 — the engine only; **no route has flipped**, so Python still serves every write. Held to Python by two generated oracles: 2,051 `_render` cases byte for byte, and 514 operation steps over eleven fixture decks (`tests/go_fixtures.py` writes both) |
-  | the deck **write** routes — the swap, add, remove, entomb, return, exile, the two `PATCH`es and the note `PUT` — plus `service._commit` and `decks/log.py`'s write side | **porting** | frozen for feature work; the engine is in Go and the routes are next |
-  | everything else under `/api` — `api/` (the other writes, the jobs, the Claude routes, `/api/health`, the upcoming sets), `decks/` (import, create, delete, the wheel), `sim/`, `claude/`, `artifacts/` (rendering), `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback; Phase 4 (the writes and the log) is in progress |
+  | `service._commit`, the pool checks above the editor (`_check_category`, `_identity_of`, `_check_printing_of`), `decks/source.py`'s and `decks/sqlsource.py`'s `write_text`, `decks/log.py`'s write side | **go** | `go/internal/api/edits.go`, `go/internal/library/write.go`, `go/internal/decklog`, 2026-08-22 — `create` and `delete` deliberately **not** ported yet, since an update and a create have opposite safety requirements and a method that exists but refuses is a method somebody wires up |
+  | `POST .../swap`, `POST .../cards`, `DELETE .../cards/{name}`, `POST .../entomb`, `POST .../graveyard/{name}/return`, `DELETE .../graveyard/{name}`, `PATCH .../cards/{name}`, `PATCH /api/decks/{owner}/{slug}`, `PUT .../notes/{key}` | **go** | `go/internal/api`, 2026-08-22 — the fifth family, and the first that *writes*. Every one goes out through one `commit`, so the gate's verdict and ADR 28's entry are inherited rather than remembered |
+  | everything else under `/api` — `api/` (create, import, delete, `PUT .../shared`, the artifacts rebuild, the jobs, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the wheel), `sim/`, `claude/`, `artifacts/` (rendering), `mana.py` (the solver), `tarot.py`, `cli.py`, and all of `auth/`'s writes | python | proxied to uvicorn on loopback; Phase 4 continues with the lifecycle (create/import/promote/delete, sharing) and then the accounts |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
   walked before the next flip starts (main deploys itself; every flip is a

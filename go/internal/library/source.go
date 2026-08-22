@@ -271,15 +271,23 @@ func (f *FileSource) OwnerID() *int64 { return nil }
 // cannot be leaked by a code path that forgot to filter -- the row never
 // arrives. ADR 22's 404 is that clause.
 type SQLSource struct {
-	db         *sql.DB
+	db *sql.DB
+	// write is the read-write handle, separate from `db` on purpose: every
+	// read goes through a pool of read-only connections that block nobody,
+	// and the one write path is serialised behind a single connection. Nil on
+	// an instance with no app.db, where a write refuses rather than panics.
+	write      *sql.DB
 	ownerID    int64
 	writable   bool
 	sharedOnly bool
 }
 
-// NewSQLSource is one owner's SQL tier over an app.db handle.
-func NewSQLSource(db *sql.DB, ownerID int64, writable, sharedOnly bool) *SQLSource {
-	return &SQLSource{db: db, ownerID: ownerID, writable: writable, sharedOnly: sharedOnly}
+// NewSQLSource is one owner's SQL tier over an app.db handle. `write` may be
+// nil, which makes the tier read-only however `writable` is set -- the honest
+// answer on an instance whose database was opened for reading only.
+func NewSQLSource(db, write *sql.DB, ownerID int64, writable, sharedOnly bool) *SQLSource {
+	return &SQLSource{db: db, write: write, ownerID: ownerID,
+		writable: writable, sharedOnly: sharedOnly}
 }
 
 func (s *SQLSource) where() (string, []any) {
