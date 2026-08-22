@@ -1,0 +1,67 @@
+{
+  "categories": [
+    "land",
+    "ramp",
+    "card-advantage",
+    "tutor",
+    "interaction",
+    "protection",
+    "threat",
+    "engine",
+    "sac-outlet",
+    "payoff",
+    "recursion",
+    "win-con",
+    "utility"
+  ],
+  "deck_statuses": [
+    "built",
+    "theoretical"
+  ],
+  "deck_stages": [
+    "draft",
+    "curated"
+  ],
+  "singleton_exempt": [
+    "forest",
+    "island",
+    "mountain",
+    "plains",
+    "snow-covered forest",
+    "snow-covered island",
+    "snow-covered mountain",
+    "snow-covered plains",
+    "snow-covered swamp",
+    "swamp",
+    "wastes"
+  ],
+  "category_targets": {
+    "land": [
+      33,
+      38
+    ],
+    "ramp": [
+      8,
+      12
+    ],
+    "card-advantage": [
+      8,
+      12
+    ],
+    "interaction": [
+      6,
+      12
+    ],
+    "tutor": [
+      0,
+      10
+    ]
+  },
+  "game_changer_limits": {
+    "1": 0,
+    "2": 0,
+    "3": 3,
+    "4": null,
+    "5": null
+  }
+}

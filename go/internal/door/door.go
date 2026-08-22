@@ -63,6 +63,12 @@ type Config struct {
 	// nil is an instance with no pool, answered in the degraded shapes
 	// `service._connect()` returning None produces.
 	Pool *pool.Pool
+	// DecksDir is the file tier's root (MTGLAB_DECKS_DIR).
+	DecksDir string
+	// AdminEmail is MTGLAB_ADMIN_EMAIL, resolved to the maintainer's handle
+	// through app.db when a caller is signed in (ADR 17, ADR 22); never
+	// rendered.
+	AdminEmail string
 	// Logger, or slog.Default().
 	Logger *slog.Logger
 }
@@ -104,7 +110,8 @@ func New(cfg Config) (*Door, error) {
 	}
 	d.static = site
 	d.proxy = newProxy(cfg.Upstream, cfg.Logger)
-	ported := api.New(api.Config{Logger: cfg.Logger, Pool: cfg.Pool})
+	ported := api.New(api.Config{Logger: cfg.Logger, Pool: cfg.Pool, AppDB: d.db,
+		AppDBPath: cfg.AppDB, DecksDir: cfg.DecksDir, AdminEmail: cfg.AdminEmail})
 	table, err := newRouteTable(ported.Routes(), ported.Proxied())
 	if err != nil {
 		return nil, err

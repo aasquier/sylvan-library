@@ -1,0 +1,51 @@
+slug: messy
+name: Messy Fixture
+status: shelved
+stage: curated
+commander:
+  - Goreclaw, Terror of Qal Sisma
+  - Gyome, Master Chef
+companion: Sol Ring
+bracket: 2
+strategy: A fixture, not a deck. See tests/tiny_pool.py.
+cards:
+  - name: Sol Ring
+    category: land
+    why: Two mana on turn one, and it always has been.
+  - name: Regal Behemoth
+    category: threat
+  - name: Vorinclex, Voice of Hunger
+    category: threat
+    why: Taxes every opponent's mana.
+  - name: Cultivator Colossus
+    category: threat
+    why: Trample body that puts lands onto the battlefield; ramp and threat in one.
+  - name: Forest
+    category: land
+    why: Basic, untapped, and the only green source this list needs.
+    qty: 95
+  - name: Rhystic Study
+    category: card-advantage
+    why: Blue, in a green deck.
+  - name: Swords to Plowshares
+    category: interaction
+    why: White, in a green deck.
+  - name: Black Lotus
+    category: ramp
+    why: Not legal, not banned.
+  - name: Llanowar Reborn
+    category: ramp
+    why: A land under ramp.
+  - name: Goreclaw, Terror of Qal Sisma
+    category: threat
+    why: The commander, again.
+  - name: Sol Ring
+    category: utility
+    why: A second Sol Ring.
+  - name: Not A Real Card
+    category: mystery
+    why: Unknown to the pool.
+swap_board:
+  - name: Ajani, Nacatl Pariah
+    category: threat
+    why: Red-white, on the board.

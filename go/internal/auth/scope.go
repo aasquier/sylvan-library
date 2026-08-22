@@ -40,3 +40,24 @@ func Resolve(ctx context.Context, db *sql.DB, token string) (Scope, error) {
 	return Scope{UserID: user.ID, Username: user.Username, IsAdmin: user.IsAdmin,
 		Authenticated: true}, nil
 }
+
+// The request's caller, carried on the context by the door's middleware so
+// the ported routes can ask who is asking -- `api/deps.py:scope` reading
+// what `api/auth.py` left on `request.state`.
+
+type scopeKey struct{}
+
+// WithScope attaches the caller to a context.
+func WithScope(ctx context.Context, s Scope) context.Context {
+	return context.WithValue(ctx, scopeKey{}, s)
+}
+
+// ScopeFrom is the caller the middleware resolved. Local -- auth off, one
+// person, full access -- when nothing was attached, which is the permissive
+// default `api/deps.py` keeps for an app assembled without the middleware.
+func ScopeFrom(ctx context.Context) Scope {
+	if s, ok := ctx.Value(scopeKey{}).(Scope); ok {
+		return s
+	}
+	return Local
+}

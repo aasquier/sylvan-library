@@ -1,0 +1,42 @@
+{
+ "with_pool": [
+  {
+   "level": "error",
+   "code": "not-a-commander",
+   "message": "type line is 'Artifact' and it does not say it can be your commander",
+   "card": "Sol Ring"
+  },
+  {
+   "level": "error",
+   "code": "color-identity",
+   "message": "identity {G} includes {G}, outside the commander's {C}",
+   "card": "Regal Behemoth"
+  },
+  {
+   "level": "error",
+   "code": "color-identity",
+   "message": "identity {G} includes {G}, outside the commander's {C}",
+   "card": "Vorinclex, Voice of Hunger"
+  },
+  {
+   "level": "error",
+   "code": "color-identity",
+   "message": "identity {G} includes {G}, outside the commander's {C}",
+   "card": "Cultivator Colossus"
+  },
+  {
+   "level": "error",
+   "code": "color-identity",
+   "message": "identity {G} includes {G}, outside the commander's {C}",
+   "card": "Forest"
+  }
+ ],
+ "without_pool": [
+  {
+   "level": "warn",
+   "code": "unverified",
+   "message": "no card pool supplied; identity, legality and text were NOT checked",
+   "card": null
+  }
+ ]
+}

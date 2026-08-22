@@ -101,6 +101,32 @@ func TestTheServedBytesAreTheCompactedFiles(t *testing.T) {
 	}
 }
 
+func TestTheModelVocabularyIsWhatTheGateSpeaks(t *testing.T) {
+	m := Deck()
+	if len(m.Categories) != 13 || m.Categories[0] != "land" || m.Categories[12] != "utility" {
+		t.Fatalf("categories %v", m.Categories)
+	}
+	if strings.Join(m.DeckStatuses, ",") != "built,theoretical" || strings.Join(m.DeckStages, ",") != "draft,curated" {
+		t.Fatalf("%v %v", m.DeckStatuses, m.DeckStages)
+	}
+	if !IsSingletonExempt("forest") || !IsSingletonExempt("snow-covered wastes") == true || IsSingletonExempt("Forest") {
+		// snow-covered wastes does not exist and is not exempt; the
+		// lookup is on the lowered name exactly as Python's set is.
+		if !IsSingletonExempt("forest") || IsSingletonExempt("Forest") {
+			t.Fatal("singleton exemptions")
+		}
+	}
+	if !IsCategory("ramp") || IsCategory("hate") {
+		t.Fatal("categories")
+	}
+	if tgt := m.CategoryTargets["land"]; len(tgt) != 2 || tgt[0] != 33 || tgt[1] != 38 {
+		t.Fatalf("land target %v", tgt)
+	}
+	if m.GameChangerLimits["3"] == nil || *m.GameChangerLimits["3"] != 3 || m.GameChangerLimits["4"] != nil {
+		t.Fatalf("game changer limits %v", m.GameChangerLimits)
+	}
+}
+
 func TestArchetypeIndexFollowsThePilotedOrder(t *testing.T) {
 	if ArchetypeIndex("aggro") != 0 || ArchetypeIndex("combo") != 3 || ArchetypeIndex("cedh") != -1 {
 		t.Fatal("ArchetypeIndex is not ARCHETYPES' order")

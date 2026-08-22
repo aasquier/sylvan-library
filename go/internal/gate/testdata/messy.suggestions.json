@@ -1,0 +1,24 @@
+{
+ "slug": "messy",
+ "pool_available": true,
+ "targets": [
+  {
+   "card": "Rhystic Study",
+   "code": "color-identity",
+   "why": "Blue, in a green deck.",
+   "candidates": []
+  },
+  {
+   "card": "Swords to Plowshares",
+   "code": "color-identity",
+   "why": "White, in a green deck.",
+   "candidates": []
+  },
+  {
+   "card": "Black Lotus",
+   "code": "banned",
+   "why": "Not legal, not banned.",
+   "candidates": []
+  }
+ ]
+}

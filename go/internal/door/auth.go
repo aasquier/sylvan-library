@@ -106,7 +106,9 @@ func (r dbResolver) Resolve(ctx context.Context, token string) (auth.Scope, erro
 func (d *Door) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !d.cfg.RequireAuth {
-			next.ServeHTTP(w, r)
+			// One person on their own machine: the local scope, an admin
+			// because there is nobody else for it to be true relative to.
+			next.ServeHTTP(w, r.WithContext(auth.WithScope(r.Context(), auth.Local)))
 			return
 		}
 		caller := auth.Anonymous
@@ -129,6 +131,8 @@ func (d *Door) authenticate(next http.Handler) http.Handler {
 			writeJSON(w, http.StatusForbidden, map[string]any{"detail": adminOnly})
 			return
 		}
-		next.ServeHTTP(w, r)
+		// The caller rides on the context for the ported routes; the proxy
+		// sends the cookie on and Python resolves it again for its own.
+		next.ServeHTTP(w, r.WithContext(auth.WithScope(r.Context(), caller)))
 	})
 }

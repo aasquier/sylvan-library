@@ -1,0 +1,18 @@
+{
+ "with_pool": [
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Kaheera, the Orphanguard"
+  }
+ ],
+ "without_pool": [
+  {
+   "level": "warn",
+   "code": "unverified",
+   "message": "no card pool supplied; identity, legality and text were NOT checked",
+   "card": null
+  }
+ ]
+}

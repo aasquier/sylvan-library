@@ -577,10 +577,9 @@ func TestOnlyACanonicalRequestIsTheDoors(t *testing.T) {
 		{"POST", "/api/glossary"}, {"HEAD", "/api/glossary"}, {"DELETE", "/api/themes"},
 		{"GET", "//api/glossary"}, {"GET", "/api/glossary/"}, {"GET", "/api/./glossary"},
 		{"GET", "/api/x/../glossary"}, {"GET", "/api/glossary%2F"},
-		// A literal Python still owns, beside a template Go answers: the
-		// reservation sends it on as it arrived.
-		{"GET", "/api/colors/progress"},
-		{"GET", "/api/decks"},
+		// Routes Python still owns go on as they arrived.
+		{"GET", "/api/jobs"}, {"GET", "/api/forge"}, {"GET", "/api/claude"},
+		{"POST", "/api/decks/local/mono-green/wheel"},
 	}
 	for _, c := range proxied {
 		resp := get(t, srv, c.method, c.path, "alice")

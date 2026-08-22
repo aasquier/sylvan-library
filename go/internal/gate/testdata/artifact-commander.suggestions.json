@@ -1,0 +1,30 @@
+{
+ "slug": "artifact-commander",
+ "pool_available": true,
+ "targets": [
+  {
+   "card": "Regal Behemoth",
+   "code": "color-identity",
+   "why": "Doubles the mana and refills the hand.",
+   "candidates": []
+  },
+  {
+   "card": "Vorinclex, Voice of Hunger",
+   "code": "color-identity",
+   "why": "Taxes every opponent's mana.",
+   "candidates": []
+  },
+  {
+   "card": "Cultivator Colossus",
+   "code": "color-identity",
+   "why": "Trample body that puts lands onto the battlefield; ramp and threat in one.",
+   "candidates": []
+  },
+  {
+   "card": "Forest",
+   "code": "color-identity",
+   "why": "Basic, untapped, and the only green source this list needs.",
+   "candidates": []
+  }
+ ]
+}

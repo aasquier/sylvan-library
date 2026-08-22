@@ -1,0 +1,30 @@
+{
+ "with_pool": [
+  {
+   "level": "error",
+   "code": "deck-size",
+   "message": "deck has 99 cards in the 99, expected 98 (2 commanders)",
+   "card": null
+  },
+  {
+   "level": "error",
+   "code": "illegal-pairing",
+   "message": "neither card has a pairing ability, so they cannot be two commanders together",
+   "card": null
+  }
+ ],
+ "without_pool": [
+  {
+   "level": "error",
+   "code": "deck-size",
+   "message": "deck has 99 cards in the 99, expected 98 (2 commanders)",
+   "card": null
+  },
+  {
+   "level": "warn",
+   "code": "unverified",
+   "message": "no card pool supplied; identity, legality and text were NOT checked",
+   "card": null
+  }
+ ]
+}

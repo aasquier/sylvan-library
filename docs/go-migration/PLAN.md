@@ -445,7 +445,40 @@ by the door's test. And on this Mac the CGO door needs
 not declare, which the CGO-free door never asked clang about (the same
 missing symbol that made golangci-lint a `CGO_ENABLED=0` install in Phase
 2). Linux — CI and the image — never sees it; CLAUDE.md's toolchain
-paragraph carries the flag.
+paragraph carries the flag. *Deployed as v158 and walked the same way: the
+signed-in probes answered from the door (search, identify, `/api/colors/G`,
+`/api/colors/nope`, `/api/lore`, the 422 for `limit=abc`) and uvicorn
+logged only `/api/colors/progress`; BASELINE has the block.*
+
+**The deck reads came third — the family the phase is named for.**
+`go/internal/deck` is `decks/model.py` parsed and only parsed (a `Payload`
+projection stands in for `dump()` where the baseline comparison needs one,
+so Go still never serialises a deck); `go/internal/gate` is the whole gate
+now — `validate`, `companion`, `partners` — and **agrees with Python case
+for case** on eight fixture decks: `tests/go_fixtures.py` writes each
+deck's text beside Python's own report (with the 21-card pool and without),
+its `stats_for` answer and, where the gate found something a different
+card would fix, its `suggestions_for` answer, into
+`go/internal/gate/testdata/`; `tests/test_go_fixtures.py` holds those
+files current and requires the cases to emit every code the gate has; and
+the Go tests parse the same text, build the same pool from `pooltest`, and
+must produce the same issues in the same order with the same sentences —
+the same stats document, the same candidates with the same scores and
+reasons. `go/internal/analyze`, `go/internal/suggest`, `go/internal/mana`
+(the parser; the solver is Phase 5's, held to the 13,944-case oracle then),
+`go/internal/library` (the file tier, the SQL tier read-only over the door's
+`app.db` handle, the shared-only view and `Library` — ADR 22's owner
+resolution, `visible()`'s order, the maintainer resolved through the
+address and never rendered) and `go/internal/decklog` (ADR 28's read side)
+carry the rest; the deck model's spoken vocabulary — `CATEGORIES`, the
+statuses and stages, the singleton exemptions, the category targets and
+the Game Changer limits — joined the generated JSON as `model.json`, so the
+Go gate's sentences are Python's words. The door puts the caller's scope on
+the request context (`auth.WithScope`) for the ported routes; the third
+family flipped is `GET /api/decks`, the deck, `validate`, `stats`,
+`suggestions`, `commander`, `printings`, `log`, `artifacts` (the shelf and
+one deliverable) and `/api/colors/progress`, which left the reservation
+list the day it moved.
 
 **Phase 4 — Writes and the log** *(~¾–1 day).* The edit operations
 (text surgery + oracle verification, ADR 12's five rules re-proven),
@@ -588,9 +621,11 @@ There is more than one Claude in this house now. Rules for the duration:
   | the route classification (`tests/contract/routes.json`) | shared | read by `tests/test_isolation.py`, `tests/contract/`, and `go/internal/routes` |
   | `GET /api/colors`, `GET /api/glossary`, `GET /api/themes` — the reference prose with no pool behind it | **go** | `go/internal/api` over `go/internal/reference`, 2026-08-21 — the first family flipped, and the flip mechanism (`go/internal/door/routes.go`) with it |
   | `cards/db.py` (read side: open read-only, `get_cards`, `search`, the column fill, `art_crop_from`), `config.py` (paths and flags), `decks/partners.py`, `cards/identify.py` | **go** | `go/internal/pool` (leased, stamp-checked; `pool.Schema` is `SCHEMA` verbatim), `go/internal/config`, `go/internal/gate` (partners first), `go/internal/cards`, 2026-08-21 — the door is a CGO build from here |
-  | `GET /api/cards/search`, `POST /api/cards/identify`, `GET /api/colors/{key}`, `GET /api/lore` — the pool behind the prose and the pool's own two doors | **go** | `go/internal/api`, 2026-08-21 — the second family; `/api/colors/progress` stays Python's and is reserved (`api.Proxied`) until the deck family moves |
+  | `GET /api/cards/search`, `POST /api/cards/identify`, `GET /api/colors/{key}`, `GET /api/lore` — the pool behind the prose and the pool's own two doors | **go** | `go/internal/api`, 2026-08-21 — the second family; deployed as v158 |
+  | `decks/model.py` (parse), `decks/validate.py`, `decks/companion.py`, `decks/analyze.py`, `decks/suggest.py`, `mana.py` (the parser), `decks/source.py` + `decks/sqlsource.py` + `decks/library.py` (reads), `decks/log.py` (reads), `auth/bootstrap.py:maintainer_username` | **go** | `go/internal/deck`, `gate`, `analyze`, `suggest`, `mana`, `library`, `decklog`, 2026-08-22 — held to Python by the differential cases in `go/internal/gate/testdata/` (written by `tests/go_fixtures.py`); Python still owns every write and the schema ladder |
+  | `GET /api/decks`, `GET /api/decks/{owner}/{slug}` and its `validate`, `stats`, `suggestions`, `commander`, `printings`, `log`, `artifacts`, `artifacts/{name}`; `GET /api/colors/progress` | **go** | `go/internal/api`, 2026-08-22 — the third family, the deck reads |
   | `colors.py`, `glossary.py`, `lore.py`, `tarotlore.py`, `decks/model.py:THEMES` — the prose itself | shared | authored in Python, rendered by `mtglab.reference` into `go/internal/reference/data/` (written by `tests/go_fixtures.py`, held current by `tests/test_go_fixtures.py`), embedded and served by Go; the JSON becomes authoritative at Phase 8 |
-  | everything else under `/api` — `api/`, `decks/` (model, gate, analyze, suggest, the sources, the log), `sim/`, `claude/`, `artifacts/`, `mana.py`, `tarot.py`, `symbols.py`, `ocr.py`, `cli.py` | python | proxied to uvicorn on loopback; the read spine continues with the deck reads, then the shelves |
+  | everything else under `/api` — `api/` (the writes, the jobs, the Claude routes, health, the upcoming sets), `decks/` (the edits, import, create, delete, the wheel), `sim/`, `claude/`, `artifacts/` (rendering), `mana.py` (the solver), `tarot.py`, `symbols.py`, `ocr.py`, `cardmotion` serving, `cli.py` | python | proxied to uvicorn on loopback; the read spine's last family is the shelves (symbols, OCR, cardmotion), then Phase 4 |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
   walked before the next flip starts (main deploys itself; every flip is a

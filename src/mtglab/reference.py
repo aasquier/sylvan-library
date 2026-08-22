@@ -29,12 +29,19 @@ import json
 from typing import Any
 
 from mtglab import colors, glossary, lore, tarotlore
-from mtglab.decks.model import ARCHETYPES, THEMES
+from mtglab.decks import analyze, validate
+from mtglab.decks.model import (
+    ARCHETYPES,
+    CATEGORIES,
+    DECK_STAGES,
+    DECK_STATUSES,
+    THEMES,
+)
 
 #: The files, in the order they are written. The names are the Go package's
 #: embed paths; a rename here is a rename there.
 FILES = ("colors.json", "glossary.json", "themes.json", "lore.json",
-         "tarotlore.json")
+         "tarotlore.json", "model.json")
 
 
 def colors_payload() -> dict[str, Any]:
@@ -115,6 +122,27 @@ def tarotlore_payload() -> dict[str, Any]:
     }
 
 
+def model_payload() -> dict[str, Any]:
+    """The deck model's vocabulary that is not served but is *spoken*: the
+    gate's sentences list `CATEGORIES`, `DECK_STATUSES` and `DECK_STAGES`
+    word for word, the advice in `analyze.py` reads `CATEGORY_TARGETS` and
+    `GAME_CHANGER_LIMITS`, and the singleton rule exempts the basics by name.
+    Rendered for the same reason as the prose: the Go gate must say exactly
+    what the Python gate says, and a copy typed into a second language is
+    the drift this file exists to refuse. Small, stable, and still one
+    source."""
+    return {
+        "categories": list(CATEGORIES),
+        "deck_statuses": list(DECK_STATUSES),
+        "deck_stages": list(DECK_STAGES),
+        "singleton_exempt": sorted(validate.SINGLETON_EXEMPT),
+        "category_targets": {k: [lo, hi] for k, (lo, hi)
+                             in analyze.CATEGORY_TARGETS.items()},
+        "game_changer_limits": {str(k): v for k, v
+                                in analyze.GAME_CHANGER_LIMITS.items()},
+    }
+
+
 def payloads() -> dict[str, dict[str, Any]]:
     return {
         "colors.json": colors_payload(),
@@ -122,6 +150,7 @@ def payloads() -> dict[str, dict[str, Any]]:
         "themes.json": themes_payload(),
         "lore.json": lore_payload(),
         "tarotlore.json": tarotlore_payload(),
+        "model.json": model_payload(),
     }
 
 

@@ -193,3 +193,27 @@ Two notes. Fly's edge compresses door-served assets (`app.js` arrived
 door carries no compressor for the duration. And the door's RSS is the
 reference-prose-free Phase 2 binary; Phase 3 embeds ~230 KB of JSON and,
 with the pool, links libduckdb — the next block measures that.
+
+## 2026-08-22 — the pair with the pool in the door (Phase 3, release v158)
+
+Read the same way as the block above, a few minutes after v158 (PR #225:
+the door reads the card pool through libduckdb; `/api/cards/search`,
+`/api/cards/identify`, `/api/colors/{key}` and `/api/lore` answered by Go),
+right after a signed-in walk had asked the door for a search and a lore
+shelf -- so the pool had just been opened and was inside its lease.
+
+| Metric | Measured | How |
+| --- | ---: | --- |
+| Idle RSS, the door | **119.2 MB** (VmHWM 121.5 MB; 8 threads) | `/proc/<pid>/status` of `/opt/door/mtglab`, pid 653 |
+| Idle RSS, the Python server behind it | **104.0 MB** (VmHWM 126.4 MB) | same, pid 673 |
+| Idle RSS, the pair | **≈223 MB** | against ≈136 MB for the Phase 2 pair and 127 MB for Python alone |
+| App image, compressed | **147.3 MB** (12 layers) | sum of layer sizes in the registry's v2 manifest for the deployed tag (`curl -u "x:$(fly auth token)" registry.fly.io/v2/sylvan-library/manifests/<tag>`); 121.3 MB before the door, ~+22 MB (347 MB unpacked per flyctl) with the static door at v156 |
+
+The door's number is the one to read: **+88 MB over the static Phase 2
+door**, which is libduckdb loaded in-process plus the pool's instance held
+open on the ten-second lease -- the same memory Python pays when it opens
+the pool, now paid by both halves of the pair -- and the image grew by the
+same cause (the CGO door binary links libduckdb's static archive). It is the interim PLAN §4
+named (the image and the pair get bigger before they get smaller) and it is
+well inside the 1 GB machine; the door alone after Phase 8 is the number
+Appendix B wants, and this block is what it is compared against.

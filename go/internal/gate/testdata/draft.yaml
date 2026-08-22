@@ -1,0 +1,29 @@
+slug: mono-green
+name: Mono-Green Fixture
+status: theoretical
+stage: draft
+commander:
+  - Goreclaw, Terror of Qal Sisma
+bracket: 2
+archetype: midrange
+themes:
+  - stompy
+  - not-a-theme
+strategy: A fixture, not a deck. See tests/tiny_pool.py.
+cards:
+  - name: Sol Ring
+    category: ramp
+    why: ''
+  - name: Regal Behemoth
+    category: threat
+    why: ''
+  - name: Vorinclex, Voice of Hunger
+    category: threat
+    why: ''
+  - name: Primeval Titan
+    category: threat
+    why: ''
+  - name: Forest
+    category: land
+    why: Basic, untapped, and the only green source this list needs.
+    qty: 95

@@ -1,0 +1,54 @@
+{
+ "with_pool": [
+  {
+   "level": "warn",
+   "code": "legacy-archetype",
+   "message": "`archetype:` is a legacy key (ADR 37): declare a strategy word in `themes` instead -- aggro, midrange, control, combo -- and the edit that does will drop this key itself",
+   "card": null
+  },
+  {
+   "level": "warn",
+   "code": "unknown-theme",
+   "message": "theme 'not-a-theme' is not in the vocabulary; the list grows by editing THEMES in decks/model.py",
+   "card": null
+  },
+  {
+   "level": "warn",
+   "code": "draft-incomplete",
+   "message": "4 of 5 cards still need a `why` (Sol Ring, Regal Behemoth, Vorinclex, Voice of Hunger, Primeval Titan). Write them, then set `stage: curated` -- the gate refuses the promotion while any card is still blank",
+   "card": null
+  },
+  {
+   "level": "error",
+   "code": "banned",
+   "message": "not legal in Commander",
+   "card": "Primeval Titan"
+  }
+ ],
+ "without_pool": [
+  {
+   "level": "warn",
+   "code": "legacy-archetype",
+   "message": "`archetype:` is a legacy key (ADR 37): declare a strategy word in `themes` instead -- aggro, midrange, control, combo -- and the edit that does will drop this key itself",
+   "card": null
+  },
+  {
+   "level": "warn",
+   "code": "unknown-theme",
+   "message": "theme 'not-a-theme' is not in the vocabulary; the list grows by editing THEMES in decks/model.py",
+   "card": null
+  },
+  {
+   "level": "warn",
+   "code": "draft-incomplete",
+   "message": "4 of 5 cards still need a `why` (Sol Ring, Regal Behemoth, Vorinclex, Voice of Hunger, Primeval Titan). Write them, then set `stage: curated` -- the gate refuses the promotion while any card is still blank",
+   "card": null
+  },
+  {
+   "level": "warn",
+   "code": "unverified",
+   "message": "no card pool supplied; identity, legality and text were NOT checked",
+   "card": null
+  }
+ ]
+}

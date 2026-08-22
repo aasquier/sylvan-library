@@ -40,7 +40,9 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -154,6 +156,122 @@ def render_tiny_pool() -> str:
     }, indent=1, ensure_ascii=False) + "\n"
 
 
+# ------------------------------------------------------------ the gate's cases
+#
+# The decks the Go gate is held to, case for case: each is written as the
+# YAML text `Deck.dump` produces and, beside it, Python's own report over the
+# 21-card pool (and, for the first, with no pool at all) -- so
+# `go/internal/gate`'s test parses the same text, builds the same pool from
+# `pooltest`, and must produce the same issues in the same order with the
+# same sentences. The cases are chosen for what they exercise, not for being
+# decks anybody would play.
+
+GATE_DIR = ROOT / "go" / "internal" / "gate" / "testdata"
+
+
+def gate_cases() -> dict[str, Deck]:
+    """Name -> deck, each built to trip a different part of the gate."""
+    import tiny_pool
+    mono = tiny_pool.mono_green_deck()                    # one banned card
+    clean = tiny_pool.mono_green_deck(clean=True)          # passes
+    draft = tiny_pool.mono_green_deck(stage="draft")
+    for c in draft.cards[:4]:
+        c.why = ""                                         # the counted warning
+    draft.themes = ["stompy", "not-a-theme"]
+    draft.legacy_archetype = "midrange"
+    # Everything the card-level checks can say, at once: off-identity cards,
+    # a not-legal card that is not banned, a second commander that cannot
+    # pair, a land filed under ramp and a spell filed under land, a
+    # companion with no such ability, a duplicate, a commander in the 99,
+    # an unknown category and a card the pool lacks.
+    messy = tiny_pool.mono_green_deck(clean=True)
+    messy.slug, messy.name = "messy", "Messy Fixture"
+    messy.commander = ["Goreclaw, Terror of Qal Sisma", "Gyome, Master Chef"]
+    messy.companion = "Sol Ring"
+    messy.status, messy.stage = "shelved", "curated"
+    messy.cards[0].category = "land"                       # Sol Ring as a land
+    messy.cards[1].why = ""                                # curated: blocks
+    messy.cards.append(CardEntry("Rhystic Study", "card-advantage", "Blue, in a green deck."))
+    messy.cards.append(CardEntry("Swords to Plowshares", "interaction", "White, in a green deck."))
+    messy.cards.append(CardEntry("Black Lotus", "ramp", "Not legal, not banned."))
+    messy.cards.append(CardEntry("Llanowar Reborn", "ramp", "A land under ramp."))
+    messy.cards.append(CardEntry("Goreclaw, Terror of Qal Sisma", "threat", "The commander, again."))
+    messy.cards.append(CardEntry("Sol Ring", "utility", "A second Sol Ring."))
+    messy.cards.append(CardEntry("Not A Real Card", "mystery", "Unknown to the pool."))
+    messy.swap_board.append(CardEntry("Ajani, Nacatl Pariah", "threat", "Red-white, on the board."))
+    # Kaheera's restriction against a deck with non-Cats; a Background as a
+    # lone commander; and the rich fixture, which the pool mostly lacks.
+    kaheera = tiny_pool.mono_green_deck(clean=True)
+    kaheera.slug, kaheera.name = "kaheera", "Kaheera Fixture"
+    kaheera.companion = "Kaheera, the Orphanguard"
+    pair = tiny_pool.mono_green_deck(clean=True)
+    pair.slug, pair.name = "pair", "Pair Fixture"
+    pair.commander = ["Gyome, Master Chef", "Ajani, Nacatl Pariah"]
+    artifact = tiny_pool.mono_green_deck(clean=True)
+    artifact.slug, artifact.name = "artifact-commander", "Artifact Commander Fixture"
+    artifact.commander = ["Sol Ring"]
+    artifact.cards = [c for c in artifact.cards if c.name != "Sol Ring"]
+    artifact.cards[-1].qty += 1                             # keep the 99
+    return {"mono-green": mono, "mono-green-clean": clean, "draft": draft,
+            "messy": messy, "kaheera": kaheera, "pair": pair,
+            "artifact-commander": artifact, "rich": rich_deck()}
+
+
+def render_gate_cases() -> dict[str, str]:
+    """name -> the deck text and Python's answers over it: the gate's report
+    (`<name>.report.json`, with and without the pool), the analysis
+    (`<name>.stats.json`, exactly what `GET .../stats` serves) and, where the
+    gate found something a different card would fix, the suggestions
+    (`<name>.suggestions.json`, what `GET .../suggestions` serves)."""
+    import tiny_pool
+    from mtglab.api import service
+    from mtglab.cards import db
+    from mtglab.decks.source import MemoryDeckSource
+    from mtglab.decks.validate import validate
+    out: dict[str, str] = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        # Named as `config.DB_PATH` names it, so `service` finds it through
+        # `use_paths(data_dir=tmp)` below and answers *with* the pool.
+        pool_path = tiny_pool.build(Path(tmp) / "mtg.duckdb")
+        con = db.connect_readonly(pool_path)
+        try:
+            for name, deck in gate_cases().items():
+                text = deck.dump()
+                parsed = Deck.from_text(text, slug=deck.slug)
+                names = parsed.commander + [c.name for c in parsed.cards] + \
+                    [c.name for c in parsed.swap_board] + [c.name for c in parsed.graveyard]
+                if parsed.companion:
+                    names.append(parsed.companion)
+                cards = db.get_cards(con, names)
+                reports = {
+                    "with_pool": [issue_json(i) for i in validate(parsed, cards).issues],
+                    "without_pool": [issue_json(i) for i in validate(parsed, None).issues],
+                }
+                out[f"{name}.yaml"] = text
+                out[f"{name}.report.json"] = json.dumps(reports, indent=1,
+                                                        ensure_ascii=False) + "\n"
+                # The service's own answers, through the same source the
+                # routes use, against the same pool: what the wire carries.
+                from mtglab import config
+                with config.use_paths(data_dir=Path(tmp)):
+                    source = MemoryDeckSource([parsed])
+                    stats = service.stats_for(parsed.slug, source=source)
+                    out[f"{name}.stats.json"] = json.dumps(
+                        stats, indent=1, ensure_ascii=False) + "\n"
+                    suggestions = service.suggestions_for(parsed.slug, source=source)
+                    if suggestions["targets"]:
+                        out[f"{name}.suggestions.json"] = json.dumps(
+                            suggestions, indent=1, ensure_ascii=False) + "\n"
+        finally:
+            con.close()
+    return out
+
+
+def issue_json(issue: Any) -> dict[str, Any]:
+    return {"level": issue.level, "code": issue.code, "message": issue.message,
+            "card": issue.card}
+
+
 def write() -> None:
     TESTDATA.mkdir(parents=True, exist_ok=True)
     text, parsed = render()
@@ -168,6 +286,10 @@ def write() -> None:
     SCHEMA_PATH.write_text(render_schema(), encoding="utf-8")
     TINY_POOL_PATH.write_text(render_tiny_pool(), encoding="utf-8")
     print(f"wrote {SCHEMA_PATH}\nwrote {TINY_POOL_PATH}")
+    GATE_DIR.mkdir(parents=True, exist_ok=True)
+    for name, body in render_gate_cases().items():
+        (GATE_DIR / name).write_text(body, encoding="utf-8")
+    print(f"wrote {len(render_gate_cases())} gate cases into {GATE_DIR}")
 
 
 if __name__ == "__main__":

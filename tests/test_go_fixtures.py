@@ -161,3 +161,43 @@ def test_the_committed_tiny_pool_is_the_fixture_as_loaded():
     # The two cards the gate and the reader exist for are in it.
     assert "Primeval Titan" in names
     assert "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger" in names
+
+
+# ------------------------------------------------------------- the gate
+
+def test_the_committed_gate_cases_are_pythons_reports_now():
+    """`go/internal/gate/testdata/*` is each fixture deck's text and Python's
+    own validate report over it; the Go gate is held to them case for case,
+    so a change to the gate here must be regenerated there or the Go test
+    proves equivalence with a stale answer."""
+    rendered = go_fixtures.render_gate_cases()
+    for name, body in rendered.items():
+        path = go_fixtures.GATE_DIR / name
+        assert path.exists(), (
+            f"{path} is missing; generate it with `python tests/go_fixtures.py`")
+        assert path.read_text(encoding="utf-8") == body, (
+            f"{path} is stale; regenerate with `python tests/go_fixtures.py`")
+    on_disk = {p.name for p in go_fixtures.GATE_DIR.iterdir()}
+    assert on_disk == set(rendered), f"stray gate fixtures: {on_disk - set(rendered)}"
+
+
+def test_the_gate_cases_exercise_what_they_claim():
+    """Breadth is the point: every code the gate can emit should appear in
+    at least one case, or the Go gate is proven only against the easy ones."""
+    rendered = go_fixtures.render_gate_cases()
+    codes = set()
+    for name, body in rendered.items():
+        if name.endswith(".report.json"):
+            for report in json.loads(body).values():
+                codes.update(i["code"] for i in report)
+    # `companion-restriction` is absent on purpose: `tiny_pool` holds no
+    # companion, so the restriction checkers are held by unit tests over
+    # synthetic records in `go/internal/gate` rather than by a case here.
+    for code in ("banned", "color-identity", "unknown-card", "singleton",
+                 "commander-in-99", "not-a-commander", "illegal-pairing",
+                 "category-mismatch", "unknown-category", "missing-rationale",
+                 "draft-incomplete", "unknown-theme", "legacy-archetype",
+                 "deck-status", "deck-size", "not-a-companion", "unverified"):
+        assert code in codes, f"no gate case emits {code}"
+    assert any(n.endswith(".stats.json") for n in rendered)
+    assert "mono-green.suggestions.json" in rendered

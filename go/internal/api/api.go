@@ -22,26 +22,44 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
+	"sync"
 
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// Config is what the ported routes need. It grows with the families: the
-// pool arrived with the card reads; the deck library arrives with the deck
-// reads.
+// Config is what the ported routes need. It grew with the families: the
+// pool with the card reads, the deck library with the deck reads.
 type Config struct {
 	Logger *slog.Logger
 	// Pool is the card pool, or nil for an instance that has none -- the
 	// same degraded answers `service._connect()` returning None produces.
 	Pool *pool.Pool
+	// AppDB is the door's read-only `app.db` handle when auth is on; nil
+	// otherwise, and then AppDBPath is opened lazily, read-only, only if the
+	// file exists -- reading must not acquire a database.
+	AppDB     *sql.DB
+	AppDBPath string
+	// DecksDir is the file tier's root.
+	DecksDir string
+	// AdminEmail is MTGLAB_ADMIN_EMAIL, resolved to the maintainer's handle
+	// through app.db for a signed-in caller (ADR 17, ADR 22); never rendered.
+	AdminEmail string
 }
 
 // API holds the ported routes' dependencies.
 type API struct {
-	log  *slog.Logger
-	pool *pool.Pool
+	log        *slog.Logger
+	pool       *pool.Pool
+	db         *sql.DB
+	dbPath     string
+	decksDir   string
+	adminEmail string
+
+	lazy   sync.Mutex
+	lazyDB *sql.DB
 }
 
 // New builds the ported routes.
@@ -49,7 +67,8 @@ func New(cfg Config) *API {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	return &API{log: cfg.Logger, pool: cfg.Pool}
+	return &API{log: cfg.Logger, pool: cfg.Pool, db: cfg.AppDB, dbPath: cfg.AppDBPath,
+		decksDir: cfg.DecksDir, adminEmail: cfg.AdminEmail}
 }
 
 // Route is one ported route: a method, a path template in the syntax
@@ -79,20 +98,32 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/lore", Handler: a.lore},
 		{Method: http.MethodGet, Pattern: "/api/cards/search", Handler: a.search},
 		{Method: http.MethodPost, Pattern: "/api/cards/identify", Handler: a.identify},
+		// The deck reads (the third family): the shelf, the deck, the gate's
+		// verdict, the analysis, the suggestions, the commander's panel, the
+		// printings, the history, the artifacts shelf -- every one resolved
+		// through `Library` (ADR 22) -- and the 32 Deck Challenge's score.
+		{Method: http.MethodGet, Pattern: "/api/decks", Handler: a.listDecks},
+		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}", Handler: a.getDeck},
+		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/validate", Handler: a.validateDeck},
+		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/stats", Handler: a.deckStats},
+		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/suggestions", Handler: a.suggestions},
+		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/commander", Handler: a.commanderDossier},
+		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/printings", Handler: a.commanderPrintings},
+		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/log", Handler: a.deckLog},
+		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/artifacts", Handler: a.deckArtifacts},
+		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/artifacts/{name}", Handler: a.deckArtifact},
+		{Method: http.MethodGet, Pattern: "/api/colors/progress", Handler: a.challengeProgress},
 	}
 }
 
 // Proxied is every exact path that a pattern above would capture but that
 // still belongs to Python: the door hands these to the proxy before any
-// pattern is consulted. FastAPI resolves `/api/colors/progress` against
-// `/api/colors/{key}` by declaring the literal first; until the literal
-// moves (it reads the deck library, so it comes with the deck family) the
-// template must not answer for it. Each entry leaves this list the day its
-// route arrives in Routes.
+// pattern is consulted. FastAPI resolves a literal declared before a
+// template by order; here a literal Go has not ported is named, and each
+// entry leaves this list the day its route arrives in Routes.
+// `/api/colors/progress` was the first entry, and left with the deck reads.
 func (a *API) Proxied() []string {
-	return []string{
-		"/api/colors/progress",
-	}
+	return []string{}
 }
 
 // usePool is `service._connect()` followed by the work: fn runs against a

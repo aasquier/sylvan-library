@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,12 @@ import (
 // the most specific pattern first -- so a test reaches the handler a real
 // request would.
 func call(t *testing.T, a *API, method, target, body string) (int, map[string]any, []byte) {
+	t.Helper()
+	return callCtx(t, a, context.Background(), method, target, body)
+}
+
+// callCtx is call with a caller on the context (the deck tests sign in).
+func callCtx(t *testing.T, a *API, ctx context.Context, method, target, body string) (int, map[string]any, []byte) {
 	t.Helper()
 	path := strings.SplitN(target, "?", 2)[0]
 	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
@@ -52,7 +59,7 @@ func call(t *testing.T, a *API, method, target, body string) (int, map[string]an
 	if found == nil {
 		t.Fatalf("no route for %s %s", method, target)
 	}
-	req := httptest.NewRequest(method, target, strings.NewReader(body))
+	req := httptest.NewRequest(method, target, strings.NewReader(body)).WithContext(ctx)
 	for name, value := range values {
 		req.SetPathValue(name, value)
 	}
