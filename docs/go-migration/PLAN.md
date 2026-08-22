@@ -372,17 +372,21 @@ built is a *suite* that can run against a live server, because the other
 thirteen HTTP test files reach into process state (`jobs.submit`,
 `MemoryDeckSource`, monkeypatched writers) and could not. They keep doing
 what they do; the contract suite is the live-capable set, and the
-adversarial matrix is written in both. **Owed, and still owed:** requiring the
-`contract` check on `main` (a repository setting, Aaron's — ENGINEERING §5
-carries the one-line `gh api` command). Read back from the API at the start
-of Phase 4, 2026-08-22: the ten required checks are `test (3.11)`, `test
-(3.12)`, `frontend`, `image`, `no-secrets-or-card-data`,
-`dependency-review`, `image-arm64`, `go (amd64)`, `go (arm64)` and
-`go-lint`, and `contract` is not among them. It gates `deploy` through
-`needs`, so a red contract run still stops a *release*; what it cannot do
-until required is stop a *merge*. That gap widens with every flip — from
-Phase 4 on, the suite is the only thing standing between a mis-ported write
-and somebody's `deck.yaml`.
+adversarial matrix is written in both. **Owed for three sessions, and closed
+2026-08-22:** `contract` is now a required check on `main`, the eleventh, read
+back from the API with `strict`, linear history and admin enforcement
+unchanged in the same call. Until then it gated `deploy` through `needs` — so
+a red contract run stopped a *release* — but could not stop a *merge*, and
+that gap widened with every flip: from Phase 4 on, the suite is the only thing
+standing between a mis-ported write and somebody's `deck.yaml`.
+
+**Why it took three sessions is the part worth keeping.** This paragraph said
+the setting was "Aaron's", and two other documents said the same; each session
+inherited it as a fact. It never was one — the `gh` CLI is his own and the
+change is one API call. What was actually missing was a *confirmation*, which
+is a question to ask in the moment, not a line to write into a plan. A note
+saying somebody else must do a thing reads like a permission boundary and
+outlives the moment it was true.
 
 **Phase 2 — Skeleton and front door** *(~½–1 day; the spike day — if the
 plan snags on CGO or the toolchain, it snags here, cheaply, and the
