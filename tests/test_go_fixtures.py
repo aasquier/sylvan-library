@@ -107,6 +107,7 @@ _ORACLES = [
     ("CPython's float floor", "PYFLOAT_PATH", "render_pyfloat_cases"),
     ("the closed form", "KARSTEN_PATH", "render_karsten_cases"),
     ("the mana curve", "CURVE_PATH", "render_curve_cases"),
+    ("Tier 1", "TIER1_PATH", "render_tier1_cases"),
 ]
 
 

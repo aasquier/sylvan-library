@@ -16,6 +16,7 @@ import random
 from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
+from math import fsum
 from statistics import median
 
 from mtglab.mana import ManaCost, ManaSource, can_pay, expand_units
@@ -375,11 +376,31 @@ class SimSummary:
 
     def spells_through(self, turn: int) -> float:
         """Total spells deployed by end of `turn` -- the flood-aware measure
-        of whether extra lands are actually buying anything."""
-        return sum(self.avg_spells_by_turn[:turn])
+        of whether extra lands are actually buying anything.
+
+        `fsum`, not `sum`, for the reason `sim/curve.py`'s module docstring
+        sets out at length: **CPython 3.12 gave `sum()` compensated
+        (Neumaier) accumulation and 3.11 adds left to right**, so a float sum
+        answers differently on the two interpreters this project supports.
+        Measured: `sum([0.1] * 10)` is 1.0 under 3.12.13 and
+        0.9999999999999999 under 3.11.15.
+
+        The exposure here is smaller than the curve's -- every caller wraps
+        this in `round(x, 2)`, so the difference is a last-ulp one that no
+        screen shows -- but `sim/mulligan.py` *ranks* policies on
+        `spells_through_t8` and reports a spread against `FLAT`, and a
+        ranking that depends on the interpreter is the same bug however
+        rarely it fires. Fixing beats pinning either answer, which is the
+        call the closed forms made first and this follows.
+
+        One visible consequence, and it is an improvement: `sum([])` is the
+        **int** 0 and `fsum([])` is `0.0`, so a zero-turn total now matches
+        the annotation.
+        """
+        return fsum(self.avg_spells_by_turn[:turn])
 
     def wasted_through(self, turn: int) -> float:
-        return sum(self.avg_unused_by_turn[:turn])
+        return fsum(self.avg_unused_by_turn[:turn])
 
     def report(self) -> str:
         lines = [

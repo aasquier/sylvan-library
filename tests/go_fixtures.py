@@ -1697,6 +1697,9 @@ def write() -> None:
     JOBS_PATH.write_text(render_jobs_cases(), encoding="utf-8")
     print(f"wrote the job registry oracle into {JOBS_PATH}")
     write_closed_forms()
+    TIER1_PATH.parent.mkdir(parents=True, exist_ok=True)
+    TIER1_PATH.write_text(render_tier1_cases(), encoding="utf-8")
+    print(f"wrote the Tier 1 corpus into {TIER1_PATH}")
 
 
 # ------------------------------------------------------------------ pyrand
@@ -3216,6 +3219,403 @@ def jobs_cases() -> dict[str, Any]:
 
 def render_jobs_cases() -> str:
     return _compact_json(jobs_cases()) + "\n"
+
+
+# ------------------------------------------------------------------- tier 1
+#
+# `sim/tier1/engine.py` in Go (PLAN section 7, Phase 5), and the corpus that
+# says the port is the same simulator rather than a similar one.
+#
+# The gate is `tests/test_determinism.py`'s REFERENCE_DIGEST -- a sha256 over
+# `repr()` of one game, one 300-game run and a three-point land sweep. A
+# digest is opaque by design, so this corpus records the *text* it is taken
+# over as well: a Go run that diverges then reports which line and which
+# character rather than "the hash moved".
+#
+# Four things this records that the digest alone cannot.
+#
+# **The decks, as data.** `build_golgari` is a test helper, and writing a
+# second one in Go would put a deck builder between the two engines -- a
+# builder disagreement would then present as an engine disagreement. So the
+# libraries travel as compiled SimCards and neither side builds anything.
+#
+# **Cards that compare equal.** Every card in `build_golgari` has a distinct
+# name, so nothing in the reference run exercises `list.remove` taking out a
+# *different* card from the one it was handed -- which is what happens in
+# every real deck, because `compile_deck` writes `[compiled] * qty`. The
+# duplicates deck below is that hazard on purpose.
+#
+# **Castability, both ways round.** Tier 1 asks `mana.can_pay` inside
+# `_pick_land` and `engine._consume` everywhere else, and the Go port answers
+# both through its port of `_consume`. That is an equivalence argument, so
+# each case here records what *both* Python functions said.
+#
+# **`repr(float)` at its boundaries.** The digest hashes text, so Python's
+# number formatting is inside the gate: `100.0` is not `100` and `1e-05` is
+# not `0.00001`. The float section is CPython's own answer for every value
+# the reference run produces, plus the places the notation changes shape.
+
+TIER1_PATH = ROOT / "go" / "internal" / "sim" / "tier1" / "testdata" / "tier1.json"
+
+
+#: The card, cost and source encoders are the closed forms' own
+#: (`_card_json` and friends, above): one encoder for one Go type, since
+#: `sim.Card` is shared by every tier. They omit defaults, which is why a
+#: `category` of "utility" and a `has_x` of False do not appear below -- Go's
+#: zero value is the same default, and `amount` is the one field written
+#: always because Python's default is 1 where Go's zero value is 0.
+#:
+#: A cost travels **parsed** rather than as the string it came from. Re-parsing
+#: in Go would put `mana.Parse` inside the comparison, and a parser
+#: disagreement would then present as an engine disagreement.
+
+
+def _tier1_keep_json(rule: Any) -> dict[str, int]:
+    return {
+        "min_lands": rule.min_lands,
+        "max_lands": rule.max_lands,
+        "min_mana_pieces": rule.min_mana_pieces,
+        "cheap_ramp_mv": rule.cheap_ramp_mv,
+        "max_mulligans": rule.max_mulligans,
+    }
+
+
+def tier1_duplicate_deck() -> tuple[list[Any], Any]:
+    """A deck of cards that compare equal, which `build_golgari` has none of.
+
+    `compile_deck` writes `[compiled] * qty`, so a real deck's basics are one
+    object repeated -- and `hand.remove(card)` takes out the first *equal*
+    element, not the one it was handed. With every name distinct those are
+    always the same card and the distinction is invisible; here they are not.
+    It also carries the shapes the Golgari shell lacks: a two-mana source
+    (unit expansion), a hybrid pip, a genuinely colourless pip, and a spell
+    too expensive to cast inside most horizons, which is a never-cast timing
+    row and therefore the head of the sort.
+    """
+    import test_sim_tier1 as t1
+    from mtglab.mana import ManaSource
+
+    forest = t1.land("Forest", t1.G)
+    swamp = t1.land("Swamp", t1.B)
+    tainted = t1.land("Tainted Wood", t1.BG, tapped=True)
+    sol_ring = t1.spell("Sol Ring", "{1}", "ramp",
+                        produces=[ManaSource(t1.C, 2)])
+    signet = t1.spell("Golgari Signet", "{2}", "ramp",
+                      produces=[ManaSource(t1.BG)])
+    dork = t1.spell("Llanowar Elves", "{G}", "ramp",
+                    produces=[ManaSource(t1.G)], delay=1)
+    cultivate = t1.spell("Cultivate", "{2}{G}", "ramp", fetches=1)
+    hybrid = t1.spell("Fire Covenant", "{2}{B/G}", "interaction")
+    eldrazi = t1.spell("Kozilek's Chatter", "{4}{C}", "threat")
+    unreachable = t1.spell("Impervious Greatwurm", "{6}{B}{G}", "threat")
+
+    library = ([forest] * 18 + [swamp] * 9 + [tainted] * 6 + [sol_ring] * 4
+               + [signet] * 8 + [dork] * 8 + [cultivate] * 7 + [hybrid] * 9
+               + [eldrazi] * 10 + [unreachable] * 20)
+    commander = t1.spell("Gyome, Master Chef", "{3}{B}{G}", "engine")
+    return library[:99], commander
+
+
+def tier1_decks() -> dict[str, tuple[list[Any], Any]]:
+    """Every deck the cases below name, keyed by the name they name it by."""
+    from test_sim_tier1 import build_golgari
+
+    decks: dict[str, tuple[list[Any], Any]] = {
+        f"golgari-{n}": build_golgari(n) for n in (30, 32, 34, 35, 38)
+    }
+    duplicates, commander = tier1_duplicate_deck()
+    decks["duplicates"] = (duplicates, commander)
+    decks["headless"] = (duplicates, None)
+    return decks
+
+
+#: (deck, seed, turns, keep rule overrides, on_the_play). The keep rules are
+#: chosen to exercise both branches of the bottoming loop: a rule nothing can
+#: satisfy mulligans to the cap and bottoms lands, and a hand held at
+#: `min_lands` bottoms its most expensive spell instead.
+TIER1_GAMES: tuple[tuple[str, int, int, dict[str, int], bool], ...] = (
+    ("golgari-34", 17, 10, {}, False),
+    ("golgari-34", 7, 12, {}, False),
+    ("golgari-34", 20260810, 10, {}, True),
+    ("golgari-30", 3, 8, {}, False),
+    ("golgari-38", 99, 14, {}, False),
+    ("duplicates", 1, 10, {}, False),
+    ("duplicates", 2, 10, {}, True),
+    ("duplicates", 3, 6, {"min_lands": 4, "max_lands": 4,
+                          "min_mana_pieces": 6}, False),
+    ("duplicates", 4, 10, {"min_lands": 0, "max_lands": 7,
+                           "min_mana_pieces": 0, "max_mulligans": 0}, False),
+    ("duplicates", 5, 10, {"min_lands": 6, "max_lands": 7,
+                           "min_mana_pieces": 7, "max_mulligans": 3}, False),
+    ("duplicates", 6, 10, {"cheap_ramp_mv": 4, "min_mana_pieces": 5}, False),
+    # These two are here because a mutation survived without them. The first
+    # bottoms LANDS from a hand of equal Forests -- `hand.remove` is handed
+    # `lands_in_hand[-1]` and takes out the FIRST card equal to it, which is
+    # the one place in the engine where "the same card" and "an equal card"
+    # part company. The second mulligans past a seven-card hand, which is the
+    # only way `min(mulligans, len(hand) - 1)` ever binds.
+    ("duplicates", 7, 10, {"min_lands": 0, "max_lands": 7,
+                           "min_mana_pieces": 8, "max_mulligans": 3}, False),
+    ("duplicates", 8, 10, {"min_lands": 0, "max_lands": 0,
+                           "min_mana_pieces": 0, "max_mulligans": 9}, False),
+    ("golgari-34", 21, 10, {"min_lands": 0, "max_lands": 0,
+                            "min_mana_pieces": 0, "max_mulligans": 9}, False),
+    ("headless", 11, 10, {}, False),
+    ("headless", 12, 4, {}, True),
+    ("golgari-32", 0, 1, {}, False),
+    ("golgari-32", 0, 0, {}, False),
+)
+
+#: (deck, games, turns, seed, keep rule overrides). Small on purpose -- the
+#: reference run is the large one, and these vary the *shape* (no commander,
+#: a horizon shorter than the commander's cost, a policy that mulligans
+#: everything, a single game) rather than sampling harder.
+TIER1_RUNS: tuple[tuple[str, int, int, int, dict[str, int]], ...] = (
+    ("golgari-34", 40, 10, 42, {}),
+    ("duplicates", 60, 10, 5, {}),
+    ("duplicates", 25, 4, 8, {"min_lands": 3, "max_lands": 3,
+                              "min_mana_pieces": 5}),
+    ("headless", 30, 9, 13, {}),
+    ("golgari-30", 1, 12, 1, {}),
+    ("golgari-38", 12, 3, 2, {"max_mulligans": 0}),
+    ("duplicates", 20, 8, 9, {"min_lands": 0, "max_lands": 0,
+                              "min_mana_pieces": 0, "max_mulligans": 9}),
+)
+
+
+def _tier1_pool(spec: list[tuple[str, int]]) -> list[Any]:
+    from mtglab.mana import ManaSource
+    return [ManaSource(frozenset(colors), amount) for colors, amount in spec]
+
+
+#: Pools for the castability cases, as (colours, amount) pairs.
+TIER1_POOLS: tuple[tuple[str, list[tuple[str, int]]], ...] = (
+    ("empty", []),
+    ("one-green", [("G", 1)]),
+    ("one-dual", [("BG", 1)]),
+    ("two-duals", [("BG", 1), ("BG", 1)]),
+    ("sol-ring", [("C", 2)]),
+    ("sol-ring-and-forest", [("C", 2), ("G", 1)]),
+    ("split", [("G", 1), ("B", 1)]),
+    ("split-and-dual", [("G", 1), ("B", 1), ("BG", 1)]),
+    ("any-colour", [("WUBRG", 1)]),
+    ("any-colour-twice", [("WUBRG", 2)]),
+    ("five-basics", [("W", 1), ("U", 1), ("B", 1), ("R", 1), ("G", 1)]),
+    ("colourless-heap", [("C", 3)]),
+    ("dual-and-colourless", [("BG", 1), ("C", 1)]),
+    ("wide-and-narrow", [("BG", 1), ("G", 1), ("WUBRG", 1), ("C", 2)]),
+    ("zero-amount", [("G", 0), ("B", 1)]),
+)
+
+#: Costs for the castability cases.
+TIER1_COSTS: tuple[str, ...] = (
+    "", "{0}", "{1}", "{2}", "{5}", "{G}", "{B}", "{C}",
+    "{G}{G}", "{B}{G}", "{1}{G}", "{2}{G}", "{3}{B}{G}", "{2}{C}",
+    "{B/G}", "{B/G}{B/G}", "{2}{B/G}", "{2/G}", "{G/P}", "{G/P}{G}",
+    "{X}{G}", "{X}", "{W}{U}{B}{R}{G}", "{4}{C}", "{6}{B}{G}", "{C}{C}",
+)
+
+
+def tier1_consume_cases() -> list[dict[str, Any]]:
+    """`engine._consume` and `mana.can_pay` over the same (cost, pool) pairs.
+
+    Both, because the Go port answers `can_pay` through its port of
+    `_consume`, and the equivalence of the two is an argument: the same
+    matching over the same units, with `_consume`'s extra generic check
+    implied by its own opening one. An argument about equivalence is a thing
+    to check. If the two ever disagree on a case here, the Go side is
+    answering the wrong question and this is where it says so.
+    """
+    from mtglab.mana import can_pay, parse_mana_cost
+    from mtglab.sim.tier1.engine import _consume
+
+    out: list[dict[str, Any]] = []
+    for cost_text in TIER1_COSTS:
+        cost = parse_mana_cost(cost_text)
+        for pool_name, spec in TIER1_POOLS:
+            sources = _tier1_pool(spec)
+            remaining = _consume(cost, list(sources))
+            out.append({
+                "cost_text": cost_text,
+                "cost": _cost_json(cost),
+                "pool": pool_name,
+                "sources": [_source_json(s) for s in sources],
+                "can_pay": can_pay(cost, sources),
+                "remaining": (None if remaining is None
+                              else [_source_json(s) for s in remaining]),
+            })
+    return out
+
+
+def _tier1_floats(obj: Any, seen: list[float]) -> None:
+    """Every float reachable from a result object, in traversal order."""
+    from dataclasses import fields, is_dataclass
+
+    if isinstance(obj, bool) or obj is None:
+        return
+    if isinstance(obj, float):
+        seen.append(obj)
+    elif isinstance(obj, dict):
+        for key, value in obj.items():
+            _tier1_floats(key, seen)
+            _tier1_floats(value, seen)
+    elif isinstance(obj, (list, tuple)):
+        for item in obj:
+            _tier1_floats(item, seen)
+    elif is_dataclass(obj) and not isinstance(obj, type):
+        for f in fields(obj):
+            _tier1_floats(getattr(obj, f.name), seen)
+
+
+#: Floats chosen for where CPython's repr *changes shape* rather than for
+#: their magnitude: both fixed/exponential boundaries, values needing all
+#: seventeen significant digits, and the ones a naive renderer prints with no
+#: decimal point at all.
+TIER1_EDGE_FLOATS: tuple[float, ...] = (
+    0.0, -0.0, 1.0, -1.0, 0.5, 2.0, 100.0, -100.0,
+    1 / 3, 2 / 3, 1 / 7, 0.1, 0.2, 0.1 + 0.2, 1e-1,
+    1e15, 1e16, 1e17, 9999999999999998.0, 1.2345678901234567e16,
+    1e-3, 1e-4, 1e-5, 1.5e-5, 9.999999999999999e-5,
+    1e100, 1e-100, 1e308, 1e-308, 5e-324, 2.2250738585072014e-308,
+    1.7976931348623157e308, 2.0 ** 53, 2.0 ** 53 + 2, float(2 ** 63),
+    123456789.0, 1234567890123456.0, 12345678901234567.0,
+    float("inf"), float("-inf"), float("nan"),
+)
+
+
+def tier1_float_cases(extra: list[float]) -> list[dict[str, Any]]:
+    """`repr(float)` from CPython, as (bits, text).
+
+    Bits rather than a JSON number, for the same reason the draw corpus
+    compares `Float64bits`: the thing under test is a *rendering*, so the
+    input has to arrive as the exact double and not as a decimal that must be
+    read back through the very code being checked.
+    """
+    values: list[float] = list(TIER1_EDGE_FLOATS)
+    values += [n / 300 for n in range(302)]
+    values += [n / 100 for n in range(101)]
+    values += [n / 7 for n in range(40)]
+    values += extra
+    seen: set[int] = set()
+    out: list[dict[str, Any]] = []
+    for value in values:
+        bits = _float_bits(value)
+        if bits in seen:
+            continue
+        seen.add(bits)
+        out.append({"bits": bits, "repr": repr(value)})
+    return out
+
+
+#: Strings whose `repr` a renderer can get wrong: the quote choice, the
+#: escapes, and the printable non-ASCII CPython passes through untouched.
+TIER1_STRINGS: tuple[str, ...] = (
+    "", "Forest", "Gyome, Master Chef", "Kozilek's Chatter",
+    'a "quoted" name', 'both \' and "', "back\\slash",
+    "keep 2-5 lands AND lands + ramp(mv<=2) >= 3",
+    "line\nbreak", "tab\there", "carriage\rreturn",
+    "Jotun Grunt — em dash", "Júbilee", "æther Vial",
+    "null\x00byte", "bell\x07", "delete\x7f", "no break",
+    "\U0001f5e1 blade",
+)
+
+
+def tier1_string_cases() -> list[dict[str, str]]:
+    return [{"value": s, "repr": repr(s)} for s in TIER1_STRINGS]
+
+
+def tier1_cases() -> dict[str, Any]:
+    """The whole Tier 1 corpus, as the Go module reads it."""
+    import determinism_probe as probe
+    from mtglab.sim.tier1.engine import KeepRule, run, simulate_game
+
+    decks = tier1_decks()
+    floats: list[float] = []
+
+    games: list[dict[str, Any]] = []
+    for name, seed, turns, overrides, on_play in TIER1_GAMES:
+        library, commander = decks[name]
+        rule = KeepRule(**overrides)
+        result = simulate_game(library, commander, turns=turns,
+                               keep_rule=rule, rng=random.Random(seed),
+                               on_the_play=on_play)
+        games.append({
+            "deck": name,
+            "seed": str(seed),
+            "turns": turns,
+            "keep_rule": _tier1_keep_json(rule),
+            "on_the_play": on_play,
+            "repr": repr(result),
+        })
+
+    runs: list[dict[str, Any]] = []
+    for name, count, turns, seed, overrides in TIER1_RUNS:
+        library, commander = decks[name]
+        rule = KeepRule(**overrides)
+        summary = run(library, commander, games=count, turns=turns,
+                      keep_rule=rule, seed=seed)
+        _tier1_floats(summary, floats)
+        # `spells_through` is what a land sweep is read by, and it is a Python
+        # *slice*: a negative turn drops from the end rather than meaning
+        # nothing, and a turn past the horizon is the whole list. Recorded as
+        # text because a sum of floats has one right answer and a tolerance
+        # here would hide the summation rather than allow for it -- and it can
+        # be recorded at all only because that sum is `fsum` now. It was
+        # `sum`, which CPython compensates from 3.12 and not before, so these
+        # values would have differed across the CI matrix and taken this
+        # corpus's cross-version stability with them.
+        through = [{"turn": t,
+                    "spells": repr(summary.spells_through(t)),
+                    "wasted": repr(summary.wasted_through(t))}
+                   for t in (-1, 0, 1, 3, 8, 100)]
+        runs.append({
+            "deck": name,
+            "through": through,
+            "games": count,
+            "turns": turns,
+            "seed": str(seed),
+            "keep_rule": _tier1_keep_json(rule),
+            "repr": repr(summary),
+        })
+
+    outputs = probe.reference_outputs()
+    digest = probe.reference_digest()
+    library, commander = decks["golgari-34"]
+    _tier1_floats(run(library, commander, games=probe.GAMES,
+                      turns=probe.TURNS, seed=probe.SEED), floats)
+
+    return {
+        "note": ("Generated from the real engine by "
+                 "`python tests/go_fixtures.py`. Seeds are strings because a "
+                 "`random.Random` seed may outgrow a JSON number; floats are "
+                 "Float64bits."),
+        "reference": {
+            "digest": digest,
+            "seed": str(probe.SEED),
+            "games": probe.GAMES,
+            "turns": probe.TURNS,
+            "sweep_counts": list(probe.SWEEP_COUNTS),
+            "keep_rule": _tier1_keep_json(KeepRule()),
+            "outputs": outputs,
+        },
+        "decks": {
+            name: {
+                "library": [_card_json(c) for c in library],
+                "commander": (None if commander is None
+                              else _card_json(commander)),
+            }
+            for name, (library, commander) in decks.items()
+        },
+        "games": games,
+        "runs": runs,
+        "consume": tier1_consume_cases(),
+        "floats": tier1_float_cases(floats),
+        "strings": tier1_string_cases(),
+    }
+
+
+def render_tier1_cases() -> str:
+    return _compact_json(tier1_cases()) + "\n"
 
 
 if __name__ == "__main__":
