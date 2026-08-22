@@ -357,10 +357,20 @@ def test_opening_hand_land_distribution_sums_to_one():
 
 
 def test_opening_hand_keepable_is_the_two_to_four_band():
+    """`fsum` here rather than `sum`, and that is the point of the test.
+
+    `keepable` is `math.fsum` because a bare `sum` over floats is compensated
+    from CPython 3.12 and naive before it, so the figure depended on the
+    interpreter. Recomputing the expectation with `sum` would reintroduce
+    exactly that dependence one level up -- it fails by a single ulp on both
+    legs of the matrix, which is how this was found.
+    """
+    from math import fsum
+
     from mtglab.decks.analyze import opening_hand
     out = opening_hand(_big_deck())
-    band = sum(row["chance"] for row in out["lands"]["distribution"]
-               if 2 <= row["lands"] <= 4)
+    band = fsum(row["chance"] for row in out["lands"]["distribution"]
+                if 2 <= row["lands"] <= 4)
     assert out["lands"]["keepable"] == band
     assert 0.0 < band < 1.0
 
