@@ -90,8 +90,8 @@ def _compile_checked(slug: str, *, source: DeckSource | None = None
     Both halves happen here because they need the same open connection, and
     because **every number this module reports has to be able to say whether
     the deck it describes is legal.** The alternative was refusing to simulate
-    an invalid deck, and that is the wrong call: two of the six decks in this
-    library deliberately fail the gate on a banned card, a deck mid-import
+    an invalid deck, and that is the wrong call: a deck in this library
+    deliberately fails the gate on a banned card, a deck mid-import
     fails it by construction, and the simulator is the tool you would reach
     for to *fix* a deck. Refusing takes the diagnosis away at exactly the
     moment somebody wants it, which is commandment 2 with the sign flipped.

@@ -30,8 +30,10 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
+	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/shelves"
+	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
 )
 
 // Config is what the ported routes need. It grew with the families: the
@@ -75,6 +77,29 @@ type Config struct {
 	// real process wants -- and which is also why no test here sends mail: the
 	// tests pass a recorder instead.
 	EmailSender auth.EmailSender
+	// Jobs is this process's job registry, or nil before any job family has
+	// flipped. Nil is what makes the two generic poll routes pure fall-through
+	// again, which is the state PLAN section 10 describes and the state every
+	// test that does not care about jobs runs in.
+	Jobs *jobs.Registry
+	// SimCache is ADR 18's `sim_cache` table, or nil for an instance with no
+	// `app.db`. A nil `*cache.Store` is a working store that caches nothing,
+	// so no caller branches on it.
+	SimCache *cache.Store
+	// Upstream is the door's proxy, and it exists for exactly one reason: the
+	// **hybrid poll handler**.
+	//
+	// PLAN section 10 named this as the awkward part -- "it inverts the door's
+	// dependency (the proxy is chosen in `door` when `match` misses; `door`
+	// imports `api`, not the reverse)". The inversion is avoided by passing a
+	// plain `http.Handler` rather than importing anything: the door builds its
+	// proxy before it builds this package, and hands it over. `api` never
+	// learns what an upstream is.
+	//
+	// Nil means "no upstream", and the poll routes then answer from Go's
+	// registry alone -- correct for a test, and correct after Phase 8 when
+	// there is no Python left to ask.
+	Upstream http.Handler
 }
 
 // API holds the ported routes' dependencies.
@@ -91,6 +116,9 @@ type API struct {
 	requireAuth   bool
 	secureCookies bool
 	email         auth.EmailSender
+	jobs          *jobs.Registry
+	simCache      *cache.Store
+	upstream      http.Handler
 
 	lazy        sync.Mutex
 	lazyDB      *sql.DB
@@ -111,7 +139,8 @@ func New(cfg Config) *API {
 	return &API{log: cfg.Logger, pool: cfg.Pool, db: cfg.AppDB, writeDB: cfg.AppWriteDB,
 		dbPath: cfg.AppDBPath, decksDir: cfg.DecksDir, adminEmail: cfg.AdminEmail,
 		shelves: cfg.Shelves, log28: cfg.Recorder, requireAuth: cfg.RequireAuth,
-		secureCookies: cfg.SecureCookies, email: cfg.EmailSender}
+		secureCookies: cfg.SecureCookies, email: cfg.EmailSender,
+		jobs: cfg.Jobs, simCache: cfg.SimCache, upstream: cfg.Upstream}
 }
 
 // background runs fn after the response has gone, which is Starlette's
@@ -273,6 +302,17 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPatch, Pattern: "/api/admin/users/{username}", Handler: a.updateAccount},
 		{Method: http.MethodPost, Pattern: "/api/admin/users/{username}/reset", Handler: a.sendAccountReset},
 		{Method: http.MethodDelete, Pattern: "/api/admin/users/{username}/sessions", Handler: a.revokeSessions},
+
+		// The sim family, and with it the two generic job routes -- Phase 5's
+		// flip. `/api/sim/forge` is deliberately absent: it needs `sim/tier3`,
+		// which is Phase 7's, so it stays Python's and keeps the hybrid poll
+		// handler's proxy branch live alongside the five Claude families.
+		{Method: http.MethodPost, Pattern: "/api/sim/mana", Handler: a.simMana},
+		{Method: http.MethodPost, Pattern: "/api/sim/lands", Handler: a.simLands},
+		{Method: http.MethodPost, Pattern: "/api/sim/shelf", Handler: a.simShelf},
+		{Method: http.MethodPost, Pattern: "/api/sim/policy", Handler: a.simPolicy},
+		{Method: http.MethodGet, Pattern: "/api/jobs", Handler: a.listJobs},
+		{Method: http.MethodGet, Pattern: "/api/jobs/{job_id}", Handler: a.getJob},
 	}
 }
 

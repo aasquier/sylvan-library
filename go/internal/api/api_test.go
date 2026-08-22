@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/reference"
@@ -84,15 +83,72 @@ func TestTheProseRoutesAnswerTheEmbeddedPayloads(t *testing.T) {
 // This is meant to fail when somebody flips them on purpose, which is the
 // moment to check that the eight families went across with them. See PLAN
 // section 10.
-func TestTheGenericJobRoutesAreStillPythons(t *testing.T) {
+// TestTheGenericJobRoutesAreTheHybrid replaces
+// `TestTheGenericJobRoutesAreStillPythons`, which was the tripwire guarding
+// these two routes until the sim family flipped.
+//
+// It is not simply deleted, because the property that made the tripwire
+// necessary is still true and still load-bearing: a job lives in the registry
+// of the process that submitted it, and five of the eight job-submitting
+// families are still Python's. What changed is that Go now owns some of them,
+// so the routes must answer from **both** -- which is exactly what a plain
+// port would not do, and what a future edit could quietly undo by dropping the
+// upstream branch.
+//
+// So this asserts the two routes exist *and* that neither answers without
+// consulting the upstream when there is one.
+func TestTheGenericJobRoutesAreTheHybrid(t *testing.T) {
+	var list, one bool
 	for _, route := range New(Config{}).Routes() {
-		if route.Pattern == "/api/jobs" || strings.HasPrefix(route.Pattern, "/api/jobs/") {
-			t.Fatalf("%s %s has been ported, but a job lives in the registry "+
-				"of the process that submitted it and every family that "+
-				"submits one is still Python's -- this handler would answer "+
-				"from a registry nothing writes to (see PLAN section 10)",
-				route.Method, route.Pattern)
+		if route.Method == http.MethodGet && route.Pattern == "/api/jobs" {
+			list = true
 		}
+		if route.Method == http.MethodGet && route.Pattern == "/api/jobs/{job_id}" {
+			one = true
+		}
+	}
+	if !list || !one {
+		t.Fatalf("the generic job routes are not registered (list=%v one=%v); "+
+			"they flipped with the sim family and a registry-less door still "+
+			"has to answer them", list, one)
+	}
+
+	// Both must reach the upstream when Go's registry cannot answer. A handler
+	// that skipped it would report every Python-submitted job as lost, which is
+	// the failure PLAN section 10 spent a page on.
+	for _, tc := range []struct {
+		name   string
+		method string
+		target string
+	}{
+		{"the list", http.MethodGet, "/api/jobs"},
+		{"one by id", http.MethodGet, "/api/jobs/whatever"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			asked := false
+			upstream := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				asked = true
+				w.Header().Set("content-type", "application/json")
+				_, _ = w.Write([]byte("[]"))
+			})
+			a := New(Config{Upstream: upstream})
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(tc.method, tc.target, nil)
+			for _, route := range a.Routes() {
+				if route.Method == tc.method && route.Pattern == tc.target {
+					route.Handler(rec, req)
+				}
+			}
+			if tc.target == "/api/jobs" {
+				a.listJobs(rec, req)
+			} else {
+				a.getJob(rec, req)
+			}
+			if !asked {
+				t.Fatal("the handler answered without asking the upstream; " +
+					"every job Python holds would read as lost")
+			}
+		})
 	}
 }
 

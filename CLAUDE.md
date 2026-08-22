@@ -425,7 +425,10 @@ src/mtglab/
                           only -- every job a request creates is still this
                           module's, and its three thread pools are still
                           what runs them
-  api/simruns.py          Tier 1 planned in the request, run in a job
+  api/simruns.py          Tier 1 planned in the request, run in a job.
+                          FLIPPED to go/internal/api/simruns.go 2026-08-22
+                          (Phase 5): mana and the land sweep answer from the
+                          door, cache, deck_check and all
   api/app.py:artifacts    the five deliverables, hosted (2026-08-21). Three
                           routes on `/api/decks/{owner}/{slug}/artifacts` --
                           GET the shelf, GET one by name, POST to rebuild --
@@ -853,19 +856,33 @@ go/                       the Go module (ADR 38; module path
                           from `json.dumps` present as the same opaque digest
                           -- HTML escaping, `ensure_ascii` (the pool holds
                           Bösium Strip and Déjà Vu), and float rendering.
-                          **The two generic job routes did NOT follow the
-                          registry** (examined 2026-08-22): GET /api/jobs and
-                          GET /api/jobs/{job_id} own no state -- they are the
-                          VIEW over a registry the eight job-submitting
-                          families still write from the uvicorn process, and
-                          a registry is per-process, so a Go handler would
-                          answer an empty list and a 404 for every id the app
-                          hands out. The rule that fell out: **a route can
-                          only flip when the state it reads has flipped, so a
-                          view flips last, not first** -- "it is only a read"
-                          is exactly backwards here. api_test.go's
-                          TestTheGenericJobRoutesAreStillPythons is the
-                          tripwire.
+                          **The two generic job routes flipped LAST, and as
+                          a HYBRID** (2026-08-22, with the sim family). They
+                          own no state -- they are the VIEW over a registry
+                          the job-submitting families write -- so while every
+                          family was Python's a Go handler would have answered
+                          an empty list and a 404 for every id the app hands
+                          out. The rule stands: **a route can only flip when
+                          the state it reads has flipped, so a view flips
+                          last, not first.** What changed is that the state
+                          partly flipped: `simruns` and `shelfruns` are the
+                          door's now, the other five families and Forge are
+                          still Python's, so the view has to read BOTH. One by
+                          id is ours if we own it and proxied otherwise --
+                          which settles ADR 5 without a second rule, since
+                          somebody else's job misses the owner-scoped lookup,
+                          gets proxied, and Python 404s an id it never saw.
+                          The list is the **union**, re-sorted on `created_at`
+                          as text. The plan left two shapes open and the
+                          dependency graph picked one: all eight families at
+                          once needed `claude/` and `sim/tier3`, neither of
+                          which has crossed. **Python's rows stay
+                          `json.RawMessage` and are written back byte for
+                          byte** -- decoding one puts its `result` into a
+                          `map[string]any` and encoding/json sorts a map's
+                          keys, which is the Notes-tab regression of v159-v166
+                          wearing a different hat. TestTheGenericJobRoutes\
+                          AreTheHybrid replaced the old tripwire.
                           **internal/mana grew the SOLVER beside its
                           parser** (2026-08-22) -- `can_pay`, `expand_units`
                           and Kuhn's augmenting-path matching -- and it is a

@@ -85,10 +85,7 @@
           "edits": "number"
         }
       ],
-      "jobs": {
-        "done": "number",
-        "error": "number"
-      },
+      "jobs": "*",
       "sessions": {
         "seen_day": "number",
         "seen_week": "number",

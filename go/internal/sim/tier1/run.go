@@ -1,7 +1,10 @@
 package tier1
 
 import (
+	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/pyrand"
@@ -20,6 +23,55 @@ type Number struct {
 	IsFloat bool
 	Int     int
 	Float   float64
+}
+
+// MarshalJSON writes the number Python would write: `5` for an int and `5.5`
+// for a float, never the struct.
+//
+// **This was missing until the sim family flipped, and nothing had noticed.**
+// `Number` is checked against CPython by `repr` text and by `Float64bits`,
+// neither of which goes through `encoding/json` -- so the default marshaller
+// applied, and `median_commander_turn` went onto the wire as
+// `{"IsFloat":false,"Int":4,"Float":0}`. Every corpus stayed green; the
+// contract suite caught it on the first run through the door, which is the
+// second time that suite has found a wire-shape bug a package's own tests
+// structurally could not.
+//
+// The float branch renders through `ReprFloat`, so `5.5` is `5.5` and a value
+// that Python would print as `5.0` prints as `5.0` -- `encoding/json` writes
+// `5` for that float64, which is a different token in a payload a client
+// reads as a number either way, but a different one in any text a digest
+// hashes.
+func (n Number) MarshalJSON() ([]byte, error) {
+	if n.IsFloat {
+		return []byte(ReprFloat(n.Float)), nil
+	}
+	return []byte(strconv.Itoa(n.Int)), nil
+}
+
+// UnmarshalJSON reads one back, which the ADR 18 cache needs: a stored result
+// is decoded into the same struct it was encoded from, so a round trip has to
+// preserve which of the two a number was. A JSON number with no `.` or
+// exponent is an int, exactly as Python's own `json` decides it.
+func (n *Number) UnmarshalJSON(raw []byte) error {
+	s := string(raw)
+	if s == "null" {
+		return nil
+	}
+	if !strings.ContainsAny(s, ".eE") {
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return fmt.Errorf("tier1: %q is not an int", s)
+		}
+		*n = Number{Int: v}
+		return nil
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return fmt.Errorf("tier1: %q is not a float", s)
+	}
+	*n = Number{IsFloat: true, Float: v}
+	return nil
 }
 
 // Value is the number as a float64, for arithmetic that does not care.

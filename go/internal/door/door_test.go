@@ -48,6 +48,17 @@ func upstream(t *testing.T) *url.URL {
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("Permissions-Policy", "camera=(self), microphone=(), geolocation=()")
 		body, _ := io.ReadAll(r.Body)
+		if r.URL.Path == "/api/jobs" {
+			// Python answers this one with a **list**, and the hybrid poll
+			// handler merges it rather than echoing it -- so the stand-in has
+			// to be a list too. An object here would make the door 502, which
+			// is the handler being right about a malformed upstream rather
+			// than the handler being wrong.
+			_, _ = w.Write([]byte(`[{"id":"py-1","kind":"claude.dossier","status":"running",` +
+				`"done":0,"total":0,"percent":0,"partial":null,"label":"a dossier",` +
+				`"result":null,"error":null,"created_at":"2026-08-22T10:00:00+00:00"}]`))
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"path": r.URL.Path, "raw": r.URL.RawPath, "query": r.URL.RawQuery,
 			"host": r.Host, "method": r.Method, "body": string(body),
@@ -582,8 +593,12 @@ func TestOnlyACanonicalRequestIsTheDoors(t *testing.T) {
 		{"POST", "/api/glossary"}, {"HEAD", "/api/glossary"}, {"DELETE", "/api/themes"},
 		{"GET", "//api/glossary"}, {"GET", "/api/glossary/"}, {"GET", "/api/./glossary"},
 		{"GET", "/api/x/../glossary"}, {"GET", "/api/glossary%2F"},
-		// Routes Python still owns go on as they arrived.
-		{"GET", "/api/jobs"}, {"GET", "/api/forge"}, {"GET", "/api/claude"},
+		// Routes Python still owns go on as they arrived. `/api/jobs` is
+		// **not** among them any more: it flipped with the sim family and is
+		// the hybrid handler, which asks the upstream and merges rather than
+		// passing the request through. `TestTheJobListIsTheUnion` is where
+		// that behaviour is asserted instead.
+		{"GET", "/api/forge"}, {"GET", "/api/claude"},
 		{"POST", "/api/decks/local/mono-green/wheel"},
 	}
 	for _, c := range proxied {
@@ -750,5 +765,61 @@ func TestPathValuesReachTheHandler(t *testing.T) {
 	if _, err := newRouteTable([]api.Route{{Method: "GET", Pattern: "/api/x/{a}{b}",
 		Handler: func(http.ResponseWriter, *http.Request) {}}}, nil); err == nil {
 		t.Error("two parameters in one segment were accepted")
+	}
+}
+
+// TestTheJobListIsTheUnion is the property the sim-family flip turns on.
+//
+// A caller's jobs are spread across two registries -- Go's, holding whatever
+// the ported sim routes submitted, and Python's, holding the five Claude
+// families and Forge -- and `/api/jobs` has to show both. A handler that
+// answered from one would be wrong in the way nobody can see: the missing rows
+// look exactly like jobs that were never submitted.
+//
+// The stub upstream stands in for Python and answers with one running dossier.
+// Anything the door adds must appear beside it, not instead of it.
+func TestTheJobListIsTheUnion(t *testing.T) {
+	srv := build(t, false, fakeResolver{})
+	resp := get(t, srv, "GET", "/api/jobs", "")
+	if resp.StatusCode != 200 {
+		t.Fatalf("the job list answered %d", resp.StatusCode)
+	}
+	var rows []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
+		t.Fatalf("the job list did not decode: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("want Python's one row, got %d", len(rows))
+	}
+	if rows[0]["id"] != "py-1" || rows[0]["kind"] != "claude.dossier" {
+		t.Fatalf("Python's row did not survive the merge: %v", rows[0])
+	}
+	// And it survives **byte for byte**: the row is passed through as raw
+	// JSON rather than decoded and re-encoded, because a decoded `result`
+	// becomes a `map[string]any` and `encoding/json` sorts a map's keys where
+	// a Python dict keeps insertion order. That regression shipped once
+	// already, on the deck page's Notes tab.
+	if _, ok := rows[0]["created_at"].(string); !ok {
+		t.Fatalf("the row lost its created_at: %v", rows[0])
+	}
+}
+
+// TestAJobIdTheDoorDoesNotHoldIsProxied is the other half of the hybrid.
+//
+// Go's registry is empty in this door, so every id belongs to Python and every
+// lookup must go on to it. A handler that 404'd here would tell `followJob`
+// the run had died -- on all seven of its call sites.
+func TestAJobIdTheDoorDoesNotHoldIsProxied(t *testing.T) {
+	srv := build(t, false, fakeResolver{})
+	resp := get(t, srv, "GET", "/api/jobs/some-python-id", "")
+	if resp.StatusCode != 200 {
+		t.Fatalf("a proxied job id answered %d", resp.StatusCode)
+	}
+	var echo map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&echo); err != nil {
+		t.Fatalf("the proxied answer did not decode: %v", err)
+	}
+	if echo["path"] != "/api/jobs/some-python-id" {
+		t.Fatalf("the id was not proxied as it arrived: %v", echo["path"])
 	}
 }

@@ -40,8 +40,10 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/api"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
+	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/shelves"
+	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -86,6 +88,13 @@ type Config struct {
 
 // Door is a built handler and the things it holds open.
 type Door struct {
+	// jobs is this process's job registry (Phase 5). Every job the door's own
+	// routes submit lives here; Python's live in Python's, which is why the
+	// poll routes consult both.
+	jobs *jobs.Registry
+	// simCache is ADR 18's `sim_cache` table, or nil on an instance with no
+	// `app.db`. A nil store caches nothing and no caller branches on it.
+	simCache *cache.Store
 	cfg      Config
 	log      *slog.Logger
 	resolver Resolver
@@ -136,7 +145,19 @@ func New(cfg Config) (*Door, error) {
 	if err := d.openWriteSide(cfg); err != nil {
 		return nil, err
 	}
+	// The job registry and ADR 18's cache, for the sim family (Phase 5).
+	//
+	// The registry is this process's, and that is the whole reason the two
+	// generic poll routes are a hybrid rather than a port: jobs Go submits live
+	// here, jobs Python submits live over there, and a caller's list is the
+	// union. `d.proxy` goes in as a plain `http.Handler` so `api` can ask the
+	// upstream without importing anything of the door's -- see the note on
+	// `api.Config.Upstream`.
+	d.jobs = jobs.New(jobs.Config{Logger: cfg.Logger})
+	d.openSimCache(cfg)
+
 	ported := api.New(api.Config{Logger: cfg.Logger, Pool: cfg.Pool, AppDB: d.db,
+		Jobs: d.jobs, SimCache: d.simCache, Upstream: d.proxy,
 		AppDBPath: cfg.AppDB, DecksDir: cfg.DecksDir, AdminEmail: cfg.AdminEmail,
 		Shelves: shelf, AppWriteDB: d.writeDB, Recorder: d.recorder,
 		// The two switches the account routes read, passed rather than looked
@@ -312,4 +333,25 @@ func setDefault(h http.Header, name, value string) {
 // refusals and the ported routes' answers.
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	wire.JSON(w, status, body)
+}
+
+// openSimCache attaches to `app.db` for ADR 18's simulation cache.
+//
+// Absent, unreadable or schema-less leaves it nil, which is a working store
+// that caches nothing: a simulation still runs, it just pays full price every
+// time. That is the trade `sim/cache.py` makes in every one of its own error
+// paths -- an optimisation that can turn a working simulation into a failed
+// one is a bad trade -- so a failure here is a log line and not a refusal to
+// start.
+func (d *Door) openSimCache(cfg Config) {
+	if cfg.AppDB == "" {
+		return
+	}
+	store, err := cache.Open(cfg.AppDB, cfg.Logger)
+	if err != nil {
+		d.log.Info("no simulation cache; every run will be computed",
+			"path", cfg.AppDB, "err", err)
+		return
+	}
+	d.simCache = store
 }

@@ -371,5 +371,23 @@ def test_admin_sequence(instance, goldens):
         # `memory.available_bytes` is read from /proc/meminfo, which a Mac
         # has not got: null here, a number on CI and on the instance. Present
         # is the contract; the kind is the platform's.
+        #
+        # `jobs` joined it on 2026-08-22, when the sim family flipped, and for
+        # a related reason: it is `jobs.census()` over the **in-process**
+        # registry, and there are two of those now. Run against Python alone
+        # every job in the fixture is Python's and the census names its
+        # statuses; run against the pair the sim job is the door's, Python's
+        # registry is empty, and the census is `{}`. Both are correct answers
+        # to "what is *this* process running", which is the question that
+        # route asks -- so presence is the contract and the contents are the
+        # process's.
+        #
+        # It is a real gap and not only a fixture artefact: while both
+        # runtimes are live, the admin counter under-reports by exactly the
+        # jobs the door owns. It is admin-only, it is counts rather than
+        # anybody's work (ADR 17), and it closes when the stats family flips
+        # or when Python leaves at Phase 8 -- but it is written down here
+        # rather than absorbed, because a masked key is a claim nobody
+        # re-examines.
         goldens.check(g, f"stats-{name}",
-                      observed(r, volatile=("available_bytes",)))
+                      observed(r, volatile=("available_bytes", "jobs")))
