@@ -118,6 +118,7 @@ _ORACLES = [
     ("the seven voices", "PERSONA_PATH", "render_persona_payload"),
     ("the tarot deck", "TAROT_DATA_PATH", "render_tarot_deck"),
     ("the tarot deals", "TAROT_PATH", "render_tarot_deals"),
+    ("the Claude ledger", "LEDGER_PATH", "render_ledger_cases"),
 ]
 
 

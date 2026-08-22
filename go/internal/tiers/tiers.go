@@ -1,11 +1,18 @@
 // Package tiers is `mtglab/claude/tiers.py`: which Claude answers for whom.
 //
-// It lives in the Go module for one reason and it is not the Claude surface,
-// which has not moved and may never move as a whole. It is that `model_tier`
-// is a column on `users`, and every account the admin routes serialise
-// carries the *resolved* key -- so the table has to be readable from the side
-// that writes the account list. `auth.User.AsDict` is the caller, and the
-// Admin page's tier picker is served from `Roster`.
+// It crossed in Phase 4, ahead of the Claude surfaces and for a reason that
+// was not them: `model_tier` is a column on `users`, and every account the
+// admin routes serialise carries the *resolved* key -- so the table had to be
+// readable from the side that writes the account list. `auth.User.AsDict` is
+// that caller, and the Admin page's tier picker is served from `Roster`.
+//
+// **This paragraph said the Claude surface "has not moved and may never move
+// as a whole" until 2026-08-22**, which Phase 6 then contradicted -- the dial,
+// the voices and the tarot table crossed that day. It is corrected here rather
+// than quietly deleted because the shape of the mistake is the one this
+// repository keeps finding: a sentence about what the rest of the system has
+// not done yet is a claim with an expiry date, and it expires without telling
+// anybody. `LabelFor` below is the part Phase 6 came back for.
 //
 // The three rules Python states, kept here because each is a decision rather
 // than an implementation detail:
@@ -28,6 +35,8 @@
 // grants a tier that does not exist and reads on the Admin page as the
 // ordinary one.
 package tiers
+
+import "strings"
 
 // Tier is one seat's model, and why a maintainer would grant it.
 type Tier struct {
@@ -122,4 +131,51 @@ func Roster() []Entry {
 		out = append(out, Entry{Key: t.Key, Label: t.Label, Blurb: t.Blurb})
 	}
 	return out
+}
+
+// How a model id is spoken about on a screen. Prefix-matched on the family,
+// because the family is the name Anthropic uses in prose and the digits after
+// it are the technology commandment 10 keeps off every surface.
+//
+// Not derived from All, deliberately, even though the three labels coincide
+// today. A ledger row can hold a model that is no tier at all — a model served
+// after a fallback, an older id, an A/B via MTGLAB_CLAUDE_MODEL — and
+// resolving those through Get would label them with the DEFAULT TIER, which is
+// how a screen ends up naming the wrong Claude with total confidence. A test
+// pins that every tier's model still lands on that tier's label.
+var families = []struct{ Prefix, Label string }{
+	{"claude-fable-", "Fable"},
+	{"claude-mythos-", "Mythos"},
+	{"claude-opus-", "Opus"},
+	{"claude-sonnet-", "Sonnet"},
+	{"claude-haiku-", "Haiku"},
+}
+
+// Various is what a roll-up says in the column it aggregated away. The ledger
+// writes the marker; this is the word for it.
+const Various = "(various)"
+
+// LabelFor is how to name the Claude that answered, on a screen.
+//
+// Commandment 10 in the one place it was still being broken: the Admin ledger
+// rendered `claude-sonnet-5` in its "Answered by" column, which is a model id,
+// which is technology. The tier picker two tabs over already said "Sonnet";
+// this is the two agreeing.
+//
+// An id from no known family is "Another Claude" rather than a guess. That is
+// deliberately uninformative on the page and deliberately paired with the
+// unpriced counter beside it: both mean "this build does not know that model",
+// and the maintainer who needs the id itself has the CLI, which prints it — a
+// terminal is the same carve-out `mtglab users list` gets for printing
+// addresses.
+func LabelFor(model string) string {
+	if model == Various {
+		return "Several"
+	}
+	for _, family := range families {
+		if strings.HasPrefix(model, family.Prefix) {
+			return family.Label
+		}
+	}
+	return "Another Claude"
 }
