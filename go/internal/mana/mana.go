@@ -1,11 +1,21 @@
-// Package mana is `mtglab/mana.py`, the parser half: a Scryfall cost string
-// read into generic mana, coloured pips (each the SET of colours that can
-// pay it), Phyrexian symbols (kept apart: two life always pays them, so they
-// constrain no mana base, yet they count toward mana value and identity) and
-// whether the cost holds an X. The castability solver -- Kuhn's matching over
-// pips and units -- arrives with Tier 1 in Phase 5 and is held to the 13,944
-// case oracle then; the parser arrives now because `analyze.py`'s curve and
-// pip counts read it.
+// Package mana is `mtglab/mana.py`: a Scryfall cost string read into generic
+// mana, coloured pips (each the SET of colours that can pay it), Phyrexian
+// symbols (kept apart: two life always pays them, so they constrain no mana
+// base, yet they count toward mana value and identity) and whether the cost
+// holds an X -- and then the exact castability solver over that reading.
+//
+// The parser arrived in Phase 3, because `analyze.py`'s curve and pip counts
+// read it. The solver followed in Phase 5 (`solver.go`), held to the
+// 13,944-case enumeration of `tests/mana_oracle.py` and to that case set's
+// pinned answer digest, which is the differential the whole port was promised
+// on: ENGINEERING section 1 built that oracle to be usable "in any language,
+// forever", and this is the language.
+//
+// The package takes plain records and keeps no database, no network and no
+// dependency past the standard library -- the same boundary CLAUDE.md draws
+// around `mana.py` and `sim/`, and for the same reason. It is what lets the
+// most correctness-critical function in the project be tested ten thousand
+// times in a few milliseconds.
 package mana
 
 import (
@@ -50,6 +60,43 @@ func (c Cost) ColorsOf() []string {
 	for col := range seen {
 		out = append(out, col)
 	}
+	sort.Strings(out)
+	return out
+}
+
+// String is `ManaCost.__str__`, and it is load-bearing rather than cosmetic:
+// the differential case set names a case by rendering its cost, so these bytes
+// are compared against Python's for all 168 costs in the enumeration.
+//
+// Two details are Python's and are reproduced rather than tidied. A generic of
+// zero is omitted (it is a falsy `if`, not a `> 0`), and a cost that renders to
+// nothing at all is "{0}" -- so a bare X is "{X}" and an empty cost is "{0}".
+func (c Cost) String() string {
+	var b strings.Builder
+	if c.HasX {
+		b.WriteString("{X}")
+	}
+	if c.Generic != 0 {
+		b.WriteString("{" + strconv.Itoa(c.Generic) + "}")
+	}
+	for _, pip := range c.Pips {
+		b.WriteString("{" + strings.Join(sortedCopy(pip), "/") + "}")
+	}
+	for _, pip := range c.Phyrexian {
+		b.WriteString("{" + strings.Join(sortedCopy(pip), "/") + "/P}")
+	}
+	if b.Len() == 0 {
+		return "{0}"
+	}
+	return b.String()
+}
+
+// sortedCopy sorts without disturbing the caller's slice. Python sorts each
+// pip at render time and a hand-built Cost need not arrive sorted, so the sort
+// has to happen here -- but a String() that reorders its receiver's fields
+// would be a trap laid for whoever calls it inside a failure message.
+func sortedCopy(in []string) []string {
+	out := append([]string(nil), in...)
 	sort.Strings(out)
 	return out
 }
