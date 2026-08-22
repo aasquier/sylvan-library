@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
 )
 
 // describeCase is one row of the oracle: the keywords `_commit` handed
@@ -132,20 +134,16 @@ func TestAnUnknownOperationStillSaysSomething(t *testing.T) {
 // which `tests/go_fixtures.py` reads out of `sqlite_master` and commits. Go
 // does not own the ladder (PLAN section 10), so this is a reading of it rather
 // than a second copy.
+//
+// The bytes lived in this package's own `testdata` until 2026-08-22, when the
+// accounts flip found two other packages had each transcribed the ladder by
+// hand and frozen it at a different rung. They are `authtest`'s now, which is
+// where the story is written down.
 func newScratchDB(t *testing.T) string {
 	t.Helper()
-	schema, err := os.ReadFile("testdata/app_schema.sql")
-	if err != nil {
-		t.Fatalf("reading app.db's schema: %v", err)
-	}
 	path := filepath.Join(t.TempDir(), "app.db")
-	db, err := sql.Open("sqlite", "file:"+path+"?mode=rwc")
-	if err != nil {
+	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
-	}
-	defer db.Close()
-	if _, err := db.Exec(string(schema)); err != nil {
-		t.Fatalf("building the scratch app.db: %v", err)
 	}
 	return path
 }

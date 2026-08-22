@@ -547,7 +547,30 @@ go/                       the Go module (ADR 38; module path
                           for itself. The rebuild ROUTE is its own flip, and
                           stays outside the activity log when it lands -- a
                           build derives files from a deck rather than editing
-                          one. The contract
+                          one. **The accounts engine followed the
+                          same day and also flipped nothing**: internal/auth
+                          grew the whole of `mtglab/auth` beside its read
+                          side -- accounts, single-use tokens, the
+                          fixed-window limiter, the EmailSender seam (no Go
+                          test sends mail either) -- plus internal/tiers,
+                          since `model_tier` is a column every serialised
+                          account carries. Its write handle is `mode=rw`
+                          like the log's, and **an absent app.db is read as
+                          an EMPTY one**: measured, Python creates the file
+                          on the first login and answers 401 against it, and
+                          a reader cannot tell empty from absent. The
+                          Argon2id claim is held to Python by
+                          auth/testdata/crypto.json -- the exact PHC string
+                          argon2-cffi writes for a password AND a fixed
+                          salt, which Go must reproduce byte for byte,
+                          because a round trip in each direction would pass
+                          even if the two encoders disagreed about base64
+                          padding for some salts and not others.
+                          `auth/authtest` is where app.db's generated schema
+                          lives now: three packages had each transcribed the
+                          ladder by hand and frozen it at a different rung,
+                          and two of them broke the day `model_tier` was
+                          first read. The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
