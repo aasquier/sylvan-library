@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -572,5 +573,76 @@ func TestAnUnstorableResultIsAMissNotAFailure(t *testing.T) {
 	}
 	if store.Get(ctx, "bad") != nil {
 		t.Fatal("an unstorable result came back")
+	}
+}
+
+// TestEveryKeepRuleFieldChangesTheKey is
+// `tests/test_sim_cache.py`'s `test_every_keep_rule_field_changes_the_key`,
+// and it guards the one place this port had to spell out what Python gets for
+// free.
+//
+// Python writes `asdict(keep_rule)`, so **a new mulligan lever is in the key
+// the day it is added** -- that sentence is in `cache.key`'s docstring and is
+// the reason it does not name the fields. `writeKeepRule` cannot do that:
+// `encoding/json` on a struct would sort nothing and a `map` would sort
+// everything, so the five keys are written out by hand, in Python's
+// `sort_keys=True` order.
+//
+// A hand-written list is a list that can fall behind the struct, and the
+// failure is the exact one ADR 18 exists to prevent rather than a cosmetic
+// drift: a sixth field would be **absent from the Go key while Python's
+// `asdict` put it in**, so two runs under genuinely different keep rules would
+// share one Go row and the second would be served the first one's numbers.
+// Every figure well-formed, none of them about the rule that was asked for.
+//
+// The corpus cannot see it. It is generated from today's five fields, so it
+// would keep passing while saying nothing about the sixth. Reflection is what
+// makes this a question about the struct instead of about the fixture.
+func TestEveryKeepRuleFieldChangesTheKey(t *testing.T) {
+	input := func(k tier1.KeepRule) cache.Input {
+		return cache.Input{
+			Library:  []*sim.Card{{Name: "Forest", Category: "land", IsLand: true}},
+			Games:    100,
+			Turns:    10,
+			KeepRule: k,
+			Seed:     7,
+		}
+	}
+	base := cache.Key("sim.mana", input(tier1.DefaultKeepRule()))
+	if base == "" {
+		t.Fatal("Key is empty, so caching would be off entirely")
+	}
+	payload := cache.Payload("engine", "sim.mana", input(tier1.DefaultKeepRule()))
+
+	rt := reflect.TypeOf(tier1.KeepRule{})
+	for i := range rt.NumField() {
+		field := rt.Field(i)
+		t.Run(field.Name, func(t *testing.T) {
+			// The name Python's `asdict` would use, which is the name that has
+			// to appear in the blob.
+			name := strings.Split(field.Tag.Get("json"), ",")[0]
+			if name == "" {
+				t.Fatalf("%s carries no json tag, so Python's name for it is "+
+					"unknowable from here", field.Name)
+			}
+			if !strings.Contains(payload, `"`+name+`":`) {
+				t.Errorf("`%s` is a KeepRule field and does not appear in the "+
+					"cache key. `writeKeepRule` names its fields by hand, so a "+
+					"new one has to be added there -- in Python's sorted order "+
+					"-- or two different keep rules will share a row.", name)
+			}
+
+			mutated := tier1.DefaultKeepRule()
+			f := reflect.ValueOf(&mutated).Elem().Field(i)
+			if f.Kind() != reflect.Int {
+				t.Fatalf("%s is a %s; this test only knows how to move an int, "+
+					"and a field it cannot move is a field it cannot check",
+					field.Name, f.Kind())
+			}
+			f.SetInt(f.Int() + 1)
+			if got := cache.Key("sim.mana", input(mutated)); got == base {
+				t.Errorf("moving `%s` did not change the key", name)
+			}
+		})
 	}
 }

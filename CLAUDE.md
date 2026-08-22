@@ -832,10 +832,22 @@ go/                       the Go module (ADR 38; module path
                           because Go would have to hash `engine.py`'s bytes
                           and the container has no Python after Phase 8. Go's
                           fingerprint is a hash of **embedded Go source** --
-                          tier1, mana, sim and pyrand, each carrying a
-                          `source.go`; the last two are fingerprinted where
-                          Python's counterparts are not, because `random` and
-                          `math.fsum` are CPython's and ours are ours. The
+                          five packages, each carrying a `source.go`: tier1,
+                          mana, sim, pyfloat and pyrand. The last three are
+                          named here where Python's list names nothing: the
+                          compiled card sits inside `engine.py`, which Python
+                          covers by hashing that one file, and `random` and
+                          `math.fsum` are CPython's own and cannot change
+                          under a running interpreter. **That sentence said
+                          four packages on the day it was written**, drafted
+                          while `pyfloat` still sat inside `internal/sim`
+                          (#249 moved it out) -- the fourth completeness
+                          claim in this file to rot, in a file carrying three
+                          warnings about them. The only guard is
+                          `engineSources` itself, since a package's own embed
+                          test is satisfied on BOTH sides when a file leaves
+                          it, so `tests/test_packaging.py` now fails when a
+                          fingerprinted package is not named here. The
                           corpus records the **payload string** beside the
                           key, because all three ways `encoding/json` differs
                           from `json.dumps` present as the same opaque digest

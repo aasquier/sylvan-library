@@ -75,6 +75,7 @@ import (
 	"sync"
 
 	"github.com/aasquier/sylvan-library/go/internal/mana"
+	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/pyrand"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier1"
@@ -110,8 +111,19 @@ const MaxRows = 2000
 // key rather than in a global fingerprint that would throw away every stored
 // Tier 1 result each time a grid constant moved.
 //
-// `internal/sim` and `internal/pyrand` are present where Python's counterparts
-// are not; each package's `source.go` argues its own case.
+// `internal/sim`, `internal/pyfloat` and `internal/pyrand` are present where
+// Python's counterparts are not; each package's `source.go` argues its own
+// case.
+//
+// **This list is the only guard against a file leaving a package.** Each
+// package's embed is held complete against its own directory by a test, and
+// that test is satisfied on *both* sides when a file moves out: it is gone
+// from the directory and gone from the list, so nothing is missing anywhere
+// and the fingerprint quietly stops covering it. `pyfloat.go` did exactly that
+// on 2026-08-22 (#249, out of `internal/sim` into `internal/pyfloat`), and
+// what noticed was the build refusing an embed pattern that matched no file --
+// a move into an *existing* package would not even have done that. So adding
+// a package under the engine is a decision to take here, deliberately.
 type engineSource struct {
 	name string
 	fs   fs.FS
@@ -121,6 +133,7 @@ var engineSources = []engineSource{
 	{"internal/sim/tier1", tier1.SourceFS},
 	{"internal/mana", mana.SourceFS},
 	{"internal/sim", sim.SourceFS},
+	{"internal/pyfloat", pyfloat.SourceFS},
 	{"internal/pyrand", pyrand.SourceFS},
 }
 
