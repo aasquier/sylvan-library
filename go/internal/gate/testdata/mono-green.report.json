@@ -1,0 +1,18 @@
+{
+ "with_pool": [
+  {
+   "level": "error",
+   "code": "banned",
+   "message": "not legal in Commander",
+   "card": "Primeval Titan"
+  }
+ ],
+ "without_pool": [
+  {
+   "level": "warn",
+   "code": "unverified",
+   "message": "no card pool supplied; identity, legality and text were NOT checked",
+   "card": null
+  }
+ ]
+}

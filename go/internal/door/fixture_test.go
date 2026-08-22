@@ -9,9 +9,11 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// writeFixtureDB writes an app.db the way Python would have: WAL, the v1
-// users/sessions tables, alice (admin) and bob, each with a live session whose
-// token is "<name>-token".
+// writeFixtureDB writes an app.db the way Python would have: WAL, the
+// users/sessions tables and the deck tier's three (`user_decks`,
+// `user_deck_artifacts`, `deck_log`, the shapes `auth/db.py`'s ladder
+// leaves), alice (admin) and bob, each with a live session whose token is
+// "<name>-token".
 func writeFixtureDB(t *testing.T, path string) {
 	t.Helper()
 	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=journal_mode(WAL)")
@@ -24,7 +26,15 @@ CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE COLLAT
   password_hash TEXT, email TEXT UNIQUE COLLATE NOCASE, is_admin INTEGER NOT NULL DEFAULT 0,
   disabled_at TEXT, created_at TEXT NOT NULL);
 CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  created_at TEXT NOT NULL, expires_at TEXT NOT NULL, last_seen_at TEXT);`
+  created_at TEXT NOT NULL, expires_at TEXT NOT NULL, last_seen_at TEXT);
+CREATE TABLE user_decks (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  slug TEXT NOT NULL, name TEXT NOT NULL, yaml TEXT NOT NULL, shared INTEGER NOT NULL DEFAULT 0,
+  deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE user_deck_artifacts (deck_id INTEGER NOT NULL REFERENCES user_decks(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, body TEXT NOT NULL, built_at TEXT NOT NULL, PRIMARY KEY (deck_id, name));
+CREATE TABLE deck_log (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL,
+  owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE, slug TEXT NOT NULL, actor TEXT,
+  action TEXT NOT NULL, summary TEXT NOT NULL);`
 	if _, err := db.Exec(ddl); err != nil {
 		t.Fatal(err)
 	}

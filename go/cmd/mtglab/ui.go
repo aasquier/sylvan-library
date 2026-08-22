@@ -91,8 +91,10 @@ func serve(host, port, upstream, webDist, tarot string, child []string) error {
 		Upstream:      up,
 		// The pool, on a lease: opened at the first ask, handed back when
 		// idle, re-opened when `data refresh` replaces the file.
-		Pool:   pool.New(config.DBPath(), log),
-		Logger: log,
+		Pool:       pool.New(config.DBPath(), log),
+		DecksDir:   config.DecksDir(),
+		AdminEmail: config.AdminEmail(),
+		Logger:     log,
 	})
 	if err != nil {
 		return err

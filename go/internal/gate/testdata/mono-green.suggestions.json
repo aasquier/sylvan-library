@@ -1,0 +1,92 @@
+{
+ "slug": "mono-green",
+ "pool_available": true,
+ "targets": [
+  {
+   "card": "Primeval Titan",
+   "code": "banned",
+   "why": "Banned in Commander -- deliberately.",
+   "candidates": [
+    {
+     "name": "Cultivator Colossus",
+     "mana_cost": "{4}{G}{G}{G}",
+     "cmc": 7.0,
+     "type_line": "Creature — Plant Beast",
+     "oracle_text": "Trample\nCultivator Colossus's power and toughness are each equal to the number of lands you control.\nWhen this creature enters, you may put a land card from your hand onto the battlefield tapped. If you do, draw a card and repeat this process.",
+     "color_identity": [
+      "G"
+     ],
+     "image": "https://cards.scryfall.io/normal/front/4/2/426ed66e-41b3-4e44-90a2-697aafaa8c5c.jpg?1783908104",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/4/2/426ed66e-41b3-4e44-90a2-697aafaa8c5c.jpg?1783908104",
+     "edhrec_rank": 1589,
+     "score": 0.7593,
+     "reasons": [
+      "same card type (Creature)",
+      "mana value 7 vs 6",
+      "shares trample",
+      "text: battlefield, creature, enters, land, tapped, trample",
+      "EDHREC rank 1,589"
+     ]
+    },
+    {
+     "name": "Woodfall Primus",
+     "mana_cost": "{5}{G}{G}{G}",
+     "cmc": 8.0,
+     "type_line": "Creature — Treefolk Shaman",
+     "oracle_text": "Trample\nWhen this creature enters, destroy target noncreature permanent.\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)",
+     "color_identity": [
+      "G"
+     ],
+     "image": "https://cards.scryfall.io/normal/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235",
+     "edhrec_rank": 3942,
+     "score": 0.5631,
+     "reasons": [
+      "same card type (Creature)",
+      "shares trample",
+      "text: battlefield, creature, enters, trample",
+      "EDHREC rank 3,942"
+     ]
+    },
+    {
+     "name": "Craterhoof Behemoth",
+     "mana_cost": "{5}{G}{G}{G}",
+     "cmc": 8.0,
+     "type_line": "Creature — Beast",
+     "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control.",
+     "color_identity": [
+      "G"
+     ],
+     "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "edhrec_rank": 315,
+     "score": 0.4867,
+     "reasons": [
+      "same card type (Creature)",
+      "text: creature, enters, trample",
+      "EDHREC rank 315"
+     ]
+    },
+    {
+     "name": "Terastodon",
+     "mana_cost": "{6}{G}{G}",
+     "cmc": 8.0,
+     "type_line": "Creature — Elephant",
+     "oracle_text": "When this creature enters, you may destroy up to three target noncreature permanents. For each permanent put into a graveyard this way, its controller creates a 3/3 green Elephant creature token.",
+     "color_identity": [
+      "G"
+     ],
+     "image": "https://cards.scryfall.io/normal/front/6/3/63195796-197e-47ec-85f0-d4ec0065f6e6.jpg?1783927528",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/6/3/63195796-197e-47ec-85f0-d4ec0065f6e6.jpg?1783927528",
+     "edhrec_rank": 1375,
+     "score": 0.4506,
+     "reasons": [
+      "same card type (Creature)",
+      "text: creature, enters",
+      "EDHREC rank 1,375"
+     ]
+    }
+   ]
+  }
+ ]
+}

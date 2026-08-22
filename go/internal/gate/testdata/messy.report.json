@@ -1,0 +1,132 @@
+{
+ "with_pool": [
+  {
+   "level": "error",
+   "code": "deck-status",
+   "message": "status 'shelved' is not one of built, theoretical",
+   "card": null
+  },
+  {
+   "level": "error",
+   "code": "deck-size",
+   "message": "deck has 106 cards in the 99, expected 98 (2 commanders)",
+   "card": null
+  },
+  {
+   "level": "error",
+   "code": "singleton",
+   "message": "appears 2 times",
+   "card": "sol ring"
+  },
+  {
+   "level": "error",
+   "code": "commander-in-99",
+   "message": "commander is also listed in the 99",
+   "card": "Goreclaw, Terror of Qal Sisma"
+  },
+  {
+   "level": "error",
+   "code": "missing-rationale",
+   "message": "no `why` -- every inclusion must justify itself",
+   "card": "Regal Behemoth"
+  },
+  {
+   "level": "warn",
+   "code": "unknown-category",
+   "message": "category 'mystery' is not one of land, ramp, card-advantage, tutor, interaction, protection, threat, engine, sac-outlet, payoff, recursion, win-con, utility",
+   "card": "Not A Real Card"
+  },
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Not A Real Card"
+  },
+  {
+   "level": "error",
+   "code": "illegal-pairing",
+   "message": "neither card has a pairing ability, so they cannot be two commanders together",
+   "card": null
+  },
+  {
+   "level": "warn",
+   "code": "category-mismatch",
+   "message": "filed under 'land' but type line is 'Artifact'",
+   "card": "Sol Ring"
+  },
+  {
+   "level": "error",
+   "code": "color-identity",
+   "message": "identity {U} includes {U}, outside the commander's {BG}",
+   "card": "Rhystic Study"
+  },
+  {
+   "level": "error",
+   "code": "color-identity",
+   "message": "identity {W} includes {W}, outside the commander's {BG}",
+   "card": "Swords to Plowshares"
+  },
+  {
+   "level": "error",
+   "code": "banned",
+   "message": "not legal in Commander",
+   "card": "Black Lotus"
+  },
+  {
+   "level": "warn",
+   "code": "category-mismatch",
+   "message": "is a land but filed under 'ramp'",
+   "card": "Llanowar Reborn"
+  },
+  {
+   "level": "error",
+   "code": "not-a-companion",
+   "message": "listed as companion but has no Companion ability",
+   "card": "Sol Ring"
+  }
+ ],
+ "without_pool": [
+  {
+   "level": "error",
+   "code": "deck-status",
+   "message": "status 'shelved' is not one of built, theoretical",
+   "card": null
+  },
+  {
+   "level": "error",
+   "code": "deck-size",
+   "message": "deck has 106 cards in the 99, expected 98 (2 commanders)",
+   "card": null
+  },
+  {
+   "level": "error",
+   "code": "singleton",
+   "message": "appears 2 times",
+   "card": "sol ring"
+  },
+  {
+   "level": "error",
+   "code": "commander-in-99",
+   "message": "commander is also listed in the 99",
+   "card": "Goreclaw, Terror of Qal Sisma"
+  },
+  {
+   "level": "error",
+   "code": "missing-rationale",
+   "message": "no `why` -- every inclusion must justify itself",
+   "card": "Regal Behemoth"
+  },
+  {
+   "level": "warn",
+   "code": "unknown-category",
+   "message": "category 'mystery' is not one of land, ramp, card-advantage, tutor, interaction, protection, threat, engine, sac-outlet, payoff, recursion, win-con, utility",
+   "card": "Not A Real Card"
+  },
+  {
+   "level": "warn",
+   "code": "unverified",
+   "message": "no card pool supplied; identity, legality and text were NOT checked",
+   "card": null
+  }
+ ]
+}

@@ -1,0 +1,26 @@
+slug: pair
+name: Pair Fixture
+status: theoretical
+stage: curated
+commander:
+  - Gyome, Master Chef
+  - Ajani, Nacatl Pariah
+bracket: 2
+strategy: A fixture, not a deck. See tests/tiny_pool.py.
+cards:
+  - name: Sol Ring
+    category: ramp
+    why: Two mana on turn one, and it always has been.
+  - name: Regal Behemoth
+    category: threat
+    why: Doubles the mana and refills the hand.
+  - name: Vorinclex, Voice of Hunger
+    category: threat
+    why: Taxes every opponent's mana.
+  - name: Cultivator Colossus
+    category: threat
+    why: Trample body that puts lands onto the battlefield; ramp and threat in one.
+  - name: Forest
+    category: land
+    why: Basic, untapped, and the only green source this list needs.
+    qty: 95

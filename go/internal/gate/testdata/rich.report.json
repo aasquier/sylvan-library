@@ -1,0 +1,144 @@
+{
+ "with_pool": [
+  {
+   "level": "warn",
+   "code": "legacy-archetype",
+   "message": "`archetype:` is a legacy key (ADR 37): declare a strategy word in `themes` instead -- aggro, midrange, control, combo -- and the edit that does will drop this key itself",
+   "card": null
+  },
+  {
+   "level": "warn",
+   "code": "unknown-theme",
+   "message": "theme 'knights' is not in the vocabulary; the list grows by editing THEMES in decks/model.py",
+   "card": null
+  },
+  {
+   "level": "error",
+   "code": "deck-size",
+   "message": "deck has 33 cards in the 99, expected 99",
+   "card": null
+  },
+  {
+   "level": "warn",
+   "code": "unknown-category",
+   "message": "category 'equipment' is not one of land, ramp, card-advantage, tutor, interaction, protection, threat, engine, sac-outlet, payoff, recursion, win-con, utility",
+   "card": "Embercleave"
+  },
+  {
+   "level": "warn",
+   "code": "unknown-category",
+   "message": "category 'equipment' is not one of land, ramp, card-advantage, tutor, interaction, protection, threat, engine, sac-outlet, payoff, recursion, win-con, utility",
+   "card": "Lightning Greaves"
+  },
+  {
+   "level": "warn",
+   "code": "unknown-category",
+   "message": "category 'hate' is not one of land, ramp, card-advantage, tutor, interaction, protection, threat, engine, sac-outlet, payoff, recursion, win-con, utility",
+   "card": "Null Rod"
+  },
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Syr Gwyn, Hero of Ashvale"
+  },
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Embercleave"
+  },
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Æther Vial"
+  },
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Plains"
+  },
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Lightning Greaves"
+  },
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Null Rod"
+  },
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Counterspell"
+  },
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Knight of the White Orchid"
+  },
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Sword of Feast and Famine"
+  },
+  {
+   "level": "error",
+   "code": "unknown-card",
+   "message": "not found in the local pool -- check spelling, or refresh the Scryfall data if this is a new card",
+   "card": "Kaheera, the Orphanguard"
+  }
+ ],
+ "without_pool": [
+  {
+   "level": "warn",
+   "code": "legacy-archetype",
+   "message": "`archetype:` is a legacy key (ADR 37): declare a strategy word in `themes` instead -- aggro, midrange, control, combo -- and the edit that does will drop this key itself",
+   "card": null
+  },
+  {
+   "level": "warn",
+   "code": "unknown-theme",
+   "message": "theme 'knights' is not in the vocabulary; the list grows by editing THEMES in decks/model.py",
+   "card": null
+  },
+  {
+   "level": "error",
+   "code": "deck-size",
+   "message": "deck has 33 cards in the 99, expected 99",
+   "card": null
+  },
+  {
+   "level": "warn",
+   "code": "unknown-category",
+   "message": "category 'equipment' is not one of land, ramp, card-advantage, tutor, interaction, protection, threat, engine, sac-outlet, payoff, recursion, win-con, utility",
+   "card": "Embercleave"
+  },
+  {
+   "level": "warn",
+   "code": "unknown-category",
+   "message": "category 'equipment' is not one of land, ramp, card-advantage, tutor, interaction, protection, threat, engine, sac-outlet, payoff, recursion, win-con, utility",
+   "card": "Lightning Greaves"
+  },
+  {
+   "level": "warn",
+   "code": "unknown-category",
+   "message": "category 'hate' is not one of land, ramp, card-advantage, tutor, interaction, protection, threat, engine, sac-outlet, payoff, recursion, win-con, utility",
+   "card": "Null Rod"
+  },
+  {
+   "level": "warn",
+   "code": "unverified",
+   "message": "no card pool supplied; identity, legality and text were NOT checked",
+   "card": null
+  }
+ ]
+}

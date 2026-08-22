@@ -1,0 +1,75 @@
+slug: rich-fixture
+name: 'Rich Fixture: Every Shape the Dumper Writes'
+status: built
+stage: curated
+commander:
+  - Syr Gwyn, Hero of Ashvale
+shared: false
+pilot: Mark's wife
+commander_art: 0aae2e33-0000-4000-8000-000000000000
+companion: Kaheera, the Orphanguard
+bracket: 3
+archetype: midrange
+themes:
+  - knights
+  - equipment
+  - voltron
+strategy: 'Suit up a knight and swing: Syr Gwyn''s trigger draws a card and the equipment costs nothing,
+  so every turn after the third is a cantrip with a sword attached -- panache *and* martial prowess.'
+notes:
+  mulligan: 'Keep any seven with two lands and an equipment; ship a hand
+
+    with no knight by turn three.'
+  politics: 'The table forgets Ashvale until it is too late: say nothing.'
+  weird: 'colon: and # hash, plus braces {G}{W} and a trailing space '
+cards:
+  - name: Sol Ring
+    category: ramp
+    why: 'Two mana on turn one, and it always has been: the single most played card in the format, the
+      first thing every primer tells a newcomer to find, and the card this line exists to make room for
+      -- which is why it is first.'
+  - name: Embercleave
+    category: equipment
+    why: 'It''s the card with the apostrophe -- and the one that ends games: flash, trample, double strike.'
+    scryfall_id: c3a4b2d1-1111-4222-8333-444455556666
+    tags:
+      - finisher
+      - flash
+  - name: Æther Vial
+    category: utility
+    why: 'Unicode in the name: Æ — é — ü.'
+    mana_cost: '{1}'
+    art: deadbeef-0000-4000-8000-000000000001
+  - name: Forest
+    category: land
+    why: '* starts with a star, which must be quoted'
+    qty: 12
+  - name: Plains
+    category: land
+    why: '#not a comment'
+    qty: 13
+  - name: Lightning Greaves
+    category: equipment
+    why: 'yes'
+  - name: Null Rod
+    category: hate
+    why: 'null'
+  - name: Counterspell
+    category: interaction
+    why: '12'
+  - name: Swords to Plowshares
+    category: interaction
+    why: 1.5 mana, in effect
+  - name: Knight of the White Orchid
+    category: ramp
+    why: cost {1}{W}{W} -- braces again, inside a longer sentence that also runs past the hundred-character
+      fold so both rules fire at once.
+    mana_cost: '{1}{W}{W}'
+swap_board:
+  - name: Sword of Feast and Famine
+    category: equipment
+    why: Waiting on a slot.
+graveyard:
+  - name: Gilded Lotus
+    category: ramp
+    why: 'Entombed: too slow for a deck that wants its mana on turn two.'

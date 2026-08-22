@@ -461,15 +461,30 @@ go/                       the Go module (ADR 38; module path
                           the spikes as packages. Since Phase 3 (2026-08-21)
                           the door also ANSWERS the routes that have moved:
                           internal/api is src/mtglab/api one family at a
-                          time (the pool-free reference prose first --
-                          /api/colors, /api/glossary, /api/themes),
-                          internal/reference embeds the JSON mtglab.reference
-                          renders, internal/wire writes FastAPI's envelope,
-                          and the door's routes.go answers a ported route
-                          only for a canonical request (normalised path,
-                          matching method) and proxies everything else as it
-                          arrived. The contract suite runs through the door
-                          locally and in CI; PLAN §10 is the port board
+                          time (the pool-free prose, then the pool's four,
+                          then the deck reads -- PLAN §10 is the port
+                          board), internal/reference embeds the JSON
+                          mtglab.reference renders, internal/wire writes
+                          FastAPI's envelope, and the door's routes.go
+                          answers a ported route only for a canonical
+                          request (normalised path, matching method; the
+                          most specific pattern wins; a literal Python still
+                          owns can be reserved) and proxies everything else
+                          as it arrived. Behind the handlers: internal/pool
+                          (the card pool, leased and stamp-checked, with
+                          pool.Schema = cards/db.py's SCHEMA and pooltest
+                          building the 21-card pool for tests),
+                          internal/deck (the model, parsed and only
+                          parsed), internal/gate (validate + companion +
+                          partners, agreeing with Python case for case on
+                          the differential fixtures in gate/testdata that
+                          tests/go_fixtures.py writes), internal/analyze,
+                          internal/suggest, internal/mana (the parser),
+                          internal/library (the file and SQL tiers, read
+                          side, and ADR 22's Library), internal/decklog,
+                          internal/cards (the camera reader), and
+                          internal/config. The contract suite runs through
+                          the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
                           this one included — normally holds no decks at all

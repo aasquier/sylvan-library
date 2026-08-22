@@ -100,8 +100,14 @@ Where it stands, kept here so a fresh session knows the frontier:
   `go/internal/pool` (leased, stamp-checked, the door a CGO build from here),
   the partners port and the camera reader, and the second family —
   `/api/cards/search`, `/api/cards/identify`, `/api/colors/{key}`,
-  `/api/lore` — with `/api/colors/progress` reserved for Python until the
-  deck reads move.
+  `/api/lore` (v158). **Then the deck reads:** the model, the gate
+  (`validate`, companion, partners — agreeing with Python case for case on
+  the differential fixtures `tests/go_fixtures.py` writes), analyze,
+  suggest, the mana parser, the file and SQL tiers behind `Library`
+  (ADR 22), the log's read side — and the third family: `/api/decks`, the
+  deck and its `validate`/`stats`/`suggestions`/`commander`/`printings`/
+  `log`/`artifacts` reads, and `/api/colors/progress`. Left for the read
+  spine: the shelves (symbols, OCR, cardmotion).
 
 ### The next phase — the Simulator learns (decided 2026-08-20)
 

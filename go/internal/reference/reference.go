@@ -44,6 +44,9 @@ var loreFile []byte
 //go:embed data/tarotlore.json
 var tarotloreFile []byte
 
+//go:embed data/model.json
+var modelFile []byte
+
 // Color is one of the five, and what it wants.
 type Color struct {
 	Code  string `json:"code"`
@@ -176,6 +179,21 @@ type TarotLore struct {
 	Facts []TarotFact `json:"facts"`
 }
 
+// Model is the deck model's spoken vocabulary (`decks/model.py`,
+// `decks/validate.py`, `decks/analyze.py`): the categories a card may be
+// filed under, the two statuses and two stages, the basics the singleton
+// rule exempts, the conventional category targets and the Game Changer
+// limits per bracket -- rendered so the Go gate says exactly what the Python
+// gate says.
+type Model struct {
+	Categories        []string         `json:"categories"`
+	DeckStatuses      []string         `json:"deck_statuses"`
+	DeckStages        []string         `json:"deck_stages"`
+	SingletonExempt   []string         `json:"singleton_exempt"`
+	CategoryTargets   map[string][]int `json:"category_targets"`
+	GameChangerLimits map[string]*int  `json:"game_changer_limits"`
+}
+
 var (
 	colorsJSON, glossaryJSON, themesJSON []byte
 
@@ -184,6 +202,7 @@ var (
 	vocabulary Vocabulary
 	shelves    Shelves
 	tarot      TarotLore
+	model      Model
 	byKey      = map[string]*Combination{}
 )
 
@@ -193,6 +212,7 @@ func init() {
 	themesJSON = mustCompact("themes.json", themesFile, &vocabulary)
 	mustCompact("lore.json", loreFile, &shelves)
 	mustCompact("tarotlore.json", tarotloreFile, &tarot)
+	mustCompact("model.json", modelFile, &model)
 	for i := range taxonomy.Combinations {
 		c := &taxonomy.Combinations[i]
 		if _, dup := byKey[c.Key]; dup {
@@ -241,6 +261,29 @@ func Lore() *Shelves { return &shelves }
 
 // Tarot is the fortune-teller's corpus, typed. Read-only.
 func Tarot() *TarotLore { return &tarot }
+
+// Deck is the deck model's vocabulary, typed. Read-only.
+func Deck() *Model { return &model }
+
+// IsCategory is `category in model.CATEGORIES`.
+func IsCategory(word string) bool {
+	for _, c := range model.Categories {
+		if c == word {
+			return true
+		}
+	}
+	return false
+}
+
+// IsSingletonExempt is `name.lower() in validate.SINGLETON_EXEMPT`.
+func IsSingletonExempt(lowered string) bool {
+	for _, n := range model.SingletonExempt {
+		if n == lowered {
+			return true
+		}
+	}
+	return false
+}
 
 // CombinationByKey is `colors.BY_KEY`: the slot for a canonical key ("WG",
 // "C"), or false.
