@@ -37,6 +37,20 @@ updates:
       # does not reach the deployed instance. pyproject's triage paragraph
       # is the checklist for the day the depth tier leaves this machine.
       - dependency-name: torch
+      # `transformers` is depth-only too, and its upper bound exists to pair
+      # with that torch. Nothing else in the tree imports it.
+      - dependency-name: transformers
+      # `numpy` appears TWICE and only one of them may move: `numpy>=1.26` in
+      # the main dependencies, which should keep getting updates, and
+      # `numpy<2` in `depth`, which is there because torch 2.2.2 predates
+      # numpy 2 and cannot initialise against it. Dependabot cannot tell one
+      # from the other, so the block is by update *type*: a major widening is
+      # what turns `<2` into `<3`, and the main dependency is already `>=1.26`
+      # and needs no major bump to accept a 2.x. PR #241 proved this was
+      # needed -- the `torch` ignore alone left it widening the two
+      # constraints that exist only to accommodate that pin.
+      - dependency-name: numpy
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /web
