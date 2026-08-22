@@ -504,7 +504,8 @@ go/                       the Go module (ADR 38; module path
                           partners, agreeing with Python case for case on
                           the differential fixtures in gate/testdata that
                           tests/go_fixtures.py writes), internal/analyze,
-                          internal/suggest, internal/mana (the parser),
+                          internal/suggest, internal/mana (the parser, and
+                          since Phase 5 the castability solver),
                           internal/library (the file and SQL tiers, read
                           side, and ADR 22's Library), internal/decklog
                           (ADR 28, both sides since Phase 4 -- and Record
@@ -771,7 +772,70 @@ go/                       the Go module (ADR 38; module path
                           view flips last, not first** -- "it is only a read"
                           is exactly backwards here. api_test.go's
                           TestTheGenericJobRoutesAreStillPythons is the
-                          tripwire. The contract
+                          tripwire.
+                          **internal/mana grew the SOLVER beside its
+                          parser** (2026-08-22) -- `can_pay`, `expand_units`
+                          and Kuhn's augmenting-path matching -- and it is a
+                          library like pyrand: no route flipped, and `CanPay`
+                          has NO CALLER at all, because the goldfish carries
+                          its own private `canPay` over `sim.Source` exactly
+                          as `engine._consume` re-solves this in Python.
+                          `tier1.go` says in a comment that its own becomes a
+                          call to this one; until then **the two Go solvers
+                          are each held to Python and neither to the other**,
+                          where Python pins its pair with
+                          `test_consume_agrees_with_can_pay`. `mana.Source`
+                          is deliberately field-for-field `sim.Source`, in
+                          order, so the conversion at that seam is free; they
+                          stay separate types because `mana` sits BELOW `sim`
+                          and must not import it -- the same split
+                          `sim.Cost` beside `mana.Cost` already makes. The package
+                          takes plain records and imports nothing outside the
+                          standard library, which is `mana.py`'s own boundary
+                          and the reason the most correctness-critical
+                          function here can be asked ten thousand questions
+                          in a few milliseconds. It is held to Python by
+                          `testdata/castability.json`, which carries the
+                          **enumeration** rather than 13,944 dumped rows: Go
+                          rebuilds the case set from the same alphabets in
+                          the same order and reads only the answers, because
+                          `mana_oracle.py`'s claim is that its cases come out
+                          identical "in any language, on any machine,
+                          forever", and replaying a dump would leave that
+                          claim untested. Two digests, so a failure localises
+                          -- the case NAMES alone, then the names with their
+                          answers -- and `tests/go_fixtures.py` **compares**
+                          `CASES_ANSWER_DIGEST` rather than writing it,
+                          refusing to render a corpus that would move a pin.
+                          Both of `mana_oracle.py`'s references are rewritten
+                          in Go from their theorems (a backtracking search
+                          over injective assignments; Hall's condition over
+                          subset bitmasks), never transliterated -- a second
+                          clever algorithm may be wrong the same way, and a
+                          copied one certainly is. They keep their OWN unit
+                          expansion and colour comparison rather than calling
+                          the solver's, so `ExpandUnits` and the six-bit
+                          packing are judged against them -- over amounts 0,
+                          2 and negative, because **every pool in the case
+                          set is a single-mana source** and all 13,944 cases
+                          together say nothing whatever about Sol Ring.
+                          **And the 13,944 cases are
+                          not enough, which is the thing to carry away**:
+                          `case_costs` draws pips with
+                          `combinations_with_replacement`, so every cost in
+                          the set has its pips in non-decreasing width order,
+                          and NO case ever offers a wide pip before a narrow
+                          one. Deleting one line -- the `seen` reset between
+                          pips, the classic Kuhn's mistake -- passes all
+                          13,944, both oracles, and every hand-pinned trap,
+                          while answering `{W/U}{W} <- [W U]` wrongly. Python
+                          was never exposed (Hypothesis asserts exactly that
+                          property); the hole was in what the documents
+                          *claimed* the case set proved. It is pinned as a
+                          limit by a named test now, the case is a permanent
+                          trap in the Go table, and the fuzz target found it
+                          by the order-reversal property rather than by an
+                          oracle. The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —

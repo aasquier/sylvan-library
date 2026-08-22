@@ -108,6 +108,7 @@ _ORACLES = [
     ("the closed form", "KARSTEN_PATH", "render_karsten_cases"),
     ("the mana curve", "CURVE_PATH", "render_curve_cases"),
     ("Tier 1", "TIER1_PATH", "render_tier1_cases"),
+    ("the castability cases", "MANA_PATH", "render_mana_cases"),
 ]
 
 
@@ -671,3 +672,88 @@ def test_the_corpus_would_notice_a_sum_that_is_not_an_fsum():
     assert differs, (
         "no row in the grid separates fsum from a running total, so the Go "
         "test over them could not tell the two apart")
+# -------------------------------------------------------------------- mana
+
+def test_the_castability_corpus_carries_the_pinned_golden_and_not_a_new_one():
+    """Regenerating the case set must never be a way to move the golden.
+
+    `render_mana_cases` refuses to write when the answers it computes hash to
+    something other than `CASES_ANSWER_DIGEST`, which is the whole reason this
+    corpus is safe to regenerate on a whim. That refusal is the load-bearing
+    line in the generator and it is worth an assertion of its own, because its
+    failure mode is silent in exactly the wrong direction: a corpus that
+    quietly recorded new semantics would then be matched, perfectly, by a Go
+    solver reproducing a change nobody decided to make.
+    """
+    from test_mana_properties import CASES_ANSWER_DIGEST
+
+    committed = json.loads(go_fixtures.MANA_PATH.read_text(encoding="utf-8"))
+    assert committed["answers_digest"] == CASES_ANSWER_DIGEST
+    assert committed["enumeration_digest"] != committed["answers_digest"], (
+        "the two digests are equal, so one of them is not hashing what it says")
+
+
+def test_the_castability_corpus_is_the_case_set_it_claims():
+    cases = go_fixtures.mana_cases()
+
+    assert cases["cases"] == 13_944 == len(cases["costs"]) * len(cases["pools"])
+    assert len(cases["answers"]) == len(cases["costs"])
+    assert {len(row) for row in cases["answers"]} == {len(cases["pools"])}
+    assert set("".join(cases["answers"])) == {"0", "1"}
+
+    # Both answers have to be well represented, or a solver that always
+    # refused would match a corpus of refusals and look correct.
+    assert 0 < cases["payable"] < cases["cases"]
+    assert len(set(cases["answers"])) > 20, "the answer rows are nearly all alike"
+
+
+def test_the_enumerated_case_set_never_puts_a_wide_pip_before_a_narrow_one():
+    """The case set's blind spot, written down where it can be checked.
+
+    Found 2026-08-22, by mutation-testing the Go port of the solver: deleting
+    the `seen` reset between pips in Kuhn's algorithm -- one line, and the
+    classic way to get that algorithm wrong -- passes **all 13,944 cases**,
+    both oracles across all 13,944, and every hand-pinned trap in
+    `tests/test_mana.py`. It answers `{W/U}{W} <- [W U]` wrongly, and that
+    case cannot appear here: `case_costs` draws pips with
+    `itertools.combinations_with_replacement`, whose tuples are non-decreasing
+    in alphabet index, and `CASE_PIPS` puts its only hybrid last. So every
+    cost in the set has its pips in non-decreasing width order, and a matching
+    that is wrong only when a wide pip is offered first is invisible to it.
+
+    Nothing is broken. `mana.py` is correct, Hypothesis covers this on the
+    Python side (`test_pip_order_does_not_change_the_answer` states exactly
+    the property that fails), and `go/internal/mana/fuzz_test.go` covers it on
+    the Go side. What was missing was anybody *saying* so: the enumeration is
+    described as the differential case set for a port, and a reader has no way
+    to see this hole by looking at it.
+
+    So this test asserts the limit rather than removing it. Widening
+    `CASE_PIPS`, or reordering it so a hybrid comes first, would change
+    `CASES_ANSWER_DIGEST` -- a deliberate act, argued in a commit message --
+    and this failing is how that reader is told the hole has closed and this
+    docstring is stale.
+    """
+    import mana_oracle as oracle
+
+    wide_first = [
+        oracle.case_id(cost, ())
+        for cost in oracle.case_costs()
+        if any(len(later) < len(earlier)
+               for i, earlier in enumerate(cost.pips)
+               for later in cost.pips[i + 1:])
+    ]
+    assert not wide_first, (
+        f"{len(wide_first)} cost(s) now present a wider pip before a narrower "
+        f"one, e.g. {wide_first[0]}. That is a widening of the case set, not a "
+        f"bug -- update this test and its docstring, which tell the next "
+        f"reader the hole is still open.")
+
+    # And the property that hole hides, asserted here so the claim above is a
+    # demonstration rather than an assertion about a mutation nobody can see.
+    from mtglab.mana import ManaCost, ManaSource, can_pay
+
+    w, u = frozenset({"W"}), frozenset({"U"})
+    hand = (ManaSource(w), ManaSource(u))
+    assert can_pay(ManaCost(pips=(frozenset({"W", "U"}), w)), hand)
+    assert can_pay(ManaCost(pips=(w, frozenset({"W", "U"}))), hand)
