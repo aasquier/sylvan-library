@@ -509,15 +509,21 @@ export function CardArt({
    */
   position?: string
 }) {
-  const [loaded, setLoaded] = useState(false)
+  // *Which* picture has landed, rather than a bare "one has". Derived rather
+  // than reset in an effect, and that is a fade rather than a flash: clearing
+  // it after the commit meant the new painting drew at full opacity for a
+  // frame -- under the old one's fade class -- before snapping to nothing and
+  // starting over. Comparing against `src` during render makes the change take
+  // effect in the same paint that swapped the picture.
+  const [shown, setShown] = useState<string | null>(null)
+  const loaded = shown !== null && shown === src
   const imgRef = useRef<HTMLImageElement>(null)
 
   // A cached image can finish decoding before React attaches onLoad, in which
   // case the event never fires and the fade-in leaves it stuck at opacity 0 --
   // an invisible image over a grey box. Ask the element directly instead.
   useEffect(() => {
-    setLoaded(false)
-    if (imgRef.current?.complete) setLoaded(true)
+    if (src && imgRef.current?.complete) setShown(src)
   }, [src])
 
   if (!src) {
@@ -538,9 +544,9 @@ export function CardArt({
         src={src}
         alt={alt}
         loading={eager ? 'eager' : 'lazy'}
-        onLoad={() => setLoaded(true)}
+        onLoad={() => setShown(src)}
         // Never leave a broken URL as an invisible element -- show the frame.
-        onError={() => setLoaded(true)}
+        onError={() => setShown(src)}
         style={position ? { objectPosition: position } : undefined}
         className={`art-fade h-full w-full object-cover ${loaded ? 'loaded' : ''}`}
       />
@@ -627,7 +633,16 @@ export function CardLoupe({ src, alt, className = '', zoom = 2.6, imgStyle }: {
   zoom?: number
   imgStyle?: React.CSSProperties
 }) {
-  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
+  // Where the cursor is over the card, *and* how big the card was when it was
+  // there. The size travels with the position because the two are read from
+  // one measurement in one event: taking the rect again at render time meant
+  // the glass was sized by whatever the layout happened to be at the last
+  // paint while the cursor came from the last mouse move, and a card that
+  // resized between the two put the lens somewhere its own maths denied.
+  // jsdom has no layout, so a zero rect never becomes a position at all --
+  // which is the same "no lens off the test rig" this had before.
+  const [at, setAt] = useState<
+    { x: number; y: number; w: number; h: number } | null>(null)
   const ref = useRef<HTMLImageElement>(null)
 
   function track(e: React.MouseEvent) {
@@ -636,24 +651,25 @@ export function CardLoupe({ src, alt, className = '', zoom = 2.6, imgStyle }: {
     setAt({
       x: (e.clientX - rect.left) / rect.width,
       y: (e.clientY - rect.top) / rect.height,
+      w: rect.width,
+      h: rect.height,
     })
   }
 
-  const rect = ref.current?.getBoundingClientRect()
   return (
     <span className={`card-loupe-host relative inline-block ${className}`}
           onMouseEnter={track} onMouseMove={track}
           onMouseLeave={() => setAt(null)}>
       <img ref={ref} src={src} alt={alt} className="block w-full rounded-xl"
            style={imgStyle} />
-      {at && rect && rect.width > 0 && (
+      {at && (
         <span aria-hidden className="card-loupe"
               style={{
                 left: `${at.x * 100}%`,
                 top: `${at.y * 100}%`,
                 backgroundImage: `url(${src})`,
-                backgroundSize: `${rect.width * zoom}px ${rect.height * zoom}px`,
-                backgroundPosition: `${-(at.x * rect.width * zoom - 66)}px ${-(at.y * rect.height * zoom - 66)}px`,
+                backgroundSize: `${at.w * zoom}px ${at.h * zoom}px`,
+                backgroundPosition: `${-(at.x * at.w * zoom - 66)}px ${-(at.y * at.h * zoom - 66)}px`,
               }} />
       )}
     </span>

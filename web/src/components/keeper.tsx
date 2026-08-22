@@ -81,7 +81,7 @@ export function KeeperDossier({ open, onClose }: {
   onClose: () => void
 }) {
   const [works, setWorks] = useState<Card[] | null>(null)
-  const [flurry, setFlurry] = useState(0)
+  const [bells, setBells] = useState(0)
   const panel = useRef<HTMLDivElement>(null)
 
   // The exhibit case: the pool's own records of his name. Fetched when the
@@ -102,11 +102,14 @@ export function KeeperDossier({ open, onClose }: {
   // up. The interval is long on purpose.
   useEffect(() => {
     if (!open) return
-    setFlurry((n) => n + 1)
-    const id = window.setInterval(
-      () => setFlurry((n) => n + 1), 16000)
+    const id = window.setInterval(() => setBells((n) => n + 1), 16000)
     return () => window.clearInterval(id)
   }, [open])
+
+  // The opening *is* the first bell, so the count is derived rather than
+  // nudged by the effect above: `BatFlurry` releases on any change and reads
+  // zero as "nothing yet", which is exactly what a closed dossier is.
+  const flurry = open ? bells + 1 : 0
 
   useEffect(() => {
     if (!open) return

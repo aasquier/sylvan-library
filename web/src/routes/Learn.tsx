@@ -120,10 +120,13 @@ function CombinationPanel({ combo, taxonomy }: {
   const [detail, setDetail] = useState<CombinationDetail | null>(null)
   const [failed, setFailed] = useState(false)
 
+  // No clearing here, because there is nothing to clear: the call site keys
+  // this panel on the combination, so choosing another builds a new one whose
+  // detail starts empty. Clearing in the effect instead painted the *previous*
+  // combination's paragraph under the new one's name for a frame, which on
+  // the page that teaches the colours is the one mistake it must not make.
   useEffect(() => {
     let live = true
-    setDetail(null)
-    setFailed(false)
     api.combination(combo.key)
       .then((d) => { if (live) setDetail(d) })
       .catch(() => { if (live) setFailed(true) })
@@ -346,7 +349,9 @@ function ColorsTab({ taxonomy, selected, onSelect }: {
         </div>
       </div>
 
-      <CombinationPanel combo={combo} taxonomy={taxonomy} />
+      {/* Keyed on the combination: a different one is a different panel, so
+          its detail is fetched from empty rather than swapped underneath. */}
+      <CombinationPanel key={combo.key} combo={combo} taxonomy={taxonomy} />
     </div>
   )
 }

@@ -168,10 +168,12 @@ export default function Research() {
 
   // Minutes of a still spinner is indistinguishable from a wedge. Ticking is
   // the cheapest honest signal, and it is why `converse` reports turns at all.
+  // The clock is zeroed by `ask` below rather than here, because asking is
+  // the thing that starts it: an effect reset it a render after the spinner
+  // had already appeared carrying the last question's total.
   useEffect(() => {
     if (!busy) return
     const started = Date.now()
-    setElapsed(0)
     const id = window.setInterval(
       () => setElapsed(Math.round((Date.now() - started) / 1000)), 1000)
     return () => window.clearInterval(id)
@@ -183,6 +185,7 @@ export default function Research() {
     const asked = text.trim()
     if (!asked || busy) return
     setBusy(true)
+    setElapsed(0)
     setError(null)
     setReport(null)
     run.current?.cancel()

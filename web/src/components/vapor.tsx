@@ -79,8 +79,13 @@ export function VaporLayer({ sources, busy = false, className = '' }: {
   className?: string
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  // The loop below outlives every render and must read the *current* busy
+  // rather than the one it closed over, so the flag rides a ref. Written from
+  // an effect and not during render: a render may be thrown away or replayed,
+  // and a ref written in one is a value the next render cannot account for.
+  // The loop is on rAF, so it picks the new flag up on the following frame.
   const busyRef = useRef(busy)
-  busyRef.current = busy
+  useEffect(() => { busyRef.current = busy }, [busy])
   const [ambience] = useAmbience()
 
   useEffect(() => {

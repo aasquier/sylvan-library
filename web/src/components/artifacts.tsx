@@ -60,14 +60,16 @@ export function DeckArtifactsPanel({ deck, deckRef }: {
   const [building, setBuilding] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    try {
-      setState(await api.deckArtifacts(deckRef))
-      setError('')
-    } catch (e) {
-      setError(errorMessage(e))
-    }
-  }, [deckRef])
+  // Written as a promise rather than with `await`, which is how every other
+  // fetch on this page reads and, here, the only form that says plainly what
+  // is true: the shelf lands after a round trip, never in the effect that
+  // asked for it.
+  const load = useCallback(
+    () => api.deckArtifacts(deckRef)
+      .then((shelf) => { setState(shelf); setError('') })
+      .catch((e: unknown) => { setError(errorMessage(e)) }),
+    [deckRef],
+  )
 
   useEffect(() => { void load() }, [load])
 

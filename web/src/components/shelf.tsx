@@ -19,7 +19,7 @@
  * nothing at all.
  */
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLore } from '../lib/lore'
 import { CardHover, ManaCost } from './ui'
@@ -32,12 +32,16 @@ export function TheShelves() {
   const lore = useLore()
   const [step, setStep] = useState(0)
   const [open, setOpen] = useState(false)
-  const offset = useRef(Math.floor(Math.random() * 997))
+  // One offset per mount, and a lazy initialiser rather than `useRef(…)`:
+  // useRef evaluates its argument on *every* render and throws all but the
+  // first away, so the single roll this looked like it was making was really
+  // being made again on each keystroke anywhere on the page.
+  const [offset] = useState(() => Math.floor(Math.random() * 997))
 
   const facts = lore?.facts ?? []
   if (facts.length === 0) return null
 
-  const fact = facts[(offset.current + step * STRIDE) % facts.length]
+  const fact = facts[(offset + step * STRIDE) % facts.length]
   if (!fact) return null
   const volume = lore?.volumes.find((v) => v.key === fact.volume)
 

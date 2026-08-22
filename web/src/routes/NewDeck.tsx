@@ -151,7 +151,7 @@ export default function NewDeck() {
   // The fastest path of all: someone who already knows the commander and does
   // not care what the colours are called.
   const [nameQuery, setNameQuery] = useState('')
-  const [nameHits, setNameHits] = useState<Card[] | null>(null)
+  const [found, setFound] = useState<Card[] | null>(null)
 
   const [chosen, setChosen] = useState<Combination | null>(null)
   const [commanders, setCommanders] = useState<Card[] | null>(null)
@@ -229,15 +229,22 @@ export default function NewDeck() {
   // combination rather than a commander, so it lands on the carousel showing
   // that slot — the reading and the choosing are still the same act, this one
   // just started on the other screen.
-  useEffect(() => {
-    const key = params.get('c')
-    if (!key || !taxonomy) return
-    const combo = taxonomy.combinations.find((c) => c.key === key)
+  //
+  // Applied during the render the taxonomy arrives in rather than in an effect
+  // after it: an effect drew the carousel's default slot first and jumped a
+  // frame later, so the combination somebody clicked was the second thing they
+  // saw. Guarded by the key it last honoured, so arrowing away from a linked
+  // combination is not undone on the next render.
+  const linked = params.get('c')
+  const [followed, setFollowed] = useState<string | null>(null)
+  if (taxonomy && linked && followed !== linked) {
+    setFollowed(linked)
+    const combo = taxonomy.combinations.find((c) => c.key === linked)
     if (combo) {
       setMode('guided')
       goTo(combo)
     }
-  }, [params, taxonomy, goTo])
+  }
 
   // Arrow keys drive the carousel while it is the active step. Only bound
   // before a combination is chosen, so it cannot fight the commander list.
@@ -276,17 +283,23 @@ export default function NewDeck() {
     return () => { live = false }
   }, [current, chosen, mode, leaders])
 
+  // Under two characters there is nothing to search for, so there is nothing
+  // to show. Decided here rather than cleared in the effect below, which could
+  // only say so a render later — long enough for a list to survive the
+  // backspace that emptied the question it was answering.
+  const query = nameQuery.trim()
+  const nameHits = query.length < 2 ? null : found
+
   // Debounced so a name search does not fire a query per keystroke.
   useEffect(() => {
-    const q = nameQuery.trim()
-    if (q.length < 2) { setNameHits(null); return }
+    if (query.length < 2) return
     const timer = setTimeout(() => {
-      api.searchCards({ q, commanders_only: 'true', sort: 'edhrec', limit: 12 })
-        .then((r) => setNameHits(r.cards))
-        .catch(() => setNameHits([]))
+      api.searchCards({ q: query, commanders_only: 'true', sort: 'edhrec', limit: 12 })
+        .then((r) => setFound(r.cards))
+        .catch(() => setFound([]))
     }, 250)
     return () => clearTimeout(timer)
-  }, [nameQuery])
+  }, [query])
 
   const choose = async (combo: Combination) => {
     setChosen(combo)

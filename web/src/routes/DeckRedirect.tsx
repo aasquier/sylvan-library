@@ -27,26 +27,29 @@ import { Spinner } from '../components/ui'
 export default function DeckRedirect() {
   const { slug = '' } = useParams()
   const navigate = useNavigate()
-  const [missing, setMissing] = useState(false)
+  // *Which* slug came back empty, rather than a bare "one did". A verdict that
+  // names the slug it is about needs no clearing when the address changes: the
+  // old answer simply stops matching, and the spinner is back without an
+  // effect having to run to put it there.
+  const [missing, setMissing] = useState<string | null>(null)
 
   useEffect(() => {
     let live = true
-    setMissing(false)
     api.decks()
       .then((decks) => {
         if (!live) return
         const found = decks.find((d) => d.slug === slug)
         if (found) navigate(deckUrl(found), { replace: true })
-        else setMissing(true)
+        else setMissing(slug)
       })
       // A library that cannot be listed cannot be searched. The honest answer
       // is the same one an unknown slug gets: this link does not lead anywhere
       // we can reach.
-      .catch(() => { if (live) setMissing(true) })
+      .catch(() => { if (live) setMissing(slug) })
     return () => { live = false }
   }, [slug, navigate])
 
-  if (!missing) return <Spinner label="Finding that deck…" />
+  if (missing !== slug) return <Spinner label="Finding that deck…" />
   return (
     <div className="card-surface rounded-xl px-6 py-10 text-center">
       <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
