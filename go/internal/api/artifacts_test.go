@@ -541,18 +541,23 @@ func TestTheSQLTierBuildsToo(t *testing.T) {
 
 // An instance with no card pool -- a fresh one, before `mtglab data refresh`.
 //
-// The gate is handed an **empty** map rather than a nil one, because
-// `service.build_artifacts` writes `_pool_for(deck, con)` where
-// `service.validate_deck` writes `_pool_for(deck, con) if con is not None else
-// None`. `_pool_for` answers `{}` for a missing connection, which is not
-// `None`, so the build's gate run does its card checks against an empty pool
-// and every card comes back `unknown-card` -- while the validate route beside
-// it reports one `unverified` warning and stops.
+// **The two surfaces agree, and that they agree is the assertion.** Until
+// 2026-08-22 they did not: the gate was handed an **empty** map here and a nil
+// one by the validate route, because `service.build_artifacts` wrote
+// `_pool_for(deck, con)` where `service.validate_deck` wrote `_pool_for(deck,
+// con) if con is not None else None`, and `_pool_for` answered `{}` for a
+// missing connection. An empty map is not a nil one: the gate reads nil as "the
+// pool was never consulted" and warns `unverified` once, and reads empty as a
+// pool that has never heard of these cards and calls all 99 unknown. So one
+// deck had three answers on one instance -- validate warned, a rebuild refused
+// with 99 errors, and every edit came back `ok: false`.
 //
-// The two disagree, and this pins the disagreement rather than resolving it: a
-// flip reproduces Python, and which of the two Python meant is a question for
-// somebody with the authority to answer it.
-func TestWithNoPoolTheBuildAndTheGateDisagreeAsPythonsDo(t *testing.T) {
+// The flip reproduced that rather than ruling on it, and this test pinned the
+// disagreement. It has since been ruled on: `_pool_for` answers `None`, every
+// caller that feeds the gate passes it through, and `mtglab decks build` --
+// which was handed `None` by `cli._pool` and built happily throughout -- is
+// what the route now matches, as rule 3 requires.
+func TestWithNoPoolTheBuildAndTheGateAgree(t *testing.T) {
 	decks := decksDir(t)
 	// An app.db, because the owner segment is resolved through it -- but no
 	// Pool, which is the state a fresh instance is in before `data refresh`.
@@ -577,22 +582,46 @@ func TestWithNoPoolTheBuildAndTheGateDisagreeAsPythonsDo(t *testing.T) {
 		t.Fatalf("validate reports %d warnings, expected the one `unverified`: %s", len(warns), raw)
 	}
 
-	// The build: refused, because every card is unknown against an empty pool.
+	// The build: it goes through, unforced, and reports the same one warning
+	// the validate route reported. No `force` is needed, because there is
+	// nothing to override -- which is the whole of the fix.
 	status, body, raw = callAs(t, a, scope, "POST", cleanDeck+"/artifacts", `{}`)
-	if status != 422 || !strings.Contains(fmtDetail(body), "the gate reports") {
-		t.Fatalf("the build answered %d: %s", status, raw)
-	}
-	// And forced, it builds anyway -- with the errors reported beside it.
-	status, body, raw = callAs(t, a, scope, "POST", cleanDeck+"/artifacts", `{"force":true}`)
 	if status != 200 {
-		t.Fatalf("a forced build with no pool answered %d: %s", status, raw)
+		t.Fatalf("the build answered %d with no pool: %s", status, raw)
 	}
-	if body["forced"] != true {
-		t.Error("a build that overrode an empty pool's verdict must say so")
+	if body["forced"] != false {
+		t.Error("nothing was overridden, so the build must not say it forced anything")
 	}
 	issues, _ := body["issues"].(map[string]any)
-	if errs, _ := issues["errors"].([]any); len(errs) == 0 {
-		t.Error("the empty pool's `unknown-card` errors should be reported")
+	if errs, _ := issues["errors"].([]any); len(errs) != 0 {
+		t.Errorf("the build reports errors with no pool: %v", errs)
+	}
+	buildWarns, _ := issues["warnings"].([]any)
+	if len(buildWarns) != len(warns) {
+		t.Errorf("the build reports %d warnings where validate reported %d; "+
+			"the two surfaces must say the same thing about one deck",
+			len(buildWarns), len(warns))
+	}
+
+	// And the third surface: an ordinary edit, whose verdict comes back through
+	// `commit`. This half was already nil-correct here and `{}`-wrong in
+	// Python, so on a pool-less instance the door and uvicorn disagreed about
+	// what a write to the same deck answered -- a divergence the contract suite
+	// could not see, because its harness always builds the 21-card pool.
+	status, body, raw = callAs(t, a, scope, "PATCH", cleanDeck,
+		`{"field":"bracket","value":3}`)
+	if status != 200 {
+		t.Fatalf("an edit with no pool answered %d: %s", status, raw)
+	}
+	if body["ok"] != true {
+		t.Errorf("an edit with no pool reports the deck as failing: %s", raw)
+	}
+	if errs, _ := body["errors"].([]any); len(errs) != 0 {
+		t.Errorf("an edit with no pool reports %d errors: %v", len(errs), errs)
+	}
+	if editWarns, _ := body["warnings"].([]any); len(editWarns) != len(warns) {
+		t.Errorf("the edit reports %d warnings where validate reported %d",
+			len(editWarns), len(warns))
 	}
 	// The deliverables still render; they simply carry no mana costs, which is
 	// what `cards={}` means to the annotated list.

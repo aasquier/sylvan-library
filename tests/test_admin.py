@@ -763,6 +763,39 @@ def test_an_invite_with_no_address_at_all_is_refused(client):
     assert "email" in response.json()["detail"]
 
 
+@pytest.mark.parametrize(("sent", "says"), [
+    (123, "'123' does not look like an email address"),
+    (0, "'0' does not look like an email address"),
+    (True, "'True' does not look like an email address"),
+    (False, "'False' does not look like an email address"),
+    ([1], "'[1]' does not look like an email address"),
+    (None, "an invite needs an email address"),
+])
+def test_an_email_that_is_not_a_string_is_refused_and_not_a_crash(
+        client, sent, says):
+    """422, because a malformed body is the caller's mistake and not a fault.
+
+    This answered **500** until 2026-08-22. `payload` is a bare JSON object, so
+    `payload.get("email")` is whatever arrived, and `users.normalise_email` is
+    annotated `str | None` and takes that at its word -- it calls `.strip()`.
+    On an int that raises `AttributeError`, which is not the `users.InvalidEmail`
+    the handler catches, so it went out as a server error. The sibling field
+    three lines down had been coercing since the day it was written; the
+    inconsistency was inside one function.
+
+    **The sentences are pinned and not just the status**, because the door
+    serves this route and has always coerced here (`internal/api`'s `str`), so
+    the fix is only a fix if the two runtimes say the same thing. `0` and
+    `False` are the cases that decide the spelling: `str(x or "")` would fold
+    them into "absent" and report a *missing* address for a body that supplied
+    one, so the coercion is `str(x) if x is not None else None` instead.
+    """
+    response = client.post("/api/admin/users", json={"email": sent})
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == says
+
+
 def test_a_username_that_cannot_be_normalised_asks_for_one(client):
     """The address is fine and its local part is not a usable handle.
 

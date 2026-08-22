@@ -103,8 +103,15 @@ func (a *API) sourceFor(w http.ResponseWriter, r *http.Request) (library.Source,
 	return src, true
 }
 
-// poolFor is `service._pool_for`: the deck's names, looked up; an empty map
-// when there is no pool.
+// poolFor is `service._pool_for`: the deck's names, looked up.
+//
+// It is only ever called with a live connection, so it has no "no pool" answer
+// of its own -- the caller holds one, and which one it holds matters. A caller
+// that hands the result to `gate.Validate` must leave the map **nil** when
+// there is no pool, because nil is how the gate is told it was never consulted;
+// an empty map means a pool that has never heard of any of these cards. A
+// caller that only looks names up may use either, and every one of them uses an
+// empty map so the lookups read straight through.
 func poolFor(ctx context.Context, c *pool.Conn, d *deck.Deck) (map[string]*pool.CardRecord, error) {
 	names := append([]string{}, d.Commander...)
 	for _, card := range d.Cards {

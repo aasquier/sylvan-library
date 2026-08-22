@@ -1543,6 +1543,30 @@ def test_the_shelf_requires_a_slug(sim_client):
     assert sim_client.post("/api/sim/shelf", json={}).status_code == 422
 
 
+@pytest.mark.parametrize(("sent", "want"), [
+    (None, 422), (0, 422), (False, 422), ("", 422),      # nothing was named
+    (123, 404), ([1], 404), ({"a": 1}, 404),             # something, and no deck
+])
+def test_a_slug_that_is_not_a_string_is_refused_and_not_a_crash(
+        sim_client, sent, want):
+    """422 or 404, never a 500. Found by sweeping bug 2's shape (2026-08-22).
+
+    `payload` is a bare JSON object, so `payload.get("slug")` is whatever
+    arrived; a list is *truthy*, so it walked past the `if not slug` guard and
+    reached the deck source, where SQLite refused to bind it and the route
+    answered a server error for a merely malformed request. The four
+    `/api/sim/*` routes shared the block; `sim_forge` beside them had coerced
+    its two slugs since the day it was written, which is the same
+    already-defended-sibling shape as the invite route's `email`.
+
+    Only the shelf can show it as a status code -- it is the one plain route
+    here, so its exception is the response. On the three job routes the same
+    input produced a job in state `error`, which is quieter and no better.
+    """
+    assert sim_client.post("/api/sim/shelf",
+                           json={"slug": sent}).status_code == want
+
+
 def test_an_unknown_deck_is_a_404_from_the_shelf(sim_client):
     assert sim_client.post("/api/sim/shelf",
                            json={"slug": "no-such-deck"}).status_code == 404
@@ -4343,6 +4367,66 @@ def test_an_edited_deck_reports_its_artifacts_as_different(clean_client):
         body = client.get(BUILD).json()
     assert "swaps.md" in [a["name"] for a in body["artifacts"]]
     assert body["baseline"] == "current"
+
+
+@pytest.fixture
+def pool_less_client(in_memory_client, tmp_path):
+    """The clean deck on an instance with no card pool at all.
+
+    `data_dir` is pointed at an empty directory rather than simply left alone.
+    `config.DB_PATH` defaults into the repository, where this machine's own
+    500MB pool lives, so a fixture that merely omitted `pool` would find one
+    anyway -- passing here while asserting the opposite of what CI sees. It is
+    the trap `test_combination_detail_reports_no_pool_rather_than_failing`
+    already names.
+    """
+    with config.use_paths(data_dir=tmp_path / "no-pool"), \
+            in_memory_client([tiny_pool.mono_green_deck(clean=True)]) as c:
+        yield c
+
+
+def test_with_no_pool_every_surface_says_the_same_thing_about_one_deck(
+        pool_less_client):
+    """A fresh instance, before `mtglab data refresh`, and one deck's verdict.
+
+    **This is the assertion nothing made until 2026-08-22, and all three
+    surfaces disagreed.** `service._pool_for` answered `{}` for a missing
+    connection where `cli._pool` answered `None`, and the gate reads those
+    differently on purpose: `None` is "the pool was never consulted", one
+    `unverified` warning and stop, while `{}` is a pool that has never heard of
+    any of these cards and every one of them comes back `unknown-card`. Only
+    `validate_deck` guarded, so on a pool-less instance this deck was
+    simultaneously clean (validate), unbuildable (`BuildRejected`, 99 errors)
+    and failing (`ok: false` on every edit, from `_commit`).
+
+    `mtglab decks build` was right throughout, which is what makes it a bug
+    rather than a preference: rule 3 says the CLI and the deck page run the
+    same `render_all` and so cannot produce different files, and here one built
+    and the other refused.
+
+    The three are compared to **each other** rather than to a copied literal,
+    because agreeing is the property -- a future change that moves all three
+    together is not this bug coming back.
+    """
+    client = pool_less_client
+    verdict = client.get("/api/decks/local/mono-green/validate").json()
+    assert verdict["ok"] is True
+    assert verdict["errors"] == []
+    assert [w["code"] for w in verdict["warnings"]] == ["unverified"]
+
+    built = client.post(BUILD, json={})
+    assert built.status_code == 200, built.text
+    # Unforced: there is nothing to override, which is the whole of the fix.
+    assert built.json()["forced"] is False
+    assert built.json()["issues"]["errors"] == verdict["errors"]
+    assert built.json()["issues"]["warnings"] == verdict["warnings"]
+
+    edited = client.patch("/api/decks/local/mono-green",
+                          json={"field": "bracket", "value": 3})
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["ok"] is True
+    assert edited.json()["errors"] == verdict["errors"]
+    assert edited.json()["warnings"] == verdict["warnings"]
 
 
 def test_a_deliverable_is_served_verbatim(clean_client):

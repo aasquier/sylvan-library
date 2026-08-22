@@ -310,9 +310,35 @@ def health(*, source: DeckSource | None = None) -> dict[str, Any]:
 
 
 def _pool_for(deck: Deck,
-                con: DuckDBPyConnection | None) -> dict[str, CardRecord]:
+              con: DuckDBPyConnection | None) -> dict[str, CardRecord] | None:
+    """Every name this deck mentions, looked up. `None` when there is no pool.
+
+    **`None` and `{}` are different answers, and the gate is the one caller
+    that reads them differently.** `validate` takes `None` as "the pool was
+    never consulted", warns `unverified` once and returns; it takes `{}` as a
+    pool that has never heard of any of these cards and reports `unknown-card`
+    for every one of them.
+
+    This answered `{}` for a missing connection until 2026-08-22, and only
+    `validate_deck` guarded against it -- so on an instance with no pool, which
+    is what a fresh deployment is before `mtglab data refresh`, one deck had
+    three answers: `GET .../validate` warned once and passed, a rebuild refused
+    with 99 errors, and every edit came back `ok: false` with the same 99. The
+    CLI was right the whole time and said so in `cli._pool`'s own docstring --
+    "returns None if the DB is absent, so callers can degrade to structural
+    checks with a visible warning" -- which is why `mtglab decks build` built a
+    pool-less deck happily while the route beside it refused, against rule 3's
+    promise that the two cannot produce different files.
+
+    Callers that only *look a name up* want a mapping and say `or {}`; to them
+    the two answers are the same and always were. Callers that hand this to the
+    gate pass it straight through. **mypy is what keeps that honest**: with the
+    return typed `| None`, a lookup caller who forgets is a type error where
+    the mistake is, which is exactly the check that did not exist while this
+    returned a dict unconditionally.
+    """
     if con is None:
-        return {}
+        return None
     names = deck.commander + [c.name for c in deck.cards] + \
         [c.name for c in deck.swap_board] + [c.name for c in deck.graveyard]
     if deck.companion:
@@ -890,7 +916,7 @@ def get_deck(slug: str, *, source: DeckSource | None = None,
     deck = decks.get(slug)
     con = _connect()
     try:
-        cards = _pool_for(deck, con)
+        cards = _pool_for(deck, con) or {}
         commander_rec = cards.get(deck.commander[0]) if deck.commander else None
         commander_card = _card_json(
             type("E", (), {"name": deck.commander[0], "category": "commander",
@@ -993,8 +1019,9 @@ def validate_deck(slug: str, *, source: DeckSource | None = None) -> dict[str, A
     deck = _source(source).get(slug)
     con = _connect()
     try:
-        cards = _pool_for(deck, con) if con is not None else None
-        rep = validate(deck, cards)
+        # No guard here any more, and none needed: `_pool_for` answers `None`
+        # when there is no pool, which is what the gate has always wanted.
+        rep = validate(deck, _pool_for(deck, con))
         return {
             "ok": rep.ok,
             "errors": [{"code": i.code, "message": i.message, "card": i.card}
@@ -1996,6 +2023,10 @@ def _commit(slug: str, decks: DeckSource, updated: str,
     after = decks.get(slug)
     con = _connect()
     try:
+        # `_pool_for` answers `None` with no pool, so an edit on a pool-less
+        # instance reports the one `unverified` warning the validate route
+        # reports -- not `ok: false` and 99 `unknown-card` errors, which is
+        # what every write said until 2026-08-22.
         report = validate(after, _pool_for(after, con))
     finally:
         if con is not None:
@@ -2370,7 +2401,7 @@ def wheel_spin(slug: str, *, source: DeckSource | None = None,
         return {"pool_available": False, "card": None, "symbol": None,
                 "message": "no card pool yet -- run `mtglab data refresh`"}
     try:
-        cards = _pool_for(deck, con)
+        cards = _pool_for(deck, con) or {}
         commander = cards.get(deck.commander[0]) if deck.commander else None
         identity = commander.color_identity if commander else frozenset()
         return {"pool_available": True,
@@ -2396,7 +2427,12 @@ def suggestions_for(slug: str, *, source: DeckSource | None = None,
     if con is None:
         return {"slug": slug, "pool_available": False, "targets": []}
     try:
-        cards = _pool_for(deck, con)
+        # The `or {}` never fires -- `con` is not None past the guard above --
+        # but it is not decoration either: `_pool_for` is typed `| None` and
+        # mypy cannot narrow a return from the argument's narrowing, so a
+        # lookup caller has to say which of the two answers it wants. Same in
+        # `wheel_spin`, which guards the same way.
+        cards = _pool_for(deck, con) or {}
         rep = validate(deck, cards)
         fixable = [(i.card, i.code) for i in rep.errors
                    if i.card and i.code in ("banned", "color-identity")]
@@ -2895,6 +2931,11 @@ def build_artifacts(slug: str, *, force: bool = False,
 
     con = _connect()
     try:
+        # `None` with no pool, so the gate warns `unverified` once instead of
+        # calling all 99 cards unknown and refusing the build. Until
+        # 2026-08-22 this got `{}` and did exactly that -- while
+        # `mtglab decks build`, handed `None` by `cli._pool`, built the same
+        # deck without complaint. Rule 3 promises those two cannot differ.
         cards = _pool_for(deck, con)
     finally:
         if con is not None:

@@ -1424,8 +1424,16 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         else's private deck must answer 404 here exactly as it does on `GET`.
         Absent, `owner` means the caller's own library, which is what every
         existing client sends.
+
+        **`str()` here for the reason `owner` has always had one**, and the
+        four routes in this block were the ones that did not: `payload` is a
+        bare JSON object, so `{"slug": ["a"]}` walked a list past a truthiness
+        check into the deck source, where SQLite refused to bind it and the
+        route answered **500**. `sim_forge` below coerced its two from the day
+        it was written; these four now match it, and a slug that is not a slug
+        is the 404 any other unknown slug gets.
         """
-        slug = payload.get("slug")
+        slug = str(payload.get("slug") or "")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
         owner = str(payload.get("owner") or lib.my_owner)
@@ -1436,8 +1444,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     @app.post("/api/sim/lands")
     def sim_lands(payload: dict[str, Any], lib: Lib,
                   caller: Scope) -> dict[str, Any]:
-        """Queue a Tier 1 land sweep. `owner` as for `/api/sim/mana` above."""
-        slug = payload.get("slug")
+        """Queue a Tier 1 land sweep. `owner` and `slug` as for `/api/sim/mana`."""
+        slug = str(payload.get("slug") or "")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
         owner = str(payload.get("owner") or lib.my_owner)
@@ -1453,9 +1461,9 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         measurement rather than a preference: `karsten.shelf` is arithmetic
         over an already-compiled deck and runs in 0.03-0.04s, where a Tier 1
         run is eighteen seconds. `api/shelfruns.py`'s docstring carries the
-        numbers. `owner` resolves as it does for `/api/sim/mana`.
+        numbers. `owner` and `slug` resolve as they do for `/api/sim/mana`.
         """
-        slug = payload.get("slug")
+        slug = str(payload.get("slug") or "")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
         owner = str(payload.get("owner") or lib.my_owner)
@@ -1474,12 +1482,12 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
     @app.post("/api/sim/policy")
     def sim_policy(payload: dict[str, Any], lib: Lib,
                    caller: Scope) -> dict[str, Any]:
-        """Queue a mulligan policy search. `owner` as for `/api/sim/mana`.
+        """Queue a mulligan policy search. `owner` and `slug` as for `/api/sim/mana`.
 
         A job, unlike the shelf above, because it is thirty-three seeded Tier 1
         runs and takes about fifty seconds.
         """
-        slug = payload.get("slug")
+        slug = str(payload.get("slug") or "")
         if not slug:
             raise HTTPException(status_code=422, detail="slug is required")
         owner = str(payload.get("owner") or lib.my_owner)
