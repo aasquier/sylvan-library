@@ -114,6 +114,10 @@ _ORACLES = [
     ("the compiler", "COMPILE_PATH", "render_compile_cases"),
     ("the mulligan grid", "MULLIGAN_PATH", "render_mulligan_cases"),
     ("the sim cache's key", "CACHE_PATH", "render_cache_cases"),
+    ("the stance dial", "STANCE_PATH", "render_stance_cases"),
+    ("the seven voices", "PERSONA_PATH", "render_persona_payload"),
+    ("the tarot deck", "TAROT_DATA_PATH", "render_tarot_deck"),
+    ("the tarot deals", "TAROT_PATH", "render_tarot_deals"),
 ]
 
 
@@ -931,3 +935,112 @@ def test_the_cache_oracle_carries_a_name_json_has_to_escape():
     for case in recorded["cases"]:
         assert hashlib.sha256(
             case["payload"].encode("utf-8")).hexdigest() == case["key"]
+
+
+# ------------------------------------------------------- the stance and voices
+
+def test_the_stance_corpus_is_exhaustive_rather_than_sampled():
+    """36 stances and all 1,296 clamp pairs, which is the whole space.
+
+    Asserted rather than trusted, because "exhaustive" is a claim that decays
+    the moment somebody adds a level to an axis: the generator would keep
+    producing a corpus, the Go tests would keep passing, and the new level
+    would be covered nowhere. The arithmetic is recomputed from the axes here,
+    so widening one fails this test until the corpus is regenerated.
+    """
+    payload = json.loads(go_fixtures.render_stance_cases())
+    expected = 1
+    for axis in payload["axes"]:
+        expected *= len(payload["levels"][axis])
+    assert len(payload["stances"]) == expected
+    assert len(payload["clamps"]) == expected * expected
+
+
+def test_the_stance_corpus_records_the_refusals_and_not_only_the_answers():
+    """The refusal text is the half that caught two real porting bugs.
+
+    Python repr-quotes with single quotes where Go's `%q` uses double, and
+    Python's json tells `7` from `7.5` by the literal rather than by the value
+    -- so `cannot read a stance from int` and `...from float` are two
+    sentences that a plain float64 port collapses into one. Neither divergence
+    changes a stance; both change what a person reads in a 422. If these rows
+    ever stop being recorded, the Go side can drift back with every structural
+    test still green.
+    """
+    payload = json.loads(go_fixtures.render_stance_cases())
+    errors = [row["error"] for row in payload["parses"] if "error" in row]
+    assert any(e.startswith("'nope' is not a stance preset") for e in errors), \
+        "no single-quoted refusal in the corpus"
+    assert "cannot read a stance from int" in errors
+    assert "cannot read a stance from float" in errors, \
+        "int and float must be told apart, or the Go port cannot be checked"
+    assert any(e.startswith("['also', 'nope'] are not stance axes")
+               for e in errors), "no Python list-repr refusal in the corpus"
+
+
+def test_the_embedded_roster_never_carries_a_voice():
+    """The served half of the persona payload has no `voice`, in the file the
+    Go module embeds -- so the guard holds at the data as well as at the type.
+
+    A client that received a prompt would eventually send one back, and "the
+    persona is one of a fixed set" is worth keeping structural. Two guards
+    rather than one because they fail differently: the Go test catches a
+    `RosterEntry` that grows a field, and this catches a generator that starts
+    writing one into the roster it renders.
+    """
+    payload = json.loads(go_fixtures.render_persona_payload())
+    assert payload["roster"], "an empty roster would satisfy any leak check"
+    for entry in payload["roster"]:
+        assert set(entry) == {"key", "label", "blurb", "deals"}, entry
+    # And the other direction: the server-side half must still HAVE the voices,
+    # or the Go module would build every persona's prompt out of nothing.
+    voiced = [p for p in payload["personas"] if p["voice"]]
+    assert len(voiced) == len(payload["personas"]) - 1, \
+        "every persona but `plain` carries a voice"
+
+
+def test_the_tarot_corpus_reaches_the_branches_a_sweep_never_would():
+    """Four of the deal corpus's seeds were searched for, not swept.
+
+    `describe()` grows two paragraphs that no card field states directly -- the
+    Magic-card omen, and a trump landing twice at one table, which the prose
+    itself calls the rarest thing this spread can do. A plain range of seeds
+    reaches neither reliably and the doubled trump not at all, so those
+    branches would be exercised by nothing while the corpus looked thorough.
+
+    Asserted on the rendered payload rather than on the search, because the
+    search would happily "succeed" by returning a seed inside the sweep it was
+    supposed to reach past.
+    """
+    payload = json.loads(go_fixtures.render_tarot_deals())
+    searched = payload["searched"]
+    assert set(searched) == {"crossover", "echo", "reversed", "alignment"}
+    prose = {case["seed"]: case["describe"] for case in payload["cases"]}
+    for want in searched.values():
+        assert want in prose, f"seed {want} was searched for but not recorded"
+    assert "The stars have aligned" in prose[searched["alignment"]]
+    assert "an omen in its own right" in prose[searched["crossover"]]
+    # The doubled trump is genuinely rare: if it ever turns up inside the plain
+    # sweep, the search stopped being the thing this test is defending.
+    assert searched["alignment"] >= 24, (
+        "the alignment seed is inside the swept range; either the deck changed "
+        "or the search is no longer reaching past it")
+
+
+def test_the_tarot_pool_totals_separate_the_two_arithmetics():
+    """The corpus can tell `fsum` from a running total before Go is asked to.
+
+    Swapping one for the other changes no spread -- 200,000 seeds deal
+    identically, measured -- so the deal cannot test it and the Go mutation
+    survives every seeded case. The pool totals are recorded as bits, both
+    ways, precisely so the arithmetic can be checked where it is visible. If
+    these ever stop differing, the Go test that reads them passes vacuously.
+    """
+    payload = json.loads(go_fixtures.render_tarot_deals())
+    totals = payload["pool_totals"]
+    assert len(totals) == 3, "one total per draw in the spread"
+    for row in totals:
+        assert row["differ"], (
+            f"the {row['cards']}-card pool no longer separates fsum from a "
+            f"naive sum; the Go fsum test would pass against either")
+        assert row["fsum_bits"] != row["naive_bits"]
