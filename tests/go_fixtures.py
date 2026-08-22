@@ -48,9 +48,14 @@ encoding; it is not a card pool redistribution (ADR 6, rule 5).
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
+import random
+import struct
 import sys
 import tempfile
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -59,8 +64,9 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from mtglab import reference
+from mtglab.cards.db import CardRecord
 from mtglab.decks.decklist import MAX_LINE
-from mtglab.decks.model import CardEntry, Deck
+from mtglab.decks.model import CATEGORIES, CardEntry, Deck
 
 ROOT = Path(__file__).resolve().parents[1]
 TESTDATA = ROOT / "go" / "internal" / "deckyaml" / "testdata"
@@ -85,6 +91,11 @@ IMPORT_PATH = ROOT / "go" / "internal" / "deckimport" / "testdata" / "imports.js
 #: deck lifecycle can produce, beside the exact bytes PyYAML writes for it.
 #: Reached by `create` and `import` only -- every other write is surgical.
 DUMPS_PATH = ROOT / "go" / "internal" / "deck" / "testdata" / "dumps.json"
+#: The artifacts oracle: `render_all` over every fixture deck, beside the
+#: exact markdown Python writes for it -- the five deliverables in the order
+#: they are built, `swaps.md` when there is a baseline, the snapshot last, and
+#: the refusal's own sentence for a draft.
+ARTIFACTS_PATH = ROOT / "go" / "internal" / "artifacts" / "testdata" / "artifacts.json"
 #: The activity log's oracle: every sentence `log.describe` writes, and
 #: `app.db`'s schema as the ladder leaves it, so the Go log tests have a real
 #: table to insert into in CI where there is no Python (Phase 4).
@@ -728,9 +739,75 @@ cards:
 """
 
 
+#: The notes fixture, and the one hand-written deck that exists for the
+#: *dumper* rather than for the editor.
+#:
+#: `notes:` is the only mapping in a deck file whose keys are the author's
+#: rather than the model's, and `sort_keys=False` means the file's order is
+#: what a dump writes back. Nothing needed that until the artifacts snapshot,
+#: which is `deck.dump()` of a **parsed** deck -- so this deck's notes are
+#: deliberately out of alphabetical order (a map iterated at random passes an
+#: in-order assertion far too often) and hold every value shape a person can
+#: type: folded prose, a literal block that keeps its line breaks, a scalar
+#: that has to be quoted to read back as itself, a nested mapping and a list.
+#:
+#: The exotic values are filed under keys the primers never ask for.
+#: `generate._note` calls `.strip()` on whatever it finds, so a mapping under
+#: `mulligan` would be a traceback rather than a fixture -- which is a true
+#: fact about the Python and not one worth recording as an oracle case.
+NOTED = """\
+slug: noted
+name: Written With Notes
+status: built
+stage: curated
+commander:
+  - Gyome, Master Chef
+themes:
+  - food
+  - midrange
+
+notes:
+  wincons: >-
+    Feed the table until somebody is the only one left who can afford to
+    stop eating.
+  pitfalls: >-
+    The deck folds to graveyard hate it cannot rebuild through.
+  mulligan: >-
+    Keep any seven with two lands and a sacrifice outlet.
+  gameplan: Cook, and keep cooking.
+  curve_plan: |
+    T2 outlet.
+    T3 Gyome.
+    T4 the table starts asking for food.
+  commander_why: 'yes'
+  shopping:
+    cheapest: Bag End Banquet
+    dearest: Sword of Feast and Famine
+  sources:
+    - The primer nobody wrote
+    - A conversation at the kitchen table
+
+cards:
+
+  # ---- RAMP 1
+  - name: Sol Ring
+    category: ramp
+    why: >-
+      Two mana on turn one, and it always has been.
+
+  # ---- LANDS 98
+  - name: Forest
+    category: land
+    qty: 98
+    why: >-
+      Green, and there is nothing else to be.
+"""
+
+
 def handwritten_decks() -> dict[str, str]:
     """name -> deck text, written the way a person writes one."""
-    return {"handwritten": HANDWRITTEN, "wide": WIDE, "tight": TIGHT}
+    return {"handwritten": HANDWRITTEN, "wide": WIDE, "tight": TIGHT,
+            "noted": NOTED}
 
 
 # ------------------------------------------------------- the edit operations
@@ -1168,14 +1245,240 @@ def dump_cases() -> dict[str, Deck]:
                              why="- a leading dash, and *an asterisk*"),
                    CardEntry(name="Erase (Not the Urza's Legacy One)",
                              category="interaction", why="1996")]),
+        # The notes, which `dump` could not write at all until the artifacts
+        # flip: `sort_keys=False` makes the payload's order the file's order,
+        # and a Go map has none. Deliberately not alphabetical, and holding a
+        # value long enough to fold, one that must be quoted to read back as a
+        # string, and one carrying its own line breaks.
+        "notes": Deck(
+            slug="notes", name="Noted", status="built", stage="curated",
+            commander=["Gyome, Master Chef"],
+            notes={
+                "wincons": "Feed the table until somebody is the only one left "
+                           "who can afford to stop eating, which takes longer "
+                           "than a hundred characters to say.",
+                "gameplan": "Cook.",
+                "mulligan": "yes",
+                "curve_plan": "T2 outlet.\nT3 Gyome.\nT4 the table asks for food.",
+            },
+            cards=[CardEntry(name="Forest", category="land", qty=99,
+                             why="Green, and there is nothing else to be.")]),
     }
 
 
+#: The dump cases whose *source* is a file a person typed rather than the
+#: dumper's own output. The round trip the Go test drives -- parse this, dump
+#: it, compare with what Python's parse dumped -- only proves anything about
+#: reading a hand-written file when one is the thing being read: a recorded
+#: dump fed back in has already been through PyYAML's choices once, so both
+#: parsers see the tidied version and a disagreement about the untidied one
+#: never surfaces.
+def dump_from_text() -> dict[str, str]:
+    """Hand-written deck text -> what Python's parse of it dumps to."""
+    return handwritten_decks()
+
+
 def render_dump_cases() -> str:
-    """Each deck above, as the dumper writes it."""
-    return json.dumps(
-        {name: deck.dump() for name, deck in dump_cases().items()},
-        indent=1, ensure_ascii=False) + "\n"
+    """Each deck above, as the dumper writes it, beside what it was dumped from."""
+    out: dict[str, dict[str, str]] = {}
+    for name, deck in dump_cases().items():
+        # A constructed deck has no source text of its own; its dump is both
+        # sides, which is exactly the round trip this oracle has always run.
+        text = deck.dump()
+        out[name] = {"source": text, "want": text}
+    for name, source in dump_from_text().items():
+        # Loudly, because the two halves are named in different functions and
+        # a collision would silently drop a case rather than fail.
+        assert name not in out, f"{name} is both a constructed and a written case"
+        out[name] = {"source": source,
+                     "want": Deck.from_text(source, slug=name).dump()}
+    return json.dumps(out, indent=1, ensure_ascii=False) + "\n"
+
+
+# ----------------------------------------------------- the artifacts oracle
+#
+# The five deliverables, and the bytes are the product: a primer is markdown a
+# person reads and `moxfield.txt` is pasted into a website, so the Go port has
+# to reproduce `render_all` character for character rather than approximately.
+#
+# Two things this oracle does that the others do not. It records the **order**
+# of the files as well as their contents, because `store` writes them in that
+# order and relies on the snapshot being last. And it **freezes the date**:
+# every deliverable ends in `_Generated <today>_`, so an oracle that asked the
+# clock would be a fixture that failed at midnight. Go takes the same date
+# through `Options.Today`.
+
+#: The day the oracle was rendered on. Any date will do; what matters is that
+#: it is written down rather than asked for.
+ARTIFACTS_DATE = date(2026, 8, 22)
+
+
+class _FrozenDate:
+    """`generate.date`, with today pinned to ARTIFACTS_DATE."""
+
+    @staticmethod
+    def today() -> date:
+        return ARTIFACTS_DATE
+
+
+def _record(name: str, mana_cost: str | None) -> CardRecord:
+    """A pool record with the one field the annotated list reads."""
+    return CardRecord(name=name, mana_cost=mana_cost, cmc=0.0, type_line="",
+                      oracle_text="", color_identity=frozenset(),
+                      produced_mana=(), legal_commander=False, reserved=False,
+                      edhrec_rank=None, image_normal=None)
+
+
+#: The mana costs the annotated list prints, for the cards the fixtures use.
+#: A card missing from here renders with no cost, which is the ordinary state
+#: of a deck built on a machine with no pool.
+ARTIFACT_CARDS = {"Sol Ring": "{1}", "Forest": None,
+                  "Swords to Plowshares": "{W}",
+                  "Cultivator Colossus": "{5}{G}{G}",
+                  "Vorinclex, Voice of Hunger": "{6}{G}{G}"}
+
+
+def artifact_decks() -> dict[str, Deck]:
+    """Decks built for the renderer's own branches rather than the gate's."""
+    every = Deck(
+        slug="every-category", name="One Of Everything", status="built",
+        stage="curated", commander=["Gyome, Master Chef"],
+        companion="Kaheera, the Orphanguard", bracket=4,
+        strategy="A card in every category, so every heading renders.",
+        cards=[CardEntry(name=f"Card {i}", category=cat,
+                         why=f"The {cat} slot.")
+               for i, cat in enumerate(CATEGORIES)],
+        swap_board=[CardEntry(name="Bag End Banquet", category="payoff",
+                              why="Waiting on a slot."),
+                    CardEntry(name="Aetherflux Reservoir", category="win-con",
+                              why="")])
+    # Two categories the model does not declare, so the "sorted, and after the
+    # declared ones" branch has something to sort and `str.title()` has
+    # something to capitalise -- and lands still end up last.
+    every.cards += [
+        CardEntry(name="Stax Piece", category="stax-piece", why="Invented."),
+        CardEntry(name="Aggro Plan", category="aggro-plan", why="Invented too."),
+        CardEntry(name="Forest", category="land", qty=30,
+                  why="Green, and there is nothing else to be."),
+        CardEntry(name="Sol Ring", category="ramp", qty=2, why=""),
+    ]
+    return {
+        "every-category": every,
+        # Every note key both primers ask for, with the whitespace `_note`
+        # strips still on them.
+        "full-notes": Deck(
+            slug="full-notes", name="Fully Noted", status="built",
+            stage="curated", commander=["Trostani, Selesnya's Voice"],
+            bracket=3,
+            strategy="Make more creatures than anybody can answer.",
+            notes={key: f"  What {key} has to say, with space around it.  "
+                   for key in ("gameplan", "mulligan", "curve_plan", "pitfalls",
+                               "engine_detail", "lines", "wincons", "manabase",
+                               "matchups", "politics", "failure_modes",
+                               "swap_philosophy", "rules_corners",
+                               "commander_why")},
+            cards=[CardEntry(name="Sol Ring", category="ramp", why="Fast."),
+                   CardEntry(name="Forest", category="land", qty=40,
+                             why="Green.")]),
+        # No commander, no companion, no bracket: the header's other branch.
+        # A bracket of nought is *falsy* in Python, so it is not written --
+        # which is a real difference from "no bracket" and looks identical.
+        "bare": Deck(slug="bare", name="Bare", status="theoretical",
+                     stage="curated", commander=[], bracket=0,
+                     cards=[CardEntry(name="Forest", category="land", qty=99,
+                                      why="Green.")]),
+        # A draft, refused -- with more than eight cards owing a rationale, so
+        # the "and N more" tail renders.
+        "draft-owing": Deck(
+            slug="draft-owing", name="Owing", status="theoretical",
+            stage="draft", commander=["Goreclaw, Terror of Qal Sisma"],
+            cards=[CardEntry(name=f"Card {i}", category="utility", why="")
+                   for i in range(11)]),
+        # A draft that owes nothing, which is the other half of the refusal:
+        # the way out is `stage: curated`, not a flag.
+        "draft-settled": Deck(
+            slug="draft-settled", name="Settled", status="built",
+            stage="draft", commander=["Goreclaw, Terror of Qal Sisma"],
+            cards=[CardEntry(name="Forest", category="land", qty=99,
+                             why="Green.")]),
+    }
+
+
+def artifact_cases() -> list[dict[str, Any]]:
+    """Every deck the renderer can be handed, and what Python renders for it."""
+    from mtglab.artifacts import generate
+
+    sources: dict[str, Deck] = dict(artifact_decks())
+    sources.update(dump_cases())
+    for name, text in handwritten_decks().items():
+        sources[f"hand-{name}"] = Deck.from_text(text, slug=name)
+
+    cards = {name: _record(name, cost) for name, cost in ARTIFACT_CARDS.items()}
+
+    # The three kwargs `render_all` takes beyond the deck, each on one case:
+    # a baseline (so `swaps.md` exists at all), prices (so it grows a shopping
+    # list), and stats (so both primers grow a block). Neither the CLI nor the
+    # API passes prices or stats today; the shape is ported, so the shape is
+    # proven.
+    previous = Deck(
+        slug="every-category", name="One Of Everything", status="built",
+        stage="curated", commander=["Gyome, Master Chef"],
+        cards=[CardEntry(name="Card 0", category="land", why="The land slot."),
+               CardEntry(name="Cut With A Reason", category="ramp",
+                         why="It was here and now it is not."),
+               CardEntry(name="Cut With None", category="ramp", why=""),
+               CardEntry(name="Forest", category="land", qty=30, why="Green.")])
+    extras: dict[str, dict[str, Any]] = {
+        "every-category": {
+            "previous": previous,
+            # Two cards at the same price, so the dearest-first sort has a tie
+            # to keep stable, and one with no price at all.
+            "prices": {"Card 1": 12.5, "Card 2": 12.5, "Card 3": 0.25,
+                       "Sol Ring": 1.995},
+            "stats": {"mulligan rate": "12.4%", "spells through T8": "9.1"},
+        },
+        "full-notes": {"previous": previous},
+    }
+
+    out: list[dict[str, Any]] = []
+    for name in sorted(sources):
+        deck = sources[name]
+        extra = extras.get(name, {})
+        case: dict[str, Any] = {
+            "name": name,
+            "deck": deck.dump(),
+            "previous": extra["previous"].dump() if "previous" in extra else None,
+            "prices": extra.get("prices"),
+            "stats": list((extra.get("stats") or {}).items()) or None,
+        }
+        try:
+            rendered = generate.render_all(
+                deck, cards=cards, previous=extra.get("previous"),
+                prices=extra.get("prices"), stats=extra.get("stats"))
+            case["ok"] = True
+            case["files"] = [{"name": n, "text": t} for n, t in rendered.items()]
+        except generate.DraftDeck as exc:
+            # The refusal is half of what this module does, and its sentence
+            # reaches the wire as the 422's `detail`.
+            case["ok"] = False
+            case["error"] = str(exc)
+        out.append(case)
+    return out
+
+
+def render_artifact_cases() -> str:
+    """Every case above, with the date pinned so the oracle does not expire."""
+    from mtglab.artifacts import generate
+
+    original = generate.date
+    generate.date = _FrozenDate            # type: ignore[assignment]
+    try:
+        cases = artifact_cases()
+    finally:
+        generate.date = original           # type: ignore[assignment]
+    return json.dumps({"today": ARTIFACTS_DATE.isoformat(),
+                       "cards": ARTIFACT_CARDS, "cases": cases},
+                      indent=1, ensure_ascii=False) + "\n"
 
 
 def render_edit_cases() -> str:
@@ -1217,6 +1520,126 @@ def render_edit_cases() -> str:
                       indent=1, ensure_ascii=False) + "\n"
 
 
+CRYPTO_PATH = ROOT / "go" / "internal" / "auth" / "testdata" / "crypto.json"
+
+#: `app.db`'s DDL, embedded by `go/internal/auth/authtest` and handed to every
+#: Go test that needs a real one. It lived beside `internal/decklog`'s tests
+#: until 2026-08-22, when the accounts flip found that two *other* packages had
+#: each transcribed the ladder by hand and frozen it at a different rung; the
+#: package comment on `authtest` records what that cost.
+APP_SCHEMA_PATH = ROOT / "go" / "internal" / "auth" / "authtest" / "app_schema.sql"
+
+#: Passwords the Argon2 oracle records. Deliberately awkward: a short one the
+#: strength check would refuse but the *verifier* must still handle (an account
+#: whose hash predates the floor), an empty one, unicode above the BMP, a
+#: passphrase with the spaces the floor is written to encourage, and one at the
+#: 1024-byte ceiling. What is being proven is the encoding, and the encoding is
+#: where a length or a code point turns into a different byte string.
+_ARGON2_PASSWORDS: tuple[tuple[str, str], ...] = (
+    ("an ordinary passphrase", "correct horse battery staple"),
+    ("the shortest a route will store", "twelve chars"),
+    ("below the floor, still verifiable", "short"),
+    ("empty, which verify must not crash on", ""),
+    ("unicode above the BMP", "🜁 quicksilver 🜃 the alchemist's word"),
+    ("a colon and a dollar, which PHC delimits on", "a$b:c$d$e:f$gh"),
+    ("at the byte ceiling", "x" * 1024),
+)
+
+#: Salts, fixed so the fixture is reproducible and the *encoding* is what is
+#: under test rather than the entropy source. 16 bytes is argon2-cffi's default
+#: and therefore the project's.
+_ARGON2_SALTS: tuple[bytes, ...] = tuple(
+    bytes(((i * 37 + j * 11) % 256) for j in range(16))
+    for i in range(len(_ARGON2_PASSWORDS))
+)
+
+
+def crypto_cases() -> dict[str, Any]:
+    """The Argon2id and SHA-256 oracle: what `mtglab.auth` writes, exactly.
+
+    This is the fixture behind the migration's sharpest compatibility claim.
+    ADR 38 promises "Argon2id PHC hashes verify as-is", which the read side
+    proved in Phase 2 -- but Phase 4's accounts flip makes Go a *writer*, and a
+    hash Go writes has to be one `argon2-cffi` verifies for the rest of time,
+    including after a rollback to a Python-only door.
+
+    A round trip in one direction would not settle it. So the record is
+    stronger: each case pins the **exact PHC string** `argon2-cffi` produces
+    for a given password *and a given salt*, which turns the question from "do
+    both sides accept each other's output" into "are both sides the same
+    function". Go recomputes the string from the recorded salt and must match
+    it byte for byte; a Go-written hash then differs from a Python-written one
+    only in the random salt, which travels inside the string.
+
+    Two assertions run here rather than in a test, because a fixture that
+    records something the project does not itself produce would prove the wrong
+    thing: every encoded hash must verify under the project's own
+    `PasswordHasher`, and none may be reported as needing a rehash -- which is
+    what pins the parameters to `passwords.MEMORY_COST_KIB` and friends rather
+    than to numbers written twice.
+
+    The SHA-256 half is the token hash both `sessions.py` and `tokens.py`
+    store. It is a one-liner on both sides and it is recorded anyway, because
+    it is the other thing that would let a Go-minted session or invite be
+    invisible to Python -- and a fixture is cheaper than finding out.
+    """
+    from argon2.low_level import Type, hash_secret
+
+    from mtglab.auth import passwords, sessions, tokens
+
+    cases: list[dict[str, Any]] = []
+    for (note, password), salt in zip(_ARGON2_PASSWORDS, _ARGON2_SALTS,
+                                      strict=True):
+        encoded = hash_secret(
+            password.encode("utf-8"), salt,
+            time_cost=passwords.TIME_COST,
+            memory_cost=passwords.MEMORY_COST_KIB,
+            parallelism=passwords.PARALLELISM,
+            hash_len=32,          # argon2-cffi's DEFAULT_HASH_LENGTH
+            type=Type.ID,
+        ).decode("ascii")
+        # The fixture must be the project's own output, not merely valid
+        # Argon2: verify it through the hasher the app actually holds.
+        assert passwords.verify(encoded, password), note
+        assert not passwords.needs_rehash(encoded), (
+            f"{note}: the recorded parameters are not the ones "
+            "`passwords.py` asks for")
+        cases.append({
+            "note": note,
+            "password": password,
+            "salt_b64": base64.b64encode(salt).decode("ascii"),
+            "hash": encoded,
+        })
+
+    # Both modules hash a token the same way; recorded through both names so a
+    # divergence between them would fail here rather than in production.
+    token_inputs = ("", "a", "x" * 43, "🜂-a-token-with-unicode-in-it")
+    digests = [{"input": raw,
+                "digest": sessions._hash(raw)} for raw in token_inputs]
+    for entry in digests:
+        assert tokens._hash(entry["input"]) == entry["digest"]
+
+    return {
+        "argon2id": {
+            "params": {
+                "memory_cost_kib": passwords.MEMORY_COST_KIB,
+                "time_cost": passwords.TIME_COST,
+                "parallelism": passwords.PARALLELISM,
+                "salt_bytes": 16,
+                "hash_bytes": 32,
+            },
+            "min_password_length": passwords.MIN_PASSWORD_LENGTH,
+            "max_password_bytes": passwords.MAX_PASSWORD_BYTES,
+            "cases": cases,
+        },
+        "sha256_hex": digests,
+    }
+
+
+def render_crypto_cases() -> str:
+    return json.dumps(crypto_cases(), indent=1, ensure_ascii=False) + "\n"
+
+
 def write() -> None:
     TESTDATA.mkdir(parents=True, exist_ok=True)
     text, parsed = render()
@@ -1233,14 +1656,20 @@ def write() -> None:
     print(f"wrote {SCHEMA_PATH}\nwrote {TINY_POOL_PATH}")
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     (LOG_DIR / "describe.json").write_text(render_log_cases(), encoding="utf-8")
-    (LOG_DIR / "app_schema.sql").write_text(render_app_schema(), encoding="utf-8")
-    print(f"wrote the log oracle and app.db's schema into {LOG_DIR}")
+    print(f"wrote the log oracle into {LOG_DIR}")
+    APP_SCHEMA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    APP_SCHEMA_PATH.write_text(render_app_schema(), encoding="utf-8")
+    print(f"wrote app.db's schema into {APP_SCHEMA_PATH}")
     EDITS_PATH.parent.mkdir(parents=True, exist_ok=True)
     EDITS_PATH.write_text(render_edit_cases(), encoding="utf-8")
     print(f"wrote {EDITS_PATH}")
     DUMPS_PATH.parent.mkdir(parents=True, exist_ok=True)
     DUMPS_PATH.write_text(render_dump_cases(), encoding="utf-8")
-    print(f"wrote {len(dump_cases())} dump cases into {DUMPS_PATH}")
+    print(f"wrote {len(dump_cases()) + len(dump_from_text())} dump cases "
+          f"into {DUMPS_PATH}")
+    ARTIFACTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ARTIFACTS_PATH.write_text(render_artifact_cases(), encoding="utf-8")
+    print(f"wrote {len(artifact_cases())} artifact cases into {ARTIFACTS_PATH}")
     DECKLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
     DECKLIST_PATH.write_text(render_decklist_cases(), encoding="utf-8")
     print(f"wrote {len(decklist_cases())} decklist cases into {DECKLIST_PATH}")
@@ -1254,6 +1683,396 @@ def write() -> None:
     for name, body in render_gate_cases().items():
         (GATE_DIR / name).write_text(body, encoding="utf-8")
     print(f"wrote {len(render_gate_cases())} gate cases into {GATE_DIR}")
+    CRYPTO_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CRYPTO_PATH.write_text(render_crypto_cases(), encoding="utf-8")
+    print(f"wrote the Argon2id and token-hash oracle into {CRYPTO_PATH}")
+    PYRAND_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PYRAND_PATH.write_text(render_pyrand_cases(), encoding="utf-8")
+    print(f"wrote the draw corpus for {len(PYRAND_SEEDS)} seeds into {PYRAND_PATH}")
+
+
+# ------------------------------------------------------------------ pyrand
+#
+# CPython's `random.Random`, reproduced in Go (PLAN section 5 item 3), and the
+# corpus that says the reproduction is exact rather than merely plausible.
+#
+# Three things make this corpus different from every other one in this file.
+#
+# **It records the generator, not only its consumers.** `getrandbits(32)` is
+# one `genrand_uint32()` word and nothing else -- CPython's fast path is
+# `genrand_uint32(self) >> (32 - k)` -- so `words` below is the raw Mersenne
+# Twister stream, the only place a seeding or twist bug can be seen *as* a
+# seeding or twist bug. Every other section consumes that stream through a
+# method, and a mismatch there with `words` matching localises the fault to
+# the consumer. That distinction is the whole reason this corpus has a layer
+# nothing in the app calls directly.
+#
+# **The floats are compared as bits.** `random()` is
+# `(a >> 5) * 67108864.0 + (b >> 6)) * (1.0 / 9007199254740992.0)` over two
+# words, in that order; every value it can produce is exactly representable,
+# so a tolerance would be hiding something rather than allowing for something.
+# They are stored as `math.Float64bits`.
+#
+# **The seeds are strings.** `random.Random(n)` takes an int of any size and
+# splits `abs(n)` into little-endian 32-bit words for `init_by_array`, so the
+# number of words -- and therefore the whole stream -- changes at 2**32 and
+# again at 2**64. A JSON number would not survive the round trip, and the
+# seeds past 2**64 are exactly the ones worth having.
+#
+# Everything here is stdlib CPython and takes no pool, no network and no deck.
+
+#: Where the Go module reads the draw corpus from.
+PYRAND_PATH = ROOT / "go" / "internal" / "pyrand" / "testdata" / "draws.json"
+
+#: The seeds the corpus is generated over, chosen so that every branch of
+#: CPython's seeding path is taken by something: zero (`bits == 0`, so one
+#: word of nothing), the small ints real callers pass, both sides of 2**32
+#: and of 2**64 (where `keyused` grows), a seed past 2**96, and negatives --
+#: which `random_seed` runs through `abs()`, so -7 and 7 are the same stream
+#: and the corpus proves it rather than asserting it.
+PYRAND_SEEDS: tuple[int, ...] = (
+    0, 1, 2, 7, 42, 99, 4096, 20260810, 2147483647,
+    4294967295, 4294967296, 4294967297,
+    18446744073709551615, 18446744073709551616, 18446744073709551617,
+    79228162514264337593543950337,
+    -1, -7, -20260810, -4294967296,
+)
+
+#: The seeds that get the full-width sections. The rest get a narrower slice
+#: of the same shapes: seeding breadth is what the wide set buys, and it is
+#: bought by `words`, which every seed gets in full.
+PYRAND_CORE_SEEDS: tuple[int, ...] = (0, 1, 20260810, 4294967296,
+                                      18446744073709551616, -7)
+
+#: How many raw words each seed records. 700 crosses MT19937's 624-word
+#: regeneration boundary, which is where a wrong twist first shows and where a
+#: generator that is merely *seeded* right stops being right.
+PYRAND_WORDS = 700
+
+#: Every bit width `getrandbits` is asked for. 1 through 64 covers the fast
+#: path (k <= 32, one word), the two-word path, and the boundary at exactly
+#: 32 and 64 where the last word's `r >>= (32 - k)` is and is not applied.
+PYRAND_BITS = tuple(range(1, 65))
+
+#: A width sequence drawn from one generator, so the corpus also says the
+#: state threads correctly between calls of *different* widths -- a bug that
+#: a per-width sweep from a fresh generator cannot see.
+PYRAND_BITS_MIXED = (1, 3, 7, 8, 15, 16, 17, 31, 32, 33, 53, 64, 5, 2, 64, 32)
+
+#: The bounds `_randbelow` is asked for. Powers of two and their neighbours,
+#: because `k = n.bit_length()` makes the rejection rate jump there: at
+#: n = 2**k the loop never rejects, and at n = 2**k + 1 it rejects almost
+#: half the time. A port that gets the rejection wrong agrees on the first
+#: draw and diverges on the tenth. 1 is in the list on purpose -- it always
+#: returns 0 and is never free, because `getrandbits(1)` is redrawn until it
+#: comes up 0.
+PYRAND_BELOW = (
+    1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65,
+    99, 100, 255, 256, 257, 1000, 4096, 1000000,
+    2147483647, 2147483648, 4294967295, 4294967296, 4294967297,
+    9007199254740992, 4611686018427387904,
+)
+
+#: The `randrange` forms, as `(start, stop, step)` with `None` for absent.
+#: Only the one-argument form has a caller in the served package (tarot's
+#: `randrange(2**31)`, the wheel's three) -- the rest are here because they
+#: are the same `_randbelow` reached by different arithmetic, and arithmetic
+#: is cheap to get wrong in a language with different integer division.
+PYRAND_RANGES: tuple[tuple[int, int | None, int | None], ...] = (
+    (10, None, None), (2, None, None), (1, None, None),
+    (10, 20, None), (-5, 5, None), (-20, -10, None), (1, 2, None),
+    (0, 100, 7), (0, 10, 3), (5, 6, 1), (-100, -1, 3),
+    (100, 0, -7), (10, -10, -3), (0, -1, -1),
+)
+
+#: Deck-sized and degenerate lengths for `shuffle`. 0 and 1 draw nothing at
+#: all (the loop is `reversed(range(1, len(x)))`); 99 is a Commander deck,
+#: which is the length Tier 1 actually shuffles.
+PYRAND_SHUFFLES = (0, 1, 2, 3, 4, 5, 7, 13, 52, 60, 99, 100, 101, 250)
+
+#: What a seed outside the core set still gets shuffled.
+PYRAND_SHUFFLES_NARROW = (13, 99)
+
+
+def _pyrand_seed_case(seed: int, core: bool) -> dict[str, Any]:
+    """Every draw one seed produces, each section from its own generator.
+
+    A fresh `random.Random` per section is deliberate: it makes each section
+    independently checkable, so a Go test that fails one of them has not been
+    put out of step by an earlier one.
+    """
+    case: dict[str, Any] = {"seed": str(seed)}
+
+    #: The raw stream. `getrandbits(32)` is exactly `genrand_uint32()`.
+    rng = random.Random(seed)
+    case["words"] = [rng.getrandbits(32) for _ in range(PYRAND_WORDS)]
+
+    rng = random.Random(seed)
+    case["randoms"] = [_float_bits(rng.random())
+                       for _ in range(120 if core else 40)]
+
+    rng = random.Random(seed)
+    case["bits_mixed"] = [
+        {"k": k, "value": rng.getrandbits(k)}
+        for _ in range(3) for k in PYRAND_BITS_MIXED
+    ]
+
+    #: `randrange(n)` is `_randbelow(n)` for n > 0 and reaches it through the
+    #: public door, so the corpus never touches a private name.
+    rng = random.Random(seed)
+    case["below"] = [
+        {"n": n, "value": rng.randrange(n)}
+        for _ in range(3 if core else 1) for n in PYRAND_BELOW
+    ]
+
+    rng = random.Random(seed)
+    ranges: list[dict[str, Any]] = []
+    for _ in range(3 if core else 1):
+        for start, stop, step in PYRAND_RANGES:
+            if stop is None:
+                value = rng.randrange(start)
+            elif step is None:
+                value = rng.randrange(start, stop)
+            else:
+                value = rng.randrange(start, stop, step)
+            ranges.append({"start": start, "stop": stop, "step": step,
+                           "value": value})
+    case["ranges"] = ranges
+
+    lengths = PYRAND_SHUFFLES if core else PYRAND_SHUFFLES_NARROW
+    case["shuffles"] = []
+    for n in lengths:
+        rng = random.Random(seed)
+        order = list(range(n))
+        rng.shuffle(order)
+        case["shuffles"].append({"n": n, "order": order})
+
+    #: Ten shuffles from *one* generator, which is Tier 1's exact shape: one
+    #: `random.Random(seed)` per run, one shuffle per mulligan, all games.
+    rng = random.Random(seed)
+    repeated: list[list[int]] = []
+    for _ in range(10):
+        order = list(range(99))
+        rng.shuffle(order)
+        repeated.append(order)
+    case["repeated_99"] = repeated
+
+    rng = random.Random(seed)
+    case["choices"] = [rng.choice(range(7)) for _ in range(24)]
+
+    return case
+
+
+def _float_bits(value: float) -> int:
+    """`math.Float64bits`, so a double is compared as the bits it is."""
+    return int(struct.unpack("<Q", struct.pack("<d", value))[0])
+
+
+def pyrand_bits_sweep() -> list[dict[str, Any]]:
+    """`getrandbits(k)` for every k in 1..64, each from a fresh generator.
+
+    Separated from the per-seed sections because what it isolates is the
+    *width* arithmetic -- how many words k consumes and which one gets
+    shifted -- and mixing that with state threading would leave a failure
+    ambiguous between the two.
+    """
+    out: list[dict[str, Any]] = []
+    for seed in PYRAND_CORE_SEEDS:
+        for k in PYRAND_BITS:
+            rng = random.Random(seed)
+            out.append({"seed": str(seed), "k": k,
+                        "values": [rng.getrandbits(k) for _ in range(4)]})
+    return out
+
+
+class _Recording(random.Random):
+    """A `random.Random` that keeps a note of everything it was asked.
+
+    Tier 1 is not ported here -- that is Phase 5's own job -- so the strongest
+    honest claim this corpus can make about `REFERENCE_DIGEST` is that the Go
+    generator produces the *stream the digest is computed over*. This is the
+    instrument that reads that stream off a real reference run.
+
+    It works because of a fact about the engine worth writing down: Tier 1
+    consumes randomness through exactly one call, `rng.shuffle(deck)` in
+    `simulate_game`, and through nothing else. So the whole entropy budget of
+    a run is a sequence of shuffles of a known length, and a shuffle of length
+    L is exactly `_randbelow(i + 1)` for i from L-1 down to 1. Record the
+    lengths and the returns and you have described the run's randomness
+    completely, without needing a single card fact.
+
+    Both overrides delegate: `_randbelow` returns what CPython's
+    `_randbelow_with_getrandbits` returns, so the instrument consumes nothing
+    and changes nothing. `render_pyrand_cases` proves that rather than
+    claiming it -- it re-runs the digest under instrumentation and refuses to
+    write a corpus if `REFERENCE_DIGEST` moved.
+    """
+
+    def __init__(self, x: Any = None) -> None:
+        super().__init__(x)
+        self.pyrand_seed = x
+        self.pyrand_lengths: list[int] = []
+        self.pyrand_draws: list[tuple[int, int]] = []
+        _RECORDED.append(self)
+
+    def _randbelow(self, n: int) -> int:
+        value = int(super()._randbelow(n))  # type: ignore[misc]
+        self.pyrand_draws.append((n, value))
+        return value
+
+    def shuffle(self, x: Any) -> None:
+        self.pyrand_lengths.append(len(x))
+        super().shuffle(x)
+
+
+#: Every `_Recording` built while the patch is in place, in construction
+#: order -- which is the order `reference_outputs()` builds them in.
+_RECORDED: list[_Recording] = []
+
+#: How many draws either end of a generator's stream are recorded verbatim.
+#: A digest is opaque, and this repository has already learned once that an
+#: opaque golden can stay stable while the thing under it stops happening
+#: (`test_the_reference_run_is_the_shape_the_digest_assumes`). These are the
+#: shape beside the digest: a Go run that matches them and misses the digest
+#: has diverged somewhere in the middle, which is a different bug from one
+#: that never agreed at all.
+PYRAND_TIER1_SAMPLE = 8
+
+
+def _draw_digest(draws: list[tuple[int, int]]) -> str:
+    """sha256 over a draw sequence, defined so Go can compute it too.
+
+    One draw per line as `n:value`, decimal, `\\n`-separated with a trailing
+    newline. `n` is in the hash as well as the return, so the digest pins the
+    *order the shuffle loop asks in* -- `reversed(range(1, len(x)))` -- and
+    not only what came back.
+    """
+    text = "".join(f"{n}:{value}\n" for n, value in draws)
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def pyrand_tier1_stream() -> dict[str, Any]:
+    """The draw sequence `REFERENCE_DIGEST` is computed over.
+
+    Runs `determinism_probe.reference_outputs()` with `random.Random` patched
+    to the recorder above, then reports, per generator the run built: the seed
+    it was given, the lengths it was asked to shuffle in order, how many draws
+    that came to, the first and last few verbatim, and a digest of all of
+    them.
+
+    The patch is global for the duration and restored in a `finally`, because
+    `engine.run` builds its generator itself -- there is no seam to inject one
+    through, and inventing one for a test would be changing the thing under
+    measurement.
+    """
+    import determinism_probe as probe
+
+    original = random.Random
+    _RECORDED.clear()
+    try:
+        random.Random = _Recording  # type: ignore[misc]
+        digest = probe.reference_digest()
+    finally:
+        random.Random = original  # type: ignore[misc]
+
+    generators = []
+    for rng in _RECORDED:
+        draws = rng.pyrand_draws
+        generators.append({
+            "seed": str(rng.pyrand_seed),
+            "lengths": list(rng.pyrand_lengths),
+            "draws": len(draws),
+            "first": [{"n": n, "value": v}
+                      for n, v in draws[:PYRAND_TIER1_SAMPLE]],
+            "last": [{"n": n, "value": v}
+                     for n, v in draws[-PYRAND_TIER1_SAMPLE:]],
+            "digest": _draw_digest(draws),
+        })
+    return {
+        "reference_digest": digest,
+        "seed": str(probe.SEED),
+        "games": probe.GAMES,
+        "turns": probe.TURNS,
+        "sweep_counts": list(probe.SWEEP_COUNTS),
+        "generators": generators,
+    }
+
+
+def _compact_json(obj: Any, indent: int = 0) -> str:
+    """JSON that keeps a draw sequence on one line.
+
+    `indent=1` -- what every other corpus in this file uses -- would put each
+    of the 14,000 words on a line of its own. One line per *sequence* is both
+    smaller and the granularity a diff wants: a changed stream shows as one
+    changed line naming its seed.
+    """
+    pad = " " * indent
+    if isinstance(obj, dict):
+        if not obj:
+            return "{}"
+        if all(v is None or isinstance(v, (bool, int, float, str))
+               for v in obj.values()):
+            return json.dumps(obj, ensure_ascii=False)
+        body = ",\n".join(f"{pad} {json.dumps(k)}: {_compact_json(v, indent + 1)}"
+                          for k, v in obj.items())
+        return "{\n" + body + "\n" + pad + "}"
+    if isinstance(obj, list):
+        if not obj:
+            return "[]"
+        if all(isinstance(v, int) and not isinstance(v, bool) for v in obj):
+            return json.dumps(obj)
+        body = ",\n".join(f"{pad} {_compact_json(v, indent + 1)}" for v in obj)
+        return "[\n" + body + "\n" + pad + "]"
+    return json.dumps(obj, ensure_ascii=False)
+
+
+def pyrand_floor_div() -> list[dict[str, int]]:
+    """Python's `//` over the numerators and divisors `randrange` builds.
+
+    `randrange` counts its steps with floor division, and Go's `/` truncates
+    towards zero. The two disagree only for a quotient that is negative and
+    inexact -- and, worked through, every such case describes an empty range,
+    which both implementations then refuse. So no *successful* `randrange`
+    can tell the two apart, and the corpus above cannot pin the difference:
+    a Go port that truncated would pass every case in it.
+
+    That is an argument, and this file's standing rule is that an argument
+    about equivalence is a thing to check rather than a thing to believe. So
+    the division itself gets a corpus, taken from Python, covering the signs
+    the argument turns on. It is the only section here that records something
+    no caller can reach -- deliberately, because unreachable-by-argument is
+    exactly the claim that rots.
+    """
+    out: list[dict[str, int]] = []
+    for a in (-13, -12, -7, -3, -1, 0, 1, 3, 7, 12, 13, 100, -100):
+        for b in (-7, -3, -2, -1, 1, 2, 3, 7):
+            out.append({"a": a, "b": b, "want": a // b})
+    return out
+
+
+def pyrand_cases() -> dict[str, Any]:
+    """The whole corpus, as the Go module reads it."""
+    return {
+        "note": ("Generated from CPython's own random.Random by "
+                 "`python tests/go_fixtures.py`. Seeds are strings because "
+                 "they outgrow a JSON number; floats are Float64bits."),
+        "cross_version": ("These bytes must be identical on every CPython this "
+                          "project supports. Nothing here records which one "
+                          "wrote them, deliberately: the drift test in "
+                          "tests/test_go_fixtures.py re-renders the corpus and "
+                          "compares, and CI runs it on each version in the "
+                          "matrix -- so cross-version stability is re-proven on "
+                          "every push rather than asserted once in a comment."),
+        "seeds": [_pyrand_seed_case(seed, seed in PYRAND_CORE_SEEDS)
+                  for seed in PYRAND_SEEDS],
+        "bits_sweep": pyrand_bits_sweep(),
+        "floor_div": pyrand_floor_div(),
+        "tier1": pyrand_tier1_stream(),
+    }
+
+
+def render_pyrand_cases() -> str:
+    return _compact_json(pyrand_cases()) + "\n"
 
 
 if __name__ == "__main__":

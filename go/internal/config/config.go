@@ -80,3 +80,51 @@ func AdminEmail() string { return strings.TrimSpace(os.Getenv("MTGLAB_ADMIN_EMAI
 // AdminUsername is MTGLAB_ADMIN_USERNAME, the maintainer's handle when it
 // is not to be derived from the address.
 func AdminUsername() string { return strings.TrimSpace(os.Getenv("MTGLAB_ADMIN_USERNAME")) }
+
+// BaseURL is where this instance answers, for links that have to work in an
+// inbox. MTGLAB_BASE_URL, no trailing slash.
+//
+// An invite or a reset is a URL somebody clicks days later in another
+// application, so it cannot be relative and cannot be guessed from the
+// request -- a `Host` header is client-supplied, and building a password-reset
+// link out of one is how a reset lands on an attacker's domain. It is
+// configuration, and it is **wrong-by-default rather than absent**: the local
+// port is what `mtglab ui` serves on, so a laptop needs no setting and a
+// deployment that forgets one sends links to localhost, which is visibly
+// broken rather than quietly hijackable.
+func BaseURL() string {
+	if v := strings.TrimRight(strings.TrimSpace(os.Getenv("MTGLAB_BASE_URL")), "/"); v != "" {
+		return v
+	}
+	return "http://127.0.0.1:8765"
+}
+
+// EmailFrom is the From address on invites and resets. MTGLAB_EMAIL_FROM.
+//
+// Resend refuses anything outside a verified sending domain, so this is a
+// deploy-day setting rather than a preference (`docs/HOSTING.md` §7). The
+// default is only ever seen by the console sender.
+func EmailFrom() string {
+	if v := strings.TrimSpace(os.Getenv("MTGLAB_EMAIL_FROM")); v != "" {
+		return v
+	}
+	return "mtglab <no-reply@localhost>"
+}
+
+// ClientIPHeader names the header a trusted proxy sets to the real client IP,
+// or empty.
+//
+// Unset by default, and deliberately so: rate limiting keyed on a header any
+// client can send is rate limiting an attacker opts out of by typing a
+// different number. Set this (`Fly-Client-IP`, `X-Forwarded-For`) only when a
+// proxy you control is guaranteed to overwrite it on the way in.
+func ClientIPHeader() string {
+	return strings.TrimSpace(os.Getenv("MTGLAB_CLIENT_IP_HEADER"))
+}
+
+// ResendAPIKey is the transactional mail provider's key, read at call time.
+//
+// The one secret this package names, and it is named rather than held because
+// the sender has to put it in a header itself -- unlike ANTHROPIC_API_KEY,
+// which the SDK reads on its own and which nothing here should ever copy.
+func ResendAPIKey() string { return strings.TrimSpace(os.Getenv("RESEND_API_KEY")) }

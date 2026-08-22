@@ -527,9 +527,101 @@ go/                       the Go module (ADR 38; module path
                           Create/Delete/SetShared complete the write side --
                           so create, import, delete and sharing answer from
                           the door. None of the four is in the activity log,
-                          because none of them is in `_commit` (ADR 28). The
-                          artifacts rebuild is deliberately NOT in it and is
-                          its own flip. The contract
+                          because none of them is in `_commit` (ADR 28).
+                          **Then the renderer, 2026-08-22, and it flipped
+                          nothing either**: internal/artifacts is
+                          artifacts/generate.py -- RenderAll returns the five
+                          deliverables as text, Store writes them and prunes
+                          the ones this build did not make, Deliverables is
+                          the served set and the path guard in one, and a
+                          draft is refused in its own words. Held to Python by
+                          an oracle of 18 decks, byte for byte and in the
+                          order Store writes, with the date pinned so it does
+                          not expire at midnight. Its first job was the
+                          notes: deckyaml.ParseOrdered keeps every mapping's
+                          key order and Deck.Notes is one, because the
+                          snapshot is a dump of a *parsed* deck and
+                          `sort_keys=False` makes the file's order the
+                          payload's. Dump refused a deck carrying notes until
+                          that landed, which is the expiry that refusal named
+                          for itself -- and ordering them **fixed a live
+                          regression**: the deck page's Notes tab renders the
+                          payload's order unsorted, so from #226 (v159) until
+                          #233 a deliberate reading order rendered
+                          alphabetised on the deployed instance. **Then the
+                          rebuild route, its own flip**: POST .../artifacts
+                          in internal/api/artifacts.go over the Sources'
+                          fifth write verb, a PLAIN route because 70-83ms was
+                          measured, and NOT through `commit` -- a build
+                          derives files from a deck rather than editing one,
+                          so ADR 28 has nothing to record.
+                          **The accounts engine followed the
+                          same day and also flipped nothing**: internal/auth
+                          grew the whole of `mtglab/auth` beside its read
+                          side -- accounts, single-use tokens, the
+                          fixed-window limiter, the EmailSender seam (no Go
+                          test sends mail either) -- plus internal/tiers,
+                          since `model_tier` is a column every serialised
+                          account carries. Its write handle is `mode=rw`
+                          like the log's, and **an absent app.db is read as
+                          an EMPTY one**: measured, Python creates the file
+                          on the first login and answers 401 against it, and
+                          a reader cannot tell empty from absent. The
+                          Argon2id claim is held to Python by
+                          auth/testdata/crypto.json -- the exact PHC string
+                          argon2-cffi writes for a password AND a fixed
+                          salt, which Go must reproduce byte for byte,
+                          because a round trip in each direction would pass
+                          even if the two encoders disagreed about base64
+                          padding for some salts and not others.
+                          `auth/authtest` is where app.db's generated schema
+                          lives now: four packages had each transcribed the
+                          ladder by hand and frozen it at a different rung,
+                          and two of them broke the day `model_tier` was
+                          first read. **Then the accounts flipped**: eleven
+                          of the twelve registrations under /api/auth and
+                          /api/admin/users answer from the door
+                          (internal/api/accounts.go and admin.go). The
+                          twelfth, DELETE /api/admin/users/{username}, is
+                          deliberately still Python's -- it calls
+                          jobs.forget_owner on a registry held in the uvicorn
+                          process's memory, and `users.id` is re-issued by
+                          SQLite, so jobs left keyed on a freed id would be
+                          handed to the next account created. The six
+                          /api/admin/stats/* routes are not Phase 4's either,
+                          for the same coupling plus claude/. A prefix is not
+                          a family. **internal/pyrand is CPython's
+                          `random.Random`, bit for bit** (2026-08-22) --
+                          Phase 5's named tail risk pulled forward and
+                          closed, and a library rather than a route: it
+                          flips nothing and nothing calls it yet. It exists
+                          because a seed is a promise -- Tier 1's every run,
+                          the tarot deal the browser holds a seed for, the
+                          Wheel's spin -- and a backend that merely shuffled
+                          *well* would deal a newcomer a different spread
+                          across the cutover. The three things a
+                          reimplementation gets wrong are all documented and
+                          all skippable: `random.Random(n)` seeds through
+                          `abs(n)` and `init_by_array` (NOT `init_genrand`,
+                          and the key grows a word at 2**32 and at 2**64),
+                          `getrandbits` fills words least-significant-first,
+                          and `_randbelow` rejects on `n.bit_length()` --
+                          not `(n-1)`'s. Held to CPython by
+                          `testdata/draws.json`, which `tests/go_fixtures.py`
+                          writes from a real interpreter: 20 seeds, the raw
+                          `genrand_uint32` stream recorded APART from every
+                          method that consumes it (so a failure says which
+                          half is wrong), `random()` compared as
+                          `Float64bits` rather than to a tolerance, and a
+                          replay of the reference run's whole 99,274-draw
+                          stream -- Tier 1 draws through `shuffle` and
+                          nothing else, so its randomness is checked before
+                          the engine that consumes it is written.
+                          Byte-identical under 3.11 and 3.12, and CI
+                          re-proves that on every matrix leg because nothing
+                          in the corpus names an interpreter. `sample()` is
+                          named in the plan and has NO CALLER; it is not
+                          there. The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —

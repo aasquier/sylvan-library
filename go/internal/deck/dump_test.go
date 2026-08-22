@@ -5,35 +5,44 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/aasquier/sylvan-library/go/internal/deckyaml"
 )
 
 // The dump oracle: `Deck.dump` over every field combination the two lifecycle
 // writers can produce, beside the exact bytes PyYAML gives for it
 // (`tests/go_fixtures.py`, which writes testdata/dumps.json).
 //
-// Driven as a round trip -- parse the recorded file, dump it again, compare
-// bytes -- rather than by rebuilding each fixture deck in Go, which would be
-// eight constructions free to drift from the eight Python ones. The round trip
-// catches everything either half could get wrong about a shape that survives a
-// parse: a key in the wrong order, a default asserted that should have been
-// omitted, a scalar quoted differently, a fold at the wrong column. The one
-// branch it cannot reach is the archetype the dump *drops*, which has its own
-// test below.
+// Driven as parse-then-dump -- read the case's source, dump it, compare bytes
+// with what Python's parse of that same source dumped to -- rather than by
+// rebuilding each fixture deck in Go, which would be a dozen constructions
+// free to drift from the dozen Python ones. It catches everything either half
+// could get wrong about a shape that survives a parse: a key in the wrong
+// order, a default asserted that should have been omitted, a scalar quoted
+// differently, a fold at the wrong column. The one branch it cannot reach is
+// the archetype the dump *drops*, which has its own test below.
+//
+// For a deck Python *constructed*, `source` is its own dump and this is the
+// round trip the oracle has always run. For the hand-written decks it is the
+// file a person typed, which is the only shape that proves anything about
+// reading one: a recorded dump has already been through PyYAML's choices, so
+// feeding it back in shows both parsers the tidied version and hides every
+// disagreement about the untidied one.
 func TestDumpWritesWhatPythonWrites(t *testing.T) {
 	raw, err := os.ReadFile("testdata/dumps.json")
 	if err != nil {
 		t.Fatalf("reading the oracle: %v", err)
 	}
-	var cases map[string]string
+	var cases map[string]struct{ Source, Want string }
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		t.Fatalf("decoding the oracle: %v", err)
 	}
 	if len(cases) == 0 {
 		t.Fatal("the oracle is empty; run `python tests/go_fixtures.py`")
 	}
-	for name, want := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			d, err := FromText(want, name)
+			d, err := FromText(c.Source, name)
 			if err != nil {
 				t.Fatalf("parsing the recorded file: %v", err)
 			}
@@ -41,9 +50,9 @@ func TestDumpWritesWhatPythonWrites(t *testing.T) {
 			if err != nil {
 				t.Fatalf("dumping: %v", err)
 			}
-			if got != want {
+			if got != c.Want {
 				t.Errorf("dump differs from Python's\n--- want ---\n%s\n--- got ---\n%s",
-					want, got)
+					c.Want, got)
 			}
 		})
 	}
@@ -97,20 +106,97 @@ func TestTheLegacyArchetypeIsDroppedOnceShadowed(t *testing.T) {
 	}
 }
 
-// Notes are refused rather than written in whatever order a Go map hands them
-// over. Neither lifecycle caller can reach it -- a created deck has none and
-// an imported one carries none across -- and a refusal is the honest answer
-// until something needs the ordering.
-func TestADeckWithNotesRefusesToDump(t *testing.T) {
+// The notes come back out in the order they went in, at every depth. Written
+// deliberately backwards through the alphabet, because a Go map iterated at
+// random passes an ordered assertion often enough to be useless and passes a
+// *reversed* one about one time in `n!`.
+func TestNotesKeepTheFilesOrder(t *testing.T) {
+	const text = `slug: ordered
+name: Ordered
+status: built
+stage: curated
+commander:
+  - Gyome, Master Chef
+notes:
+  wincons: Feed everybody, then stop.
+  pitfalls: The table remembers who fed them.
+  mulligan: Keep two lands and a sacrifice outlet.
+  gameplan: Cook.
+cards:
+  - name: Sol Ring
+    category: ramp
+    why: Two mana on turn one.
+`
+	d, err := FromText(text, "ordered")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	want := []string{"wincons", "pitfalls", "mulligan", "gameplan"}
+	for i, key := range want {
+		if d.Notes[i].Key != key {
+			t.Fatalf("note %d is %q, want %q", i, d.Notes[i].Key, key)
+		}
+	}
+	got, err := d.Dump()
+	if err != nil {
+		t.Fatalf("dump: %v", err)
+	}
+	if !strings.Contains(got, "notes:\n  wincons: Feed everybody, then stop.\n  pitfalls:") {
+		t.Fatalf("the dump reordered the notes:\n%s", got)
+	}
+	// And back again: a snapshot is parsed by the *next* build, so the order
+	// has to survive the round trip rather than only the first half of it.
+	again, err := FromText(got, "ordered")
+	if err != nil {
+		t.Fatalf("re-parse: %v", err)
+	}
+	if !again.SameAs(d) {
+		t.Fatalf("a round trip changed the deck:\n%s", got)
+	}
+	twice, err := again.Dump()
+	if err != nil || twice != got {
+		t.Fatalf("a second dump differs (%v):\n%s\n---\n%s", err, got, twice)
+	}
+}
+
+// A deck whose notes are the same pairs in a different order is a *different*
+// deck to `_baseline_state`, because in Python that comparison is `dump() ==
+// dump()` and the two files differ. A Go map would have called them equal and
+// reported artifacts as `current` that were not.
+func TestReorderedNotesAreADifferentDeck(t *testing.T) {
+	head := "slug: d\nname: D\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\n"
+	tail := "cards:\n  - name: Sol Ring\n    category: ramp\n    why: Two mana.\n"
+	one, err := FromText(head+"notes:\n  a: first\n  b: second\n"+tail, "d")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	other, err := FromText(head+"notes:\n  b: second\n  a: first\n"+tail, "d")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if one.SameAs(other) {
+		t.Fatal("two note orders must not compare equal: their dumps differ")
+	}
+}
+
+// The refusal that outlived the notes. A strategy that is not prose still
+// cannot be written, for the reason the notes could not be until they were
+// ordered -- a hand-edited file may hold anything and `FromText` passes it
+// through -- and a note holding a mapping is written now rather than refused,
+// because the parse keeps its order too.
+func TestAStrategyThatIsNotProseRefusesToDump(t *testing.T) {
 	d := &Deck{Slug: "d", Name: "D", Status: "built", Stage: "curated",
 		Commander: []string{"Gyome, Master Chef"},
-		Notes:     map[string]any{"mulligan": "Keep two lands."}}
+		Strategy:  map[string]any{"plan": "not prose"}}
 	if _, err := d.Dump(); err == nil {
-		t.Fatal("a deck with notes must not be dumped in map order")
+		t.Fatal("a strategy that is not prose must not be dumped")
 	}
-	d.Notes = nil
-	d.Strategy = map[string]any{"plan": "not prose"}
+	// A note the emitter has no way to write is the same refusal one field
+	// over: Python reaches it as a traceback out of `_note`, and both sides
+	// answer 500.
+	d.Strategy = ""
+	d.Notes = deckyaml.Map{{Key: "mulligan", Value: 1.5}}
 	if _, err := d.Dump(); err == nil {
-		t.Fatal("a strategy that is not prose must not be dumped either")
+		t.Fatal("a note the emitter cannot write must not be dumped")
 	}
 }

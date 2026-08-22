@@ -1,0 +1,427 @@
+{
+ "today": "2026-08-22",
+ "cards": {
+  "Sol Ring": "{1}",
+  "Forest": null,
+  "Swords to Plowshares": "{W}",
+  "Cultivator Colossus": "{5}{G}{G}",
+  "Vorinclex, Voice of Hunger": "{6}{G}{G}"
+ },
+ "cases": [
+  {
+   "name": "bare",
+   "deck": "slug: bare\nname: Bare\nstatus: theoretical\nstage: curated\ncommander: []\nbracket: 0\ncards:\n  - name: Forest\n    category: land\n    why: Green.\n    qty: 99\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# Bare — Quick Start\n\n**Commander:** (no commander set)  \n**Size:** 99 + commander\n\n## What this deck does\n\n_(set `strategy:` in deck.yaml)_\n\n## The 30-second version\n\n_(set `notes.gameplan` in deck.yaml)_\n\n## Mulligan rule\n\n_(set `notes.mulligan` — derive it from a Tier 1 sweep)_\n\n## Turn-by-turn shape\n\n_(set `notes.curve_plan`)_\n\n## Three things that will kill you\n\n_(set `notes.pitfalls`)_\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n| Lands | 99 |\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# Bare — Advanced Primer\n\n**Commander:** (no commander set)  \n**Size:** 99 + commander\n\n## Core engine\n\n_(set `notes.engine_detail` in deck.yaml)_\n\n## Lines and sequencing\n\n_(set `notes.lines` in deck.yaml)_\n\n## Win conditions\n\n_(set `notes.wincons` in deck.yaml)_\n\n## Mana base notes\n\n_(set `notes.manabase` in deck.yaml)_\n\n## Matchups\n\n_(set `notes.matchups` in deck.yaml)_\n\n## Politics and table talk\n\n_(set `notes.politics` in deck.yaml)_\n\n## Failure modes and how to recover\n\n_(set `notes.failure_modes` in deck.yaml)_\n\n## Sideboard / swap philosophy\n\n_(set `notes.swap_philosophy` in deck.yaml)_\n\n## Rules corners worth knowing\n\n_(set `notes.rules_corners` in deck.yaml)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# Bare — Annotated Decklist\n\n**Commander:** (no commander set)  \n**Size:** 99 + commander\n\n## Lands (99)\n\n- **99x Forest** — Green.\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "99 Forest\n"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: bare\nname: Bare\nstatus: theoretical\nstage: curated\ncommander: []\nbracket: 0\ncards:\n  - name: Forest\n    category: land\n    why: Green.\n    qty: 99\n"
+    }
+   ]
+  },
+  {
+   "name": "created",
+   "deck": "slug: created\nname: Gyome, Master Chef\nstatus: theoretical\nstage: draft\ncommander:\n  - Gyome, Master Chef\ncards: []\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": false,
+   "error": "created is a draft, and the artifacts are the shareable surface. every card is justified -- set `stage: curated` to promote it"
+  },
+  {
+   "name": "created-paired",
+   "deck": "slug: created-paired\nname: Ishai and Kraum\nstatus: built\nstage: draft\ncommander:\n  - Ishai, Ojutai Dragonspeaker\n  - Kraum, Ludevic's Opus\ncompanion: Kaheera, the Orphanguard\nbracket: 5\ncards: []\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": false,
+   "error": "created-paired is a draft, and the artifacts are the shareable surface. every card is justified -- set `stage: curated` to promote it"
+  },
+  {
+   "name": "curated-full",
+   "deck": "slug: curated-full\nname: Everything At Once\nstatus: built\nstage: curated\ncommander:\n  - Trostani, Selesnya's Voice\nshared: false\npilot: Aaron's sister\ncommander_art: 0aae2e33-1111-4000-8000-000000000000\ncompanion: Kaheera, the Orphanguard\nbracket: 4\nthemes:\n  - tokens\n  - lifegain\n  - midrange\nstrategy: Make more creatures than anybody can answer, and then make each of them worth answering twice.\ncards:\n  - name: Forest\n    category: land\n    why: Green mana, and a great deal of it.\n    qty: 12\n  - name: Sol Ring\n    category: ramp\n    why: Two mana on turn one, and it always has been.\n    scryfall_id: 0aae2e33-2222-4000-8000-000000000000\n    mana_cost: '{1}'\n    tags:\n      - fast\n      - colourless\ngraveyard:\n  - name: Primeval Titan\n    category: ramp\n    why: Banned, and buried until it is not.\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# Everything At Once — Quick Start\n\n**Commander:** Trostani, Selesnya's Voice  \n**Companion:** Kaheera, the Orphanguard *(outside the 100)*  \n**Bracket:** 4  \n**Size:** 13 + commander\n\n## What this deck does\n\nMake more creatures than anybody can answer, and then make each of them worth answering twice.\n\n## The 30-second version\n\n_(set `notes.gameplan` in deck.yaml)_\n\n## Mulligan rule\n\n_(set `notes.mulligan` — derive it from a Tier 1 sweep)_\n\n## Turn-by-turn shape\n\n_(set `notes.curve_plan`)_\n\n## Three things that will kill you\n\n_(set `notes.pitfalls`)_\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n| Ramp & Mana Acceleration | 1 |\n| Lands | 12 |\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# Everything At Once — Advanced Primer\n\n**Commander:** Trostani, Selesnya's Voice  \n**Companion:** Kaheera, the Orphanguard *(outside the 100)*  \n**Bracket:** 4  \n**Size:** 13 + commander\n\n## Core engine\n\n_(set `notes.engine_detail` in deck.yaml)_\n\n## Lines and sequencing\n\n_(set `notes.lines` in deck.yaml)_\n\n## Win conditions\n\n_(set `notes.wincons` in deck.yaml)_\n\n## Mana base notes\n\n_(set `notes.manabase` in deck.yaml)_\n\n## Matchups\n\n_(set `notes.matchups` in deck.yaml)_\n\n## Politics and table talk\n\n_(set `notes.politics` in deck.yaml)_\n\n## Failure modes and how to recover\n\n_(set `notes.failure_modes` in deck.yaml)_\n\n## Sideboard / swap philosophy\n\n_(set `notes.swap_philosophy` in deck.yaml)_\n\n## Rules corners worth knowing\n\n_(set `notes.rules_corners` in deck.yaml)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# Everything At Once — Annotated Decklist\n\n**Commander:** Trostani, Selesnya's Voice  \n**Companion:** Kaheera, the Orphanguard *(outside the 100)*  \n**Bracket:** 4  \n**Size:** 13 + commander\n\nMake more creatures than anybody can answer, and then make each of them worth answering twice.\n\n## Command Zone\n\n**Trostani, Selesnya's Voice** — _(set `notes.commander_why`)_\n\n## Ramp & Mana Acceleration (1)\n\n- **Sol Ring** `{1}` — Two mana on turn one, and it always has been.\n\n## Lands (12)\n\n- **12x Forest** — Green mana, and a great deal of it.\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "12 Forest\n1 Sol Ring\n\nSIDEBOARD:\n1 Trostani, Selesnya's Voice\n1 Kaheera, the Orphanguard\n"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: curated-full\nname: Everything At Once\nstatus: built\nstage: curated\ncommander:\n  - Trostani, Selesnya's Voice\nshared: false\npilot: Aaron's sister\ncommander_art: 0aae2e33-1111-4000-8000-000000000000\ncompanion: Kaheera, the Orphanguard\nbracket: 4\nthemes:\n  - tokens\n  - lifegain\n  - midrange\nstrategy: Make more creatures than anybody can answer, and then make each of them worth answering twice.\ncards:\n  - name: Forest\n    category: land\n    why: Green mana, and a great deal of it.\n    qty: 12\n  - name: Sol Ring\n    category: ramp\n    why: Two mana on turn one, and it always has been.\n    scryfall_id: 0aae2e33-2222-4000-8000-000000000000\n    mana_cost: '{1}'\n    tags:\n      - fast\n      - colourless\ngraveyard:\n  - name: Primeval Titan\n    category: ramp\n    why: Banned, and buried until it is not.\n"
+    }
+   ]
+  },
+  {
+   "name": "draft-owing",
+   "deck": "slug: draft-owing\nname: Owing\nstatus: theoretical\nstage: draft\ncommander:\n  - Goreclaw, Terror of Qal Sisma\ncards:\n  - name: Card 0\n    category: utility\n    why: ''\n  - name: Card 1\n    category: utility\n    why: ''\n  - name: Card 2\n    category: utility\n    why: ''\n  - name: Card 3\n    category: utility\n    why: ''\n  - name: Card 4\n    category: utility\n    why: ''\n  - name: Card 5\n    category: utility\n    why: ''\n  - name: Card 6\n    category: utility\n    why: ''\n  - name: Card 7\n    category: utility\n    why: ''\n  - name: Card 8\n    category: utility\n    why: ''\n  - name: Card 9\n    category: utility\n    why: ''\n  - name: Card 10\n    category: utility\n    why: ''\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": false,
+   "error": "draft-owing is a draft, and the artifacts are the shareable surface. 11 card(s) still need a `why`: Card 0, Card 1, Card 2, Card 3, Card 4, Card 5, Card 6, Card 7, and 3 more"
+  },
+  {
+   "name": "draft-settled",
+   "deck": "slug: draft-settled\nname: Settled\nstatus: built\nstage: draft\ncommander:\n  - Goreclaw, Terror of Qal Sisma\ncards:\n  - name: Forest\n    category: land\n    why: Green.\n    qty: 99\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": false,
+   "error": "draft-settled is a draft, and the artifacts are the shareable surface. every card is justified -- set `stage: curated` to promote it"
+  },
+  {
+   "name": "empty",
+   "deck": "slug: empty\nname: empty\nstatus: theoretical\nstage: draft\ncommander: []\ncards: []\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": false,
+   "error": "empty is a draft, and the artifacts are the shareable surface. every card is justified -- set `stage: curated` to promote it"
+  },
+  {
+   "name": "every-category",
+   "deck": "slug: every-category\nname: One Of Everything\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\ncompanion: Kaheera, the Orphanguard\nbracket: 4\nstrategy: A card in every category, so every heading renders.\ncards:\n  - name: Card 0\n    category: land\n    why: The land slot.\n  - name: Card 1\n    category: ramp\n    why: The ramp slot.\n  - name: Card 2\n    category: card-advantage\n    why: The card-advantage slot.\n  - name: Card 3\n    category: tutor\n    why: The tutor slot.\n  - name: Card 4\n    category: interaction\n    why: The interaction slot.\n  - name: Card 5\n    category: protection\n    why: The protection slot.\n  - name: Card 6\n    category: threat\n    why: The threat slot.\n  - name: Card 7\n    category: engine\n    why: The engine slot.\n  - name: Card 8\n    category: sac-outlet\n    why: The sac-outlet slot.\n  - name: Card 9\n    category: payoff\n    why: The payoff slot.\n  - name: Card 10\n    category: recursion\n    why: The recursion slot.\n  - name: Card 11\n    category: win-con\n    why: The win-con slot.\n  - name: Card 12\n    category: utility\n    why: The utility slot.\n  - name: Stax Piece\n    category: stax-piece\n    why: Invented.\n  - name: Aggro Plan\n    category: aggro-plan\n    why: Invented too.\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 30\n  - name: Sol Ring\n    category: ramp\n    qty: 2\nswap_board:\n  - name: Bag End Banquet\n    category: payoff\n    why: Waiting on a slot.\n  - name: Aetherflux Reservoir\n    category: win-con\n",
+   "previous": "slug: every-category\nname: One Of Everything\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\ncards:\n  - name: Card 0\n    category: land\n    why: The land slot.\n  - name: Cut With A Reason\n    category: ramp\n    why: It was here and now it is not.\n  - name: Cut With None\n    category: ramp\n  - name: Forest\n    category: land\n    why: Green.\n    qty: 30\n",
+   "prices": {
+    "Card 1": 12.5,
+    "Card 2": 12.5,
+    "Card 3": 0.25,
+    "Sol Ring": 1.995
+   },
+   "stats": [
+    [
+     "mulligan rate",
+     "12.4%"
+    ],
+    [
+     "spells through T8",
+     "9.1"
+    ]
+   ],
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# One Of Everything — Quick Start\n\n**Commander:** Gyome, Master Chef  \n**Companion:** Kaheera, the Orphanguard *(outside the 100)*  \n**Bracket:** 4  \n**Size:** 47 + commander\n\n## What this deck does\n\nA card in every category, so every heading renders.\n\n## The 30-second version\n\n_(set `notes.gameplan` in deck.yaml)_\n\n## Mulligan rule\n\n_(set `notes.mulligan` — derive it from a Tier 1 sweep)_\n\n## Turn-by-turn shape\n\n_(set `notes.curve_plan`)_\n\n## Three things that will kill you\n\n_(set `notes.pitfalls`)_\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n| Ramp & Mana Acceleration | 3 |\n| Card Advantage | 1 |\n| Tutors | 1 |\n| Interaction & Removal | 1 |\n| Protection | 1 |\n| Threats | 1 |\n| Engines | 1 |\n| Sacrifice Outlets | 1 |\n| Payoffs | 1 |\n| Recursion | 1 |\n| Win Conditions | 1 |\n| Utility | 1 |\n| aggro-plan | 1 |\n| stax-piece | 1 |\n| Lands | 31 |\n\n## Simulated consistency\n\n- **mulligan rate:** 12.4%\n- **spells through T8:** 9.1\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# One Of Everything — Advanced Primer\n\n**Commander:** Gyome, Master Chef  \n**Companion:** Kaheera, the Orphanguard *(outside the 100)*  \n**Bracket:** 4  \n**Size:** 47 + commander\n\n## Core engine\n\n_(set `notes.engine_detail` in deck.yaml)_\n\n## Lines and sequencing\n\n_(set `notes.lines` in deck.yaml)_\n\n## Win conditions\n\n_(set `notes.wincons` in deck.yaml)_\n\n## Mana base notes\n\n_(set `notes.manabase` in deck.yaml)_\n\n## Matchups\n\n_(set `notes.matchups` in deck.yaml)_\n\n## Politics and table talk\n\n_(set `notes.politics` in deck.yaml)_\n\n## Failure modes and how to recover\n\n_(set `notes.failure_modes` in deck.yaml)_\n\n## Sideboard / swap philosophy\n\n_(set `notes.swap_philosophy` in deck.yaml)_\n\n## Rules corners worth knowing\n\n_(set `notes.rules_corners` in deck.yaml)_\n\n## Simulation results\n\n- **mulligan rate:** 12.4%\n- **spells through T8:** 9.1\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# One Of Everything — Annotated Decklist\n\n**Commander:** Gyome, Master Chef  \n**Companion:** Kaheera, the Orphanguard *(outside the 100)*  \n**Bracket:** 4  \n**Size:** 47 + commander\n\nA card in every category, so every heading renders.\n\n## Command Zone\n\n**Gyome, Master Chef** — _(set `notes.commander_why`)_\n\n## Ramp & Mana Acceleration (3)\n\n- **Card 1** — The ramp slot.\n- **2x Sol Ring** `{1}` — _**no rationale recorded — this card should not ship**_\n\n## Card Advantage (1)\n\n- **Card 2** — The card-advantage slot.\n\n## Tutors (1)\n\n- **Card 3** — The tutor slot.\n\n## Interaction & Removal (1)\n\n- **Card 4** — The interaction slot.\n\n## Protection (1)\n\n- **Card 5** — The protection slot.\n\n## Threats (1)\n\n- **Card 6** — The threat slot.\n\n## Engines (1)\n\n- **Card 7** — The engine slot.\n\n## Sacrifice Outlets (1)\n\n- **Card 8** — The sac-outlet slot.\n\n## Payoffs (1)\n\n- **Card 9** — The payoff slot.\n\n## Recursion (1)\n\n- **Card 10** — The recursion slot.\n\n## Win Conditions (1)\n\n- **Card 11** — The win-con slot.\n\n## Utility (1)\n\n- **Card 12** — The utility slot.\n\n## Aggro-Plan (1)\n\n- **Aggro Plan** — Invented too.\n\n## Stax-Piece (1)\n\n- **Stax Piece** — Invented.\n\n## Lands (31)\n\n- **Card 0** — The land slot.\n- **30x Forest** — Green, and there is nothing else to be.\n\n## Swap Board (outside the 99)\n\n- **Aetherflux Reservoir** — _(no note)_\n- **Bag End Banquet** — Waiting on a slot.\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "1 Aggro Plan\n1 Card 0\n1 Card 1\n1 Card 10\n1 Card 11\n1 Card 12\n1 Card 2\n1 Card 3\n1 Card 4\n1 Card 5\n1 Card 6\n1 Card 7\n1 Card 8\n1 Card 9\n30 Forest\n2 Sol Ring\n1 Stax Piece\n\nSIDEBOARD:\n1 Gyome, Master Chef\n1 Kaheera, the Orphanguard\n"
+    },
+    {
+     "name": "swaps.md",
+     "text": "# One Of Everything — Swap List\n\n**2 out / 15 in**\n\n## Out\n\n- **Cut With A Reason** — It was here and now it is not.\n- **Cut With None** — _(cut)_\n\n## In\n\n- **Aggro Plan** — Invented too.\n- **Card 1** — The ramp slot.\n- **Card 10** — The recursion slot.\n- **Card 11** — The win-con slot.\n- **Card 12** — The utility slot.\n- **Card 2** — The card-advantage slot.\n- **Card 3** — The tutor slot.\n- **Card 4** — The interaction slot.\n- **Card 5** — The protection slot.\n- **Card 6** — The threat slot.\n- **Card 7** — The engine slot.\n- **Card 8** — The sac-outlet slot.\n- **Card 9** — The payoff slot.\n- **Sol Ring** — _(added)_\n- **Stax Piece** — Invented.\n\n## Shopping list\n\n| Card | Cheapest non-foil (USD) |\n| --- | ---: |\n| Card 1 | 12.50 |\n| Card 2 | 12.50 |\n| Sol Ring | 2.00 |\n| Card 3 | 0.25 |\n| Aggro Plan | _no price data_ |\n| Card 10 | _no price data_ |\n| Card 11 | _no price data_ |\n| Card 12 | _no price data_ |\n| Card 4 | _no price data_ |\n| Card 5 | _no price data_ |\n| Card 6 | _no price data_ |\n| Card 7 | _no price data_ |\n| Card 8 | _no price data_ |\n| Card 9 | _no price data_ |\n| Stax Piece | _no price data_ |\n| **Total (4 priced)** | **27.25** |\n\n### TCGplayer Mass Entry\n\nPaste into <https://www.tcgplayer.com/massentry>:\n\n```\n1 Aggro Plan\n1 Card 1\n1 Card 10\n1 Card 11\n1 Card 12\n1 Card 2\n1 Card 3\n1 Card 4\n1 Card 5\n1 Card 6\n1 Card 7\n1 Card 8\n1 Card 9\n1 Sol Ring\n1 Stax Piece\n```\n\n---\n_Generated 2026-08-22 by diffing deck.yaml._"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: every-category\nname: One Of Everything\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\ncompanion: Kaheera, the Orphanguard\nbracket: 4\nstrategy: A card in every category, so every heading renders.\ncards:\n  - name: Card 0\n    category: land\n    why: The land slot.\n  - name: Card 1\n    category: ramp\n    why: The ramp slot.\n  - name: Card 2\n    category: card-advantage\n    why: The card-advantage slot.\n  - name: Card 3\n    category: tutor\n    why: The tutor slot.\n  - name: Card 4\n    category: interaction\n    why: The interaction slot.\n  - name: Card 5\n    category: protection\n    why: The protection slot.\n  - name: Card 6\n    category: threat\n    why: The threat slot.\n  - name: Card 7\n    category: engine\n    why: The engine slot.\n  - name: Card 8\n    category: sac-outlet\n    why: The sac-outlet slot.\n  - name: Card 9\n    category: payoff\n    why: The payoff slot.\n  - name: Card 10\n    category: recursion\n    why: The recursion slot.\n  - name: Card 11\n    category: win-con\n    why: The win-con slot.\n  - name: Card 12\n    category: utility\n    why: The utility slot.\n  - name: Stax Piece\n    category: stax-piece\n    why: Invented.\n  - name: Aggro Plan\n    category: aggro-plan\n    why: Invented too.\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 30\n  - name: Sol Ring\n    category: ramp\n    qty: 2\nswap_board:\n  - name: Bag End Banquet\n    category: payoff\n    why: Waiting on a slot.\n  - name: Aetherflux Reservoir\n    category: win-con\n"
+    }
+   ]
+  },
+  {
+   "name": "full-notes",
+   "deck": "slug: full-notes\nname: Fully Noted\nstatus: built\nstage: curated\ncommander:\n  - Trostani, Selesnya's Voice\nbracket: 3\nstrategy: Make more creatures than anybody can answer.\nnotes:\n  gameplan: '  What gameplan has to say, with space around it.  '\n  mulligan: '  What mulligan has to say, with space around it.  '\n  curve_plan: '  What curve_plan has to say, with space around it.  '\n  pitfalls: '  What pitfalls has to say, with space around it.  '\n  engine_detail: '  What engine_detail has to say, with space around it.  '\n  lines: '  What lines has to say, with space around it.  '\n  wincons: '  What wincons has to say, with space around it.  '\n  manabase: '  What manabase has to say, with space around it.  '\n  matchups: '  What matchups has to say, with space around it.  '\n  politics: '  What politics has to say, with space around it.  '\n  failure_modes: '  What failure_modes has to say, with space around it.  '\n  swap_philosophy: '  What swap_philosophy has to say, with space around it.  '\n  rules_corners: '  What rules_corners has to say, with space around it.  '\n  commander_why: '  What commander_why has to say, with space around it.  '\ncards:\n  - name: Sol Ring\n    category: ramp\n    why: Fast.\n  - name: Forest\n    category: land\n    why: Green.\n    qty: 40\n",
+   "previous": "slug: every-category\nname: One Of Everything\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\ncards:\n  - name: Card 0\n    category: land\n    why: The land slot.\n  - name: Cut With A Reason\n    category: ramp\n    why: It was here and now it is not.\n  - name: Cut With None\n    category: ramp\n  - name: Forest\n    category: land\n    why: Green.\n    qty: 30\n",
+   "prices": null,
+   "stats": null,
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# Fully Noted — Quick Start\n\n**Commander:** Trostani, Selesnya's Voice  \n**Bracket:** 3  \n**Size:** 41 + commander\n\n## What this deck does\n\nMake more creatures than anybody can answer.\n\n## The 30-second version\n\nWhat gameplan has to say, with space around it.\n\n## Mulligan rule\n\nWhat mulligan has to say, with space around it.\n\n## Turn-by-turn shape\n\nWhat curve_plan has to say, with space around it.\n\n## Three things that will kill you\n\nWhat pitfalls has to say, with space around it.\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n| Ramp & Mana Acceleration | 1 |\n| Lands | 40 |\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# Fully Noted — Advanced Primer\n\n**Commander:** Trostani, Selesnya's Voice  \n**Bracket:** 3  \n**Size:** 41 + commander\n\n## Core engine\n\nWhat engine_detail has to say, with space around it.\n\n## Lines and sequencing\n\nWhat lines has to say, with space around it.\n\n## Win conditions\n\nWhat wincons has to say, with space around it.\n\n## Mana base notes\n\nWhat manabase has to say, with space around it.\n\n## Matchups\n\nWhat matchups has to say, with space around it.\n\n## Politics and table talk\n\nWhat politics has to say, with space around it.\n\n## Failure modes and how to recover\n\nWhat failure_modes has to say, with space around it.\n\n## Sideboard / swap philosophy\n\nWhat swap_philosophy has to say, with space around it.\n\n## Rules corners worth knowing\n\nWhat rules_corners has to say, with space around it.\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# Fully Noted — Annotated Decklist\n\n**Commander:** Trostani, Selesnya's Voice  \n**Bracket:** 3  \n**Size:** 41 + commander\n\nMake more creatures than anybody can answer.\n\n## Command Zone\n\n**Trostani, Selesnya's Voice** — What commander_why has to say, with space around it.\n\n## Ramp & Mana Acceleration (1)\n\n- **Sol Ring** `{1}` — Fast.\n\n## Lands (40)\n\n- **40x Forest** — Green.\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "40 Forest\n1 Sol Ring\n\nSIDEBOARD:\n1 Trostani, Selesnya's Voice\n"
+    },
+    {
+     "name": "swaps.md",
+     "text": "# Fully Noted — Swap List\n\n**3 out / 1 in**\n\n## Out\n\n- **Card 0** — The land slot.\n- **Cut With A Reason** — It was here and now it is not.\n- **Cut With None** — _(cut)_\n\n## In\n\n- **Sol Ring** — Fast.\n\n---\n_Generated 2026-08-22 by diffing deck.yaml._"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: full-notes\nname: Fully Noted\nstatus: built\nstage: curated\ncommander:\n  - Trostani, Selesnya's Voice\nbracket: 3\nstrategy: Make more creatures than anybody can answer.\nnotes:\n  gameplan: '  What gameplan has to say, with space around it.  '\n  mulligan: '  What mulligan has to say, with space around it.  '\n  curve_plan: '  What curve_plan has to say, with space around it.  '\n  pitfalls: '  What pitfalls has to say, with space around it.  '\n  engine_detail: '  What engine_detail has to say, with space around it.  '\n  lines: '  What lines has to say, with space around it.  '\n  wincons: '  What wincons has to say, with space around it.  '\n  manabase: '  What manabase has to say, with space around it.  '\n  matchups: '  What matchups has to say, with space around it.  '\n  politics: '  What politics has to say, with space around it.  '\n  failure_modes: '  What failure_modes has to say, with space around it.  '\n  swap_philosophy: '  What swap_philosophy has to say, with space around it.  '\n  rules_corners: '  What rules_corners has to say, with space around it.  '\n  commander_why: '  What commander_why has to say, with space around it.  '\ncards:\n  - name: Sol Ring\n    category: ramp\n    why: Fast.\n  - name: Forest\n    category: land\n    why: Green.\n    qty: 40\n"
+    }
+   ]
+  },
+  {
+   "name": "hand-handwritten",
+   "deck": "slug: handwritten\nname: Written By Hand\nstatus: built\nstage: curated\ncommander:\n  - Goreclaw, Terror of Qal Sisma\nbracket: 4\narchetype: midrange\nstrategy: Cast the biggest thing that will still resolve, and then cast a bigger one. The commander is\n  the discount; everything else is the payoff.\nnotes:\n  mulligan: Keep any seven with two lands and a way to spend the third turn. Ship a hand that cannot cast\n    the commander by turn five.\n  pitfalls: The deck folds to a wrath it cannot rebuild through, so hold one threat back once the board\n    is ahead.\ncards:\n  - name: Sol Ring\n    category: ramp\n    why: Two mana on turn one, and it always has been.\n  - name: Cultivator Colossus\n    category: ramp\n    why: Draws the land drops the curve is built on.\n  - name: Regal Behemoth\n    category: threat\n    why: A monarch that also doubles the mana.\n  - name: Vorinclex, Voice of Hunger\n    category: threat\n    why: The mana denial the deck wins through.\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 95\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# Written By Hand — Quick Start\n\n**Commander:** Goreclaw, Terror of Qal Sisma  \n**Bracket:** 4  \n**Size:** 99 + commander\n\n## What this deck does\n\nCast the biggest thing that will still resolve, and then cast a bigger one. The commander is the discount; everything else is the payoff.\n\n## The 30-second version\n\n_(set `notes.gameplan` in deck.yaml)_\n\n## Mulligan rule\n\nKeep any seven with two lands and a way to spend the third turn. Ship a hand that cannot cast the commander by turn five.\n\n## Turn-by-turn shape\n\n_(set `notes.curve_plan`)_\n\n## Three things that will kill you\n\nThe deck folds to a wrath it cannot rebuild through, so hold one threat back once the board is ahead.\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n| Ramp & Mana Acceleration | 2 |\n| Threats | 2 |\n| Lands | 95 |\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# Written By Hand — Advanced Primer\n\n**Commander:** Goreclaw, Terror of Qal Sisma  \n**Bracket:** 4  \n**Size:** 99 + commander\n\n## Core engine\n\n_(set `notes.engine_detail` in deck.yaml)_\n\n## Lines and sequencing\n\n_(set `notes.lines` in deck.yaml)_\n\n## Win conditions\n\n_(set `notes.wincons` in deck.yaml)_\n\n## Mana base notes\n\n_(set `notes.manabase` in deck.yaml)_\n\n## Matchups\n\n_(set `notes.matchups` in deck.yaml)_\n\n## Politics and table talk\n\n_(set `notes.politics` in deck.yaml)_\n\n## Failure modes and how to recover\n\n_(set `notes.failure_modes` in deck.yaml)_\n\n## Sideboard / swap philosophy\n\n_(set `notes.swap_philosophy` in deck.yaml)_\n\n## Rules corners worth knowing\n\n_(set `notes.rules_corners` in deck.yaml)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# Written By Hand — Annotated Decklist\n\n**Commander:** Goreclaw, Terror of Qal Sisma  \n**Bracket:** 4  \n**Size:** 99 + commander\n\nCast the biggest thing that will still resolve, and then cast a bigger one. The commander is the discount; everything else is the payoff.\n\n## Command Zone\n\n**Goreclaw, Terror of Qal Sisma** — _(set `notes.commander_why`)_\n\n## Ramp & Mana Acceleration (2)\n\n- **Cultivator Colossus** `{5}{G}{G}` — Draws the land drops the curve is built on.\n- **Sol Ring** `{1}` — Two mana on turn one, and it always has been.\n\n## Threats (2)\n\n- **Regal Behemoth** — A monarch that also doubles the mana.\n- **Vorinclex, Voice of Hunger** `{6}{G}{G}` — The mana denial the deck wins through.\n\n## Lands (95)\n\n- **95x Forest** — Green, and there is nothing else to be.\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "1 Cultivator Colossus\n95 Forest\n1 Regal Behemoth\n1 Sol Ring\n1 Vorinclex, Voice of Hunger\n\nSIDEBOARD:\n1 Goreclaw, Terror of Qal Sisma\n"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: handwritten\nname: Written By Hand\nstatus: built\nstage: curated\ncommander:\n  - Goreclaw, Terror of Qal Sisma\nbracket: 4\narchetype: midrange\nstrategy: Cast the biggest thing that will still resolve, and then cast a bigger one. The commander is\n  the discount; everything else is the payoff.\nnotes:\n  mulligan: Keep any seven with two lands and a way to spend the third turn. Ship a hand that cannot cast\n    the commander by turn five.\n  pitfalls: The deck folds to a wrath it cannot rebuild through, so hold one threat back once the board\n    is ahead.\ncards:\n  - name: Sol Ring\n    category: ramp\n    why: Two mana on turn one, and it always has been.\n  - name: Cultivator Colossus\n    category: ramp\n    why: Draws the land drops the curve is built on.\n  - name: Regal Behemoth\n    category: threat\n    why: A monarch that also doubles the mana.\n  - name: Vorinclex, Voice of Hunger\n    category: threat\n    why: The mana denial the deck wins through.\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 95\n"
+    }
+   ]
+  },
+  {
+   "name": "hand-noted",
+   "deck": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\nnotes:\n  wincons: Feed the table until somebody is the only one left who can afford to stop eating.\n  pitfalls: The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: 'T2 outlet.\n\n    T3 Gyome.\n\n    T4 the table starts asking for food.\n\n    '\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\ncards:\n  - name: Sol Ring\n    category: ramp\n    why: Two mana on turn one, and it always has been.\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 98\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# Written With Notes — Quick Start\n\n**Commander:** Gyome, Master Chef  \n**Size:** 99 + commander\n\n## What this deck does\n\n_(set `strategy:` in deck.yaml)_\n\n## The 30-second version\n\nCook, and keep cooking.\n\n## Mulligan rule\n\nKeep any seven with two lands and a sacrifice outlet.\n\n## Turn-by-turn shape\n\nT2 outlet.\nT3 Gyome.\nT4 the table starts asking for food.\n\n## Three things that will kill you\n\nThe deck folds to graveyard hate it cannot rebuild through.\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n| Ramp & Mana Acceleration | 1 |\n| Lands | 98 |\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# Written With Notes — Advanced Primer\n\n**Commander:** Gyome, Master Chef  \n**Size:** 99 + commander\n\n## Core engine\n\n_(set `notes.engine_detail` in deck.yaml)_\n\n## Lines and sequencing\n\n_(set `notes.lines` in deck.yaml)_\n\n## Win conditions\n\nFeed the table until somebody is the only one left who can afford to stop eating.\n\n## Mana base notes\n\n_(set `notes.manabase` in deck.yaml)_\n\n## Matchups\n\n_(set `notes.matchups` in deck.yaml)_\n\n## Politics and table talk\n\n_(set `notes.politics` in deck.yaml)_\n\n## Failure modes and how to recover\n\n_(set `notes.failure_modes` in deck.yaml)_\n\n## Sideboard / swap philosophy\n\n_(set `notes.swap_philosophy` in deck.yaml)_\n\n## Rules corners worth knowing\n\n_(set `notes.rules_corners` in deck.yaml)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# Written With Notes — Annotated Decklist\n\n**Commander:** Gyome, Master Chef  \n**Size:** 99 + commander\n\n## Command Zone\n\n**Gyome, Master Chef** — yes\n\n## Ramp & Mana Acceleration (1)\n\n- **Sol Ring** `{1}` — Two mana on turn one, and it always has been.\n\n## Lands (98)\n\n- **98x Forest** — Green, and there is nothing else to be.\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "98 Forest\n1 Sol Ring\n\nSIDEBOARD:\n1 Gyome, Master Chef\n"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: noted\nname: Written With Notes\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nthemes:\n  - food\n  - midrange\nnotes:\n  wincons: Feed the table until somebody is the only one left who can afford to stop eating.\n  pitfalls: The deck folds to graveyard hate it cannot rebuild through.\n  mulligan: Keep any seven with two lands and a sacrifice outlet.\n  gameplan: Cook, and keep cooking.\n  curve_plan: 'T2 outlet.\n\n    T3 Gyome.\n\n    T4 the table starts asking for food.\n\n    '\n  commander_why: 'yes'\n  shopping:\n    cheapest: Bag End Banquet\n    dearest: Sword of Feast and Famine\n  sources:\n    - The primer nobody wrote\n    - A conversation at the kitchen table\ncards:\n  - name: Sol Ring\n    category: ramp\n    why: Two mana on turn one, and it always has been.\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 98\n"
+    }
+   ]
+  },
+  {
+   "name": "hand-tight",
+   "deck": "slug: tight\nname: Tight Dash\nstatus: built\nstage: curated\ncommander:\n  - Goreclaw, Terror of Qal Sisma\ncards:\n  - name: Sol Ring\n    category: ramp\n    why: Two mana on turn one, and it always has been.\n  - name: Regal Behemoth\n    category: threat\n    why: A monarch that also doubles the mana.\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 97\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# Tight Dash — Quick Start\n\n**Commander:** Goreclaw, Terror of Qal Sisma  \n**Size:** 99 + commander\n\n## What this deck does\n\n_(set `strategy:` in deck.yaml)_\n\n## The 30-second version\n\n_(set `notes.gameplan` in deck.yaml)_\n\n## Mulligan rule\n\n_(set `notes.mulligan` — derive it from a Tier 1 sweep)_\n\n## Turn-by-turn shape\n\n_(set `notes.curve_plan`)_\n\n## Three things that will kill you\n\n_(set `notes.pitfalls`)_\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n| Ramp & Mana Acceleration | 1 |\n| Threats | 1 |\n| Lands | 97 |\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# Tight Dash — Advanced Primer\n\n**Commander:** Goreclaw, Terror of Qal Sisma  \n**Size:** 99 + commander\n\n## Core engine\n\n_(set `notes.engine_detail` in deck.yaml)_\n\n## Lines and sequencing\n\n_(set `notes.lines` in deck.yaml)_\n\n## Win conditions\n\n_(set `notes.wincons` in deck.yaml)_\n\n## Mana base notes\n\n_(set `notes.manabase` in deck.yaml)_\n\n## Matchups\n\n_(set `notes.matchups` in deck.yaml)_\n\n## Politics and table talk\n\n_(set `notes.politics` in deck.yaml)_\n\n## Failure modes and how to recover\n\n_(set `notes.failure_modes` in deck.yaml)_\n\n## Sideboard / swap philosophy\n\n_(set `notes.swap_philosophy` in deck.yaml)_\n\n## Rules corners worth knowing\n\n_(set `notes.rules_corners` in deck.yaml)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# Tight Dash — Annotated Decklist\n\n**Commander:** Goreclaw, Terror of Qal Sisma  \n**Size:** 99 + commander\n\n## Command Zone\n\n**Goreclaw, Terror of Qal Sisma** — _(set `notes.commander_why`)_\n\n## Ramp & Mana Acceleration (1)\n\n- **Sol Ring** `{1}` — Two mana on turn one, and it always has been.\n\n## Threats (1)\n\n- **Regal Behemoth** — A monarch that also doubles the mana.\n\n## Lands (97)\n\n- **97x Forest** — Green, and there is nothing else to be.\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "97 Forest\n1 Regal Behemoth\n1 Sol Ring\n\nSIDEBOARD:\n1 Goreclaw, Terror of Qal Sisma\n"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: tight\nname: Tight Dash\nstatus: built\nstage: curated\ncommander:\n  - Goreclaw, Terror of Qal Sisma\ncards:\n  - name: Sol Ring\n    category: ramp\n    why: Two mana on turn one, and it always has been.\n  - name: Regal Behemoth\n    category: threat\n    why: A monarch that also doubles the mana.\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 97\n"
+    }
+   ]
+  },
+  {
+   "name": "hand-wide",
+   "deck": "slug: wide\nname: Wide Indentation\nstatus: theoretical\nstage: draft\ncommander:\n  - Goreclaw, Terror of Qal Sisma\nthemes:\n  - stompy\n  - big-mana\ncards:\n  - name: Sol Ring\n    category: ramp\n    why: An override on each side, so a swap has both to drop.\n    scryfall_id: c3a4b2d1-1111-4222-8333-444455556666\n    mana_cost: '{1}'\n  - name: Regal Behemoth\n    category: threat\n    why: ''\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 97\nswap_board:\n  - name: Rhystic Study\n    category: card-advantage\n    why: Waiting on a slot it will never get in mono-green.\ngraveyard:\n  - name: Gilded Lotus\n    category: ramp\n    why: 'Entombed: too slow for a deck that wants its mana on turn two.'\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": false,
+   "error": "wide is a draft, and the artifacts are the shareable surface. 1 card(s) still need a `why`: Regal Behemoth"
+  },
+  {
+   "name": "imported",
+   "deck": "slug: imported\nname: Imported\nstatus: theoretical\nstage: draft\ncommander:\n  - Goreclaw, Terror of Qal Sisma\nbracket: 4\ncards:\n  - name: Forest\n    category: land\n    qty: 38\n    why: ''\n  - name: Sol Ring\n    category: ramp\n    why: ''\n  - name: Cultivator Colossus\n    category: ramp\n    art: 0aae2e33-0000-4000-8000-000000000000\n    why: ''\nswap_board:\n  - name: Kaheera, the Orphanguard\n    category: utility\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": false,
+   "error": "imported is a draft, and the artifacts are the shareable surface. 3 card(s) still need a `why`: Forest, Sol Ring, Cultivator Colossus"
+  },
+  {
+   "name": "legacy-archetype",
+   "deck": "slug: legacy-archetype\nname: Pre-ADR-37\nstatus: built\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\narchetype: midrange\nthemes:\n  - dinosaurs\n  - sacrifice\ncards: []\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# Pre-ADR-37 — Quick Start\n\n**Commander:** Atla Palani, Nest Tender  \n**Size:** 0 + commander\n\n## What this deck does\n\n_(set `strategy:` in deck.yaml)_\n\n## The 30-second version\n\n_(set `notes.gameplan` in deck.yaml)_\n\n## Mulligan rule\n\n_(set `notes.mulligan` — derive it from a Tier 1 sweep)_\n\n## Turn-by-turn shape\n\n_(set `notes.curve_plan`)_\n\n## Three things that will kill you\n\n_(set `notes.pitfalls`)_\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# Pre-ADR-37 — Advanced Primer\n\n**Commander:** Atla Palani, Nest Tender  \n**Size:** 0 + commander\n\n## Core engine\n\n_(set `notes.engine_detail` in deck.yaml)_\n\n## Lines and sequencing\n\n_(set `notes.lines` in deck.yaml)_\n\n## Win conditions\n\n_(set `notes.wincons` in deck.yaml)_\n\n## Mana base notes\n\n_(set `notes.manabase` in deck.yaml)_\n\n## Matchups\n\n_(set `notes.matchups` in deck.yaml)_\n\n## Politics and table talk\n\n_(set `notes.politics` in deck.yaml)_\n\n## Failure modes and how to recover\n\n_(set `notes.failure_modes` in deck.yaml)_\n\n## Sideboard / swap philosophy\n\n_(set `notes.swap_philosophy` in deck.yaml)_\n\n## Rules corners worth knowing\n\n_(set `notes.rules_corners` in deck.yaml)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# Pre-ADR-37 — Annotated Decklist\n\n**Commander:** Atla Palani, Nest Tender  \n**Size:** 0 + commander\n\n## Command Zone\n\n**Atla Palani, Nest Tender** — _(set `notes.commander_why`)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "\nSIDEBOARD:\n1 Atla Palani, Nest Tender\n"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: legacy-archetype\nname: Pre-ADR-37\nstatus: built\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\narchetype: midrange\nthemes:\n  - dinosaurs\n  - sacrifice\ncards: []\n"
+    }
+   ]
+  },
+  {
+   "name": "legacy-shadowed",
+   "deck": "slug: legacy-shadowed\nname: Shadowed\nstatus: built\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\nthemes:\n  - dinosaurs\n  - sacrifice\n  - midrange\ncards: []\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# Shadowed — Quick Start\n\n**Commander:** Atla Palani, Nest Tender  \n**Size:** 0 + commander\n\n## What this deck does\n\n_(set `strategy:` in deck.yaml)_\n\n## The 30-second version\n\n_(set `notes.gameplan` in deck.yaml)_\n\n## Mulligan rule\n\n_(set `notes.mulligan` — derive it from a Tier 1 sweep)_\n\n## Turn-by-turn shape\n\n_(set `notes.curve_plan`)_\n\n## Three things that will kill you\n\n_(set `notes.pitfalls`)_\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# Shadowed — Advanced Primer\n\n**Commander:** Atla Palani, Nest Tender  \n**Size:** 0 + commander\n\n## Core engine\n\n_(set `notes.engine_detail` in deck.yaml)_\n\n## Lines and sequencing\n\n_(set `notes.lines` in deck.yaml)_\n\n## Win conditions\n\n_(set `notes.wincons` in deck.yaml)_\n\n## Mana base notes\n\n_(set `notes.manabase` in deck.yaml)_\n\n## Matchups\n\n_(set `notes.matchups` in deck.yaml)_\n\n## Politics and table talk\n\n_(set `notes.politics` in deck.yaml)_\n\n## Failure modes and how to recover\n\n_(set `notes.failure_modes` in deck.yaml)_\n\n## Sideboard / swap philosophy\n\n_(set `notes.swap_philosophy` in deck.yaml)_\n\n## Rules corners worth knowing\n\n_(set `notes.rules_corners` in deck.yaml)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# Shadowed — Annotated Decklist\n\n**Commander:** Atla Palani, Nest Tender  \n**Size:** 0 + commander\n\n## Command Zone\n\n**Atla Palani, Nest Tender** — _(set `notes.commander_why`)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "\nSIDEBOARD:\n1 Atla Palani, Nest Tender\n"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: legacy-shadowed\nname: Shadowed\nstatus: built\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\nthemes:\n  - dinosaurs\n  - sacrifice\n  - midrange\ncards: []\n"
+    }
+   ]
+  },
+  {
+   "name": "notes",
+   "deck": "slug: notes\nname: Noted\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nnotes:\n  wincons: Feed the table until somebody is the only one left who can afford to stop eating, which takes\n    longer than a hundred characters to say.\n  gameplan: Cook.\n  mulligan: 'yes'\n  curve_plan: 'T2 outlet.\n\n    T3 Gyome.\n\n    T4 the table asks for food.'\ncards:\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 99\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# Noted — Quick Start\n\n**Commander:** Gyome, Master Chef  \n**Size:** 99 + commander\n\n## What this deck does\n\n_(set `strategy:` in deck.yaml)_\n\n## The 30-second version\n\nCook.\n\n## Mulligan rule\n\nyes\n\n## Turn-by-turn shape\n\nT2 outlet.\nT3 Gyome.\nT4 the table asks for food.\n\n## Three things that will kill you\n\n_(set `notes.pitfalls`)_\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n| Lands | 99 |\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# Noted — Advanced Primer\n\n**Commander:** Gyome, Master Chef  \n**Size:** 99 + commander\n\n## Core engine\n\n_(set `notes.engine_detail` in deck.yaml)_\n\n## Lines and sequencing\n\n_(set `notes.lines` in deck.yaml)_\n\n## Win conditions\n\nFeed the table until somebody is the only one left who can afford to stop eating, which takes longer than a hundred characters to say.\n\n## Mana base notes\n\n_(set `notes.manabase` in deck.yaml)_\n\n## Matchups\n\n_(set `notes.matchups` in deck.yaml)_\n\n## Politics and table talk\n\n_(set `notes.politics` in deck.yaml)_\n\n## Failure modes and how to recover\n\n_(set `notes.failure_modes` in deck.yaml)_\n\n## Sideboard / swap philosophy\n\n_(set `notes.swap_philosophy` in deck.yaml)_\n\n## Rules corners worth knowing\n\n_(set `notes.rules_corners` in deck.yaml)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# Noted — Annotated Decklist\n\n**Commander:** Gyome, Master Chef  \n**Size:** 99 + commander\n\n## Command Zone\n\n**Gyome, Master Chef** — _(set `notes.commander_why`)_\n\n## Lands (99)\n\n- **99x Forest** — Green, and there is nothing else to be.\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "99 Forest\n\nSIDEBOARD:\n1 Gyome, Master Chef\n"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: notes\nname: Noted\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nnotes:\n  wincons: Feed the table until somebody is the only one left who can afford to stop eating, which takes\n    longer than a hundred characters to say.\n  gameplan: Cook.\n  mulligan: 'yes'\n  curve_plan: 'T2 outlet.\n\n    T3 Gyome.\n\n    T4 the table asks for food.'\ncards:\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 99\n"
+    }
+   ]
+  },
+  {
+   "name": "scalars",
+   "deck": "slug: scalars\nname: 'yes'\nstatus: built\nstage: curated\ncommander:\n  - Ich-Tekik, Salvage Splicer\npilot: '1.0e+3'\nstrategy: A strategy long enough that PyYAML has to fold it across more than one line at width one hundred,\n  which is where the fold rule and the indent rule meet.\ncards:\n  - name: Ætherling\n    category: threat\n    why: 'colon: and # hash, plus braces {G}{W} and a trailing space '\n  - name: Sword of Feast and Famine\n    category: threat\n    why: 'no'\n  - name: Borrowing 100,000 Arrows\n    category: threat\n    why: '- a leading dash, and *an asterisk*'\n  - name: Erase (Not the Urza's Legacy One)\n    category: interaction\n    why: '1996'\n",
+   "previous": null,
+   "prices": null,
+   "stats": null,
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# yes — Quick Start\n\n**Commander:** Ich-Tekik, Salvage Splicer  \n**Size:** 4 + commander\n\n## What this deck does\n\nA strategy long enough that PyYAML has to fold it across more than one line at width one hundred, which is where the fold rule and the indent rule meet.\n\n## The 30-second version\n\n_(set `notes.gameplan` in deck.yaml)_\n\n## Mulligan rule\n\n_(set `notes.mulligan` — derive it from a Tier 1 sweep)_\n\n## Turn-by-turn shape\n\n_(set `notes.curve_plan`)_\n\n## Three things that will kill you\n\n_(set `notes.pitfalls`)_\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n| Interaction & Removal | 1 |\n| Threats | 3 |\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# yes — Advanced Primer\n\n**Commander:** Ich-Tekik, Salvage Splicer  \n**Size:** 4 + commander\n\n## Core engine\n\n_(set `notes.engine_detail` in deck.yaml)_\n\n## Lines and sequencing\n\n_(set `notes.lines` in deck.yaml)_\n\n## Win conditions\n\n_(set `notes.wincons` in deck.yaml)_\n\n## Mana base notes\n\n_(set `notes.manabase` in deck.yaml)_\n\n## Matchups\n\n_(set `notes.matchups` in deck.yaml)_\n\n## Politics and table talk\n\n_(set `notes.politics` in deck.yaml)_\n\n## Failure modes and how to recover\n\n_(set `notes.failure_modes` in deck.yaml)_\n\n## Sideboard / swap philosophy\n\n_(set `notes.swap_philosophy` in deck.yaml)_\n\n## Rules corners worth knowing\n\n_(set `notes.rules_corners` in deck.yaml)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# yes — Annotated Decklist\n\n**Commander:** Ich-Tekik, Salvage Splicer  \n**Size:** 4 + commander\n\nA strategy long enough that PyYAML has to fold it across more than one line at width one hundred, which is where the fold rule and the indent rule meet.\n\n## Command Zone\n\n**Ich-Tekik, Salvage Splicer** — _(set `notes.commander_why`)_\n\n## Interaction & Removal (1)\n\n- **Erase (Not the Urza's Legacy One)** — 1996\n\n## Threats (3)\n\n- **Borrowing 100,000 Arrows** — - a leading dash, and *an asterisk*\n- **Sword of Feast and Famine** — no\n- **Ætherling** — colon: and # hash, plus braces {G}{W} and a trailing space \n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "1 Borrowing 100,000 Arrows\n1 Erase (Not the Urza's Legacy One)\n1 Sword of Feast and Famine\n1 Ætherling\n\nSIDEBOARD:\n1 Ich-Tekik, Salvage Splicer\n"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: scalars\nname: 'yes'\nstatus: built\nstage: curated\ncommander:\n  - Ich-Tekik, Salvage Splicer\npilot: '1.0e+3'\nstrategy: A strategy long enough that PyYAML has to fold it across more than one line at width one hundred,\n  which is where the fold rule and the indent rule meet.\ncards:\n  - name: Ætherling\n    category: threat\n    why: 'colon: and # hash, plus braces {G}{W} and a trailing space '\n  - name: Sword of Feast and Famine\n    category: threat\n    why: 'no'\n  - name: Borrowing 100,000 Arrows\n    category: threat\n    why: '- a leading dash, and *an asterisk*'\n  - name: Erase (Not the Urza's Legacy One)\n    category: interaction\n    why: '1996'\n"
+    }
+   ]
+  }
+ ]
+}

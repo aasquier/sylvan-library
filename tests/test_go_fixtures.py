@@ -17,6 +17,7 @@ the JSON cannot say one thing while `/api/colors` says another.
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -98,6 +99,8 @@ _ORACLES = [
     ("the whole-file dumps", "DUMPS_PATH", "render_dump_cases"),
     ("the decklist grammar", "DECKLIST_PATH", "render_decklist_cases"),
     ("the importer", "IMPORT_PATH", "render_import_cases"),
+    ("the five deliverables", "ARTIFACTS_PATH", "render_artifact_cases"),
+    ("the draw corpus", "PYRAND_PATH", "render_pyrand_cases"),
 ]
 
 
@@ -111,6 +114,33 @@ def test_the_committed_oracle_is_what_python_answers_now(what, path_name, render
         f"`python tests/go_fixtures.py`")
 
 
+def test_the_artifacts_oracle_does_not_expire_at_midnight():
+    """The five deliverables each end in `_Generated <today>_`.
+
+    An oracle that asked the clock would be a fixture that passed all day and
+    failed overnight -- the sort of red build that gets rerun rather than read,
+    and the sort of green one that means nothing. So `render_artifact_cases`
+    pins `generate.date`, and this is the assertion that it did: every
+    generated line names the recorded day rather than this one.
+
+    It also checks the pin was *undone*. The freeze is a module attribute
+    swapped in place, so a `finally` that ever stopped running would leave
+    every later test in the session rendering artifacts dated 2026-08-22.
+    """
+    from mtglab.artifacts import generate
+
+    committed = json.loads(go_fixtures.ARTIFACTS_PATH.read_text(encoding="utf-8"))
+    frozen = go_fixtures.ARTIFACTS_DATE.isoformat()
+    assert committed["today"] == frozen
+    generated = [line for case in committed["cases"] for file in case.get("files", [])
+                 for line in file["text"].splitlines() if line.startswith("_Generated ")]
+    assert generated, "no deliverable carries a generated-on line any more"
+    assert all(frozen in line for line in generated), (
+        "a deliverable is dated something other than the oracle's own day")
+    assert generate.date.today() == date.today(), (
+        "the frozen date outlived the render that installed it")
+
+
 def test_every_oracle_this_module_writes_is_checked_for_drift():
     """The list above is complete, and stays complete.
 
@@ -120,7 +150,8 @@ def test_every_oracle_this_module_writes_is_checked_for_drift():
     checked by name above or by a test of its own.
     """
     named = {name for _what, name, _render in _ORACLES} | {
-        "YAML_PATH", "JSON_PATH", "RENDER_PATH", "SCHEMA_PATH", "TINY_POOL_PATH"}
+        "YAML_PATH", "JSON_PATH", "RENDER_PATH", "SCHEMA_PATH", "TINY_POOL_PATH",
+        "APP_SCHEMA_PATH", "CRYPTO_PATH"}
     writes = {name for name in dir(go_fixtures)
               if name.endswith("_PATH") and isinstance(getattr(go_fixtures, name), Path)}
     assert writes - named == set(), (
@@ -159,17 +190,70 @@ def test_the_committed_app_schema_is_what_the_ladder_leaves():
     tests inserting into a table that no longer looks like that.
     """
     fresh = go_fixtures.render_app_schema()
-    committed = (go_fixtures.LOG_DIR / "app_schema.sql").read_text(encoding="utf-8")
+    committed = go_fixtures.APP_SCHEMA_PATH.read_text(encoding="utf-8")
     assert committed == fresh, (
-        f"{go_fixtures.LOG_DIR / 'app_schema.sql'} is stale; regenerate with "
+        f"{go_fixtures.APP_SCHEMA_PATH} is stale; regenerate with "
         "`python tests/go_fixtures.py`")
     from mtglab.auth import db
     assert f"PRAGMA user_version = {db.SCHEMA_VERSION};" in committed
     assert "CREATE TABLE deck_log" in committed
+    # The columns three Go packages had each transcribed by hand, and the one
+    # that broke two of them: `model_tier` arrives at rung 10, and a fixture
+    # frozen at rung 1 reports `no such column` rather than being obviously
+    # eight rungs behind. Named here so a rebuild of `users` that dropped it
+    # fails as a sentence rather than as somebody else's test.
+    assert "model_tier" in committed
     # Schema only. This file is committed to a public repository, and rule 5
     # is about what a tracked file may contain, not only about what is easy to
     # forget.
     assert "INSERT" not in committed.upper()
+
+
+def test_the_committed_crypto_oracle_is_what_argon2_writes_now():
+    """The migration's sharpest compatibility claim, and its one moving part.
+
+    Phase 4 makes Go a *writer* of password hashes, so a hash it stores has to
+    be one `argon2-cffi` verifies for the rest of the file's life -- after a
+    rollback to a Python-only door, and for `mtglab users` on the machine. The
+    Go test proves that by reproducing each recorded PHC string byte for byte
+    from the recorded salt; this holds the record itself to what Python writes
+    today, so an argon2-cffi upgrade that changed the encoding fails here with
+    the regeneration command rather than in production six weeks later.
+    """
+    fresh = go_fixtures.render_crypto_cases()
+    committed = go_fixtures.CRYPTO_PATH.read_text(encoding="utf-8")
+    assert committed == fresh, (
+        f"{go_fixtures.CRYPTO_PATH} is stale; regenerate with "
+        "`python tests/go_fixtures.py`")
+
+
+def test_the_crypto_oracle_records_this_builds_own_parameters():
+    """A corpus recorded under other parameters would prove the wrong thing.
+
+    `crypto_cases` already asserts every hash verifies and none needs a
+    rehash, which is the strong form; this is the cheap readable form, so a
+    change to `passwords.py` fails with the parameter's name in the message.
+    """
+    from mtglab.auth import passwords
+    recorded = json.loads(go_fixtures.render_crypto_cases())["argon2id"]
+    assert recorded["params"]["memory_cost_kib"] == passwords.MEMORY_COST_KIB
+    assert recorded["params"]["time_cost"] == passwords.TIME_COST
+    assert recorded["params"]["parallelism"] == passwords.PARALLELISM
+    assert recorded["min_password_length"] == passwords.MIN_PASSWORD_LENGTH
+    assert recorded["max_password_bytes"] == passwords.MAX_PASSWORD_BYTES
+    # The corpus is only as good as its awkward cases: an empty password, one
+    # under the storage floor that must still *verify*, and one carrying the
+    # `$` and `:` that PHC delimits on.
+    passwords_recorded = {c["password"] for c in recorded["cases"]}
+    assert "" in passwords_recorded
+    assert any(len(p) < passwords.MIN_PASSWORD_LENGTH and p
+               for p in passwords_recorded)
+    assert any("$" in p for p in passwords_recorded)
+    # And a salt whose base64 uses both characters the URL alphabet renames,
+    # because that substitution is the mistake that would produce a string
+    # Python accepts for some salts and rejects for others.
+    salts = "".join(c["salt_b64"] for c in recorded["cases"])
+    assert "+" in salts and "/" in salts
 
 
 def test_the_fixture_round_trips_through_the_deck_model():
@@ -332,3 +416,77 @@ def test_the_gate_cases_exercise_what_they_claim():
         assert code in codes, f"no gate case emits {code}"
     assert any(n.endswith(".stats.json") for n in rendered)
     assert "mono-green.suggestions.json" in rendered
+
+
+# ------------------------------------------------------------------ pyrand
+
+def test_the_draw_corpus_covers_every_shape_it_claims_to():
+    """A corpus that quietly lost a section still passes every case left in it.
+
+    Each assertion below names a way `random.Random` can be reproduced
+    wrongly, and the seeding breadth is the load-bearing half: the key
+    `init_by_array` is given grows a 32-bit word at 2**32 and again at 2**64,
+    so a corpus of small seeds would prove a port correct for exactly the
+    seeds it was shown.
+    """
+    cases = go_fixtures.pyrand_cases()
+
+    seeds = {int(c["seed"]) for c in cases["seeds"]}
+    assert 0 in seeds, "the zero seed takes its own branch (bits == 0)"
+    assert any(s < 0 for s in seeds), "a negative seed is what proves the abs()"
+    assert any(2**32 < s < 2**64 for s in seeds), "no two-word key"
+    assert any(s > 2**64 for s in seeds), "no key past what an int64 can hold"
+    for pair in ((-7, 7), (-20260810, 20260810)):
+        assert set(pair) <= seeds, f"{pair} must both be present to compare"
+
+    first = cases["seeds"][0]
+    assert len(first["words"]) > 624, (
+        "the raw stream must cross MT19937's 624-word regeneration boundary, "
+        "or a wrong twist is invisible")
+    for section in ("words", "randoms", "bits_mixed", "below", "ranges",
+                    "shuffles", "repeated_99", "choices"):
+        assert first[section], f"the {section} section is empty"
+
+    widths = {c["k"] for c in cases["bits_sweep"]}
+    assert widths == set(range(1, 65)), "the getrandbits sweep has a hole"
+
+    # The bounds that make `_randbelow` reject at very different rates: at a
+    # power of two it never rejects, one past it rejects almost half the time.
+    bounds = {d["n"] for d in first["below"]}
+    assert {1, 2, 3, 2**32, 2**32 + 1} <= bounds
+
+    # Every `randrange` form, including a negative step -- the only place the
+    # count is a floor division of a negative quotient.
+    steps = {c["step"] for c in first["ranges"]}
+    assert None in steps and any(s is not None and s < 0 for s in steps)
+
+    # And the division itself, which no *successful* `randrange` can pin.
+    assert any(c["want"] != int(c["a"] / c["b"]) for c in cases["floor_div"]), (
+        "no floor-division case disagrees with truncation, so the Go test "
+        "over them proves nothing")
+
+
+def test_the_recorded_tier1_stream_is_the_reference_runs_own():
+    """The instrument that reads Tier 1's draws off a real run is inert.
+
+    `pyrand_tier1_stream` patches `random.Random` to a recording subclass that
+    delegates every draw to CPython, so the run under it should be the same
+    run. "Should be" is why this test exists: the recorded digest is checked
+    against the pin in `tests/test_determinism.py`, so an instrument that
+    consumed a single extra draw would be caught here rather than baked into a
+    corpus the Go side then matches perfectly and wrongly.
+    """
+    from test_determinism import REFERENCE_DIGEST
+
+    tier1 = go_fixtures.pyrand_tier1_stream()
+    assert tier1["reference_digest"] == REFERENCE_DIGEST, (
+        "recording the reference run changed it; the corpus would pin a "
+        "stream Tier 1 does not actually consume")
+
+    assert tier1["generators"], "the reference run built no generators"
+    for generator in tier1["generators"]:
+        assert generator["draws"] > 0
+        assert generator["lengths"], "a generator shuffled nothing"
+        assert len(generator["digest"]) == 64
+    total = sum(g["draws"] for g in tier1["generators"])
+    assert total > 10_000, f"the whole reference run drew only {total} times"

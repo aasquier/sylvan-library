@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
 )
 
 // Vectors Python wrote (2026-08-21, `.venv` argon2-cffi 25.1.0, CPython
@@ -31,28 +33,17 @@ const (
 	fixtureTokenHash = "25db52bb467767ed987f3a5d32af58aaf9e632df182f26b4e23014977d248bd7"
 )
 
-// The first rung of `auth/db.py`'s ladder, verbatim, for `users` and
-// `sessions` -- the two tables the door reads. (`users` is rebuilt with
-// AUTOINCREMENT at rung 5; the columns the door reads are the same in both.)
-const schemaV1 = `
-CREATE TABLE users (
-    id            INTEGER PRIMARY KEY,
-    username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    password_hash TEXT,
-    email         TEXT UNIQUE COLLATE NOCASE,
-    is_admin      INTEGER NOT NULL DEFAULT 0,
-    disabled_at   TEXT,
-    created_at    TEXT NOT NULL
-);
-CREATE TABLE sessions (
-    token_hash   TEXT PRIMARY KEY,
-    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at   TEXT NOT NULL,
-    expires_at   TEXT NOT NULL,
-    last_seen_at TEXT
-);
-CREATE INDEX sessions_by_user ON sessions(user_id);
-`
+// appSchema is `app.db` as Python's migration ladder leaves it.
+//
+// It was a hand-copied transcription of the ladder's *first* rung until
+// 2026-08-22, which was fine while the door only read `users.id`, `username`,
+// `is_admin` and `disabled_at` -- and stopped being fine the moment the
+// accounts flip needed `model_tier`, a column rung 10 adds. `authtest`'s
+// package comment records what that cost and why the bytes are generated now.
+func appSchema(t *testing.T) string {
+	t.Helper()
+	return authtest.Schema()
+}
 
 // isoformat is what `datetime.now(UTC).isoformat()` writes.
 func isoformat(t time.Time) string {
@@ -74,7 +65,7 @@ func fixtureDB(t *testing.T) (*sql.DB, *sql.DB) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { writer.Close() })
-	if _, err := writer.Exec(schemaV1); err != nil {
+	if _, err := writer.Exec(appSchema(t)); err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now()

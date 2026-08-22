@@ -7,10 +7,16 @@ changed.*
 with Aaron the same day the plan was drafted; each ruling is recorded
 inline there, and [ADR 38](../adr/0038-the-served-backend-is-rewritten-in-go.md)
 made them formal on the Phase 1 branch the same day (Appendix A was its
-draft). **Phases 0 to 3 are done and Phase 4 is in progress** — the edit
-engine, the nine editing routes and the four lifecycle routes have flipped,
-and what is left of it is the artifacts rebuild and the accounts; the port
-board in §10 is the frontier. Written by Claude from a
+draft). **Phases 0 to 4 are done** — the edit engine, the nine editing routes,
+the four lifecycle routes, the renderer, the artifacts rebuild and the accounts
+have all flipped, and every `/api/decks` route and eleven of the twelve
+account registrations are the door's. The port board in §10 is the frontier,
+and it now also records what is **not** Phase 4's despite living under
+`/api/admin`: the stats six and `DELETE /api/admin/users/{username}`, both
+coupled to the in-memory jobs registry, both Phase 5's.
+**Phase 5's tail risk was pulled forward and closed on 2026-08-22**:
+`pyrand` is bit-exact (§5 item 3), so the one item this plan said *"does not
+price at all"* now has an actual beside it. Written by Claude from a
 measured read of the tree (see [BASELINE.md](BASELINE.md)); the judgment
 calls were argued, then ruled.
 
@@ -225,6 +231,40 @@ suite read. The port gets four instruments, cheapest first:
    bounds) plus re-pinned digests — but exactness is the plan, and it is
    ENGINEERING §1's differential-testing dream with a better punchline than
    Rust-vs-Python ever offered.
+
+   **Landed 2026-08-22, ahead of its phase, and exact.** `go/internal/pyrand`
+   is CPython's `random.Random` bit for bit — the seeding path included, which
+   is the half that is easy to get plausibly wrong: `random.Random(n)` runs
+   `abs(n)` through `init_by_array` over little-endian 32-bit words, so it is
+   not `init_genrand` and the key grows a word at 2**32 and again at 2**64.
+   It was pulled forward precisely because it was the item this document said
+   *"does not price at all"*; §7's Phase 5 paragraph and §11's risk 3 are
+   rewritten accordingly, and §10 carries its row.
+
+   **The fallback was not taken and is no longer needed.** What is proved is
+   the generator, not yet Tier 1: the engine is still Phase 5's own work, so
+   `REFERENCE_DIGEST` is not reproduced here. What replaces it is stronger
+   than a spot check and was possible because of a fact worth recording —
+   **Tier 1 consumes randomness through exactly one call**, `rng.shuffle(deck)`
+   in `simulate_game`, and through nothing else. So a run's whole entropy
+   budget is a sequence of shuffles of a known length from one seeded
+   generator, and `tests/go_fixtures.py` reads that sequence off a *real*
+   reference run by instrumentation that delegates to CPython (and re-checks
+   `REFERENCE_DIGEST` while instrumented, refusing to write a corpus if it
+   moved). The Go test replays it: **all 99,274 draws of the reference run,
+   in order, through the real `Shuffle`.** When Phase 5 ports the engine, the
+   randomness under it is already a checked fact rather than a hope.
+
+   The corpus is `go/internal/pyrand/testdata/draws.json` — 20 seeds
+   (including 0, negatives, and both sides of 2**32 and 2**64), the raw
+   `genrand_uint32` stream recorded separately from every method that consumes
+   it, `random()` compared as `Float64bits` rather than to a tolerance, and
+   `getrandbits` at every width from 1 to 64. It is **byte-identical under
+   CPython 3.11.15 and 3.12.13** — verified by rendering it under both, and
+   held that way continuously, since nothing in the file records which
+   interpreter wrote it and CI runs the drift test on each leg of the matrix.
+   `sample()`, which this item names, turned out to have **no caller at all**
+   and was not written.
 4. **The closed forms match to float tolerance.** `sim/karsten.py` and
    `sim/curve.py` are `math.comb` hypergeometrics and expectations — no
    sampling; Go must agree to within an epsilon pinned per function.
@@ -603,14 +643,41 @@ and a wrong byte here lands in the file somebody's deck lives in).* The edit ope
 `_commit` + the activity log (ADR 28: one call site, `record` never raises,
 no rationale text), create/import/promote/delete, notes, labels (ADR 37's
 worst-piloted reading — server-side only, as the deck page already assumes),
-admin routes, invites/resets (EmailSender seam; no test sends mail),
+the **account** routes, invites/resets (EmailSender seam; no test sends mail),
 rate limiting. *Gate: golden-deck edit equivalence — every operation applied
 by Go over fixture decks yields byte-output Python's operation also yields;
 ADR 5/16/17 matrices green via the contract suite.*
 
-**Phase 5 — Jobs and the simulator** *(~1–1½ days; **re-priced ~½–1 day**
-— the line-driven half prices at Phase 3's rate; the `pyrand` digest chase
-does not price at all, and is the whole width of the band).* The registry
+**What "admin routes" turned out to mean, recorded 2026-08-22 when the
+accounts were built.** This phase said "admin routes" without qualification
+and that sentence was false in both directions, so it now says *accounts*.
+The **stats** six under `/api/admin` are not Phase 4's: `adminstats.py` reads
+`api/jobs.py`'s in-memory registry and the process's own RSS, and
+`claude/prices.py` and `claude/tiers.py` besides — two families that have not
+moved. And one *account* route is not Phase 4's either: `DELETE
+/api/admin/users/{username}` calls `jobs.forget_owner` on that same in-memory
+registry, and it cannot be skipped, because `users.id` is re-issued by SQLite
+and jobs left keyed on a freed id would be handed to the next account
+created. Both flip behind the jobs registry, which is Phase 5. §10's board
+carries the detail; the lesson is the general one this plan keeps
+re-learning — **a prefix is not a family.**
+
+**Phase 5 — Jobs and the simulator** *(~1–1½ days; re-priced ~½–1 day, and
+**re-priced again 2026-08-22 to ~½ day** — the band's whole width was the
+`pyrand` digest chase, which said it did not price at all; it has now been
+run and it priced. Measured off the clock: first read of the plan and the
+consumers 05:44 UTC, three green Go gates 06:10 — **about 25 minutes** for
+the package, its 444KB differential corpus, the fuzz target and the
+99,274-draw replay of the reference run's stream. Two things about that
+number. It is **not** evidence the rest of Phase 5 is fast: the chase was
+the risk, and what is left is line-driven work that prices at Phase 3's
+rate. And it was 25 minutes **because the research was cheap, not because
+the reproduction was easy** — the seeding path, `getrandbits`'s word order
+and `_randbelow`'s rejection are each a place a plausible implementation is
+wrong, and all three were caught by having CPython's own answers on hand
+rather than by being careful. The corpus is the whole story; a session that
+had written the same package without one would still be looking for the
+first of them.).* The registry
 (pools → semaphores; `key=` dedupe per owner in one locked step;
 born-finished jobs; the FORGE single-lane rule), then `pyrand`, then Tier 1
 against `REFERENCE_DIGEST`, karsten + curve to tolerance, the mulligan grid,
@@ -693,11 +760,20 @@ Ordered by expected pain, each with the mitigation already in the plan:
    decks; the surgery itself never serializes; worst case the oracle parse
    gets a strictness shim, and the refusal path (edit refused, nothing
    written) already fails safe.
-3. **`pyrand` exactness stalls** (an undocumented CPython corner).
-   *Mitigation:* MT19937 + shuffle + `_randbelow` are specified and stable
-   across CPython 3.11/3.12 (the digest already proves cross-version
-   stability); fallback to statistical equivalence is pre-declared with its
-   own gate so it cannot happen silently.
+3. ~~**`pyrand` exactness stalls** (an undocumented CPython corner).~~
+   **Closed 2026-08-22 — the risk did not arrive, and it was pulled forward
+   on purpose so that sentence could be written early.** `go/internal/pyrand`
+   reproduces `random.Random` bit for bit, held to 20 seeds of CPython's own
+   answers and to the reference run's full 99,274-draw stream; the
+   statistical fallback was never reached and is withdrawn. There was no
+   undocumented corner: every difficulty was documented and *easy to skip* —
+   the `abs()`-then-`init_by_array` seeding, `getrandbits`'s least-
+   significant-word-first fill, `_randbelow`'s `n.bit_length()` rejection
+   (not `(n-1)`), and `shuffle` walking downwards. Each is a place where a
+   reasonable implementation is wrong and still looks random, which is the
+   general lesson: **the hazard here was never obscurity, it was
+   plausibility**, and the only instrument that finds plausibility is a
+   differential corpus.
 4. **CGO friction** — go-duckdb on macOS 12 Intel dev, arm64 CI, image size.
    *Mitigation:* earliest spike in the plan; native runners already build
    both arches; if this Mac cannot build, dev falls back to the container/CI
@@ -754,14 +830,34 @@ There is more than one Claude in this house now. Rules for the duration:
   | `decks/edit.py` (the nine operations and their text surgery), and PyYAML's emitter under it | **go** | `go/internal/deckedit` over `go/internal/pyyaml`, 2026-08-22 — the engine only; **no route has flipped**, so Python still serves every write. Held to Python by two generated oracles: 2,051 `_render` cases byte for byte, and 514 operation steps over eleven fixture decks (`tests/go_fixtures.py` writes both) |
   | `service._commit`, the pool checks above the editor (`_check_category`, `_identity_of`, `_check_printing_of`), `decks/source.py`'s and `decks/sqlsource.py`'s `write_text`, `decks/log.py`'s write side | **go** | `go/internal/api/edits.go`, `go/internal/library/write.go`, `go/internal/decklog`, 2026-08-22 — `create` and `delete` deliberately **not** ported yet, since an update and a create have opposite safety requirements and a method that exists but refuses is a method somebody wires up |
   | `POST .../swap`, `POST .../cards`, `DELETE .../cards/{name}`, `POST .../entomb`, `POST .../graveyard/{name}/return`, `DELETE .../graveyard/{name}`, `PATCH .../cards/{name}`, `PATCH /api/decks/{owner}/{slug}`, `PUT .../notes/{key}` | **go** | `go/internal/api`, 2026-08-22 — the fifth family, and the first that *writes*. Every one goes out through one `commit`, so the gate's verdict and ADR 28's entry are inherited rather than remembered |
-  | `decks/decklist.py`, `decks/importer.py`, `decks/model.py:Deck.dump`, `decks/source.py`'s and `decks/sqlsource.py`'s `create` / `delete` / `set_shared`, and `decks/edit.py`'s **tenth** operation | **go** | `go/internal/decklist`, `go/internal/deckimport`, `go/internal/deck/dump.go` over `go/internal/pyyaml`'s whole-document emitter, `go/internal/library/write.go`, `go/internal/deckedit`, 2026-08-22 — held to Python by two more generated oracles (15 decklist pastes, 12 imports resolved against the 21-card pool, 8 dumps). `Dump` **refuses a deck carrying notes**: the payload's order is the file's order and this package holds notes in a Go map; neither lifecycle caller can reach it, and ordering them is the artifacts flip's first job |
+  | `decks/decklist.py`, `decks/importer.py`, `decks/model.py:Deck.dump`, `decks/source.py`'s and `decks/sqlsource.py`'s `create` / `delete` / `set_shared`, and `decks/edit.py`'s **tenth** operation | **go** | `go/internal/decklist`, `go/internal/deckimport`, `go/internal/deck/dump.go` over `go/internal/pyyaml`'s whole-document emitter, `go/internal/library/write.go`, `go/internal/deckedit`, 2026-08-22 — held to Python by two more generated oracles (15 decklist pastes, 12 imports resolved against the 21-card pool, 13 dumps). `Dump` **refused a deck carrying notes** until the artifacts flip ordered them, which is the expiry that refusal named for itself |
   | `POST /api/decks`, `POST /api/decks/import`, `DELETE /api/decks/{owner}/{slug}`, `PUT .../shared` | **go** | `go/internal/api/lifecycle.go`, 2026-08-22 — the sixth family: the moments a deck begins and ends. **None of them goes through `commit`**, because creation, deletion and sharing are outside `service._commit` in Python and therefore outside ADR 28's log; keeping them outside is the decision, since adding one means a second call site and one call site is the log's whole design |
-  | `POST /api/decks/{owner}/{slug}/artifacts` and `artifacts/generate.py` | python | **its own flip, decided 2026-08-22 rather than drifted into.** It is `render_all` — five markdown deliverables whose *bytes* are the product, `swaps.md` being a diff of `deck.yaml` — which is a rendering surface of the edit engine's weight and nothing to do with a lifecycle. It also needs what the lifecycle deliberately did not build: the snapshot is `deck.dump()` of a **parsed** deck, so the notes have to carry their file order across before a single primer can be written |
-  | everything else under `/api` — `api/` (the jobs, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the wheel), `sim/`, `claude/`, `mana.py` (the solver), `tarot.py`, `cli.py`, and all of `auth/`'s writes | python | proxied to uvicorn on loopback; Phase 4 finishes with the accounts (admin routes, invites and resets through the EmailSender seam, rate limiting) |
+  | `artifacts/generate.py` — the renderer, `store`, and the notes' file order under both | **go** | `go/internal/artifacts` over `go/internal/deckyaml`'s `ParseOrdered`, 2026-08-22 — the engine only; the route followed in the row below. Held to Python by an eighth generated oracle: 18 fixture decks, every deliverable byte for byte and in order, the draft refusal's own sentence included, with the date pinned so the corpus does not expire at midnight. Ordering the notes **fixed a live regression**: `GET .../{slug}` had served them alphabetised since the deck reads flipped (#226, v159), and the deck page's Notes tab renders the payload's order unsorted |
+  | `POST /api/decks/{owner}/{slug}/artifacts` and `decks/source.py`'s `write_artifacts` | **go** | `go/internal/api/artifacts.go`, `go/internal/library/write.go`, 2026-08-22 — the flip that finishes Phase 4's **deck** side, every route under `/api/decks` now the door's. Deliberately not numbered among the families: the accounts row below claims a number too, and which of the two lands first is a fact about a night's merge order rather than about the port. A **plain route, and that was measured** (70–83ms warm across four real decks on the instance), so it stays one; and it is deliberately **outside ADR 28's log**, which is why it does not go through `commit` even though it writes. Two refusals and only one is forceable: the gate's errors yield to `force`, a draft never does (ADR 13) |
+  | `auth/users.py`, `auth/tokens.py`, `auth/invites.py`, `auth/ratelimit.py`, `auth/mail.py`, and the write sides of `auth/sessions.py` and `auth/passwords.py`; `claude/tiers.py`'s table | **go** | `go/internal/auth` (one Go package for one Python package, file for file) and `go/internal/tiers`, 2026-08-22 — the engine only; **no route has flipped**, so Python still serves every account request. The write handle is `mode=rw`, never `rwc`, and an absent `app.db` is **read as an empty one** — measured against Python, which creates the file on the first login and then answers 401 against it, because a reader cannot tell empty from absent. Held to Python by `go/internal/auth/testdata/crypto.json`: the exact PHC string argon2-cffi writes for a password **and a fixed salt**, which the Go encoder must reproduce byte for byte — a round trip in each direction would pass even if the two encoders disagreed about base64 padding for some salts and not others |
+  | `POST /api/auth/login`, `logout`, `reset`, `claim`, `claim/preview`, `GET /api/auth/me`; `GET` and `POST /api/admin/users`, `PATCH /api/admin/users/{username}`, `POST .../reset`, `DELETE .../sessions` | **go** | `go/internal/api/accounts.go` and `admin.go`, 2026-08-22 — the seventh family: eleven of the twelve registrations under `/api/auth` and `/api/admin/users`. The public six are the ones with no session behind them, so each is rate limited and each is written so a refusal tells the caller nothing it did not already know; the admin five are protected twice, by the prefix the door refuses before routing and by `requireAdmin` on the handler. `POST /api/auth/reset` is the only route in the whole port with work *after* the response — Starlette's `BackgroundTasks`, and the reason is the timing: a hit costs a database read and an HTTPS round trip, a miss costs neither, and neither happens while anybody is waiting. **The twelfth registration, `DELETE /api/admin/users/{username}`, is not here** — it is the row below, and it is still Python's. This row is checkable: `grep -c 'api/auth' go/internal/api/api.go` is non-zero from the commit that landed the routes, and was **zero** for the day the engine's PR carried this row ahead of the code |
+  | `DELETE /api/admin/users/{username}` | python | **blocked behind the jobs registry, not deferred by choice.** Deleting an account also calls `jobs.forget_owner`, and `api/jobs.py` holds its jobs **in memory in the uvicorn process** — which the door cannot reach. The reason it must not be skipped is arithmetic rather than tidiness: `users.id` is `INTEGER PRIMARY KEY` without `AUTOINCREMENT`, so SQLite re-issues a deleted account's rowid, and jobs left keyed on that integer would be handed to whoever is created next. The response says `jobs_dropped`, so a Go handler could not even report an honest number. It flips with the jobs family |
+  | `/api/admin/stats/*` (the six), `api/traffic.py`, `api/flymetrics.py` | python | **not part of Phase 4, despite the prefix.** `adminstats.py` is coupled to two families that have not moved: `stats/system` reads the same in-memory job registry *and* `_rss()`, the process's own resident size — which is the worse of the two, because a Go handler would answer it *successfully* with the door's RSS and the number would keep rendering while quietly changing meaning; and `stats/claude` reads `claude/prices.py` and `claude/tiers.py`, so porting it now would drag slices of `claude/` across ahead of its family, which §7's "a route family moves whole" forbids. It flips behind the jobs registry and the Claude family |
+  | CPython's `random.Random` — MT19937, `init_by_array` seeding, `random()`, `getrandbits`, `_randbelow`, `randrange`, `shuffle`, `choice` | **go** | `go/internal/pyrand`, 2026-08-22 — **Phase 5's named tail risk, pulled forward and closed** (§5 item 3, §11 risk 3). A library, not a route: nothing calls it yet and nothing flipped. Held to CPython by `testdata/draws.json` (20 seeds, the raw word stream recorded apart from every consumer, `random()` compared as bits) plus a replay of the reference run's full 99,274-draw stream, so Tier 1's randomness is a checked fact before the engine that consumes it exists. `sample()` had no caller and was not written |
+  | everything else under `/api` — `api/` (the jobs, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the wheel), `sim/`, `claude/`, `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
   walked before the next flip starts (main deploys itself; every flip is a
   release).
+- **A board row is a claim about the code, and the code is what says whether
+  it is true.** A row moves to **go** in the PR that *registers the routes*,
+  never in the one before it — and the date on it is the date those routes
+  landed, not the date somebody wrote the row. This is here because it was
+  broken the day it was written: the accounts engine's PR (2026-08-22)
+  described the account routes as **go** while `go/internal/api` had no such
+  pattern in it, and a live capture showed `GET /api/auth/me` still reaching
+  uvicorn. Nothing was served wrongly and the next PR made it true within
+  hours — the cost is entirely to the *next session*, which reads this table
+  as the frontier and would have been told a family was done while it was
+  still proxied. Two of the three false completeness claims this project has
+  found were in documents nobody could check; this one was checkable in one
+  command, so **write rows that name the command** (`grep` for the pattern,
+  `git show origin/main:` for the file) and run it before merging.
 - **Schema changes keep their standing rule** — own branch, merged while
   watched — and during coexistence they land in the runtime that owns the
   ladder (Python until Phase 8).

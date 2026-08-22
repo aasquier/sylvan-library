@@ -26,6 +26,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
@@ -62,22 +63,44 @@ type Config struct {
 	// `app.db` -- where an edit is recorded as a warning and still succeeds,
 	// because the deck write has already happened by then.
 	Recorder *decklog.Recorder
+	// RequireAuth mirrors MTGLAB_REQUIRE_AUTH. Two account routes read it and
+	// nothing else does: `me` reports it, and `logout` deletes the session row
+	// only when it is on -- both exactly as `auth.install(require=…)` does.
+	RequireAuth bool
+	// SecureCookies mirrors MTGLAB_SECURE_COOKIES: the `Secure` attribute on
+	// the session cookie, on once TLS fronts the app.
+	SecureCookies bool
+	// EmailSender is ADR 16's seam reaching the edge. Nil means "decide from
+	// the environment, when a message is actually being sent", which is what a
+	// real process wants -- and which is also why no test here sends mail: the
+	// tests pass a recorder instead.
+	EmailSender auth.EmailSender
 }
 
 // API holds the ported routes' dependencies.
 type API struct {
-	log        *slog.Logger
-	pool       *pool.Pool
-	db         *sql.DB
-	writeDB    *sql.DB
-	dbPath     string
-	decksDir   string
-	adminEmail string
-	shelves    *shelves.Shelves
-	log28      *decklog.Recorder
+	log           *slog.Logger
+	pool          *pool.Pool
+	db            *sql.DB
+	writeDB       *sql.DB
+	dbPath        string
+	decksDir      string
+	adminEmail    string
+	shelves       *shelves.Shelves
+	log28         *decklog.Recorder
+	requireAuth   bool
+	secureCookies bool
+	email         auth.EmailSender
 
-	lazy   sync.Mutex
-	lazyDB *sql.DB
+	lazy        sync.Mutex
+	lazyDB      *sql.DB
+	lazyWriteDB *sql.DB
+
+	// bg tracks the work started after a response has gone -- Starlette's
+	// `BackgroundTasks`, which one route needs (`POST /api/auth/reset`, whose
+	// whole timing argument is that the lookup happens where nobody is
+	// waiting). Only tests wait on it.
+	bg sync.WaitGroup
 }
 
 // New builds the ported routes.
@@ -87,8 +110,39 @@ func New(cfg Config) *API {
 	}
 	return &API{log: cfg.Logger, pool: cfg.Pool, db: cfg.AppDB, writeDB: cfg.AppWriteDB,
 		dbPath: cfg.AppDBPath, decksDir: cfg.DecksDir, adminEmail: cfg.AdminEmail,
-		shelves: cfg.Shelves, log28: cfg.Recorder}
+		shelves: cfg.Shelves, log28: cfg.Recorder, requireAuth: cfg.RequireAuth,
+		secureCookies: cfg.SecureCookies, email: cfg.EmailSender}
 }
+
+// background runs fn after the response has gone, which is Starlette's
+// `BackgroundTasks` and, for the one route that uses it, the whole design:
+// `POST /api/auth/reset` must cost the same whether or not the address
+// resolves, and it can only do that if the lookup happens where nobody is
+// timing it.
+//
+// The context is detached from the request's, because the request is over --
+// a cancelled one must not abort a message that is already owed. It carries a
+// ceiling so a hung mail provider cannot leak a goroutine per attempt.
+func (a *API) background(fn func(context.Context)) {
+	a.bg.Add(1)
+	go func() {
+		defer a.bg.Done()
+		ctx, cancel := context.WithTimeout(context.Background(), backgroundBudget)
+		defer cancel()
+		fn(ctx)
+	}()
+}
+
+// backgroundBudget bounds one background task. Comfortably past `MailTimeout`
+// plus a database read, and far short of anything that would pile up.
+const backgroundBudget = 30 * time.Second
+
+// WaitBackground blocks until every background task has finished. **For tests
+// only** -- production never calls it, so the code path under test is the one
+// that ships. A test that ran the task inline instead would be measuring
+// something else: the asynchrony is the property, not an implementation
+// detail.
+func (a *API) WaitBackground() { a.bg.Wait() }
 
 // recorder is the activity log's writer. Nil is a real state -- an instance
 // with no `app.db` -- and `Record` on a nil Recorder warns and returns, which
@@ -176,6 +230,49 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPost, Pattern: "/api/decks/import", Handler: a.importDeck},
 		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}", Handler: a.deleteDeck},
 		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/shared", Handler: a.setDeckShared},
+		// The artifacts rebuild, and with it every route under `/api/decks` is
+		// the door's: the five deliverables, derived from the deck rather than
+		// edited into it. A **plain route**
+		// and not a job, which was measured rather than assumed -- 70-83ms
+		// warm across four real decks on the instance. Like the lifecycle
+		// above it does not go through `commit`, and for a sharper reason:
+		// this changes no deck field at all, so ADR 28 has nothing to record.
+		// The two GETs on the same path flipped with the deck reads.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/artifacts", Handler: a.buildArtifacts},
+		// The accounts (Phase 4's last flip): the five public doors of
+		// `api/auth.py` and the `me` that says who is standing in them, then
+		// the admin surface of `api/admin.py`. The middleware half of
+		// `api/auth.py` crossed in Phase 2 and lives in `internal/door`;
+		// these are the routes it lets through.
+		//
+		// **Every one of the first six is in `PUBLIC_PATHS`**, which is the
+		// load-bearing fact about them: reachable with no session, so each is
+		// rate limited and each is written so a refusal tells the caller
+		// nothing it did not already know.
+		{Method: http.MethodPost, Pattern: "/api/auth/login", Handler: a.login},
+		{Method: http.MethodPost, Pattern: "/api/auth/logout", Handler: a.logout},
+		{Method: http.MethodPost, Pattern: "/api/auth/reset", Handler: a.requestReset},
+		{Method: http.MethodPost, Pattern: "/api/auth/claim", Handler: a.claim},
+		{Method: http.MethodPost, Pattern: "/api/auth/claim/preview", Handler: a.claimPreview},
+		{Method: http.MethodGet, Pattern: "/api/auth/me", Handler: a.me},
+		// The admin surface. The door refuses this prefix to a non-admin
+		// before routing (ADR 17, and 403 rather than ADR 5's 404 because an
+		// admin route's existence is published in a public repository);
+		// `requireAdmin` on each handler is the second check, and the only
+		// one an admin route mounted somewhere else by mistake would have.
+		//
+		// `DELETE /api/admin/users/{username}` is deliberately absent and
+		// still Python's: it calls `jobs.forget_owner` on a registry held in
+		// the uvicorn process's memory, and `users.id` is re-issued by
+		// SQLite, so jobs left keyed on a freed id would be handed to the
+		// next account created. `internal/api/admin.go` argues it; it flips
+		// with the jobs family. A DELETE on that path simply matches no route
+		// here and goes to the proxy as it arrived.
+		{Method: http.MethodGet, Pattern: "/api/admin/users", Handler: a.listAccounts},
+		{Method: http.MethodPost, Pattern: "/api/admin/users", Handler: a.inviteAccount},
+		{Method: http.MethodPatch, Pattern: "/api/admin/users/{username}", Handler: a.updateAccount},
+		{Method: http.MethodPost, Pattern: "/api/admin/users/{username}/reset", Handler: a.sendAccountReset},
+		{Method: http.MethodDelete, Pattern: "/api/admin/users/{username}/sessions", Handler: a.revokeSessions},
 	}
 }
 

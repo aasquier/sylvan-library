@@ -1,0 +1,75 @@
+{
+ "argon2id": {
+  "params": {
+   "memory_cost_kib": 19456,
+   "time_cost": 2,
+   "parallelism": 1,
+   "salt_bytes": 16,
+   "hash_bytes": 32
+  },
+  "min_password_length": 12,
+  "max_password_bytes": 1024,
+  "cases": [
+   {
+    "note": "an ordinary passphrase",
+    "password": "correct horse battery staple",
+    "salt_b64": "AAsWISw3Qk1YY255hI+apQ==",
+    "hash": "$argon2id$v=19$m=19456,t=2,p=1$AAsWISw3Qk1YY255hI+apQ$27/eq2elLWfhcG/LhcdmGq2hP9O5eZ863aAs6KYjqG4"
+   },
+   {
+    "note": "the shortest a route will store",
+    "password": "twelve chars",
+    "salt_b64": "JTA7RlFcZ3J9iJOeqbS/yg==",
+    "hash": "$argon2id$v=19$m=19456,t=2,p=1$JTA7RlFcZ3J9iJOeqbS/yg$AV8YhMXgoWEz3/uBviotk3Y1NG3BPdi4fo5IVh1u6EI"
+   },
+   {
+    "note": "below the floor, still verifiable",
+    "password": "short",
+    "salt_b64": "SlVga3aBjJeirbjDztnk7w==",
+    "hash": "$argon2id$v=19$m=19456,t=2,p=1$SlVga3aBjJeirbjDztnk7w$ibNavTYiLN4ObRK9OZFUk7A2xxFVpsaLWVMNoq049Mo"
+   },
+   {
+    "note": "empty, which verify must not crash on",
+    "password": "",
+    "salt_b64": "b3qFkJumsbzH0t3o8/4JFA==",
+    "hash": "$argon2id$v=19$m=19456,t=2,p=1$b3qFkJumsbzH0t3o8/4JFA$4i7iHu4CLmYMDifkAHx05g+yxWI/BrLc+Llx+LWUrjo"
+   },
+   {
+    "note": "unicode above the BMP",
+    "password": "🜁 quicksilver 🜃 the alchemist's word",
+    "salt_b64": "lJ+qtcDL1uHs9wINGCMuOQ==",
+    "hash": "$argon2id$v=19$m=19456,t=2,p=1$lJ+qtcDL1uHs9wINGCMuOQ$4mtYXdmRRCzFaaIm/VCSsHlHwRkXa1bK1CYomcAbnRE"
+   },
+   {
+    "note": "a colon and a dollar, which PHC delimits on",
+    "password": "a$b:c$d$e:f$gh",
+    "salt_b64": "ucTP2uXw+wYRHCcyPUhTXg==",
+    "hash": "$argon2id$v=19$m=19456,t=2,p=1$ucTP2uXw+wYRHCcyPUhTXg$MSrc/T+tOVShBB61IkVCW4t60OLjYZT2UER+DP+zR0k"
+   },
+   {
+    "note": "at the byte ceiling",
+    "password": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "salt_b64": "3un0/woVICs2QUxXYm14gw==",
+    "hash": "$argon2id$v=19$m=19456,t=2,p=1$3un0/woVICs2QUxXYm14gw$RNVxxdzjOrrAUM0+OkPOCKzjAB5aOdRUcZWMI9FA8dk"
+   }
+  ]
+ },
+ "sha256_hex": [
+  {
+   "input": "",
+   "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "input": "a",
+   "digest": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb"
+  },
+  {
+   "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "digest": "cc0b1c2c66f3bb9fd1a081c626ba1bef62f6f96441a43be15268523776ac26a1"
+  },
+  {
+   "input": "🜂-a-token-with-unicode-in-it",
+   "digest": "aa3717c2dd45e2bd9d957b4a5afea8d7abbcb3e859d40fa8a15e68225d393a3c"
+  }
+ ]
+}
