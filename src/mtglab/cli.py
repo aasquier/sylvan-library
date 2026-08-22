@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from math import fsum
 from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Any
@@ -898,8 +899,14 @@ def cmd_sim_forge(args: argparse.Namespace) -> None:
     played = [g.milliseconds / 1000 for g in result.games]
     print(f"{len(result.games)} games in {result.wall_seconds:.1f}s "
           f"({result.startup_seconds:.1f}s of it JVM + card database)")
+    # `fsum` for the rule rather than for this number: these are wall-clock
+    # readings off a JVM, so the mean is not reproducible whatever sums it.
+    # It is spelled the same as every other float sum in the package so that
+    # `sum(` over floats stays a defect anybody can grep for, with no
+    # exception a reader has to re-derive as harmless. `tests/test_float_sums.py`
+    # is that grep.
     print(f"per game: {min(played):.1f}s min / "
-          f"{sum(played) / len(played):.1f}s mean / {max(played):.1f}s max")
+          f"{fsum(played) / len(played):.1f}s mean / {max(played):.1f}s max")
     for slug in args.slugs:
         print(f"  {slug:<22} {wins.get(slug, 0)}")
     if wins.get("draw"):
@@ -966,7 +973,12 @@ def cmd_price_deck(args: argparse.Namespace) -> None:
           AND NOT promo
         GROUP BY name ORDER BY 2 DESC
     """, [[n.lower() for n in names]]).fetchall()
-    total = sum(r[1] for r in rows)
+    # `fsum`, not `sum`, for the reason `artifacts/generate.py` sets out: a
+    # bare `sum` over floats is compensated on CPython 3.12 and left to right
+    # on 3.11. This is the same money total the shopping list prints, from
+    # the same column, and two spellings of one sum answering two ways is
+    # how a difference nobody can explain gets discovered.
+    total = fsum(r[1] for r in rows)
     for name, price in rows:
         print(f"  {price:>8.2f}  {name}")
     print(f"\n  {total:>8.2f}  TOTAL ({len(rows)}/{len(names)} priced)")

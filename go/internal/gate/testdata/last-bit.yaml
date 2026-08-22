@@ -1,0 +1,37 @@
+slug: last-bit
+name: Last Bit Fixture
+status: theoretical
+stage: curated
+commander:
+  - Goreclaw, Terror of Qal Sisma
+bracket: 2
+strategy: A fixture, not a deck. See tests/tiny_pool.py.
+cards:
+  - name: Sol Ring
+    category: ramp
+    why: Two mana on turn one, and it always has been.
+  - name: Regal Behemoth
+    category: threat
+    why: Doubles the mana and refills the hand.
+  - name: Vorinclex, Voice of Hunger
+    category: threat
+    why: Taxes every opponent's mana.
+  - name: Cultivator Colossus
+    category: threat
+    why: Trample body that puts lands onto the battlefield; ramp and threat in one.
+  - name: Forest
+    category: land
+    why: Basic, untapped, and the only green source this list needs.
+    qty: 91
+  - name: Craterhoof Behemoth
+    category: threat
+    why: The finisher every green deck owes itself.
+  - name: Terastodon
+    category: interaction
+    why: Green's answer to a permanent it cannot target.
+  - name: Woodfall Primus
+    category: interaction
+    why: Persist, and the artifact goes twice.
+  - name: Bag End Banquet
+    category: ramp
+    why: Colourless, so it costs the identity nothing.

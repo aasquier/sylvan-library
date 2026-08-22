@@ -261,7 +261,48 @@ def gate_cases() -> dict[str, Deck]:
     artifact.cards[-1].qty += 1                             # keep the 99
     return {"mono-green": mono, "mono-green-clean": clean, "draft": draft,
             "messy": messy, "kaheera": kaheera, "pair": pair,
-            "artifact-commander": artifact, "rich": rich_deck()}
+            "artifact-commander": artifact, "last-bit": last_bit_deck(),
+            "rich": rich_deck()}
+
+
+def last_bit_deck() -> Deck:
+    """A deck at the shape where `analyze.opening_hand`'s `keepable` parts.
+
+    Not a deck anybody would play, and not pretending to be: it is the ninth
+    fixture and it exists for one number. `keepable` sums three hypergeometric
+    probabilities, and **`sum()` over floats is not the same function on every
+    interpreter** -- CPython 3.12 gave it compensated (Neumaier) accumulation
+    where 3.11 adds left to right, and a Go `+=` loop reproduces 3.11 while the
+    container runs 3.12. Swept over every deck size from 8 to 250 and every
+    land count inside it, the two arithmetics disagree in 5,098 shapes.
+
+    **The other eight fixtures are in none of them.** They sit at 99 cards on
+    95 or 96 lands and at 106 on 96, and the arithmetic happens to agree there,
+    so before this deck existed the corpus could not have caught the naive loop
+    the port was written with -- a green test that had no way to go red. This
+    is the same hole `sim/curve.py`'s `tie-breaker` deck was cut for, on the
+    same day, from the opposite direction.
+
+    99 cards on **91** lands is the nearest divergent shape reachable from
+    `tiny_pool`, whose 21 cards cannot furnish the 65 nonlands a realistic land
+    count would need. It is `mono_green_deck(clean=True)` with four more green
+    spells and four fewer Forests, so it is gate-clean and reads as a sibling
+    of the deck it came from. Measured: 3.11 answers 0.010640320706772594 and
+    3.12 answers 0.010640320706772595, and the difference reaches the JSON.
+    """
+    import tiny_pool
+    deck = tiny_pool.mono_green_deck(clean=True)
+    deck.slug, deck.name = "last-bit", "Last Bit Fixture"
+    forest = next(c for c in deck.cards if c.name == "Forest")
+    extra = [
+        ("Craterhoof Behemoth", "threat", "The finisher every green deck owes itself."),
+        ("Terastodon", "interaction", "Green's answer to a permanent it cannot target."),
+        ("Woodfall Primus", "interaction", "Persist, and the artifact goes twice."),
+        ("Bag End Banquet", "ramp", "Colourless, so it costs the identity nothing."),
+    ]
+    deck.cards.extend(CardEntry(name=n, category=c, why=w) for n, c, w in extra)
+    forest.qty -= len(extra)                     # still 99, now on 91 lands
+    return deck
 
 
 def render_gate_cases() -> dict[str, str]:
@@ -317,6 +358,162 @@ def render_gate_cases() -> dict[str, str]:
 def issue_json(issue: Any) -> dict[str, Any]:
     return {"level": issue.level, "code": issue.code, "message": issue.message,
             "card": issue.card}
+
+
+# --------------------------------------------------- the scorer's own corpus
+#
+# `suggest.score` had exactly one differential case: the Titan's four
+# candidates out of the 21-card pool, which is four points in a space with
+# four dimensions. That was enough to prove the *reasons* and the ordering and
+# nothing at all about the arithmetic, and on 2026-08-22 the arithmetic turned
+# out to be where the bug was -- the weighted sum was `sum` in Python (which
+# CPython 3.12 compensates and 3.11 does not) and a chain of `+` in Go (which
+# is 3.11's answer, and fusable into an FMA on arm64 besides).
+#
+# Real cards cannot be steered onto a knife edge. Synthetic ones can: each
+# case here names the four component scores it wants and builds a pair of
+# records that produce them, so the corpus covers the reachable range on
+# purpose rather than by luck.
+
+SCORE_PATH = ROOT / "go" / "internal" / "suggest" / "testdata" / "scores.json"
+
+
+def _score_word(i: int) -> str:
+    """A significant token: alphabetic (`_WORD` is `[a-z]+`), longer than two
+    letters, and nowhere near the stopword list."""
+    return f"zz{chr(97 + i // 26)}{chr(97 + i % 26)}"
+
+
+def _score_pair(spec: dict[str, Any]) -> tuple[Any, Any]:
+    """Two records built to produce the component scores `spec` asks for.
+
+    `keywords` is `(target, candidate, shared)` counts, so the Jaccard the
+    scorer computes is `shared / (target + candidate - shared)`; `tokens` is
+    `(target, shared)`, so the asymmetric text score is `shared / target`.
+    """
+    from mtglab.cards.db import CardRecord
+    kt, kc, ks = spec["keywords"]
+    xt, xs = spec["tokens"]
+    shared_kw = [f"shared{i:02d}" for i in range(ks)]
+    target_kw = shared_kw + [f"onlytarget{i:02d}" for i in range(kt - ks)]
+    cand_kw = shared_kw + [f"onlycand{i:02d}" for i in range(kc - ks)]
+    target_words = [_score_word(i) for i in range(xt)]
+    # The candidate repeats `xs` of the target's words and adds its own, so
+    # the denominator stays the target's vocabulary.
+    cand_words = target_words[:xs] + [_score_word(500 + i) for i in range(4)]
+
+    def rec(name: str, type_line: str, cmc: float, kws: list[str],
+            words: list[str], rank: int | None) -> Any:
+        return CardRecord(
+            name=name, mana_cost=None, cmc=cmc, type_line=type_line,
+            oracle_text=" ".join(words), color_identity=frozenset(),
+            produced_mana=(), legal_commander=False, reserved=False,
+            edhrec_rank=rank, image_normal=None, keywords=tuple(kws))
+
+    return (rec("Target Card", spec["target_type"], spec["target_cmc"],
+                target_kw, target_words, None),
+            rec("Candidate Card", spec["candidate_type"], spec["candidate_cmc"],
+                cand_kw, cand_words, spec["rank"]))
+
+
+def _score_spec(target_type: str, candidate_type: str, target_cmc: float,
+                candidate_cmc: float, keywords: tuple[int, int, int],
+                tokens: tuple[int, int], rank: int | None,
+                note: str) -> dict[str, Any]:
+    return {"target_type": target_type, "candidate_type": candidate_type,
+            "target_cmc": target_cmc, "candidate_cmc": candidate_cmc,
+            "keywords": keywords, "tokens": tokens, "rank": rank, "note": note}
+
+
+def score_specs() -> list[dict[str, Any]]:
+    """Every pair the corpus asks Python about.
+
+    The first block walks the scorer's ordinary range -- both permanents, one
+    permanent, an exact type match, every curve distance the score is nonzero
+    over, no keywords at all on the target (which scores 0 rather than
+    renormalising), no shared text, all shared text, and the popularity nudge
+    at both ends. The second block is the point: quadruples measured to fall
+    where a left-to-right sum and a correctly-rounded one disagree.
+    """
+    ordinary = [
+        _score_spec("Creature — Elf", "Creature — Beast", 3.0, 3.0,
+                    (3, 3, 3), (10, 10), 1, "identical everything, rank 1"),
+        _score_spec("Creature — Elf", "Artifact", 4.0, 4.0,
+                    (2, 2, 0), (12, 0), None, "permanent for permanent, nothing shared"),
+        _score_spec("Instant", "Creature — Elf", 2.0, 5.0,
+                    (0, 3, 0), (8, 4), 500, "no target keywords, curve three apart"),
+        _score_spec("Sorcery", "Sorcery", 6.0, 5.0,
+                    (4, 2, 1), (20, 7), 12345, "same type, one off the curve"),
+        _score_spec("Land", "Land", 0.0, 0.0,
+                    (1, 1, 1), (3, 3), 99999, "lands, and the rank floor"),
+        _score_spec("Enchantment", "Instant", 5.0, 1.0,
+                    (2, 2, 1), (15, 5), None, "curve four apart, so curve scores zero"),
+        _score_spec("Planeswalker", "Battle", 4.0, 6.0,
+                    (5, 5, 2), (30, 11), 3, "two permanents, two off the curve"),
+        _score_spec("Creature — Elf", "", 3.0, 3.0,
+                    (2, 2, 2), (6, 6), 250, "an empty type line scores zero"),
+    ]
+    # Measured on 2026-08-22: with these four components, adding
+    # `0.30t + 0.20c + 0.15k + 0.35x` left to right and summing it correctly
+    # give different doubles, and the first two differ at `round(., 4)` --
+    # the value that is serialised and sorted on.
+    knife_edge = [
+        _score_spec("Instant", "Sorcery", 3.0, 3.0, (6, 7, 1), (40, 13), None,
+                    "type 0, curve 1, keywords 1/12, text 13/40 -- differs at four places"),
+        _score_spec("Instant", "Sorcery", 3.0, 3.0, (5, 6, 1), (40, 21), 620,
+                    "keywords 1/10, text 21/40, with the popularity nudge on top"),
+        _score_spec("Instant", "Sorcery", 2.0, 2.0, (6, 7, 1), (40, 19), None,
+                    "keywords 1/12, text 19/40"),
+    ]
+    return ordinary + knife_edge
+
+
+def score_cases() -> list[dict[str, Any]]:
+    """Each pair, the records it builds, and what Python's `score` answers."""
+    from mtglab.decks import suggest as sg
+
+    def as_json(rec: Any) -> dict[str, Any]:
+        return {"name": rec.name, "type_line": rec.type_line, "cmc": rec.cmc,
+                "oracle_text": rec.oracle_text,
+                "keywords": list(rec.keywords),
+                "edhrec_rank": rec.edhrec_rank}
+
+    out: list[dict[str, Any]] = []
+    for spec in score_specs():
+        target, candidate = _score_pair(spec)
+        result = sg.score(target, candidate, why="")
+        tokens = sg._tokens(target.oracle_text, "")
+        out.append({
+            "note": spec["note"],
+            "target": as_json(target),
+            "candidate": as_json(candidate),
+            # The four components, recorded apart from the score they sum to,
+            # so a failure says which half is wrong -- the same division
+            # `pyrand`'s corpus makes between the word stream and its
+            # consumers.
+            "parts": [sg._type_score(target, candidate),
+                      sg._curve_score(target, candidate),
+                      sg._keyword_score(target, candidate),
+                      sg._text_score(tokens, candidate)],
+            "weights": [0.30, 0.20, 0.15, 0.35],
+            "popularity": sg._popularity(candidate),
+            "score": result.score,
+            "reasons": list(result.reasons),
+        })
+    return out
+
+
+def render_score_cases() -> str:
+    return _rows_json({
+        "note": "`suggest.score` over synthetic records, component by "
+                "component. Written by `python tests/go_fixtures.py`.",
+        "why": "The weighted sum is `math.fsum` and each product is rounded "
+               "on its own. A chain of `+` is CPython 3.11's `sum` rather "
+               "than 3.12's, and `a*b + c*d` is what arm64 fuses into one "
+               "FMADDD -- and the value is rounded to four places and then "
+               "sorted on, so either difference is a different shortlist.",
+        "cases": score_cases(),
+    }) + "\n"
 
 
 # --------------------------------------------------------- the render oracle
@@ -1368,6 +1565,38 @@ def artifact_decks() -> dict[str, Deck]:
     ]
     return {
         "every-category": every,
+        # The shopping list's total, at the one place its two decimals can
+        # show which interpreter added them up. `render_all`'s `total` was a
+        # bare `sum` over floats until 2026-08-22 and the Go port was a `+=`
+        # loop, which is CPython 3.11's `sum` and not 3.12's -- and 3.12 is
+        # what the image runs. `every-category` prices four cards and could
+        # not catch it: its 12.5, 0.25 and 1.995 are all exact halves or
+        # quarters until the last addition, so the naive answer *is* the
+        # correctly-rounded one and the byte-exact oracle passed either way.
+        # A test that cannot fail is the thing worth fixing here, not the
+        # line above it.
+        #
+        # Three cards at half-cent prices, the same shape as the 1.995 the
+        # older case already carries. Their exact total is 902.405, dead on
+        # the boundary `{:.2f}` rounds at: adding them left to right gives
+        # 902.4050000000001 and renders **902.41**, and the correctly-rounded
+        # sum gives 902.405 and renders **902.40**. Measured separately, and
+        # worth writing down: over two million random all-two-decimal price
+        # sets, *none* renders a different total, so real Scryfall prices
+        # could never have exposed this. The guard has to be built, not
+        # waited for.
+        "half-cent": Deck(
+            slug="half-cent", name="The Half Cent", status="built",
+            stage="curated", commander=["Gyome, Master Chef"],
+            strategy="Three cards whose prices land on the rounding boundary.",
+            cards=[CardEntry(name="Forest", category="land", qty=96,
+                             why="Green, and the rest of the deck."),
+                   CardEntry(name="Card A", category="ramp",
+                             why="Dearest of the three."),
+                   CardEntry(name="Card B", category="ramp",
+                             why="Priced so the order of addition matters."),
+                   CardEntry(name="Card C", category="ramp",
+                             why="The one that carries the last bit.")]),
         # Every note key both primers ask for, with the whitespace `_note`
         # strips still on them.
         "full-notes": Deck(
@@ -1432,6 +1661,15 @@ def artifact_cases() -> list[dict[str, Any]]:
                          why="It was here and now it is not."),
                CardEntry(name="Cut With None", category="ramp", why=""),
                CardEntry(name="Forest", category="land", qty=30, why="Green.")])
+    # The baseline for `half-cent`: the same deck with the three priced cards
+    # not yet in it, so `add` is exactly `["Card A", "Card B", "Card C"]` --
+    # alphabetical, which is the order `swaps.md` adds them in. That order is
+    # half of the point: a left-to-right sum is a function of it.
+    before_half_cent = Deck(
+        slug="half-cent", name="The Half Cent", status="built", stage="curated",
+        commander=["Gyome, Master Chef"],
+        cards=[CardEntry(name="Forest", category="land", qty=96,
+                         why="Green, and the rest of the deck.")])
     extras: dict[str, dict[str, Any]] = {
         "every-category": {
             "previous": previous,
@@ -1440,6 +1678,13 @@ def artifact_cases() -> list[dict[str, Any]]:
             "prices": {"Card 1": 12.5, "Card 2": 12.5, "Card 3": 0.25,
                        "Sol Ring": 1.995},
             "stats": {"mulligan rate": "12.4%", "spells through T8": "9.1"},
+        },
+        # 142.115 + 412.545 + 347.745 is exactly 902.405. Left to right that
+        # is 902.4050000000001 and renders 902.41; correctly rounded it is
+        # 902.405 and renders 902.40. See the deck's own note above.
+        "half-cent": {
+            "previous": before_half_cent,
+            "prices": {"Card A": 142.115, "Card B": 412.545, "Card C": 347.745},
         },
         "full-notes": {"previous": previous},
     }
@@ -1687,6 +1932,9 @@ def write() -> None:
     for name, body in render_gate_cases().items():
         (GATE_DIR / name).write_text(body, encoding="utf-8")
     print(f"wrote {len(render_gate_cases())} gate cases into {GATE_DIR}")
+    SCORE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SCORE_PATH.write_text(render_score_cases(), encoding="utf-8")
+    print(f"wrote {len(score_specs())} scorer cases into {SCORE_PATH}")
     CRYPTO_PATH.parent.mkdir(parents=True, exist_ok=True)
     CRYPTO_PATH.write_text(render_crypto_cases(), encoding="utf-8")
     print(f"wrote the Argon2id and token-hash oracle into {CRYPTO_PATH}")
@@ -2122,7 +2370,10 @@ def render_pyrand_cases() -> str:
 #: `round(x)` and `round(x, n)`. Their own corpus, because they are the floor
 #: the two closed forms stand on and a failure there should not be reported as
 #: a failure of arithmetic built on top of them.
-PYFLOAT_PATH = ROOT / "go" / "internal" / "sim" / "testdata" / "pyfloat.json"
+#: Its own package since 2026-08-22 -- `go/internal/pyfloat`, beside `pyrand`
+#: and `pyyaml` -- because `artifacts`, `analyze` and `suggest` need `Fsum`
+#: too, and none of the three is the simulator.
+PYFLOAT_PATH = ROOT / "go" / "internal" / "pyfloat" / "testdata" / "pyfloat.json"
 #: Tier 1.5's closed form: the hypergeometrics, the requirement, the
 #: castability heatmap, the regression land count, and whole shelves.
 KARSTEN_PATH = ROOT / "go" / "internal" / "sim" / "karsten" / "testdata" / "karsten.json"

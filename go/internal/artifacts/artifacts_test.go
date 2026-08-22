@@ -3,13 +3,17 @@ package artifacts
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 )
 
 // The artifacts oracle: `render_all` over every fixture deck, beside the exact
@@ -245,5 +249,79 @@ func TestAnInventedCategoryIsTitleCasedInOnePlaceOnly(t *testing.T) {
 		if got := pyTitle(word); got != want {
 			t.Errorf("pyTitle(%q) = %q, want %q", word, got, want)
 		}
+	}
+}
+
+// The oracle has to be able to fail.
+//
+// `swaps.md`'s shopping-list total was a `+=` loop here and a bare `sum` in
+// Python until 2026-08-22, and neither is what the other interpreter does:
+// CPython 3.12 gave `sum()` over floats compensated accumulation where 3.11
+// adds left to right, so the loop reproduced 3.11 while the image runs 3.12.
+// The only case that priced anything was `every-category`, whose 12.5, 12.5,
+// 0.25 and 1.995 are exact until the last addition -- so the running total
+// *was* the correctly-rounded one and this byte-exact oracle passed either
+// way. A green test with no way to go red.
+//
+// `half-cent` is the case cut for it: three prices summing to exactly 902.405,
+// where a running total renders 902.41 and the correctly-rounded sum renders
+// 902.40. Worth recording alongside: over two million random price sets at
+// two decimals, *none* renders a different total, so no plausible Scryfall
+// data could have produced this fixture by accident.
+func TestTheShoppingListSeparatesFsumFromARunningTotal(t *testing.T) {
+	o := loadOracle(t)
+	priced, differs := 0, 0
+	for _, c := range o.Cases {
+		if len(c.Prices) < 2 {
+			continue
+		}
+		var swaps string
+		for _, f := range c.Files {
+			if f.Name == "swaps.md" {
+				swaps = f.Text
+			}
+		}
+		if swaps == "" {
+			continue
+		}
+		// The list is summed in the order `swaps.md` adds the cards, which is
+		// alphabetical; every priced card in these cases is an added one.
+		names := make([]string, 0, len(c.Prices))
+		for n := range c.Prices {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		amounts := make([]float64, 0, len(names))
+		naive := 0.0
+		for _, n := range names {
+			amounts = append(amounts, c.Prices[n])
+			naive += c.Prices[n]
+		}
+		exact := pyfloat.Fsum(amounts)
+		priced++
+		if fmt.Sprintf("%.2f", naive) == fmt.Sprintf("%.2f", exact) {
+			continue
+		}
+		differs++
+		// The rendered cell must be the correctly-rounded one, and must not be
+		// the running total's.
+		want := "**" + fmt.Sprintf("%.2f", exact) + "**"
+		unwanted := "**" + fmt.Sprintf("%.2f", naive) + "**"
+		if !strings.Contains(swaps, want) {
+			t.Errorf("%s: shopping list does not carry the correctly-rounded total %s", c.Name, want)
+		}
+		if strings.Contains(swaps, unwanted) {
+			t.Errorf("%s: shopping list carries the running total %s", c.Name, unwanted)
+		}
+		t.Logf("%s: running total renders %s, correctly rounded renders %s",
+			c.Name, fmt.Sprintf("%.2f", naive), fmt.Sprintf("%.2f", exact))
+	}
+	if priced < 2 {
+		t.Fatalf("only %d cases price more than one card; regenerate with `python tests/go_fixtures.py`", priced)
+	}
+	if differs == 0 {
+		t.Fatal("no case's prices render a different total under a running " +
+			"total, so the shopping list could be summed left to right and " +
+			"this oracle would stay green")
 	}
 }

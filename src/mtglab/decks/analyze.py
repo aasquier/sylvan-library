@@ -10,12 +10,23 @@ reproduce them and nothing tested them. Logic that lives here gets tests.
 
 The pool is passed in as a `{name: CardRecord}` dict, matching
 `decks/validate.py`, so these test without a database.
+
+"The same deck always produces the same report" acquired a footnote on
+2026-08-22 and lost it again the same day. `opening_hand`'s `keepable` was a
+bare `sum` over three hypergeometric probabilities, and **`sum()` over floats
+is not the same function on every interpreter**: CPython 3.12 gave it
+compensated (Neumaier) accumulation where 3.11 adds left to right. Swept over
+every deck size from 8 to 250 and every land count inside it, the two
+arithmetics disagree in 5,098 shapes -- 33 of them ordinary Commander decks of
+95 to 101 cards with 28 to 45 lands -- and the difference survives into the
+JSON the deck page is served. It is `fsum` now, which is correctly rounded and
+therefore nobody's dialect. Found by the Go port.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from math import comb
+from math import comb, fsum
 from typing import TYPE_CHECKING, Any
 
 from mtglab.decks.model import CATEGORIES, Deck
@@ -299,8 +310,11 @@ def opening_hand(deck: Deck) -> dict[str, Any]:
          if comb(n, hand) else 0.0}
         for k in range(hand + 1)
     ]
-    keepable = sum(row["chance"] for row in distribution
-                   if 2 <= row["lands"] <= 4)
+    # `fsum`, not `sum`: see the module docstring. Three terms is enough --
+    # a 99-card deck on 34 lands is one of the shapes where the two
+    # accumulations disagree, and the disagreement reaches the wire.
+    keepable = fsum(row["chance"] for row in distribution
+                    if 2 <= row["lands"] <= 4)
 
     counts: dict[str, int] = {}
     for entry in deck.cards:

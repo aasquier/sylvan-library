@@ -1,0 +1,252 @@
+{
+ "slug": "last-bit",
+ "name": "Last Bit Fixture",
+ "commander": [
+  "Goreclaw, Terror of Qal Sisma"
+ ],
+ "bracket": 2,
+ "total_cards": 99,
+ "land_count": 91,
+ "curve": {
+  "average_mv": 6.5,
+  "nonland_cards": 8,
+  "buckets": [
+   {
+    "mv": 1,
+    "count": 1,
+    "names": [
+     "Sol Ring"
+    ]
+   },
+   {
+    "mv": 6,
+    "count": 2,
+    "names": [
+     "Regal Behemoth",
+     "Bag End Banquet"
+    ]
+   },
+   {
+    "mv": 7,
+    "count": 1,
+    "names": [
+     "Cultivator Colossus"
+    ]
+   },
+   {
+    "mv": 8,
+    "count": 4,
+    "names": [
+     "Vorinclex, Voice of Hunger",
+     "Craterhoof Behemoth",
+     "Terastodon",
+     "Woodfall Primus"
+    ]
+   }
+  ]
+ },
+ "categories": [
+  {
+   "category": "land",
+   "count": 91,
+   "target_low": 33,
+   "target_high": 38,
+   "status": "high"
+  },
+  {
+   "category": "ramp",
+   "count": 2,
+   "target_low": 8,
+   "target_high": 12,
+   "status": "low"
+  },
+  {
+   "category": "card-advantage",
+   "count": 0,
+   "target_low": 8,
+   "target_high": 12,
+   "status": "low"
+  },
+  {
+   "category": "tutor",
+   "count": 0,
+   "target_low": 0,
+   "target_high": 10,
+   "status": "ok"
+  },
+  {
+   "category": "interaction",
+   "count": 2,
+   "target_low": 6,
+   "target_high": 12,
+   "status": "low"
+  },
+  {
+   "category": "protection",
+   "count": 0,
+   "target_low": null,
+   "target_high": null,
+   "status": null
+  },
+  {
+   "category": "threat",
+   "count": 4,
+   "target_low": null,
+   "target_high": null,
+   "status": null
+  },
+  {
+   "category": "engine",
+   "count": 0,
+   "target_low": null,
+   "target_high": null,
+   "status": null
+  },
+  {
+   "category": "sac-outlet",
+   "count": 0,
+   "target_low": null,
+   "target_high": null,
+   "status": null
+  },
+  {
+   "category": "payoff",
+   "count": 0,
+   "target_low": null,
+   "target_high": null,
+   "status": null
+  },
+  {
+   "category": "recursion",
+   "count": 0,
+   "target_low": null,
+   "target_high": null,
+   "status": null
+  },
+  {
+   "category": "win-con",
+   "count": 0,
+   "target_low": null,
+   "target_high": null,
+   "status": null
+  },
+  {
+   "category": "utility",
+   "count": 0,
+   "target_low": null,
+   "target_high": null,
+   "status": null
+  }
+ ],
+ "game_changers": {
+  "cards": [],
+  "count": 0,
+  "allowed": 0,
+  "bracket": 2,
+  "verdict": "ok"
+ },
+ "opening": {
+  "deck_size": 99,
+  "hand_size": 7,
+  "lands": {
+   "count": 91,
+   "distribution": [
+    {
+     "lands": 0,
+     "chance": 5.373804694613066e-10
+    },
+    {
+     "lands": 1,
+     "chance": 1.7115567952342615e-07
+    },
+    {
+     "lands": 2,
+     "chance": 1.5404011157108352e-05
+    },
+    {
+     "lands": 3,
+     "chance": 0.0005712320804094348
+    },
+    {
+     "lands": 4,
+     "chance": 0.010053684615206051
+    },
+    {
+     "lands": 5,
+     "chance": 0.08746705615229265
+    },
+    {
+     "lands": 6,
+     "chance": 0.3581984204331985
+    },
+    {
+     "lands": 7,
+     "chance": 0.5436940310146763
+    }
+   ],
+   "keepable": 0.010640320706772595
+  },
+  "categories": [
+   {
+    "category": "land",
+    "count": 91,
+    "in_opening_hand": 0.9999999994626195,
+    "by_turn_four": 1.0
+   },
+   {
+    "category": "threat",
+    "count": 4,
+    "in_opening_hand": 0.2577375373767127,
+    "by_turn_four": 0.3805374383430348
+   },
+   {
+    "category": "ramp",
+    "count": 2,
+    "in_opening_hand": 0.13708513708513703,
+    "by_turn_four": 0.2108843537414966
+   },
+   {
+    "category": "interaction",
+    "count": 2,
+    "in_opening_hand": 0.13708513708513703,
+    "by_turn_four": 0.2108843537414966
+   }
+  ],
+  "singleton": [
+   {
+    "turn": 1,
+    "cards_seen": 8,
+    "chance": 0.08080808080808081
+   },
+   {
+    "turn": 4,
+    "cards_seen": 11,
+    "chance": 0.1111111111111111
+   },
+   {
+    "turn": 7,
+    "cards_seen": 14,
+    "chance": 0.1414141414141414
+   },
+   {
+    "turn": 10,
+    "cards_seen": 17,
+    "chance": 0.1717171717171717
+   }
+  ]
+ },
+ "colors": [
+  {
+   "color": "G",
+   "pips": 15,
+   "sources": 93,
+   "cards": 6,
+   "sources_per_pip": 6.2
+  }
+ ],
+ "types": {
+  "Land": 91,
+  "Creature": 6,
+  "Artifact": 2
+ }
+}

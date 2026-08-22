@@ -196,6 +196,44 @@
    ]
   },
   {
+   "name": "half-cent",
+   "deck": "slug: half-cent\nname: The Half Cent\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nstrategy: Three cards whose prices land on the rounding boundary.\ncards:\n  - name: Forest\n    category: land\n    why: Green, and the rest of the deck.\n    qty: 96\n  - name: Card A\n    category: ramp\n    why: Dearest of the three.\n  - name: Card B\n    category: ramp\n    why: Priced so the order of addition matters.\n  - name: Card C\n    category: ramp\n    why: The one that carries the last bit.\n",
+   "previous": "slug: half-cent\nname: The Half Cent\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\ncards:\n  - name: Forest\n    category: land\n    why: Green, and the rest of the deck.\n    qty: 96\n",
+   "prices": {
+    "Card A": 142.115,
+    "Card B": 412.545,
+    "Card C": 347.745
+   },
+   "stats": null,
+   "ok": true,
+   "files": [
+    {
+     "name": "primer-quick.md",
+     "text": "# The Half Cent — Quick Start\n\n**Commander:** Gyome, Master Chef  \n**Size:** 99 + commander\n\n## What this deck does\n\nThree cards whose prices land on the rounding boundary.\n\n## The 30-second version\n\n_(set `notes.gameplan` in deck.yaml)_\n\n## Mulligan rule\n\n_(set `notes.mulligan` — derive it from a Tier 1 sweep)_\n\n## Turn-by-turn shape\n\n_(set `notes.curve_plan`)_\n\n## Three things that will kill you\n\n_(set `notes.pitfalls`)_\n\n## Deck at a glance\n\n| Category | Count |\n| --- | ---: |\n| Ramp & Mana Acceleration | 3 |\n| Lands | 96 |\n\n---\n_Generated 2026-08-22 from `deck.yaml`. Edit the deck file, not this document._"
+    },
+    {
+     "name": "primer-advanced.md",
+     "text": "# The Half Cent — Advanced Primer\n\n**Commander:** Gyome, Master Chef  \n**Size:** 99 + commander\n\n## Core engine\n\n_(set `notes.engine_detail` in deck.yaml)_\n\n## Lines and sequencing\n\n_(set `notes.lines` in deck.yaml)_\n\n## Win conditions\n\n_(set `notes.wincons` in deck.yaml)_\n\n## Mana base notes\n\n_(set `notes.manabase` in deck.yaml)_\n\n## Matchups\n\n_(set `notes.matchups` in deck.yaml)_\n\n## Politics and table talk\n\n_(set `notes.politics` in deck.yaml)_\n\n## Failure modes and how to recover\n\n_(set `notes.failure_modes` in deck.yaml)_\n\n## Sideboard / swap philosophy\n\n_(set `notes.swap_philosophy` in deck.yaml)_\n\n## Rules corners worth knowing\n\n_(set `notes.rules_corners` in deck.yaml)_\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "decklist-annotated.md",
+     "text": "# The Half Cent — Annotated Decklist\n\n**Commander:** Gyome, Master Chef  \n**Size:** 99 + commander\n\nThree cards whose prices land on the rounding boundary.\n\n## Command Zone\n\n**Gyome, Master Chef** — _(set `notes.commander_why`)_\n\n## Ramp & Mana Acceleration (3)\n\n- **Card A** — Dearest of the three.\n- **Card B** — Priced so the order of addition matters.\n- **Card C** — The one that carries the last bit.\n\n## Lands (96)\n\n- **96x Forest** — Green, and the rest of the deck.\n\n---\n_Generated 2026-08-22 from `deck.yaml`._"
+    },
+    {
+     "name": "moxfield.txt",
+     "text": "1 Card A\n1 Card B\n1 Card C\n96 Forest\n\nSIDEBOARD:\n1 Gyome, Master Chef\n"
+    },
+    {
+     "name": "swaps.md",
+     "text": "# The Half Cent — Swap List\n\n**0 out / 3 in**\n\n## Out\n\n\n## In\n\n- **Card A** — Dearest of the three.\n- **Card B** — Priced so the order of addition matters.\n- **Card C** — The one that carries the last bit.\n\n## Shopping list\n\n| Card | Cheapest non-foil (USD) |\n| --- | ---: |\n| Card B | 412.55 |\n| Card C | 347.75 |\n| Card A | 142.12 |\n| **Total (3 priced)** | **902.40** |\n\n### TCGplayer Mass Entry\n\nPaste into <https://www.tcgplayer.com/massentry>:\n\n```\n1 Card A\n1 Card B\n1 Card C\n```\n\n---\n_Generated 2026-08-22 by diffing deck.yaml._"
+    },
+    {
+     "name": "deck.last-built.yaml",
+     "text": "slug: half-cent\nname: The Half Cent\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\nstrategy: Three cards whose prices land on the rounding boundary.\ncards:\n  - name: Forest\n    category: land\n    why: Green, and the rest of the deck.\n    qty: 96\n  - name: Card A\n    category: ramp\n    why: Dearest of the three.\n  - name: Card B\n    category: ramp\n    why: Priced so the order of addition matters.\n  - name: Card C\n    category: ramp\n    why: The one that carries the last bit.\n"
+    }
+   ]
+  },
+  {
    "name": "hand-handwritten",
    "deck": "slug: handwritten\nname: Written By Hand\nstatus: built\nstage: curated\ncommander:\n  - Goreclaw, Terror of Qal Sisma\nbracket: 4\narchetype: midrange\nstrategy: Cast the biggest thing that will still resolve, and then cast a bigger one. The commander is\n  the discount; everything else is the payoff.\nnotes:\n  mulligan: Keep any seven with two lands and a way to spend the third turn. Ship a hand that cannot cast\n    the commander by turn five.\n  pitfalls: The deck folds to a wrath it cannot rebuild through, so hold one threat back once the board\n    is ahead.\ncards:\n  - name: Sol Ring\n    category: ramp\n    why: Two mana on turn one, and it always has been.\n  - name: Cultivator Colossus\n    category: ramp\n    why: Draws the land drops the curve is built on.\n  - name: Regal Behemoth\n    category: threat\n    why: A monarch that also doubles the mana.\n  - name: Vorinclex, Voice of Hunger\n    category: threat\n    why: The mana denial the deck wins through.\n  - name: Forest\n    category: land\n    why: Green, and there is nothing else to be.\n    qty: 95\n",
    "previous": null,

@@ -17,6 +17,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 )
 
 // PrimaryTypes are the card types, most specific first: a "Legendary
@@ -170,11 +171,36 @@ func thousands(n int) string {
 // Score is `suggest.score`: one candidate against the card being replaced.
 // `why` is the deck's own rationale for the slot, folded into the text
 // comparison because it says what the card was *for*.
+//
+// # Two ways this line could disagree with Python, and both are guarded
+//
+// It read as one expression -- `0.30*a + 0.20*b + 0.15*c + 0.35*d` -- until
+// 2026-08-22, which is the shape that gets both wrong at once.
+//
+// **The sum.** Python's is `math.fsum` (and was `sum` until the same day):
+// `sum()` over floats is compensated from CPython 3.12 and left to right
+// before it, so a left-to-right chain of `+` here reproduces 3.11 while the
+// image runs 3.12. Swept over the reachable scores, 48,350 quadruples differ
+// between the two accumulations and 814 change `round(similarity, 4)`, which
+// is the number that is serialised **and sorted on** -- so at the boundary a
+// candidate moves past the one above it, and with `limit=5` the fifth one can
+// disappear.
+//
+// **The multiply.** `a*b + c*d` is exactly what arm64 fuses into an `FMADDD`,
+// rounding once where CPython rounds twice, on the architecture the image
+// ships. `pyfloat.Rounded` is the explicit conversion the Go spec blesses for
+// this; putting each product into a `[]float64` for `Fsum` needs it for the
+// same reason `curve` does. `total` needs it too -- `similarity + 0.10*p` is
+// the same fusable shape with the sum already collapsed.
 func Score(target, candidate *pool.CardRecord, why string) Candidate {
 	targetTokens := Tokens(target.OracleText, why)
-	similarity := 0.30*typeScore(target, candidate) + 0.20*curveScore(target, candidate) +
-		0.15*keywordScore(target, candidate) + 0.35*textScore(targetTokens, candidate)
-	total := similarity + 0.10*popularity(candidate)
+	similarity := pyfloat.Fsum([]float64{
+		pyfloat.Rounded(0.30 * typeScore(target, candidate)),
+		pyfloat.Rounded(0.20 * curveScore(target, candidate)),
+		pyfloat.Rounded(0.15 * keywordScore(target, candidate)),
+		pyfloat.Rounded(0.35 * textScore(targetTokens, candidate)),
+	})
+	total := similarity + pyfloat.Rounded(0.10*popularity(candidate))
 
 	reasons := []string{}
 	if typeScore(target, candidate) == 1 {

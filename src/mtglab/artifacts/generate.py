@@ -15,12 +15,25 @@ Generation is deterministic: same deck.yaml, same output. That is the point.
 The prose that only a human or a conversation can supply -- strategy, lines,
 matchup notes -- lives in `notes:` in the deck file, so it survives regeneration
 instead of being retyped each time.
+
+**"Same output" includes the interpreter underneath**, which is why the
+shopping list's total is `fsum`. It was `sum` until 2026-08-22, and `sum` over
+floats is not one function: CPython 3.12 gave it compensated (Neumaier)
+accumulation where 3.11 adds left to right. This project supports both and the
+container runs 3.12, so a deliverable built on a laptop and the same
+deliverable built on the instance were two computations of one number -- and
+the bytes of these five files are the product (rule 3), not a view of it.
+Two decimal places hides it for the prices Scryfall actually publishes; the
+`prices` mapping is typed `dict[str, float]` and promises no such thing, and
+the Go port renders the same cell from the same numbers. Correctly rounded is
+the only answer that is the same everywhere.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date
+from math import fsum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -234,7 +247,9 @@ def swap_list(deck: Deck, previous: Deck, cards: dict[str, CardRecord] | None = 
         need = [(n, prices.get(n)) for n in add]
         known = [(n, p) for n, p in need if p is not None]
         unknown = [n for n, p in need if p is None]
-        total = sum(p for _, p in known)
+        # `fsum`, not `sum`: see the module docstring. Same prices, same
+        # order, two answers, depending only on which Python is running.
+        total = fsum(p for _, p in known)
         lines += ["", "## Shopping list", "",
                   "| Card | Cheapest non-foil (USD) |", "| --- | ---: |"]
         for name, price in sorted(known, key=lambda x: -x[1]):

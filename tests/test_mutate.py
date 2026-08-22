@@ -211,11 +211,44 @@ def test_a_named_site_is_selected_by_its_line_and_not_by_its_text():
     very first use — re-checking a survivor the ledger had recorded — silently
     swept in a second line whose number merely started with the same digits.
     A path fragment is still a substring; the number is compared as a number.
+
+    **The confusing pair is found rather than written down**, and that is a
+    fix rather than a flourish. This asked about `decks/analyze.py:33`
+    literally until 2026-08-22, when eleven lines of docstring were added to
+    that module's head and line 33 stopped holding a mutable site at all —
+    a green test turned red by a change that could not possibly have broken
+    what it tests. A line number in a test is a reference to a file's
+    *layout*, which every edit above it moves; the property here is about
+    arithmetic, so the fixture is derived from whatever the catalogue holds
+    now and only the property is written down.
     """
     available = mutate.catalogue(SRC)
-    picked = mutate.select(available, ["decks/analyze.py:33"])
-    assert picked, "the site the ledger names must still exist"
-    assert {m.line for m in picked} == {33}
+    lines_by_file: dict[str, set[int]] = {}
+    for m in available:
+        lines_by_file.setdefault(m.relpath, set()).add(m.line)
+
+    # A real site whose line number is a text *prefix* of another site's in
+    # the same file -- 33 against 336 -- so the assertion faces the exact
+    # confusion `select` exists to rule out.
+    target: tuple[str, int, set[int]] | None = None
+    for relpath, lines in sorted(lines_by_file.items()):
+        for line in sorted(lines):
+            decoys = {n for n in lines
+                      if n != line and str(n).startswith(str(line))}
+            if decoys:
+                target = (relpath, line, decoys)
+                break
+        if target:
+            break
+    assert target is not None, (
+        "no file has two mutable lines where one number prefixes the other, "
+        "so this test cannot pose the question it was written for")
+
+    relpath, line, decoys = target
+    picked = mutate.select(available, [f"{relpath}:{line}"])
+    assert {m.line for m in picked} == {line}, (
+        f"{relpath}:{line} swept in {sorted(decoys)}; the number after the "
+        "colon is compared as an integer, never matched as text")
 
 
 def test_a_filter_matching_nothing_raises_rather_than_running_nothing():

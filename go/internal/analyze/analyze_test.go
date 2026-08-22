@@ -3,6 +3,7 @@ package analyze_test
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,4 +98,77 @@ func canonical(t *testing.T, raw []byte) string {
 	}
 	out, _ := json.Marshal(v)
 	return string(out)
+}
+
+// The corpus has to be able to fail.
+//
+// `OpeningHand` sums three hypergeometric probabilities into `keepable`, and
+// it summed them with a `+=` loop until 2026-08-22 -- which is CPython 3.11's
+// `sum()` and not the 3.12 the image runs, because 3.12 gave `sum()` over
+// floats compensated accumulation. The eight fixture decks that existed then
+// sat at 99 cards on 95 or 96 lands and at 106 on 96, and the two arithmetics
+// agree at every one of those shapes, so the whole differential corpus was
+// green against an implementation that answered a different number from the
+// interpreter it was ported from.
+//
+// `last-bit` is the ninth deck, cut for this: 99 cards on 91 lands, where
+// 3.11 answers 0.010640320706772594 and 3.12 answers 0.010640320706772595.
+// This asserts that some deck in the corpus still lands there.
+func TestTheStatsCorpusSeparatesFsumFromARunningTotal(t *testing.T) {
+	dir := filepath.Join("..", "gate", "testdata")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	differs, checked := 0, 0
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".stats.json") {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			Opening struct {
+				Lands struct {
+					Distribution []struct {
+						Lands  int     `json:"lands"`
+						Chance float64 `json:"chance"`
+					} `json:"distribution"`
+					Keepable float64 `json:"keepable"`
+				} `json:"lands"`
+			} `json:"opening"`
+		}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		terms := []float64{}
+		for _, row := range doc.Opening.Lands.Distribution {
+			if row.Lands >= 2 && row.Lands <= 4 {
+				terms = append(terms, row.Chance)
+			}
+		}
+		if len(terms) == 0 {
+			continue
+		}
+		checked++
+		naive := 0.0
+		for _, v := range terms {
+			naive += v
+		}
+		if math.Float64bits(naive) != math.Float64bits(doc.Opening.Lands.Keepable) {
+			differs++
+			t.Logf("%s: running total %v, Python %v", e.Name(), naive, doc.Opening.Lands.Keepable)
+		}
+	}
+	if checked < 5 {
+		t.Fatalf("only %d land distributions; regenerate with `python tests/go_fixtures.py`", checked)
+	}
+	if differs == 0 {
+		t.Fatal("no fixture deck's land distribution separates fsum from a " +
+			"running total, so `keepable` could be summed left to right and " +
+			"the corpus would stay green")
+	}
+	t.Logf("%d of %d decks separate fsum from a running total", differs, checked)
 }

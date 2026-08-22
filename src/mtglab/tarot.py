@@ -89,6 +89,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from math import fsum
 
 #: The trumps, in order. Keys match the asset filenames exactly, which is what
 #: `tests/test_tarot.py` checks -- a renamed card with no picture is a broken
@@ -1004,11 +1005,29 @@ def _weighted_sample(rng: random.Random, k: int) -> list[Card]:
     replacement", so this is the classic successive draw: pick against the
     remaining total, remove, repeat. Deterministic under a seeded `rng`,
     which is the property everything else here is built on.
+
+    **The running total is `fsum` because deterministic has to mean
+    deterministic everywhere.** It was `sum` until 2026-08-22, and `sum()`
+    over floats is not one function: CPython 3.12 gives it compensated
+    (Neumaier) accumulation and 3.11 adds left to right. `ECHO_WEIGHT` is
+    0.14, which no binary float holds exactly, so this was not a corner case
+    -- measured, **all 9,180 of the 134-card pools this loop reaches on its
+    third draw give a different total on 3.11 than on 3.12**, by about
+    2.8e-14. `mark` is `rng.random() * total`, so the number the deal is
+    compared against was a fact about the interpreter.
+
+    No spread actually moved: 200,000 seeds deal the same three cards either
+    way, because `mark` would have to land inside a 2.8e-14 window out of
+    90.2 to notice. That is the reason to fix it rather than a reason not to
+    -- a seed is a promise to a person who reloads the page, and "it has not
+    been claimed yet" is not the same as "it cannot be". `fsum` agrees with
+    what 3.12 already computed, so the container's readings are unchanged and
+    no seed anybody holds deals differently today.
     """
     pool = [(c, c.weight) for c in FULL_DECK]
     out: list[Card] = []
     for _ in range(k):
-        total = sum(w for _, w in pool)
+        total = fsum(w for _, w in pool)
         mark = rng.random() * total
         acc = 0.0
         for i, (_card, weight) in enumerate(pool):

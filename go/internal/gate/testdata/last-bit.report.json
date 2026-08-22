@@ -1,0 +1,11 @@
+{
+ "with_pool": [],
+ "without_pool": [
+  {
+   "level": "warn",
+   "code": "unverified",
+   "message": "no card pool supplied; identity, legality and text were NOT checked",
+   "card": null
+  }
+ ]
+}

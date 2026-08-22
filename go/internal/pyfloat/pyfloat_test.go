@@ -1,4 +1,4 @@
-package sim_test
+package pyfloat_test
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/aasquier/sylvan-library/go/internal/sim"
+	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 )
 
 // The floor the two closed forms stand on, held to CPython by
@@ -76,7 +76,7 @@ func TestFsumIsCPythonsFsum(t *testing.T) {
 		t.Fatalf("the corpus has shrunk to %d sequences", len(corpus.Fsum))
 	}
 	for i, c := range corpus.Fsum {
-		got := sim.Fsum(c.Values)
+		got := pyfloat.Fsum(c.Values)
 		if !same(got, c.Value, epsilonFsum) {
 			t.Errorf("case %d (%d terms): Fsum = %v (%#016x), CPython = %v (%#016x)",
 				i, len(c.Values), got, math.Float64bits(got),
@@ -110,17 +110,17 @@ func TestFsumBeatsANaiveSumOnAtLeastOneCase(t *testing.T) {
 func TestRoundBreaksTiesToEven(t *testing.T) {
 	corpus := loadPyfloat(t)
 	for _, row := range corpus.Round {
-		if got := sim.Round(row.X); got != row.Value {
+		if got := pyfloat.Round(row.X); got != row.Value {
 			t.Errorf("Round(%v) = %d, CPython = %d", row.X, got, row.Value)
 		}
 	}
 	// The one that matters, spelled out: Go's own rounding disagrees, and it
 	// disagrees by a whole land in `RegressionLands`.
-	if int(math.Round(34.5)) == sim.Round(34.5) {
+	if int(math.Round(34.5)) == pyfloat.Round(34.5) {
 		t.Fatal("math.Round and CPython agree about 34.5, so this guard is vacuous")
 	}
-	if sim.Round(34.5) != 34 {
-		t.Errorf("Round(34.5) = %d, want 34 (ties to even)", sim.Round(34.5))
+	if pyfloat.Round(34.5) != 34 {
+		t.Errorf("Round(34.5) = %d, want 34 (ties to even)", pyfloat.Round(34.5))
 	}
 }
 
@@ -130,7 +130,7 @@ func TestRoundToIsCPythonsTwoArgumentRound(t *testing.T) {
 		t.Fatalf("the corpus has shrunk to %d cases", len(corpus.RoundTo))
 	}
 	for _, row := range corpus.RoundTo {
-		if got := sim.RoundTo(row.X, row.Ndigits); !same(got, row.Value, epsilonRoundTo) {
+		if got := pyfloat.RoundTo(row.X, row.Ndigits); !same(got, row.Value, epsilonRoundTo) {
 			t.Errorf("RoundTo(%v, %d) = %v (%#016x), CPython = %v (%#016x)",
 				row.X, row.Ndigits, got, math.Float64bits(got),
 				row.Value, math.Float64bits(row.Value))
@@ -139,18 +139,18 @@ func TestRoundToIsCPythonsTwoArgumentRound(t *testing.T) {
 	// The textbook case, because it is the one everybody expects to be wrong:
 	// 2.675 is really 2.67499999999999982..., so rounding it to two places
 	// gives 2.67 rather than the 2.68 the decimal literal suggests.
-	if got := sim.RoundTo(2.675, 2); got != 2.67 {
+	if got := pyfloat.RoundTo(2.675, 2); got != 2.67 {
 		t.Errorf("RoundTo(2.675, 2) = %v, want 2.67", got)
 	}
 }
 
 // fusedProbe has the exact shape of every accumulation in `karsten` and
-// `curve`: a running total, a product, and the `sim.Rounded` guard between
+// `curve`: a running total, a product, and the `pyfloat.Rounded` guard between
 // them.
 func fusedProbe(xs, ys []float64, start float64) float64 {
 	total := start
 	for i := range xs {
-		total += sim.Rounded(xs[i] * ys[i])
+		total += pyfloat.Rounded(xs[i] * ys[i])
 	}
 	return total
 }
@@ -158,7 +158,7 @@ func fusedProbe(xs, ys []float64, start float64) float64 {
 // fusedSubProbe is the other shape, from `RegressionLands`: a running value
 // with a product subtracted, which arm64 fuses to FMSUB.
 func fusedSubProbe(a, b, start float64) float64 {
-	return start - sim.Rounded(a*b)
+	return start - pyfloat.Rounded(a*b)
 }
 
 func TestNoFusedMultiplyAddSurvivesTheGuard(t *testing.T) {
@@ -176,7 +176,7 @@ func TestNoFusedMultiplyAddSurvivesTheGuard(t *testing.T) {
 	}
 	if got := fusedProbe([]float64{a}, []float64{b}, -1.0); got != 0.0 {
 		t.Errorf("the accumulation fused: got %v (%#016x), want 0 -- "+
-			"sim.Rounded is not stopping the compiler on this architecture",
+			"pyfloat.Rounded is not stopping the compiler on this architecture",
 			got, math.Float64bits(got))
 	}
 	if got := fusedSubProbe(a, b, 1.0); got != 0.0 {

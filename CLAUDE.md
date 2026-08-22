@@ -752,12 +752,14 @@ go/                       the Go module (ADR 38; module path
                           says so in the code. Two absences are deliberate:
                           `SimSummary.report()` is `cli.py`'s text table, which
                           no route reads; and `spells_through` is **not** in
-                          the corpus, because it sums floats and CPython's
-                          `sum` is compensated from 3.12 and naive before it --
-                          so the value is a fact about the interpreter, Go
-                          answers as 3.12 does (what the image runs), and the
-                          corpus stays byte-identical on both legs of the
-                          matrix. That is the same trap the closed forms hit in
+                          the corpus. **That absence's stated reason expired
+                          the same day it was written** and is corrected here:
+                          it was "the value is a fact about the interpreter",
+                          which was true while the method said `sum`, and #240
+                          made it `fsum` in the same change. It is correctly
+                          rounded now, so it is the same number everywhere and
+                          the corpus could take it; the absence is an absence.
+                          That is the same trap the closed forms hit in
                           `curve.py`, found twice in one day from opposite
                           directions.
                           **The two generic job routes did NOT follow the
@@ -835,7 +837,41 @@ go/                       the Go module (ADR 38; module path
                           limit by a named test now, the case is a permanent
                           trap in the Go table, and the fuzz target found it
                           by the order-reversal property rather than by an
-                          oracle. The contract
+                          oracle.
+                          **The same trap arrived a third time before the day
+                          was out**, from a sweep of the rest of the package
+                          (`git grep 'sum('` over `src/mtglab`: 50 call sites,
+                          six of them genuinely over floats). Two reached a
+                          served payload -- `decks/analyze.py`'s `keepable`,
+                          three hypergeometrics onto the deck page, and
+                          `decks/suggest.py`'s similarity, which is rounded to
+                          four places and then **sorted on** -- one reached a
+                          deliverable (`artifacts/generate.py`'s shopping-list
+                          total), and one reached a promise
+                          (`tarot.py`'s weighted deal, where `ECHO_WEIGHT` is
+                          0.14 and every 134-card pool answered differently on
+                          the two interpreters). All six are `fsum`; the Go
+                          sides of the three that are ported use `pyfloat.Fsum`
+                          -- and `suggest.Score` needed `Rounded` as well,
+                          being `a*b + c*d`, the shape arm64 fuses. The rule is
+                          in Working style and enforced by
+                          `tests/test_float_sums.py`. **The corpora could not
+                          have caught any of it**: `artifacts.json`'s prices
+                          were exact halves and quarters, and the eight gate
+                          decks sat at land counts where the two arithmetics
+                          agree, so three byte-exact oracles were green against
+                          a Go implementation answering as the wrong Python. A
+                          ninth deck (`last-bit`, 99 cards on 91 lands), a
+                          nineteenth artifacts case (`half-cent`, three prices
+                          summing to exactly 902.405) and a new scorer corpus
+                          were cut for it, each with a test asserting the
+                          corpus still separates `Fsum` from a running total.
+                          **`pyfloat` left `internal/sim` for its own package**
+                          in the same change -- `artifacts`, `analyze` and
+                          `suggest` all need `Fsum` and none of them is the
+                          simulator -- joining `pyrand` and `pyyaml` as the
+                          third reproduction of somebody else's arithmetic.
+                          The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
@@ -1568,6 +1604,19 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
 - Reserved List is allowed or forbidden **per deck** — check the deck file.
 - Every bug fix gets a test. `mana.py` is subtle; `tests/test_mana.py` pins the
   cases where naive source-counting gives the wrong answer.
+- **A bare `sum()` over floats is interpreter-dependent — use `math.fsum`.**
+  CPython 3.12 gave `sum()` compensated (Neumaier) accumulation over floats
+  where 3.11 adds left to right: `sum([0.1] * 10)` is `1.0` under 3.12.13 and
+  `0.9999999999999999` under 3.11.15. This project supports both, tests both
+  in CI, and runs 3.12 in the container, so a float sum answers one way on a
+  laptop and another on the instance — and a Go port written as
+  `for … { total += x }` reproduces **3.11**, the one the image is not
+  running. `fsum` is correctly rounded and therefore nobody's dialect.
+  Integer sums stay `sum`; Python's ints are exact and there is nothing to
+  choose. It cost three lanes in one day (2026-08-22) to learn, so it is
+  enforced rather than remembered: `tests/test_float_sums.py` is the register
+  of every float sum in the package and every integer one, exact in both
+  directions, and a new `sum()` fails there until somebody says which it is.
 - Go, from `go/`: `go vet`, `go test -race` and `golangci-lint run` before
   pushing — the three checks CI requires, and on this Mac all three want the
   environment the Setup section spells out (CGO on, the 1.26 toolchain on
