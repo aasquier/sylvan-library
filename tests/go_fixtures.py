@@ -53,6 +53,7 @@ import dataclasses
 import hashlib
 import json
 import math
+import os
 import random
 import struct
 import sys
@@ -1890,6 +1891,405 @@ def render_crypto_cases() -> str:
     return json.dumps(crypto_cases(), indent=1, ensure_ascii=False) + "\n"
 
 
+
+# ------------------------------------------------------------- the stance dial
+
+#: Where `internal/claude`'s stance corpus lands.
+STANCE_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "stance.json"
+
+
+def _all_stances() -> list[Any]:
+    """Every stance there is: 4 x 3 x 3 = 36, in axis order.
+
+    Enumerated rather than sampled, and the whole point is that it *can* be.
+    `mana_oracle.py`'s 13,944 cases had to be drawn because the space is
+    unbounded, and the hole that left -- no case offering a wide pip before a
+    narrow one -- was invisible for exactly as long as nobody asked what the
+    drawing rule excluded. This space is 36. Excluding nothing costs nothing,
+    so nothing is excluded, and no future session has to reason about what a
+    sampler skipped.
+    """
+    from mtglab.claude import stance as st
+    return [st.Stance(i, s, w)
+            for i in st.INITIATIVE for s in st.SCOPE for w in st.WRITE]
+
+
+def stance_cases() -> dict[str, Any]:
+    """The dial, exhaustively: every stance, every clamp pair, every readout.
+
+    Four tables, because a failure that names its table localises itself:
+
+    * `stances` -- all 36, each with the two properties everything asks
+      (`allows_calls`, `may_write`) and its full `describe()` payload. That
+      payload is the one that reaches `/api/claude`, so it is recorded as the
+      *serialised* shape rather than as fields: a Go struct whose tags are
+      right and whose field order is wrong marshals to different bytes, and
+      only comparing bytes sees it. (The lesson `tier1.Number` taught -- a type
+      bit-exact by `repr` still went onto the wire as a struct -- one level up.)
+    * `clamps` -- all 36 x 36 = 1,296 pairs. Per-axis minimum is four lines of
+      code and it is the line an operator's cap runs through, so it is checked
+      at every pair rather than at a chosen few.
+    * `parses` -- what `from_obj` accepts and what it refuses, refusal text
+      included. Those strings reach a 422 body.
+    * `ceilings` -- what each value of the environment variable resolves to,
+      including the two that matter most: unset (uncapped) and unreadable
+      (`OFF`, failing closed).
+    """
+    from mtglab.claude import stance as st
+
+    stances = [{
+        "stance": s.to_dict(),
+        "allows_calls": s.allows_calls,
+        "may_write": s.may_write,
+        # Serialised, not structured: see the docstring. `sort_keys=False`
+        # keeps Python's insertion order, which is the order the client reads.
+        "describe": json.dumps(st.describe(s), ensure_ascii=False,
+                               separators=(",", ":"), sort_keys=False),
+    } for s in _all_stances()]
+
+    clamps = [{
+        "requested": a.to_dict(), "limit": b.to_dict(),
+        "clamped": st.clamp(a, b).to_dict(),
+    } for a in _all_stances() for b in _all_stances()]
+
+    # Every shape `from_obj` can be handed, including the ones that must fail.
+    # `partial` maps are the load-bearing group: an axis left out takes OFF's
+    # value, so a half-written request is quieter and never louder.
+    parse_inputs: list[Any] = [
+        None,
+        "off", "consultant", "second-opinion", "collaborator",
+        "  Consultant  ", "COLLABORATOR", "Second-Opinion",
+        "", "  ", "nope", "Off ",
+        {}, {"initiative": "volunteers"}, {"scope": "rethink"},
+        {"write": "applies"}, {"initiative": "interjects", "write": "applies"},
+        {"initiative": "on-request", "scope": "adjacent", "write": "proposes"},
+        {"initiative": "nope"}, {"scope": "nope"}, {"write": "nope"},
+        {"nope": "off"}, {"initiative": "off", "nope": "x", "also": "y"},
+        {"initiative": 3}, 7, 7.5, True, ["off"],
+    ]
+    parses = []
+    for raw in parse_inputs:
+        row: dict[str, Any] = {"input": raw}
+        try:
+            row["stance"] = st.Stance.from_obj(raw).to_dict()
+        except ValueError as exc:
+            row["error"] = str(exc)
+        parses.append(row)
+
+    ceilings = []
+    for raw in (None, "", "off", "consultant", "second-opinion",
+                "collaborator", "  COLLABORATOR ", "nope", "0", "none"):
+        before = os.environ.get(st.CEILING_ENV)
+        try:
+            if raw is None:
+                os.environ.pop(st.CEILING_ENV, None)
+            else:
+                os.environ[st.CEILING_ENV] = raw
+            ceilings.append({"env": raw, "ceiling": st.ceiling().to_dict()})
+        finally:
+            if before is None:
+                os.environ.pop(st.CEILING_ENV, None)
+            else:
+                os.environ[st.CEILING_ENV] = before
+
+    # `default_for` reads one field and is the reason a theoretical deck opens
+    # wider than a built one. Absent/blank/unknown all mean built, which is the
+    # conservative direction and the one a typo must fall to.
+    defaults = [{"status": status,
+                 "stance": st.default_for(_Statused(status)).to_dict()}
+                for status in (None, "", "built", "theoretical", "  Theoretical  ",
+                               "THEORETICAL", "nonsense")]
+
+    return {
+        "_comment": ("The stance dial, exhaustive. Generated by "
+                     "tests/go_fixtures.py; do not edit by hand. `describe` is "
+                     "recorded as a SERIALISED string rather than as an object "
+                     "because field order is part of the contract and only "
+                     "bytes carry it."),
+        "axes": list(st.AXES),
+        "levels": {a: list(v) for a, v in st.LEVELS.items()},
+        "preset_names": list(st.PRESETS),
+        "presets": {n: s.to_dict() for n, s in st.PRESETS.items()},
+        "preset_blurbs": dict(st.PRESET_BLURBS),
+        "stances": stances,
+        "clamps": clamps,
+        "parses": parses,
+        "ceilings": ceilings,
+        "defaults": defaults,
+    }
+
+
+class _Statused:
+    """The one field `default_for` reads, and nothing else.
+
+    A stand-in rather than a real `Deck`, because `default_for` uses `getattr`
+    with a default and so accepts an object that has no `status` at all -- the
+    `None` row above is that case, and a real Deck cannot produce it.
+    """
+
+    def __init__(self, status: Any) -> None:
+        if status is not None:
+            self.status = status
+
+
+def render_stance_cases() -> str:
+    return _rows_json(stance_cases()) + "\n"
+
+
+# ------------------------------------------------------------- the seven voices
+
+#: Where the persona roster lands. `data/`, not `testdata/`: Go EMBEDS this and
+#: serves from it, exactly as `internal/reference/data` embeds the prose
+#: modules. A voice is checked-in prose whose bytes reach a model, so
+#: transcribing 350 lines of it by hand into a second language is the one
+#: mistake this file exists to prevent.
+PERSONA_PATH = ROOT / "go" / "internal" / "claude" / "data" / "personas.json"
+
+
+def persona_payload() -> dict[str, Any]:
+    """Every persona, voice included -- and the roster the door may serve.
+
+    Two lists rather than one, and the split is the design. `voice` reaches the
+    model and must never reach the client: not because a prompt in a public
+    repository is a secret, but because a client that received one would
+    eventually send one back, and "the persona is one of a fixed set" is worth
+    keeping structural rather than polite. Go embeds `personas`; its route
+    serves `roster`; a test asserts the second is the first with one field
+    removed, so the two cannot drift into agreement by accident.
+    """
+    from mtglab.claude import persona as persona_mod
+    return {
+        "_comment": ("The seven voices. Generated by tests/go_fixtures.py from "
+                     "src/mtglab/claude/persona.py; do not edit by hand. "
+                     "`voice` is server-side only -- `roster` is what the route "
+                     "may answer with."),
+        "default": persona_mod.DEFAULT,
+        "personas": [{"key": who.key, "label": who.label, "blurb": who.blurb,
+                      "voice": who.voice, "deals": who.deals}
+                     for who in persona_mod.PERSONAS.values()],
+        "roster": persona_mod.as_dicts(),
+    }
+
+
+def render_persona_payload() -> str:
+    return _rows_json(persona_payload()) + "\n"
+
+
+# ------------------------------------------------------------------ the tarot
+
+#: The deck itself: 136 cards, embedded and served. Data, like the personas.
+TAROT_DATA_PATH = ROOT / "go" / "internal" / "tarot" / "data" / "deck.json"
+#: The deal, held to CPython's own `random` through `pyrand`.
+TAROT_PATH = ROOT / "go" / "internal" / "tarot" / "testdata" / "deals.json"
+
+
+def tarot_deck_payload() -> dict[str, Any]:
+    """Every card and every position, as the Go module embeds them.
+
+    Rendered rather than transcribed for the persona reason doubled: 136 cards
+    carrying names, artists, credits and `note` prose, where a mistyped `after`
+    silently breaks the alignment paragraph and a mistyped weight silently
+    changes which cards land. None of that fails loudly.
+
+    `SPREAD` rides along because its three `slot` values ARE `theme.SLOT_KINDS`'
+    first three, and that coupling is load-bearing: a card is dealt *for* a
+    slot, so ADR 20's grounded-quote readiness works untouched. Its failure is
+    silent -- drift, and the proposal button simply never lights up -- so the
+    Go side gets the same three strings from the same place rather than a
+    second copy of them.
+    """
+    from mtglab import tarot
+    return {
+        "_comment": ("The 1909 deck plus Magic's crossovers and echoes, and the "
+                     "three-card spread. Generated by tests/go_fixtures.py from "
+                     "src/mtglab/tarot.py; do not edit by hand."),
+        "crossover_weight": tarot.CROSSOVER_WEIGHT,
+        "echo_weight": tarot.ECHO_WEIGHT,
+        "spread": [{"slot": pos.slot, "name": pos.name, "asks": pos.asks}
+                   for pos in tarot.SPREAD],
+        # FULL_DECK's ORDER is the sampler's search order, so it is part of the
+        # answer and not a presentation detail: `_weighted_sample` walks this
+        # list accumulating weight until it passes `mark`. Reorder it and every
+        # seed deals differently.
+        "cards": [{
+            "key": c.key, "name": c.name, "arcana": c.arcana, "suit": c.suit,
+            "number": c.number, "art_url": c.art_url, "artist": c.artist,
+            "after": c.after, "echo": c.echo, "weight": c.weight,
+            "note": c.note, "image": c.image, "face_name": c.face_name,
+        } for c in tarot.FULL_DECK],
+    }
+
+
+def tarot_deal_cases() -> dict[str, Any]:
+    """Seeded deals, recorded as the payload AND as the reader's prose.
+
+    Both halves, because they fail differently. `as_dict` is what the browser
+    renders and what a reload must reproduce; `describe()` is what reaches the
+    model, and it carries the two Python-detected paragraphs -- the Magic-card
+    omen and the trump landing twice -- that no card field states directly.
+
+    The seeds are not arbitrary. Most are a plain sweep, but four are chosen by
+    SEARCHING for the states the prose branches on: a spread containing a
+    crossover, one containing an echo, one containing a reversed card, and --
+    the rare one -- a trump landing twice at the same table. That last is what
+    `describe` calls the rarest thing this spread can do, and a corpus of the
+    first twenty seeds would never once contain it, so the branch that renders
+    it would be covered by nothing at all.
+    """
+    from mtglab import tarot
+
+    def has_after(r: Any) -> bool:
+        return any(d.card.after for d in r.cards)
+
+    def has_echo(r: Any) -> bool:
+        return any(d.card.echo for d in r.cards)
+
+    def has_reversed(r: Any) -> bool:
+        return any(d.reversed for r_ in [r] for d in r_.cards)
+
+    def has_alignment(r: Any) -> bool:
+        seen: dict[tuple[str, Any, int], int] = {}
+        for d in r.cards:
+            k = (d.card.arcana, d.card.suit, d.card.number)
+            seen[k] = seen.get(k, 0) + 1
+        return any(v > 1 for v in seen.values())
+
+    seeds = list(range(24))
+    for want in (has_after, has_echo, has_reversed, has_alignment):
+        for candidate in range(200_000):
+            if candidate in seeds:
+                continue
+            if want(tarot.deal(candidate)):
+                seeds.append(candidate)
+                break
+        else:  # pragma: no cover - a deck this search cannot satisfy is a bug
+            raise AssertionError(f"no seed found for {want.__name__}")
+
+    cases = []
+    for seed in seeds:
+        reading = tarot.deal(seed)
+        cases.append({
+            "seed": seed,
+            # Serialised, not structured: field order is the contract, and only
+            # bytes carry it. The stance corpus makes the same choice for the
+            # same reason.
+            "as_dict": json.dumps(reading.as_dict(), ensure_ascii=False,
+                                  separators=(",", ":"), sort_keys=False),
+            "describe": reading.describe(),
+        })
+    return {
+        "_comment": ("Seeded tarot deals. Generated by tests/go_fixtures.py; do "
+                     "not edit by hand. The last four seeds were SEARCHED for "
+                     "-- a crossover, an echo, a reversal and a doubled trump "
+                     "-- because a plain sweep reaches none of the prose "
+                     "branches that make `describe` more than a card list."),
+        "searched": {"crossover": seeds[24], "echo": seeds[25],
+                     "reversed": seeds[26], "alignment": seeds[27]},
+        "pool_totals": _tarot_pool_totals(),
+        "seed_strings": _tarot_seed_strings(),
+        "cases": cases,
+    }
+
+
+def _tarot_seed_strings() -> list[dict[str, Any]]:
+    """What `?seed=` accepts, and what it refuses.
+
+    `/api/tarot/reading` declares `seed: int | None`, so the query string is
+    parsed by Pydantic before `deal` ever sees it -- and Pydantic's integer
+    grammar is wider than `strconv.ParseInt`'s in three ways a port gets wrong
+    by writing the obvious thing. Whitespace is stripped; a leading `+` is
+    fine; and **single underscores between digits are digit separators**, so
+    `1_0` is ten. Each of those is a 422 from a naive Go door where Python
+    answered 200.
+
+    **The oracle is `TypeAdapter(int)`, not `int()`, and that distinction was
+    measured rather than assumed.** This function was first written against
+    `int()` with a docstring asserting the two agreed; they do not. Python's
+    `int()` accepts any Unicode decimal digit, so `int("７")` is 7, while
+    Pydantic refuses the fullwidth form and the route answers 422. One row out
+    of twenty-four, in the direction that would have made the Go door accept a
+    seed the Python door rejects -- which is the direction a contract suite
+    finds late, since no client sends fullwidth digits until one does.
+    `TypeAdapter(int)` is what FastAPI actually calls, and driving the real
+    route over every row below confirmed it agrees on all of them.
+
+    The oversized values are the other load-bearing rows: `random.Random` seeds
+    through arbitrary-precision integers, and `deal` echoes the seed it was
+    given, so a Go side holding it in an int64 truncates 2**70 into a
+    different reading AND a different number on the wire.
+    """
+    from pydantic import TypeAdapter, ValidationError
+    adapter = TypeAdapter(int)
+    raw = ["7", "0", "-5", "+7", "0007", "  7  ", "1_0", "1_000_000",
+           "_7", "7_", "1__0", "", " ", "abc", "7.5", "0x10",
+           # The two rows that separate Pydantic's grammar from Python's.
+           "\uff17", "\u0667",
+           str(2**70), str(-(2**70)), str(2**63), str(2**63 - 1),
+           "-0", "00", "+0"]
+    rows: list[dict[str, Any]] = []
+    for text in raw:
+        row: dict[str, Any] = {"text": text}
+        try:
+            value = adapter.validate_python(text)
+        except ValidationError:
+            row["ok"] = False
+        else:
+            row["ok"] = True
+            # As a STRING: these outgrow every fixed-width integer type, and
+            # the value is echoed back on the wire exactly as given.
+            row["value"] = str(value)
+        rows.append(row)
+    return rows
+
+
+def _tarot_pool_totals() -> list[dict[str, Any]]:
+    """The three running totals a deal computes, as BITS -- and as both sums.
+
+    This table exists because of a mutation that survives and cannot be made to
+    die any other way. Replacing `fsum` with a naive running total changes no
+    spread: `tarot.py` measured 200,000 seeds and every one deals the same
+    three cards, because `mark` would have to land inside a 2.8e-14 window out
+    of 90.2 to notice. A deal-level corpus therefore cannot tell the two
+    arithmetics apart, at any size -- the odds are about 3e-16 per draw, so
+    searching for a separating seed is not slow, it is hopeless.
+
+    That is a reason to test the sum DIRECTLY, not a reason to leave it
+    untested. `naive` is recorded beside `fsum` and asserted to DIFFER, so the
+    corpus proves it can tell them apart before the Go side is asked to agree
+    with one. Both are recorded as `Float64bits`, since the whole quantity in
+    dispute is the last bit.
+
+    The 134-card pool is the interesting one: the third draw, where the
+    docstring's measurement found all 9,180 pools disagreeing across
+    interpreters. 136 and 135 are recorded too, because a port that got the
+    first two right and the third wrong would be a strange bug to debug from a
+    single row.
+    """
+    from mtglab import tarot
+    rows = []
+    weights = [c.weight for c in tarot.FULL_DECK]
+    for drop in (0, 1, 2):
+        pool = weights[drop:]
+        exact = math.fsum(pool)
+        running = 0.0
+        for w in pool:
+            running += w
+        rows.append({
+            "cards": len(pool),
+            "fsum_bits": struct.unpack("<Q", struct.pack("<d", exact))[0],
+            "naive_bits": struct.unpack("<Q", struct.pack("<d", running))[0],
+            "differ": exact != running,
+        })
+    return rows
+
+
+def render_tarot_deck() -> str:
+    return _rows_json(tarot_deck_payload()) + "\n"
+
+
+def render_tarot_deals() -> str:
+    return _rows_json(tarot_deal_cases()) + "\n"
+
 def write() -> None:
     TESTDATA.mkdir(parents=True, exist_ok=True)
     text, parsed = render()
@@ -1936,6 +2336,20 @@ def write() -> None:
     SCORE_PATH.parent.mkdir(parents=True, exist_ok=True)
     SCORE_PATH.write_text(render_score_cases(), encoding="utf-8")
     print(f"wrote {len(score_specs())} scorer cases into {SCORE_PATH}")
+    TAROT_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    TAROT_DATA_PATH.write_text(render_tarot_deck(), encoding="utf-8")
+    TAROT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    TAROT_PATH.write_text(render_tarot_deals(), encoding="utf-8")
+    print(f"wrote {len(tarot_deck_payload()['cards'])} tarot cards and "
+          f"{len(tarot_deal_cases()['cases'])} deals into {TAROT_PATH.parent.parent}")
+    PERSONA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PERSONA_PATH.write_text(render_persona_payload(), encoding="utf-8")
+    print(f"wrote {len(persona_payload()['personas'])} voices into {PERSONA_PATH}")
+    STANCE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    STANCE_PATH.write_text(render_stance_cases(), encoding="utf-8")
+    _stance = stance_cases()
+    print(f"wrote {len(_stance['stances'])} stances and "
+          f"{len(_stance['clamps'])} clamp pairs into {STANCE_PATH}")
     CRYPTO_PATH.parent.mkdir(parents=True, exist_ok=True)
     CRYPTO_PATH.write_text(render_crypto_cases(), encoding="utf-8")
     print(f"wrote the Argon2id and token-hash oracle into {CRYPTO_PATH}")

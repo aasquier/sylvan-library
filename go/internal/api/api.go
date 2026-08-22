@@ -206,6 +206,13 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/colors", Handler: a.colors},
 		{Method: http.MethodGet, Pattern: "/api/glossary", Handler: a.glossary},
 		{Method: http.MethodGet, Pattern: "/api/themes", Handler: a.themes},
+		// The Claude surface's two free corners (Phase 6, the pure half):
+		// a checked-in roster of voices, and a seeded deal. Neither needs a
+		// key, a pool or a network, so both answer on a base install --
+		// and the deal is internal/pyrand's first served caller, where a
+		// seed minted before the cutover must still deal its own spread.
+		{Method: http.MethodGet, Pattern: "/api/claude/personas", Handler: a.personaRoster},
+		{Method: http.MethodGet, Pattern: "/api/tarot/reading", Handler: a.tarotReading},
 		// The pool behind the prose, and the pool's own two doors (the
 		// second family): a combination's champions and signature cards,
 		// the shelves' named cards, the search box, and the camera's reader.

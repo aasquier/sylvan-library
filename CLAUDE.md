@@ -980,6 +980,53 @@ go/                       the Go module (ADR 38; module path
                           simulator -- joining `pyrand` and `pyyaml` as the
                           third reproduction of somebody else's arithmetic.
                           The contract
+                          **Phase 6 opened with the pure half, 2026-08-22**:
+                          internal/claude is stance.py and persona.py, and
+                          internal/tarot is the deck, the weighted shuffle and
+                          the spread -- pyrand's FIRST SERVED CALLER, which is
+                          what it was built bit-exact for, since a seed minted
+                          before the cutover must deal the same three cards
+                          after it. Two routes flipped with them
+                          (/api/claude/personas and /api/tarot/reading), being
+                          the two that need no key, no pool and no network.
+                          The stance corpus is EXHAUSTIVE rather than sampled
+                          -- 36 stances, all 1,296 clamp pairs -- because the
+                          space is small enough that excluding nothing costs
+                          nothing, and it records REFUSAL TEXT, which is what
+                          caught the two divergences no structural test could
+                          see: Python repr-quotes with single quotes, and its
+                          json tells `7` from `7.5` by the literal rather than
+                          the value, so "cannot read a stance from int" and
+                          "...from float" are two sentences a plain float64
+                          decode collapses into one. The persona voices cross
+                          as GENERATED DATA rather than transcribed prose, and
+                          `voice` never reaches the client -- guarded at the
+                          type, at the data and at the route, three places
+                          because they fail differently. The tarot seed
+                          parameter is the sharpest lesson of the lane and all
+                          of it was MEASURED against the running app:
+                          Starlette takes the LAST repeated query value where
+                          Go's Query().Get takes the first; Pydantic's integer
+                          grammar accepts whitespace, a leading `+` and single
+                          underscores between digits (`1_0` is ten) while
+                          REFUSING the fullwidth `７` that Python's own int()
+                          reads as seven -- so the corpus oracle is
+                          TypeAdapter(int), a correction made after generating
+                          it from int() and finding one row of twenty-four
+                          disagreed; and the seed is a *big.Int, because
+                          Python's integers are unbounded and `deal` echoes
+                          the seed it was given, so an int64 would truncate
+                          2**70 into a different reading under a different
+                          number. Two mutations survive the deal corpus and
+                          are argued in the code rather than dropped: the
+                          strict `<` is unobservable at ~2**-52, and **Fsum
+                          versus a running total changes no spread at any
+                          corpus size** (200,000 seeds deal identically,
+                          measured), so it is tested AT THE SUM, where the two
+                          differ by 2 ULP -- and driven through the sampler,
+                          since the first version of that test called
+                          pyfloat.Fsum by hand and the mutation survived it.
+                          The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
