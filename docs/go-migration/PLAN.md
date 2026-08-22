@@ -478,7 +478,13 @@ the request context (`auth.WithScope`) for the ported routes; the third
 family flipped is `GET /api/decks`, the deck, `validate`, `stats`,
 `suggestions`, `commander`, `printings`, `log`, `artifacts` (the shelf and
 one deliverable) and `/api/colors/progress`, which left the reservation
-list the day it moved.
+list the day it moved. *Deployed as v159 and walked through the signed-in
+seat against the real library: seven tiles under the maintainer, the
+gate's counts on the shelf exactly CLAUDE.md's record (adrix 1, goreclaw 1
+— the banned Titan — the rest 0), Goreclaw's 75 known cards and the Titan's
+five suggested replacements, Tivit's and Goreclaw's commander panels; and
+uvicorn's access log silent for every one of them. The door's RSS read
+103 MB after the walk; the v159 image 147.7 MB compressed.*
 
 **The shelves came last, and closed the read spine.** `go/internal/shelves`
 is `symbols.py`, `ocr.py` and `cardmotion/cache.py`'s serving half over
