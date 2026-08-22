@@ -51,6 +51,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import random
 import struct
 import sys
@@ -67,6 +68,9 @@ from mtglab import reference
 from mtglab.cards.db import CardRecord
 from mtglab.decks.decklist import MAX_LINE
 from mtglab.decks.model import CATEGORIES, CardEntry, Deck
+from mtglab.mana import ManaCost, ManaSource, parse_mana_cost
+from mtglab.sim import curve, karsten
+from mtglab.sim.tier1.engine import SimCard
 
 ROOT = Path(__file__).resolve().parents[1]
 TESTDATA = ROOT / "go" / "internal" / "deckyaml" / "testdata"
@@ -1692,6 +1696,7 @@ def write() -> None:
     JOBS_PATH.parent.mkdir(parents=True, exist_ok=True)
     JOBS_PATH.write_text(render_jobs_cases(), encoding="utf-8")
     print(f"wrote the job registry oracle into {JOBS_PATH}")
+    write_closed_forms()
 
 
 # ------------------------------------------------------------------ pyrand
@@ -2077,6 +2082,932 @@ def pyrand_cases() -> dict[str, Any]:
 def render_pyrand_cases() -> str:
     return _compact_json(pyrand_cases()) + "\n"
 
+# --------------------------------------------------------- the closed forms
+#
+# `sim/karsten.py` and `sim/curve.py` -- Tier 1.5, ported in Phase 5 (PLAN
+# section 5 item 4: "the closed forms match to float tolerance... Go must
+# agree to within an epsilon pinned per function").
+#
+# The epsilon this corpus is written to support is **zero**, and that is a
+# decision rather than an accident. Every integer these modules produce comes
+# out of a `>=` against a float -- `required_sources` scans until the odds
+# clear the target, `CardOdds.reliable_turn` scans against 0.90,
+# `_slots_to_target` scans until `on_curve_odds` clears, and `curve`'s advice
+# branches on `abs(per_land - per_ramp) < TOO_CLOSE`. One ulp of disagreement
+# in any of those is not a rounding difference on a screen; it is a different
+# land count, a different reliable turn, a different row order in the shelf,
+# or a different recommendation. So Go reproduces the arithmetic exactly --
+# `math/big` where Python has `math.comb`, Shewchuk's summation where Python
+# has `math.fsum` -- and this corpus asserts bit equality rather than
+# nearness. A tolerance is still pinned per function on the Go side, so that
+# a future divergence names which function drifted.
+#
+# Floats travel as plain JSON numbers, which is exact in both directions:
+# `json.dumps` writes a float through `repr`, which is the shortest string
+# that round-trips, and Go's `encoding/json` parses it with `ParseFloat`,
+# which is correctly rounded. No value here is NaN or infinite.
+#
+# Rows are lists rather than objects. A grid of 2,352 hypergeometrics is a
+# table, and naming its four columns 2,352 times would quadruple the file to
+# say nothing; the column order is written down beside each one.
+
+#: The CPython float behaviours the Go `sim` package reproduces: `math.fsum`,
+#: `round(x)` and `round(x, n)`. Their own corpus, because they are the floor
+#: the two closed forms stand on and a failure there should not be reported as
+#: a failure of arithmetic built on top of them.
+PYFLOAT_PATH = ROOT / "go" / "internal" / "sim" / "testdata" / "pyfloat.json"
+#: Tier 1.5's closed form: the hypergeometrics, the requirement, the
+#: castability heatmap, the regression land count, and whole shelves.
+KARSTEN_PATH = ROOT / "go" / "internal" / "sim" / "karsten" / "testdata" / "karsten.json"
+#: The mana curve: the two distributions, the two-dial question, the land-drop
+#: truth, and whole curves with their advice.
+CURVE_PATH = ROOT / "go" / "internal" / "sim" / "curve" / "testdata" / "curve.json"
+
+
+#: Anything whose compact JSON fits in this many characters is written on one
+#: line. A row of a table, a compiled card, one rung of a pip ladder -- each is
+#: one thing, and the diff a reader wants names the thing rather than the
+#: field inside it that moved. It is also most of the reason these three files
+#: are a third of the size they were when every leaf got its own line.
+_ONE_LINE = 200
+
+
+def _rows_json(obj: Any, indent: int = 0) -> str:
+    """JSON that keeps one row of a table on one line.
+
+    `_compact_json` above keeps a list of *ints* on one line, which is what a
+    draw stream wants. These tables are rows of mixed scalars -- three ints, a
+    float, a bool -- and their leaves are small records, so the rule here is
+    one line per flat list and one line per record that fits.
+    """
+    pad = " " * indent
+    flat = json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+    if len(flat) <= _ONE_LINE:
+        return flat
+    if isinstance(obj, dict):
+        body = ",\n".join(f"{pad} {json.dumps(k)}: {_rows_json(v, indent + 1)}"
+                          for k, v in obj.items())
+        return "{\n" + body + "\n" + pad + "}"
+    if isinstance(obj, list):
+        body = ",\n".join(f"{pad} {_rows_json(v, indent + 1)}" for v in obj)
+        return "[\n" + body + "\n" + pad + "]"
+    return flat
+
+
+# ------------------------------------------------------ the fixture decks
+
+def _sim_land(name: str, *colors: str, tapped: bool = False) -> SimCard:
+    return SimCard(name=name, is_land=True, enters_tapped=tapped,
+                   category="land",
+                   produces=(ManaSource(frozenset(colors)),))
+
+
+def _sim_spell(name: str, cost: str, category: str = "utility") -> SimCard:
+    return SimCard(name=name, cost=parse_mana_cost(cost), category=category)
+
+
+def _sim_rock(name: str, cost: str, colors: str = "C", amount: int = 1,
+              delay: int = 0) -> SimCard:
+    return SimCard(name=name, cost=parse_mana_cost(cost), category="ramp",
+                   produces=(ManaSource(frozenset(colors), amount),),
+                   produce_delay=delay)
+
+
+def _sim_fetch(name: str, cost: str, lands: int = 1) -> SimCard:
+    return SimCard(name=name, cost=parse_mana_cost(cost), category="ramp",
+                   fetches_lands=lands)
+
+
+def _mono_green(lands: int, spells: int) -> list[SimCard]:
+    return ([_sim_land(f"Forest {i}", "G") for i in range(lands)]
+            + [_sim_spell(f"Bear {i}", "{1}{G}") for i in range(spells)])
+
+
+def closed_form_decks() -> dict[str, dict[str, Any]]:
+    """The decks both corpora are computed over, and why each one is here.
+
+    A grid of numbers proves the arithmetic; a deck proves the *reading* of a
+    deck, which is where the two modules do their real work. Each entry names
+    the property it exists to exercise, because a corpus that loses one still
+    passes every case left in it.
+    """
+    naya = (
+        [_sim_land(f"Forest {i}", "G") for i in range(8)]
+        + [_sim_land(f"Plains {i}", "W") for i in range(7)]
+        + [_sim_land(f"Mountain {i}", "R") for i in range(6)]
+        + [_sim_land(f"Temple {i}", "G", "W", tapped=True) for i in range(5)]
+        + [_sim_land(f"Command Tower {i}", "W", "U", "B", "R", "G")
+           for i in range(4)]
+        + [_sim_land(f"Waste {i}", "C") for i in range(3)]
+        + [_sim_rock("Sol Ring", "{1}", "C", amount=2)]
+        + [_sim_rock("Birds of Paradise", "{G}", "WUBRG", delay=1)]
+        + [_sim_rock("Selesnya Signet", "{2}", "GW")]
+        + [_sim_fetch("Cultivate", "{2}{G}", lands=2)]
+        + [_sim_fetch("Rampant Growth", "{1}{G}", lands=1)]
+        + [_sim_spell("Naya Charm", "{R}{G}{W}")]
+        + [_sim_spell("Hybrid Hero", "{G/W}{G/W}")]
+        + [_sim_spell("Split Demand", "{G/W}{G}")]
+        + [_sim_spell("Compleated One", "{2}{U/P}")]
+        + [_sim_spell("Colourless Engine", "{4}")]
+        + [_sim_spell("Ghalta", "{10}{G}{G}")]
+        + [_sim_spell(f"Beast {i}", "{2}{G}") for i in range(20)]
+        + [_sim_spell(f"Angel {i}", "{3}{W}{W}") for i in range(15)]
+        + [_sim_spell(f"Dragon {i}", "{4}{R}") for i in range(10)]
+    )
+    esper = (
+        [_sim_land(f"Island {i}", "U") for i in range(11)]
+        + [_sim_land(f"Swamp {i}", "B") for i in range(11)]
+        + [_sim_land(f"Plains {i}", "W") for i in range(11)]
+        + [_sim_rock(f"Signet {i}", "{2}", "WUB") for i in range(5)]
+        + [_sim_rock(f"Talisman {i}", "{2}", "UB", delay=0) for i in range(3)]
+        + [_sim_rock("Mana Vault", "{1}", "C", amount=3)]
+        + [_sim_spell(f"Counterspell {i}", "{U}{U}") for i in range(12)]
+        + [_sim_spell(f"Removal {i}", "{1}{B}") for i in range(12)]
+        + [_sim_spell(f"Wrath {i}", "{2}{W}{W}") for i in range(10)]
+        + [_sim_spell(f"Esper Thing {i}", "{W}{U}{B}") for i in range(8)]
+        + [_sim_spell(f"Filler {i}", "{3}") for i in range(15)]
+    )
+    ladder = [*_mono_green(34, 62),
+              _sim_spell("Cheap", "{G}"),
+              _sim_spell("Middling", "{1}{G}{G}"),
+              _sim_spell("Greedy", "{G}{G}{G}")]
+    hybrids = (_mono_green(30, 60)
+               + [_sim_spell(f"Hybrid {i}", "{G/W}") for i in range(5)]
+               + [_sim_spell(f"Both Ways {i}", "{G/W}{G}") for i in range(4)]
+    )
+    return {
+        "mono-green": {
+            "why": "the canonical fixture: 34 Forests, 65 two-drop bears",
+            "library": _mono_green(34, 65), "commander": None,
+        },
+        "mono-green-rich": {
+            "why": "44 lands, so castability rises and the regression's delta flips",
+            "library": _mono_green(44, 55), "commander": None,
+        },
+        "mono-green-poor": {
+            "why": "20 lands: an unmet requirement at every rung",
+            "library": _mono_green(20, 79), "commander": None,
+        },
+        "pip-ladder": {
+            "why": "one colour, three rungs, and only the triple pip failing",
+            "library": ladder, "commander": None,
+        },
+        "hybrid-heavy": {
+            "why": ("a hybrid pip is charged to both colours, and a card asking "
+                    "{G/W} AND {G} lands in ('G', 1) twice -- the tier's card "
+                    "list shows it, and tidying that away is a divergence"),
+            "library": hybrids, "commander": None,
+        },
+        "naya": {
+            "why": ("three colours with duals, a five-colour land, wastes, a "
+                    "Sol Ring making two, a summoning-sick dork, two land "
+                    "fetchers, a Phyrexian cost that must demand nothing, a "
+                    "wholly generic cost, and a card past the horizon"),
+            "library": naya, "commander": _sim_spell("Atla Palani", "{2}{R}{G}{W}"),
+        },
+        "esper-rocks": {
+            "why": "rocks rather than lands carry the colours; a rock makes three",
+            "library": esper, "commander": _sim_spell("Tivit", "{4}{W}{U}{B}"),
+        },
+        "commanded": {
+            "why": ("the commander sets a white demand a mono-green library "
+                    "cannot meet, and is not one of the 99"),
+            "library": _mono_green(34, 65),
+            "commander": _sim_spell("Legend", "{2}{W}{W}"),
+        },
+        "sixty": {
+            "why": "Karsten's own fit size, where his published table is quoted",
+            "library": ([_sim_land(f"Plains {i}", "W") for i in range(14)]
+                        + [_sim_spell(f"Soldier {i}", "{W}") for i in range(46)]),
+            "commander": None,
+        },
+        "all-lands": {
+            "why": "no nonland cards: the regression has no curve to fit",
+            "library": [_sim_land(f"Forest {i}", "G") for i in range(99)],
+            "commander": None,
+        },
+        "no-lands": {
+            "why": "no lands at all, and the whole 99 asking for colour",
+            "library": [_sim_spell(f"Bear {i}", "{1}{G}") for i in range(99)],
+            "commander": None,
+        },
+        "tiny": {
+            "why": ("five cards, where a requirement is larger than the deck "
+                    "and `required_sources` falls through to the deck size"),
+            "library": [_sim_land("Forest", "G"), _sim_land("Plains", "W"),
+                        _sim_spell("Bear", "{1}{G}"),
+                        _sim_spell("Greedy", "{G}{G}{G}{G}"),
+                        _sim_rock("Signet", "{2}", "GW")],
+            "commander": None,
+        },
+        "empty": {
+            "why": "the library nothing may be computed over, which must not raise",
+            "library": [], "commander": None,
+        },
+        "tie-breaker": {
+            "why": ("built so that every rounding in both modules lands on an "
+                    "exact half, which is where Python's banker's rounding and "
+                    "Go's away-from-zero rounding differ. 30 cards, 20 lands, "
+                    "10 spells of total mana value 51 and exactly one cheap "
+                    "accelerant put `regression_lands` at 14.5 (Python 14, a "
+                    "naive port 15); the two accelerants average 2.5 mana, 2.5 "
+                    "output and 0.5 delay, so `_typical_accelerant` rounds "
+                    "three ties at once. Added because a mutation survived "
+                    "without it -- twelve real decks and not one of them "
+                    "landed on a half"),
+            "library": (
+                [_sim_land(f"Forest {i}", "G") for i in range(20)]
+                + [_sim_rock("Sick Engine", "{2}", "C", amount=2, delay=1),
+                   _sim_rock("Grand Battery", "{3}", "C", amount=3, delay=0)]
+                + [_sim_spell(f"Titan {i}", "{6}") for i in range(6)]
+                + [_sim_spell(f"Colossus {i}", "{5}") for i in range(2)]
+            ),
+            "commander": None,
+        },
+    }
+
+
+def _source_json(src: ManaSource) -> dict[str, Any]:
+    """A mana source. `amount` is written even when it is the default.
+
+    Every other field below is omitted when it holds its default, because Go's
+    zero value for an absent JSON field is the same default and 1,300 cards
+    saying `"fetches_lands": 0` is a third of a megabyte saying nothing.
+    `amount` is the one place that reasoning fails: Python's default is **1**
+    and Go's zero value is **0**, so an omitted amount would silently make
+    every mana source produce nothing.
+    """
+    return {"colors": sorted(src.colors), "amount": src.amount}
+
+
+def _cost_json(cost: ManaCost) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    if cost.generic:
+        out["generic"] = cost.generic
+    if cost.pips:
+        out["pips"] = [sorted(p) for p in cost.pips]
+    if cost.phyrexian:
+        out["phyrexian"] = [sorted(p) for p in cost.phyrexian]
+    if cost.has_x:
+        out["has_x"] = True
+    return out
+
+
+def _card_json(card: SimCard) -> dict[str, Any]:
+    out: dict[str, Any] = {"name": card.name}
+    cost = _cost_json(card.cost)
+    if cost:
+        out["cost"] = cost
+    if card.category != "utility":
+        out["category"] = card.category
+    if card.is_land:
+        out["is_land"] = True
+    if card.enters_tapped:
+        out["enters_tapped"] = True
+    if card.produces:
+        out["produces"] = [_source_json(s) for s in card.produces]
+    if card.produce_delay:
+        out["produce_delay"] = card.produce_delay
+    if card.fetches_lands:
+        out["fetches_lands"] = card.fetches_lands
+    return out
+
+
+def _decks_json() -> list[dict[str, Any]]:
+    out = []
+    for name, spec in closed_form_decks().items():
+        commander = spec["commander"]
+        out.append({
+            "name": name,
+            "why": spec["why"],
+            "library": [_card_json(c) for c in spec["library"]],
+            "commander": None if commander is None else _card_json(commander),
+        })
+    return out
+
+
+# --------------------------------------------------- the CPython float floor
+
+#: Sequences `math.fsum` is asked for, chosen so that a naive left-to-right
+#: sum fails at least one of them. The last group is captured from the real
+#: `castable_odds` term lists rather than invented -- see `_fsum_cases`.
+_FSUM_SEEDS: list[list[float]] = [
+    [],
+    [0.0],
+    [-0.0],
+    [1.0],
+    [0.1] * 10,
+    [1e-16, 1.0, 1e16],
+    [1e16, 1.0, 1e-16],
+    [1e100, 1.0, -1e100, -1.0],
+    [-1.0, 1e100, 1.0, -1e100],
+    # No overflowing sequence here: CPython raises OverflowError on an
+    # intermediate overflow of finite summands, which is an exception rather
+    # than a value and so has nothing to compare against.
+    [0.1, 0.2, 0.3, -0.6],
+    [2.0 ** -1074, 2.0 ** -1074, 1.0],
+    [1.0, 2.0 ** -1074, 2.0 ** -1074],
+    [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    [1.0 / 3.0] * 3,
+    [1.0 / 7.0] * 7,
+]
+
+
+def _fsum_cases() -> list[dict[str, Any]]:
+    """Every sequence, with CPython's answer -- and the real ones, instrumented.
+
+    The invented sequences are the classic traps. The captured ones are the
+    point: `castable_odds` is the only caller, its term lists are a hundred
+    products of probabilities, and a corpus of invented sequences would prove
+    Shewchuk's algorithm without proving it on the shape this project actually
+    sums. So `karsten.fsum` is replaced with a recorder that **delegates to
+    CPython's own** `math.fsum` -- the same instrument-and-delegate technique
+    the pyrand corpus uses on `random.shuffle` -- and a few real shelves are
+    read with it in place.
+    """
+    cases = [{"values": list(v), "value": math.fsum(v)} for v in _FSUM_SEEDS]
+
+    captured: list[list[float]] = []
+    real = karsten.fsum
+
+    def recorder(values: Any) -> float:
+        seq = list(values)
+        captured.append(seq)
+        return real(seq)
+
+    karsten.fsum = recorder          # type: ignore[assignment]
+    try:
+        decks = closed_form_decks()
+        for name in ("naya", "esper-rocks", "mono-green"):
+            spec = decks[name]
+            karsten.shelf(spec["library"], spec["commander"])
+    finally:
+        karsten.fsum = real          # type: ignore[assignment]
+
+    # Longest first, then the most terms per distinct value: a sum of a
+    # hundred tiny products is the case the algorithm exists for, and a
+    # handful of one-term lists would hide a broken partials loop.
+    captured.sort(key=lambda seq: (-len(seq), seq))
+    seen: set[tuple[float, ...]] = set()
+    for seq in captured:
+        key = tuple(seq)
+        if key in seen:
+            continue
+        seen.add(key)
+        cases.append({"values": seq, "value": math.fsum(seq)})
+        if len(seen) >= 40:
+            break
+    return cases
+
+
+#: Values whose rounding is the whole question: exact halves in both
+#: directions, the double that is *just* under a half, and the land counts
+#: `regression_lands` actually produces.
+_ROUND_VALUES = [
+    0.0, -0.0, 0.5, 1.5, 2.5, 3.5, -0.5, -1.5, -2.5,
+    0.49999999999999994, 2.675, 33.5, 34.5, 35.5, 36.5,
+    36.499999999999996, 36.500000000000004, 54.5, -54.5,
+    19.59, 33.333333333333336, 1e15 + 0.5, 0.1, 0.9,
+]
+
+#: `(value, ndigits)` pairs. `regression_lands` rounds to 2 and `curve`'s
+#: advice to 4, so those two are swept over real figures; the rest are the
+#: cases where a decimal round and a binary one disagree.
+_ROUND_TO_VALUES = [
+    2.675, 1.005, 0.125, 0.135, 2.5, -2.5, 0.0, -0.0,
+    0.1, 0.30000000000000004, 1.0 / 3.0, 2.0 / 3.0,
+    0.86056, 0.9000000000000001, 0.8999999999999999,
+    # These round to a *negative* zero, which CPython's dtoa/strtod
+    # round trip keeps and an exact-rational implementation loses.
+    -0.4, -0.0004, -0.049,
+    3.4499999999999997, 3.45, 33.333333333333336, 19.59,
+]
+
+
+def _round_cases() -> list[dict[str, Any]]:
+    """`round(x)` -- and the answer is an **int**, which is the point.
+
+    CPython's one-argument round returns an integer, and an integer has no
+    signed zero while Go's `math.Round(-0.5)` does. Recording the int is what
+    makes `Round(-0.5)` a question with one answer.
+    """
+    return [{"x": v, "value": round(v)} for v in _ROUND_VALUES]
+
+
+def _round_to_cases() -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for value in _ROUND_TO_VALUES:
+        for ndigits in (0, 1, 2, 3, 4, 6):
+            out.append({"x": value, "ndigits": ndigits,
+                        "value": round(value, ndigits)})
+    return out
+
+
+def pyfloat_cases() -> dict[str, Any]:
+    return {
+        "note": ("CPython's `math.fsum`, `round(x)` and `round(x, n)`, which "
+                 "`go/internal/sim` reproduces. Written by "
+                 "`python tests/go_fixtures.py`."),
+        "why": ("Go's `math.Round` breaks ties away from zero and Python's "
+                "`round` breaks them to even, so a land count of 34.5 differs "
+                "by one land between the two; and a naive sum of a hundred "
+                "products is not `math.fsum`, which `castable_odds` calls "
+                "deliberately. Both feed a `>=` comparison whose answer is an "
+                "integer, so neither is cosmetic."),
+        "fsum_columns": ["values", "value"],
+        "fsum": _fsum_cases(),
+        "round": _round_cases(),
+        "round_to": _round_to_cases(),
+    }
+
+
+def render_pyfloat_cases() -> str:
+    return _rows_json(pyfloat_cases()) + "\n"
+
+
+# ------------------------------------------------------------- karsten
+
+_HYPER_POPULATIONS = [0, 1, 5, 12, 40, 60, 99]
+_HYPER_SUCCESSES = [0, 1, 2, 14, 30, 40, 99, 120]
+_HYPER_DRAWS = [0, 1, 7, 10, 13, 40, 99]
+_HYPER_WANTED = [0, 1, 2, 3, 5, 10]
+
+
+def _hypergeometric_cases() -> list[list[Any]]:
+    """The grid, plus the pair that drives each summation branch.
+
+    `hypergeometric_at_least` sums the complement when it is the shorter sum,
+    which is two code paths for one number and therefore two chances to be
+    wrong. The grid crosses the branch many times over; the two rows appended
+    at the end are the ones `tests/test_karsten.py` names, so a reader can see
+    the branch being exercised without deriving it from the grid.
+    """
+    rows = []
+    for population in _HYPER_POPULATIONS:
+        for successes in _HYPER_SUCCESSES:
+            for draws in _HYPER_DRAWS:
+                for wanted in _HYPER_WANTED:
+                    rows.append([
+                        population, successes, draws, wanted,
+                        karsten.hypergeometric_at_least(
+                            population, successes, draws, wanted),
+                    ])
+    for pop, suc, dra, wan in [(12, 5, 4, 1), (12, 5, 4, 4), (60, 14, 7, 1),
+                               (99, 36, 10, 2), (99, 1, 10, 2), (10, 10, 20, 5)]:
+        rows.append([pop, suc, dra, wan,
+                     karsten.hypergeometric_at_least(pop, suc, dra, wan)])
+    return rows
+
+
+def _exactly_cases() -> list[list[Any]]:
+    rows = []
+    for population in _HYPER_POPULATIONS:
+        for successes in _HYPER_SUCCESSES:
+            for draws in _HYPER_DRAWS:
+                for count in _HYPER_WANTED:
+                    rows.append([
+                        population, successes, draws, count,
+                        karsten._exactly(population, successes, draws, count),
+                    ])
+    return rows
+
+
+def _cards_seen_cases() -> list[list[Any]]:
+    return [[turn, otp, karsten.cards_seen(turn, on_the_play=otp)]
+            for turn in range(-2, 15) for otp in (True, False)]
+
+
+def _required_sources_cases() -> list[list[Any]]:
+    rows = []
+    for deck_size in (0, 1, 20, 40, 60, 99, 100):
+        for pips in (0, 1, 2, 3, 4):
+            for turn in (1, 2, 3, 4, 5, 10):
+                for target in (0.5, 0.8, 0.9, 0.95, 0.99):
+                    for otp in (True, False):
+                        rows.append([
+                            deck_size, pips, turn, target, otp,
+                            karsten.required_sources(
+                                deck_size=deck_size, pips=pips, turn=turn,
+                                target=target, on_the_play=otp),
+                        ])
+    return rows
+
+
+def _sources_for_cases() -> list[dict[str, Any]]:
+    rows = []
+    for name, spec in closed_form_decks().items():
+        for colors in (["G"], ["W"], ["U"], ["C"], ["G", "W"], ["W", "U", "B"],
+                       ["W", "U", "B", "R", "G"], []):
+            rows.append({
+                "deck": name,
+                "colors": colors,
+                "value": karsten.sources_for(spec["library"], frozenset(colors)),
+            })
+    return rows
+
+
+def _probe_cards(library: list[SimCard], commander: SimCard | None) -> list[SimCard]:
+    """A handful of distinct cards per deck, cheapest and dearest included."""
+    seen: dict[str, SimCard] = {}
+    for card in list(library) + ([commander] if commander is not None else []):
+        if card.is_land:
+            continue
+        seen.setdefault(card.name, card)
+    cards = sorted(seen.values(), key=lambda c: (c.mv, c.name))
+    if len(cards) <= 8:
+        return cards
+    picks = [cards[0], cards[len(cards) // 4], cards[len(cards) // 2],
+             cards[3 * len(cards) // 4], cards[-1]]
+    # Anything with more than one distinct pip set is where the method stops
+    # being exact, so make sure at least one is in the sample.
+    for card in cards:
+        if len(karsten._pip_demand(card.cost)) > 1 and card not in picks:
+            picks.append(card)
+            break
+    out: list[SimCard] = []
+    for card in picks:
+        if card not in out:
+            out.append(card)
+    return out
+
+
+def _castable_odds_cases() -> list[dict[str, Any]]:
+    rows = []
+    for name, spec in closed_form_decks().items():
+        for card in _probe_cards(spec["library"], spec["commander"]):
+            for otp in (True, False):
+                rows.append({
+                    "deck": name,
+                    "card": card.name,
+                    "on_the_play": otp,
+                    "by_turn": [
+                        karsten.castable_odds(card, spec["library"], turn=t,
+                                              on_the_play=otp)
+                        for t in range(1, karsten.HORIZON + 1)
+                    ],
+                })
+    return rows
+
+
+def _estimate_json(estimate: karsten.LandEstimate) -> dict[str, Any]:
+    return {
+        "lands_now": estimate.lands_now,
+        "recommended": estimate.recommended,
+        "delta": estimate.delta,
+        "average_mana_value": estimate.average_mana_value,
+        "cheap_accelerants": estimate.cheap_accelerants,
+        "deck_size": estimate.deck_size,
+        "caveats": list(estimate.caveats),
+    }
+
+
+def _regression_cases() -> list[dict[str, Any]]:
+    return [{"deck": name,
+             "value": _estimate_json(karsten.regression_lands(spec["library"]))}
+            for name, spec in closed_form_decks().items()]
+
+
+def _shelf_json(shelf: karsten.Shelf) -> dict[str, Any]:
+    return {
+        "deck_size": shelf.deck_size,
+        "lands": shelf.lands,
+        "target": shelf.target,
+        "on_the_play": shelf.on_the_play,
+        "colors": [
+            {
+                "color": req.color,
+                "have": req.have,
+                "have_lands": req.have_lands,
+                "met": req.met,
+                "shortfall": req.shortfall,
+                "tiers": [
+                    {
+                        "pips": tier.pips,
+                        "turn": tier.turn,
+                        "need": tier.need,
+                        "have": tier.have,
+                        "met": tier.met,
+                        "shortfall": tier.shortfall,
+                        "odds_now": tier.odds_now,
+                        "cards": list(tier.cards),
+                    }
+                    for tier in req.tiers
+                ],
+            }
+            for req in shelf.colors
+        ],
+        "land_estimate": _estimate_json(shelf.land_estimate),
+        "odds": [
+            {
+                "name": odds.name,
+                "mv": odds.mv,
+                "by_turn": list(odds.by_turn),
+                "on_curve": odds.on_curve,
+                "reliable_turn": odds.reliable_turn,
+                "lag": odds.lag,
+                "lateness": odds.lateness,
+            }
+            for odds in shelf.odds
+        ],
+        "approximated": list(shelf.approximated),
+        "unmet": [req.color for req in shelf.unmet],
+    }
+
+
+def _shelf_cases() -> list[dict[str, Any]]:
+    """Every deck at the default dials, and three of them turned.
+
+    The whole structure rather than a summary, because the shelf's *order* is
+    an output: `odds` is sorted by lateness so that a three-drop landing on
+    turn six outranks an eight-drop that never arrives, and a port that got
+    every probability right and the comparator wrong would look green against
+    anything less.
+    """
+    decks = closed_form_decks()
+    rows = []
+    for name, spec in decks.items():
+        rows.append({
+            "deck": name, "target": karsten.TARGET, "on_the_play": True,
+            "value": _shelf_json(karsten.shelf(spec["library"], spec["commander"])),
+        })
+    for name, target, otp in [("naya", 0.80, False), ("esper-rocks", 0.99, False),
+                              ("pip-ladder", 0.60, True)]:
+        spec = decks[name]
+        rows.append({
+            "deck": name, "target": target, "on_the_play": otp,
+            "value": _shelf_json(karsten.shelf(
+                spec["library"], spec["commander"], target=target,
+                on_the_play=otp)),
+        })
+    return rows
+
+
+def karsten_cases() -> dict[str, Any]:
+    return {
+        "note": ("`sim/karsten.py` -- Tier 1.5, the closed form -- rendered by "
+                 "`python tests/go_fixtures.py`. Floats are plain JSON numbers "
+                 "and round-trip exactly; `go/internal/sim/karsten` must "
+                 "reproduce every one of them bit for bit."),
+        "target": karsten.TARGET,
+        "horizon": karsten.HORIZON,
+        "hypergeometric_columns": ["population", "successes", "draws", "wanted", "value"],
+        "hypergeometric": _hypergeometric_cases(),
+        "exactly_columns": ["population", "successes", "draws", "count", "value"],
+        "exactly": _exactly_cases(),
+        "cards_seen_columns": ["turn", "on_the_play", "value"],
+        "cards_seen": _cards_seen_cases(),
+        "required_sources_columns": ["deck_size", "pips", "turn", "target",
+                                     "on_the_play", "value"],
+        "required_sources": _required_sources_cases(),
+        "decks": _decks_json(),
+        "sources_for": _sources_for_cases(),
+        "castable_odds": _castable_odds_cases(),
+        "regression_lands": _regression_cases(),
+        "shelves": _shelf_cases(),
+    }
+
+
+def render_karsten_cases() -> str:
+    return _rows_json(karsten_cases()) + "\n"
+
+
+# --------------------------------------------------------------- the curve
+
+def _expected_lands_cases() -> list[list[Any]]:
+    rows = []
+    for deck_size in (0, 1, 40, 60, 99):
+        for lands in (0, 1, 17, 34, 40, 60, 99):
+            for turn in (0, 1, 2, 4, 6, 10):
+                for otp in (True, False):
+                    rows.append([
+                        deck_size, lands, turn, otp,
+                        curve.expected_lands_in_play(deck_size, lands, turn,
+                                                     on_the_play=otp),
+                    ])
+    return rows
+
+
+def _land_distribution_cases() -> list[dict[str, Any]]:
+    rows = []
+    for deck_size in (0, 1, 40, 99):
+        for lands in (0, 1, 17, 36, 60, 99):
+            for turn in (0, 1, 3, 4, 7):
+                for otp in (True, False):
+                    rows.append({
+                        "deck_size": deck_size, "lands": lands, "turn": turn,
+                        "on_the_play": otp,
+                        "value": curve._land_distribution(
+                            deck_size, lands, turn, on_the_play=otp),
+                    })
+    return rows
+
+
+def _expected_ramp_cases() -> list[dict[str, Any]]:
+    rows = []
+    for name, spec in closed_form_decks().items():
+        for otp in (True, False):
+            rows.append({
+                "deck": name, "on_the_play": otp,
+                "by_turn": [curve.expected_ramp(spec["library"], t,
+                                                on_the_play=otp)
+                            for t in range(1, curve.HORIZON + 1)],
+            })
+    return rows
+
+
+def _ramp_distribution_cases() -> list[dict[str, Any]]:
+    rows = []
+    for name, spec in closed_form_decks().items():
+        for turn in (1, 2, 4, 6, 10):
+            for extra, count in ((None, 0), ((2, 1, 0), 1), ((1, 2, 1), 3),
+                                 ((7, 5, 0), 2)):
+                rows.append({
+                    "deck": name, "turn": turn, "on_the_play": True,
+                    "extra": None if extra is None else list(extra),
+                    "extra_count": count,
+                    "value": curve._ramp_distribution(
+                        spec["library"], turn, extra=extra, extra_count=count),
+                })
+    return rows
+
+
+def _on_curve_odds_cases() -> list[list[Any]]:
+    """The two dials, and the hypotheticals the advice is built from.
+
+    `need` is carried as a JSON null where Python passes `None`, because zero
+    is a *different* question there -- `need=0` asks for no mana and answers
+    1.0 -- and a port that collapsed the two would pass a corpus that never
+    asked.
+    """
+    rows = []
+    for name, spec in closed_form_decks().items():
+        for turn in (1, 2, 4, 6):
+            for need in (None, 0, 1, turn, turn + 1, turn + 2, 12):
+                for extra in ({}, {"extra_lands": 1}, {"extra_lands": 5},
+                              {"extra_ramp": (2, 1, 0), "extra_ramp_count": 1},
+                              {"extra_ramp": (1, 2, 1), "extra_ramp_count": 4}):
+                    for otp in (True, False):
+                        piece = extra.get("extra_ramp")
+                        rows.append([
+                            name, turn, need, otp,
+                            extra.get("extra_lands", 0),
+                            None if piece is None else list(piece),
+                            extra.get("extra_ramp_count", 0),
+                            curve.on_curve_odds(
+                                spec["library"], turn, need=need,
+                                on_the_play=otp,
+                                extra_lands=extra.get("extra_lands", 0),
+                                extra_ramp=piece,
+                                extra_ramp_count=extra.get("extra_ramp_count", 0)),
+                        ])
+    return rows
+
+
+def _lands_for_every_drop_cases() -> list[list[Any]]:
+    """Includes the pinned pair: 48 lands through turn 3, 54 through turn 4.
+
+    That is the number the feature exists to talk somebody *out* of, so a
+    regression that made it look reasonable would be the feature quietly
+    reversing its own advice.
+    """
+    rows = []
+    for deck_size in (5, 40, 60, 99, 120):
+        for turn in range(1, 11):
+            for target in (0.5, 0.8, 0.9, 0.99):
+                for otp in (True, False):
+                    rows.append([
+                        deck_size, turn, target, otp,
+                        curve.lands_for_every_drop(deck_size, turn,
+                                                   target=target,
+                                                   on_the_play=otp),
+                    ])
+    return rows
+
+
+def _typical_accelerant_cases() -> list[dict[str, Any]]:
+    rows = []
+    for name, spec in closed_form_decks().items():
+        for turn in (1, 2, 4, 6, 10):
+            piece, generic = curve._typical_accelerant(spec["library"], turn)
+            rows.append({"deck": name, "turn": turn,
+                         "piece": list(piece), "generic": generic})
+    return rows
+
+
+def _curve_json(mc: curve.ManaCurve) -> dict[str, Any]:
+    return {
+        "deck_size": mc.deck_size,
+        "lands": mc.lands,
+        "accelerants": mc.accelerants,
+        "target_turn": mc.target_turn,
+        "target_mana": mc.target_mana,
+        "target": mc.target,
+        "on_the_play": mc.on_the_play,
+        "turns": [
+            {
+                "turn": t.turn,
+                "from_lands": t.from_lands,
+                "from_ramp": t.from_ramp,
+                "expected_mana": t.expected_mana,
+                "land_drop_odds": t.land_drop_odds,
+                "odds": t.odds,
+            }
+            for t in mc.turns
+        ],
+        "advice": {
+            "target_turn": mc.advice.target_turn,
+            "target_mana": mc.advice.target_mana,
+            "target": mc.advice.target,
+            "odds": mc.advice.odds,
+            "odds_per_land": mc.advice.odds_per_land,
+            "odds_per_ramp": mc.advice.odds_per_ramp,
+            "recommend": mc.advice.recommend,
+            "slots": mc.advice.slots,
+            "ramp_is_generic": mc.advice.ramp_is_generic,
+            "beyond_the_curve": mc.advice.beyond_the_curve,
+            "lands_for_every_drop": mc.advice.lands_for_every_drop,
+        },
+    }
+
+
+#: `(target_turn, target_mana, target, on_the_play)`. The clamps are here on
+#: purpose: turn 99 must come back as the horizon and turn 0 as turn 1, and a
+#: target of 0.999 must come back as 0.99.
+_CURVE_DIALS = [
+    (4, None, 0.90, True),
+    (4, 6, 0.90, True),
+    (2, 2, 0.60, True),
+    (4, 4, 0.85, False),
+    (2, 12, 0.90, True),
+    (99, None, 0.999, True),
+    (0, 0, 0.1, True),
+    (6, 3, 0.95, False),
+]
+
+
+def _curve_cases() -> list[dict[str, Any]]:
+    rows = []
+    for name, spec in closed_form_decks().items():
+        for target_turn, target_mana, target, otp in _CURVE_DIALS:
+            rows.append({
+                "deck": name,
+                "target_turn": target_turn,
+                "target_mana": target_mana,
+                "target": target,
+                "on_the_play": otp,
+                "value": _curve_json(curve.curve(
+                    spec["library"], target_turn=target_turn,
+                    target_mana=target_mana, target=target, on_the_play=otp)),
+            })
+    return rows
+
+
+def curve_cases() -> dict[str, Any]:
+    return {
+        "note": ("`sim/curve.py` -- P(N mana on turn T), decomposed, with the "
+                 "lands-or-ramp advice -- rendered by "
+                 "`python tests/go_fixtures.py`."),
+        "horizon": curve.HORIZON,
+        "default_target_turn": curve.DEFAULT_TARGET_TURN,
+        "default_target": curve.DEFAULT_TARGET,
+        "too_close": curve.TOO_CLOSE,
+        "generic_rock": list(curve._GENERIC_ROCK),
+        "decks": _decks_json(),
+        "accelerants": [
+            {"deck": name, "value": [list(p) for p in curve._accelerants(spec["library"])]}
+            for name, spec in closed_form_decks().items()
+        ],
+        "expected_lands_columns": ["deck_size", "lands", "turn", "on_the_play", "value"],
+        "expected_lands": _expected_lands_cases(),
+        "land_distribution": _land_distribution_cases(),
+        "expected_ramp": _expected_ramp_cases(),
+        "ramp_distribution": _ramp_distribution_cases(),
+        "on_curve_odds_columns": ["deck", "turn", "need", "on_the_play",
+                                  "extra_lands", "extra_ramp", "extra_ramp_count",
+                                  "value"],
+        "on_curve_odds": _on_curve_odds_cases(),
+        "lands_for_every_drop_columns": ["deck_size", "turn", "target",
+                                         "on_the_play", "value"],
+        "lands_for_every_drop": _lands_for_every_drop_cases(),
+        "typical_accelerant": _typical_accelerant_cases(),
+        "curves": _curve_cases(),
+    }
+
+
+def render_curve_cases() -> str:
+    return _rows_json(curve_cases()) + "\n"
+
+
+def write_closed_forms() -> None:
+    """The three files the closed forms are held to. Called by `write`."""
+    for path, body, what in (
+        (PYFLOAT_PATH, render_pyfloat_cases(), "CPython's float floor"),
+        (KARSTEN_PATH, render_karsten_cases(), "Tier 1.5's closed form"),
+        (CURVE_PATH, render_curve_cases(), "the mana curve"),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body, encoding="utf-8")
+        print(f"wrote {what} into {path}")
 
 # ---------------------------------------------------------- the job registry
 #

@@ -17,6 +17,7 @@ the JSON cannot say one thing while `/api/colors` says another.
 from __future__ import annotations
 
 import json
+import math
 from datetime import date
 from pathlib import Path
 
@@ -24,6 +25,7 @@ import pytest
 import yaml
 
 import go_fixtures
+from mtglab.sim import curve, karsten
 
 
 def test_the_committed_yaml_is_what_the_dumper_writes_now():
@@ -102,6 +104,9 @@ _ORACLES = [
     ("the five deliverables", "ARTIFACTS_PATH", "render_artifact_cases"),
     ("the draw corpus", "PYRAND_PATH", "render_pyrand_cases"),
     ("the job registry", "JOBS_PATH", "render_jobs_cases"),
+    ("CPython's float floor", "PYFLOAT_PATH", "render_pyfloat_cases"),
+    ("the closed form", "KARSTEN_PATH", "render_karsten_cases"),
+    ("the mana curve", "CURVE_PATH", "render_curve_cases"),
 ]
 
 
@@ -560,3 +565,108 @@ def test_the_jobs_oracle_never_leaks_the_owner_or_the_key():
         assert "owner" not in case["want_json"]
         key = case["job"]["key"]
         assert not key or key not in case["want_json"]
+# ------------------------------------------------------- the closed forms
+
+def test_the_closed_form_corpus_covers_every_deck_it_claims_to():
+    """A corpus that quietly lost a deck still passes every case left in it.
+
+    Each fixture deck exists for a property -- a hybrid pip charged to both
+    colours, a Phyrexian symbol that must demand nothing, a fetcher that is not
+    a rock, a library with nothing in it -- and the `why` beside each is what
+    makes dropping one visible rather than merely smaller.
+    """
+    decks = go_fixtures.closed_form_decks()
+    assert set(decks) == {
+        "mono-green", "mono-green-rich", "mono-green-poor", "pip-ladder",
+        "hybrid-heavy", "naya", "esper-rocks", "commanded", "sixty",
+        "all-lands", "no-lands", "tiny", "empty", "tie-breaker"}
+    for name, spec in decks.items():
+        assert spec["why"].strip(), f"{name} does not say what it is for"
+
+    # And the edges are really edges, not decks that merely have odd names.
+    assert decks["empty"]["library"] == []
+    assert all(c.is_land for c in decks["all-lands"]["library"])
+    assert not any(c.is_land for c in decks["no-lands"]["library"])
+    assert decks["commanded"]["commander"] is not None
+    naya = decks["naya"]["library"]
+    assert any(c.cost.phyrexian for c in naya), "no Phyrexian cost left"
+    assert any(c.fetches_lands for c in naya), "no land fetcher left"
+    assert any(c.produce_delay for c in naya), "no summoning-sick dork left"
+    assert any(len(s.colors) > 1 for c in naya for s in c.produces), "no dual"
+    assert any(len(p) > 1 for c in naya for p in c.cost.pips), "no hybrid pip"
+    assert any(c.mv > karsten.HORIZON for c in naya), "nothing past the horizon"
+
+    # And the deck that exists only so a rounding tie has somewhere to happen.
+    # Asserted as the halves themselves rather than as the deck's contents,
+    # because what matters is the property, not the list that produces it.
+    tie = decks["tie-breaker"]["library"]
+    estimate_scaled = karsten.regression_lands(tie)
+    assert estimate_scaled.recommended == 14, (
+        "the tie-breaker deck no longer lands on 14.5; a port rounding away "
+        "from zero would answer 15 and nothing here would notice")
+    piece, generic = curve._typical_accelerant(tie, 4)
+    assert not generic and piece == (2, 2, 0), (
+        "the tie-breaker deck no longer averages 2.5 / 2.5 / 0.5, so the "
+        "three ties in `_typical_accelerant` are no longer exercised")
+
+
+def test_the_closed_form_corpus_is_wide_enough_to_be_worth_running():
+    """Breadth, asserted, because a grid is the easiest thing to quietly trim.
+
+    The numbers are floors rather than exact counts: adding a case must not
+    fail a test, and losing a thousand must.
+    """
+    karsten_cases = go_fixtures.karsten_cases()
+    assert len(karsten_cases["hypergeometric"]) >= 2000
+    assert len(karsten_cases["exactly"]) >= 2000
+    assert len(karsten_cases["required_sources"]) >= 2000
+    assert len(karsten_cases["shelves"]) >= 13
+    curve_cases = go_fixtures.curve_cases()
+    assert len(curve_cases["on_curve_odds"]) >= 3000
+    assert len(curve_cases["lands_for_every_drop"]) >= 300
+    assert len(curve_cases["curves"]) >= 50
+
+    # Both summation branches of `hypergeometric_at_least`, and both answers of
+    # `lands_for_every_drop`. A grid that only ever took one path would prove
+    # half of what it looks like it proves.
+    assert any(row[4] is None for row in curve_cases["lands_for_every_drop"]), (
+        "no row reaches the unreachable case, which is a real answer")
+    assert any(row[2] is None for row in curve_cases["on_curve_odds"]), (
+        "no row asks the `need=None` question, which is the surface's default")
+
+
+def test_the_corpus_would_notice_a_sum_that_is_not_an_fsum():
+    """The discovery that produced `curve.fsum`, kept as a live assertion.
+
+    `expected_lands_in_play` and `on_curve_odds` summed with the builtin `sum`
+    until 2026-08-22, and CPython 3.12 gave `sum()` over floats compensated
+    accumulation where 3.11 adds left to right -- so those two lines answered
+    differently depending on the interpreter, on a project that supports both
+    and ships 3.12. The fix was `math.fsum`, which is correctly rounded and
+    therefore the same on every interpreter.
+
+    What this asserts is that the *corpus* can tell the difference. If every
+    recorded value happened to agree with a naive running total, the Go side
+    could sum however it liked and pass, and the next interpreter change would
+    walk straight back in.
+    """
+    rows = [row for row in go_fixtures.curve_cases()["expected_lands"]
+            if row[4] != 0.0]
+    assert rows, "the expectation grid recorded nothing but zeroes"
+
+    differs = 0
+    for deck_size, lands, turn, on_the_play, value in rows:
+        seen = min(curve.cards_seen(turn, on_the_play=on_the_play), deck_size)
+        terms = [min(turn, k) * curve._exactly(deck_size, lands, seen, k)
+                 for k in range(min(seen, lands) + 1)]
+        running = 0.0
+        for term in terms:
+            running += term
+        assert value == math.fsum(terms), (
+            f"expected_lands_in_play({deck_size}, {lands}, {turn}, "
+            f"{on_the_play}) is not the correctly-rounded sum of its terms")
+        if running != value:
+            differs += 1
+    assert differs, (
+        "no row in the grid separates fsum from a running total, so the Go "
+        "test over them could not tell the two apart")

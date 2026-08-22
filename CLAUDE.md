@@ -361,7 +361,15 @@ src/mtglab/
                           and at N > T a land is worth **nothing** -- you may
                           play one a turn -- so only ramp can help. Measured:
                           six decks x five turns, ramp never won at N == T;
-                          at N > T it won every time
+                          at N > T it won every time. Its two float sums are
+                          `math.fsum` and not `sum`, since 2026-08-22: they
+                          were `sum`, and **CPython 3.12 gave sum() over
+                          floats compensated accumulation where 3.11 adds
+                          left to right**, so this module answered
+                          differently on the two interpreters this project
+                          supports -- one ulp, which is nothing on a screen
+                          and is a different slot count out of the >= scans
+                          the advice is made of. Found by the Go port
   sim/mulligan.py         the keep-rule grid search: 33 rules, one seed,
                           judged on spells through T8 like the land sweep.
                           Its verdict is `flat` measured **against the
@@ -660,7 +668,39 @@ go/                       the Go module (ADR 38; module path
                           falls out of it: **a job result must be a struct
                           with its fields in Python's order, never a
                           `map[string]any`**, because encoding/json sorts map
-                          keys and a dict does not. The contract
+                          keys and a dict does not.
+                          **Tier 1.5 followed, 2026-08-22, and flipped
+                          nothing**: internal/sim/karsten and
+                          internal/sim/curve are the closed forms, over a
+                          shared internal/sim that holds the compiled card
+                          and the three CPython float behaviours a port has
+                          to reproduce (math.fsum, both rounds). PLAN 5.4
+                          asked for "an epsilon pinned per function"; every
+                          one is pinned at ZERO and the corpora compare
+                          Float64bits, because exact was affordable --
+                          math/big binomials where Python has math.comb, one
+                          correctly-rounded big.Rat division, and Shewchuk's
+                          summation transcribed. Exact is also *wanted*:
+                          required_sources, reliable_turn and
+                          _slots_to_target all scan a float against >=, so
+                          one ulp is a different land count or a different
+                          recommendation, never a different last decimal.
+                          Two divergences the port FOUND rather than
+                          inherited, both fixed in both runtimes at once.
+                          **arm64 fuses `t += a*b` into one FMADDD** and
+                          rounds once where CPython rounds twice -- on the
+                          architecture the image ships; sim.Rounded is the
+                          explicit conversion the Go spec blesses for
+                          exactly this, and the disassembly was read to
+                          confirm it survives inlining. And **sum() is not
+                          the same function on every interpreter**: CPython
+                          3.12 gave sum() over floats compensated
+                          accumulation where 3.11 adds left to right, so
+                          `curve.expected_lands_in_play` and
+                          `curve.on_curve_odds` answered differently
+                          depending on the Python underneath -- both are
+                          `fsum` now, and the corpus was rendered under 3.11
+                          and 3.12 and diffed to prove the fix. The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
