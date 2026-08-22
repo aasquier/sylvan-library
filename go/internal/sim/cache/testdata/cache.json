@@ -1,0 +1,323 @@
+{
+ "note": "ADR 18's cache key, written by `python tests/go_fixtures.py`. `payload` is the exact string sha256 is taken over -- recorded because a digest mismatch alone cannot say WHICH of the three encoder differences caused it.",
+ "sim_version": 2,
+ "max_rows": 2000,
+ "run_inputs": ["commander","games","keep_rule","library","seed","turns"],
+ "run_non_inputs": ["progress"],
+ "engine_sources": ["mtglab.sim.tier1.engine","mtglab.mana"],
+ "python_fingerprint": "4c834e0750905a12150be5921892ec4f77bd85f1e6e82b0182619aa92ff8b125",
+ "cases": [
+  {
+   "label": "the plain shape",
+   "why": "three cards, a commander, and no extras",
+   "kind": "sim.mana",
+   "library": [
+    {
+     "name": "Forest",
+     "cost": {"generic":0,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": true,
+     "enters_tapped": false,
+     "produces": [{"colors":["G"],"amount":1}],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {
+     "name": "Sol Ring",
+     "cost": {"generic":1,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": false,
+     "enters_tapped": false,
+     "produces": [{"colors":["C"],"amount":2}],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {"name":"Beast","cost":{"generic":2,"pips":[["G"]],"phyrexian":[],"has_x":false},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0}
+   ],
+   "commander": {
+    "name": "Goreclaw, Terror of Qal Sisma",
+    "cost": {"generic":3,"pips":[["G"]],"phyrexian":[],"has_x":false},
+    "category": "utility",
+    "is_land": false,
+    "enters_tapped": false,
+    "produces": [],
+    "produce_delay": 0,
+    "fetches_lands": 0
+   },
+   "games": 20000,
+   "turns": 12,
+   "keep_rule": {"min_lands":2,"max_lands":5,"min_mana_pieces":3,"cheap_ramp_mv":2,"max_mulligans":3},
+   "seed": 4242,
+   "extra": null,
+   "payload": "{\"commander\":[\"Goreclaw, Terror of Qal Sisma\",\"utility\",3,[[\"G\"]],[],false,false,false,[],0,0],\"engine\":\"4c834e0750905a12150be5921892ec4f77bd85f1e6e82b0182619aa92ff8b125\",\"games\":20000,\"keep_rule\":{\"cheap_ramp_mv\":2,\"max_lands\":5,\"max_mulligans\":3,\"min_lands\":2,\"min_mana_pieces\":3},\"kind\":\"sim.mana\",\"library\":[[\"Forest\",\"utility\",0,[],[],false,true,false,[[[\"G\"],1]],0,0],[\"Sol Ring\",\"utility\",1,[],[],false,false,false,[[[\"C\"],2]],0,0],[\"Beast\",\"utility\",2,[[\"G\"]],[],false,false,false,[],0,0]],\"seed\":4242,\"turns\":12,\"version\":2}",
+   "key": "aee30564a810f65c707323592d78376a052d86cba8c77c80878408d2076a2be6"
+  },
+  {
+   "label": "no commander",
+   "why": "`None` renders as `null`, not as an absent field",
+   "kind": "sim.mana",
+   "library": [
+    {
+     "name": "Forest",
+     "cost": {"generic":0,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": true,
+     "enters_tapped": false,
+     "produces": [{"colors":["G"],"amount":1}],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {
+     "name": "Sol Ring",
+     "cost": {"generic":1,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": false,
+     "enters_tapped": false,
+     "produces": [{"colors":["C"],"amount":2}],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {"name":"Beast","cost":{"generic":2,"pips":[["G"]],"phyrexian":[],"has_x":false},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0}
+   ],
+   "commander": null,
+   "games": 2000,
+   "turns": 10,
+   "keep_rule": {"min_lands":2,"max_lands":5,"min_mana_pieces":3,"cheap_ramp_mv":2,"max_mulligans":3},
+   "seed": 7,
+   "extra": null,
+   "payload": "{\"commander\":null,\"engine\":\"4c834e0750905a12150be5921892ec4f77bd85f1e6e82b0182619aa92ff8b125\",\"games\":2000,\"keep_rule\":{\"cheap_ramp_mv\":2,\"max_lands\":5,\"max_mulligans\":3,\"min_lands\":2,\"min_mana_pieces\":3},\"kind\":\"sim.mana\",\"library\":[[\"Forest\",\"utility\",0,[],[],false,true,false,[[[\"G\"],1]],0,0],[\"Sol Ring\",\"utility\",1,[],[],false,false,false,[[[\"C\"],2]],0,0],[\"Beast\",\"utility\",2,[[\"G\"]],[],false,false,false,[],0,0]],\"seed\":7,\"turns\":10,\"version\":2}",
+   "key": "6408da66ff6c164c6e93ae1d77fc07732b097332071e0f98e1b41dccdc13c333"
+  },
+  {
+   "label": "an empty library",
+   "why": "the compiler refuses this, and the key must still be a key",
+   "kind": "sim.lands.count",
+   "library": [],
+   "commander": null,
+   "games": 1,
+   "turns": 1,
+   "keep_rule": {"min_lands":2,"max_lands":5,"min_mana_pieces":3,"cheap_ramp_mv":2,"max_mulligans":3},
+   "seed": 0,
+   "extra": null,
+   "payload": "{\"commander\":null,\"engine\":\"4c834e0750905a12150be5921892ec4f77bd85f1e6e82b0182619aa92ff8b125\",\"games\":1,\"keep_rule\":{\"cheap_ramp_mv\":2,\"max_lands\":5,\"max_mulligans\":3,\"min_lands\":2,\"min_mana_pieces\":3},\"kind\":\"sim.lands.count\",\"library\":[],\"seed\":0,\"turns\":1,\"version\":2}",
+   "key": "88195536ac76a65fe3381e3c6f02ca5c85311a250a74e4063adffd9c9dcdce1d"
+  },
+  {
+   "label": "every cost shape",
+   "why": "hybrid, Phyrexian, X, several sources, a delay, a fetch, and the one card carrying a category the compiler never sets",
+   "kind": "sim.mana",
+   "library": [
+    {"name":"Hybrid","cost":{"generic":0,"pips":[["G","W"]],"phyrexian":[],"has_x":false},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0},
+    {"name":"Phyrexian","cost":{"generic":2,"pips":[],"phyrexian":[["U"]],"has_x":false},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0},
+    {"name":"X Spell","cost":{"generic":1,"pips":[],"phyrexian":[],"has_x":true},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0},
+    {
+     "name": "Rainbow",
+     "cost": {"generic":0,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": false,
+     "enters_tapped": false,
+     "produces": [{"colors":["B","G","R","U","W"],"amount":1},{"colors":["C"],"amount":3}],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {
+     "name": "Tapland",
+     "cost": {"generic":0,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": true,
+     "enters_tapped": true,
+     "produces": [{"colors":["U","W"],"amount":1}],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {
+     "name": "Sickly Rock",
+     "cost": {"generic":0,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": false,
+     "enters_tapped": false,
+     "produces": [{"colors":["G"],"amount":1}],
+     "produce_delay": 1,
+     "fetches_lands": 0
+    },
+    {"name":"Cultivate","cost":{"generic":2,"pips":[["G"]],"phyrexian":[],"has_x":false},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":2},
+    {"name":"Categorised","cost":{"generic":0,"pips":[],"phyrexian":[],"has_x":false},"category":"ramp","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0}
+   ],
+   "commander": null,
+   "games": 2000,
+   "turns": 10,
+   "keep_rule": {"min_lands":1,"max_lands":6,"min_mana_pieces":5,"cheap_ramp_mv":3,"max_mulligans":6},
+   "seed": -1,
+   "extra": null,
+   "payload": "{\"commander\":null,\"engine\":\"4c834e0750905a12150be5921892ec4f77bd85f1e6e82b0182619aa92ff8b125\",\"games\":2000,\"keep_rule\":{\"cheap_ramp_mv\":3,\"max_lands\":6,\"max_mulligans\":6,\"min_lands\":1,\"min_mana_pieces\":5},\"kind\":\"sim.mana\",\"library\":[[\"Hybrid\",\"utility\",0,[[\"G\",\"W\"]],[],false,false,false,[],0,0],[\"Phyrexian\",\"utility\",2,[],[[\"U\"]],false,false,false,[],0,0],[\"X Spell\",\"utility\",1,[],[],true,false,false,[],0,0],[\"Rainbow\",\"utility\",0,[],[],false,false,false,[[[\"B\",\"G\",\"R\",\"U\",\"W\"],1],[[\"C\"],3]],0,0],[\"Tapland\",\"utility\",0,[],[],false,true,true,[[[\"U\",\"W\"],1]],0,0],[\"Sickly Rock\",\"utility\",0,[],[],false,false,false,[[[\"G\"],1]],1,0],[\"Cultivate\",\"utility\",2,[[\"G\"]],[],false,false,false,[],0,2],[\"Categorised\",\"ramp\",0,[],[],false,false,false,[],0,0]],\"seed\":-1,\"turns\":10,\"version\":2}",
+   "key": "855a8f9912b9efe80c00047c35551b8c663ca12fa7b573c14a94d8d123b7d0f7"
+  },
+  {
+   "label": "names JSON has to escape",
+   "why": "the ensure_ascii difference, which is the one `SetEscapeHTML` does not cover and the one real card names actually hit",
+   "kind": "sim.mana",
+   "library": [
+    {
+     "name": "quote \" backslash \\ tab \t newline \n bell \u0007 del ",
+     "cost": {"generic":0,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": false,
+     "enters_tapped": false,
+     "produces": [],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {"name":"astral 😀 and 􏿿","cost":{"generic":0,"pips":[],"phyrexian":[],"has_x":false},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0},
+    {"name":"Bösium Strip","cost":{"generic":0,"pips":[],"phyrexian":[],"has_x":false},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0},
+    {"name":"Déjà Vu","cost":{"generic":0,"pips":[],"phyrexian":[],"has_x":false},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0},
+    {
+     "name": "Círdan the Shipwright",
+     "cost": {"generic":0,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": false,
+     "enters_tapped": false,
+     "produces": [],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {"name":"Dandân","cost":{"generic":0,"pips":[],"phyrexian":[],"has_x":false},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0}
+   ],
+   "commander": {
+    "name": "quote \" backslash \\ tab \t newline \n bell \u0007 del ",
+    "cost": {"generic":0,"pips":[],"phyrexian":[],"has_x":false},
+    "category": "utility",
+    "is_land": false,
+    "enters_tapped": false,
+    "produces": [],
+    "produce_delay": 0,
+    "fetches_lands": 0
+   },
+   "games": 2000,
+   "turns": 10,
+   "keep_rule": {"min_lands":2,"max_lands":5,"min_mana_pieces":3,"cheap_ramp_mv":2,"max_mulligans":3},
+   "seed": 1,
+   "extra": null,
+   "payload": "{\"commander\":[\"quote \\\" backslash \\\\ tab \\t newline \\n bell \\u0007 del \\u007f\",\"utility\",0,[],[],false,false,false,[],0,0],\"engine\":\"4c834e0750905a12150be5921892ec4f77bd85f1e6e82b0182619aa92ff8b125\",\"games\":2000,\"keep_rule\":{\"cheap_ramp_mv\":2,\"max_lands\":5,\"max_mulligans\":3,\"min_lands\":2,\"min_mana_pieces\":3},\"kind\":\"sim.mana\",\"library\":[[\"quote \\\" backslash \\\\ tab \\t newline \\n bell \\u0007 del \\u007f\",\"utility\",0,[],[],false,false,false,[],0,0],[\"astral \\ud83d\\ude00 and \\udbff\\udfff\",\"utility\",0,[],[],false,false,false,[],0,0],[\"B\\u00f6sium Strip\",\"utility\",0,[],[],false,false,false,[],0,0],[\"D\\u00e9j\\u00e0 Vu\",\"utility\",0,[],[],false,false,false,[],0,0],[\"C\\u00edrdan the Shipwright\",\"utility\",0,[],[],false,false,false,[],0,0],[\"Dand\\u00e2n\",\"utility\",0,[],[],false,false,false,[],0,0]],\"seed\":1,\"turns\":10,\"version\":2}",
+   "key": "9a0f36b02c23fd4a485f708c605a83f969194a6a0baf1623f6fa43e37ef1e8d8"
+  },
+  {
+   "label": "the policy sweep's extra",
+   "why": "`sim.policy`'s real key, carrying the whole grid, an int and a FLOAT -- 0.25 renders through `float.__repr__`",
+   "kind": "sim.policy",
+   "library": [
+    {
+     "name": "Forest",
+     "cost": {"generic":0,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": true,
+     "enters_tapped": false,
+     "produces": [{"colors":["G"],"amount":1}],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {
+     "name": "Sol Ring",
+     "cost": {"generic":1,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": false,
+     "enters_tapped": false,
+     "produces": [{"colors":["C"],"amount":2}],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {"name":"Beast","cost":{"generic":2,"pips":[["G"]],"phyrexian":[],"has_x":false},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0}
+   ],
+   "commander": {
+    "name": "Goreclaw, Terror of Qal Sisma",
+    "cost": {"generic":3,"pips":[["G"]],"phyrexian":[],"has_x":false},
+    "category": "utility",
+    "is_land": false,
+    "enters_tapped": false,
+    "produces": [],
+    "produce_delay": 0,
+    "fetches_lands": 0
+   },
+   "games": 2000,
+   "turns": 10,
+   "keep_rule": {"min_lands":2,"max_lands":5,"min_mana_pieces":3,"cheap_ramp_mv":2,"max_mulligans":3},
+   "seed": 7,
+   "extra": {
+    "grid": [
+     [1,4,2],
+     [1,4,3],
+     [1,4,4],
+     [1,4,5],
+     [1,5,2],
+     [1,5,3],
+     [1,5,4],
+     [1,5,5],
+     [1,6,2],
+     [1,6,3],
+     [1,6,4],
+     [1,6,5],
+     [2,4,2],
+     [2,4,3],
+     [2,4,4],
+     [2,4,5],
+     [2,5,2],
+     [2,5,3],
+     [2,5,4],
+     [2,5,5],
+     [2,6,2],
+     [2,6,3],
+     [2,6,4],
+     [2,6,5],
+     [3,4,3],
+     [3,4,4],
+     [3,4,5],
+     [3,5,3],
+     [3,5,4],
+     [3,5,5],
+     [3,6,3],
+     [3,6,4],
+     [3,6,5]
+    ],
+    "through": 8,
+    "flat": 0.25
+   },
+   "payload": "{\"commander\":[\"Goreclaw, Terror of Qal Sisma\",\"utility\",3,[[\"G\"]],[],false,false,false,[],0,0],\"engine\":\"4c834e0750905a12150be5921892ec4f77bd85f1e6e82b0182619aa92ff8b125\",\"extra\":{\"flat\":0.25,\"grid\":[[1,4,2],[1,4,3],[1,4,4],[1,4,5],[1,5,2],[1,5,3],[1,5,4],[1,5,5],[1,6,2],[1,6,3],[1,6,4],[1,6,5],[2,4,2],[2,4,3],[2,4,4],[2,4,5],[2,5,2],[2,5,3],[2,5,4],[2,5,5],[2,6,2],[2,6,3],[2,6,4],[2,6,5],[3,4,3],[3,4,4],[3,4,5],[3,5,3],[3,5,4],[3,5,5],[3,6,3],[3,6,4],[3,6,5]],\"through\":8},\"games\":2000,\"keep_rule\":{\"cheap_ramp_mv\":2,\"max_lands\":5,\"max_mulligans\":3,\"min_lands\":2,\"min_mana_pieces\":3},\"kind\":\"sim.policy\",\"library\":[[\"Forest\",\"utility\",0,[],[],false,true,false,[[[\"G\"],1]],0,0],[\"Sol Ring\",\"utility\",1,[],[],false,false,false,[[[\"C\"],2]],0,0],[\"Beast\",\"utility\",2,[[\"G\"]],[],false,false,false,[],0,0]],\"seed\":7,\"turns\":10,\"version\":2}",
+   "key": "9f4c8e84ac64d2c62eb3fc8e8c71eb6947c996d6bbcf27afa5aa0a9be960d101"
+  },
+  {
+   "label": "an extra whose keys are not in order",
+   "why": "`sort_keys=True` sorts them, and a Go map walk is random",
+   "kind": "sim.policy",
+   "library": [
+    {
+     "name": "Forest",
+     "cost": {"generic":0,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": true,
+     "enters_tapped": false,
+     "produces": [{"colors":["G"],"amount":1}],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {
+     "name": "Sol Ring",
+     "cost": {"generic":1,"pips":[],"phyrexian":[],"has_x":false},
+     "category": "utility",
+     "is_land": false,
+     "enters_tapped": false,
+     "produces": [{"colors":["C"],"amount":2}],
+     "produce_delay": 0,
+     "fetches_lands": 0
+    },
+    {"name":"Beast","cost":{"generic":2,"pips":[["G"]],"phyrexian":[],"has_x":false},"category":"utility","is_land":false,"enters_tapped":false,"produces":[],"produce_delay":0,"fetches_lands":0}
+   ],
+   "commander": null,
+   "games": 2000,
+   "turns": 10,
+   "keep_rule": {"min_lands":2,"max_lands":5,"min_mana_pieces":3,"cheap_ramp_mv":2,"max_mulligans":3},
+   "seed": 7,
+   "extra": {"zebra":true,"alpha":null,"Middle":"text","nested":{"b":[1,2,3],"a":0.5}},
+   "payload": "{\"commander\":null,\"engine\":\"4c834e0750905a12150be5921892ec4f77bd85f1e6e82b0182619aa92ff8b125\",\"extra\":{\"Middle\":\"text\",\"alpha\":null,\"nested\":{\"a\":0.5,\"b\":[1,2,3]},\"zebra\":true},\"games\":2000,\"keep_rule\":{\"cheap_ramp_mv\":2,\"max_lands\":5,\"max_mulligans\":3,\"min_lands\":2,\"min_mana_pieces\":3},\"kind\":\"sim.policy\",\"library\":[[\"Forest\",\"utility\",0,[],[],false,true,false,[[[\"G\"],1]],0,0],[\"Sol Ring\",\"utility\",1,[],[],false,false,false,[[[\"C\"],2]],0,0],[\"Beast\",\"utility\",2,[[\"G\"]],[],false,false,false,[],0,0]],\"seed\":7,\"turns\":10,\"version\":2}",
+   "key": "c474a9665c4d4fcb6f953b1a36cc66c70cb69427b250172ac99ac9a1d62ac04a"
+  }
+ ]
+}

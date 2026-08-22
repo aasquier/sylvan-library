@@ -16,6 +16,7 @@ the JSON cannot say one thing while `/api/colors` says another.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from datetime import date
@@ -110,6 +111,9 @@ _ORACLES = [
     ("the mana curve", "CURVE_PATH", "render_curve_cases"),
     ("Tier 1", "TIER1_PATH", "render_tier1_cases"),
     ("the castability cases", "MANA_PATH", "render_mana_cases"),
+    ("the compiler", "COMPILE_PATH", "render_compile_cases"),
+    ("the mulligan grid", "MULLIGAN_PATH", "render_mulligan_cases"),
+    ("the sim cache's key", "CACHE_PATH", "render_cache_cases"),
 ]
 
 
@@ -758,3 +762,172 @@ def test_the_enumerated_case_set_never_puts_a_wide_pip_before_a_narrow_one():
     hand = (ManaSource(w), ManaSource(u))
     assert can_pay(ManaCost(pips=(frozenset({"W", "U"}), w)), hand)
     assert can_pay(ManaCost(pips=(w, frozenset({"W", "U"}))), hand)
+
+
+# ------------------------------------------------- Phase 5's engine tail
+#
+# Three corpora, and claims about them the drift test above cannot make.
+# Drift says "this file is what Python answers now"; these say "this file
+# still contains the case it was written for", which is the failure a corpus
+# has when somebody trims it.
+
+
+def test_the_compile_oracle_still_loses_cards_to_the_pool():
+    """A corpus with no unresolved name proves nothing about the report.
+
+    `CompileReport.unresolved` is the whole reason that type exists -- a
+    99-card deck whose pool was missing six cards simulated as a 93-card deck
+    with no signal at all -- so a case set where every name resolves would
+    leave the Go side asserting an empty list against an empty list.
+    """
+    decks = {c["name"]: c for c in go_fixtures.compile_deck_cases()}
+    half = decks["half-unknown"]["report"]
+    assert half["unresolved"], "no case loses a card to the pool any more"
+    assert half["simulated_size"] < half["declared_size"]
+    assert not half["complete"]
+    assert not half["commander_unresolved"], (
+        "half-unknown must lose cards and keep its commander, or the two "
+        "fields are only ever exercised together")
+    # The other half of the pair: a commander that did not resolve, with every
+    # other name intact.
+    commander = decks["unknown-commander"]["report"]
+    assert commander["commander"] is None
+    assert commander["commander_unresolved"]
+    assert commander["unresolved"] == []
+    # A deck with no commander declared is NOT an unresolved commander, which
+    # is the distinction a bare `commander is None` check loses.
+    none_declared = decks["no-commander"]["report"]
+    assert none_declared["commander"] is None
+    assert not none_declared["commander_unresolved"]
+    # Both refusals, each with the message Go must reproduce -- and the third
+    # case, which is the one nobody would have thought to write: a deck where
+    # not one name resolves hands the compiler an EMPTY mapping, which reads
+    # as "no pool" rather than as "no cards". Wrong word, right behaviour, and
+    # pinned in both runtimes so it can only change deliberately.
+    assert decks["nothing-resolves"]["error"] == "nothing_to_simulate"
+    assert "declares" in decks["nothing-resolves"]["message"]
+    assert decks["empty-lookup"]["error"] == "pool_required"
+    assert decks["no-pool"]["error"] == "pool_required"
+
+
+def test_the_compile_oracle_reads_a_real_multi_mana_source():
+    """`mana_produced` is the function that made Sol Ring produce one mana.
+
+    The corpus is prose, and prose is easy to trim. This names the answers the
+    docstring's argument rests on -- a run summed, alternatives maxed, a
+    written-out amount, and the shape that correctly falls through to one --
+    so a case set that quietly lost them fails here rather than passing
+    smaller.
+    """
+    texts = {c["label"]: c for c in go_fixtures.compile_text_cases()}
+    assert texts["Sol Ring"]["mana_produced"] == 2
+    assert texts["Gilded Lotus"]["mana_produced"] == 3
+    assert texts["Talisman of Progress"]["mana_produced"] == 1
+    assert texts["Wooded Bastion"]["mana_produced"] == 1
+    assert texts["Grim Monolith"]["mana_produced"] == 3
+    assert texts["Nykthos, Shrine to Nyx"]["mana_produced"] == 1
+    # The land shapes `enters_tapped` exists to tell apart.
+    assert texts["Temple of Plenty"]["enters_tapped"] is True
+    assert texts["Hallowed Fountain"]["enters_tapped"] is False
+    assert texts["Rootbound Crag"]["enters_tapped"] is False
+    # A fetch that moves two, one that moves one, and one that moves none.
+    assert texts["Skyshroud Claim"]["fetches_lands"] == 2
+    assert texts["Nature's Lore"]["fetches_lands"] == 1
+    assert texts["Sol Ring"]["fetches_lands"] == 0
+    # Every `pool` text is a card read out of the real pool; every
+    # `constructed` one is labelled as nobody's card.
+    assert {c["source"] for c in go_fixtures.compile_text_cases()} == {
+        "pool", "constructed"}
+
+
+def test_the_mulligan_oracle_reaches_the_baseline_fallback():
+    """`search` runs a thirty-fourth simulation when the default is not in the grid.
+
+    Nothing in the standard 33 can reach that branch -- the default rule is a
+    cell of it -- so without an explicit rule list the fallback is dead code on
+    both sides, and a Go port that dropped it would stay green.
+    """
+    sweeps = {s["label"]: s for s in json.loads(
+        go_fixtures.MULLIGAN_PATH.read_text(encoding="utf-8"))["sweeps"]}
+    off = sweeps["naya-off-grid"]
+    assert off["rules"] is not None
+    triples = {(r["min_lands"], r["max_lands"], r["min_mana_pieces"])
+               for r in off["rules"]}
+    assert (2, 5, 3) not in triples, (
+        "the off-grid sweep now contains the default rule, so the baseline "
+        "fallback is unreachable again")
+    baseline = off["baseline"]
+    assert (baseline["min_lands"], baseline["max_lands"],
+            baseline["min_pieces"]) == (2, 5, 3)
+    # Every other sweep finds its baseline inside the grid, which is the branch
+    # that runs 33 simulations rather than 34.
+    for label, sweep in sweeps.items():
+        if label == "naya-off-grid":
+            continue
+        assert sweep["rules"] is None
+        assert len(sweep["rows"]) == 33
+
+
+def test_the_mulligan_oracle_keeps_a_flat_sweep_and_a_decided_one():
+    """`flat` is measured against the default, never against the spread.
+
+    Goreclaw is the case that found that: a grid spanning 1.62 spells whose
+    best rule beats its default by 0.01. The corpus has to hold a sweep of
+    each verdict or the Go side proves only one branch of it.
+    """
+    sweeps = json.loads(
+        go_fixtures.MULLIGAN_PATH.read_text(encoding="utf-8"))["sweeps"]
+    verdicts = {s["flat"] for s in sweeps}
+    assert verdicts == {True, False}, (
+        f"every sweep now reports flat={verdicts}; one branch of the verdict "
+        f"is untested")
+    # A tied grid is where `best` is decided by the grid's ORDER rather than by
+    # the numbers, which is what Python's first-wins `max` settles.
+    tied = [s for s in sweeps
+            if len({r["spells_through_t8"] for r in s["rows"]}) == 1]
+    assert tied, "no sweep ties across the whole grid any more"
+
+
+def test_the_cache_oracle_records_the_engine_it_was_written_under():
+    """The fingerprint in the file is this checkout's, and that is the point.
+
+    ADR 18 makes the engine's own source part of the key, so this corpus goes
+    stale the moment `engine.py` or `mana.py` moves -- and having to regenerate
+    it is the reminder that every stored row in `app.db` just re-keyed. If that
+    ever feels like a nuisance, the alternative was a constant somebody
+    remembered to bump, which is the thing the ADR rejected.
+    """
+    from mtglab.sim import cache
+
+    recorded = json.loads(go_fixtures.CACHE_PATH.read_text(encoding="utf-8"))
+    assert recorded["python_fingerprint"] == cache.fingerprint()
+    assert recorded["engine_sources"] == list(cache._ENGINE_SOURCES)
+    assert recorded["sim_version"] == cache.SIM_VERSION
+    # Recorded so the Go side checks its own list against Python's rather than
+    # against a transcription.
+    assert set(recorded["run_inputs"]) == cache.RUN_INPUTS
+    assert set(recorded["run_non_inputs"]) == cache.RUN_NON_INPUTS
+
+
+def test_the_cache_oracle_carries_a_name_json_has_to_escape():
+    r"""`ensure_ascii=True` is the encoder difference no Go flag turns on.
+
+    Go writes raw UTF-8 where Python writes `\uXXXX`, and a real library holds
+    Bösium Strip and Déjà Vu -- so without a non-ASCII name in the corpus the
+    two runtimes would agree on every case here and disagree on a real deck.
+    """
+    recorded = json.loads(go_fixtures.CACHE_PATH.read_text(encoding="utf-8"))
+    payloads = "".join(c["payload"] for c in recorded["cases"])
+    assert "\\u00f6" in payloads, "no name escapes to \\uXXXX any more"
+    # Above the BMP, which Python writes as a surrogate pair.
+    assert "\\ud83d\\ude00" in payloads, "no astral character survives"
+    # The short escapes and the numeric form for a control character.
+    for escape in ('\\"', "\\\\", "\\t", "\\n", "\\u0007", "\\u007f"):
+        assert escape in payloads, f"nothing exercises {escape} any more"
+    # A float in `extra`, which renders through `float.__repr__`.
+    assert any(c["extra"] and any(isinstance(v, float) for v in c["extra"].values())
+               for c in recorded["cases"]), "no `extra` carries a float"
+    # And every payload really is what its key hashes.
+    for case in recorded["cases"]:
+        assert hashlib.sha256(
+            case["payload"].encode("utf-8")).hexdigest() == case["key"]

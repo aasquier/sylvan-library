@@ -355,7 +355,20 @@ class SimSummary:
     mulligan_rate: float
     avg_mulligans: float
     commander_by_turn: dict[int, float]
-    median_commander_turn: float | None
+    #: `statistics.median` over a list of ints, which is an **int** for an odd
+    #: count (`data[n // 2]`) and a float for an even one (the mean of the
+    #: middle pair). It said `float | None` until 2026-08-22 and was an int
+    #: about half the time; mypy missed it because `statistics.median`'s stub
+    #: is loose.
+    #:
+    #: **Do not coerce the value to close the gap.** `repr(4)` is not
+    #: `repr(4.0)`, and this field is rendered into
+    #: `tests/test_determinism.REFERENCE_DIGEST` -- so a `float(...)` here
+    #: would be a deliberate change to Tier 1's output dressed as a type fix.
+    #: The Go port carries the same duality as `tier1.Number` and reproduces
+    #: the digest with it; narrowing the annotation is what makes the two
+    #: agree on paper as well as in bytes.
+    median_commander_turn: int | float | None
     never_cast_commander: float
     avg_lands_by_turn: list[float]
     avg_mana_by_turn: list[float]

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -383,6 +384,68 @@ func TestCanPayIsCPythonsCanPay(t *testing.T) {
 	}
 	if agreed == 0 {
 		t.Fatal("no castability cases in the corpus")
+	}
+}
+
+// TestConsumeAgreesWithCanPay is `tests/test_mana_properties.py`'s
+// `test_consume_agrees_with_can_pay`, in Go.
+//
+// It exists because of what changed on 2026-08-22: `canPay` now delegates to
+// `mana.CanPay`, so this package and `internal/mana` hold **two independent
+// solvers** -- `consume`, which has to return the leftovers and therefore
+// keeps its own matching, and `CanPay`, which only answers yes or no. Each was
+// checked against Python and, until this test, **neither against the other**.
+// Python pins exactly that pair with the Hypothesis property above; the corpus
+// cannot, because it records what CPython answered rather than what the two Go
+// functions answer about the same input.
+//
+// Seeded and bounded rather than a fuzz target: `internal/mana` already fuzzes
+// castability, and what is wanted here is a cheap invariant that runs on every
+// `go test` -- the divergence this guards against is a refactor of one solver,
+// which a deterministic sweep catches on the next run rather than on the next
+// fuzz budget.
+func TestConsumeAgreesWithCanPay(t *testing.T) {
+	// Small alphabets on purpose: a divergence between two matchings shows up
+	// on tight pools where the assignment is forced, not on generous ones
+	// where everything is payable.
+	colours := [][]string{
+		{"W"}, {"U"}, {"B"}, {"R"}, {"G"}, {"C"},
+		{"G", "W"}, {"U", "B"}, {"B", "R", "G"},
+		{"B", "G", "R", "U", "W"},
+	}
+	rng := rand.New(rand.NewSource(20260822)) //nolint:gosec // a test's own dice
+	both, payable := 0, 0
+	for i := 0; i < 20000; i++ {
+		cost := sim.Cost{Generic: rng.Intn(4), HasX: rng.Intn(8) == 0}
+		for p := rng.Intn(4); p > 0; p-- {
+			cost.Pips = append(cost.Pips, colours[rng.Intn(len(colours))])
+		}
+		for p := rng.Intn(2); p > 0; p-- {
+			cost.Phyrexian = append(cost.Phyrexian, colours[rng.Intn(len(colours))])
+		}
+		var pool []sim.Source
+		for s := rng.Intn(6); s > 0; s-- {
+			pool = append(pool, sim.Source{
+				Colors: colours[rng.Intn(len(colours))],
+				Amount: rng.Intn(3),
+			})
+		}
+		_, ok := consume(cost, pool)
+		if got := canPay(cost, pool); got != ok {
+			t.Fatalf("the two solvers disagree on %v / %v: consume=%v canPay=%v",
+				cost, pool, ok, got)
+		}
+		both++
+		if ok {
+			payable++
+		}
+	}
+	// A sweep where nothing is payable, or everything is, proves neither
+	// direction. Both counts are asserted so a narrowed generator fails here
+	// rather than passing smaller.
+	if payable == 0 || payable == both {
+		t.Fatalf("%d of %d cases were payable; the generator has stopped "+
+			"producing both answers", payable, both)
 	}
 }
 
