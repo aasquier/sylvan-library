@@ -762,3 +762,155 @@ func QuotedList(items []string) string {
 	}
 	return strings.Join(quoted, ", ")
 }
+
+// MaxNamedCards caps one lookup, matching `service.MAX_NAMED_CARDS`.
+const MaxNamedCards = 100
+
+// NamedCard is one row of `service.cards_named`, in Python's key order.
+type NamedCard struct {
+	// Name is the POOL's spelling, not the caller's: asked for "arahbo, roar
+	// of the world" you get the real name back, which is what any follow-up
+	// edit has to be keyed on.
+	Name string `json:"name"`
+	// AskedAs is what the caller wrote, when it differed. Null otherwise.
+	AskedAs        *string  `json:"asked_as"`
+	ManaCost       *string  `json:"mana_cost"`
+	CMC            float64  `json:"cmc"`
+	TypeLine       *string  `json:"type_line"`
+	OracleText     *string  `json:"oracle_text"`
+	ColorIdentity  []string `json:"color_identity"`
+	Keywords       []string `json:"keywords"`
+	Layout         *string  `json:"layout"`
+	LegalCommander bool     `json:"legal_commander"`
+	Reserved       bool     `json:"reserved"`
+	EdhrecRank     *int     `json:"edhrec_rank"`
+	Image          *string  `json:"image"`
+	ArtCrop        *string  `json:"art_crop"`
+	Power          *string  `json:"power"`
+	Toughness      *string  `json:"toughness"`
+	Loyalty        *string  `json:"loyalty"`
+	Defense        *string  `json:"defense"`
+	GameChanger    bool     `json:"game_changer"`
+	FlavorText     *string  `json:"flavor_text"`
+	Artist         *string  `json:"artist"`
+}
+
+// NamedCards is `service.cards_named`'s whole answer.
+type NamedCards struct {
+	Cards         []NamedCard `json:"cards"`
+	NotFound      []string    `json:"not_found"`
+	PoolAvailable bool        `json:"pool_available"`
+	Message       string      `json:"message,omitempty"`
+}
+
+// CardsNamed is exact-name card lookup: the answer to "what does this card
+// actually do".
+//
+// Distinct from SearchCards, and the distinction is the point. SearchCards
+// filters to Commander-legal, which is right when the question is "what could
+// I play" and wrong when the question is "what is this card" — **a banned card
+// is invisible to it.** That was found by running a Claude turn rather than by
+// reasoning about it: asked what the two cards failing the gate do, it could
+// look up neither, said so, and answered from labelled recall. Honest, and
+// still rule 1 failing.
+//
+// So this filters on nothing and reports LegalCommander per card instead,
+// which is strictly more useful: a banned card comes back with its real oracle
+// text *and* the fact that it is banned, rather than as a shrug.
+//
+// **Names that do not resolve are returned in NotFound, never omitted.** The
+// pool drops misses silently; this is the loud handling every caller owes.
+// A lookup that quietly returns four cards for five names is how a confident
+// claim gets made about the fifth.
+func CardsNamed(ctx context.Context, c *pool.Conn, names []string) (NamedCards, error) {
+	wanted := make([]string, 0, len(names))
+	for _, n := range names {
+		trimmed := strings.TrimSpace(n)
+		if trimmed == "" {
+			continue
+		}
+		wanted = append(wanted, trimmed)
+		if len(wanted) == MaxNamedCards {
+			break
+		}
+	}
+	if len(wanted) == 0 {
+		return NamedCards{Cards: []NamedCard{}, NotFound: []string{}, PoolAvailable: true}, nil
+	}
+	if c == nil {
+		return NamedCards{Cards: []NamedCard{}, NotFound: wanted, PoolAvailable: false,
+			Message: "no card pool yet -- run `mtglab data refresh`"}, nil
+	}
+	found, err := c.GetCards(ctx, wanted)
+	if err != nil {
+		return NamedCards{}, err
+	}
+	out := NamedCards{Cards: []NamedCard{}, NotFound: []string{}, PoolAvailable: true}
+	for _, asked := range wanted {
+		rec := found[asked]
+		if rec == nil {
+			out.NotFound = append(out.NotFound, asked)
+			continue
+		}
+		var askedAs *string
+		if asked != rec.Name {
+			a := asked
+			askedAs = &a
+		}
+		identity := append([]string{}, rec.ColorIdentity...)
+		sort.Strings(identity)
+		keywords := rec.Keywords
+		if keywords == nil {
+			keywords = []string{}
+		}
+		// The three plain strings on the record become pointers here, as the
+		// existing card rows do: Python's field is nullable and an empty
+		// oracle text is not the same as an absent one on the wire.
+		typeLine, oracle, layout := rec.TypeLine, rec.OracleText, rec.Layout
+		out.Cards = append(out.Cards, NamedCard{
+			Name: rec.Name, AskedAs: askedAs, ManaCost: rec.ManaCost, CMC: rec.CMC,
+			TypeLine: &typeLine, OracleText: &oracle,
+			ColorIdentity: identity, Keywords: keywords, Layout: &layout,
+			LegalCommander: rec.LegalCommander, Reserved: rec.Reserved,
+			EdhrecRank: rec.EdhrecRank, Image: rec.ImageNormal, ArtCrop: rec.ImageArtCrop,
+			Power: rec.Power, Toughness: rec.Toughness, Loyalty: rec.Loyalty,
+			Defense: rec.Defense, GameChanger: rec.GameChanger,
+			FlavorText: rec.FlavorText, Artist: rec.Artist,
+		})
+	}
+	return out, nil
+}
+
+// Source is the read side of a deck library, and it is declared HERE rather
+// than used from `internal/library` for a reason the boundary guard found.
+//
+// `internal/library` holds both the read `Source` and the write `Writer`, and
+// imports `internal/deckedit` for the second — so anything naming
+// `library.Source` reaches the deck editor transitively, and
+// `internal/claude`'s boundary analysis fails it. Correctly: that is a Claude
+// surface one hop from a deck write, whatever the intent.
+//
+// Python does not have this problem because it never collapsed the two:
+// `decks/source.py` declares the protocol and `decks/edit.py` is a different
+// module. This restores that separation on the Go side. Go's interfaces are
+// structural, so `library.Source` satisfies this without being changed or even
+// knowing it exists — the narrow interface is purely a statement about what
+// the caller is allowed to want.
+//
+// Deliberately narrower than `library.Source`: only the methods a reader
+// actually needs. A method added there does not appear here unless somebody
+// decides a reader should have it.
+type Source interface {
+	// Slugs is every deck's slug, without parsing any of them.
+	Slugs(ctx context.Context) ([]string, error)
+	// Get is one deck, or an error the caller reports by name.
+	Get(ctx context.Context, slug string) (*deck.Deck, error)
+	// All is every deck, parsed, in a stable order.
+	All(ctx context.Context) ([]*deck.Deck, error)
+	// ReadText is the deck's YAML, verbatim.
+	ReadText(ctx context.Context, slug string) (string, error)
+	// Writable is REPORTED, not exercised: it says whether this caller could
+	// edit these decks, so a payload can tell a UI to show a control. The
+	// refusal itself belongs to the write path, which is nowhere near here.
+	Writable() bool
+}
