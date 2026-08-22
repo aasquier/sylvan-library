@@ -504,7 +504,19 @@ go/                       the Go module (ADR 38; module path
                           operation steps over eleven fixture decks, three
                           of them written by hand because the rules that
                           keep Goreclaw's section banners intact cannot be
-                          exercised by a machine-dumped deck). The contract
+                          exercised by a machine-dumped deck). **The
+                          lifecycle followed on 2026-08-22**: internal/
+                          decklist and internal/deckimport are decklist.py
+                          and importer.py (held to Python by 15 pastes and
+                          12 imports resolved against the 21-card pool),
+                          internal/deck's Dump is `Deck.dump` over a
+                          whole-document PyYAML emitter, and library's
+                          Create/Delete/SetShared complete the write side --
+                          so create, import, delete and sharing answer from
+                          the door. None of the four is in the activity log,
+                          because none of them is in `_commit` (ADR 28). The
+                          artifacts rebuild is deliberately NOT in it and is
+                          its own flip. The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
@@ -809,6 +821,18 @@ mtglab animist measure <recipe> --output X   # the size curve and its knee
 
 Editing, all surgical and self-verifying ([ADR 12](docs/adr/0012-decks-are-edited-by-surgical-operations.md)),
 each also a route and a control on the deck page:
+
+`set_shared` is a surgical edit too, since 2026-08-22. It was a
+`Deck.load` / `Deck.dump` round trip -- the only thing on the write path that
+called `dump` on an existing file -- so one press of the deck page's share
+toggle rewrote the whole file, taking a hand-written deck's section banners,
+its trailing comments, its folded blocks and its `swap_board: []` with it.
+Found by the Go port, which had to reproduce the bytes and so had to ask what
+they were; ruled by Aaron and fixed in both runtimes at once. It is
+`edit.set_shared`, the editor's tenth operation, and deliberately not a
+`SETTABLE_DECK_FIELDS` entry -- that tuple is what the PATCH beside it
+publishes, and `shared` has its own route because the two tiers keep the fact
+in different places.
 
 ```bash
 mtglab decks add <slug> --card X --category ramp --why '...'  # pool-checked

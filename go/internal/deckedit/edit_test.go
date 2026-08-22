@@ -93,6 +93,9 @@ func apply(step editStep, text string) (string, error) {
 		return SetDeckField(text, arg("field"), step.Args["value"])
 	case "set_note":
 		return SetNote(text, arg("key"), arg("value"))
+	case "set_shared":
+		shared, _ := step.Args["shared"].(bool)
+		return SetShared(text, shared)
 	default:
 		return "", fmt.Errorf("unknown operation %q", step.Op)
 	}
@@ -168,6 +171,14 @@ func TestTheOracleCoversEveryOperation(t *testing.T) {
 		if refused[op] == 0 {
 			t.Errorf("the oracle never sees %s refuse", op)
 		}
+	}
+	// `set_shared` is listed apart because it has no refusal of its own: the
+	// value is a boolean, so there is nothing to be wrong about and no state
+	// to be in. It refuses only where every operation does -- a file that will
+	// not parse, and an edit that changed more than it was asked to -- and
+	// both of those are proven on the operations above.
+	if applied["set_shared"] == 0 {
+		t.Error("the oracle never applies set_shared")
 	}
 	if len(fixture.Decks) < 11 {
 		t.Errorf("the oracle covers %d decks; it wants the gate's eight plus "+

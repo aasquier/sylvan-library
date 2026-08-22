@@ -129,3 +129,35 @@ func LessThanEqual(where, name string, input any, le int) ValidationError {
 func Missing(loc ...any) ValidationError {
 	return ValidationError{Type: "missing", Loc: loc, Msg: "Field required", Input: nil}
 }
+
+// DictType is a body that arrived and is not a mapping.
+//
+// It is the answer to more than it looks. Starlette parses a request body as
+// JSON **only** when the content type says `application/json` (or
+// `application/…+json`); with any other type, or none, the raw bytes are
+// handed through as a *string* -- which is not a dictionary, so a perfectly
+// well-formed object posted without a content type lands here with itself as
+// the `input`.
+func DictType(where string, input any) ValidationError {
+	return ValidationError{Type: "dict_type", Loc: []any{where},
+		Msg: "Input should be a valid dictionary", Input: input}
+}
+
+// JSONInvalid is a body the JSON parser refused.
+//
+// `loc` carries the position the parser stopped at, one-based as CPython
+// reports it, and `input` is an empty object rather than the body -- both are
+// pydantic's choices, not this project's.
+//
+// **`ctx.error` is the one field in this file that is not word for word
+// Python's.** It is CPython's `json` scanner talking ("Expecting property name
+// enclosed in double quotes"), and reproducing that scanner's sentences and
+// offsets exactly would be a parser rewrite to improve a diagnostic nobody's
+// client reads: the app's own frontend always sends valid JSON with a content
+// type, so this is reachable only from a shell. The type, the shape and the
+// status are identical, which is what a client can depend on.
+func JSONInvalid(where string, at int, reason string) ValidationError {
+	return ValidationError{Type: "json_invalid", Loc: []any{where, at},
+		Msg: "JSON decode error", Input: map[string]any{},
+		Ctx: map[string]any{"error": reason}}
+}

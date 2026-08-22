@@ -838,3 +838,34 @@ def test_sql_artifact_size_is_bytes_not_characters(sql_owner):
     src.create("theirs", SQL_DECK)
     src.write_artifacts("theirs", {"moxfield.txt": "—" * 10})
     assert src.artifacts("theirs")[0].size == 30
+
+
+def test_the_file_tier_shares_without_rewriting_the_deck(decks_root):
+    """ADR 12 reaches the sharing flag too, since 2026-08-22.
+
+    This was a `Deck.load` / `Deck.dump` round trip, and `edit.py`'s own
+    docstring claimed no write path called `dump` on an existing file. It did,
+    and it was the only one: a deck taken off display came back reflowed, with
+    its comments gone and the keys `dump` writes by default added. The six
+    curated decks are hand-written and live only on the volume (ADR 30), so
+    there was nothing to restore them from.
+    """
+    hand = DECK_YAML.replace(
+        "bracket: 4",
+        "bracket: 4  # a comment that must survive a share").replace(
+        "strategy: A minimal",
+        "\n# ---- THE PLAN\nstrategy: A minimal")
+    (decks_root / "mini" / "deck.yaml").write_text(hand, encoding="utf-8")
+    source = FileDeckSource(decks_root)
+
+    source.set_shared("mini", False)
+    after = (decks_root / "mini" / "deck.yaml").read_text(encoding="utf-8")
+    assert source.get("mini").shared is False
+    assert "# a comment that must survive a share" in after
+    assert "# ---- THE PLAN" in after
+    # One line added and nothing else touched, which is the whole claim.
+    assert [line for line in after.splitlines()
+            if line not in hand.splitlines()] == ["shared: false"]
+
+    source.set_shared("mini", True)
+    assert (decks_root / "mini" / "deck.yaml").read_text(encoding="utf-8") == hand

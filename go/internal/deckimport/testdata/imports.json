@@ -1,0 +1,222 @@
+[
+ {
+  "name": "explicit-commander",
+  "slug": "explicit",
+  "text": "1 Sol Ring (LTC) 284\n1 Cultivator Colossus\n38 Forest\n1 Rhystic Study\n",
+  "commander": [
+   "Goreclaw, Terror of Qal Sisma"
+  ],
+  "companion": "",
+  "bracket": 4,
+  "deck_name": "",
+  "status": "theoretical",
+  "yaml": "# Imported DATE from a pasted decklist, and NOT yet reasoned about.\n#\n# `stage: draft` means the gate reports every missing `why` as a warning\n# instead of an error, so the deck's *facts* -- legality, colour identity,\n# singleton, size -- are checked from day one while the thinking is still\n# owed. Artifacts stay blocked until that work is done.\n#\n# To promote it: write a `why` on every card, then set `stage: curated`. The\n# gate refuses the promotion while any card is still blank, and nothing here\n# will fill one in for you -- a rationale written by the tool is exactly the\n# empty justification the rule exists to prevent.\n\nslug: explicit\nname: explicit\nstatus: theoretical\nstage: draft\ncommander:\n  - Goreclaw, Terror of Qal Sisma\nbracket: 4\ncards:\n  - name: Sol Ring\n    category: utility\n    why: ''\n  - name: Cultivator Colossus\n    category: utility\n    why: ''\n  - name: Forest\n    category: land\n    qty: 38\n    why: ''\n  - name: Rhystic Study\n    category: utility\n    why: ''\n",
+  "unknown": [],
+  "notes": [],
+  "unreadable": [],
+  "skipped": [],
+  "needs_rationale": 4
+ },
+ {
+  "name": "inline-commander",
+  "slug": "inline",
+  "text": "1 Goreclaw, Terror of Qal Sisma (M19) 176 *CMDR*\n1 Sol Ring (LTC) 284\n30 Forest\n",
+  "commander": [],
+  "companion": "",
+  "bracket": null,
+  "deck_name": "",
+  "status": "theoretical",
+  "yaml": "# Imported DATE from a pasted decklist, and NOT yet reasoned about.\n#\n# `stage: draft` means the gate reports every missing `why` as a warning\n# instead of an error, so the deck's *facts* -- legality, colour identity,\n# singleton, size -- are checked from day one while the thinking is still\n# owed. Artifacts stay blocked until that work is done.\n#\n# To promote it: write a `why` on every card, then set `stage: curated`. The\n# gate refuses the promotion while any card is still blank, and nothing here\n# will fill one in for you -- a rationale written by the tool is exactly the\n# empty justification the rule exists to prevent.\n\nslug: inline\nname: inline\nstatus: theoretical\nstage: draft\ncommander:\n  - Goreclaw, Terror of Qal Sisma\ncards:\n  - name: Sol Ring\n    category: utility\n    why: ''\n  - name: Forest\n    category: land\n    qty: 30\n    why: ''\n",
+  "unknown": [],
+  "notes": [],
+  "unreadable": [],
+  "skipped": [],
+  "needs_rationale": 2
+ },
+ {
+  "name": "demoted",
+  "slug": "demoted",
+  "text": "Commander\n1 Goreclaw, Terror of Qal Sisma\nDeck\n1 Sol Ring\n20 Swamp\n",
+  "commander": [
+   "Gyome, Master Chef"
+  ],
+  "companion": "",
+  "bracket": null,
+  "deck_name": "",
+  "status": "theoretical",
+  "yaml": "# Imported DATE from a pasted decklist, and NOT yet reasoned about.\n#\n# `stage: draft` means the gate reports every missing `why` as a warning\n# instead of an error, so the deck's *facts* -- legality, colour identity,\n# singleton, size -- are checked from day one while the thinking is still\n# owed. Artifacts stay blocked until that work is done.\n#\n# To promote it: write a `why` on every card, then set `stage: curated`. The\n# gate refuses the promotion while any card is still blank, and nothing here\n# will fill one in for you -- a rationale written by the tool is exactly the\n# empty justification the rule exists to prevent.\n\nslug: demoted\nname: demoted\nstatus: theoretical\nstage: draft\ncommander:\n  - Gyome, Master Chef\ncards:\n  - name: Sol Ring\n    category: utility\n    why: ''\n  - name: Swamp\n    category: land\n    qty: 20\n    why: ''\n  - name: Goreclaw, Terror of Qal Sisma\n    category: utility\n    why: ''\n",
+  "unknown": [],
+  "notes": [
+   "1 card(s) the list nominated for the command zone were not chosen, and went into the 99: Goreclaw, Terror of Qal Sisma"
+  ],
+  "unreadable": [],
+  "skipped": [],
+  "needs_rationale": 3
+ },
+ {
+  "name": "lifted-from-the-board",
+  "slug": "lifted",
+  "text": "Deck\n1 Sol Ring\n30 Forest\nSideboard\n1 Goreclaw, Terror of Qal Sisma\n1 Black Lotus\n",
+  "commander": [
+   "Goreclaw, Terror of Qal Sisma"
+  ],
+  "companion": "",
+  "bracket": null,
+  "deck_name": "",
+  "status": "theoretical",
+  "yaml": "# Imported DATE from a pasted decklist, and NOT yet reasoned about.\n#\n# `stage: draft` means the gate reports every missing `why` as a warning\n# instead of an error, so the deck's *facts* -- legality, colour identity,\n# singleton, size -- are checked from day one while the thinking is still\n# owed. Artifacts stay blocked until that work is done.\n#\n# To promote it: write a `why` on every card, then set `stage: curated`. The\n# gate refuses the promotion while any card is still blank, and nothing here\n# will fill one in for you -- a rationale written by the tool is exactly the\n# empty justification the rule exists to prevent.\n\nslug: lifted\nname: lifted\nstatus: theoretical\nstage: draft\ncommander:\n  - Goreclaw, Terror of Qal Sisma\ncards:\n  - name: Sol Ring\n    category: utility\n    why: ''\n  - name: Forest\n    category: land\n    qty: 30\n    why: ''\nswap_board:\n  - name: Black Lotus\n    category: utility\n",
+  "unknown": [],
+  "notes": [
+   "1 card(s) sit outside the 99 and were removed from it: Goreclaw, Terror of Qal Sisma"
+  ],
+  "unreadable": [],
+  "skipped": [],
+  "needs_rationale": 2
+ },
+ {
+  "name": "resolution",
+  "slug": "resolution",
+  "text": "1 sol ring\n1 Ajani, Nacatl Pariah\n1 Etali, Primal Conqueror // Etali, Primal Sickness\n1 Not A Real Card\n1 llanowar reborn\n",
+  "commander": [
+   "goreclaw, terror of qal sisma"
+  ],
+  "companion": "",
+  "bracket": null,
+  "deck_name": "",
+  "status": "theoretical",
+  "yaml": "# Imported DATE from a pasted decklist, and NOT yet reasoned about.\n#\n# `stage: draft` means the gate reports every missing `why` as a warning\n# instead of an error, so the deck's *facts* -- legality, colour identity,\n# singleton, size -- are checked from day one while the thinking is still\n# owed. Artifacts stay blocked until that work is done.\n#\n# To promote it: write a `why` on every card, then set `stage: curated`. The\n# gate refuses the promotion while any card is still blank, and nothing here\n# will fill one in for you -- a rationale written by the tool is exactly the\n# empty justification the rule exists to prevent.\n\nslug: resolution\nname: resolution\nstatus: theoretical\nstage: draft\ncommander:\n  - Goreclaw, Terror of Qal Sisma\ncards:\n  - name: Sol Ring\n    category: utility\n    why: ''\n  - name: Ajani, Nacatl Pariah\n    category: utility\n    why: ''\n  - name: Etali, Primal Conqueror // Etali, Primal Sickness\n    category: utility\n    why: ''\n  - name: Not A Real Card\n    category: utility\n    why: ''\n  - name: Llanowar Reborn\n    category: land\n    why: ''\n",
+  "unknown": [
+   "Not A Real Card"
+  ],
+  "notes": [],
+  "unreadable": [],
+  "skipped": [],
+  "needs_rationale": 5
+ },
+ {
+  "name": "merged",
+  "slug": "merged",
+  "text": "1 Sol Ring\n2 Sol Ring\n10 Swamp\n20 Swamp\n",
+  "commander": [
+   "Gyome, Master Chef"
+  ],
+  "companion": "",
+  "bracket": null,
+  "deck_name": "",
+  "status": "theoretical",
+  "yaml": "# Imported DATE from a pasted decklist, and NOT yet reasoned about.\n#\n# `stage: draft` means the gate reports every missing `why` as a warning\n# instead of an error, so the deck's *facts* -- legality, colour identity,\n# singleton, size -- are checked from day one while the thinking is still\n# owed. Artifacts stay blocked until that work is done.\n#\n# To promote it: write a `why` on every card, then set `stage: curated`. The\n# gate refuses the promotion while any card is still blank, and nothing here\n# will fill one in for you -- a rationale written by the tool is exactly the\n# empty justification the rule exists to prevent.\n\nslug: merged\nname: merged\nstatus: theoretical\nstage: draft\ncommander:\n  - Gyome, Master Chef\ncards:\n  - name: Sol Ring\n    category: utility\n    qty: 3\n    why: ''\n  - name: Swamp\n    category: land\n    qty: 30\n    why: ''\n",
+  "unknown": [],
+  "notes": [
+   "Sol Ring appeared on more than one line; merged to qty 3",
+   "Swamp appeared on more than one line; merged to qty 30"
+  ],
+  "unreadable": [],
+  "skipped": [],
+  "needs_rationale": 2
+ },
+ {
+  "name": "companion",
+  "slug": "companion",
+  "text": "1 Sol Ring\n10 Forest\n",
+  "commander": [
+   "Goreclaw, Terror of Qal Sisma"
+  ],
+  "companion": "Black Lotus",
+  "bracket": null,
+  "deck_name": "",
+  "status": "theoretical",
+  "yaml": "# Imported DATE from a pasted decklist, and NOT yet reasoned about.\n#\n# `stage: draft` means the gate reports every missing `why` as a warning\n# instead of an error, so the deck's *facts* -- legality, colour identity,\n# singleton, size -- are checked from day one while the thinking is still\n# owed. Artifacts stay blocked until that work is done.\n#\n# To promote it: write a `why` on every card, then set `stage: curated`. The\n# gate refuses the promotion while any card is still blank, and nothing here\n# will fill one in for you -- a rationale written by the tool is exactly the\n# empty justification the rule exists to prevent.\n\nslug: companion\nname: companion\nstatus: theoretical\nstage: draft\ncommander:\n  - Goreclaw, Terror of Qal Sisma\ncompanion: Black Lotus\ncards:\n  - name: Sol Ring\n    category: utility\n    why: ''\n  - name: Forest\n    category: land\n    qty: 10\n    why: ''\n",
+  "unknown": [],
+  "notes": [],
+  "unreadable": [],
+  "skipped": [],
+  "needs_rationale": 2
+ },
+ {
+  "name": "no-commander",
+  "slug": "nobody",
+  "text": "1 Sol Ring\n10 Forest\n",
+  "commander": [],
+  "companion": "",
+  "bracket": null,
+  "deck_name": "",
+  "status": "theoretical",
+  "refused": "no commander in this list, and none was given. Add a `Commander` section to the list, or name one explicitly."
+ },
+ {
+  "name": "no-commander-with-a-board",
+  "slug": "nobody2",
+  "text": "Deck\n1 Sol Ring\nSideboard\n1 Goreclaw, Terror of Qal Sisma\n1 Gyome, Master Chef\n",
+  "commander": [],
+  "companion": "",
+  "bracket": null,
+  "deck_name": "",
+  "status": "theoretical",
+  "refused": "no commander in this list, and none was given. Add a `Commander` section to the list, or name one explicitly. This list has a sideboard section containing Goreclaw, Terror of Qal Sisma, Gyome, Master Chef -- Moxfield uses `SIDEBOARD:` to carry the commander, so that may be what you want."
+ },
+ {
+  "name": "three-commanders",
+  "slug": "three",
+  "text": "1 Sol Ring\n",
+  "commander": [
+   "Goreclaw, Terror of Qal Sisma",
+   "Gyome, Master Chef",
+   "Regal Behemoth"
+  ],
+  "companion": "",
+  "bracket": null,
+  "deck_name": "",
+  "status": "theoretical",
+  "refused": "3 commanders listed (Goreclaw, Terror of Qal Sisma, Gyome, Master Chef, Regal Behemoth); Commander allows at most two, and only with a pairing ability"
+ },
+ {
+  "name": "no-cards",
+  "slug": "bare",
+  "text": "",
+  "commander": [
+   "Gyome, Master Chef"
+  ],
+  "companion": "",
+  "bracket": null,
+  "deck_name": "",
+  "status": "theoretical",
+  "yaml": "# Imported DATE from a pasted decklist, and NOT yet reasoned about.\n#\n# `stage: draft` means the gate reports every missing `why` as a warning\n# instead of an error, so the deck's *facts* -- legality, colour identity,\n# singleton, size -- are checked from day one while the thinking is still\n# owed. Artifacts stay blocked until that work is done.\n#\n# To promote it: write a `why` on every card, then set `stage: curated`. The\n# gate refuses the promotion while any card is still blank, and nothing here\n# will fill one in for you -- a rationale written by the tool is exactly the\n# empty justification the rule exists to prevent.\n\nslug: bare\nname: bare\nstatus: theoretical\nstage: draft\ncommander:\n  - Gyome, Master Chef\ncards: []\n",
+  "unknown": [],
+  "notes": [],
+  "unreadable": [],
+  "skipped": [],
+  "needs_rationale": 0
+ },
+ {
+  "name": "reported-lines",
+  "slug": "reported",
+  "text": "1 Sol Ring\nTokens\n1 Beast\n(LTC) 284\n*CMDR*\n",
+  "commander": [
+   "Gyome, Master Chef"
+  ],
+  "companion": "",
+  "bracket": null,
+  "deck_name": "",
+  "status": "theoretical",
+  "yaml": "# Imported DATE from a pasted decklist, and NOT yet reasoned about.\n#\n# `stage: draft` means the gate reports every missing `why` as a warning\n# instead of an error, so the deck's *facts* -- legality, colour identity,\n# singleton, size -- are checked from day one while the thinking is still\n# owed. Artifacts stay blocked until that work is done.\n#\n# To promote it: write a `why` on every card, then set `stage: curated`. The\n# gate refuses the promotion while any card is still blank, and nothing here\n# will fill one in for you -- a rationale written by the tool is exactly the\n# empty justification the rule exists to prevent.\n\nslug: reported\nname: reported\nstatus: theoretical\nstage: draft\ncommander:\n  - Gyome, Master Chef\ncards:\n  - name: Sol Ring\n    category: utility\n    why: ''\n",
+  "unknown": [],
+  "notes": [],
+  "unreadable": [
+   {
+    "line_no": 4,
+    "text": "(LTC) 284"
+   },
+   {
+    "line_no": 5,
+    "text": "*CMDR*"
+   }
+  ],
+  "skipped": [
+   {
+    "line_no": 3,
+    "text": "Beast"
+   }
+  ],
+  "needs_rationale": 1
+ }
+]

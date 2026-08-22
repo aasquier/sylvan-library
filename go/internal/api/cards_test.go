@@ -75,6 +75,15 @@ func callCtx(t *testing.T, a *API, ctx context.Context, method, target, body str
 		t.Fatalf("no route for %s %s", method, target)
 	}
 	req := httptest.NewRequest(method, target, strings.NewReader(body)).WithContext(ctx)
+	if body != "" {
+		// Starlette parses a body as JSON only when the content type says so,
+		// and hands the raw bytes through as a *string* otherwise -- so a
+		// request without this header is a `dict_type` refusal on both sides,
+		// however well-formed the JSON is. Every real client sends it; a rig
+		// that did not was asking a question no client asks, and it hid the
+		// gap `readBody` had until 2026-08-22.
+		req.Header.Set("Content-Type", "application/json")
+	}
 	for name, value := range values {
 		req.SetPathValue(name, value)
 	}
