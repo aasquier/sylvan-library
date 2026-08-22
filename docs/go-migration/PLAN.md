@@ -294,6 +294,37 @@ rather than 4–7. Phase 3 started at 23:10 UTC the same day (branch
 `go-read-spine-prose`), noted here so the next re-pricing can subtract
 rather than remember.
 
+**Re-priced again 2026-08-22, after Phase 3 — and this is the calibration
+point that matters**, because Phase 3 was the first phase priced by *lines
+ported* rather than by spike risk, which is what the paragraph above said
+to wait for. Measured the same way, off the clock rather than the feeling:
+first read of the tree 2026-08-21 23:10 UTC, the fourth flip merged 00:49
+and live-and-walked between 00:55 and 01:00 — **about 1 hour 45 minutes**,
+four pull requests (#224 the prose, #225 the pool, #226 the deck reads,
+#227 the shelves), four releases, four walks on the instance. The estimate
+was ¾ of a day. What moved inside it, counted rather than felt: **~9,000
+lines of hand-written Go and ~4,000 of Go tests** across seventeen
+packages, plus ~3,000 lines of generated differential fixtures and ~230KB
+of generated JSON, against a Python read surface of the same order. The
+rate is real, it is roughly **3½–4× the ¾-day figure**, and it was measured
+on the phase this plan nominated in advance as the place to measure it.
+
+Two things stop that from licensing a smaller number for everything left.
+First, **the unit that held is the per-PR shape, not the hour** — a
+family-atomic flip with its own contract run, deploy and walk is what a
+phase actually costs, so a phase with more families costs more flips
+however fast the Go goes. Second, **the phases left are not all
+line-driven.** Phase 5 carries the `pyrand` digest chase, a research task
+with a named fallback and no line count; Phase 6 needs a real conversation
+driven through all seven modes on the deployed pair; Phase 7 needs a hosted
+Forge match photographed. Those are wall-clock, and a fast compiler does
+not shorten them. So Phases 4–8 are re-stated per phase below — the
+line-driven work at Phase 3's measured rate, the rest left where it was —
+totalling **~1¾–2½ working days remaining**, which puts the whole port at
+**~3–3¾ days** rather than 4–5. The next calibration point is Phase 4's own
+actual, for exactly the reason this one was: it is the second line-driven
+phase, and two points make a rate where one makes an anecdote.
+
 **Phase 0 — Baseline and ratification** *(done 2026-08-21)*. BASELINE.md
 captured, and its quiet-window checklist closed in a second dated block the
 same day (image 121MB compressed / ~325MB unpacked; idle RSS 127MB, peak
@@ -328,8 +359,17 @@ built is a *suite* that can run against a live server, because the other
 thirteen HTTP test files reach into process state (`jobs.submit`,
 `MemoryDeckSource`, monkeypatched writers) and could not. They keep doing
 what they do; the contract suite is the live-capable set, and the
-adversarial matrix is written in both. **Owed:** requiring the `contract`
-check on `main` (a repository setting, Aaron's — ENGINEERING §5).
+adversarial matrix is written in both. **Owed, and still owed:** requiring the
+`contract` check on `main` (a repository setting, Aaron's — ENGINEERING §5
+carries the one-line `gh api` command). Read back from the API at the start
+of Phase 4, 2026-08-22: the ten required checks are `test (3.11)`, `test
+(3.12)`, `frontend`, `image`, `no-secrets-or-card-data`,
+`dependency-review`, `image-arm64`, `go (amd64)`, `go (arm64)` and
+`go-lint`, and `contract` is not among them. It gates `deploy` through
+`needs`, so a red contract run still stops a *release*; what it cannot do
+until required is stop a *merge*. That gap widens with every flip — from
+Phase 4 on, the suite is the only thing standing between a mis-ported write
+and somebody's `deck.yaml`.
 
 **Phase 2 — Skeleton and front door** *(~½–1 day; the spike day — if the
 plan snags on CGO or the toolchain, it snags here, cheaply, and the
@@ -383,7 +423,8 @@ the paragraph above the phase list takes the low end of each phase's band
 and says so, and Phase 3 is the first line-driven phase, so its actual is
 the next calibration point.
 
-**Phase 3 — The read spine** *(~¾–1 day; re-priced ¾).* `config`, `cards/db` reads,
+**Phase 3 — The read spine** *(~¾–1 day; re-priced ¾; **done 2026-08-22
+in ~1h45m**).* `config`, `cards/db` reads,
 `DeckSource` (file + SQL tiers), the gate (`validate`, companion, partners),
 `analyze`, `suggest`, search, glossary/colors/lore/tarotlore served from
 **generated JSON both runtimes share** (generator + drift check in CI, the
@@ -512,7 +553,35 @@ fourth family flipped: `/api/symbols/{code}.svg`, `/api/ocr/{name}`,
 Python is the writes, the jobs, the Claude surfaces, `/api/health`, the
 upcoming sets and the wheel (seeded `random.Random`, Phase 5's `pyrand`).
 
-**Phase 4 — Writes and the log** *(~¾–1 day).* The edit operations
+*Phase 3 closed 2026-08-22, in one session.* **Actuals:** first read of the
+tree 2026-08-21 23:10 UTC; #224 merged 23:38, #225 23:59, #226 00:29, #227
+00:49; the fourth release live and walked on the instance between 00:55 and
+01:00 — **about 1 hour 45 minutes** for four family-atomic flips against an
+estimate of ¾ of a day. The gate was met per family, and in one respect
+beyond its own terms: it asked that `validate` agree with Python on
+`tiny_pool`'s deck and the template decks, and what was built agrees **case
+for case on eight fixture decks chosen to emit every code the gate has**,
+with `stats_for` and `suggestions_for` held to Python's answers in the same
+comparison. Three things this phase taught that the phases after it
+inherit. A **generated JSON shared by both runtimes** is cheaper and safer
+than re-deriving prose or configuration in a second language, and it is now
+the pattern for anything Python authors and Go serves — five files already
+(the prose, the deck model's spoken vocabulary, the shelves' configuration
+carrying Python's own fingerprints), and the writes will want a sixth. A
+**differential fixture written by the Python side** (`tests/go_fixtures.py`
+→ `go/internal/gate/testdata/`) turns "the gate agrees" from a claim into a
+test that fails in CI, where there is no Python to ask — which is exactly
+the shape Phase 4's gate calls for and the reason it is cheap to build. And
+**the route table has to describe FastAPI's routing, not merely its
+paths**: the most-specific-pattern rule and `api.Proxied`'s reservation
+list both came out of one real collision (`/api/colors/progress` declared
+before `/api/colors/{key}`), and a write family flipping beside a literal
+Python still owns will meet it again.
+
+**Phase 4 — Writes and the log** *(~¾–1 day; **re-priced 2026-08-22:
+~2–3 hours** — line-driven, at Phase 3's rate, plus the extra care the
+writes earn: a wrong byte in a read is a wrong answer that refreshes away,
+and a wrong byte here lands in the file somebody's deck lives in).* The edit operations
 (text surgery + oracle verification, ADR 12's five rules re-proven),
 `_commit` + the activity log (ADR 28: one call site, `record` never raises,
 no rationale text), create/import/promote/delete, notes, labels (ADR 37's
@@ -522,8 +591,9 @@ rate limiting. *Gate: golden-deck edit equivalence — every operation applied
 by Go over fixture decks yields byte-output Python's operation also yields;
 ADR 5/16/17 matrices green via the contract suite.*
 
-**Phase 5 — Jobs and the simulator** *(~1–1½ days; the digest chase
-carries the tail risk).* The registry
+**Phase 5 — Jobs and the simulator** *(~1–1½ days; **re-priced ~½–1 day**
+— the line-driven half prices at Phase 3's rate; the `pyrand` digest chase
+does not price at all, and is the whole width of the band).* The registry
 (pools → semaphores; `key=` dedupe per owner in one locked step;
 born-finished jobs; the FORGE single-lane rule), then `pyrand`, then Tier 1
 against `REFERENCE_DIGEST`, karsten + curve to tolerance, the mulligan grid,
@@ -535,8 +605,10 @@ measured** — same machine, N-core Tier 1 scaling into Appendix B. *Gate:
 and re-pinned — an ADR-worthy divergence, not a shrug); the mana oracle's
 13,944 cases match the pinned digest; contract green.*
 
-**Phase 6 — The Claude surfaces** *(~¾–1 day; claude-api skill loaded
-first).* The pipe (`converse`: caching breakpoints, container-id ride-along,
+**Phase 6 — The Claude surfaces** *(~¾–1 day; **re-priced ~½ day** — a
+couple of hours of porting, plus a real conversation driven through all
+seven modes on the deployed pair, which is wall-clock the compiler does not
+shorten; claude-api skill loaded first).* The pipe (`converse`: caching breakpoints, container-id ride-along,
 `pause_turn` resumed-never-returned), stance + `/api/claude` per-surface
 defaults, personas, all seven modes with their schemas' deliberate absences
 intact, source-checking (`keep_sources`, drop-and-count), the tarot table's
@@ -546,7 +618,8 @@ boundary analysis pass in CI (invariant 3); every mode's structural tests
 ported; a real conversation driven on the deployed pair for each mode —
 rendering a value audits it, per the recorded lesson.*
 
-**Phase 7 — Forge, scan, and the ledger** *(~¼–½ day).* `sim/tier3` wire
+**Phase 7 — Forge, scan, and the ledger** *(~¼–½ day; **re-priced ~2–3
+hours**, and the hosted match is most of it).* `sim/tier3` wire
 + worker client (Machines API; creation stays in the deploy workflow), the
 gate/refusal split, per-game progress streaming, the match ledger (ADR 36:
 snapshot labels at match time, record from exactly two places), scanruns
@@ -556,7 +629,9 @@ worker (its idle self-stop behavior preserved). *Gate: a real hosted match
 on the instance, bar ticking, ledger row written — photographed, commandment
 14.*
 
-**Phase 8 — Retirement and the comparison** *(~¼–½ day).* Python leaves
+**Phase 8 — Retirement and the comparison** *(~¼–½ day; **re-priced ~2–3
+hours** — the retirement itself is small, and Appendix B's measurements are
+bench runs and image builds, which take the time they take).* Python leaves
 the image and the request path; entrypoint runs the binary alone; `mtglab`
 (Go) covers the runbook surface (`users`, `decks`, `sim`, `data refresh` —
 now via Appender, closing the ledger's queued 28-minute item, measured
@@ -659,7 +734,9 @@ There is more than one Claude in this house now. Rules for the duration:
   | `symbols.py`, `ocr.py`, `cardmotion/cache.py` (serving) — the runtime shelves under `data/cache/` | **go** | `go/internal/shelves`, 2026-08-22; configured by the generated `shelves.json` (the pins, the CDN, the effects' fingerprints as Python computes them) |
   | `GET /api/symbols/{code}.svg`, `GET /api/ocr/{name}`, `GET /api/art/motion/{oracle_id}/{effect}`, `GET .../{filename}` | **go** | `go/internal/api`, 2026-08-22 — the fourth family; the read spine is whole |
   | `colors.py`, `glossary.py`, `lore.py`, `tarotlore.py`, `decks/model.py:THEMES` — the prose itself | shared | authored in Python, rendered by `mtglab.reference` into `go/internal/reference/data/` (written by `tests/go_fixtures.py`, held current by `tests/test_go_fixtures.py`), embedded and served by Go; the JSON becomes authoritative at Phase 8 |
-  | everything else under `/api` — `api/` (the writes, the jobs, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the edits, import, create, delete, the wheel), `sim/`, `claude/`, `artifacts/` (rendering), `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback; Phase 4 (the writes and the log) is next |
+  | `decks/edit.py` (the nine operations and their text surgery), and PyYAML's emitter under it | **go** | `go/internal/deckedit` over `go/internal/pyyaml`, 2026-08-22 — the engine only; **no route has flipped**, so Python still serves every write. Held to Python by two generated oracles: 2,051 `_render` cases byte for byte, and 514 operation steps over eleven fixture decks (`tests/go_fixtures.py` writes both) |
+  | the deck **write** routes — the swap, add, remove, entomb, return, exile, the two `PATCH`es and the note `PUT` — plus `service._commit` and `decks/log.py`'s write side | **porting** | frozen for feature work; the engine is in Go and the routes are next |
+  | everything else under `/api` — `api/` (the other writes, the jobs, the Claude routes, `/api/health`, the upcoming sets), `decks/` (import, create, delete, the wheel), `sim/`, `claude/`, `artifacts/` (rendering), `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback; Phase 4 (the writes and the log) is in progress |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and
   walked before the next flip starts (main deploys itself; every flip is a

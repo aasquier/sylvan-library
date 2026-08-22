@@ -1,0 +1,277 @@
+package decklog
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// describeCase is one row of the oracle: the keywords `_commit` handed
+// `describe`, and the verb and sentence it gave back. Written by
+// `tests/go_fixtures.py`.
+type describeCase struct {
+	Extra   map[string]any `json:"extra"`
+	Action  string         `json:"action"`
+	Summary string         `json:"summary"`
+}
+
+// editFor turns one recorded `extra` back into the typed Edit this package
+// takes. Python asks "is this key present"; the switch below asks the same
+// question in the same order, which is what makes the two comparable at all.
+func editFor(extra map[string]any) Edit {
+	str := func(key string) string { s, _ := extra[key].(string); return s }
+	switch {
+	case has(extra, "added"):
+		return Edit{Kind: EditAdd, Card: str("added"), Category: str("category"), Into: str("into")}
+	case has(extra, "entombed"):
+		if names, ok := extra["entombed"].([]any); ok {
+			return Edit{Kind: EditEntomb, Cards: strings2(names)}
+		}
+		return Edit{Kind: EditEntomb, Card: str("entombed")}
+	case has(extra, "removed"):
+		return Edit{Kind: EditRemove, Card: str("removed")}
+	case has(extra, "returned"):
+		return Edit{Kind: EditReturn, Card: str("returned")}
+	case has(extra, "exiled"):
+		return Edit{Kind: EditExile, Card: str("exiled")}
+	case has(extra, "swapped_out"):
+		return Edit{Kind: EditSwap, Card: str("swapped_out"), SwapIn: str("swapped_in")}
+	case has(extra, "note"):
+		return Edit{Kind: EditNote, Note: str("note")}
+	case has(extra, "card"):
+		return Edit{Kind: EditSetCard, Card: str("card"), Field: str("field")}
+	case has(extra, "field"):
+		return Edit{Kind: EditSetDeck, Field: str("field"), Value: extra["value"]}
+	}
+	return Edit{}
+}
+
+func has(m map[string]any, key string) bool { _, ok := m[key]; return ok }
+
+func strings2(items []any) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		s, _ := item.(string)
+		out = append(out, s)
+	}
+	return out
+}
+
+// TestDescribeWritesPythonsSentences is the log's half of the family's gate.
+// The sentence is rendered once, at write time, so a Go route that wrote a
+// different one would change the History panel's wording the day it flipped --
+// silently, and only for edits made after the flip.
+func TestDescribeWritesPythonsSentences(t *testing.T) {
+	raw, err := os.ReadFile("testdata/describe.json")
+	if err != nil {
+		t.Fatalf("reading the oracle: %v", err)
+	}
+	var cases []describeCase
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatalf("decoding the oracle: %v", err)
+	}
+	if len(cases) < 30 {
+		t.Fatalf("the oracle has %d cases; regenerate with `python tests/go_fixtures.py`", len(cases))
+	}
+	for _, c := range cases {
+		action, summary := Describe(editFor(c.Extra))
+		if action != c.Action || summary != c.Summary {
+			t.Errorf("%v\n  Python: %q / %q\n      Go: %q / %q",
+				c.Extra, c.Action, c.Summary, action, summary)
+		}
+	}
+}
+
+// TestNoRationaleReachesASentence pins ADR 28's hardest rule, which no
+// equality check can hold on its own: the oracle only proves Go says what
+// Python says, and if Python ever started leaking a rationale the two would
+// agree all the way into the table.
+func TestNoRationaleReachesASentence(t *testing.T) {
+	const secret = "A rationale that must not appear in any log line."
+	raw, err := os.ReadFile("testdata/describe.json")
+	if err != nil {
+		t.Fatalf("reading the oracle: %v", err)
+	}
+	if !strings.Contains(string(raw), secret) {
+		t.Fatal("the oracle no longer passes a `why` to describe, so this " +
+			"proves nothing; put one back")
+	}
+	var cases []describeCase
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cases {
+		_, summary := Describe(editFor(c.Extra))
+		if strings.Contains(summary, secret) || strings.Contains(c.Summary, secret) {
+			t.Errorf("a rationale reached the log: %q", summary)
+		}
+	}
+	// And the type cannot carry one: an Edit has no field for it, which is
+	// ADR 25's technique reused -- the shape refuses rather than the code.
+	if _, _ = Describe(Edit{Kind: EditSwap, Card: "A", SwapIn: "B"}); false {
+		t.Fatal("unreachable")
+	}
+}
+
+// TestAnUnknownOperationStillSaysSomething is the fallback, and it is the
+// branch most likely to be "simplified" away by somebody who notices nothing
+// reaches it. The tenth edit operation is the one somebody adds in a year.
+func TestAnUnknownOperationStillSaysSomething(t *testing.T) {
+	action, summary := Describe(Edit{})
+	if action != "edit" || summary != "edited the deck" {
+		t.Errorf("an unrecognised operation said %q / %q; silence is the one "+
+			"failure mode a history cannot have", action, summary)
+	}
+}
+
+// newScratchDB builds an `app.db` from the schema Python's ladder produced,
+// which `tests/go_fixtures.py` reads out of `sqlite_master` and commits. Go
+// does not own the ladder (PLAN section 10), so this is a reading of it rather
+// than a second copy.
+func newScratchDB(t *testing.T) string {
+	t.Helper()
+	schema, err := os.ReadFile("testdata/app_schema.sql")
+	if err != nil {
+		t.Fatalf("reading app.db's schema: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "app.db")
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=rwc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(string(schema)); err != nil {
+		t.Fatalf("building the scratch app.db: %v", err)
+	}
+	return path
+}
+
+func TestRecordWritesAnEntryTheReaderFinds(t *testing.T) {
+	path := newScratchDB(t)
+	recorder, err := NewRecorder(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer recorder.Close()
+
+	ctx := context.Background()
+	recorder.Record(ctx, "goreclaw", nil, "", Edit{
+		Kind: EditAdd, Card: "Sol Ring", Category: "ramp", Into: "cards"})
+	actor := "aasquier"
+	// `deck_log.owner_id` references `users(id)`, and foreign keys are on --
+	// which is the point of turning them on, so an entry cannot outlive the
+	// account it belongs to. The owned tier needs a real account to hang off.
+	owner := newScratchUser(t, path, actor)
+	recorder.Record(ctx, "goreclaw", &owner, actor, Edit{
+		Kind: EditEntomb, Card: "Primeval Titan"})
+
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	// The file tier is `owner_id IS NULL`, and reading it back through the
+	// same query the route uses is the point: an equality test would return
+	// nothing at all for the curated six, forever, without erroring.
+	entries, err := Entries(ctx, db, nil, "goreclaw", DefaultLimit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("the file tier has %d entries, expected 1", len(entries))
+	}
+	if entries[0].Action != "add" || entries[0].Summary != "added Sol Ring as ramp" {
+		t.Errorf("wrote %q / %q", entries[0].Action, entries[0].Summary)
+	}
+	if entries[0].Actor != nil {
+		t.Errorf("an empty actor should be null, got %q", *entries[0].Actor)
+	}
+	// Python writes an ISO-8601 stamp with microseconds and an offset, and
+	// the panel renders it, so the shape is part of the contract.
+	if got := entries[0].CreatedAt; !strings.HasSuffix(got, "+00:00") || len(got) != 32 {
+		t.Errorf("created_at is %q; Python writes `2026-08-22T01:23:45.678901+00:00`", got)
+	}
+
+	owned, err := Entries(ctx, db, &owner, "goreclaw", DefaultLimit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(owned) != 1 || owned[0].Actor == nil || *owned[0].Actor != actor {
+		t.Fatalf("the owned tier read back as %+v", owned)
+	}
+}
+
+// TestRecordNeverFailsTheEdit is the property the whole module is built
+// around: the deck write has already happened by the time this runs.
+func TestRecordNeverFailsTheEdit(t *testing.T) {
+	// No database at all -- a laptop with auth off that nothing has yet
+	// created `app.db` on.
+	missing := filepath.Join(t.TempDir(), "nothing", "app.db")
+	if _, err := NewRecorder(missing, nil); err == nil {
+		t.Error("opening a missing app.db read-write should fail loudly at " +
+			"startup; it is Record that must stay quiet")
+	}
+	// ... and a nil recorder, which is what a door with no app.db holds.
+	var recorder *Recorder
+	recorder.Record(context.Background(), "goreclaw", nil, "", Edit{Kind: EditExile, Card: "X"})
+
+	// A database whose table was dropped from under a live handle.
+	path := newScratchDB(t)
+	live, err := NewRecorder(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer live.Close()
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=rw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("DROP TABLE deck_log"); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	// The assertion is that this returns at all.
+	live.Record(context.Background(), "goreclaw", nil, "", Edit{Kind: EditAdd, Card: "X"})
+}
+
+// TestTheRecorderDoesNotCreateTheDatabase pins the coexistence rule: Python
+// owns the schema ladder until Phase 8, so a Go-created `app.db` would be a
+// database at version zero with no tables in it.
+func TestTheRecorderDoesNotCreateTheDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.db")
+	if _, err := NewRecorder(path, nil); err == nil {
+		t.Fatal("NewRecorder created app.db; the ladder is Python's until Phase 8")
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("NewRecorder left a file at %s", path)
+	}
+}
+
+// newScratchUser inserts one account and hands back its id, because the log's
+// owned tier is a foreign key into `users` and a test that skipped it would be
+// testing an insert the real database refuses.
+func newScratchUser(t *testing.T, path, username string) int64 {
+	t.Helper()
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=rw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	result, err := db.Exec(
+		"INSERT INTO users (username, email, password_hash, created_at)"+
+			" VALUES (?, ?, ?, ?)",
+		username, username+"@example.invalid", "x", "2026-08-22T00:00:00+00:00")
+	if err != nil {
+		t.Fatalf("seeding a user: %v", err)
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}

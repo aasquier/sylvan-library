@@ -25,6 +25,16 @@ labelling vocabulary -- as the JSON the Go module embeds and serves
 command, same drift test, same rule: the committed bytes are what Python
 renders now, or the suite says so and names this command.
 
+**Since Phase 4 it also writes the render oracle.** `decks/edit.py` writes
+its lines through PyYAML's emitter, at a width, with PyYAML's own choices
+about quoting and folding -- and `swaps.md` is a diff of the file those lines
+land in, so *which* legal YAML gets written is part of an edit's correctness.
+`render_cases()` asks `edit._render` for every scalar shape a deck file can
+hold (the resolver's look-alikes, every indicator, leading and trailing
+whitespace, real deck prose, card names with unicode and apostrophes, a
+one-column sweep of the fold width, ints and lists) and records the exact
+lines back; `go/internal/pyyaml` must reproduce all of them byte for byte.
+
 **And the pool's shape.** `go/internal/pool/schema.sql` is `cards/db.py`'s
 `SCHEMA` verbatim, embedded by the Go module so its tests can build a pool
 of their own and so the Go `data refresh` (Phase 8) creates the file Python
@@ -57,6 +67,16 @@ YAML_PATH = TESTDATA / "rich-deck.yaml"
 JSON_PATH = TESTDATA / "rich-deck.parsed.json"
 #: Where the Go module embeds the reference prose from (`go:embed data/*`).
 REFERENCE_DIR = ROOT / "go" / "internal" / "reference" / "data"
+#: The render oracle: every scalar shape `edit._render` writes, and the bytes
+#: PyYAML gives for it (Phase 4).
+RENDER_PATH = ROOT / "go" / "internal" / "pyyaml" / "testdata" / "render.json"
+#: The edit-equivalence oracle: every operation applied over fixture decks,
+#: beside the exact bytes Python's operation yields (Phase 4's gate).
+EDITS_PATH = ROOT / "go" / "internal" / "deckedit" / "testdata" / "edits.json"
+#: The activity log's oracle: every sentence `log.describe` writes, and
+#: `app.db`'s schema as the ladder leaves it, so the Go log tests have a real
+#: table to insert into in CI where there is no Python (Phase 4).
+LOG_DIR = ROOT / "go" / "internal" / "decklog" / "testdata"
 #: The pool's schema and the 21-card fixture, for the Go pool tests.
 POOL_DIR = ROOT / "go" / "internal" / "pool"
 SCHEMA_PATH = POOL_DIR / "schema.sql"
@@ -272,6 +292,607 @@ def issue_json(issue: Any) -> dict[str, Any]:
             "card": issue.card}
 
 
+# --------------------------------------------------------- the render oracle
+
+def render_strings() -> list[tuple[str, str]]:
+    """Every string worth asking the emitter about, grouped by what it tests."""
+    out: list[tuple[str, str]] = []
+
+    def add(group: str, *values: str) -> None:
+        out.extend((group, v) for v in values)
+
+    # A plain rendering of any of these reads back as something that is not a
+    # string, so PyYAML quotes each -- YAML 1.1 rules, which is what PyYAML
+    # implements and therefore what the port has to implement.
+    add("resolver-lookalikes",
+        "yes", "Yes", "YES", "no", "No", "NO", "true", "True", "TRUE",
+        "false", "False", "FALSE", "on", "On", "ON", "off", "Off", "OFF",
+        "null", "Null", "NULL", "~", "", "12", "0", "-3", "+7", "0x1f",
+        "0b101", "0o17", "017", "1_000", "1.5", ".5", "-.inf", ".nan",
+        "1:30", "1:30:00", "2026-08-21", "2026-8-1", "<<", "=", "!", "&", "*")
+    # ... and the near misses, which must stay plain. Both halves matter: a
+    # port that quoted everything would pass the list above and fail here.
+    add("resolver-near-misses",
+        "yess", "nope", "onward", "nullify", "1e3", "1.2.3", "12a", "0x",
+        "2026-13-99x", "truthy", "==", "a=b", "- dash", "12:99")
+
+    # Indicators, leading and interior. `#` after a space starts a comment;
+    # `:` before one ends a key.
+    add("indicators",
+        "#not a comment", "* starts with a star", "- leads with a dash",
+        "-dash-no-space", "? question", "?nospace", ": colon", ":nospace",
+        "| pipe", "> angle", "! bang", "& amp", "@ at", "` tick", "% pct",
+        "'quoted'", '"quoted"', "[bracket]", "{brace}", ",comma",
+        "--- doc start", "... doc end", "---nospace",
+        "colon: in the middle", "colon:nospace", "hash # in the middle",
+        "hash#nospace", "trailing colon:", "braces {G}{W} inline")
+
+    # Whitespace decides between the block, single and double styles, and it
+    # is the only input that can make a fold lose information.
+    add("whitespace",
+        " leading space", "trailing space ", "  both  ",
+        "a\nb", "a\n\nb", "a \nb", "a\n b", "a\n", "a\n\n",
+        "\nleading break", "one\ntwo\nthree", "tab\there", "line\r\nbreak")
+
+    # Real deck prose, at the lengths that make the folder wrap.
+    add("prose",
+        "Two mana on turn one, and it always has been: the single most played "
+        "card in the format, the first thing every primer tells a newcomer to "
+        "find, and the card this line exists to make room for -- which is why "
+        "it is first.",
+        "It's the card with the apostrophe -- and the one that ends games: "
+        "flash, trample, double strike.",
+        "cost {1}{W}{W} -- braces again, inside a longer sentence that also "
+        "runs past the hundred-character fold so both rules fire at once.",
+        "Keep any seven with two lands and an equipment; ship a hand\n"
+        "with no knight by turn three.",
+        "colon: and # hash, plus braces {G}{W} and a trailing space ",
+        "The table forgets Ashvale until it is too late: say nothing.",
+        "Suit up a knight and swing: Syr Gwyn's trigger draws a card and the "
+        "equipment costs nothing, so every turn after the third is a cantrip "
+        "with a sword attached -- panache *and* martial prowess.",
+        "supercalifragilistic" * 12,
+        " ".join(["word"] * 60),
+        "a " * 50,
+        "one two three " * 9 + "and-a-very-long-unbreakable-token-at-the-end")
+
+    # Card names: where the unicode and the apostrophes live. Every one of
+    # these is a real card except the last three.
+    add("names",
+        "Sol Ring", "\u00c6ther Vial", "Ajani, Nacatl Pariah",
+        "Yawgmoth, Thran Physician", "J\u00f6tun Grunt", "Lim-D\u00fbl's Vault",
+        "Ach! Hans, Run!", 'Kongming, "Sleeping Dragon"',
+        "Question Elemental?", "_____", "Rakdos, Lord of Riots",
+        "Look at Me, I'm the DCI", "Hazezon Tamar", "S\u00e9ance",
+        "na\u00efve r\u00e9sum\u00e9", "em \u2014 dash", "en \u2013 dash",
+        "ellipsis \u2026", "emoji \U0001f600")
+
+    # The characters that force double quotes -- and the two Unicode line
+    # separators, which are the port's one documented divergence
+    # (`TestTheSeparatorDivergence` in go/internal/pyyaml).
+    add("control", "bell\x07here", "nul\x00here", "esc\x1bhere", "del\x7fhere",
+        "nbsp\xa0here", "bom\ufeffhere", "\u2028 sep", "\u2029 par",
+        "back\\slash", 'double"quote', "single'quote")
+
+    return out
+
+
+def render_cases() -> list[dict[str, Any]]:
+    """Every `_render` call the Go emitter is held to, with PyYAML's answer."""
+    from mtglab.decks import edit
+
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[Any, ...]] = set()
+
+    def kind_of(value: Any) -> str:
+        if isinstance(value, bool):
+            return "bool"
+        if isinstance(value, int):
+            return "int"
+        if isinstance(value, list):
+            return "list"
+        return "str"
+
+    def add(group: str, key: str, value: Any, indent: int, width: int,
+            fold: bool) -> None:
+        signature = (key, repr(value), indent, width, fold)
+        if signature in seen:
+            return
+        seen.add(signature)
+        out.append({
+            "group": group, "key": key, "kind": kind_of(value),
+            "value": value, "indent": indent, "width": width, "fold": fold,
+            "want": edit._render(key, value, indent, width=width, fold=fold),
+        })
+
+    # The keys, indents and widths the edit operations actually use: a card's
+    # `why` sits at 6, a category at 4, the deck's own fields at 0, and a note
+    # at 2 with the narrower prose width.
+    shapes = (("why", 6, 96, True), ("why", 6, 96, False),
+              ("name", 6, 96, False), ("category", 4, 96, False),
+              ("strategy", 0, 96, True),
+              ("mulligan", 2, edit._PROSE_WIDTH, True),
+              ("pilot", 0, 96, False))
+    for group, value in render_strings():
+        for key, indent, width, fold in shapes:
+            add(group, key, value, indent, width, fold)
+
+    # The fold point swept a column at a time, because being one column out is
+    # the failure a handful of examples would never show.
+    long_prose = ("Two mana on turn one, and it always has been: the single "
+                  "most played card in the format, the first thing every "
+                  "primer tells a newcomer to find, and the card this line "
+                  "exists to make room for -- which is why it is first.")
+    for width in range(20, 121):
+        for indent in (0, 2, 4, 6, 8):
+            add("width-sweep", "why", long_prose, indent, width, True)
+            add("width-sweep", "why", long_prose, indent, width, False)
+
+    # The same sweep over prose whose characters are wider in UTF-8 than they
+    # are in columns: a port counting bytes wraps early and only here.
+    unicode_prose = ("\u00c6ther \u2014 a rationale with \u00e9 and \u00fc and "
+                     "\u2014 em dashes \u2014 written long enough that the folder "
+                     "has to choose a break, and every one of those characters is "
+                     "more than a byte wide in UTF-8 while being exactly one "
+                     "column to Python.")
+    for width in range(24, 101, 4):
+        add("unicode-width", "why", unicode_prose, 6, width, True)
+
+    # The other two value shapes an edit writes.
+    for qty in (1, 2, 12, 13, 99, 100):
+        add("int", "qty", qty, 6, 96, False)
+    for bracket in range(1, 6):
+        add("int", "bracket", bracket, 0, 96, False)
+    for themes in ([], ["knights"], ["knights", "equipment", "voltron"],
+                   ["tokens", "lifegain"], ["combo"], ["aggro", "midrange"],
+                   ["no"], ["yes", "off"]):
+        add("list", "themes", themes, 0, 96, False)
+        add("list", "themes", themes, 2, 96, False)
+    for flag in (True, False):
+        add("bool", "shared", flag, 0, 96, False)
+
+    return out
+
+
+def render_render_cases() -> str:
+    return json.dumps(render_cases(), ensure_ascii=False, indent=1) + "\n"
+
+
+# --------------------------------------------------------- the activity log
+#
+# ADR 28's sentences. `describe` renders them once, at write time, so the CLI
+# and the deck panel cannot become two renderers of the same row in two
+# languages -- which means the Go port has to write the same sentence or the
+# panel's history changes wording the day a route flips.
+#
+# The schema travels with them: `app.db`'s DDL as the migration ladder leaves
+# it, so `go/internal/decklog`'s tests can build a real database in CI. Python
+# owns the ladder until Phase 8; this is a *reading* of what it produced, the
+# way `pool/schema.sql` is a reading of `cards/db.py`'s SCHEMA.
+
+def log_cases() -> list[dict[str, Any]]:
+    """Every shape `_commit` hands `describe`, and the sentence it gets back."""
+    from mtglab.decks import log
+
+    extras: list[dict[str, Any]] = [
+        {"added": "Sol Ring", "category": "ramp", "into": "cards"},
+        {"added": "Sol Ring", "category": "ramp", "into": "swap_board"},
+        {"added": "Sol Ring", "into": "cards"},
+        {"added": "Sol Ring"},
+        {"entombed": "Primeval Titan"},
+        {"entombed": ["Primeval Titan"]},
+        {"entombed": ["Primeval Titan", "Sol Ring"]},
+        {"entombed": ["a", "b", "c", "d", "e", "f"]},
+        {"entombed": ["a", "b", "c", "d", "e", "f", "g"]},
+        {"entombed": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]},
+        {"removed": "Rhystic Study"},
+        {"returned": "Gilded Lotus"},
+        {"exiled": "Gilded Lotus"},
+        {"swapped_out": "Primeval Titan", "swapped_in": "Cultivator Colossus"},
+        {"swapped_out": "Primeval Titan"},
+        # The rationale rides along and must never reach the sentence.
+        {"swapped_out": "Primeval Titan", "swapped_in": "Sol Ring",
+         "why": "A rationale that must not appear in any log line."},
+        {"note": "mulligan"},
+        {"card": "Sol Ring", "field": "why"},
+        {"card": "Sol Ring", "field": "qty"},
+        {"card": "Sol Ring", "field": "category"},
+        {"card": "Sol Ring", "field": "art"},
+        {"card": "Sol Ring", "field": ""},
+        {"card": "Sol Ring"},
+        {"field": "status", "value": "built"},
+        {"field": "stage", "value": "curated"},
+        {"field": "bracket", "value": 4},
+        {"field": "pilot", "value": "Aaron"},
+        {"field": "pilot", "value": ""},
+        {"field": "pilot", "value": None},
+        {"field": "pilot", "value": "   "},
+        {"field": "commander_art", "value": "0aae2e33-0000-4000-8000-000000000000"},
+        {"field": "commander_art", "value": ""},
+        {"field": "art", "value": "0aae2e33-0000-4000-8000-000000000000"},
+        {"field": "themes", "value": ["knights", "equipment", "voltron"]},
+        {"field": "themes", "value": []},
+        {"field": "themes", "value": ("aggro", "midrange")},
+        {"field": "newfangled", "value": "something"},
+        # Past forty characters the value is not printed, only named.
+        {"field": "pilot", "value": "x" * 41},
+        {"field": "pilot", "value": "x" * 40},
+        # The load-bearing fallback: an operation nobody taught it about.
+        {},
+        {"unheard_of": "yes"},
+    ]
+    out = []
+    for extra in extras:
+        action, summary = log.describe(extra)
+        # Tuples are a Python-only shape; the wire and the Go side see a list.
+        shown = {k: (list(v) if isinstance(v, tuple) else v)
+                 for k, v in extra.items()}
+        out.append({"extra": shown, "action": action, "summary": summary})
+    return out
+
+
+def render_log_cases() -> str:
+    return json.dumps(log_cases(), indent=1, ensure_ascii=False) + "\n"
+
+
+def render_app_schema() -> str:
+    """`app.db`'s DDL, as the migration ladder leaves it.
+
+    Read out of `sqlite_master` rather than transcribed, so it cannot drift
+    from the ladder that made it, and sorted so the file is stable.
+    `sqlite_%` names are excluded: `sqlite_sequence` is SQLite's own
+    bookkeeping for AUTOINCREMENT and it refuses to let anybody else create it.
+    """
+    from mtglab import config
+    from mtglab.auth import db
+    with tempfile.TemporaryDirectory() as tmp, \
+            config.use_paths(data_dir=Path(tmp)), db.connection() as con:
+        version = con.execute("PRAGMA user_version").fetchone()[0]
+        rows = con.execute(
+            "SELECT type, name, sql FROM sqlite_master"
+            " WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"
+            " ORDER BY type DESC, name").fetchall()
+    lines = [
+        "-- app.db, as `auth/db.py`'s migration ladder leaves it at schema",
+        f"-- version {version}. Written by `python tests/go_fixtures.py`; Python",
+        "-- owns the ladder until Phase 8 and this is a reading of what it made,",
+        "-- for the Go tests that need a real table in CI. Do not hand-edit.",
+        f"PRAGMA user_version = {version};",
+    ]
+    for row in rows:
+        lines.append(f"{row['sql']};")
+    return "\n".join(lines) + "\n"
+
+
+# ------------------------------------------------------- hand-written decks
+#
+# Every fixture above is what `Deck.dump` writes, and the six real decks are
+# not: they were typed by a person, and `edit.py` exists precisely because a
+# load-and-dump would reflow them. So the edit oracle also runs over two decks
+# written the way a person writes one -- section banners with blank lines
+# around them, a trailing comment on a scalar, `[]` for the empty lists, no
+# `stage:` key at all, a legacy `archetype:` waiting to be shadowed, and card
+# entries at an indent nobody assumed.
+#
+# This is not decoration. A mutation that made an entry stop owning the blank
+# line after it passed every dumped-deck case in the corpus and failed only
+# here: `Deck.dump` writes cards back to back, so the rule that keeps
+# Goreclaw's `# ---- RAMP 14` banner off the land above it had nothing to act
+# on until these existed.
+
+HANDWRITTEN = """\
+slug: handwritten
+name: Written By Hand
+status: built  # the cards are sleeved up
+archetype: midrange
+commander:
+  - Goreclaw, Terror of Qal Sisma
+bracket: 4
+strategy: >-
+  Cast the biggest thing that will still resolve, and then cast a bigger one.
+  The commander is the discount; everything else is the payoff.
+
+notes:
+  mulligan: >-
+    Keep any seven with two lands and a way to spend the third turn. Ship a
+    hand that cannot cast the commander by turn five.
+  pitfalls: >-
+    The deck folds to a wrath it cannot rebuild through, so hold one threat
+    back once the board is ahead.
+
+cards:
+
+  # ---- RAMP 2
+  - name: Sol Ring
+    category: ramp
+    why: >-
+      Two mana on turn one, and it always has been.
+
+  - name: Cultivator Colossus
+    category: ramp
+    why: >-
+      Draws the land drops the curve is built on.
+
+  # ---- THREATS 2
+  - name: Regal Behemoth
+    category: threat
+    why: >-
+      A monarch that also doubles the mana.
+
+  - name: Vorinclex, Voice of Hunger
+    category: threat
+    why: >-
+      The mana denial the deck wins through.
+
+  # ---- LANDS 95
+  - name: Forest
+    category: land
+    qty: 95
+    why: >-
+      Green, and there is nothing else to be.
+
+swap_board: []
+
+graveyard: []
+"""
+
+#: The same deck at a wider indent, with a card carrying overrides, so the key
+#: indent is read off the entry rather than assumed and `replace_card`'s two
+#: dropped keys have something to drop.
+#:
+#: The dash sits two columns left of the keys, which is the only spacing either
+#: editor can write: `_card_lines` re-attaches the dash by hand and lays the
+#: rest at the entry's key indent, so a deck typed `-   name:` -- three spaces
+#: -- produces invalid YAML from its own editor. Both runtimes catch that in
+#: verification and refuse, quoting their own parser as they do, which is the
+#: one refusal whose sentence the port cannot match; `TestABrokenParseRefuses`
+#: pins the behaviour and the reason.
+WIDE = """\
+slug: wide
+name: Wide Indentation
+status: theoretical
+stage: draft
+commander:
+    - Goreclaw, Terror of Qal Sisma
+themes:
+    - stompy
+    - big-mana
+cards:
+    - name: Sol Ring
+      category: ramp
+      scryfall_id: c3a4b2d1-1111-4222-8333-444455556666
+      mana_cost: "{1}"
+      why: >-
+        An override on each side, so a swap has both to drop.
+    - name: Regal Behemoth
+      category: threat
+      why: ''
+    - name: Forest
+      category: land
+      qty: 97
+      why: >-
+        Green, and there is nothing else to be.
+swap_board:
+    - name: Rhystic Study
+      category: card-advantage
+      why: >-
+        Waiting on a slot it will never get in mono-green.
+graveyard:
+    - name: Gilded Lotus
+      category: ramp
+      why: >-
+        Entombed: too slow for a deck that wants its mana on turn two.
+"""
+
+
+#: A deck whose keys do *not* sit two columns right of the dash, which is the
+#: only shape that proves the key indent is read off the entry rather than
+#: computed from it. `_card_lines` re-attaches the dash by hand and lays the
+#: rest at the key indent, so the operations that *write* a card entry cannot
+#: serve this deck at all -- they build invalid YAML, verification catches it,
+#: and both runtimes refuse. The ones that only rewrite a field or remove an
+#: entry serve it correctly, and they are what this fixture is here for.
+TIGHT = """\
+slug: tight
+name: Tight Dash
+status: built
+stage: curated
+commander:
+  - Goreclaw, Terror of Qal Sisma
+cards:
+  -  name: Sol Ring
+     category: ramp
+     why: >-
+       Two mana on turn one, and it always has been.
+  -  name: Regal Behemoth
+     category: threat
+     why: >-
+       A monarch that also doubles the mana.
+  -  name: Forest
+     category: land
+     qty: 97
+     why: >-
+       Green, and there is nothing else to be.
+"""
+
+
+def handwritten_decks() -> dict[str, str]:
+    """name -> deck text, written the way a person writes one."""
+    return {"handwritten": HANDWRITTEN, "wide": WIDE, "tight": TIGHT}
+
+
+# ------------------------------------------------------- the edit operations
+#
+# Phase 4's gate, in the plan's own words: "every operation applied by Go over
+# fixture decks yields byte-output Python's operation also yields". So this
+# runs the nine operations over the same fixture decks the gate uses, records
+# the resulting text -- or the refusal, which is half of what an edit
+# operation is -- and the Go tests must reproduce both.
+#
+# Steps chain: each applies to the previous step's output, which is how the
+# entomb/return round trip, the second burial, and the emptied-list cases get
+# reached at all. A refused step leaves the text where it was, so a refusal in
+# the middle of a chain is a real assertion rather than an abandoned case.
+
+def edit_steps(name: str, deck: Deck) -> list[list[dict[str, Any]]]:
+    """The chains to run over one fixture deck, as (op, kwargs) lists."""
+    cards = [c.name for c in deck.cards]
+    first, last = cards[0], cards[-1]
+    middle = cards[len(cards) // 2]
+    category = deck.cards[0].category
+    chains: list[list[dict[str, Any]]] = [
+        # Adding: into an existing category, into a new one, onto the swap
+        # board (which may be `[]` and have to be reopened), and with a
+        # quantity, which is the one key `_card_lines` writes conditionally.
+        [{"op": "add_card", "name": "Llanowar Reborn", "category": category,
+          "why": "Filed beside the cards it belongs with."},
+         {"op": "add_card", "name": "Rhystic Study", "category": "card-advantage",
+          "why": "A category this deck did not have, so it lands at the end."},
+         {"op": "add_card", "name": "Black Lotus", "category": "ramp",
+          "why": "Onto the board, not into the 99.", "list_key": "swap_board"},
+         {"op": "add_card", "name": "Snow-Covered Forest", "category": "land",
+          "why": "Several of them.", "qty": 4}],
+        # ... and every way adding is refused.
+        [{"op": "add_card", "name": first, "category": category, "why": "Twice."},
+         {"op": "add_card", "name": deck.commander[0], "category": "threat",
+          "why": "The commander is outside the 99."},
+         {"op": "add_card", "name": "", "category": "ramp", "why": "No name."},
+         {"op": "add_card", "name": "Mox Emerald", "category": "", "why": "No category."},
+         {"op": "add_card", "name": "Mox Jet", "category": "ramp", "why": "", },
+         {"op": "add_card", "name": "Mox Ruby", "category": "ramp", "why": "Zero.",
+          "qty": 0},
+         {"op": "add_card", "name": "Mox Pearl", "category": "ramp", "why": "Elsewhere.",
+          "list_key": "sideboard"}],
+        # Removing: the first entry, a middle one, the last one -- the three
+        # places the blank-line rule reads differently -- and a name that is
+        # not there.
+        [{"op": "remove_card", "name": first},
+         {"op": "remove_card", "name": last},
+         {"op": "remove_card", "name": middle},
+         {"op": "remove_card", "name": "Not In This Deck"}],
+        # The graveyard round trip: entomb, return, entomb twice, exile.
+        [{"op": "entomb_card", "name": first},
+         {"op": "return_card", "name": first},
+         {"op": "entomb_card", "name": first},
+         {"op": "entomb_card", "name": last},
+         {"op": "exile_card", "name": first},
+         {"op": "return_card", "name": last},
+         {"op": "return_card", "name": last},
+         {"op": "exile_card", "name": last}],
+        # A card's own fields, including the two that drop a key.
+        [{"op": "set_card_field", "name": first, "field": "category", "value": "utility"},
+         {"op": "set_card_field", "name": first, "field": "qty", "value": 3},
+         {"op": "set_card_field", "name": first, "field": "qty", "value": 1},
+         {"op": "set_card_field", "name": first, "field": "why",
+          "value": "A rewritten rationale, long enough that PyYAML has to fold "
+                   "it across more than one line and pick its own quoting."},
+         {"op": "set_card_field", "name": first, "field": "why", "value": "yes"},
+         {"op": "set_card_field", "name": first, "field": "art",
+          "value": "0aae2e33-0000-4000-8000-000000000000"},
+         {"op": "set_card_field", "name": first, "field": "art", "value": ""},
+         {"op": "set_card_field", "name": first, "field": "art", "value": "not-a-uuid"},
+         {"op": "set_card_field", "name": first, "field": "qty", "value": 0},
+         {"op": "set_card_field", "name": first, "field": "name", "value": "Nope"},
+         {"op": "set_card_field", "name": first, "field": "category", "value": "  "}],
+        # A swap: the operation the whole module was written for.
+        [{"op": "replace_card", "old_name": first, "new_name": "Mana Crypt",
+          "why": "Faster, and the damage is a cost this deck can pay."},
+         {"op": "replace_card", "old_name": "Mana Crypt", "new_name": "Mana Vault",
+          "why": "Moved as well as swapped.", "category": "utility"},
+         {"op": "replace_card", "old_name": "Mana Vault", "new_name": "Sol Ring",
+          "why": "   "},
+         {"op": "replace_card", "old_name": "Not Here", "new_name": "Sol Ring",
+          "why": "Missing."}],
+        # The deck's own fields.
+        [{"op": "set_deck_field", "field": "status", "value": "built"},
+         {"op": "set_deck_field", "field": "bracket", "value": 4},
+         {"op": "set_deck_field", "field": "pilot", "value": "Aaron"},
+         {"op": "set_deck_field", "field": "pilot", "value": ""},
+         {"op": "set_deck_field", "field": "commander_art",
+          "value": "0aae2e33-0000-4000-8000-000000000000"},
+         {"op": "set_deck_field", "field": "themes", "value": ["stompy", "ramp"]},
+         {"op": "set_deck_field", "field": "themes", "value": "stompy, midrange, stompy"},
+         {"op": "set_deck_field", "field": "themes", "value": []},
+         {"op": "set_deck_field", "field": "stage", "value": "draft"},
+         {"op": "set_deck_field", "field": "stage", "value": "curated"}],
+        # ... and every way a deck field is refused.
+        [{"op": "set_deck_field", "field": "archetype", "value": "combo"},
+         {"op": "set_deck_field", "field": "commander", "value": "Somebody Else"},
+         {"op": "set_deck_field", "field": "bracket", "value": 9},
+         {"op": "set_deck_field", "field": "bracket", "value": "four"},
+         {"op": "set_deck_field", "field": "status", "value": "shelved"},
+         {"op": "set_deck_field", "field": "pilot", "value": "x" * 41},
+         {"op": "set_deck_field", "field": "commander_art", "value": "nope"},
+         {"op": "set_deck_field", "field": "themes", "value": ["not-a-theme"]}],
+        # Notes, which are the only folded write and the only block the
+        # operation may have to create.
+        [{"op": "set_note", "key": "mulligan",
+          "value": "Keep any seven with two lands and something to do with them; "
+                   "ship a hand that cannot cast the commander by turn five."},
+         {"op": "set_note", "key": "mulligan", "value": "Shorter now."},
+         {"op": "set_note", "key": "politics",
+          "value": "Say nothing about the commander until it is already resolved."},
+         {"op": "set_note", "key": "weird",
+          "value": "colon: and # hash, plus braces {G}{W}"},
+         {"op": "set_note", "key": "", "value": "No key."},
+         {"op": "set_note", "key": "not a key", "value": "Spaces."},
+         {"op": "set_note", "key": "empty", "value": "   "}],
+    ]
+    if deck.swap_board:
+        chains.append([
+            {"op": "entomb_card", "name": deck.swap_board[0].name},
+            {"op": "remove_card", "name": deck.swap_board[0].name},
+            {"op": "add_card", "name": deck.swap_board[0].name,
+             "category": "equipment", "why": "Back on the board.",
+             "list_key": "swap_board"}])
+    if deck.graveyard:
+        buried = deck.graveyard[0].name
+        chains.append([
+            {"op": "return_card", "name": buried},
+            {"op": "entomb_card", "name": buried},
+            {"op": "exile_card", "name": buried},
+            {"op": "exile_card", "name": buried}])
+    return chains
+
+
+def render_edit_cases() -> str:
+    """Every operation over every fixture deck, with Python's exact answer."""
+    from mtglab.decks import edit
+
+    ops = {"replace_card": edit.replace_card, "add_card": edit.add_card,
+           "remove_card": edit.remove_card, "entomb_card": edit.entomb_card,
+           "return_card": edit.return_card, "exile_card": edit.exile_card,
+           "set_card_field": edit.set_card_field,
+           "set_deck_field": edit.set_deck_field, "set_note": edit.set_note}
+
+    sources: dict[str, str] = {name: deck.dump()
+                              for name, deck in gate_cases().items()}
+    sources.update(handwritten_decks())
+
+    decks: dict[str, str] = {}
+    cases: list[dict[str, Any]] = []
+    for name, text in sources.items():
+        deck = Deck.from_text(text, slug=name)
+        decks[name] = text
+        for n, chain in enumerate(edit_steps(name, deck)):
+            steps: list[dict[str, Any]] = []
+            current = text
+            for step in chain:
+                kwargs = {k: v for k, v in step.items() if k != "op"}
+                record: dict[str, Any] = {"op": step["op"], "args": kwargs}
+                try:
+                    current = ops[step["op"]](current, **kwargs)
+                    record["ok"] = True
+                    record["want"] = current
+                except edit.EditFailed as exc:
+                    record["ok"] = False
+                    record["error"] = str(exc)
+                steps.append(record)
+            cases.append({"deck": name, "chain": n, "steps": steps})
+    return json.dumps({"decks": decks, "cases": cases},
+                      indent=1, ensure_ascii=False) + "\n"
+
+
 def write() -> None:
     TESTDATA.mkdir(parents=True, exist_ok=True)
     text, parsed = render()
@@ -286,6 +907,16 @@ def write() -> None:
     SCHEMA_PATH.write_text(render_schema(), encoding="utf-8")
     TINY_POOL_PATH.write_text(render_tiny_pool(), encoding="utf-8")
     print(f"wrote {SCHEMA_PATH}\nwrote {TINY_POOL_PATH}")
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    (LOG_DIR / "describe.json").write_text(render_log_cases(), encoding="utf-8")
+    (LOG_DIR / "app_schema.sql").write_text(render_app_schema(), encoding="utf-8")
+    print(f"wrote the log oracle and app.db's schema into {LOG_DIR}")
+    EDITS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    EDITS_PATH.write_text(render_edit_cases(), encoding="utf-8")
+    print(f"wrote {EDITS_PATH}")
+    RENDER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    RENDER_PATH.write_text(render_render_cases(), encoding="utf-8")
+    print(f"wrote {len(render_cases())} render cases into {RENDER_PATH}")
     GATE_DIR.mkdir(parents=True, exist_ok=True)
     for name, body in render_gate_cases().items():
         (GATE_DIR / name).write_text(body, encoding="utf-8")

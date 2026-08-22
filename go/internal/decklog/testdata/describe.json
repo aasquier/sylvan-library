@@ -1,0 +1,356 @@
+[
+ {
+  "extra": {
+   "added": "Sol Ring",
+   "category": "ramp",
+   "into": "cards"
+  },
+  "action": "add",
+  "summary": "added Sol Ring as ramp"
+ },
+ {
+  "extra": {
+   "added": "Sol Ring",
+   "category": "ramp",
+   "into": "swap_board"
+  },
+  "action": "add",
+  "summary": "added Sol Ring as ramp on the swap board"
+ },
+ {
+  "extra": {
+   "added": "Sol Ring",
+   "into": "cards"
+  },
+  "action": "add",
+  "summary": "added Sol Ring"
+ },
+ {
+  "extra": {
+   "added": "Sol Ring"
+  },
+  "action": "add",
+  "summary": "added Sol Ring"
+ },
+ {
+  "extra": {
+   "entombed": "Primeval Titan"
+  },
+  "action": "entomb",
+  "summary": "entombed Primeval Titan"
+ },
+ {
+  "extra": {
+   "entombed": [
+    "Primeval Titan"
+   ]
+  },
+  "action": "entomb",
+  "summary": "entombed Primeval Titan"
+ },
+ {
+  "extra": {
+   "entombed": [
+    "Primeval Titan",
+    "Sol Ring"
+   ]
+  },
+  "action": "entomb",
+  "summary": "entombed Primeval Titan, Sol Ring"
+ },
+ {
+  "extra": {
+   "entombed": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f"
+   ]
+  },
+  "action": "entomb",
+  "summary": "entombed a, b, c, d, e, f"
+ },
+ {
+  "extra": {
+   "entombed": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g"
+   ]
+  },
+  "action": "entomb",
+  "summary": "entombed 7 cards: a, b, c, d, e, f, and 1 more"
+ },
+ {
+  "extra": {
+   "entombed": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l"
+   ]
+  },
+  "action": "entomb",
+  "summary": "entombed 12 cards: a, b, c, d, e, f, and 6 more"
+ },
+ {
+  "extra": {
+   "removed": "Rhystic Study"
+  },
+  "action": "remove",
+  "summary": "removed Rhystic Study from the swap board"
+ },
+ {
+  "extra": {
+   "returned": "Gilded Lotus"
+  },
+  "action": "return",
+  "summary": "returned Gilded Lotus from the graveyard"
+ },
+ {
+  "extra": {
+   "exiled": "Gilded Lotus"
+  },
+  "action": "exile",
+  "summary": "exiled Gilded Lotus from the graveyard"
+ },
+ {
+  "extra": {
+   "swapped_out": "Primeval Titan",
+   "swapped_in": "Cultivator Colossus"
+  },
+  "action": "swap",
+  "summary": "swapped Primeval Titan out for Cultivator Colossus"
+ },
+ {
+  "extra": {
+   "swapped_out": "Primeval Titan"
+  },
+  "action": "swap",
+  "summary": "swapped Primeval Titan out for another card"
+ },
+ {
+  "extra": {
+   "swapped_out": "Primeval Titan",
+   "swapped_in": "Sol Ring",
+   "why": "A rationale that must not appear in any log line."
+  },
+  "action": "swap",
+  "summary": "swapped Primeval Titan out for Sol Ring"
+ },
+ {
+  "extra": {
+   "note": "mulligan"
+  },
+  "action": "note",
+  "summary": "changed the mulligan note"
+ },
+ {
+  "extra": {
+   "card": "Sol Ring",
+   "field": "why"
+  },
+  "action": "set-card",
+  "summary": "changed the rationale for Sol Ring"
+ },
+ {
+  "extra": {
+   "card": "Sol Ring",
+   "field": "qty"
+  },
+  "action": "set-card",
+  "summary": "changed the quantity for Sol Ring"
+ },
+ {
+  "extra": {
+   "card": "Sol Ring",
+   "field": "category"
+  },
+  "action": "set-card",
+  "summary": "changed the category for Sol Ring"
+ },
+ {
+  "extra": {
+   "card": "Sol Ring",
+   "field": "art"
+  },
+  "action": "set-card",
+  "summary": "changed the art for Sol Ring"
+ },
+ {
+  "extra": {
+   "card": "Sol Ring",
+   "field": ""
+  },
+  "action": "set-card",
+  "summary": "changed the entry for Sol Ring"
+ },
+ {
+  "extra": {
+   "card": "Sol Ring"
+  },
+  "action": "set-card",
+  "summary": "changed the entry for Sol Ring"
+ },
+ {
+  "extra": {
+   "field": "status",
+   "value": "built"
+  },
+  "action": "set-deck",
+  "summary": "set status to built"
+ },
+ {
+  "extra": {
+   "field": "stage",
+   "value": "curated"
+  },
+  "action": "set-deck",
+  "summary": "set stage to curated"
+ },
+ {
+  "extra": {
+   "field": "bracket",
+   "value": 4
+  },
+  "action": "set-deck",
+  "summary": "set bracket to 4"
+ },
+ {
+  "extra": {
+   "field": "pilot",
+   "value": "Aaron"
+  },
+  "action": "set-deck",
+  "summary": "set pilot to Aaron"
+ },
+ {
+  "extra": {
+   "field": "pilot",
+   "value": ""
+  },
+  "action": "set-deck",
+  "summary": "cleared the pilot"
+ },
+ {
+  "extra": {
+   "field": "pilot",
+   "value": null
+  },
+  "action": "set-deck",
+  "summary": "cleared the pilot"
+ },
+ {
+  "extra": {
+   "field": "pilot",
+   "value": "   "
+  },
+  "action": "set-deck",
+  "summary": "cleared the pilot"
+ },
+ {
+  "extra": {
+   "field": "commander_art",
+   "value": "0aae2e33-0000-4000-8000-000000000000"
+  },
+  "action": "set-deck",
+  "summary": "changed the commander art"
+ },
+ {
+  "extra": {
+   "field": "commander_art",
+   "value": ""
+  },
+  "action": "set-deck",
+  "summary": "cleared the commander art"
+ },
+ {
+  "extra": {
+   "field": "art",
+   "value": "0aae2e33-0000-4000-8000-000000000000"
+  },
+  "action": "set-deck",
+  "summary": "changed the art"
+ },
+ {
+  "extra": {
+   "field": "themes",
+   "value": [
+    "knights",
+    "equipment",
+    "voltron"
+   ]
+  },
+  "action": "set-deck",
+  "summary": "set themes to knights, equipment, voltron"
+ },
+ {
+  "extra": {
+   "field": "themes",
+   "value": []
+  },
+  "action": "set-deck",
+  "summary": "cleared the themes"
+ },
+ {
+  "extra": {
+   "field": "themes",
+   "value": [
+    "aggro",
+    "midrange"
+   ]
+  },
+  "action": "set-deck",
+  "summary": "set themes to aggro, midrange"
+ },
+ {
+  "extra": {
+   "field": "newfangled",
+   "value": "something"
+  },
+  "action": "set-deck",
+  "summary": "set newfangled to something"
+ },
+ {
+  "extra": {
+   "field": "pilot",
+   "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  "action": "set-deck",
+  "summary": "changed the pilot"
+ },
+ {
+  "extra": {
+   "field": "pilot",
+   "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  "action": "set-deck",
+  "summary": "set pilot to xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+ },
+ {
+  "extra": {},
+  "action": "edit",
+  "summary": "edited the deck"
+ },
+ {
+  "extra": {
+   "unheard_of": "yes"
+  },
+  "action": "edit",
+  "summary": "edited the deck"
+ }
+]
