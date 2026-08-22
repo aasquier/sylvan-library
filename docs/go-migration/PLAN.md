@@ -11,7 +11,10 @@ draft). **Phases 0 to 3 are done and Phase 4 is in progress** — the edit
 engine, the nine editing routes, the four lifecycle routes and the accounts
 engine have flipped, and what is left of it is the account routes and the
 artifacts rebuild; the port board in §10 is the frontier, and it now also
-records what is **not** Phase 4's despite living under `/api/admin`. Written by Claude from a
+records what is **not** Phase 4's despite living under `/api/admin`.
+**Phase 5's tail risk was pulled forward and closed on 2026-08-22**:
+`pyrand` is bit-exact (§5 item 3), so the one item this plan said *"does not
+price at all"* now has an actual beside it. Written by Claude from a
 measured read of the tree (see [BASELINE.md](BASELINE.md)); the judgment
 calls were argued, then ruled.
 
@@ -226,6 +229,40 @@ suite read. The port gets four instruments, cheapest first:
    bounds) plus re-pinned digests — but exactness is the plan, and it is
    ENGINEERING §1's differential-testing dream with a better punchline than
    Rust-vs-Python ever offered.
+
+   **Landed 2026-08-22, ahead of its phase, and exact.** `go/internal/pyrand`
+   is CPython's `random.Random` bit for bit — the seeding path included, which
+   is the half that is easy to get plausibly wrong: `random.Random(n)` runs
+   `abs(n)` through `init_by_array` over little-endian 32-bit words, so it is
+   not `init_genrand` and the key grows a word at 2**32 and again at 2**64.
+   It was pulled forward precisely because it was the item this document said
+   *"does not price at all"*; §7's Phase 5 paragraph and §11's risk 3 are
+   rewritten accordingly, and §10 carries its row.
+
+   **The fallback was not taken and is no longer needed.** What is proved is
+   the generator, not yet Tier 1: the engine is still Phase 5's own work, so
+   `REFERENCE_DIGEST` is not reproduced here. What replaces it is stronger
+   than a spot check and was possible because of a fact worth recording —
+   **Tier 1 consumes randomness through exactly one call**, `rng.shuffle(deck)`
+   in `simulate_game`, and through nothing else. So a run's whole entropy
+   budget is a sequence of shuffles of a known length from one seeded
+   generator, and `tests/go_fixtures.py` reads that sequence off a *real*
+   reference run by instrumentation that delegates to CPython (and re-checks
+   `REFERENCE_DIGEST` while instrumented, refusing to write a corpus if it
+   moved). The Go test replays it: **all 99,274 draws of the reference run,
+   in order, through the real `Shuffle`.** When Phase 5 ports the engine, the
+   randomness under it is already a checked fact rather than a hope.
+
+   The corpus is `go/internal/pyrand/testdata/draws.json` — 20 seeds
+   (including 0, negatives, and both sides of 2**32 and 2**64), the raw
+   `genrand_uint32` stream recorded separately from every method that consumes
+   it, `random()` compared as `Float64bits` rather than to a tolerance, and
+   `getrandbits` at every width from 1 to 64. It is **byte-identical under
+   CPython 3.11.15 and 3.12.13** — verified by rendering it under both, and
+   held that way continuously, since nothing in the file records which
+   interpreter wrote it and CI runs the drift test on each leg of the matrix.
+   `sample()`, which this item names, turned out to have **no caller at all**
+   and was not written.
 4. **The closed forms match to float tolerance.** `sim/karsten.py` and
    `sim/curve.py` are `math.comb` hypergeometrics and expectations — no
    sampling; Go must agree to within an epsilon pinned per function.
@@ -623,9 +660,22 @@ created. Both flip behind the jobs registry, which is Phase 5. §10's board
 carries the detail; the lesson is the general one this plan keeps
 re-learning — **a prefix is not a family.**
 
-**Phase 5 — Jobs and the simulator** *(~1–1½ days; **re-priced ~½–1 day**
-— the line-driven half prices at Phase 3's rate; the `pyrand` digest chase
-does not price at all, and is the whole width of the band).* The registry
+**Phase 5 — Jobs and the simulator** *(~1–1½ days; re-priced ~½–1 day, and
+**re-priced again 2026-08-22 to ~½ day** — the band's whole width was the
+`pyrand` digest chase, which said it did not price at all; it has now been
+run and it priced. Measured off the clock: first read of the plan and the
+consumers 05:44 UTC, three green Go gates 06:10 — **about 25 minutes** for
+the package, its 444KB differential corpus, the fuzz target and the
+99,274-draw replay of the reference run's stream. Two things about that
+number. It is **not** evidence the rest of Phase 5 is fast: the chase was
+the risk, and what is left is line-driven work that prices at Phase 3's
+rate. And it was 25 minutes **because the research was cheap, not because
+the reproduction was easy** — the seeding path, `getrandbits`'s word order
+and `_randbelow`'s rejection are each a place a plausible implementation is
+wrong, and all three were caught by having CPython's own answers on hand
+rather than by being careful. The corpus is the whole story; a session that
+had written the same package without one would still be looking for the
+first of them.).* The registry
 (pools → semaphores; `key=` dedupe per owner in one locked step;
 born-finished jobs; the FORGE single-lane rule), then `pyrand`, then Tier 1
 against `REFERENCE_DIGEST`, karsten + curve to tolerance, the mulligan grid,
@@ -708,11 +758,20 @@ Ordered by expected pain, each with the mitigation already in the plan:
    decks; the surgery itself never serializes; worst case the oracle parse
    gets a strictness shim, and the refusal path (edit refused, nothing
    written) already fails safe.
-3. **`pyrand` exactness stalls** (an undocumented CPython corner).
-   *Mitigation:* MT19937 + shuffle + `_randbelow` are specified and stable
-   across CPython 3.11/3.12 (the digest already proves cross-version
-   stability); fallback to statistical equivalence is pre-declared with its
-   own gate so it cannot happen silently.
+3. ~~**`pyrand` exactness stalls** (an undocumented CPython corner).~~
+   **Closed 2026-08-22 — the risk did not arrive, and it was pulled forward
+   on purpose so that sentence could be written early.** `go/internal/pyrand`
+   reproduces `random.Random` bit for bit, held to 20 seeds of CPython's own
+   answers and to the reference run's full 99,274-draw stream; the
+   statistical fallback was never reached and is withdrawn. There was no
+   undocumented corner: every difficulty was documented and *easy to skip* —
+   the `abs()`-then-`init_by_array` seeding, `getrandbits`'s least-
+   significant-word-first fill, `_randbelow`'s `n.bit_length()` rejection
+   (not `(n-1)`), and `shuffle` walking downwards. Each is a place where a
+   reasonable implementation is wrong and still looks random, which is the
+   general lesson: **the hazard here was never obscurity, it was
+   plausibility**, and the only instrument that finds plausibility is a
+   differential corpus.
 4. **CGO friction** — go-duckdb on macOS 12 Intel dev, arm64 CI, image size.
    *Mitigation:* earliest spike in the plan; native runners already build
    both arches; if this Mac cannot build, dev falls back to the container/CI
@@ -777,6 +836,7 @@ There is more than one Claude in this house now. Rules for the duration:
   | `POST /api/auth/login`, `logout`, `reset`, `claim`, `claim/preview`, `GET /api/auth/me`; `GET` and `POST /api/admin/users`, `PATCH /api/admin/users/{username}`, `POST .../reset`, `DELETE .../sessions` | **go** | `go/internal/api`, 2026-08-22 — the seventh family, and the last of Phase 4 |
   | `DELETE /api/admin/users/{username}` | python | **blocked behind the jobs registry, not deferred by choice.** Deleting an account also calls `jobs.forget_owner`, and `api/jobs.py` holds its jobs **in memory in the uvicorn process** — which the door cannot reach. The reason it must not be skipped is arithmetic rather than tidiness: `users.id` is `INTEGER PRIMARY KEY` without `AUTOINCREMENT`, so SQLite re-issues a deleted account's rowid, and jobs left keyed on that integer would be handed to whoever is created next. The response says `jobs_dropped`, so a Go handler could not even report an honest number. It flips with the jobs family |
   | `/api/admin/stats/*` (the six), `api/traffic.py`, `api/flymetrics.py` | python | **not part of Phase 4, despite the prefix.** `adminstats.py` is coupled to two families that have not moved: `stats/system` reads the same in-memory job registry *and* `_rss()`, the process's own resident size — which is the worse of the two, because a Go handler would answer it *successfully* with the door's RSS and the number would keep rendering while quietly changing meaning; and `stats/claude` reads `claude/prices.py` and `claude/tiers.py`, so porting it now would drag slices of `claude/` across ahead of its family, which §7's "a route family moves whole" forbids. It flips behind the jobs registry and the Claude family |
+  | CPython's `random.Random` — MT19937, `init_by_array` seeding, `random()`, `getrandbits`, `_randbelow`, `randrange`, `shuffle`, `choice` | **go** | `go/internal/pyrand`, 2026-08-22 — **Phase 5's named tail risk, pulled forward and closed** (§5 item 3, §11 risk 3). A library, not a route: nothing calls it yet and nothing flipped. Held to CPython by `testdata/draws.json` (20 seeds, the raw word stream recorded apart from every consumer, `random()` compared as bits) plus a replay of the reference run's full 99,274-draw stream, so Tier 1's randomness is a checked fact before the engine that consumes it exists. `sample()` had no caller and was not written |
   | everything else under `/api` — `api/` (the jobs, the Claude routes, `/api/health`, the upcoming sets), `decks/` (the wheel), `sim/`, `claude/`, `mana.py` (the solver), `tarot.py`, `cli.py` | python | proxied to uvicorn on loopback |
   | `animist/`, `cardmotion` build, `bench/`, `mutate/` | python, permanently | ADR 38 decision 1 |
 - **Flips are single PRs** with the contract run attached, deployed and

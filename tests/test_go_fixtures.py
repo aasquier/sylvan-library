@@ -100,6 +100,7 @@ _ORACLES = [
     ("the decklist grammar", "DECKLIST_PATH", "render_decklist_cases"),
     ("the importer", "IMPORT_PATH", "render_import_cases"),
     ("the five deliverables", "ARTIFACTS_PATH", "render_artifact_cases"),
+    ("the draw corpus", "PYRAND_PATH", "render_pyrand_cases"),
 ]
 
 
@@ -415,3 +416,77 @@ def test_the_gate_cases_exercise_what_they_claim():
         assert code in codes, f"no gate case emits {code}"
     assert any(n.endswith(".stats.json") for n in rendered)
     assert "mono-green.suggestions.json" in rendered
+
+
+# ------------------------------------------------------------------ pyrand
+
+def test_the_draw_corpus_covers_every_shape_it_claims_to():
+    """A corpus that quietly lost a section still passes every case left in it.
+
+    Each assertion below names a way `random.Random` can be reproduced
+    wrongly, and the seeding breadth is the load-bearing half: the key
+    `init_by_array` is given grows a 32-bit word at 2**32 and again at 2**64,
+    so a corpus of small seeds would prove a port correct for exactly the
+    seeds it was shown.
+    """
+    cases = go_fixtures.pyrand_cases()
+
+    seeds = {int(c["seed"]) for c in cases["seeds"]}
+    assert 0 in seeds, "the zero seed takes its own branch (bits == 0)"
+    assert any(s < 0 for s in seeds), "a negative seed is what proves the abs()"
+    assert any(2**32 < s < 2**64 for s in seeds), "no two-word key"
+    assert any(s > 2**64 for s in seeds), "no key past what an int64 can hold"
+    for pair in ((-7, 7), (-20260810, 20260810)):
+        assert set(pair) <= seeds, f"{pair} must both be present to compare"
+
+    first = cases["seeds"][0]
+    assert len(first["words"]) > 624, (
+        "the raw stream must cross MT19937's 624-word regeneration boundary, "
+        "or a wrong twist is invisible")
+    for section in ("words", "randoms", "bits_mixed", "below", "ranges",
+                    "shuffles", "repeated_99", "choices"):
+        assert first[section], f"the {section} section is empty"
+
+    widths = {c["k"] for c in cases["bits_sweep"]}
+    assert widths == set(range(1, 65)), "the getrandbits sweep has a hole"
+
+    # The bounds that make `_randbelow` reject at very different rates: at a
+    # power of two it never rejects, one past it rejects almost half the time.
+    bounds = {d["n"] for d in first["below"]}
+    assert {1, 2, 3, 2**32, 2**32 + 1} <= bounds
+
+    # Every `randrange` form, including a negative step -- the only place the
+    # count is a floor division of a negative quotient.
+    steps = {c["step"] for c in first["ranges"]}
+    assert None in steps and any(s is not None and s < 0 for s in steps)
+
+    # And the division itself, which no *successful* `randrange` can pin.
+    assert any(c["want"] != int(c["a"] / c["b"]) for c in cases["floor_div"]), (
+        "no floor-division case disagrees with truncation, so the Go test "
+        "over them proves nothing")
+
+
+def test_the_recorded_tier1_stream_is_the_reference_runs_own():
+    """The instrument that reads Tier 1's draws off a real run is inert.
+
+    `pyrand_tier1_stream` patches `random.Random` to a recording subclass that
+    delegates every draw to CPython, so the run under it should be the same
+    run. "Should be" is why this test exists: the recorded digest is checked
+    against the pin in `tests/test_determinism.py`, so an instrument that
+    consumed a single extra draw would be caught here rather than baked into a
+    corpus the Go side then matches perfectly and wrongly.
+    """
+    from test_determinism import REFERENCE_DIGEST
+
+    tier1 = go_fixtures.pyrand_tier1_stream()
+    assert tier1["reference_digest"] == REFERENCE_DIGEST, (
+        "recording the reference run changed it; the corpus would pin a "
+        "stream Tier 1 does not actually consume")
+
+    assert tier1["generators"], "the reference run built no generators"
+    for generator in tier1["generators"]:
+        assert generator["draws"] > 0
+        assert generator["lengths"], "a generator shuffled nothing"
+        assert len(generator["digest"]) == 64
+    total = sum(g["draws"] for g in tier1["generators"])
+    assert total > 10_000, f"the whole reference run drew only {total} times"

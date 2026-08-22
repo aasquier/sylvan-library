@@ -49,7 +49,10 @@ encoding; it is not a card pool redistribution (ADR 6, rule 5).
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
+import random
+import struct
 import sys
 import tempfile
 from datetime import date
@@ -1683,6 +1686,393 @@ def write() -> None:
     CRYPTO_PATH.parent.mkdir(parents=True, exist_ok=True)
     CRYPTO_PATH.write_text(render_crypto_cases(), encoding="utf-8")
     print(f"wrote the Argon2id and token-hash oracle into {CRYPTO_PATH}")
+    PYRAND_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PYRAND_PATH.write_text(render_pyrand_cases(), encoding="utf-8")
+    print(f"wrote the draw corpus for {len(PYRAND_SEEDS)} seeds into {PYRAND_PATH}")
+
+
+# ------------------------------------------------------------------ pyrand
+#
+# CPython's `random.Random`, reproduced in Go (PLAN section 5 item 3), and the
+# corpus that says the reproduction is exact rather than merely plausible.
+#
+# Three things make this corpus different from every other one in this file.
+#
+# **It records the generator, not only its consumers.** `getrandbits(32)` is
+# one `genrand_uint32()` word and nothing else -- CPython's fast path is
+# `genrand_uint32(self) >> (32 - k)` -- so `words` below is the raw Mersenne
+# Twister stream, the only place a seeding or twist bug can be seen *as* a
+# seeding or twist bug. Every other section consumes that stream through a
+# method, and a mismatch there with `words` matching localises the fault to
+# the consumer. That distinction is the whole reason this corpus has a layer
+# nothing in the app calls directly.
+#
+# **The floats are compared as bits.** `random()` is
+# `(a >> 5) * 67108864.0 + (b >> 6)) * (1.0 / 9007199254740992.0)` over two
+# words, in that order; every value it can produce is exactly representable,
+# so a tolerance would be hiding something rather than allowing for something.
+# They are stored as `math.Float64bits`.
+#
+# **The seeds are strings.** `random.Random(n)` takes an int of any size and
+# splits `abs(n)` into little-endian 32-bit words for `init_by_array`, so the
+# number of words -- and therefore the whole stream -- changes at 2**32 and
+# again at 2**64. A JSON number would not survive the round trip, and the
+# seeds past 2**64 are exactly the ones worth having.
+#
+# Everything here is stdlib CPython and takes no pool, no network and no deck.
+
+#: Where the Go module reads the draw corpus from.
+PYRAND_PATH = ROOT / "go" / "internal" / "pyrand" / "testdata" / "draws.json"
+
+#: The seeds the corpus is generated over, chosen so that every branch of
+#: CPython's seeding path is taken by something: zero (`bits == 0`, so one
+#: word of nothing), the small ints real callers pass, both sides of 2**32
+#: and of 2**64 (where `keyused` grows), a seed past 2**96, and negatives --
+#: which `random_seed` runs through `abs()`, so -7 and 7 are the same stream
+#: and the corpus proves it rather than asserting it.
+PYRAND_SEEDS: tuple[int, ...] = (
+    0, 1, 2, 7, 42, 99, 4096, 20260810, 2147483647,
+    4294967295, 4294967296, 4294967297,
+    18446744073709551615, 18446744073709551616, 18446744073709551617,
+    79228162514264337593543950337,
+    -1, -7, -20260810, -4294967296,
+)
+
+#: The seeds that get the full-width sections. The rest get a narrower slice
+#: of the same shapes: seeding breadth is what the wide set buys, and it is
+#: bought by `words`, which every seed gets in full.
+PYRAND_CORE_SEEDS: tuple[int, ...] = (0, 1, 20260810, 4294967296,
+                                      18446744073709551616, -7)
+
+#: How many raw words each seed records. 700 crosses MT19937's 624-word
+#: regeneration boundary, which is where a wrong twist first shows and where a
+#: generator that is merely *seeded* right stops being right.
+PYRAND_WORDS = 700
+
+#: Every bit width `getrandbits` is asked for. 1 through 64 covers the fast
+#: path (k <= 32, one word), the two-word path, and the boundary at exactly
+#: 32 and 64 where the last word's `r >>= (32 - k)` is and is not applied.
+PYRAND_BITS = tuple(range(1, 65))
+
+#: A width sequence drawn from one generator, so the corpus also says the
+#: state threads correctly between calls of *different* widths -- a bug that
+#: a per-width sweep from a fresh generator cannot see.
+PYRAND_BITS_MIXED = (1, 3, 7, 8, 15, 16, 17, 31, 32, 33, 53, 64, 5, 2, 64, 32)
+
+#: The bounds `_randbelow` is asked for. Powers of two and their neighbours,
+#: because `k = n.bit_length()` makes the rejection rate jump there: at
+#: n = 2**k the loop never rejects, and at n = 2**k + 1 it rejects almost
+#: half the time. A port that gets the rejection wrong agrees on the first
+#: draw and diverges on the tenth. 1 is in the list on purpose -- it always
+#: returns 0 and is never free, because `getrandbits(1)` is redrawn until it
+#: comes up 0.
+PYRAND_BELOW = (
+    1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65,
+    99, 100, 255, 256, 257, 1000, 4096, 1000000,
+    2147483647, 2147483648, 4294967295, 4294967296, 4294967297,
+    9007199254740992, 4611686018427387904,
+)
+
+#: The `randrange` forms, as `(start, stop, step)` with `None` for absent.
+#: Only the one-argument form has a caller in the served package (tarot's
+#: `randrange(2**31)`, the wheel's three) -- the rest are here because they
+#: are the same `_randbelow` reached by different arithmetic, and arithmetic
+#: is cheap to get wrong in a language with different integer division.
+PYRAND_RANGES: tuple[tuple[int, int | None, int | None], ...] = (
+    (10, None, None), (2, None, None), (1, None, None),
+    (10, 20, None), (-5, 5, None), (-20, -10, None), (1, 2, None),
+    (0, 100, 7), (0, 10, 3), (5, 6, 1), (-100, -1, 3),
+    (100, 0, -7), (10, -10, -3), (0, -1, -1),
+)
+
+#: Deck-sized and degenerate lengths for `shuffle`. 0 and 1 draw nothing at
+#: all (the loop is `reversed(range(1, len(x)))`); 99 is a Commander deck,
+#: which is the length Tier 1 actually shuffles.
+PYRAND_SHUFFLES = (0, 1, 2, 3, 4, 5, 7, 13, 52, 60, 99, 100, 101, 250)
+
+#: What a seed outside the core set still gets shuffled.
+PYRAND_SHUFFLES_NARROW = (13, 99)
+
+
+def _pyrand_seed_case(seed: int, core: bool) -> dict[str, Any]:
+    """Every draw one seed produces, each section from its own generator.
+
+    A fresh `random.Random` per section is deliberate: it makes each section
+    independently checkable, so a Go test that fails one of them has not been
+    put out of step by an earlier one.
+    """
+    case: dict[str, Any] = {"seed": str(seed)}
+
+    #: The raw stream. `getrandbits(32)` is exactly `genrand_uint32()`.
+    rng = random.Random(seed)
+    case["words"] = [rng.getrandbits(32) for _ in range(PYRAND_WORDS)]
+
+    rng = random.Random(seed)
+    case["randoms"] = [_float_bits(rng.random())
+                       for _ in range(120 if core else 40)]
+
+    rng = random.Random(seed)
+    case["bits_mixed"] = [
+        {"k": k, "value": rng.getrandbits(k)}
+        for _ in range(3) for k in PYRAND_BITS_MIXED
+    ]
+
+    #: `randrange(n)` is `_randbelow(n)` for n > 0 and reaches it through the
+    #: public door, so the corpus never touches a private name.
+    rng = random.Random(seed)
+    case["below"] = [
+        {"n": n, "value": rng.randrange(n)}
+        for _ in range(3 if core else 1) for n in PYRAND_BELOW
+    ]
+
+    rng = random.Random(seed)
+    ranges: list[dict[str, Any]] = []
+    for _ in range(3 if core else 1):
+        for start, stop, step in PYRAND_RANGES:
+            if stop is None:
+                value = rng.randrange(start)
+            elif step is None:
+                value = rng.randrange(start, stop)
+            else:
+                value = rng.randrange(start, stop, step)
+            ranges.append({"start": start, "stop": stop, "step": step,
+                           "value": value})
+    case["ranges"] = ranges
+
+    lengths = PYRAND_SHUFFLES if core else PYRAND_SHUFFLES_NARROW
+    case["shuffles"] = []
+    for n in lengths:
+        rng = random.Random(seed)
+        order = list(range(n))
+        rng.shuffle(order)
+        case["shuffles"].append({"n": n, "order": order})
+
+    #: Ten shuffles from *one* generator, which is Tier 1's exact shape: one
+    #: `random.Random(seed)` per run, one shuffle per mulligan, all games.
+    rng = random.Random(seed)
+    repeated: list[list[int]] = []
+    for _ in range(10):
+        order = list(range(99))
+        rng.shuffle(order)
+        repeated.append(order)
+    case["repeated_99"] = repeated
+
+    rng = random.Random(seed)
+    case["choices"] = [rng.choice(range(7)) for _ in range(24)]
+
+    return case
+
+
+def _float_bits(value: float) -> int:
+    """`math.Float64bits`, so a double is compared as the bits it is."""
+    return int(struct.unpack("<Q", struct.pack("<d", value))[0])
+
+
+def pyrand_bits_sweep() -> list[dict[str, Any]]:
+    """`getrandbits(k)` for every k in 1..64, each from a fresh generator.
+
+    Separated from the per-seed sections because what it isolates is the
+    *width* arithmetic -- how many words k consumes and which one gets
+    shifted -- and mixing that with state threading would leave a failure
+    ambiguous between the two.
+    """
+    out: list[dict[str, Any]] = []
+    for seed in PYRAND_CORE_SEEDS:
+        for k in PYRAND_BITS:
+            rng = random.Random(seed)
+            out.append({"seed": str(seed), "k": k,
+                        "values": [rng.getrandbits(k) for _ in range(4)]})
+    return out
+
+
+class _Recording(random.Random):
+    """A `random.Random` that keeps a note of everything it was asked.
+
+    Tier 1 is not ported here -- that is Phase 5's own job -- so the strongest
+    honest claim this corpus can make about `REFERENCE_DIGEST` is that the Go
+    generator produces the *stream the digest is computed over*. This is the
+    instrument that reads that stream off a real reference run.
+
+    It works because of a fact about the engine worth writing down: Tier 1
+    consumes randomness through exactly one call, `rng.shuffle(deck)` in
+    `simulate_game`, and through nothing else. So the whole entropy budget of
+    a run is a sequence of shuffles of a known length, and a shuffle of length
+    L is exactly `_randbelow(i + 1)` for i from L-1 down to 1. Record the
+    lengths and the returns and you have described the run's randomness
+    completely, without needing a single card fact.
+
+    Both overrides delegate: `_randbelow` returns what CPython's
+    `_randbelow_with_getrandbits` returns, so the instrument consumes nothing
+    and changes nothing. `render_pyrand_cases` proves that rather than
+    claiming it -- it re-runs the digest under instrumentation and refuses to
+    write a corpus if `REFERENCE_DIGEST` moved.
+    """
+
+    def __init__(self, x: Any = None) -> None:
+        super().__init__(x)
+        self.pyrand_seed = x
+        self.pyrand_lengths: list[int] = []
+        self.pyrand_draws: list[tuple[int, int]] = []
+        _RECORDED.append(self)
+
+    def _randbelow(self, n: int) -> int:
+        value = int(super()._randbelow(n))  # type: ignore[misc]
+        self.pyrand_draws.append((n, value))
+        return value
+
+    def shuffle(self, x: Any) -> None:
+        self.pyrand_lengths.append(len(x))
+        super().shuffle(x)
+
+
+#: Every `_Recording` built while the patch is in place, in construction
+#: order -- which is the order `reference_outputs()` builds them in.
+_RECORDED: list[_Recording] = []
+
+#: How many draws either end of a generator's stream are recorded verbatim.
+#: A digest is opaque, and this repository has already learned once that an
+#: opaque golden can stay stable while the thing under it stops happening
+#: (`test_the_reference_run_is_the_shape_the_digest_assumes`). These are the
+#: shape beside the digest: a Go run that matches them and misses the digest
+#: has diverged somewhere in the middle, which is a different bug from one
+#: that never agreed at all.
+PYRAND_TIER1_SAMPLE = 8
+
+
+def _draw_digest(draws: list[tuple[int, int]]) -> str:
+    """sha256 over a draw sequence, defined so Go can compute it too.
+
+    One draw per line as `n:value`, decimal, `\\n`-separated with a trailing
+    newline. `n` is in the hash as well as the return, so the digest pins the
+    *order the shuffle loop asks in* -- `reversed(range(1, len(x)))` -- and
+    not only what came back.
+    """
+    text = "".join(f"{n}:{value}\n" for n, value in draws)
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def pyrand_tier1_stream() -> dict[str, Any]:
+    """The draw sequence `REFERENCE_DIGEST` is computed over.
+
+    Runs `determinism_probe.reference_outputs()` with `random.Random` patched
+    to the recorder above, then reports, per generator the run built: the seed
+    it was given, the lengths it was asked to shuffle in order, how many draws
+    that came to, the first and last few verbatim, and a digest of all of
+    them.
+
+    The patch is global for the duration and restored in a `finally`, because
+    `engine.run` builds its generator itself -- there is no seam to inject one
+    through, and inventing one for a test would be changing the thing under
+    measurement.
+    """
+    import determinism_probe as probe
+
+    original = random.Random
+    _RECORDED.clear()
+    try:
+        random.Random = _Recording  # type: ignore[misc]
+        digest = probe.reference_digest()
+    finally:
+        random.Random = original  # type: ignore[misc]
+
+    generators = []
+    for rng in _RECORDED:
+        draws = rng.pyrand_draws
+        generators.append({
+            "seed": str(rng.pyrand_seed),
+            "lengths": list(rng.pyrand_lengths),
+            "draws": len(draws),
+            "first": [{"n": n, "value": v}
+                      for n, v in draws[:PYRAND_TIER1_SAMPLE]],
+            "last": [{"n": n, "value": v}
+                     for n, v in draws[-PYRAND_TIER1_SAMPLE:]],
+            "digest": _draw_digest(draws),
+        })
+    return {
+        "reference_digest": digest,
+        "seed": str(probe.SEED),
+        "games": probe.GAMES,
+        "turns": probe.TURNS,
+        "sweep_counts": list(probe.SWEEP_COUNTS),
+        "generators": generators,
+    }
+
+
+def _compact_json(obj: Any, indent: int = 0) -> str:
+    """JSON that keeps a draw sequence on one line.
+
+    `indent=1` -- what every other corpus in this file uses -- would put each
+    of the 14,000 words on a line of its own. One line per *sequence* is both
+    smaller and the granularity a diff wants: a changed stream shows as one
+    changed line naming its seed.
+    """
+    pad = " " * indent
+    if isinstance(obj, dict):
+        if not obj:
+            return "{}"
+        if all(v is None or isinstance(v, (bool, int, float, str))
+               for v in obj.values()):
+            return json.dumps(obj, ensure_ascii=False)
+        body = ",\n".join(f"{pad} {json.dumps(k)}: {_compact_json(v, indent + 1)}"
+                          for k, v in obj.items())
+        return "{\n" + body + "\n" + pad + "}"
+    if isinstance(obj, list):
+        if not obj:
+            return "[]"
+        if all(isinstance(v, int) and not isinstance(v, bool) for v in obj):
+            return json.dumps(obj)
+        body = ",\n".join(f"{pad} {_compact_json(v, indent + 1)}" for v in obj)
+        return "[\n" + body + "\n" + pad + "]"
+    return json.dumps(obj, ensure_ascii=False)
+
+
+def pyrand_floor_div() -> list[dict[str, int]]:
+    """Python's `//` over the numerators and divisors `randrange` builds.
+
+    `randrange` counts its steps with floor division, and Go's `/` truncates
+    towards zero. The two disagree only for a quotient that is negative and
+    inexact -- and, worked through, every such case describes an empty range,
+    which both implementations then refuse. So no *successful* `randrange`
+    can tell the two apart, and the corpus above cannot pin the difference:
+    a Go port that truncated would pass every case in it.
+
+    That is an argument, and this file's standing rule is that an argument
+    about equivalence is a thing to check rather than a thing to believe. So
+    the division itself gets a corpus, taken from Python, covering the signs
+    the argument turns on. It is the only section here that records something
+    no caller can reach -- deliberately, because unreachable-by-argument is
+    exactly the claim that rots.
+    """
+    out: list[dict[str, int]] = []
+    for a in (-13, -12, -7, -3, -1, 0, 1, 3, 7, 12, 13, 100, -100):
+        for b in (-7, -3, -2, -1, 1, 2, 3, 7):
+            out.append({"a": a, "b": b, "want": a // b})
+    return out
+
+
+def pyrand_cases() -> dict[str, Any]:
+    """The whole corpus, as the Go module reads it."""
+    return {
+        "note": ("Generated from CPython's own random.Random by "
+                 "`python tests/go_fixtures.py`. Seeds are strings because "
+                 "they outgrow a JSON number; floats are Float64bits."),
+        "cross_version": ("These bytes must be identical on every CPython this "
+                          "project supports. Nothing here records which one "
+                          "wrote them, deliberately: the drift test in "
+                          "tests/test_go_fixtures.py re-renders the corpus and "
+                          "compares, and CI runs it on each version in the "
+                          "matrix -- so cross-version stability is re-proven on "
+                          "every push rather than asserted once in a comment."),
+        "seeds": [_pyrand_seed_case(seed, seed in PYRAND_CORE_SEEDS)
+                  for seed in PYRAND_SEEDS],
+        "bits_sweep": pyrand_bits_sweep(),
+        "floor_div": pyrand_floor_div(),
+        "tier1": pyrand_tier1_stream(),
+    }
+
+
+def render_pyrand_cases() -> str:
+    return _compact_json(pyrand_cases()) + "\n"
 
 
 if __name__ == "__main__":
