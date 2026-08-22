@@ -1123,8 +1123,41 @@ go/                       the Go module (ADR 38; module path
                           validate, a tool round trip refuses and recovers, and
                           the breakpoints pay -- 82 uncached input tokens for a
                           two-turn conversation over a 2,791-token prefix.
-                          **Still Python: the seven modes and every Claude
-                          route** -- two engines crossed, nothing flipped.
+                          **Then the modes began, 2026-08-22, and flipped
+                          nothing either.** All SEVEN mode definitions cross at
+                          once as generated data -- prompt, tool set and
+                          response schema -- including the modes Go has no
+                          orchestration for, because a definition is data and
+                          the code that assembles a brief is the mode's own.
+                          The schemas are the sharpest case for generating
+                          rather than transcribing: **ADR 25's slot argument
+                          has no defence/verdict/summary field and ADR 34's
+                          scan has none for a card name**, and those ABSENCES
+                          are the features -- exactly what a hand-copy drops
+                          with nothing looking wrong. Both are pinned by their
+                          own test. **The generator DISCOVERS the modes rather
+                          than listing them**, and that is the fifth time this
+                          file's own warning has been earned: the first version
+                          grepped for `= Mode(` and silently missed scan.py,
+                          which spells it `modes.Mode(...)` -- seven became
+                          six, and ADR 34's absence would have crossed as the
+                          absence of the whole mode.
+                          internal/claude/interview.go is the first mode's
+                          orchestration: the brief, `OnlyQuestions` (drop
+                          anything not ending in `?`, and RETURN THE COUNT,
+                          because "it dropped two" is how a prompt that has
+                          started editorialising becomes visible), and the
+                          report. Thirteen mutations die against it. **It found
+                          a Go-only bug**: the brief is serialised into the
+                          prompt, so its key order is part of the bytes the
+                          model reads -- and a nested block held as a bare
+                          []wire.KV marshals as an array of
+                          {"Key":..,"Value":..} structs, because MarshalOrdered
+                          only recurses through wire.OrderedMap. Valid JSON,
+                          still answered, from a model handed nonsense. **Still
+                          Python: the other six modes' orchestration and every
+                          Claude route** -- three engines crossed, nothing
+                          flipped.
                           The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
