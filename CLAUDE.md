@@ -544,10 +544,18 @@ go/                       the Go module (ADR 38; module path
                           `sort_keys=False` makes the file's order the
                           payload's. Dump refused a deck carrying notes until
                           that landed, which is the expiry that refusal named
-                          for itself. The rebuild ROUTE is its own flip, and
-                          stays outside the activity log when it lands -- a
-                          build derives files from a deck rather than editing
-                          one. **The accounts engine followed the
+                          for itself -- and ordering them **fixed a live
+                          regression**: the deck page's Notes tab renders the
+                          payload's order unsorted, so from #226 (v159) until
+                          #233 a deliberate reading order rendered
+                          alphabetised on the deployed instance. **Then the
+                          rebuild route, its own flip**: POST .../artifacts
+                          in internal/api/artifacts.go over the Sources'
+                          fifth write verb, a PLAIN route because 70-83ms was
+                          measured, and NOT through `commit` -- a build
+                          derives files from a deck rather than editing one,
+                          so ADR 28 has nothing to record.
+                          **The accounts engine followed the
                           same day and also flipped nothing**: internal/auth
                           grew the whole of `mtglab/auth` beside its read
                           side -- accounts, single-use tokens, the
