@@ -27,6 +27,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/shelves"
 )
@@ -51,6 +53,15 @@ type Config struct {
 	// Shelves are the three runtime caches under the data directory; nil is
 	// an instance with none, where every shelf route is a 404.
 	Shelves *shelves.Shelves
+	// AppWriteDB is the read-write `app.db` handle the SQL deck tier's writes
+	// use, or nil. Separate from AppDB because that one is opened `mode=ro`,
+	// and a write through it would fail at the driver rather than at the gate
+	// that is supposed to answer.
+	AppWriteDB *sql.DB
+	// Recorder writes ADR 28's activity log, or nil on an instance with no
+	// `app.db` -- where an edit is recorded as a warning and still succeeds,
+	// because the deck write has already happened by then.
+	Recorder *decklog.Recorder
 }
 
 // API holds the ported routes' dependencies.
@@ -58,10 +69,12 @@ type API struct {
 	log        *slog.Logger
 	pool       *pool.Pool
 	db         *sql.DB
+	writeDB    *sql.DB
 	dbPath     string
 	decksDir   string
 	adminEmail string
 	shelves    *shelves.Shelves
+	log28      *decklog.Recorder
 
 	lazy   sync.Mutex
 	lazyDB *sql.DB
@@ -72,8 +85,22 @@ func New(cfg Config) *API {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	return &API{log: cfg.Logger, pool: cfg.Pool, db: cfg.AppDB, dbPath: cfg.AppDBPath,
-		decksDir: cfg.DecksDir, adminEmail: cfg.AdminEmail, shelves: cfg.Shelves}
+	return &API{log: cfg.Logger, pool: cfg.Pool, db: cfg.AppDB, writeDB: cfg.AppWriteDB,
+		dbPath: cfg.AppDBPath, decksDir: cfg.DecksDir, adminEmail: cfg.AdminEmail,
+		shelves: cfg.Shelves, log28: cfg.Recorder}
+}
+
+// recorder is the activity log's writer. Nil is a real state -- an instance
+// with no `app.db` -- and `Record` on a nil Recorder warns and returns, which
+// is what makes "the log never fails an edit" true at this level too.
+func (a *API) recorder() *decklog.Recorder { return a.log28 }
+
+// actor is who is asking, as the log records them: a username, or empty for
+// whoever is at this machine (the CLI, and the app with auth off). **Never an
+// email address**, which must not reach a log line at all (CLAUDE.md rule 5)
+// -- and cannot, because the scope carries only the handle.
+func (a *API) actor(ctx context.Context) string {
+	return auth.ScopeFrom(ctx).Username
 }
 
 // Route is one ported route: a method, a path template in the syntax
@@ -125,6 +152,20 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/ocr/{name}", Handler: a.ocrAsset},
 		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}", Handler: a.artMotionStatus},
 		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}/{filename}", Handler: a.artMotionFile},
+		// The deck writes (Phase 4's first flip): the nine editing routes,
+		// every one of them going out through `commit` -- so the gate's
+		// verdict and ADR 28's log entry are inherited rather than
+		// remembered. A deck the caller cannot see is a 404 before
+		// writability is asked; one they can see but not edit is a 403.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/swap", Handler: a.swapCard},
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/cards", Handler: a.addCard},
+		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}/cards/{name}", Handler: a.removeCard},
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/entomb", Handler: a.entombCards},
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/graveyard/{name}/return", Handler: a.returnCard},
+		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}/graveyard/{name}", Handler: a.exileCard},
+		{Method: http.MethodPatch, Pattern: "/api/decks/{owner}/{slug}/cards/{name}", Handler: a.patchCard},
+		{Method: http.MethodPatch, Pattern: "/api/decks/{owner}/{slug}", Handler: a.patchDeck},
+		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/notes/{key}", Handler: a.setNote},
 	}
 }
 

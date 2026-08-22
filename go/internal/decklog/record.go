@@ -74,6 +74,16 @@ func NewRecorder(path string, logger *slog.Logger) (*Recorder, error) {
 	return &Recorder{db: db, log: logger}, nil
 }
 
+// DB is the read-write handle, shared with the SQL deck tier so one process
+// keeps one writer to `app.db` rather than two pools racing for its write
+// lock. Nil on a Recorder that never opened one.
+func (r *Recorder) DB() *sql.DB {
+	if r == nil {
+		return nil
+	}
+	return r.db
+}
+
 // Close releases the handle.
 func (r *Recorder) Close() error {
 	if r == nil || r.db == nil {

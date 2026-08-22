@@ -22,7 +22,8 @@ type Library struct {
 	scope      auth.Scope
 	decksDir   string
 	appDB      *sql.DB
-	maintainer string // the maintainer's handle, or "" when there is none
+	appWriteDB *sql.DB // nil when nothing may write app.db here
+	maintainer string  // the maintainer's handle, or "" when there is none
 }
 
 // Resolver is what a Library needs from the process: the decks root, the
@@ -30,6 +31,11 @@ type Library struct {
 type Resolver struct {
 	DecksDir string
 	AppDB    *sql.DB
+	// AppWriteDB is the read-write app.db handle the SQL tier's writes use,
+	// or nil. Separate from AppDB because the read handle is opened
+	// `mode=ro` and a write through it would fail at the driver rather than
+	// at the gate that is supposed to answer.
+	AppWriteDB *sql.DB
 	// Maintainer resolves `MTGLAB_ADMIN_EMAIL` to a username through app.db
 	// (`auth/bootstrap.py:maintainer_username`), or "" when unconfigured or
 	// unknown. Called only when the caller is authenticated: with auth off
@@ -40,7 +46,8 @@ type Resolver struct {
 
 // For builds the caller's Library.
 func (r Resolver) For(ctx context.Context, scope auth.Scope) (*Library, error) {
-	lib := &Library{scope: scope, decksDir: r.DecksDir, appDB: r.AppDB}
+	lib := &Library{scope: scope, decksDir: r.DecksDir, appDB: r.AppDB,
+		appWriteDB: r.AppWriteDB}
 	if scope.Authenticated && r.Maintainer != nil {
 		m, err := r.Maintainer(ctx)
 		if err != nil {
@@ -119,9 +126,9 @@ func (l *Library) SourceFor(ctx context.Context, owner string) (Source, error) {
 		return nil, ErrNotFound{Slug: owner}
 	}
 	if mine {
-		return NewSQLSource(l.appDB, *ownerID, true, false), nil
+		return NewSQLSource(l.appDB, l.appWriteDB, *ownerID, true, false), nil
 	}
-	return NewSQLSource(l.appDB, *ownerID, false, true), nil
+	return NewSQLSource(l.appDB, nil, *ownerID, false, true), nil
 }
 
 // ownerID is `_owner_id`: `users.get(owner)`, case-insensitively (the column
@@ -152,7 +159,7 @@ func (l *Library) Mine() (Source, error) {
 	if l.scope.UserID == 0 {
 		return nil, ErrNotFound{Slug: "no account"}
 	}
-	return NewSQLSource(l.appDB, l.scope.UserID, true, false), nil
+	return NewSQLSource(l.appDB, l.appWriteDB, l.scope.UserID, true, false), nil
 }
 
 // Owned is one library the caller may read, with the segment it is shown

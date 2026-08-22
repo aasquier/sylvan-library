@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -24,7 +25,16 @@ func call(t *testing.T, a *API, method, target, body string) (int, map[string]an
 // callCtx is call with a caller on the context (the deck tests sign in).
 func callCtx(t *testing.T, a *API, ctx context.Context, method, target, body string) (int, map[string]any, []byte) {
 	t.Helper()
-	path := strings.SplitN(target, "?", 2)[0]
+	// Parsed rather than split on "?", so the path is *decoded* the way the
+	// door decodes it: the door matches on `r.URL.Path`, so a card called
+	// `Llanowar Reborn` arrives as one segment with a space in it, and a
+	// harness that matched the raw form would hand the handler a name no deck
+	// contains.
+	asked, err := url.Parse(target)
+	if err != nil {
+		t.Fatalf("bad target %q: %v", target, err)
+	}
+	path := asked.Path
 	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
 	var found *Route
 	values := map[string]string{}

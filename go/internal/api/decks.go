@@ -62,7 +62,7 @@ func (a *API) appDB() *sql.DB {
 // library is `api/deps.py:library`: every deck this caller may reach.
 func (a *API) library(ctx context.Context) (*library.Library, error) {
 	db := a.appDB()
-	resolver := library.Resolver{DecksDir: a.decksDir, AppDB: db,
+	resolver := library.Resolver{DecksDir: a.decksDir, AppDB: db, AppWriteDB: a.writeDB,
 		Maintainer: func(ctx context.Context) (string, error) {
 			return library.MaintainerUsername(ctx, db, a.adminEmail)
 		}}

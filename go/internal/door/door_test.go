@@ -275,7 +275,12 @@ func TestWithAuthOffNothingIsRefused(t *testing.T) {
 
 func TestTheProxyPassesTheRequestThroughFaithfully(t *testing.T) {
 	srv := build(t, true, fakeResolver{})
-	req, _ := http.NewRequest("POST", srv.URL+"/api/decks/local/mono-green/swap?dry=1&q=a%20b", strings.NewReader(`{"x":1}`))
+	// A POST on a deck path that Python still owns. It was `.../swap` until
+	// Phase 4 flipped the writes, and the swap-shaped choice is deliberate:
+	// this test wants segments, a query and a body, and the interview has all
+	// three. When the Claude surfaces move (Phase 6) it will want moving
+	// again -- which is the test noticing a flip, not the test being fragile.
+	req, _ := http.NewRequest("POST", srv.URL+"/api/decks/local/mono-green/interview?dry=1&q=a%20b", strings.NewReader(`{"x":1}`))
 	req.AddCookie(&http.Cookie{Name: CookieName, Value: "alice"})
 	req.Header.Set("X-Forwarded-For", "1.2.3.4") // a client picking its own bucket
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -289,7 +294,7 @@ func TestTheProxyPassesTheRequestThroughFaithfully(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&echo); err != nil {
 		t.Fatal(err)
 	}
-	if echo["path"] != "/api/decks/local/mono-green/swap" || echo["query"] != "dry=1&q=a%20b" ||
+	if echo["path"] != "/api/decks/local/mono-green/interview" || echo["query"] != "dry=1&q=a%20b" ||
 		echo["method"] != "POST" || echo["body"] != `{"x":1}` {
 		t.Fatalf("the upstream saw %v", echo)
 	}
