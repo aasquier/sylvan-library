@@ -640,7 +640,18 @@ go/                       the Go module (ADR 38; module path
                           -- sized from GOMAXPROCS (8 on this Mac, 1 on a
                           shared-cpu-1x, a Config knob rather than a
                           constant) where Python ran ONE worker because
-                          Tier 1 is GIL-bound. NET stays at two and FORGE at
+                          Tier 1 is GIL-bound. **The dividend is BANKED, not
+                          realised**: `nproc` on the instance answers 1
+                          (measured 2026-08-22), so the deployed lane is
+                          exactly as wide as Python's one worker until the
+                          machine is scaled -- and the comment that used to
+                          explain the sizing was wrong, crediting Go 1.25's
+                          cgroup-quota reader for a number it never
+                          computes. A Fly machine is a 1-vCPU Firecracker
+                          microVM on cgroup v1 with every controller at the
+                          root, so there is no `cpu.max` to read, GOMAXPROCS
+                          falls back to NumCPU, and the two agree. NET stays
+                          at two and FORGE at
                           one, because neither of those bounds is a fact
                           about the machine: two is what a Claude call costs
                           per run, one is the shared `.dck` directory. The
@@ -747,7 +758,20 @@ go/                       the Go module (ADR 38; module path
                           corpus stays byte-identical on both legs of the
                           matrix. That is the same trap the closed forms hit in
                           `curve.py`, found twice in one day from opposite
-                          directions. The contract
+                          directions.
+                          **The two generic job routes did NOT follow the
+                          registry** (examined 2026-08-22): GET /api/jobs and
+                          GET /api/jobs/{job_id} own no state -- they are the
+                          VIEW over a registry the eight job-submitting
+                          families still write from the uvicorn process, and
+                          a registry is per-process, so a Go handler would
+                          answer an empty list and a 404 for every id the app
+                          hands out. The rule that fell out: **a route can
+                          only flip when the state it reads has flipped, so a
+                          view flips last, not first** -- "it is only a read"
+                          is exactly backwards here. api_test.go's
+                          TestTheGenericJobRoutesAreStillPythons is the
+                          tripwire. The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
                           lives on the instance's volume, and a checkout —
