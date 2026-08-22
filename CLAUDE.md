@@ -1071,10 +1071,60 @@ go/                       the Go module (ADR 38; module path
                           names the full route, plus a typed identifier check
                           that catches an aliased import and an interface
                           method while correctly ignoring a same-named local.
-                          Five deliberate violations were driven before it
-                          was trusted. **Still Python: the pipe (converse),
-                          the seven modes and every Claude route** -- the
-                          engine crossed, nothing flipped.
+                          Five deliberate violations were driven before it was
+                          trusted. **Then the pipe, 2026-08-22, and it flipped
+                          nothing either**: internal/claude's client.go,
+                          mode.go and converse.go are client.py and modes.py,
+                          and `anthropic-sdk-go` joins the module with them.
+                          The three behaviours that are contract rather than
+                          detail all cross -- the TWO cache breakpoints (one
+                          fixed on the system block, which covers the tools
+                          because tools render first; one MOVING onto the
+                          newest tool result, moved rather than added since
+                          markers cap at four), the container ride-along on
+                          every turn after a server tool has run, and
+                          **pause_turn RESUMED and never returned**, which is
+                          the Forge-with-96-cards failure wearing a different
+                          hat. It is the one Phase 6 lane with **no corpus,
+                          deliberately**: all three claims are properties of
+                          the JSON that goes on the wire rather than of any
+                          value `Converse` returns, so a corpus over `Turn`
+                          would be blind to every one of them --
+                          `tier1.Number`'s lesson, one phase later. The loop is
+                          driven instead against a scripted API through the
+                          real `Connect()` (the SDK honours ANTHROPIC_BASE_URL,
+                          so no production seam was added to test it), and the
+                          assertions are on the request bodies it kept;
+                          thirteen mutations die against them. **The finding to
+                          carry is the SDK's `ExtraFields`**: novel keys are
+                          appended in Go's randomised map order, while a key
+                          shadowing a struct field is substituted in place --
+                          so carrying the tool schema through it re-renders the
+                          tools block on every request and, since tools render
+                          first, voids the whole prompt cache silently and for
+                          free. Measured: one novel key is one ordering, two
+                          are two. The schema goes through the typed fields
+                          with exactly one, and the test asserts the COUNT as
+                          well as the bytes, because the count is what fails
+                          deterministically. Two smaller divergences were fixed
+                          in passing -- the tools package now says which Python
+                          class each recoverable error stands for, which
+                          exposed that Go's deck refusal read `no deck 'x'`
+                          where Python's `DeckNotFound(slug)` stringifies to
+                          the **bare slug**; and the stance is validated before
+                          the first turn, because `_scope_note` raises a
+                          KeyError in Python where a Go map answers "" and the
+                          mode would go out with no scope paragraph at all.
+                          `sdk_installed()` has no analogue here -- the SDK is
+                          linked in, not an optional extra -- so `Available()`
+                          is the credential question alone. **Proved on the
+                          real wire** by an opt-in live test
+                          (MTGLAB_LIVE_CLAUDE=1, skipped in CI): schemas
+                          validate, a tool round trip refuses and recovers, and
+                          the breakpoints pay -- 82 uncached input tokens for a
+                          two-turn conversation over a 2,791-token prefix.
+                          **Still Python: the seven modes and every Claude
+                          route** -- two engines crossed, nothing flipped.
                           The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY

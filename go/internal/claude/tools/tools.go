@@ -84,11 +84,40 @@ type ErrNotAllowed struct{ Msg string }
 
 func (e *ErrNotAllowed) Error() string { return e.Msg }
 
+// PyName is the Python class this error stands for.
+//
+// `converse` hands a recoverable tool failure back to the model as
+// `<ClassName>: <message>`, which is `f"{type(exc).__name__}: {exc}"` in
+// Python. The name therefore reaches the model and has to be Python's, not
+// Go's -- and declaring it on the error is what makes "this failure is
+// recoverable" a property of the error rather than a list `converse` keeps.
+// An error type without this method is a fault the loop refuses to paper over.
+func (e *ErrNotAllowed) PyName() string { return "ToolNotAllowed" }
+
 // ErrArgumentsRejected is arguments that do not match the schema, checked
 // before dispatch.
 type ErrArgumentsRejected struct{ Msg string }
 
 func (e *ErrArgumentsRejected) Error() string { return e.Msg }
+
+// PyName is the Python class this error stands for. See ErrNotAllowed.PyName.
+func (e *ErrArgumentsRejected) PyName() string { return "ToolArgumentsRejected" }
+
+// ErrDeckNotFound is `decks.source.DeckNotFound`: the slug named no deck.
+//
+// **Its message is the bare slug**, which looks wrong until you read the
+// Python: `raise DeckNotFound(slug)` puts nothing else in the exception, so
+// `str(exc)` is the slug alone and the model is handed `DeckNotFound: gyome`.
+// The name still reaches the model -- which is the whole of what the refusal
+// owes it, since the recovery is to call `list_decks` and ask again -- and
+// keeping the two runtimes' words identical is worth more than a prettier
+// sentence in one of them.
+type ErrDeckNotFound struct{ Slug string }
+
+func (e *ErrDeckNotFound) Error() string { return e.Slug }
+
+// PyName is the Python class this error stands for. See ErrNotAllowed.PyName.
+func (e *ErrDeckNotFound) PyName() string { return "DeckNotFound" }
 
 var registry map[string]*Tool
 

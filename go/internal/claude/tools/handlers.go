@@ -60,10 +60,11 @@ func conn(deps Deps) *pool.Conn {
 
 // deckFor resolves the `slug` argument to a deck, or refuses by name.
 //
-// The refusal reads as "no deck 'x'" rather than as a stack trace, because it
-// is handed back to the model as a tool result: the model's recovery is to
-// call `list_decks` and ask again, and it can only do that if it is told which
-// name failed.
+// The refusal names the slug rather than being a stack trace, because it is
+// handed back to the model as a tool result: the model's recovery is to call
+// `list_decks` and ask again, and it can only do that if it is told which name
+// failed. `converse` prefixes the class name, so what the model reads is
+// `DeckNotFound: gyome` -- see ErrDeckNotFound for why the message is bare.
 func deckFor(ctx context.Context, deps Deps, args map[string]any) (deckread.Source, string, *deck.Deck, error) {
 	src, err := source(deps)
 	if err != nil {
@@ -72,7 +73,7 @@ func deckFor(ctx context.Context, deps Deps, args map[string]any) (deckread.Sour
 	slug, _ := args["slug"].(string)
 	d, err := src.Get(ctx, slug)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("no deck %s", pyRepr(slug))
+		return nil, "", nil, &ErrDeckNotFound{Slug: slug}
 	}
 	return src, slug, d, nil
 }
