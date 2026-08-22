@@ -11,18 +11,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aasquier/sylvan-library/go/internal/artifacts"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/deckedit"
 )
 
 // The write side of a Source, Phase 4's addition to the read-only tiers.
 //
-// Four verbs, and they arrived in two flips on purpose. `WriteText` came with
-// the nine editing routes; `Create`, `Delete` and `SetShared` came with the
-// lifecycle, because an update and a create have opposite safety requirements
-// -- an update to a deck that has vanished is a bug, a create over a deck that
-// exists destroys somebody's work -- and a method that exists but refuses is a
-// method somebody wires up.
+// Five verbs, and they arrived in three flips on purpose. `WriteText` came
+// with the nine editing routes; `Create`, `Delete` and `SetShared` came with
+// the lifecycle, because an update and a create have opposite safety
+// requirements -- an update to a deck that has vanished is a bug, a create
+// over a deck that exists destroys somebody's work -- and a method that exists
+// but refuses is a method somebody wires up. `WriteArtifacts` came with the
+// rebuild, for the same reason again: it is the only write here that does not
+// touch `deck.yaml` at all.
 //
 // **`Delete` returns where the deck went, and that is the protocol's
 // requirement rather than a nicety.** A tier that can only answer "yes" has
@@ -84,6 +87,17 @@ type Writer interface {
 	// tiers keep this fact in different places -- `deck.yaml` here, a column
 	// there -- and a caller should not have to know which.
 	SetShared(ctx context.Context, slug string, shared bool) error
+	// WriteArtifacts stores a build's output and says what was stored.
+	//
+	// Rendered text rather than a deck, because generating and storing are
+	// different jobs and only one of them is a Source's (`artifacts.RenderAll`).
+	// The mapping is stored **whole**, snapshot included: `Deliverables`
+	// governs what may be *read*, not what a build may write, and the baseline
+	// is part of the build.
+	//
+	// Names are returned rather than paths -- the SQL tier has none, and no
+	// caller needs one. ErrNotFound or ErrReadOnly.
+	WriteArtifacts(ctx context.Context, slug string, files artifacts.Files) ([]string, error)
 }
 
 // WriterFor is how a handler asks a Source for its write half. A Source that
@@ -162,6 +176,29 @@ func writeAtomically(path, text string) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
+}
+
+// WriteArtifacts writes a build into `<root>/<slug>/artifacts/`.
+//
+// Writability first, ahead of the deck's own existence, which is the order
+// `FileDeckSource._writable_or_raise` establishes and the reason it gives: a
+// caller who may not write gets the same answer whether or not the deck is
+// there, so no sequence of refused builds maps out the library. The route
+// above has already resolved the deck, so this ordering is never what a client
+// sees -- it is what the tier promises on its own.
+//
+// `artifacts.Store` rather than a loop, so this tier and `mtglab decks build`
+// cannot disagree about what a rebuild leaves behind. They did until
+// 2026-08-21, over a stale `swaps.md`.
+func (f *FileSource) WriteArtifacts(_ context.Context, slug string, files artifacts.Files) ([]string, error) {
+	if !f.writable {
+		return nil, ErrReadOnly{Slug: slug}
+	}
+	dir, err := f.artifactDir(slug) // ErrNotFound for a deck that is not there
+	if err != nil {
+		return nil, err
+	}
+	return artifacts.Store(files, dir)
 }
 
 // Create writes `<root>/<slug>/deck.yaml`, refusing to overwrite one.
@@ -426,6 +463,60 @@ func (s *SQLSource) SetShared(ctx context.Context, slug string, shared bool) err
 	return nil
 }
 
+// WriteArtifacts replaces this deck's rows in `user_deck_artifacts`.
+//
+// Deleted then inserted, in one transaction, so a rebuild leaves exactly what
+// this build produced -- the same pruning `artifacts.Store` does to a
+// directory, and for the same reason: a `swaps.md` from an older build
+// describes a diff that no longer exists. **Only `Deliverables` are swept**,
+// so the snapshot survives a build that writes no swap list, as it must.
+//
+// One transaction is doing real work here, unlike the single-statement writes
+// above: a failure between the sweep and the insert would leave the deck with
+// no artifacts at all, which is a worse answer than either the old set or the
+// new one.
+func (s *SQLSource) WriteArtifacts(ctx context.Context, slug string, files artifacts.Files) ([]string, error) {
+	if !s.writable || s.write == nil {
+		return nil, ErrReadOnly{Slug: slug}
+	}
+	r, err := s.row(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := s.write.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build %q: %w", slug, err)
+	}
+	defer func() { _ = tx.Rollback() }() // a no-op once Commit has succeeded
+
+	for _, name := range Deliverables {
+		if files.Has(name) {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx,
+			"DELETE FROM user_deck_artifacts WHERE deck_id = ? AND name = ?",
+			r.id, name); err != nil {
+			return nil, fmt.Errorf("build %q: %w", slug, err)
+		}
+	}
+	now := nowISO()
+	written := make([]string, 0, len(files))
+	for _, file := range files {
+		if _, err := tx.ExecContext(ctx,
+			"INSERT INTO user_deck_artifacts (deck_id, name, body, built_at)"+
+				" VALUES (?, ?, ?, ?) ON CONFLICT(deck_id, name) DO UPDATE SET"+
+				" body = excluded.body, built_at = excluded.built_at",
+			r.id, file.Name, file.Text, now); err != nil {
+			return nil, fmt.Errorf("build %q: %w", slug, err)
+		}
+		written = append(written, file.Name)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("build %q: %w", slug, err)
+	}
+	return written, nil
+}
+
 // isUniqueViolation asks the driver's error whether the partial unique index
 // refused. Matched on the message because `modernc.org/sqlite` reports its
 // codes through one error type and the constraint's name is what identifies
@@ -471,6 +562,16 @@ func (v *SharedOnly) SetShared(ctx context.Context, slug string, _ bool) error {
 		return err
 	}
 	return ErrReadOnly{Slug: slug}
+}
+
+// WriteArtifacts refuses. The deliverables are the *shareable* surface, so a
+// reader may have every one of them -- and rebuilding them is a write to
+// somebody else's library, which is the deck's owner's alone.
+func (v *SharedOnly) WriteArtifacts(ctx context.Context, slug string, _ artifacts.Files) ([]string, error) {
+	if err := v.visible(ctx, slug); err != nil {
+		return nil, err
+	}
+	return nil, ErrReadOnly{Slug: slug}
 }
 
 // IsReadOnly and IsNotFound let the route layer choose a status without

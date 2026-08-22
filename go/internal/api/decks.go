@@ -954,6 +954,12 @@ func baselineState(d *deck.Deck, baseline string, present bool) string {
 }
 
 // deckArtifacts is `GET .../artifacts` -- `service.list_artifacts`.
+//
+// A plain read, so it answers for a deck nobody may write: the artifacts are
+// the *shareable* surface, and hiding them from a reader who can already see
+// the deck would be the wrong way round. The body is `artifactsJSON` in
+// `artifacts.go`, which the rebuild answers with too -- `service` shares
+// `_artifacts_json` between them for the same reason.
 func (a *API) deckArtifacts(w http.ResponseWriter, r *http.Request) {
 	src, ok := a.sourceFor(w, r)
 	if !ok {
@@ -963,20 +969,14 @@ func (a *API) deckArtifacts(w http.ResponseWriter, r *http.Request) {
 	if a.refuse(w, "artifacts", err) {
 		return
 	}
-	held, err := src.Artifacts(r.Context(), d.Slug)
+	shelf, err := a.artifactsJSON(r, src, d)
 	if a.refuse(w, "artifacts", err) {
 		return
 	}
-	baseline, present, err := src.ReadBaseline(r.Context(), d.Slug)
+	raw, err := marshalOrdered(shelf)
 	if a.refuse(w, "artifacts", err) {
 		return
 	}
-	list := []orderedMap{}
-	for _, art := range held {
-		list = append(list, orderedMap([]kv{{"name", art.Name}, {"size", art.Size}, {"built_at", isoformat(art.BuiltAt)}}))
-	}
-	raw, _ := marshalOrdered([]kv{{"artifacts", list}, {"baseline", baselineState(d, baseline, present)},
-		{"buildable", d.Stage != "draft"}, {"stage", d.Stage}})
 	wire.Raw(w, http.StatusOK, raw)
 }
 
