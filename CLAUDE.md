@@ -575,10 +575,22 @@ go/                       the Go module (ADR 38; module path
                           even if the two encoders disagreed about base64
                           padding for some salts and not others.
                           `auth/authtest` is where app.db's generated schema
-                          lives now: three packages had each transcribed the
+                          lives now: four packages had each transcribed the
                           ladder by hand and frozen it at a different rung,
                           and two of them broke the day `model_tier` was
-                          first read. **internal/pyrand is CPython's
+                          first read. **Then the accounts flipped**: eleven
+                          of the twelve registrations under /api/auth and
+                          /api/admin/users answer from the door
+                          (internal/api/accounts.go and admin.go). The
+                          twelfth, DELETE /api/admin/users/{username}, is
+                          deliberately still Python's -- it calls
+                          jobs.forget_owner on a registry held in the uvicorn
+                          process's memory, and `users.id` is re-issued by
+                          SQLite, so jobs left keyed on a freed id would be
+                          handed to the next account created. The six
+                          /api/admin/stats/* routes are not Phase 4's either,
+                          for the same coupling plus claude/. A prefix is not
+                          a family. **internal/pyrand is CPython's
                           `random.Random`, bit for bit** (2026-08-22) --
                           Phase 5's named tail risk pulled forward and
                           closed, and a library rather than a route: it

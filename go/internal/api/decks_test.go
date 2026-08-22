@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 	_ "modernc.org/sqlite"
 )
@@ -71,18 +72,13 @@ func appDB(t *testing.T) string {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	ddl := `
-CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE COLLATE NOCASE,
-  password_hash TEXT, email TEXT UNIQUE COLLATE NOCASE, is_admin INTEGER NOT NULL DEFAULT 0,
-  disabled_at TEXT, created_at TEXT NOT NULL);
-CREATE TABLE user_decks (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  slug TEXT NOT NULL, name TEXT NOT NULL, yaml TEXT NOT NULL, shared INTEGER NOT NULL DEFAULT 0,
-  deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-CREATE TABLE user_deck_artifacts (id INTEGER PRIMARY KEY AUTOINCREMENT, deck_id INTEGER NOT NULL REFERENCES user_decks(id) ON DELETE CASCADE,
-  name TEXT NOT NULL, body TEXT NOT NULL, built_at TEXT NOT NULL, UNIQUE(deck_id, name));
-CREATE TABLE deck_log (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  slug TEXT NOT NULL, actor TEXT, action TEXT NOT NULL, summary TEXT NOT NULL);`
-	if _, err := db.Exec(ddl); err != nil {
+	// The schema Python's ladder leaves, not a transcription of it. This was
+	// the **fourth** hand-written copy in the module and the last to go: the
+	// accounts flip needed `auth_tokens` and `login_attempts`, which no
+	// transcription had, and `users.model_tier`, which two of the other three
+	// were eight rungs too old to have. `authtest`'s package comment carries
+	// the story.
+	if _, err := db.Exec(authtest.Schema()); err != nil {
 		t.Fatal(err)
 	}
 	now := "2026-08-21T12:00:00+00:00"
