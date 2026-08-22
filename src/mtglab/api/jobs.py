@@ -281,9 +281,24 @@ def submit(kind: str, fn: Callable[[Progress], Any],
             # stale second copy of part of it.
             job.partial = None
         except Exception as exc:                                    # noqa: BLE001
-            # Surface the type and message; a local tool is more useful when it
-            # says what broke than when it returns a bare 500.
-            job.error = f"{type(exc).__name__}: {exc}"
+            # Surface the message and NOT the exception's class name.
+            #
+            # This read `f"{type(exc).__name__}: {exc}"` until 2026-08-22, so a
+            # failed job rendered `DeckNotFound: no deck 'nope'` in the
+            # browser -- `job.error` becomes a JS `Error` in `lib/api.ts` and
+            # the screen shows it. A Python class name is a technology a user
+            # can see, which commandment 10 does not allow; Aaron ruled on it
+            # when the Go port surfaced the seam, since `internal/jobs`
+            # records `err.Error()` and has no class name to offer. Correcting
+            # Python rather than teaching Go to imitate it is what makes the
+            # two agree *now*, instead of at whichever flip moves this family.
+            #
+            # Nothing is lost. Every exception a job worker can raise carries
+            # a message -- checked, there are no bare raises -- so the prefix
+            # was never the load-bearing half, and `traceback.print_exc()`
+            # still puts the class name in the log, where a maintainer reads
+            # it and a visitor does not.
+            job.error = str(exc)
             job.status = "error"
             traceback.print_exc()
 

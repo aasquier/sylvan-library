@@ -126,12 +126,16 @@ Where it stands, kept here so a fresh session knows the frontier:
   mana solver, Tier 1.5's two closed forms, Tier 1 itself —
   `REFERENCE_DIGEST` reproduced — and finally the compiler, the
   mulligan grid and the ADR 18 cache, whose Go rows and Python rows
-  deliberately **sit apart**. **Next: the flips, and they are a
-  decision rather than a port.** Every job is polled through one
-  route, `GET /api/jobs/{job_id}`, so it couples all eight
-  job-submitting families and no partial order works: either all
-  eight move in one change, or the hybrid poll handler is built with
-  the first family flip. Aaron's call.
+  deliberately **sit apart**. **Then the flips, and Phase 5 closed with
+  them** (2026-08-22): the sim family answers from the door, and the two
+  generic job routes went with it as a **hybrid** -- ours if we own the
+  job, Python's otherwise, and the list a union of both registries. The
+  choice the plan left open was made by the dependency graph rather than
+  by preference: five of the eight job-submitting families need `claude/`
+  and one needs `sim/tier3`, so "all eight at once" was never reachable.
+  **Next: Phase 6, the Claude surfaces** -- the pipe, the stance, the
+  personas, seven modes, the tarot table's server half, and then five of
+  those six remaining job families.
 
 ### The next phase — the Simulator learns (decided 2026-08-20)
 

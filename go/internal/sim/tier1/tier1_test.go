@@ -675,3 +675,59 @@ func names(cards []*sim.Card) []string {
 	}
 	return out
 }
+
+// TestNumberSurvivesJSONBothWays pins the marshalling `Number` did not have
+// until the sim family flipped.
+//
+// The type is held to CPython by `repr` text and by `Float64bits`, and neither
+// route goes through `encoding/json` -- so for as long as nothing serialised
+// one, the default marshaller applied and `median_commander_turn` would have
+// reached the browser as `{"IsFloat":false,"Int":4,"Float":0}`. Every corpus
+// was green. The contract suite caught it on the first run through the door.
+//
+// Both directions are pinned because the ADR 18 cache needs the round trip: a
+// stored result is decoded into the struct it was encoded from, and a number
+// that went in an int has to come back one -- `repr(4)` and `repr(4.0)` are
+// different text, and that text is inside the determinism digest.
+func TestNumberSurvivesJSONBothWays(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   Number
+		want string
+	}{
+		{"an odd count is an int", Number{Int: 4}, "4"},
+		{"an even count is a float", Number{IsFloat: true, Float: 4.5}, "4.5"},
+		{"a whole float keeps its point", Number{IsFloat: true, Float: 4.0}, "4.0"},
+		{"zero", Number{Int: 0}, "0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := json.Marshal(tc.in)
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			if string(raw) != tc.want {
+				t.Fatalf("marshalled %s, want %s", raw, tc.want)
+			}
+			var back Number
+			if err := json.Unmarshal(raw, &back); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			if back != tc.in {
+				t.Fatalf("round trip gave %+v, want %+v", back, tc.in)
+			}
+		})
+	}
+
+	// And inside a struct, which is how it actually travels -- a pointer
+	// field, nil when no game cast the commander.
+	type holder struct {
+		N *Number `json:"median_commander_turn"`
+	}
+	raw, err := json.Marshal(holder{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != `{"median_commander_turn":null}` {
+		t.Fatalf("a nil Number rendered as %s", raw)
+	}
+}
