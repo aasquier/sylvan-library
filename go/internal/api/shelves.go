@@ -104,15 +104,15 @@ func (a *API) artMotionStatus(w http.ResponseWriter, r *http.Request) {
 		v := vals[len(vals)-1]
 		art = &v
 	}
-	notReady := orderedMap([]kv{{"ready", false}, {"effect", effectKey}})
+	notReady := wire.OrderedMap([]wire.KV{{Key: "ready", Value: false}, {Key: "effect", Value: effectKey}})
 	if a.shelves == nil {
-		raw, _ := marshalOrdered(notReady)
+		raw, _ := wire.MarshalOrdered(notReady)
 		wire.Raw(w, http.StatusOK, raw)
 		return
 	}
 	hit, ok := a.shelves.FindReady(oracleID, effect.Fingerprint, art)
 	if !ok {
-		raw, _ := marshalOrdered(notReady)
+		raw, _ := wire.MarshalOrdered(notReady)
 		wire.Raw(w, http.StatusOK, raw)
 		return
 	}
@@ -129,14 +129,14 @@ func (a *API) artMotionStatus(w http.ResponseWriter, r *http.Request) {
 	keys := map[string]string{"loop.webm": "webm", "loop.mp4": "mp4", "poster.webp": "poster", "depth.png": "depth"}
 	servable := append([]string{}, reference.Runtime().Cardmotion.Servable...)
 	sort.Strings(servable)
-	urls := []kv{}
+	urls := []wire.KV{}
 	for _, name := range servable {
 		if hit.Has(name) {
-			urls = append(urls, kv{keys[name], base + "/" + name + "?v=" + stamp + suffix})
+			urls = append(urls, wire.KV{Key: keys[name], Value: base + "/" + name + "?v=" + stamp + suffix})
 		}
 	}
-	raw, err := marshalOrdered([]kv{{"ready", true}, {"effect", effectKey}, {"fingerprint", stamp},
-		{"urls", orderedMap(urls)}, {"attribution", meta}})
+	raw, err := wire.MarshalOrdered([]wire.KV{{Key: "ready", Value: true}, {Key: "effect", Value: effectKey}, {Key: "fingerprint", Value: stamp},
+		{Key: "urls", Value: wire.OrderedMap(urls)}, {Key: "attribution", Value: meta}})
 	if err != nil {
 		a.fail(w, "art/motion", err)
 		return

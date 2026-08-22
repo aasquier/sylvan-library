@@ -17,6 +17,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/deckedit"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
+	"github.com/aasquier/sylvan-library/go/internal/deckread"
 	"github.com/aasquier/sylvan-library/go/internal/gate"
 	"github.com/aasquier/sylvan-library/go/internal/library"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -86,7 +87,7 @@ func (a *API) commit(ctx context.Context, src library.Source, slug, updated stri
 		var cards map[string]*pool.CardRecord
 		if c != nil {
 			var err error
-			if cards, err = poolFor(ctx, c, after); err != nil {
+			if cards, err = deckread.PoolFor(ctx, c, after); err != nil {
 				return err
 			}
 		}

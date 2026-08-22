@@ -9,6 +9,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/deckread"
 	"github.com/aasquier/sylvan-library/go/internal/gate"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/library"
@@ -133,7 +134,7 @@ func (a *API) compileChecked(ctx context.Context, src library.Source, slug strin
 		if c == nil {
 			return nil
 		}
-		found, err := poolFor(ctx, c, d)
+		found, err := deckread.PoolFor(ctx, c, d)
 		if err != nil {
 			return err
 		}

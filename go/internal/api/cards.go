@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -12,25 +11,10 @@ import (
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/cards"
-	"github.com/aasquier/sylvan-library/go/internal/gate"
+	"github.com/aasquier/sylvan-library/go/internal/deckread"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
-
-// searchCard is one row of `service.search_cards`' answer, in its key order.
-type searchCard struct {
-	Name          string   `json:"name"`
-	ManaCost      *string  `json:"mana_cost"`
-	CMC           float64  `json:"cmc"`
-	TypeLine      *string  `json:"type_line"`
-	OracleText    *string  `json:"oracle_text"`
-	ColorIdentity []string `json:"color_identity"`
-	EdhrecRank    *int     `json:"edhrec_rank"`
-	Image         *string  `json:"image"`
-	ArtCrop       *string  `json:"art_crop"`
-	Reserved      bool     `json:"reserved"`
-	PriceUSD      *float64 `json:"price_usd"`
-}
 
 // search is `GET /api/cards/search` -- `service.search_cards`, the 'deep
 // hits from the whole history' tool. `identity` is a subset filter;
@@ -40,142 +24,36 @@ type searchCard struct {
 func (a *API) search(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	var errs []wire.ValidationError
-	text := last(q, "q")
-	identity := last(q, "identity")
-	typeLine := last(q, "type_line")
-	cmcMax, haveCMC := optionalFloat(q, "cmc_max", &errs)
-	priceMax, havePrice := optionalFloat(q, "price_max", &errs)
-	sortBy := last(q, "sort")
-	if sortBy == "" {
-		sortBy = "edhrec"
-	}
-	limit := boundedInt(q, "limit", 60, 1, 200, &errs)
-	identityExact := flag(q, "identity_exact", &errs)
-	commandersOnly := flag(q, "commanders_only", &errs)
+	// Built field by field, in FastAPI's DECLARATION order, because that is
+	// the order the 422 lists two bad parameters in -- and a struct literal
+	// evaluates its fields in the order they are written, which reordered
+	// `limit` ahead of `cmc_max` the first time this was extracted. A test
+	// caught it; the wire shape is the contract, not just the values.
+	var query deckread.SearchQuery
+	query.Text = last(q, "q")
+	query.Identity = last(q, "identity")
+	query.TypeLine = last(q, "type_line")
+	query.CMCMax, query.HaveCMC = optionalFloat(q, "cmc_max", &errs)
+	query.PriceMax, query.HavePrice = optionalFloat(q, "price_max", &errs)
+	query.Sort = last(q, "sort")
+	query.Limit = boundedInt(q, "limit", 60, 1, 200, &errs)
+	query.IdentityExact = flag(q, "identity_exact", &errs)
+	query.CommandersOnly = flag(q, "commanders_only", &errs)
 	if len(errs) > 0 {
 		wire.Unprocessable(w, errs...)
 		return
 	}
 	type answer struct {
-		Cards []searchCard `json:"cards"`
-		Total int          `json:"total"`
+		Cards []deckread.SearchCard `json:"cards"`
+		Total int                   `json:"total"`
 	}
-	out := answer{Cards: []searchCard{}}
+	out := answer{Cards: []deckread.SearchCard{}}
 	err := a.usePool(r.Context(), func(c *pool.Conn) error {
-		where := []string{"json_extract_string(legalities, 'commander') = 'legal'"}
-		params := []any{}
-		if identity != "" || identityExact {
-			allowed := []string{}
-			for _, ch := range strings.ToUpper(identity) {
-				if strings.ContainsRune("WUBRG", ch) {
-					allowed = append(allowed, string(ch))
-				}
-			}
-			where = append(where, fmt.Sprintf("len(list_filter(color_identity, x -> x NOT IN (%s))) = 0",
-				quotedList(allowed)))
-			if identityExact {
-				// Subset plus the right size is set equality, and it lets the
-				// colourless slot work: an empty identity with length 0.
-				where = append(where, fmt.Sprintf("len(color_identity) = %d", len(allowed)))
-			}
-		}
-		// `contains(lower(col), ?)` rather than ILIKE, as Python: the same
-		// question asked cheaply, and `%` and `_` stop being wildcards.
-		if text != "" {
-			where = append(where, "(contains(lower(name), ?) OR contains(lower(oracle_text), ?))")
-			params = append(params, strings.ToLower(text), strings.ToLower(text))
-		}
-		if typeLine != "" {
-			where = append(where, "contains(lower(type_line), ?)")
-			params = append(params, strings.ToLower(typeLine))
-		}
-		if commandersOnly {
-			// A superset of CanBeCommander pushed into SQL so LIMIT counts
-			// candidates; the authoritative check runs below.
-			where = append(where, "(type_line ILIKE '%Legendary%Creature%'"+
-				" OR contains(lower(oracle_text), 'can be your commander'))")
-		}
-		if haveCMC {
-			where = append(where, "cmc <= ?")
-			params = append(params, cmcMax)
-		}
-		order := map[string]string{
-			"edhrec": "edhrec_rank NULLS LAST",
-			"cmc":    "cmc, edhrec_rank NULLS LAST",
-			"name":   "name",
-			"newest": "released_at DESC NULLS LAST",
-		}[sortBy]
-		if order == "" {
-			order = "edhrec_rank NULLS LAST"
-		}
-		sql := `
-            SELECT o.name, o.mana_cost, o.cmc, o.type_line, o.oracle_text,
-                   o.color_identity, o.edhrec_rank, o.image_normal,
-                   o.image_art_crop, o.reserved,
-                   (SELECT min(p.price_usd) FROM printings p
-                     WHERE p.oracle_id = o.oracle_id AND p.price_usd IS NOT NULL) AS usd
-            FROM oracle_cards o
-            WHERE ` + strings.Join(where, " AND ") + `
-            ORDER BY ` + order + `
-            LIMIT ?`
-		rows, err := c.DB().QueryContext(r.Context(), sql, append(params, limit)...)
+		found, err := deckread.SearchCards(r.Context(), c, query)
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
-		found := []searchCard{}
-		for rows.Next() {
-			var v [11]any
-			ptrs := make([]any, len(v))
-			for i := range v {
-				ptrs[i] = &v[i]
-			}
-			if err := rows.Scan(ptrs...); err != nil {
-				return err
-			}
-			card := searchCard{
-				Name: pool.AsString(v[0]), ManaCost: pool.AsStringPtr(v[1]), CMC: pool.AsFloat(v[2]),
-				TypeLine: pool.AsStringPtr(v[3]), OracleText: pool.AsStringPtr(v[4]),
-				ColorIdentity: pool.AsStrings(v[5]), EdhrecRank: pool.AsIntPtr(v[6]),
-				Image: pool.AsStringPtr(v[7]), ArtCrop: pool.AsStringPtr(v[8]), Reserved: pool.AsBool(v[9]),
-				PriceUSD: asFloatPtr(v[10]),
-			}
-			sort.Strings(card.ColorIdentity)
-			found = append(found, card)
-		}
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		if havePrice {
-			kept := found[:0]
-			for _, card := range found {
-				if card.PriceUSD != nil && *card.PriceUSD <= priceMax {
-					kept = append(kept, card)
-				}
-			}
-			found = kept
-		}
-		if commandersOnly {
-			// After the query rather than in SQL, because the rule reads
-			// oracle text as well as the type line. One implementation.
-			names := make([]string, 0, len(found))
-			for _, card := range found {
-				names = append(names, card.Name)
-			}
-			keep, err := c.GetCards(r.Context(), names)
-			if err != nil {
-				return err
-			}
-			kept := found[:0]
-			for _, card := range found {
-				if rec := keep[card.Name]; rec != nil && gate.CanBeCommander(rec, false) {
-					kept = append(kept, card)
-				}
-			}
-			found = kept
-		}
-		out.Cards = found
-		out.Total = len(found)
+		out.Cards, out.Total = found, len(found)
 		return nil
 	})
 	if errors.Is(err, pool.ErrNoPool) {
@@ -437,34 +315,6 @@ func readObject(w http.ResponseWriter, r *http.Request) (map[string]any, bool) {
 func stringOf(v any) string {
 	s, _ := v.(string)
 	return s
-}
-
-func asFloatPtr(v any) *float64 {
-	switch t := v.(type) {
-	case float64:
-		return &t
-	case float32:
-		f := float64(t)
-		return &f
-	case int32:
-		f := float64(t)
-		return &f
-	case int64:
-		f := float64(t)
-		return &f
-	}
-	return nil
-}
-
-func quotedList(items []string) string {
-	if len(items) == 0 {
-		return "''"
-	}
-	quoted := make([]string, len(items))
-	for i, s := range items {
-		quoted[i] = "'" + s + "'"
-	}
-	return strings.Join(quoted, ", ")
 }
 
 // fail is a handler's last line: the query failed for a reason that is not

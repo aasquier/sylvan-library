@@ -1026,6 +1026,55 @@ go/                       the Go module (ADR 38; module path
                           differ by 2 ULP -- and driven through the sampler,
                           since the first version of that test called
                           pyfloat.Fsum by hand and the mutation survived it.
+                          **Then the engine's foundation, same day, and it
+                          flipped nothing more**: internal/deckread is the
+                          READ side of api/service.py -- the payload builders
+                          the deck routes answer with -- extracted from
+                          internal/api's handlers because two callers need
+                          them and neither is the other's parent. That is
+                          Python's own shape (service.py is what the routes
+                          call AND what claude/tools.py calls, so a tool
+                          result and a route payload are the same bytes by
+                          construction), and **the boundary guard chose the
+                          layering rather than a preference**: internal/api
+                          imports internal/deckedit, so reaching the builders
+                          through it would have failed the transitive ban --
+                          correctly, a Claude surface one hop from a deck
+                          write. getDeck went 93 lines to 23, search 150 to
+                          30, and the ordered-JSON helper moved to
+                          internal/wire, costing 124 composite literals their
+                          elided form (go vet flags unkeyed fields on a
+                          struct from another package where an in-package
+                          type raised nothing). internal/claude/ledger is
+                          ledger.py -- Record never fails the conversation
+                          that produced it, app.db is mode=rw never rwc, and
+                          the row is COUNTERS ONLY so ADR 17's
+                          who-may-read-what argument never has to be made for
+                          a table that would otherwise be a chat log.
+                          internal/claude/tools is the seven read-only tools:
+                          **schemas as generated data** (a description is
+                          prescriptive prose about when to call, and an
+                          under-described tool is the commonest reason a
+                          model answers from recall -- rule 1's exact failure
+                          mode) and **dispatch as code**, because that is the
+                          half the boundary analysis must see. It found a
+                          second real fault: wiring to library.Source failed
+                          on tools -> library -> deckedit, since
+                          internal/library holds the read Source and the
+                          write Writer together where Python keeps
+                          decks/source.py apart from decks/edit.py --
+                          deckread.Source restores that split, structurally
+                          satisfied by library.Source without touching it.
+                          **The guard itself is boundary_test.go**, written
+                          BEFORE the modes on stance.py's own argument, over
+                          the typed package graph: a transitive ban that
+                          names the full route, plus a typed identifier check
+                          that catches an aliased import and an interface
+                          method while correctly ignoring a same-named local.
+                          Five deliberate violations were driven before it
+                          was trusted. **Still Python: the pipe (converse),
+                          the seven modes and every Claude route** -- the
+                          engine crossed, nothing flipped.
                           The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY

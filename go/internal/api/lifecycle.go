@@ -13,6 +13,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/deckimport"
 	"github.com/aasquier/sylvan-library/go/internal/decklist"
+	"github.com/aasquier/sylvan-library/go/internal/deckread"
 	"github.com/aasquier/sylvan-library/go/internal/gate"
 	"github.com/aasquier/sylvan-library/go/internal/library"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -329,7 +330,7 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 		}
-		cards, err := poolFor(r.Context(), c, built.Deck)
+		cards, err := deckread.PoolFor(r.Context(), c, built.Deck)
 		if err != nil {
 			return err
 		}
