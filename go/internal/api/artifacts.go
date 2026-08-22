@@ -7,6 +7,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/artifacts"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/deckread"
 	"github.com/aasquier/sylvan-library/go/internal/gate"
 	"github.com/aasquier/sylvan-library/go/internal/library"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -87,7 +88,7 @@ func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
 		if c == nil {
 			return nil
 		}
-		found, err := poolFor(r.Context(), c, d)
+		found, err := deckread.PoolFor(r.Context(), c, d)
 		if err != nil {
 			return err
 		}
@@ -137,12 +138,12 @@ func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	shelf = append(shelf,
-		kv{"issues", map[string]any{"errors": report.Errors(), "warnings": report.Warnings()}},
+		wire.KV{Key: "issues", Value: map[string]any{"errors": report.Errors(), "warnings": report.Warnings()}},
 		// `report.errors and force` -- true only when the flag actually
 		// overrode something, so a clean build never claims to have been
 		// forced.
-		kv{"forced", failing > 0 && force})
-	raw, err := marshalOrdered(shelf)
+		wire.KV{Key: "forced", Value: failing > 0 && force})
+	raw, err := wire.MarshalOrdered(shelf)
 	if a.refuse(w, "build", err) {
 		return
 	}
@@ -179,7 +180,7 @@ func (a *API) baselineDeck(r *http.Request, src library.Source, slug string) (*d
 // the app could say so. It is computed by comparing the stored snapshot
 // against the deck rather than by looking at a timestamp, so reverting an edit
 // correctly makes the artifacts current again.
-func (a *API) artifactsJSON(r *http.Request, src library.Source, d *deck.Deck) ([]kv, error) {
+func (a *API) artifactsJSON(r *http.Request, src library.Source, d *deck.Deck) ([]wire.KV, error) {
 	held, err := src.Artifacts(r.Context(), d.Slug)
 	if err != nil {
 		return nil, err
@@ -188,15 +189,15 @@ func (a *API) artifactsJSON(r *http.Request, src library.Source, d *deck.Deck) (
 	if err != nil {
 		return nil, err
 	}
-	list := []orderedMap{}
+	list := []wire.OrderedMap{}
 	for _, art := range held {
-		list = append(list, orderedMap([]kv{
-			{"name", art.Name}, {"size", art.Size}, {"built_at", isoformat(art.BuiltAt)}}))
+		list = append(list, wire.OrderedMap([]wire.KV{
+			{Key: "name", Value: art.Name}, {Key: "size", Value: art.Size}, {Key: "built_at", Value: isoformat(art.BuiltAt)}}))
 	}
-	return []kv{
-		{"artifacts", list},
-		{"baseline", baselineState(d, baseline, present)},
-		{"buildable", d.Stage != "draft"},
-		{"stage", d.Stage},
+	return []wire.KV{
+		{Key: "artifacts", Value: list},
+		{Key: "baseline", Value: baselineState(d, baseline, present)},
+		{Key: "buildable", Value: d.Stage != "draft"},
+		{Key: "stage", Value: d.Stage},
 	}, nil
 }
