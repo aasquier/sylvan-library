@@ -294,6 +294,19 @@ func (a *API) Routes() []Route {
 		// swept across a selection and is a JOB, so it stays Python's until
 		// that lane crosses -- a prefix is not a family.
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/argue", Handler: a.argueSlot},
+		// The commander dossier (ADR 19), both halves: the free GET that reads
+		// the store and never calls, and the POST that writes one as a JOB on
+		// the NET lane -- the first Claude job family to answer from the door,
+		// landing in the registry the hybrid poll routes below already read.
+		// A stored dossier and a stance of off are jobs born finished; no
+		// commander the pool knows is a 422 in the request, never four minutes
+		// later.
+		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/dossier", Handler: a.claudeDossierCached},
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/dossier", Handler: a.claudeDossier},
+		// Research (ADR 26): a job, outside /api/decks on purpose, taking no
+		// owner and no deck -- the absence is the contract. Deduplicated in
+		// flight on the normalised question, cached never.
+		{Method: http.MethodPost, Pattern: "/api/claude/research", Handler: a.claudeResearch},
 		// The accounts (Phase 4's last flip): the five public doors of
 		// `api/auth.py` and the `me` that says who is standing in them, then
 		// the admin surface of `api/admin.py`. The middleware half of

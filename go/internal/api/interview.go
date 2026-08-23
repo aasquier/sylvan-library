@@ -133,27 +133,22 @@ func (a *API) refuseClaude(w http.ResponseWriter, where string, err error) bool 
 	case errors.As(err, &notInDeck):
 		wire.Detail(w, http.StatusUnprocessableEntity, notInDeck.Error())
 	case errors.Is(err, claude.ErrStanceRejected):
-		// **502, and it is a wart reproduced rather than fixed.**
+		// **422, since 2026-08-23 -- and it was 502 for a day, deliberately.**
 		//
 		// `api/app.py` has an `except ValueError` branch here whose comment
-		// says "A malformed stance" and which raises 422 -- and that branch is
-		// DEAD CODE. `service.claude_interview` re-raises only
-		// `ClaudeUnavailable`, `CardNotInDeck` and `DeckNotFound`; a stance
-		// ValueError is not in that tuple, so the broad `except Exception`
-		// below it turns one into `ClaudeFailed` and the route answers 502
-		// before its own ValueError branch is ever consulted. Measured against
-		// the running pair, not read off the source: Python answers 502 for
-		// `{"stance": "emperor"}` and the door now answers 502 with the same
-		// sentence.
-		//
-		// A flip is not the place to decide which of two spellings Python
-		// meant, so this reproduces it. The branch exists rather than falling
-		// through to the default because this is where somebody goes to fix
-		// it: change this one line to StatusUnprocessableEntity, fix the
-		// Python in the same change (the re-raise tuple, not the route), and
-		// the two runtimes move together -- which is how `edit.set_shared`
-		// was handled when the port found that one.
-		wire.Detail(w, http.StatusBadGateway, err.Error())
+		// says "A malformed stance" and which raises 422 -- and until
+		// 2026-08-23 that branch was DEAD CODE: `service.claude_interview`
+		// re-raised only `ClaudeUnavailable`, `CardNotInDeck` and
+		// `DeckNotFound`, so a stance ValueError fell into its broad `except
+		// Exception`, became `ClaudeFailed`, and the route answered 502 before
+		// its own branch was consulted. Measured against the running pair when
+		// this route flipped, and reproduced rather than fixed: a flip is not
+		// the place to decide which of two spellings Python meant. Then ruled
+		// with Aaron and fixed in both runtimes in one change, the way
+		// `edit.set_shared` went -- `stance.StanceRejected` is the name the
+		// service layer re-raises by there, and this is the line here. The
+		// request was wrong, not the call.
+		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
 	case errors.Is(err, claude.ErrUnavailable):
 		// No key, no client, no call. The sentence names the variable and
 		// where to set it, because the person reading it is the operator.

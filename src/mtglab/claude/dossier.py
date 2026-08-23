@@ -440,7 +440,20 @@ def _competitors(raw: Any, allowed: set[str]) -> tuple[list[dict[str, Any]], int
         return [], len(items)
 
     looked_up = service.cards_named(names=wanted)
-    found = {c["name"].casefold(): c for c in looked_up.get("cards", [])}
+    # Indexed under both spellings, because a double-faced card resolves from
+    # either face and comes back under its full `A // B` name. Until
+    # 2026-08-23 this indexed the pool's spelling alone -- the index
+    # `resolve_alternatives` and `research.resolve_cards` had already been
+    # written around -- so a competitor named by its front face, which is how
+    # a model names one, was dropped and counted as a card it had invented.
+    # Commanders are exactly the population most likely to be double-faced.
+    # Found by the Go port, which reproduced the drop and raised it; fixed in
+    # both runtimes in one change.
+    found: dict[str, dict[str, Any]] = {}
+    for record in looked_up.get("cards", []):
+        found[record["name"].casefold()] = record
+        if record.get("asked_as"):
+            found[record["asked_as"].casefold()] = record
 
     out: list[dict[str, Any]] = []
     dropped = 0

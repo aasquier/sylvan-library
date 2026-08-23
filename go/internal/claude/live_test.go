@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -286,4 +287,169 @@ func TestLiveTheSlotArgumentMakesOnlyTheCaseAgainst(t *testing.T) {
 		t.Logf("  [%s/%s] %s  (%s)", c.Ground, c.Strength, c.Claim, c.Fact)
 	}
 	t.Logf("alternatives: %v", field("alternatives_dropped"))
+}
+
+// withRealPool is the full Scryfall pool when this machine has one
+// (`data/mtg.duckdb` at the repo root, ~28 minutes of `mtglab data refresh`),
+// and the 21-card test pool otherwise.
+//
+// The searching modes' live cases want the real one, and the first dossier run
+// against the tiny pool showed why: the model is told to `get_cards` every
+// competitor before writing a word about it, the tiny pool has heard of none
+// of the commanders it names, and it spent all eight turns looking for one it
+// could -- exhausting the ceiling with eight honest lookups. That was the
+// fixture talking, not the code; against the real pool the same run finishes.
+// The check is opt-in like the rest of this file, so CI never reaches it.
+func withRealPool(t *testing.T, fn func(c *pool.Conn)) {
+	t.Helper()
+	real := filepath.Join("..", "..", "..", "data", "mtg.duckdb")
+	if _, err := os.Stat(real); err != nil {
+		t.Logf("no full pool at %s; using the 21-card test pool", real)
+		withPool(t, fn)
+		return
+	}
+	p := pool.New(real, nil)
+	t.Cleanup(p.Close)
+	if err := p.Use(context.Background(), func(c *pool.Conn) error {
+		fn(c)
+		return nil
+	}); err != nil {
+		t.Fatalf("leasing the full pool: %v", err)
+	}
+}
+
+// The commander dossier on the real wire, and the things only a live call can
+// answer: that the API accepts a schema carrying a hosted search beside it,
+// that the container rides along on the turns after the search, that the
+// pages the search returned reach `Turn.Searched`, and that the source check
+// has something real to intersect. A scripted server answers all of that
+// with whatever it is told. Costs one real search and the minutes it takes.
+//
+// The assertions are on what MUST be true rather than on what the model
+// happened to write: every surviving source is one the search returned, every
+// passage cites only survivors, every competitor is a pool row -- and the
+// dossier was stored, because that is the row the deck page will serve.
+func TestLiveTheDossierCitesPagesItActuallyRead(t *testing.T) {
+	liveOrSkip(t)
+	d := fixtureDeck(t, "kaheera")
+	store := scratchStore(t)
+	var report DossierReport
+	withRealPool(t, func(c *pool.Conn) {
+		ctx := context.Background()
+		plan, err := CheckDossier(ctx, c, "kaheera", d, DossierRequest{
+			Requested: "second-opinion", Store: store, Limit: &Collaborator})
+		if err != nil {
+			t.Fatalf("the plan failed: %v", err)
+		}
+		if plan.Answer != nil {
+			t.Fatalf("the plan answered without a call: %s", plan.Answer.Reason)
+		}
+		report, err = RunDossier(ctx, c, plan, DossierRun{
+			Deps:   tools.Deps{Pool: c},
+			OnTurn: func(done, max int) { t.Logf("turn %d of %d", done, max) },
+		})
+		if err != nil {
+			t.Fatalf("the dossier did not answer: %v", err)
+		}
+		if store.Get(ctx, plan.Key) == nil {
+			t.Error("the dossier was not stored")
+		}
+	})
+	if !report.Asked {
+		t.Fatalf("no call was made: %s", report.Reason)
+	}
+	if report.Reason != "" {
+		// "No source survived checking" here is a real finding about the
+		// prompt or the search, not a flake to retry.
+		t.Fatalf("the run ended early: %s", report.Reason)
+	}
+	body, ok := report.Dossier.(DossierBody)
+	if !ok {
+		t.Fatalf("the dossier is a %T", report.Dossier)
+	}
+	if len(body.Sources) == 0 {
+		t.Fatal("a dossier with no sources was not refused")
+	}
+	allowed := map[string]bool{}
+	for _, s := range body.Sources {
+		allowed[s.ID] = true
+	}
+	for name, passage := range map[string]Passage{"who": body.Who, "allies": body.Allies,
+		"rivals": body.Rivals, "standing": body.Standing} {
+		for _, id := range passage.SourceIDs {
+			if !allowed[id] {
+				t.Errorf("%s cites %q, which did not survive", name, id)
+			}
+		}
+	}
+	for _, c := range body.Competitors {
+		if c.OracleText == nil {
+			t.Errorf("competitor %q carries no pool text; it was not resolved", c.Name)
+		}
+	}
+	t.Logf("%d sources (%d dropped), %d competitors (%d dropped), %d pages searched, "+
+		"%d in / %d out / %d cached", len(body.Sources), body.SourcesDropped,
+		len(body.Competitors), body.CompetitorsDropped, body.Searched,
+		report.Usage.InputTokens, report.Usage.OutputTokens, report.Usage.CacheReadTokens)
+	t.Logf("who: %s", body.Who.Prose)
+	t.Logf("archetype (%s): %s", body.Archetype.Name, body.Archetype.Prose)
+	for _, s := range body.Sources {
+		t.Logf("  [%s] %s  %s", s.ID, s.Title, s.URL)
+	}
+}
+
+// Research on the real wire, deck-blind: the question the pool cannot answer,
+// answered from pages the search returned, with every finding resting on one.
+func TestLiveResearchAnswersFromPagesItRead(t *testing.T) {
+	liveOrSkip(t)
+	plan, err := CheckResearch(
+		"Why is Primeval Titan banned in Commander, and when was it banned?",
+		nil, "", &Collaborator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report ResearchReport
+	withRealPool(t, func(c *pool.Conn) {
+		report, err = RunResearch(context.Background(), c, plan, ResearchRun{
+			OnTurn: func(done, max int) { t.Logf("turn %d of %d", done, max) },
+		})
+		if err != nil {
+			t.Fatalf("research did not answer: %v", err)
+		}
+	})
+	if !report.Asked {
+		t.Fatalf("no call was made: %s", report.Reason)
+	}
+	if report.Reason != "" {
+		t.Fatalf("the run ended early: %s", report.Reason)
+	}
+	body, ok := report.Research.(ResearchBody)
+	if !ok {
+		t.Fatalf("the answer is a %T", report.Research)
+	}
+	if len(body.Sources) == 0 || len(body.Findings) == 0 || body.Answer == "" {
+		t.Fatalf("a thin answer came back whole: %+v", body)
+	}
+	if !slices.Contains(ResearchConfidence, body.Confidence) {
+		t.Errorf("confidence is %q", body.Confidence)
+	}
+	for i, f := range body.Findings {
+		if len(f.SourceIDs) == 0 {
+			t.Errorf("finding %d rests on nothing", i)
+		}
+	}
+	for _, card := range body.Cards {
+		if resolved, ok := card.(ResearchCard); ok && resolved.OracleText == nil {
+			t.Errorf("card %q is in the pool and carries no text", resolved.Name)
+		}
+	}
+	t.Logf("%s (%s) -- %d findings (%d dropped), %d cards (%d unresolved), %d sources (%d dropped), %d searched",
+		body.Answer, body.Confidence, len(body.Findings), body.FindingsDropped,
+		len(body.Cards), body.CardsUnresolved, len(body.Sources), body.SourcesDropped, body.Searched)
+	for _, f := range body.Findings {
+		t.Logf("  - %s %v", f.Claim, f.SourceIDs)
+	}
+	for _, s := range body.Sources {
+		t.Logf("  [%s] %s  %s", s.ID, s.Title, s.URL)
+	}
 }

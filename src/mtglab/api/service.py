@@ -1542,12 +1542,18 @@ def claude_interview(*, slug: str, card: str, requested: Any = None,
     from mtglab.claude import client as claude_client
     from mtglab.claude.interview import CardNotInDeck, ask
     from mtglab.claude.modes import ModeExhausted
+    from mtglab.claude.stance import StanceRejected
 
     try:
         return ask(slug, card, requested=requested, focus=focus,
                    source=source, tier=tier)
-    except (claude_client.ClaudeUnavailable, CardNotInDeck, DeckNotFound):
+    except (claude_client.ClaudeUnavailable, CardNotInDeck, DeckNotFound,
+            StanceRejected):
         # Answerable by the caller, and each maps to its own status code.
+        # `StanceRejected` joined 2026-08-23: without it a malformed stance
+        # fell through to the broad clause below and was answered 502 as a
+        # failed call, while the route's own "A malformed stance" 422 branch
+        # sat dead. The Go port found it by reproducing it; see the class.
         raise
     except ModeExhausted as exc:
         raise ClaudeFailed(str(exc)) from exc
@@ -1574,11 +1580,13 @@ def claude_argue(*, slug: str, card: str, requested: Any = None,
     from mtglab.claude import client as claude_client
     from mtglab.claude.argue import CardNotInDeck, ask
     from mtglab.claude.modes import ModeExhausted
+    from mtglab.claude.stance import StanceRejected
 
     try:
         return ask(slug, card, requested=requested, focus=focus,
                    source=source, tier=tier)
-    except (claude_client.ClaudeUnavailable, CardNotInDeck, DeckNotFound):
+    except (claude_client.ClaudeUnavailable, CardNotInDeck, DeckNotFound,
+            StanceRejected):
         # Answerable by the caller, and each maps to its own status code.
         raise
     except ModeExhausted as exc:
@@ -1601,10 +1609,12 @@ def claude_dossier(*, slug: str, requested: Any = None, refresh: bool = False,
     from mtglab.claude import client as claude_client
     from mtglab.claude.dossier import NoCommander, ask
     from mtglab.claude.modes import ModeExhausted
+    from mtglab.claude.stance import StanceRejected
 
     try:
         return ask(slug, requested=requested, refresh=refresh, source=source)
-    except (claude_client.ClaudeUnavailable, NoCommander, DeckNotFound):
+    except (claude_client.ClaudeUnavailable, NoCommander, DeckNotFound,
+            StanceRejected):
         raise
     except ModeExhausted as exc:
         raise ClaudeFailed(str(exc)) from exc

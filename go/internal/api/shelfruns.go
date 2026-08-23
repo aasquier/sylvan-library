@@ -416,7 +416,9 @@ func (a *API) planPolicy(ctx context.Context, src library.Source, slug string, b
 			Spread: sweep.Spread, Gain: sweep.Gain(), Flat: sweep.IsFlat(),
 			Caveat: PolicyCaveat,
 		}
-		a.simCache.Put(ctx, key, "sim.policy", result)
+		// The job's own context, not the request's -- see planMana in
+		// simruns.go for the bug this closes.
+		a.simCache.Put(context.Background(), key, "sim.policy", result)
 		result.Cached, result.ComputedAt, result.DeckCheck = false, nil, &check
 		return result, nil
 	}}

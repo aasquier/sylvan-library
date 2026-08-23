@@ -1,0 +1,525 @@
+{
+ "note": "`claude/dossier.py`'s Python-owned halves: the cache key, the brief's opening message, the free GET's shapes, and every outcome of a run through a fake converse with the clock frozen at 2026-08-23T04:05:06.789012+00:00. Written by `python tests/go_fixtures.py`.",
+ "why": "A dossier Python wrote is served by Go after the cutover under the SAME key, so the fingerprint is Python's byte for byte -- version, prompt, `json.dumps(schema, sort_keys=True)`, model id -- and its parts are recorded apart so a failure localises. The reports are compared as marshalled bytes, key order included, because the report is the wire and `tier1.Number` taught that a value can be right and still go out wrong.",
+ "keys": [
+  {"oracle_id":"","tier":null,"key":""},
+  {"oracle_id":"","tier":"sonnet","key":""},
+  {"oracle_id":"","tier":"opus","key":""},
+  {"oracle_id":"","tier":"fable","key":""},
+  {"oracle_id":"","tier":"not-a-tier","key":""},
+  {"oracle_id":"abc","tier":null,"key":"abc:1099e695f258d61c"},
+  {"oracle_id":"abc","tier":"sonnet","key":"abc:1099e695f258d61c"},
+  {"oracle_id":"abc","tier":"opus","key":"abc:3a0b73db316073e5"},
+  {"oracle_id":"abc","tier":"fable","key":"abc:19256ae067e2c99a"},
+  {"oracle_id":"abc","tier":"not-a-tier","key":"abc:1099e695f258d61c"},
+  {"oracle_id":"a6c1b2d3-0000-4000-8000-000000000042","tier":null,"key":"a6c1b2d3-0000-4000-8000-000000000042:1099e695f258d61c"},
+  {"oracle_id":"a6c1b2d3-0000-4000-8000-000000000042","tier":"sonnet","key":"a6c1b2d3-0000-4000-8000-000000000042:1099e695f258d61c"},
+  {"oracle_id":"a6c1b2d3-0000-4000-8000-000000000042","tier":"opus","key":"a6c1b2d3-0000-4000-8000-000000000042:3a0b73db316073e5"},
+  {"oracle_id":"a6c1b2d3-0000-4000-8000-000000000042","tier":"fable","key":"a6c1b2d3-0000-4000-8000-000000000042:19256ae067e2c99a"},
+  {"oracle_id":"a6c1b2d3-0000-4000-8000-000000000042","tier":"not-a-tier","key":"a6c1b2d3-0000-4000-8000-000000000042:1099e695f258d61c"}
+ ],
+ "keys_with_model_override": [{"oracle_id":"abc","tier":null,"key":"abc:c16adac282142d98"},{"oracle_id":"abc","tier":"opus","key":"abc:c16adac282142d98"}],
+ "fingerprint": {
+  "version": 3,
+  "instructions_sha256": "bff96aeacef8981bf1dec0499c53dd1dc998dda3a20b9039349e6b263d9ab10b",
+  "schema_dumps": "{\"additionalProperties\": false, \"properties\": {\"allies\": {\"additionalProperties\": false, \"description\": \"The story's allies: who this character fought beside, served, loved or led in the lore -- a guild, a crew, a found family, a mentor. Known associates from Magic's history, not cards that pair well in a deck. A minor character may honestly have none; then say so in a sentence rather than inventing a fellowship.\", \"properties\": {\"prose\": {\"description\": \"Two to four sentences. Every factual claim here must rest on a source you list, or on the pool facts you were given.\", \"type\": \"string\"}, \"source_ids\": {\"description\": \"The ids of the sources this rests on, from the sources list. Empty only when the passage rests entirely on the pool facts in the brief.\", \"items\": {\"type\": \"string\"}, \"type\": \"array\"}}, \"required\": [\"prose\", \"source_ids\"], \"type\": \"object\"}, \"archetype\": {\"additionalProperties\": false, \"properties\": {\"name\": {\"description\": \"What the archetype is called, e.g. 'Cat tribal voltron'. A few words.\", \"type\": \"string\"}, \"prose\": {\"description\": \"Two to four sentences. Every factual claim here must rest on a source you list, or on the pool facts you were given.\", \"type\": \"string\"}, \"source_ids\": {\"description\": \"The ids of the sources this rests on, from the sources list. Empty only when the passage rests entirely on the pool facts in the brief.\", \"items\": {\"type\": \"string\"}, \"type\": \"array\"}}, \"required\": [\"name\", \"prose\", \"source_ids\"], \"type\": \"object\"}, \"competitors\": {\"description\": \"Two to four commanders that compete with this one for the same seat -- same archetype, same colours, or the obvious alternative someone would consider instead. A deckbuilding question, not a story one.\", \"items\": {\"additionalProperties\": false, \"properties\": {\"card\": {\"description\": \"The competitor's exact card name. It will be looked up in the pool and dropped if it does not resolve, so give the printed name, not a nickname.\", \"type\": \"string\"}, \"prose\": {\"description\": \"One or two sentences on how they differ. Not which is better.\", \"type\": \"string\"}, \"source_ids\": {\"description\": \"The ids of the sources this rests on, from the sources list. Empty only when the passage rests entirely on the pool facts in the brief.\", \"items\": {\"type\": \"string\"}, \"type\": \"array\"}}, \"required\": [\"card\", \"prose\", \"source_ids\"], \"type\": \"object\"}, \"type\": \"array\"}, \"rivals\": {\"additionalProperties\": false, \"description\": \"The story's rivals, not the shop's: who this character fought, feared or betrayed in the lore, and the plot lines they figure in -- Bolas and Ugin is the shape. A minor character may honestly have none; then say so in a sentence rather than inventing a feud.\", \"properties\": {\"prose\": {\"description\": \"Two to four sentences. Every factual claim here must rest on a source you list, or on the pool facts you were given.\", \"type\": \"string\"}, \"source_ids\": {\"description\": \"The ids of the sources this rests on, from the sources list. Empty only when the passage rests entirely on the pool facts in the brief.\", \"items\": {\"type\": \"string\"}, \"type\": \"array\"}}, \"required\": [\"prose\", \"source_ids\"], \"type\": \"object\"}, \"sources\": {\"description\": \"Every page you actually read, with the id the sections refer to. A page you did not visit is not a source.\", \"items\": {\"additionalProperties\": false, \"properties\": {\"id\": {\"description\": \"Short id, e.g. 's1'.\", \"type\": \"string\"}, \"title\": {\"type\": \"string\"}, \"url\": {\"type\": \"string\"}}, \"required\": [\"id\", \"title\", \"url\"], \"type\": \"object\"}, \"type\": \"array\"}, \"standing\": {\"additionalProperties\": false, \"properties\": {\"prose\": {\"description\": \"Two to four sentences. Every factual claim here must rest on a source you list, or on the pool facts you were given.\", \"type\": \"string\"}, \"source_ids\": {\"description\": \"The ids of the sources this rests on, from the sources list. Empty only when the passage rests entirely on the pool facts in the brief.\", \"items\": {\"type\": \"string\"}, \"type\": \"array\"}}, \"required\": [\"prose\", \"source_ids\"], \"type\": \"object\"}, \"who\": {\"additionalProperties\": false, \"description\": \"The character, not the card. Where they are from, what happened to them in the story, why anyone remembers them. What the card mechanically does belongs in archetype, not here.\", \"properties\": {\"prose\": {\"description\": \"Two to four sentences. Every factual claim here must rest on a source you list, or on the pool facts you were given.\", \"type\": \"string\"}, \"source_ids\": {\"description\": \"The ids of the sources this rests on, from the sources list. Empty only when the passage rests entirely on the pool facts in the brief.\", \"items\": {\"type\": \"string\"}, \"type\": \"array\"}}, \"required\": [\"prose\", \"source_ids\"], \"type\": \"object\"}}, \"required\": [\"who\", \"archetype\", \"competitors\", \"allies\", \"rivals\", \"standing\", \"sources\"], \"type\": \"object\"}",
+  "model": "claude-sonnet-5",
+  "fingerprint": "1099e695f258d61c"
+ },
+ "brief": {
+  "slug": "mini",
+  "commander": "Gyome, Master Chef",
+  "oracle_id": "0f1b5cea-2035-444c-9f63-87dcb9782c74",
+  "facts": {
+   "slug": "mini",
+   "card": {
+    "name": "Gyome, Master Chef",
+    "oracle_id": "0f1b5cea-2035-444c-9f63-87dcb9782c74",
+    "mana_cost": "{2}{B}{G}",
+    "type_line": "Legendary Creature — Troll Warlock",
+    "oracle_text": "Trample\nAt the beginning of your end step, create a number of Food tokens equal to the number of nontoken creatures you had enter the battlefield under your control this turn.\n{1}, Sacrifice a Food: Target creature gains indestructible until end of turn. Tap it.",
+    "flavor_text": null,
+    "artist": "Steve Prescott",
+    "power": "5",
+    "toughness": "3",
+    "loyalty": null,
+    "image": "https://cards.scryfall.io/normal/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751",
+    "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751",
+    "color_identity": ["B","G"],
+    "edhrec_rank": 4740,
+    "game_changer": false
+   },
+   "supertypes": ["Legendary","Creature"],
+   "subtypes": [{"name":"Troll","total":1,"legendary":1},{"name":"Warlock","total":1,"legendary":1}],
+   "other_cards": [],
+   "printings": {"count":1,"first_released":"2021-04-23","first_set":"Commander 2021"}
+  },
+  "opening": "Here is everything the pool knows about this commander. All of it is a query rather than a recollection, and it is the authority on what the card does.\n\n{\n  \"commander\": {\n    \"name\": \"Gyome, Master Chef\",\n    \"oracle_id\": \"0f1b5cea-2035-444c-9f63-87dcb9782c74\",\n    \"mana_cost\": \"{2}{B}{G}\",\n    \"type_line\": \"Legendary Creature \\u2014 Troll Warlock\",\n    \"oracle_text\": \"Trample\\nAt the beginning of your end step, create a number of Food tokens equal to the number of nontoken creatures you had enter the battlefield under your control this turn.\\n{1}, Sacrifice a Food: Target creature gains indestructible until end of turn. Tap it.\",\n    \"flavor_text\": null,\n    \"artist\": \"Steve Prescott\",\n    \"power\": \"5\",\n    \"toughness\": \"3\",\n    \"loyalty\": null,\n    \"image\": \"https://cards.scryfall.io/normal/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751\",\n    \"art_crop\": \"https://cards.scryfall.io/art_crop/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751\",\n    \"color_identity\": [\n      \"B\",\n      \"G\"\n    ],\n    \"edhrec_rank\": 4740,\n    \"game_changer\": false\n  },\n  \"supertypes\": [\n    \"Legendary\",\n    \"Creature\"\n  ],\n  \"subtypes_and_how_rare_they_are\": [\n    {\n      \"name\": \"Troll\",\n      \"total\": 1,\n      \"legendary\": 1\n    },\n    {\n      \"name\": \"Warlock\",\n      \"total\": 1,\n      \"legendary\": 1\n    }\n  ],\n  \"other_cards_carrying_this_name\": [],\n  \"printing_history\": {\n    \"count\": 1,\n    \"first_released\": \"2021-04-23\",\n    \"first_set\": \"Commander 2021\"\n  }\n}\n\nWrite the dossier for Gyome, Master Chef. Search the web for the character's story, the archetype, the competitors, the rivals and the standing; take the card's own facts from above.",
+  "label": "dossier: Gyome, Master Chef",
+  "headless_refusal": "mini has no commander the pool can find, so there is nothing to write a dossier about. (A deck with no card pool loaded reaches this too -- run `mtglab data refresh`.)"
+ },
+ "cached_get": [
+  {"note":"no row yet","payload":{"answered_by":"","slug":"mini","commander":"Gyome, Master Chef","dossier":{},"cached":false,"generated_at":null}},
+  {"note":"no commander the pool knows","payload":{"slug":"mini","commander":"","dossier":{},"cached":false,"generated_at":null}},
+  {
+   "note": "a stored row",
+   "payload": {
+    "answered_by": "claude",
+    "slug": "mini",
+    "commander": "Gyome, Master Chef",
+    "dossier": {
+     "who": {"prose":"A troll chef of Kaldheim.","source_ids":["s1","3"]},
+     "archetype": {"name":"Food aristocrats","prose":"Sacrifice Food.","source_ids":["s1"]},
+     "competitors": [
+      {
+       "name": "Craterhoof Behemoth",
+       "prose": "Goes wide.",
+       "source_ids": ["s1"],
+       "mana_cost": "{5}{G}{G}{G}",
+       "type_line": "Creature — Beast",
+       "color_identity": ["G"],
+       "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+       "legal_commander": true,
+       "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control."
+      },
+      {
+       "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+       "prose": "Cats.",
+       "source_ids": [],
+       "mana_cost": "{1}{W}",
+       "type_line": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+       "color_identity": ["R","W"],
+       "image": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "legal_commander": true,
+       "oracle_text": ""
+      },
+      {
+       "name": "Primeval Titan",
+       "prose": "Banned, still real.",
+       "source_ids": ["3"],
+       "mana_cost": "{4}{G}{G}",
+       "type_line": "Creature — Giant",
+       "color_identity": ["G"],
+       "image": "https://cards.scryfall.io/normal/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+       "legal_commander": false,
+       "oracle_text": "Trample\nWhenever this creature enters or attacks, you may search your library for up to two land cards, put them onto the battlefield tapped, then shuffle."
+      }
+     ],
+     "allies": {"prose":"The kitchen crew.","source_ids":["s1"]},
+     "rivals": {"prose":"Nobody in particular.","source_ids":[]},
+     "standing": {"prose":"A precon face.","source_ids":["3"]},
+     "sources": [{"id":"s1","title":"The Real Page","url":"https://edhrec.com/real"},{"id":"3","title":"the model's title","url":"https://mtg.wiki/Gyome/"}],
+     "sources_dropped": 1,
+     "competitors_dropped": 2,
+     "searched": 2
+    },
+    "cached": true,
+    "generated_at": "2026-08-23T04:05:06.789012+00:00"
+   }
+  }
+ ],
+ "stored": {
+  "key": "0f1b5cea-2035-444c-9f63-87dcb9782c74:1099e695f258d61c",
+  "result": {
+   "who": {"prose":"A troll chef of Kaldheim.","source_ids":["s1","3"]},
+   "archetype": {"name":"Food aristocrats","prose":"Sacrifice Food.","source_ids":["s1"]},
+   "competitors": [
+    {
+     "name": "Craterhoof Behemoth",
+     "prose": "Goes wide.",
+     "source_ids": ["s1"],
+     "mana_cost": "{5}{G}{G}{G}",
+     "type_line": "Creature — Beast",
+     "color_identity": ["G"],
+     "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "legal_commander": true,
+     "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control."
+    },
+    {
+     "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+     "prose": "Cats.",
+     "source_ids": [],
+     "mana_cost": "{1}{W}",
+     "type_line": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+     "color_identity": ["R","W"],
+     "image": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+     "legal_commander": true,
+     "oracle_text": ""
+    },
+    {
+     "name": "Primeval Titan",
+     "prose": "Banned, still real.",
+     "source_ids": ["3"],
+     "mana_cost": "{4}{G}{G}",
+     "type_line": "Creature — Giant",
+     "color_identity": ["G"],
+     "image": "https://cards.scryfall.io/normal/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+     "legal_commander": false,
+     "oracle_text": "Trample\nWhenever this creature enters or attacks, you may search your library for up to two land cards, put them onto the battlefield tapped, then shuffle."
+    }
+   ],
+   "allies": {"prose":"The kitchen crew.","source_ids":["s1"]},
+   "rivals": {"prose":"Nobody in particular.","source_ids":[]},
+   "standing": {"prose":"A precon face.","source_ids":["3"]},
+   "sources": [{"id":"s1","title":"The Real Page","url":"https://edhrec.com/real"},{"id":"3","title":"the model's title","url":"https://mtg.wiki/Gyome/"}],
+   "sources_dropped": 1,
+   "competitors_dropped": 2,
+   "searched": 2
+  },
+  "created_at": "2026-08-23T04:05:06.789012+00:00"
+ },
+ "reports": [
+  {
+   "note": "stance off, no call",
+   "requested": "off",
+   "refresh": true,
+   "turn": null,
+   "report": {
+    "answered_by": "claude",
+    "mode": "commander-dossier",
+    "model": "",
+    "slug": "mini",
+    "commander": "Gyome, Master Chef",
+    "asked": false,
+    "reason": "The stance is off, so no call was made. Nothing else about this deck is affected.",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "dossier": {},
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "cached": false,
+    "usage": {"input_tokens":0,"output_tokens":0,"cache_read_tokens":0},
+    "never": "This is Claude's writing over cited pages. The card facts beside it are the pool's."
+   }
+  },
+  {
+   "note": "the model refused",
+   "requested": "consultant",
+   "refresh": true,
+   "turn": {"model":"claude-sonnet-5","stop_reason":"refusal","text":"","refused":true,"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89,"searched":[],"search_errors":[]},
+   "report": {
+    "answered_by": "claude",
+    "mode": "commander-dossier",
+    "model": "claude-sonnet-5",
+    "slug": "mini",
+    "commander": "Gyome, Master Chef",
+    "asked": true,
+    "reason": "The model declined to write this one.",
+    "stance": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "dossier": {},
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "cached": false,
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "never": "This is Claude's writing over cited pages. The card facts beside it are the pool's."
+   }
+  },
+  {
+   "note": "the answer did not parse",
+   "requested": "consultant",
+   "refresh": true,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "max_tokens",
+    "text": "{\"who\": {\"prose\": \"trunc",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "commander-dossier",
+    "model": "claude-sonnet-5",
+    "slug": "mini",
+    "commander": "Gyome, Master Chef",
+    "asked": true,
+    "reason": "The answer did not parse (stop reason: max_tokens). Nothing was stored.",
+    "stance": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "dossier": {},
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "cached": false,
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "never": "This is Claude's writing over cited pages. The card facts beside it are the pool's."
+   }
+  },
+  {
+   "note": "no source survived",
+   "requested": "consultant",
+   "refresh": true,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"who\": {\"prose\": \"A troll.\", \"source_ids\": [\"s1\"]}, \"archetype\": {\"name\": \"Food\", \"prose\": \"Food.\", \"source_ids\": [\"s1\"]}, \"competitors\": [], \"allies\": {\"prose\": \"\", \"source_ids\": []}, \"rivals\": {\"prose\": \"None worth the name.\", \"source_ids\": []}, \"standing\": {\"prose\": \"Niche.\", \"source_ids\": [\"s1\"]}, \"sources\": [{\"id\": \"s1\", \"title\": \"Made up\", \"url\": \"https://example.com/never-fetched\"}]}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [{"url":"https://edhrec.com/real","title":"The Real Page"}],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "commander-dossier",
+    "model": "claude-sonnet-5",
+    "slug": "mini",
+    "commander": "Gyome, Master Chef",
+    "asked": true,
+    "reason": "No source survived checking, so there is nothing to stand behind the claims. 1 cited page(s) were not among the 1 the search returned.",
+    "stance": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "dossier": {},
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "cached": false,
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "never": "This is Claude's writing over cited pages. The card facts beside it are the pool's."
+   }
+  },
+  {
+   "note": "no source, and the search itself failed",
+   "requested": "consultant",
+   "refresh": true,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"who\": {\"prose\": \"A troll.\", \"source_ids\": []}, \"archetype\": {\"name\": \"\", \"prose\": \"\", \"source_ids\": []}, \"competitors\": [], \"allies\": {\"prose\": \"\", \"source_ids\": []}, \"rivals\": {\"prose\": \"\", \"source_ids\": []}, \"standing\": {\"prose\": \"\", \"source_ids\": []}, \"sources\": []}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [],
+    "search_errors": ["max_uses_exceeded","unavailable"]
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "commander-dossier",
+    "model": "claude-sonnet-5",
+    "slug": "mini",
+    "commander": "Gyome, Master Chef",
+    "asked": true,
+    "reason": "No source survived checking, so there is nothing to stand behind the claims. The search itself reported: max_uses_exceeded; unavailable.",
+    "stance": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "dossier": {},
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "cached": false,
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "never": "This is Claude's writing over cited pages. The card facts beside it are the pool's."
+   }
+  },
+  {
+   "note": "a whole dossier",
+   "requested": "consultant",
+   "refresh": true,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"who\": {\"prose\": \"  A troll chef of Kaldheim.  \", \"source_ids\": [\"s1\", \"s2\", 3]}, \"archetype\": {\"name\": \" Food aristocrats \", \"prose\": \"Sacrifice Food.\", \"source_ids\": [\"s2\", \"s1\"]}, \"competitors\": [{\"card\": \"Craterhoof Behemoth\", \"prose\": \"Goes wide.\", \"source_ids\": [\"s1\"]}, {\"card\": \"Ajani, Nacatl Pariah\", \"prose\": \"Cats.\", \"source_ids\": [\"s2\"]}, {\"card\": \"Not A Real Card\", \"prose\": \"x\", \"source_ids\": [\"s1\"]}, {\"card\": \"Primeval Titan\", \"prose\": \"Banned, still real.\", \"source_ids\": [3]}, {\"card\": 7, \"prose\": \"a number\", \"source_ids\": [\"s1\"]}, \"not an object\"], \"allies\": {\"prose\": \"The kitchen crew.\", \"source_ids\": [\"s1\"]}, \"rivals\": {\"prose\": \"Nobody in particular.\", \"source_ids\": []}, \"standing\": {\"prose\": \"A precon face.\", \"source_ids\": [\"3\"]}, \"sources\": [{\"id\": \"s1\", \"title\": \"the model's title\", \"url\": \"https://edhrec.com/real\"}, {\"id\": \"s2\", \"title\": \"t\", \"url\": \"https://example.com/invented\"}, {\"id\": 3, \"title\": \"the model's title\", \"url\": \"https://mtg.wiki/Gyome/\"}]}",
+    "refused": false,
+    "input_tokens": 4321,
+    "output_tokens": 987,
+    "cache_read_tokens": 2791,
+    "searched": [{"url":"https://edhrec.com/real","title":"The Real Page"},{"url":"https://mtg.wiki/Gyome","title":""}],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "commander-dossier",
+    "model": "claude-sonnet-5",
+    "slug": "mini",
+    "commander": "Gyome, Master Chef",
+    "asked": true,
+    "reason": "",
+    "stance": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "dossier": {
+     "who": {"prose":"A troll chef of Kaldheim.","source_ids":["s1","3"]},
+     "archetype": {"name":"Food aristocrats","prose":"Sacrifice Food.","source_ids":["s1"]},
+     "competitors": [
+      {
+       "name": "Craterhoof Behemoth",
+       "prose": "Goes wide.",
+       "source_ids": ["s1"],
+       "mana_cost": "{5}{G}{G}{G}",
+       "type_line": "Creature — Beast",
+       "color_identity": ["G"],
+       "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+       "legal_commander": true,
+       "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control."
+      },
+      {
+       "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+       "prose": "Cats.",
+       "source_ids": [],
+       "mana_cost": "{1}{W}",
+       "type_line": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+       "color_identity": ["R","W"],
+       "image": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "legal_commander": true,
+       "oracle_text": ""
+      },
+      {
+       "name": "Primeval Titan",
+       "prose": "Banned, still real.",
+       "source_ids": ["3"],
+       "mana_cost": "{4}{G}{G}",
+       "type_line": "Creature — Giant",
+       "color_identity": ["G"],
+       "image": "https://cards.scryfall.io/normal/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+       "legal_commander": false,
+       "oracle_text": "Trample\nWhenever this creature enters or attacks, you may search your library for up to two land cards, put them onto the battlefield tapped, then shuffle."
+      }
+     ],
+     "allies": {"prose":"The kitchen crew.","source_ids":["s1"]},
+     "rivals": {"prose":"Nobody in particular.","source_ids":[]},
+     "standing": {"prose":"A precon face.","source_ids":["3"]},
+     "sources": [{"id":"s1","title":"The Real Page","url":"https://edhrec.com/real"},{"id":"3","title":"the model's title","url":"https://mtg.wiki/Gyome/"}],
+     "sources_dropped": 1,
+     "competitors_dropped": 2,
+     "searched": 2
+    },
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "cached": false,
+    "usage": {"input_tokens":4321,"output_tokens":987,"cache_read_tokens":2791},
+    "never": "This is Claude's writing over cited pages. The card facts beside it are the pool's."
+   }
+  },
+  {
+   "note": "served from the store",
+   "requested": "consultant",
+   "refresh": false,
+   "turn": null,
+   "report": {
+    "answered_by": "claude",
+    "mode": "commander-dossier",
+    "model": "",
+    "slug": "mini",
+    "commander": "Gyome, Master Chef",
+    "asked": false,
+    "reason": "Served from the store; no call was made. Regenerate to write it again.",
+    "stance": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "dossier": {
+     "who": {"prose":"A troll chef of Kaldheim.","source_ids":["s1","3"]},
+     "archetype": {"name":"Food aristocrats","prose":"Sacrifice Food.","source_ids":["s1"]},
+     "competitors": [
+      {
+       "name": "Craterhoof Behemoth",
+       "prose": "Goes wide.",
+       "source_ids": ["s1"],
+       "mana_cost": "{5}{G}{G}{G}",
+       "type_line": "Creature — Beast",
+       "color_identity": ["G"],
+       "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+       "legal_commander": true,
+       "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control."
+      },
+      {
+       "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+       "prose": "Cats.",
+       "source_ids": [],
+       "mana_cost": "{1}{W}",
+       "type_line": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+       "color_identity": ["R","W"],
+       "image": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "legal_commander": true,
+       "oracle_text": ""
+      },
+      {
+       "name": "Primeval Titan",
+       "prose": "Banned, still real.",
+       "source_ids": ["3"],
+       "mana_cost": "{4}{G}{G}",
+       "type_line": "Creature — Giant",
+       "color_identity": ["G"],
+       "image": "https://cards.scryfall.io/normal/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+       "legal_commander": false,
+       "oracle_text": "Trample\nWhenever this creature enters or attacks, you may search your library for up to two land cards, put them onto the battlefield tapped, then shuffle."
+      }
+     ],
+     "allies": {"prose":"The kitchen crew.","source_ids":["s1"]},
+     "rivals": {"prose":"Nobody in particular.","source_ids":[]},
+     "standing": {"prose":"A precon face.","source_ids":["3"]},
+     "sources": [{"id":"s1","title":"The Real Page","url":"https://edhrec.com/real"},{"id":"3","title":"the model's title","url":"https://mtg.wiki/Gyome/"}],
+     "sources_dropped": 1,
+     "competitors_dropped": 2,
+     "searched": 2
+    },
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "cached": true,
+    "usage": {"input_tokens":0,"output_tokens":0,"cache_read_tokens":0},
+    "never": "This is Claude's writing over cited pages. The card facts beside it are the pool's."
+   }
+  }
+ ]
+}

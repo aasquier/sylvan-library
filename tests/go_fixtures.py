@@ -2284,6 +2284,430 @@ def render_argue_cases() -> str:
     }) + "\n"
 
 
+DOSSIER_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "dossier.json"
+RESEARCH_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "research.json"
+
+#: One instant for every stamp in the two corpora below. `generated_at` and a
+#: stored row's `created_at` are `datetime.now(UTC).isoformat()`; the Go tests
+#: freeze their clock to this same string, so a whole report compares as bytes.
+FROZEN_NOW = "2026-08-23T04:05:06.789012+00:00"
+
+#: The dossier tests' deck: Gyome in front of ninety-nine Swamps, which is all
+#: a brief needs and nothing a gate would pass. `tiny_pool` carries Gyome.
+MINI_DECK = """\
+slug: mini
+name: Mini Deck
+status: theoretical
+stage: curated
+commander:
+  - Gyome, Master Chef
+cards:
+  - name: Swamp
+    category: land
+    qty: 99
+    why: Black mana.
+"""
+HEADLESS_DECK = MINI_DECK.replace("commander:\n  - Gyome, Master Chef\n",
+                                  "commander: []\n")
+
+
+class _ClaudeScratch:
+    """The tiny pool, a scratch `app.db`, frozen clocks, and no environment
+    overrides -- everything the dossier and research corpora need held still.
+
+    A context manager written out rather than decorated so the two module
+    clocks are restored whatever the body does; `config.use_paths` puts the
+    dossier store under the scratch data dir exactly as the dossier tests do.
+    """
+
+    _ENV = ("MTGLAB_CLAUDE_STANCE_CEILING", "MTGLAB_CLAUDE_MODEL")
+
+    def __enter__(self) -> None:
+        import tiny_pool
+        from mtglab import config
+        from mtglab.claude import dossier, research
+        self._saved = {k: os.environ.pop(k, None) for k in self._ENV}
+        self._clocks = (dossier._now, research._now)
+        dossier._now = research._now = lambda: FROZEN_NOW
+        self._tmp = tempfile.TemporaryDirectory()
+        root = Path(self._tmp.name)
+        tiny_pool.build(root / "mtg.duckdb")
+        self._paths = config.use_paths(data_dir=root)
+        self._paths.__enter__()
+
+    def __exit__(self, *exc: Any) -> None:
+        from mtglab.claude import dossier, research
+        self._paths.__exit__(*exc)
+        self._tmp.cleanup()
+        dossier._now, research._now = self._clocks
+        for key, value in self._saved.items():
+            if value is not None:
+                os.environ[key] = value
+
+
+def _fake_turn(payload: Any = None, *, mode: str, text: str | None = None,
+               stop_reason: str = "end_turn", refused: bool = False,
+               searched: list[dict[str, str]] | None = None,
+               search_errors: list[str] | None = None,
+               model: str = "claude-sonnet-5", input_tokens: int = 1234,
+               output_tokens: int = 567, cache_read_tokens: int = 89) -> Any:
+    """A `Turn` as `converse` would return it, without the call."""
+    from mtglab.claude.modes import Turn
+    return Turn(mode=mode, model=model, stop_reason=stop_reason,
+                text=json.dumps(payload) if text is None else text,
+                tool_calls=[], input_tokens=input_tokens,
+                output_tokens=output_tokens, searched=list(searched or []),
+                search_errors=list(search_errors or []), refused=refused,
+                cache_read_tokens=cache_read_tokens)
+
+
+def _turn_record(turn: Any) -> dict[str, Any]:
+    """What Go needs to rebuild the same Turn: everything the readers look at."""
+    return {"model": turn.model, "stop_reason": turn.stop_reason,
+            "text": turn.text, "refused": turn.refused,
+            "input_tokens": turn.input_tokens,
+            "output_tokens": turn.output_tokens,
+            "cache_read_tokens": turn.cache_read_tokens,
+            "searched": turn.searched, "search_errors": turn.search_errors}
+
+
+_PAGES = [{"url": "https://edhrec.com/real", "title": "The Real Page"},
+          {"url": "https://mtg.wiki/Gyome", "title": ""}]
+
+
+def dossier_cases() -> dict[str, Any]:
+    """`claude/dossier.py`'s Python-owned halves, held still for the Go port.
+
+    Four tables. **`keys`** is `cache_key` over oracle ids and tiers, with the
+    fingerprint's parts recorded apart so a failure says which half is wrong --
+    and it matters more than any other key in the port, because a dossier
+    Python wrote is served by Go under it after the cutover. **`brief`** is the
+    whole opening message for the tiny pool's Gyome, bytes and all.
+    **`cached_get`** is the free route's three shapes. **`reports`** is every
+    outcome of a run, driven through a fake `converse` with the clock frozen,
+    so the Go side can rebuild each Turn and compare the report it writes as
+    marshalled bytes -- key order included, which is the wire.
+    """
+    from mtglab.api import dossierruns, service
+    from mtglab.claude import client, dossier, tiers
+    from mtglab.decks.model import Deck
+    from mtglab.decks.source import MemoryDeckSource
+
+    with _ClaudeScratch():
+        keys = []
+        for oracle_id in ("", "abc", "a6c1b2d3-0000-4000-8000-000000000042"):
+            for tier in (None, *[t["key"] for t in tiers.roster()], "not-a-tier"):
+                keys.append({"oracle_id": oracle_id, "tier": tier,
+                             "key": dossier.cache_key(oracle_id, tier)})
+        os.environ["MTGLAB_CLAUDE_MODEL"] = "claude-test-1"
+        try:
+            override = [{"oracle_id": "abc", "tier": tier,
+                         "key": dossier.cache_key("abc", tier)}
+                        for tier in (None, "opus")]
+        finally:
+            del os.environ["MTGLAB_CLAUDE_MODEL"]
+        fingerprint = {
+            "version": dossier.DOSSIER_VERSION,
+            "instructions_sha256": hashlib.sha256(
+                dossier.INSTRUCTIONS.encode()).hexdigest(),
+            "schema_dumps": json.dumps(dossier.RESPONSE_SCHEMA, sort_keys=True),
+            "model": client.model(None),
+            "fingerprint": dossier._fingerprint(None),
+        }
+
+        mini = MemoryDeckSource([Deck.from_text(MINI_DECK, slug="mini")])
+        headless = MemoryDeckSource([Deck.from_text(HEADLESS_DECK, slug="mini")])
+        facts = dossier.brief("mini", source=mini)
+        brief = {"slug": "mini", "commander": facts["card"]["name"],
+                 "oracle_id": facts["card"]["oracle_id"], "facts": facts,
+                 "opening": dossier._ask_for(facts),
+                 "label": dossierruns.plan_dossier(
+                     slug="mini", requested="off", source=mini).label}
+        try:
+            dossier.brief("mini", source=headless)
+            raise AssertionError("a headless deck must refuse")
+        except dossier.NoCommander as exc:
+            brief["headless_refusal"] = str(exc)
+
+        cached_get = [
+            {"note": "no row yet",
+             "payload": service.claude_dossier_cached(slug="mini", source=mini)},
+            {"note": "no commander the pool knows",
+             "payload": service.claude_dossier_cached(slug="mini", source=headless)},
+        ]
+
+        reports: list[dict[str, Any]] = []
+        real_converse = dossier.converse
+
+        def run(note: str, turn: Any, *, requested: Any = "consultant",
+                refresh: bool = True) -> dict[str, Any]:
+            def fake(*_a: Any, **_k: Any) -> Any:
+                if turn is None:
+                    raise AssertionError(f"{note}: no call may be made")
+                return turn
+            dossier.converse = fake
+            try:
+                report = dossier.ask("mini", requested=requested,
+                                     refresh=refresh, source=mini)
+            finally:
+                dossier.converse = real_converse
+            row = {"note": note, "requested": requested, "refresh": refresh,
+                   "turn": _turn_record(turn) if turn is not None else None,
+                   "report": report}
+            reports.append(row)
+            return report
+
+        mode = dossier.COMMANDER_DOSSIER.name
+        run("stance off, no call", None, requested="off")
+        run("the model refused", _fake_turn(
+            mode=mode, text="", stop_reason="refusal", refused=True))
+        run("the answer did not parse", _fake_turn(
+            mode=mode, text='{"who": {"prose": "trunc', stop_reason="max_tokens"))
+        run("no source survived", _fake_turn({
+            "who": {"prose": "A troll.", "source_ids": ["s1"]},
+            "archetype": {"name": "Food", "prose": "Food.", "source_ids": ["s1"]},
+            "competitors": [], "allies": {"prose": "", "source_ids": []},
+            "rivals": {"prose": "None worth the name.", "source_ids": []},
+            "standing": {"prose": "Niche.", "source_ids": ["s1"]},
+            "sources": [{"id": "s1", "title": "Made up",
+                         "url": "https://example.com/never-fetched"}],
+        }, mode=mode, searched=_PAGES[:1]))
+        run("no source, and the search itself failed", _fake_turn({
+            "who": {"prose": "A troll.", "source_ids": []},
+            "archetype": {"name": "", "prose": "", "source_ids": []},
+            "competitors": [], "allies": {"prose": "", "source_ids": []},
+            "rivals": {"prose": "", "source_ids": []},
+            "standing": {"prose": "", "source_ids": []}, "sources": [],
+        }, mode=mode, searched=[], search_errors=["max_uses_exceeded", "unavailable"]))
+        whole = run("a whole dossier", _fake_turn({
+            "who": {"prose": "  A troll chef of Kaldheim.  ",
+                    "source_ids": ["s1", "s2", 3]},
+            "archetype": {"name": " Food aristocrats ", "prose": "Sacrifice Food.",
+                          "source_ids": ["s2", "s1"]},
+            "competitors": [
+                {"card": "Craterhoof Behemoth", "prose": "Goes wide.",
+                 "source_ids": ["s1"]},
+                # A double-faced card by its FRONT face -- resolves since
+                # 2026-08-23, when `_competitors` learned `asked_as`.
+                {"card": "Ajani, Nacatl Pariah", "prose": "Cats.",
+                 "source_ids": ["s2"]},
+                {"card": "Not A Real Card", "prose": "x", "source_ids": ["s1"]},
+                {"card": "Primeval Titan", "prose": "Banned, still real.",
+                 "source_ids": [3]},
+                {"card": 7, "prose": "a number", "source_ids": ["s1"]},
+                "not an object",
+            ],
+            "allies": {"prose": "The kitchen crew.", "source_ids": ["s1"]},
+            "rivals": {"prose": "Nobody in particular.", "source_ids": []},
+            "standing": {"prose": "A precon face.", "source_ids": ["3"]},
+            "sources": [
+                {"id": "s1", "title": "the model's title", "url": "https://edhrec.com/real"},
+                {"id": "s2", "title": "t", "url": "https://example.com/invented"},
+                {"id": 3, "title": "the model's title", "url": "https://mtg.wiki/Gyome/"},
+            ],
+        }, mode=mode, searched=_PAGES, input_tokens=4321, output_tokens=987,
+            cache_read_tokens=2791))
+        key = dossier.cache_key(brief["oracle_id"])
+        stored = dossier.get(key)
+        assert stored is not None and stored["created_at"] == FROZEN_NOW
+        run("served from the store", None, requested="consultant", refresh=False)
+        cached_get.append({"note": "a stored row",
+                           "payload": service.claude_dossier_cached(slug="mini", source=mini)})
+        assert whole["dossier"]["competitors"][1]["name"].startswith("Ajani")
+
+    return {"keys": keys, "keys_with_model_override": override,
+            "fingerprint": fingerprint, "brief": brief, "cached_get": cached_get,
+            "stored": {"key": key, **stored}, "reports": reports}
+
+
+def render_dossier_cases() -> str:
+    return _rows_json({
+        "note": "`claude/dossier.py`'s Python-owned halves: the cache key, the "
+                "brief's opening message, the free GET's shapes, and every "
+                "outcome of a run through a fake converse with the clock frozen "
+                f"at {FROZEN_NOW}. Written by `python tests/go_fixtures.py`.",
+        "why": "A dossier Python wrote is served by Go after the cutover under "
+               "the SAME key, so the fingerprint is Python's byte for byte -- "
+               "version, prompt, `json.dumps(schema, sort_keys=True)`, model id "
+               "-- and its parts are recorded apart so a failure localises. The "
+               "reports are compared as marshalled bytes, key order included, "
+               "because the report is the wire and `tier1.Number` taught that a "
+               "value can be right and still go out wrong.",
+        **dossier_cases(),
+    }) + "\n"
+
+
+def research_cases() -> dict[str, Any]:
+    """`claude/research.py`'s Python-owned halves, held still for the Go port.
+
+    `check_question` over every shape a body can carry (a number, a list, an
+    explicit null, control characters Python counts as whitespace), the
+    in-flight key with its whitespace and case normalisation, the job label's
+    sixty-character cut, the default stance and its clamp, and every outcome
+    of a run through a fake `converse`. The one recorded GAP is `casefold`:
+    Python folds and Go lowercases, and the `casefold_gap` row is the input
+    where they differ, pinned so the difference is known rather than found --
+    the key never leaves the process, so nothing can observe it.
+    """
+    from mtglab.api import researchruns
+    from mtglab.claude import research
+    from mtglab.claude import stance as st
+
+    with _ClaudeScratch():
+        questions: list[dict[str, Any]] = []
+        for raw in [None, "", "   ", "  Is Goreclaw still played?  ", 7, True,
+                    False, 0, "x" * research.MAX_QUESTION,
+                    "x" * (research.MAX_QUESTION + 1),
+                    "é" * research.MAX_QUESTION,
+                    "é" * (research.MAX_QUESTION + 1),
+                    "\x1c\x1d", "　tabs\tand nbsp　",
+                    ["a", 1, None, True], "\x1fq\x1f"]:
+            try:
+                questions.append({"raw": raw,
+                                  "question": research.check_question(raw)})
+            except research.QuestionRejected as exc:
+                questions.append({"raw": raw, "rejected": str(exc)})
+
+        keys = [{"question": q, "key": research.question_key(q)} for q in (
+            "Is Goreclaw still played?", "  is   GORECLAW   still played?  ",
+            "is goreclaw\tstill\nplayed?", "Is Goreclaw still played",
+            "ÉCLAIR ou éclair?", " spaced out\x1cwide",
+            "x" * 50)]
+        casefold_gap = {"question": "Straße?",
+                        "key": research.question_key("Straße?"),
+                        # What Go computes instead: the same normalisation
+                        # with `lower()` where Python has `casefold()`.
+                        "lowercased_key": "research:" + hashlib.sha256(
+                            "Straße?".lower().encode()).hexdigest()[:16]}
+
+        labels = []
+        for q in ("Is Goreclaw still played?", "a" * 60, "a" * 61,
+                  "a" * 58 + "  " + "b" * 10, "é" * 70,
+                  "word " * 20):
+            plan = researchruns.plan_research(question=q, requested="off")
+            labels.append({"question": q, "label": plan.label})
+
+        stance_for: list[dict[str, Any]] = []
+        for ceiling in (None, "consultant"):
+            if ceiling is None:
+                os.environ.pop(st.CEILING_ENV, None)
+            else:
+                os.environ[st.CEILING_ENV] = ceiling
+            try:
+                for requested in (None, "off", "consultant", "collaborator",
+                                  {"initiative": "on-request"}):
+                    stance_for.append({
+                        "ceiling": ceiling, "requested": requested,
+                        "describe": st.describe(research.stance_for(requested))})
+            finally:
+                os.environ.pop(st.CEILING_ENV, None)
+
+        ask_for = [{"question": q, "message": research._ask_for(q)}
+                   for q in ("Is Goreclaw still played?", "two\nlines")]
+
+        reports: list[dict[str, Any]] = []
+        real_converse = research.converse
+
+        def run(note: str, turn: Any, *, question: str = "Is Goreclaw still played?",
+                requested: Any = None) -> dict[str, Any]:
+            def fake(*_a: Any, **_k: Any) -> Any:
+                if turn is None:
+                    raise AssertionError(f"{note}: no call may be made")
+                return turn
+            research.converse = fake
+            try:
+                report = research.ask(question, requested=requested)
+            finally:
+                research.converse = real_converse
+            reports.append({"note": note, "question": question,
+                            "requested": requested,
+                            "turn": _turn_record(turn) if turn is not None else None,
+                            "report": report})
+            return report
+
+        mode = research.RESEARCH.name
+        run("stance off, no call", None, requested="off")
+        run("the model refused", _fake_turn(
+            mode=mode, text="", stop_reason="refusal", refused=True))
+        run("the answer did not parse", _fake_turn(
+            mode=mode, text='{"answer": "trunc', stop_reason="max_tokens"))
+        run("no source survived", _fake_turn({
+            "answer": "Confidently wrong.",
+            "findings": [{"claim": "Everyone says so.", "source_ids": ["s1"]}],
+            "cards": [], "confidence": "settled",
+            "sources": [{"id": "s1", "title": "Invented",
+                         "url": "https://example.com/never-fetched"}],
+        }, mode=mode, searched=_PAGES[:1]))
+        run("no source, and the search itself failed", _fake_turn({
+            "answer": "", "findings": [], "cards": [], "confidence": "thin",
+            "sources": [],
+        }, mode=mode, searched=[], search_errors=["max_uses_exceeded"]))
+        run("a grounded answer", _fake_turn({
+            "answer": "  It is still played in stompy lists.  ",
+            "findings": [
+                {"claim": "cEDH primers rate it a trap.", "source_ids": ["s1"]},
+                {"claim": "Rests on nothing.", "source_ids": []},
+                {"claim": "Rests on an invented page.", "source_ids": ["s2"]},
+                {"claim": "A numeric id that survives.", "source_ids": [3]},
+                {"claim": "Four.", "source_ids": ["s1"]},
+                {"claim": "Five.", "source_ids": ["s1", "s2"]},
+                {"claim": "Six.", "source_ids": ["3"]},
+                {"claim": "Seven, past the cap.", "source_ids": ["s1"]},
+                "not an object",
+            ],
+            "cards": ["Craterhoof Behemoth", "Ajani, Nacatl Pariah",
+                      "Spoiled Card", "craterhoof behemoth", 7,
+                      "Primeval Titan", None, ""],
+            "confidence": "vibes",
+            "sources": [
+                {"id": "s1", "title": "the model's title", "url": "https://edhrec.com/real"},
+                {"id": "s2", "title": "t", "url": "https://example.com/invented"},
+                {"id": 3, "title": "the model's title", "url": "https://mtg.wiki/Gyome/"},
+            ],
+        }, mode=mode, searched=_PAGES, input_tokens=4321, output_tokens=987,
+            cache_read_tokens=2062))
+        run("a contested answer with nothing named", _fake_turn({
+            "answer": "People disagree.", "findings": [
+                {"claim": "Some say yes.", "source_ids": ["s1"]}],
+            "cards": [], "confidence": "contested",
+            "sources": [{"id": "s1", "title": "", "url": "https://edhrec.com/real"}],
+        }, mode=mode, searched=_PAGES[:1]), question="  a   question  with   spaces ",
+            requested={"initiative": "on-request", "scope": "rethink"})
+        # More grounded findings than the cap. The grounded case above lands
+        # on EXACTLY six survivors, so the cap never trims there and a port
+        # that forgot it would pass -- a mutation run said so. Here nine
+        # survive the citation check and six reach the wire.
+        run("more findings than the cap", _fake_turn({
+            "answer": "Plenty.",
+            "findings": [{"claim": f"Finding {i}.", "source_ids": ["s1"]}
+                         for i in range(1, 10)],
+            "cards": [], "confidence": "settled",
+            "sources": [{"id": "s1", "title": "t", "url": "https://edhrec.com/real"}],
+        }, mode=mode, searched=_PAGES[:1]))
+
+    return {"questions": questions, "keys": keys, "casefold_gap": casefold_gap,
+            "labels": labels, "stance_for": stance_for, "ask_for": ask_for,
+            "reports": reports}
+
+
+def render_research_cases() -> str:
+    return _rows_json({
+        "note": "`claude/research.py`'s Python-owned halves: the question "
+                "check, the in-flight key, the job label, the default stance, "
+                "the opening message, and every outcome of a run through a "
+                f"fake converse with the clock frozen at {FROZEN_NOW}. Written "
+                "by `python tests/go_fixtures.py`.",
+        "why": "ADR 26's mode cannot see a deck, and nothing here takes one. "
+               "What can vary is what a person typed: `str(raw or '')` over a "
+               "number, a list or a null, `len()` in code points, whitespace "
+               "as Python counts it (the information separators included). "
+               "The reports compare as marshalled bytes, key order included. "
+               "The one recorded gap is casefold versus lowercase in the "
+               "in-flight key, which never leaves the process.",
+        **research_cases(),
+    }) + "\n"
+
+
 STANCE_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "stance.json"
 
 
@@ -2997,6 +3421,9 @@ def write() -> None:
     ARGUE_PATH.parent.mkdir(parents=True, exist_ok=True)
     ARGUE_PATH.write_text(render_argue_cases(), encoding="utf-8")
     SOURCES_PATH.write_text(render_sources_cases(), encoding="utf-8")
+    DOSSIER_PATH.write_text(render_dossier_cases(), encoding="utf-8")
+    RESEARCH_PATH.write_text(render_research_cases(), encoding="utf-8")
+    print(f"wrote the dossier and research corpora into {DOSSIER_PATH.parent}")
     _stance = stance_cases()
     print(f"wrote {len(_stance['stances'])} stances and "
           f"{len(_stance['clamps'])} clamp pairs into {STANCE_PATH}")

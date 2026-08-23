@@ -1,0 +1,557 @@
+{
+ "note": "`claude/research.py`'s Python-owned halves: the question check, the in-flight key, the job label, the default stance, the opening message, and every outcome of a run through a fake converse with the clock frozen at 2026-08-23T04:05:06.789012+00:00. Written by `python tests/go_fixtures.py`.",
+ "why": "ADR 26's mode cannot see a deck, and nothing here takes one. What can vary is what a person typed: `str(raw or '')` over a number, a list or a null, `len()` in code points, whitespace as Python counts it (the information separators included). The reports compare as marshalled bytes, key order included. The one recorded gap is casefold versus lowercase in the in-flight key, which never leaves the process.",
+ "questions": [
+  {"raw":null,"rejected":"Ask something. The research surface takes a question about Magic in plain words."},
+  {"raw":"","rejected":"Ask something. The research surface takes a question about Magic in plain words."},
+  {"raw":"   ","rejected":"Ask something. The research surface takes a question about Magic in plain words."},
+  {"raw":"  Is Goreclaw still played?  ","question":"Is Goreclaw still played?"},
+  {"raw":7,"question":"7"},
+  {"raw":true,"question":"True"},
+  {"raw":false,"rejected":"Ask something. The research surface takes a question about Magic in plain words."},
+  {"raw":0,"rejected":"Ask something. The research surface takes a question about Magic in plain words."},
+  {
+   "raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "question": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "rejected": "That question is 2001 characters, and the ceiling is 2000. Anything longer is usually a pasted decklist, and this surface cannot see decks in any case -- ask the question on its own."
+  },
+  {
+   "raw": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+   "question": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+  },
+  {
+   "raw": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+   "rejected": "That question is 2001 characters, and the ceiling is 2000. Anything longer is usually a pasted decklist, and this surface cannot see decks in any case -- ask the question on its own."
+  },
+  {"raw":"\u001c\u001d","rejected":"Ask something. The research surface takes a question about Magic in plain words."},
+  {"raw":"　tabs\tand nbsp　","question":"tabs\tand nbsp"},
+  {"raw":["a",1,null,true],"question":"['a', 1, None, True]"},
+  {"raw":"\u001fq\u001f","question":"q"}
+ ],
+ "keys": [
+  {"question":"Is Goreclaw still played?","key":"research:05cc297e4744437f"},
+  {"question":"  is   GORECLAW   still played?  ","key":"research:05cc297e4744437f"},
+  {"question":"is goreclaw\tstill\nplayed?","key":"research:05cc297e4744437f"},
+  {"question":"Is Goreclaw still played","key":"research:cd25b778e24cf254"},
+  {"question":"ÉCLAIR ou éclair?","key":"research:18547fca24f57d98"},
+  {"question":" spaced out\u001cwide","key":"research:211918633714d21a"},
+  {"question":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","key":"research:77cf12060d47183e"}
+ ],
+ "casefold_gap": {"question":"Straße?","key":"research:603e07e765339a66","lowercased_key":"research:bc115a9dd2508661"},
+ "labels": [
+  {"question":"Is Goreclaw still played?","label":"research: Is Goreclaw still played?"},
+  {"question":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","label":"research: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+  {"question":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","label":"research: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa..."},
+  {"question":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  bbbbbbbbbb","label":"research: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa..."},
+  {"question":"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé","label":"research: éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé..."},
+  {"question":"word word word word word word word word word word word word word word word word word word word word ","label":"research: word word word word word word word word word word word word..."}
+ ],
+ "stance_for": [
+  {
+   "ceiling": null,
+   "requested": null,
+   "describe": {
+    "preset": "second-opinion",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "ceiling": null,
+   "requested": "off",
+   "describe": {
+    "preset": "off",
+    "allows_calls": false,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "ceiling": null,
+   "requested": "consultant",
+   "describe": {
+    "preset": "consultant",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "ceiling": null,
+   "requested": "collaborator",
+   "describe": {
+    "preset": "collaborator",
+    "allows_calls": true,
+    "may_write": true,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "ceiling": null,
+   "requested": {"initiative":"on-request"},
+   "describe": {
+    "preset": "consultant",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "ceiling": "consultant",
+   "requested": null,
+   "describe": {
+    "preset": "consultant",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "ceiling": "consultant",
+   "requested": "off",
+   "describe": {
+    "preset": "off",
+    "allows_calls": false,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "ceiling": "consultant",
+   "requested": "consultant",
+   "describe": {
+    "preset": "consultant",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "ceiling": "consultant",
+   "requested": "collaborator",
+   "describe": {
+    "preset": "consultant",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "ceiling": "consultant",
+   "requested": {"initiative":"on-request"},
+   "describe": {
+    "preset": "consultant",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  }
+ ],
+ "ask_for": [
+  {
+   "question": "Is Goreclaw still played?",
+   "message": "Here is the question, in the user's own words. Search for what you need, look up every card you are going to name, and answer it.\n\nIs Goreclaw still played?"
+  },
+  {"question":"two\nlines","message":"Here is the question, in the user's own words. Search for what you need, look up every card you are going to name, and answer it.\n\ntwo\nlines"}
+ ],
+ "reports": [
+  {
+   "note": "stance off, no call",
+   "question": "Is Goreclaw still played?",
+   "requested": "off",
+   "turn": null,
+   "report": {
+    "answered_by": "claude",
+    "mode": "research",
+    "model": "",
+    "question": "Is Goreclaw still played?",
+    "asked": false,
+    "reason": "The stance is off, so no call was made. Nothing else about the app is affected.",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "research": {},
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "usage": {"input_tokens":0,"output_tokens":0,"cache_read_tokens":0},
+    "never": "This is Claude's reading of the cited pages, not the tool's own answer. It has not seen any of your decks."
+   }
+  },
+  {
+   "note": "the model refused",
+   "question": "Is Goreclaw still played?",
+   "requested": null,
+   "turn": {"model":"claude-sonnet-5","stop_reason":"refusal","text":"","refused":true,"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89,"searched":[],"search_errors":[]},
+   "report": {
+    "answered_by": "claude",
+    "mode": "research",
+    "model": "claude-sonnet-5",
+    "question": "Is Goreclaw still played?",
+    "asked": true,
+    "reason": "The model declined to answer this one.",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "research": {},
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "never": "This is Claude's reading of the cited pages, not the tool's own answer. It has not seen any of your decks."
+   }
+  },
+  {
+   "note": "the answer did not parse",
+   "question": "Is Goreclaw still played?",
+   "requested": null,
+   "turn": {"model":"claude-sonnet-5","stop_reason":"max_tokens","text":"{\"answer\": \"trunc","refused":false,"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89,"searched":[],"search_errors":[]},
+   "report": {
+    "answered_by": "claude",
+    "mode": "research",
+    "model": "claude-sonnet-5",
+    "question": "Is Goreclaw still played?",
+    "asked": true,
+    "reason": "The answer did not parse (stop reason: max_tokens).",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "research": {},
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "never": "This is Claude's reading of the cited pages, not the tool's own answer. It has not seen any of your decks."
+   }
+  },
+  {
+   "note": "no source survived",
+   "question": "Is Goreclaw still played?",
+   "requested": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"answer\": \"Confidently wrong.\", \"findings\": [{\"claim\": \"Everyone says so.\", \"source_ids\": [\"s1\"]}], \"cards\": [], \"confidence\": \"settled\", \"sources\": [{\"id\": \"s1\", \"title\": \"Invented\", \"url\": \"https://example.com/never-fetched\"}]}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [{"url":"https://edhrec.com/real","title":"The Real Page"}],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "research",
+    "model": "claude-sonnet-5",
+    "question": "Is Goreclaw still played?",
+    "asked": true,
+    "reason": "No source survived checking, so there is nothing to stand behind an answer. 1 cited page(s) were not among the 1 the search returned.",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "research": {},
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "never": "This is Claude's reading of the cited pages, not the tool's own answer. It has not seen any of your decks."
+   }
+  },
+  {
+   "note": "no source, and the search itself failed",
+   "question": "Is Goreclaw still played?",
+   "requested": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"answer\": \"\", \"findings\": [], \"cards\": [], \"confidence\": \"thin\", \"sources\": []}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [],
+    "search_errors": ["max_uses_exceeded"]
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "research",
+    "model": "claude-sonnet-5",
+    "question": "Is Goreclaw still played?",
+    "asked": true,
+    "reason": "No source survived checking, so there is nothing to stand behind an answer. The search itself reported: max_uses_exceeded.",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "research": {},
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "never": "This is Claude's reading of the cited pages, not the tool's own answer. It has not seen any of your decks."
+   }
+  },
+  {
+   "note": "a grounded answer",
+   "question": "Is Goreclaw still played?",
+   "requested": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"answer\": \"  It is still played in stompy lists.  \", \"findings\": [{\"claim\": \"cEDH primers rate it a trap.\", \"source_ids\": [\"s1\"]}, {\"claim\": \"Rests on nothing.\", \"source_ids\": []}, {\"claim\": \"Rests on an invented page.\", \"source_ids\": [\"s2\"]}, {\"claim\": \"A numeric id that survives.\", \"source_ids\": [3]}, {\"claim\": \"Four.\", \"source_ids\": [\"s1\"]}, {\"claim\": \"Five.\", \"source_ids\": [\"s1\", \"s2\"]}, {\"claim\": \"Six.\", \"source_ids\": [\"3\"]}, {\"claim\": \"Seven, past the cap.\", \"source_ids\": [\"s1\"]}, \"not an object\"], \"cards\": [\"Craterhoof Behemoth\", \"Ajani, Nacatl Pariah\", \"Spoiled Card\", \"craterhoof behemoth\", 7, \"Primeval Titan\", null, \"\"], \"confidence\": \"vibes\", \"sources\": [{\"id\": \"s1\", \"title\": \"the model's title\", \"url\": \"https://edhrec.com/real\"}, {\"id\": \"s2\", \"title\": \"t\", \"url\": \"https://example.com/invented\"}, {\"id\": 3, \"title\": \"the model's title\", \"url\": \"https://mtg.wiki/Gyome/\"}]}",
+    "refused": false,
+    "input_tokens": 4321,
+    "output_tokens": 987,
+    "cache_read_tokens": 2062,
+    "searched": [{"url":"https://edhrec.com/real","title":"The Real Page"},{"url":"https://mtg.wiki/Gyome","title":""}],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "research",
+    "model": "claude-sonnet-5",
+    "question": "Is Goreclaw still played?",
+    "asked": true,
+    "reason": "",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "research": {
+     "answer": "It is still played in stompy lists.",
+     "findings": [
+      {"claim":"cEDH primers rate it a trap.","source_ids":["s1"]},
+      {"claim":"A numeric id that survives.","source_ids":["3"]},
+      {"claim":"Four.","source_ids":["s1"]},
+      {"claim":"Five.","source_ids":["s1"]},
+      {"claim":"Six.","source_ids":["3"]},
+      {"claim":"Seven, past the cap.","source_ids":["s1"]}
+     ],
+     "cards": [
+      {
+       "name": "Craterhoof Behemoth",
+       "in_pool": true,
+       "mana_cost": "{5}{G}{G}{G}",
+       "type_line": "Creature — Beast",
+       "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control.",
+       "color_identity": ["G"],
+       "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+       "legal_commander": true
+      },
+      {
+       "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+       "in_pool": true,
+       "mana_cost": "{1}{W}",
+       "type_line": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+       "oracle_text": "",
+       "color_identity": ["R","W"],
+       "image": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "legal_commander": true
+      },
+      {"name":"Spoiled Card","in_pool":false},
+      {"name":"7","in_pool":false},
+      {
+       "name": "Primeval Titan",
+       "in_pool": true,
+       "mana_cost": "{4}{G}{G}",
+       "type_line": "Creature — Giant",
+       "oracle_text": "Trample\nWhenever this creature enters or attacks, you may search your library for up to two land cards, put them onto the battlefield tapped, then shuffle.",
+       "color_identity": ["G"],
+       "image": "https://cards.scryfall.io/normal/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+       "legal_commander": false
+      }
+     ],
+     "confidence": "thin",
+     "sources": [{"id":"s1","title":"The Real Page","url":"https://edhrec.com/real"},{"id":"3","title":"the model's title","url":"https://mtg.wiki/Gyome/"}],
+     "sources_dropped": 1,
+     "findings_dropped": 3,
+     "cards_unresolved": 2,
+     "searched": 2
+    },
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "usage": {"input_tokens":4321,"output_tokens":987,"cache_read_tokens":2062},
+    "never": "This is Claude's reading of the cited pages, not the tool's own answer. It has not seen any of your decks."
+   }
+  },
+  {
+   "note": "a contested answer with nothing named",
+   "question": "  a   question  with   spaces ",
+   "requested": {"initiative":"on-request","scope":"rethink"},
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"answer\": \"People disagree.\", \"findings\": [{\"claim\": \"Some say yes.\", \"source_ids\": [\"s1\"]}], \"cards\": [], \"confidence\": \"contested\", \"sources\": [{\"id\": \"s1\", \"title\": \"\", \"url\": \"https://edhrec.com/real\"}]}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [{"url":"https://edhrec.com/real","title":"The Real Page"}],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "research",
+    "model": "claude-sonnet-5",
+    "question": "a   question  with   spaces",
+    "asked": true,
+    "reason": "",
+    "stance": {
+     "preset": null,
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "research": {
+     "answer": "People disagree.",
+     "findings": [{"claim":"Some say yes.","source_ids":["s1"]}],
+     "cards": [],
+     "confidence": "contested",
+     "sources": [{"id":"s1","title":"The Real Page","url":"https://edhrec.com/real"}],
+     "sources_dropped": 0,
+     "findings_dropped": 0,
+     "cards_unresolved": 0,
+     "searched": 1
+    },
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "never": "This is Claude's reading of the cited pages, not the tool's own answer. It has not seen any of your decks."
+   }
+  },
+  {
+   "note": "more findings than the cap",
+   "question": "Is Goreclaw still played?",
+   "requested": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"answer\": \"Plenty.\", \"findings\": [{\"claim\": \"Finding 1.\", \"source_ids\": [\"s1\"]}, {\"claim\": \"Finding 2.\", \"source_ids\": [\"s1\"]}, {\"claim\": \"Finding 3.\", \"source_ids\": [\"s1\"]}, {\"claim\": \"Finding 4.\", \"source_ids\": [\"s1\"]}, {\"claim\": \"Finding 5.\", \"source_ids\": [\"s1\"]}, {\"claim\": \"Finding 6.\", \"source_ids\": [\"s1\"]}, {\"claim\": \"Finding 7.\", \"source_ids\": [\"s1\"]}, {\"claim\": \"Finding 8.\", \"source_ids\": [\"s1\"]}, {\"claim\": \"Finding 9.\", \"source_ids\": [\"s1\"]}], \"cards\": [], \"confidence\": \"settled\", \"sources\": [{\"id\": \"s1\", \"title\": \"t\", \"url\": \"https://edhrec.com/real\"}]}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [{"url":"https://edhrec.com/real","title":"The Real Page"}],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "research",
+    "model": "claude-sonnet-5",
+    "question": "Is Goreclaw still played?",
+    "asked": true,
+    "reason": "",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "research": {
+     "answer": "Plenty.",
+     "findings": [
+      {"claim":"Finding 1.","source_ids":["s1"]},
+      {"claim":"Finding 2.","source_ids":["s1"]},
+      {"claim":"Finding 3.","source_ids":["s1"]},
+      {"claim":"Finding 4.","source_ids":["s1"]},
+      {"claim":"Finding 5.","source_ids":["s1"]},
+      {"claim":"Finding 6.","source_ids":["s1"]}
+     ],
+     "cards": [],
+     "confidence": "settled",
+     "sources": [{"id":"s1","title":"The Real Page","url":"https://edhrec.com/real"}],
+     "sources_dropped": 0,
+     "findings_dropped": 0,
+     "cards_unresolved": 0,
+     "searched": 1
+    },
+    "generated_at": "2026-08-23T04:05:06.789012+00:00",
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "never": "This is Claude's reading of the cited pages, not the tool's own answer. It has not seen any of your decks."
+   }
+  }
+ ]
+}

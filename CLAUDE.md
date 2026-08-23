@@ -452,13 +452,19 @@ src/mtglab/
                           per job, stopped when idle, gate flipped by
                           MTGLAB_FORGE_WORKER + MTGLAB_FLY_API_TOKEN
   api/themeruns.py        both theme halves, same shape (226s / 134s, ADR 20)
-  api/dossierruns.py      the commander dossier, same shape (236s, ADR 19)
+  api/dossierruns.py      the commander dossier, same shape (236s, ADR 19).
+                          FLIPPED to go/internal/api/dossier.go 2026-08-23
+                          (Phase 6): both halves, the free GET and the job,
+                          answer from the door, and the Go job lands in the
+                          registry the hybrid poll routes already read
   api/scanruns.py         one photographed card read by Claude, same shape
                           (ADR 34) — and the first whose duration is
                           **unmeasured**, which is the reason it is a job
                           rather than an argument that it needs to be
   api/researchruns.py     research, same shape (265s, ADR 26) — and the first
-                          one that was a job before it was a failure
+                          one that was a job before it was a failure. FLIPPED
+                          to go/internal/api/research.go 2026-08-23, taking
+                          no owner and no deck, which is the contract
   api/argueruns.py        the slot argument swept across a selection, same
                           shape; one job for the sweep, one card at a time
   api/auth.py             the deny-by-default middleware and login routes
@@ -1193,23 +1199,29 @@ go/                       the Go module (ADR 38; module path
                           again, and the same lesson as `converse` handing the
                           model `no deck 'x'` where DeckNotFound stringifies to
                           the bare slug. **The other was a WART, reproduced
-                          rather than fixed**: a malformed stance is a **502**,
-                          not the 422 `api/app.py` looks like it gives. That
-                          route has an `except ValueError` branch commented "A
-                          malformed stance" and the branch is DEAD CODE --
-                          `service.claude_interview` re-raises only
+                          rather than fixed -- and then, a day later, ruled
+                          and fixed in both runtimes at once** (2026-08-23):
+                          a malformed stance was a **502**, not the 422
+                          `api/app.py` looked like it gave. That route has an
+                          `except ValueError` branch commented "A malformed
+                          stance" and the branch was DEAD CODE --
+                          `service.claude_interview` re-raised only
                           ClaudeUnavailable, CardNotInDeck and DeckNotFound, so
-                          a stance ValueError is swallowed by the broad
+                          a stance ValueError was swallowed by the broad
                           `except Exception` and answered as ClaudeFailed
-                          before the route's own branch is consulted. Go had
+                          before the route's own branch was consulted. Go had
                           been written to the docstring's intent and was
                           IMPROVING on Python, which is not a flip;
                           `ErrStanceRejected` (wrapped inside `Resolve`, so
-                          the six remaining modes inherit it) now routes to
-                          502 in a branch that exists to make the wart visible
-                          at the one place somebody would fix it -- one line
-                          here, the re-raise tuple there, both runtimes at
-                          once, the way `edit.set_shared` went. The Claude
+                          the six remaining modes inherit it) routed to 502
+                          for a day, in a branch that existed to make the wart
+                          visible at the one place somebody would fix it. The
+                          fix is `stance.StanceRejected(ValueError)` -- the
+                          name the service layer re-raises by, same sentence,
+                          so the route's own branch finally answers -- and one
+                          line in `refuseClaude`, both runtimes at once, the
+                          way `edit.set_shared` went. The request was wrong,
+                          not the call. The Claude
                           ledger shares the activity log's app.db handle
                           rather than opening a second mode=rw. Seventeen route tests, and the one
                           that would not exist without `tier1.Number`'s lesson
@@ -1274,10 +1286,13 @@ go/                       the Go module (ADR 38; module path
                           payload key orders, all Python's: `oracle_text` is
                           fifth in a research card and LAST in a competitor,
                           and an unresolved card has exactly two keys. It found
-                          a Python bug (`_competitors` does not index
-                          `asked_as`, so a DFC named by its front face is
-                          dropped as invented there and resolves in research --
-                          reproduced, pinned, raised) and one of OUR OWN, which
+                          a Python bug (`_competitors` did not index
+                          `asked_as`, so a DFC named by its front face was
+                          dropped as invented there and resolved in research --
+                          reproduced, pinned, raised, and **fixed in both
+                          runtimes on 2026-08-23**, commanders being exactly
+                          the population most likely to be double-faced) and
+                          one of OUR OWN, which
                           is the general lesson: **Python's `str()` renders a
                           non-string where Go's `v.(string)` answers ""**, so a
                           numeric claim is kept by Python and dropped by Go.
@@ -1290,18 +1305,85 @@ go/                       the Go module (ADR 38; module path
                           OnlyQuestions and OnlyCharges**, near-unreachable
                           because those fields are schema-declared strings, and
                           named here so it is not rediscovered.
+                          **Then the two searching modes themselves,
+                          2026-08-23, and three routes flipped with them --
+                          the first Claude JOB families the door answers.**
+                          internal/claude/dossier.go and research.go are
+                          dossier.py and research.py: the brief (over
+                          `deckread.CommanderDossier`, extracted from the
+                          `.../commander` handler so the counted strip and the
+                          model's facts are one query, ADR 19), check/run
+                          split exactly as Python splits it, and the report
+                          types in Python's key order. internal/api/dossier.go
+                          answers `GET .../dossier` (free, never calls) and
+                          `POST .../dossier` (a job on the NET lane, keyed on
+                          the cache key so a second click joins the first);
+                          internal/api/research.go answers
+                          `POST /api/claude/research` (a job keyed on the
+                          normalised question; no owner, no deck -- the
+                          absence is the contract, ADR 26, and a test holds
+                          the plan's types free of one). Both land in the
+                          registry the hybrid poll routes already read, so
+                          `/api/jobs/{id}` needed nothing. **The dossier
+                          cache key is Python's byte for byte, deliberately
+                          and unlike the sim cache's**: a dossier is the
+                          model's prose after a source check both runtimes
+                          hold to one corpus, so the rows are SHARED and every
+                          commander already written is served after the
+                          cutover rather than paid for again -- `Fingerprint`
+                          hashes the same version, the same instruction bytes
+                          (they cross in modes.json), the same
+                          `json.dumps(schema, sort_keys=True)` (pyjson.go, a
+                          transcription of `json.encoder` with the input set
+                          closed) and the same model id, and the corpus holds
+                          the keys and the fingerprint's parts apart so a
+                          failure localises. Held to Python by two corpora
+                          `tests/go_fixtures.py` writes with the clock frozen:
+                          every outcome of a run -- stance off, refused,
+                          unparsed, no source (with and without search
+                          errors), a whole dossier, served from the store --
+                          compared as marshalled bytes, key order included;
+                          the brief's whole opening message as bytes; the free
+                          GET's three shapes (two key sets: a deck with no
+                          commander has FIVE keys and no `answered_by`);
+                          `check_question` over every shape a body can carry
+                          (`str(raw or "")` over a number, a list, a null;
+                          `len()` in code points; whitespace as Python counts
+                          it, the four information separators included). Two
+                          Go-only divergences found and fixed in passing, both
+                          the `unavailable` lesson again: `Converse` wrapped an
+                          API failure as `"%s: %s"` of the mode name and
+                          `Explain`, so the 502 `detail` and every job error
+                          carried a `rationale-interview: ` prefix Python never
+                          writes (`apiFailure` now: `Error()` is the bare
+                          explanation, `Unwrap()` the SDK's error); and the
+                          turn ceiling read `mode exhausted: ... half-done`
+                          where `str(ModeExhausted)` has no prefix and ends in
+                          a full stop. Two warts reproduced: the GET reads the
+                          store under the DEFAULT tier's key (Python's
+                          `cache_key(oracle_id)` with no tier), and a stance
+                          off or a stored row answers before the key is asked
+                          for, so a dossier somebody else wrote is served on
+                          an instance with no key. One recorded gap: the
+                          research in-flight key `casefold`s in Python and
+                          lowercases in Go -- it never leaves the process, so
+                          nothing can observe it, and the corpus pins the one
+                          input where they differ so it is known rather than
+                          found. And the GET, in Go, never CREATES app.db:
+                          Python's `get` would, through `auth.db.connect`, and
+                          a reader that acquires a database is the one thing
+                          the door refuses to be.
                           **Still Python, and ENUMERATED rather than
                           counted** (this file's own lesson about numbers):
-                          the orchestration of dossier, research, both theme
-                          halves and scan; and the routes `/api/claude`,
-                          `/api/claude/research`, `/api/claude/scan`,
-                          `/api/claude/theme`, `/api/claude/theme/proposal`,
-                          `.../argue/deck` and `.../dossier` (a GET and a
-                          POST). Five of those are job families, so each waits
-                          on its own submit-and-poll rather than on this one.
-                          `/api/admin/stats/claude` is NOT this family and
-                          never was -- it is the admin roll-up, still Python
-                          for the coupling Phase 4 recorded.
+                          the orchestration of both theme halves and scan; and
+                          the routes `/api/claude`, `/api/claude/scan`,
+                          `/api/claude/theme`, `/api/claude/theme/proposal`
+                          and `.../argue/deck`. Four of those are job
+                          families, so each waits on its own submit-and-poll
+                          rather than on this one. `/api/admin/stats/claude`
+                          is NOT this family and never was -- it is the admin
+                          roll-up, still Python for the coupling Phase 4
+                          recorded.
                           The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY

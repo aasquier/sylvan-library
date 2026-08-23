@@ -660,9 +660,17 @@ func TestAnAPIFailureRecordsNothing(t *testing.T) {
 	if err == nil {
 		t.Fatal("a 401 was not reported")
 	}
-	// And it is reported in the words somebody reads at 2am.
+	// And it is reported in the words somebody reads at 2am -- as the whole
+	// of `err.Error()`, not merely inside it. Python's `str(exc)` for a
+	// failed call is `explain(exc)` and nothing else; a route's 502 and a
+	// job's error both render Explain(err) and would hide a prefix here, so
+	// this is the one place a stray "mode: " on the error itself is visible
+	// -- a mutation run found the assertion missing.
 	if !strings.Contains(err.Error(), "It may have expired") {
 		t.Errorf("a 401 should say the key may have expired: %v", err)
+	}
+	if err.Error() != Explain(err) {
+		t.Errorf("the error reads %q; it must be exactly its explanation %q", err.Error(), Explain(err))
 	}
 	if rows := ledgerRows(t, ledPath); len(rows) != 0 {
 		t.Errorf("an API failure was recorded as a conversation: %+v", rows)
@@ -825,4 +833,57 @@ func ledgerRows(t *testing.T, path string) []ledger.Row {
 		out = append(out, r)
 	}
 	return out
+}
+
+// The assistant turn goes back as it arrived -- every block's own bytes --
+// and not through the SDK's typed conversion. The case that found it: the
+// dated web search filters inside a code-execution container, and the turn
+// that ran it carries a `code_execution_tool_result` whose content is the
+// ENCRYPTED result variant. `ToParam` in anthropic-sdk-go v1.66.0 has no
+// branch for that variant and renders an empty plain result the API refuses
+// with a 400 -- on the second turn of every dossier, after the search was
+// paid for. Found by the live case, 2026-08-23, and by nothing else.
+func TestTheAssistantTurnIsResentAsItArrived(t *testing.T) {
+	encrypted := `{"type":"code_execution_tool_result","tool_use_id":"srv_9",` +
+		`"content":{"type":"encrypted_code_execution_result","encrypted_stdout":"c2VjcmV0",` +
+		`"content":[],"return_code":0,"stderr":""}}`
+	api := &scriptedAPI{replies: []string{
+		reply{stop: "tool_use", container: "cont_1",
+			content: thinkingBlock() + "," + encrypted + "," + searchOK("https://a") + "," +
+				toolUse("tu_1", "list_decks", "{}")}.json(),
+		reply{stop: "end_turn", content: textBlock("done")}.json(),
+	}}
+	api.start(t)
+	if _, err := Converse(context.Background(), testMode(t, nil),
+		Request{Messages: ask(t), Stance: testStance(t)}); err != nil {
+		t.Fatalf("converse: %v", err)
+	}
+	if len(api.requests) != 2 {
+		t.Fatalf("%d requests, want 2", len(api.requests))
+	}
+	msgs, _ := api.requests[1]["messages"].([]any)
+	if len(msgs) != 3 {
+		t.Fatalf("the second request carried %d messages, want 3", len(msgs))
+	}
+	assistant, _ := msgs[1].(map[string]any)
+	blocks, _ := assistant["content"].([]any)
+	if len(blocks) != 4 {
+		t.Fatalf("the assistant turn carried %d blocks, want 4 (thinking, result, search, tool use)", len(blocks))
+	}
+	sent, _ := json.Marshal(blocks[1])
+	var want any
+	_ = json.Unmarshal([]byte(encrypted), &want)
+	var got any
+	_ = json.Unmarshal(sent, &got)
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("the code-execution result was re-sent as\n  %s\nnot as it arrived\n  %s", sent, encrypted)
+	}
+	if !strings.Contains(string(sent), `"encrypted_code_execution_result"`) {
+		t.Errorf("the encrypted variant was lost on the way back: %s", sent)
+	}
+	// And the thinking block kept its signature, which it must.
+	thinking, _ := json.Marshal(blocks[0])
+	if !strings.Contains(string(thinking), `"signature":"sig"`) {
+		t.Errorf("the thinking block lost its signature: %s", thinking)
+	}
 }
