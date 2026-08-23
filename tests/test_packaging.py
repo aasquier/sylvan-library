@@ -39,39 +39,15 @@ FLY_TOML = ROOT / "fly.toml"
 CI_YML = ROOT / ".github" / "workflows" / "ci.yml"
 CLAUDE_MD = ROOT / "CLAUDE.md"
 
-# Extras the runtime image must install, and the surface each one is there for.
-# An entry is a promise the UI already makes: a control the app renders whose
-# handler imports something from that extra.
-REQUIRED_EXTRAS = {
-    "api": "the web app itself -- fastapi, uvicorn, argon2-cffi",
-    "claude": "the dossier and both theme-interview modes (ADR 19, ADR 20)",
-}
 
 
-def install_extras() -> set[str]:
-    """The extras named in the image's `pip install`."""
+def test_the_image_carries_no_python():
+    """The app image is the Go binary, the bundle and the tarot art. A `pip`,
+    a venv or an interpreter reappearing in it is the retirement running
+    backwards, and the layer tripling in the dark."""
     text = DOCKERFILE.read_text(encoding="utf-8")
-    # `RUN pip install --no-cache-dir ".[api,claude]"` -- the bracketed list is
-    # the whole of what this file needs to know about the build.
-    found = re.search(r"pip install[^\n]*\"\.\[([^\]]+)\]\"", text)
-    assert found, "no `pip install \".[...]\"` in the Dockerfile"
-    return {part.strip() for part in found.group(1).split(",")}
-
-
-@pytest.mark.parametrize("extra", sorted(REQUIRED_EXTRAS))
-def test_the_image_installs_the_extras_its_surfaces_need(extra):
-    assert extra in install_extras(), (
-        f"the deployed image would ship without `{extra}` -- "
-        f"{REQUIRED_EXTRAS[extra]}. A surface the app renders would answer 503 "
-        "on the instance while every test here passed."
-    )
-
-
-def test_the_image_does_not_ship_the_dev_extra():
-    """`dev` pulls pytest, ruff and mypy, and includes the other two, so it
-    would satisfy the check above while tripling the layer."""
-    assert "dev" not in install_extras(), \
-        "the runtime image should not carry the test toolchain"
+    for marker in ("pip install", "python -m venv", "FROM python"):
+        assert marker not in text, f"the app image grew `{marker}` back"
 
 
 def declared_extras() -> set[str]:
@@ -87,14 +63,6 @@ def declared_extras() -> set[str]:
     extras = parsed["project"].get("optional-dependencies")
     assert extras, "no optional-dependencies table in pyproject.toml"
     return set(extras)
-
-
-def test_every_required_extra_is_declared_in_pyproject():
-    """A Dockerfile naming an extra that does not exist fails the build, which
-    is late. `pip` treats an unknown extra as a warning in some versions, which
-    is worse."""
-    missing = set(REQUIRED_EXTRAS) - declared_extras()
-    assert not missing, f"the Dockerfile would install undeclared extras: {missing}"
 
 
 # ------------------------------------- what a documented checkout can test
@@ -569,33 +537,20 @@ def dockerfile_cmd() -> list[str]:
     return json.loads(found.group(1).replace("\\\n", ""))
 
 
-def test_the_container_runs_the_front_door_with_the_library_behind_it():
-    """ADR 38, decision 2: the Go binary takes the port and the Python server
-    runs behind it on loopback, for the whole of the migration.
-
-    Three things about the CMD, each of which a one-token edit could undo
-    while the image still built and still answered `/api/health`: it is the
-    door that is PID 1 (the entrypoint `exec`s into argv[0]); it proxies to a
-    loopback upstream and supervises a command after `--`; and the supervised
-    command is the Python `mtglab ui` bound to that same loopback port --
-    a mismatch here is a door answering 502 to every API request with a
-    healthy-looking container behind it.
-    """
+def test_the_container_runs_the_binary_alone():
+    """One process, one name: `mtglab ui` on 0.0.0.0:8080, no upstream, no
+    supervised child, and the HEALTHCHECK asked by the binary itself -- the
+    image carries no curl and no interpreter to ask any other way."""
     cmd = dockerfile_cmd()
-    assert cmd[0] == "/opt/door/mtglab" and cmd[1] == "ui", cmd
-    assert "--" in cmd, "the door supervises nothing; the Python server would never start"
-    door, child = cmd[: cmd.index("--")], cmd[cmd.index("--") + 1:]
-    assert "--host" in door and door[door.index("--host") + 1] == "0.0.0.0"
-    assert "--port" in door and door[door.index("--port") + 1] == "8080", \
+    assert cmd[0] == "mtglab" and cmd[1] == "ui", cmd
+    assert "--" not in cmd and "--upstream" not in cmd, \
+        "the serving command grew a supervised child back"
+    assert "--host" in cmd and cmd[cmd.index("--host") + 1] == "0.0.0.0"
+    assert "--port" in cmd and cmd[cmd.index("--port") + 1] == "8080", \
         "fly.toml's internal_port is 8080"
-    upstream = door[door.index("--upstream") + 1]
-    assert child[:2] == ["mtglab", "ui"], child
-    assert "--no-open" in child
-    assert child[child.index("--host") + 1] == "127.0.0.1", \
-        "the Python server must bind loopback only; the door is the public face"
-    child_port = child[child.index("--port") + 1]
-    assert upstream == f"http://127.0.0.1:{child_port}", (
-        f"the door proxies to {upstream} but the child listens on {child_port}")
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    assert '"mtglab", "probe"' in text, \
+        "the HEALTHCHECK must be the binary probing itself"
 
 
 def test_the_forge_worker_image_runs_the_go_shim_and_carries_no_python():
@@ -663,10 +618,10 @@ def test_the_go_module_pins_the_last_go_that_runs_on_this_mac():
         "go.mod grew a `toolchain` line, which would make the build reach for "
         "a Go newer than the one this Mac can run")
     docker = DOCKERFILE.read_text(encoding="utf-8")
-    found = re.search(r"^FROM golang:(\d+\.\d+)\S* AS door$", docker, re.MULTILINE)
-    assert found, "the Dockerfile has no `golang:<minor>` door stage"
+    found = re.search(r"^FROM golang:(\d+\.\d+)\S* AS builder$", docker, re.MULTILINE)
+    assert found, "the Dockerfile has no `golang:<minor>` builder stage"
     assert found.group(1) == "1.26", (
-        f"the door stage builds with golang:{found.group(1)} while go.mod "
+        f"the builder stage builds with golang:{found.group(1)} while go.mod "
         "pins 1.26")
 
 

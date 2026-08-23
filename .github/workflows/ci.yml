@@ -269,29 +269,24 @@ jobs:
       - name: The contract suite, over TCP against a live mtglab ui
         run: pytest tests/contract --live -q -p no:cacheprovider
 
-      # And the same suite through the Go front door -- the migration's
-      # Phase 2 exit gate (docs/go-migration/PLAN.md section 7), on every
-      # pull request from now on. Python is started on a scratch the
-      # harness seeded, the door is built from `go/` and stood in front of it
-      # on another port, and `--base-url` points at the door. A shape the door
-      # answers itself -- the shell, the assets, the middleware's own 401 and
-      # 403 -- is held to exactly the goldens Python recorded; a shape it
-      # proxies is proven to pass through untouched. The first local run of
-      # this found the door doubling Python's security headers, which is the
-      # whole argument for running it here rather than trusting the unit tests.
+      # And the same suite against the Go server ALONE -- the exact process
+      # the container runs, built from `go/`, with nothing behind it. The
+      # Python leg above stays while the package remains in the tree: it is
+      # the recorded goldens' oracle, and the two legs passing on one scratch
+      # shape is what proves the server and the oracle still agree.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
-      - name: Build the front door
-        run: go build -o "$RUNNER_TEMP/mtglab-door" ./cmd/mtglab
+      - name: Build the server
+        run: go build -o "$RUNNER_TEMP/mtglab-go" ./cmd/mtglab
         working-directory: go
-      - name: The contract suite, through the front door
+      - name: The contract suite, against the Go server alone
         run: |
           set -euo pipefail
-          PAIR="$RUNNER_TEMP/pair"; mkdir -p "$PAIR"
+          SOLO="$RUNNER_TEMP/solo"; mkdir -p "$SOLO"
           # Seed first, exactly as --live does, with the harness's own seeder.
-          PYTHONPATH=tests python - "$PAIR" <<'PY'
+          PYTHONPATH=tests python - "$SOLO" <<'PY'
           import sys
           from pathlib import Path
           from contract import harness
@@ -303,26 +298,21 @@ jobs:
                  MTGLAB_ADMIN_USERNAME= ANTHROPIC_API_KEY= ANTHROPIC_AUTH_TOKEN= \
                  RESEND_API_KEY= FLY_METRICS_TOKEN= MTGLAB_FORGE_WORKER= \
                  MTGLAB_FLY_API_TOKEN= MTGLAB_CLIENT_IP_HEADER= MTGLAB_BASE_URL= \
-                 PYTHONUNBUFFERED=1 MTGLAB_DATA_DIR="$PAIR/data" \
-                 MTGLAB_DECKS_DIR="$PAIR/decks" MTGLAB_FORGE_HOME="$PAIR/no-forge-here"
-          (cd "$PAIR" && python -m mtglab.cli ui --no-open --host 127.0.0.1 --port 8766 \
-              > "$PAIR/python.log" 2>&1 &)
-          "$RUNNER_TEMP/mtglab-door" ui --host 127.0.0.1 --port 8765 \
-              --upstream http://127.0.0.1:8766 \
+                 MTGLAB_DATA_DIR="$SOLO/data" \
+                 MTGLAB_DECKS_DIR="$SOLO/decks" MTGLAB_FORGE_HOME="$SOLO/no-forge-here"
+          "$RUNNER_TEMP/mtglab-go" ui --host 127.0.0.1 --port 8765 \
               --web-dist src/mtglab/web_dist --tarot src/mtglab/assets/tarot \
-              > "$PAIR/door.log" 2>&1 &
+              > "$SOLO/server.log" 2>&1 &
           for _ in $(seq 1 120); do
             curl -fsS http://127.0.0.1:8765/api/health >/dev/null 2>&1 && break
             sleep 0.5
           done
           curl -fsS http://127.0.0.1:8765/door/health; echo
           pytest tests/contract --base-url http://127.0.0.1:8765 \
-                 --data-dir "$PAIR/data" --decks-dir "$PAIR/decks" -q -p no:cacheprovider
-      - name: The pair's logs, on failure
+                 --data-dir "$SOLO/data" --decks-dir "$SOLO/decks" -q -p no:cacheprovider
+      - name: The server's log, on failure
         if: failure()
-        run: |
-          echo "--- python"; tail -60 "$RUNNER_TEMP/pair/python.log" || true
-          echo "--- door";   tail -60 "$RUNNER_TEMP/pair/door.log" || true
+        run: tail -60 "$RUNNER_TEMP/solo/server.log" || true
 
   # The Go module (docs/go-migration/PLAN.md; ADR 38): `go vet`, the
   # race-detected tests, and a tidy check, on both architectures the image is
