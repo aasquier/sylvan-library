@@ -5,13 +5,24 @@ import (
 	"database/sql"
 )
 
-// Scope is who a request is on behalf of -- `api/deps.py:UserScope`, minus
-// the model tier, which the door has no use for.
+// Scope is who a request is on behalf of -- `api/deps.py:UserScope`.
 type Scope struct {
 	UserID        int64
 	Username      string
 	IsAdmin       bool
 	Authenticated bool
+	// ModelTier is which Claude answers this caller (`internal/tiers`), or
+	// empty for the house model -- which is every account until a maintainer
+	// says otherwise, and is also what an unauthenticated caller and the local
+	// single-user app get.
+	//
+	// It belongs here for the same reason IsAdmin does: it is a fact about the
+	// caller that a handler is allowed to know and that must be read fresh per
+	// request rather than captured anywhere longer-lived. It arrived with the
+	// first Claude route to flip; the comment above this struct used to say the
+	// door had no use for it, which was true of every route that had crossed
+	// until then.
+	ModelTier string
 }
 
 // Anonymous is auth on, no valid session: reaches the public routes and
@@ -38,7 +49,7 @@ func Resolve(ctx context.Context, db *sql.DB, token string) (Scope, error) {
 		return Anonymous, err
 	}
 	return Scope{UserID: user.ID, Username: user.Username, IsAdmin: user.IsAdmin,
-		Authenticated: true}, nil
+		Authenticated: true, ModelTier: user.ModelTier}, nil
 }
 
 // The request's caller, carried on the context by the door's middleware so

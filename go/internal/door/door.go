@@ -39,6 +39,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/api"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -160,6 +161,11 @@ func New(cfg Config) (*Door, error) {
 		Jobs: d.jobs, SimCache: d.simCache, Upstream: d.proxy,
 		AppDBPath: cfg.AppDB, DecksDir: cfg.DecksDir, AdminEmail: cfg.AdminEmail,
 		Shelves: shelf, AppWriteDB: d.writeDB, Recorder: d.recorder,
+		// The Claude ledger writes a different table in the same file the
+		// activity log writes, so it shares that handle rather than opening a
+		// second one. Nil handle, nil database, dropped row with a warning --
+		// the same degradation the log makes on an instance with no app.db.
+		ClaudeLedger: ledger.RecorderFrom(d.writeDB, cfg.Logger),
 		// The two switches the account routes read, passed rather than looked
 		// up so the door and the routes it serves cannot disagree about what
 		// this process is: `me` reports RequireAuth, `logout` deletes a

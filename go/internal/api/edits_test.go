@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 )
@@ -43,6 +44,9 @@ func newWriteRig(t *testing.T) *writeRig {
 	a := New(Config{
 		Pool: pooltest.Open(t), DecksDir: decks, AdminEmail: "alice@example.com",
 		AppDB: db, AppWriteDB: recorder.DB(), Recorder: recorder,
+		// The same handle the activity log writes through, which is how the
+		// door wires it: two ledgers, two tables, one app.db.
+		ClaudeLedger: ledger.RecorderFrom(recorder.DB(), nil),
 	})
 	return &writeRig{api: a, decks: decks, dbPath: dbPath, recorder: recorder,
 		close: func() { recorder.Close(); db.Close() }}

@@ -1154,10 +1154,76 @@ go/                       the Go module (ADR 38; module path
                           []wire.KV marshals as an array of
                           {"Key":..,"Value":..} structs, because MarshalOrdered
                           only recurses through wire.OrderedMap. Valid JSON,
-                          still answered, from a model handed nonsense. **Still
-                          Python: the other six modes' orchestration and every
-                          Claude route** -- three engines crossed, nothing
-                          flipped.
+                          still answered, from a model handed nonsense.
+                          **Then the first Claude surface FLIPPED**, and it is
+                          the interview's own route: POST
+                          /api/decks/{owner}/{slug}/interview, in
+                          internal/api/interview.go, a PLAIN route because the
+                          mode is handed its facts rather than sent shopping
+                          for them (~4,900 input tokens, no tool calls in the
+                          ordinary case). Its failure modes stay APART -- 422
+                          a wrong question, 404 a deck this caller cannot see,
+                          503 no key at all, 502 a call that came back unusable
+                          -- because collapsing them tells somebody their key
+                          is missing when the model was rate limited. The 502
+                          default is Python's and looks like a mistake:
+                          `service.claude_interview` catches bare Exception
+                          around the whole of `ask()`, the brief included, so a
+                          POOL failure while assembling the brief is a 502
+                          there and is a 502 here. **auth.Scope grew
+                          ModelTier** for it -- its comment had said the door
+                          has no use for it, true of every family that had
+                          crossed until a Claude route needed to know which
+                          seat is asking.
+                          **The whole matrix was diffed against a running
+                          pair**, twelve cases through the door beside the same
+                          twelve straight to uvicorn, and that is what caught
+                          both of this lane's findings -- neither of which any
+                          test or golden could see, since the goldens record
+                          this body as `{"detail": "string"}` and that is true
+                          of every spelling of it. **One was a bug**: `Require`
+                          wrapped its reason as `fmt.Errorf("%w: ...",
+                          ErrUnavailable)`, so the door answered "claude is
+                          unavailable: no ANTHROPIC_API_KEY ..." where
+                          `str(ClaudeUnavailable(...))` is the bare reason --
+                          the sentinel's own words shipping as a prefix nobody
+                          wrote, into a `detail` the deck page renders
+                          verbatim. `unavailable` is that error carrying the
+                          reason and nothing else, the `stanceRejection` shape
+                          again, and the same lesson as `converse` handing the
+                          model `no deck 'x'` where DeckNotFound stringifies to
+                          the bare slug. **The other was a WART, reproduced
+                          rather than fixed**: a malformed stance is a **502**,
+                          not the 422 `api/app.py` looks like it gives. That
+                          route has an `except ValueError` branch commented "A
+                          malformed stance" and the branch is DEAD CODE --
+                          `service.claude_interview` re-raises only
+                          ClaudeUnavailable, CardNotInDeck and DeckNotFound, so
+                          a stance ValueError is swallowed by the broad
+                          `except Exception` and answered as ClaudeFailed
+                          before the route's own branch is consulted. Go had
+                          been written to the docstring's intent and was
+                          IMPROVING on Python, which is not a flip;
+                          `ErrStanceRejected` (wrapped inside `Resolve`, so
+                          the six remaining modes inherit it) now routes to
+                          502 in a branch that exists to make the wart visible
+                          at the one place somebody would fix it -- one line
+                          here, the re-raise tuple there, both runtimes at
+                          once, the way `edit.set_shared` went. The Claude
+                          ledger shares the activity log's app.db handle
+                          rather than opening a second mode=rw. Seventeen route tests, and the one
+                          that would not exist without `tier1.Number`'s lesson
+                          asserts the report's KEY ORDER IN THE MARSHALLED
+                          BYTES: InterviewReport had been proved field by field
+                          and never once put through encoding/json.
+                          `str(payload.get("card", ""))` is reproduced exactly,
+                          including the one input where it differs from the
+                          `or ""` spelling beside it -- an explicit null
+                          reaches `str(None)` and asks the deck about a card
+                          called "None", a different 422 from a missing field.
+                          **Still Python: the other six modes'
+                          orchestration, and the nine Claude routes that
+                          remain -- five of them job families.**
                           The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY

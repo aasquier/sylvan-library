@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -65,6 +66,11 @@ type Config struct {
 	// `app.db` -- where an edit is recorded as a warning and still succeeds,
 	// because the deck write has already happened by then.
 	Recorder *decklog.Recorder
+	// ClaudeLedger is where a Claude conversation's accounting lands, or nil
+	// on an instance with no `app.db` -- where a row is dropped with a warning
+	// and the conversation still answers, because the call has already been paid
+	// for by the time there is anything to record.
+	ClaudeLedger *ledger.Recorder
 	// RequireAuth mirrors MTGLAB_REQUIRE_AUTH. Two account routes read it and
 	// nothing else does: `me` reports it, and `logout` deletes the session row
 	// only when it is on -- both exactly as `auth.install(require=…)` does.
@@ -113,6 +119,7 @@ type API struct {
 	adminEmail    string
 	shelves       *shelves.Shelves
 	log28         *decklog.Recorder
+	claudeLedger  *ledger.Recorder
 	requireAuth   bool
 	secureCookies bool
 	email         auth.EmailSender
@@ -140,7 +147,8 @@ func New(cfg Config) *API {
 		dbPath: cfg.AppDBPath, decksDir: cfg.DecksDir, adminEmail: cfg.AdminEmail,
 		shelves: cfg.Shelves, log28: cfg.Recorder, requireAuth: cfg.RequireAuth,
 		secureCookies: cfg.SecureCookies, email: cfg.EmailSender,
-		jobs: cfg.Jobs, simCache: cfg.SimCache, upstream: cfg.Upstream}
+		jobs: cfg.Jobs, simCache: cfg.SimCache, upstream: cfg.Upstream,
+		claudeLedger: cfg.ClaudeLedger}
 }
 
 // background runs fn after the response has gone, which is Starlette's
@@ -275,6 +283,12 @@ func (a *API) Routes() []Route {
 		// this changes no deck field at all, so ADR 28 has nothing to record.
 		// The two GETs on the same path flipped with the deck reads.
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/artifacts", Handler: a.buildArtifacts},
+		// The rationale interview (Phase 6's first flipped Claude surface):
+		// one plain route, because the mode is handed its facts rather than
+		// sent shopping for them and answers in the seconds class. It reaches
+		// exactly as far as the deck does -- `Library` resolves the owner, and
+		// the same source goes to the tools the conversation may reach for.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/interview", Handler: a.rationaleInterview},
 		// The accounts (Phase 4's last flip): the five public doors of
 		// `api/auth.py` and the `me` that says who is standing in them, then
 		// the admin surface of `api/admin.py`. The middleware half of

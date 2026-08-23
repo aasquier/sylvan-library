@@ -156,6 +156,42 @@ func TestResolvesASessionWrittenInPythonsShape(t *testing.T) {
 	}
 }
 
+// A resolved session carries the account's model tier, because that is a fact
+// about the caller a handler is allowed to know and must read fresh per
+// request -- `api/deps.py` puts `model_tier` on `UserScope` for exactly the
+// reason it puts `is_admin` there.
+//
+// This test exists because a mutation survived without it: the field can be
+// declared on Scope, set by a handler's own test fixture, and never once
+// copied out of the user row, with every route test still green. The first
+// Claude route is what reads it, and it reads it from here.
+func TestAResolvedSessionCarriesTheAccountsModelTier(t *testing.T) {
+	ctx := context.Background()
+	writer, reader := fixtureDB(t)
+	if _, err := writer.Exec("UPDATE users SET model_tier = ? WHERE id = ?", "opus", 2); err != nil {
+		t.Fatal(err)
+	}
+	mint(t, writer, "bob-tiered", 2, time.Now().Add(Lifetime))
+	scope, err := Resolve(ctx, reader, "bob-tiered")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.ModelTier != "opus" {
+		t.Errorf("bob's seat resolved to tier %q, want opus", scope.ModelTier)
+	}
+	// NULL is the ordinary case and must stay empty rather than becoming the
+	// default's key: which tier is the default may change, and a row that
+	// never asked for one must not be rewritten by having been read.
+	mint(t, writer, "alice-house", 1, time.Now().Add(Lifetime))
+	scope, err = Resolve(ctx, reader, "alice-house")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.ModelTier != "" {
+		t.Errorf("an account with no tier resolved to %q, want empty", scope.ModelTier)
+	}
+}
+
 func TestAnUnknownExpiredOrDisabledSessionIsAnonymous(t *testing.T) {
 	ctx := context.Background()
 	writer, reader := fixtureDB(t)
