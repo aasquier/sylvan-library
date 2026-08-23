@@ -104,7 +104,16 @@ type Turn struct {
 }
 
 // Parsed is the answer as JSON, for a mode that constrained its format.
-func (t Turn) Parsed(into any) error { return json.Unmarshal([]byte(t.Text), into) }
+func (t Turn) Parsed(into any) error {
+	// **UseNumber, for the reason the stance parser already carries it.**
+	// Python's json gives `3` an int and `3.0` a float, and `str()` renders
+	// them "3" and "3.0"; a plain Go decode makes both `float64(3)` and throws
+	// the literal away. Every instrument downstream renders these values with
+	// Python's `str()` semantics, so the literal has to survive the decode.
+	decoder := json.NewDecoder(strings.NewReader(t.Text))
+	decoder.UseNumber()
+	return decoder.Decode(into)
+}
 
 // Request is everything a conversation needs that is not the mode.
 type Request struct {

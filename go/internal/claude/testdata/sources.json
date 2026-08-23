@@ -1,0 +1,489 @@
+{
+ "note": "The two hosted-search modes' shared instruments and their two deliberate asymmetries. Written by `python tests/go_fixtures.py`.",
+ "why": "A response schema suppresses the API's own citations, so a URL in a payload has nothing behind it but the model's word; keep_sources is what puts something behind it. Past that the two modes diverge on purpose (a dossier passage may rest on its brief, a research finding may not; an unresolved rival is invented, an unresolved research card may be spoiled) and once BY ACCIDENT -- _competitors does not index `asked_as`, so a DFC named by its front face is dropped there and resolved in research. The three payload key ORDERS differ and all three are the wire.",
+ "canonical": [
+  {"url":"https://example.com/a","canonical":"https://example.com/a"},
+  {"url":"https://example.com/a/","canonical":"https://example.com/a"},
+  {"url":"HTTPS://EXAMPLE.COM/a","canonical":"https://example.com/a"},
+  {"url":"https://EXAMPLE.com/A","canonical":"https://example.com/A"},
+  {"url":"https://example.com/A/","canonical":"https://example.com/A"},
+  {"url":"https://example.com","canonical":"https://example.com"},
+  {"url":"https://example.com/","canonical":"https://example.com"},
+  {"url":"  https://example.com/a  ","canonical":"https://example.com/a"},
+  {"url":"http://example.com/a","canonical":"http://example.com/a"},
+  {"url":"example.com/A","canonical":"example.com/a"},
+  {"url":"EXAMPLE.COM/A","canonical":"example.com/a"},
+  {"url":"","canonical":""},
+  {"url":"   ","canonical":""},
+  {"url":"/","canonical":""},
+  {"url":"//","canonical":""},
+  {"url":"https://example.com//a//","canonical":"https://example.com//a"},
+  {"url":"https://example.com/a?b=C#D","canonical":"https://example.com/a?b=C#D"},
+  {"url":"ftp://Example.COM/Path","canonical":"ftp://example.com/Path"},
+  {"url":"https://sub.Example.com/Deep/Path/Here","canonical":"https://sub.example.com/Deep/Path/Here"}
+ ],
+ "keep": [
+  {
+   "note": "a page the search returned",
+   "claimed": [{"id":"s1","title":"the model's title","url":"https://example.com/one"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"s1","title":"The First Page","url":"https://example.com/one"}],
+   "dropped": 0
+  },
+  {
+   "note": "nothing claimed",
+   "claimed": [],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [],
+   "dropped": 0
+  },
+  {
+   "note": "a page the search never returned",
+   "claimed": [{"id":"s1","title":"t","url":"https://invented.example/page"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [],
+   "dropped": 1
+  },
+  {
+   "note": "a trailing slash is the same page",
+   "claimed": [{"id":"s1","title":"t","url":"https://example.com/two"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"s1","title":"The Second Page","url":"https://example.com/two"}],
+   "dropped": 0
+  },
+  {
+   "note": "the host is case-insensitive",
+   "claimed": [{"id":"s1","title":"t","url":"https://EXAMPLE.com/one"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"s1","title":"The First Page","url":"https://EXAMPLE.com/one"}],
+   "dropped": 0
+  },
+  {
+   "note": "a different path on the same site is a different page",
+   "claimed": [{"id":"s1","title":"t","url":"https://example.com/three"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [],
+   "dropped": 1
+  },
+  {
+   "note": "no id falls back to the url",
+   "claimed": [{"title":"t","url":"https://example.com/one"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"https://example.com/one","title":"The First Page","url":"https://example.com/one"}],
+   "dropped": 0
+  },
+  {
+   "note": "a blank id falls back to the url",
+   "claimed": [{"id":"   ","title":"t","url":"https://example.com/one"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"https://example.com/one","title":"The First Page","url":"https://example.com/one"}],
+   "dropped": 0
+  },
+  {
+   "note": "the search's title beats the model's",
+   "claimed": [{"id":"s1","title":"the model's title","url":"https://example.com/two"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"s1","title":"The Second Page","url":"https://example.com/two"}],
+   "dropped": 0
+  },
+  {
+   "note": "an empty search title falls back to the model's",
+   "claimed": [{"id":"s1","title":"the model's title","url":"https://other.example/deep/Path"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"s1","title":"the model's title","url":"https://other.example/deep/Path"}],
+   "dropped": 0
+  },
+  {
+   "note": "no url at all",
+   "claimed": [{"id":"s1","title":"t"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [],
+   "dropped": 1
+  },
+  {
+   "note": "a blank url",
+   "claimed": [{"id":"s1","title":"t","url":"  "}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [],
+   "dropped": 1
+  },
+  {
+   "note": "a non-object is dropped",
+   "claimed": ["https://example.com/one",7,null],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [],
+   "dropped": 3
+  },
+  {
+   "note": "mixed",
+   "claimed": [{"id":"s1","url":"https://example.com/one","title":"t"},{"id":"s2","url":"https://nope.example/x","title":"t"},"not an object"],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"s1","title":"The First Page","url":"https://example.com/one"}],
+   "dropped": 2
+  },
+  {
+   "note": "a null url is the string None",
+   "claimed": [{"id":"s1","title":"t","url":null}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"s1","title":"A Page Called None","url":"None"}],
+   "dropped": 0
+  },
+  {
+   "note": "a null id falls back to the url, not to None",
+   "claimed": [{"id":null,"title":"t","url":"https://example.com/one"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"https://example.com/one","title":"The First Page","url":"https://example.com/one"}],
+   "dropped": 0
+  },
+  {
+   "note": "a null title falls back, not to None",
+   "claimed": [{"id":"s1","title":null,"url":"https://other.example/deep/Path"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"s1","title":"","url":"https://other.example/deep/Path"}],
+   "dropped": 0
+  },
+  {
+   "note": "a numeric id is rendered",
+   "claimed": [{"id":7,"title":"t","url":"https://example.com/one"}],
+   "searched": [
+    {"url":"https://example.com/one","title":"The First Page"},
+    {"url":"https://example.com/two/","title":"The Second Page"},
+    {"url":"https://other.example/deep/Path","title":""},
+    {"url":"None","title":"A Page Called None"}
+   ],
+   "kept": [{"id":"7","title":"The First Page","url":"https://example.com/one"}],
+   "dropped": 0
+  }
+ ],
+ "grounded": [
+  {
+   "note": "cited, and the citation survived",
+   "item": {"prose":"A sentence.","claim":"A sentence.","source_ids":["s1"]},
+   "allowed": ["3","s1","s2"],
+   "section": {"prose":"A sentence.","source_ids":["s1"]},
+   "grounded": [{"claim":"A sentence.","source_ids":["s1"]}],
+   "grounded_dropped": 0
+  },
+  {
+   "note": "cited, but every citation was dropped",
+   "item": {"prose":"A sentence.","claim":"A sentence.","source_ids":["gone"]},
+   "allowed": ["3","s1","s2"],
+   "section": {"prose":"A sentence.","source_ids":[]},
+   "grounded": [],
+   "grounded_dropped": 1
+  },
+  {
+   "note": "some citations survived",
+   "item": {"prose":"A sentence.","claim":"A sentence.","source_ids":["s1","gone","s2"]},
+   "allowed": ["3","s1","s2"],
+   "section": {"prose":"A sentence.","source_ids":["s1","s2"]},
+   "grounded": [{"claim":"A sentence.","source_ids":["s1","s2"]}],
+   "grounded_dropped": 0
+  },
+  {
+   "note": "no citations at all",
+   "item": {"prose":"A sentence.","claim":"A sentence.","source_ids":[]},
+   "allowed": ["3","s1","s2"],
+   "section": {"prose":"A sentence.","source_ids":[]},
+   "grounded": [],
+   "grounded_dropped": 1
+  },
+  {"note":"no source_ids key","item":{"prose":"A sentence.","claim":"A sentence."},"allowed":["3","s1","s2"],"section":{"prose":"A sentence.","source_ids":[]},"grounded":[],"grounded_dropped":1},
+  {"note":"empty text, good citation","item":{"prose":"   ","claim":"   ","source_ids":["s1"]},"allowed":["3","s1","s2"],"section":{"prose":"","source_ids":["s1"]},"grounded":[],"grounded_dropped":1},
+  {
+   "note": "a numeric id that survives",
+   "item": {"prose":"A sentence.","claim":"A sentence.","source_ids":[3]},
+   "allowed": ["3","s1","s2"],
+   "section": {"prose":"A sentence.","source_ids":["3"]},
+   "grounded": [{"claim":"A sentence.","source_ids":["3"]}],
+   "grounded_dropped": 0
+  },
+  {
+   "note": "a numeric id that does not",
+   "item": {"prose":"A sentence.","claim":"A sentence.","source_ids":[1,2]},
+   "allowed": ["3","s1","s2"],
+   "section": {"prose":"A sentence.","source_ids":[]},
+   "grounded": [],
+   "grounded_dropped": 1
+  },
+  {"note":"not an object","item":"a bare string","allowed":["3","s1","s2"],"section":{"prose":"","source_ids":[]},"grounded":[],"grounded_dropped":1},
+  {
+   "note": "a numeric text is rendered",
+   "item": {"prose":42,"claim":42,"source_ids":["s1"]},
+   "allowed": ["3","s1","s2"],
+   "section": {"prose":"42","source_ids":["s1"]},
+   "grounded": [{"claim":"42","source_ids":["s1"]}],
+   "grounded_dropped": 0
+  },
+  {
+   "note": "a null prose is empty, a null claim is None",
+   "item": {"prose":null,"claim":null,"source_ids":["s1"]},
+   "allowed": ["3","s1","s2"],
+   "section": {"prose":"","source_ids":["s1"]},
+   "grounded": [{"claim":"None","source_ids":["s1"]}],
+   "grounded_dropped": 0
+  },
+  {
+   "note": "a boolean text",
+   "item": {"prose":true,"claim":true,"source_ids":["s1"]},
+   "allowed": ["3","s1","s2"],
+   "section": {"prose":"True","source_ids":["s1"]},
+   "grounded": [{"claim":"True","source_ids":["s1"]}],
+   "grounded_dropped": 0
+  }
+ ],
+ "pool": [
+  {
+   "note": "an ordinary card",
+   "name": "Craterhoof Behemoth",
+   "allowed": ["s1"],
+   "competitors": [
+    {
+     "name": "Craterhoof Behemoth",
+     "prose": "p",
+     "source_ids": ["s1"],
+     "mana_cost": "{5}{G}{G}{G}",
+     "type_line": "Creature — Beast",
+     "color_identity": ["G"],
+     "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "legal_commander": true,
+     "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control."
+    }
+   ],
+   "competitors_dropped": 0,
+   "research_cards": [
+    {
+     "name": "Craterhoof Behemoth",
+     "in_pool": true,
+     "mana_cost": "{5}{G}{G}{G}",
+     "type_line": "Creature — Beast",
+     "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control.",
+     "color_identity": ["G"],
+     "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "legal_commander": true
+    }
+   ],
+   "research_unresolved": 0
+  },
+  {
+   "note": "a card the pool lacks",
+   "name": "Not A Real Card",
+   "allowed": ["s1"],
+   "competitors": [],
+   "competitors_dropped": 1,
+   "research_cards": [{"name":"Not A Real Card","in_pool":false}],
+   "research_unresolved": 1
+  },
+  {
+   "note": "a banned card still resolves",
+   "name": "Primeval Titan",
+   "allowed": ["s1"],
+   "competitors": [
+    {
+     "name": "Primeval Titan",
+     "prose": "p",
+     "source_ids": ["s1"],
+     "mana_cost": "{4}{G}{G}",
+     "type_line": "Creature — Giant",
+     "color_identity": ["G"],
+     "image": "https://cards.scryfall.io/normal/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+     "legal_commander": false,
+     "oracle_text": "Trample\nWhenever this creature enters or attacks, you may search your library for up to two land cards, put them onto the battlefield tapped, then shuffle."
+    }
+   ],
+   "competitors_dropped": 0,
+   "research_cards": [
+    {
+     "name": "Primeval Titan",
+     "in_pool": true,
+     "mana_cost": "{4}{G}{G}",
+     "type_line": "Creature — Giant",
+     "oracle_text": "Trample\nWhenever this creature enters or attacks, you may search your library for up to two land cards, put them onto the battlefield tapped, then shuffle.",
+     "color_identity": ["G"],
+     "image": "https://cards.scryfall.io/normal/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+     "legal_commander": false
+    }
+   ],
+   "research_unresolved": 0
+  },
+  {
+   "note": "a DFC by its front face",
+   "name": "Ajani, Nacatl Pariah",
+   "allowed": ["s1"],
+   "competitors": [],
+   "competitors_dropped": 1,
+   "research_cards": [
+    {
+     "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+     "in_pool": true,
+     "mana_cost": "{1}{W}",
+     "type_line": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+     "oracle_text": "",
+     "color_identity": ["R","W"],
+     "image": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+     "legal_commander": true
+    }
+   ],
+   "research_unresolved": 0
+  },
+  {
+   "note": "a DFC by its full name",
+   "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+   "allowed": ["s1"],
+   "competitors": [
+    {
+     "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+     "prose": "p",
+     "source_ids": ["s1"],
+     "mana_cost": "{1}{W}",
+     "type_line": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+     "color_identity": ["R","W"],
+     "image": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+     "legal_commander": true,
+     "oracle_text": ""
+    }
+   ],
+   "competitors_dropped": 0,
+   "research_cards": [
+    {
+     "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+     "in_pool": true,
+     "mana_cost": "{1}{W}",
+     "type_line": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+     "oracle_text": "",
+     "color_identity": ["R","W"],
+     "image": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+     "legal_commander": true
+    }
+   ],
+   "research_unresolved": 0
+  },
+  {
+   "note": "case does not matter",
+   "name": "craterhoof behemoth",
+   "allowed": ["s1"],
+   "competitors": [
+    {
+     "name": "Craterhoof Behemoth",
+     "prose": "p",
+     "source_ids": ["s1"],
+     "mana_cost": "{5}{G}{G}{G}",
+     "type_line": "Creature — Beast",
+     "color_identity": ["G"],
+     "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "legal_commander": true,
+     "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control."
+    }
+   ],
+   "competitors_dropped": 0,
+   "research_cards": [
+    {
+     "name": "Craterhoof Behemoth",
+     "in_pool": true,
+     "mana_cost": "{5}{G}{G}{G}",
+     "type_line": "Creature — Beast",
+     "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control.",
+     "color_identity": ["G"],
+     "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "legal_commander": true
+    }
+   ],
+   "research_unresolved": 0
+  },
+  {"note":"a numeric card name","name":7,"allowed":["s1"],"competitors":[],"competitors_dropped":1,"research_cards":[{"name":"7","in_pool":false}],"research_unresolved":1}
+ ]
+}

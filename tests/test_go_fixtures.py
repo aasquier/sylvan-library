@@ -122,6 +122,7 @@ _ORACLES = [
     ("the seven tools", "TOOLS_PATH", "render_tools_payload"),
     ("the seven mode definitions", "MODES_PATH", "render_modes_payload"),
     ("the slot argument", "ARGUE_PATH", "render_argue_cases"),
+    ("the shared sources", "SOURCES_PATH", "render_sources_cases"),
 ]
 
 
