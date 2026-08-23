@@ -4,15 +4,11 @@
 // carry a slug and a slug can carry a person), the status class, and a
 // count. No IP, no user agent, no username, no timestamp finer than the day.
 //
-// The door records **what the door answers**: its own routes by their
-// pattern, the static tiers by their mount prefix (`/assets`, `/tarot`), the
-// shell as `/{full_path}` (the template Starlette's catch-all records — read
-// off the deployed ledger, not guessed), and everything refused before
-// routing or matched by nothing as `(unrouted)`. During coexistence a
-// proxied request is deliberately NOT recorded here — Python's own
-// middleware counts what Python answers, so the two ledgers partition the
-// traffic instead of double-counting it; when the proxy retires, this is
-// the only recorder left and the partition is everything.
+// Every request the process answers lands here exactly once: the routes by
+// their pattern, the static tiers by their mount prefix (`/assets`,
+// `/tarot`), the shell and the stray-API refusals as `/{full_path}` (the
+// catch-all is a route and has always been counted as one), and everything
+// refused before routing as `(unrouted)`.
 //
 // The two mechanical rules are Python's: counts buffer in memory and flush
 // when a request lands more than FlushEvery after the last flush (and when

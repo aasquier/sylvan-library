@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -28,6 +29,61 @@ func TokenURLSafe(n int) string {
 		panic(fmt.Sprintf("auth: no entropy for a token: %v", err))
 	}
 	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+// LookupTouching is the serving resolver's session lookup: `Lookup`, plus
+// the two writes a live server owes the table. An expired row is deleted on
+// the way past rather than left to a purge -- one write on a request that
+// was going to be refused anyway, and the common case needs no scheduled
+// cleanup at all. A live row's `last_seen_at` is refreshed when it is empty,
+// older than TouchInterval, or unreadable -- rewriting a value nothing can
+// parse is the one sane recovery for it.
+func LookupTouching(ctx context.Context, db *sql.DB, token string) (*Session, error) {
+	if token == "" {
+		return nil, nil
+	}
+	var userID int64
+	var created, expires string
+	var lastSeen sql.NullString
+	err := db.QueryRowContext(ctx,
+		"SELECT user_id, created_at, expires_at, last_seen_at FROM sessions"+
+			" WHERE token_hash = ?",
+		HashToken(token)).Scan(&userID, &created, &expires, &lastSeen)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("session lookup: %w", err)
+	}
+	now := time.Now()
+	expiresAt, err := ParseTimestamp(expires)
+	if err != nil {
+		return nil, fmt.Errorf("session expires_at: %w", err)
+	}
+	if !expiresAt.After(now) {
+		if _, err := db.ExecContext(ctx,
+			"DELETE FROM sessions WHERE token_hash = ?", HashToken(token)); err != nil {
+			return nil, fmt.Errorf("session delete: %w", err)
+		}
+		return nil, nil
+	}
+	createdAt, err := ParseTimestamp(created)
+	if err != nil {
+		return nil, fmt.Errorf("session created_at: %w", err)
+	}
+	touch := !lastSeen.Valid || lastSeen.String == ""
+	if !touch {
+		seenAt, parseErr := ParseTimestamp(lastSeen.String)
+		touch = parseErr != nil || now.Sub(seenAt) >= TouchInterval
+	}
+	if touch {
+		if _, err := db.ExecContext(ctx,
+			"UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?",
+			isoAt(now), HashToken(token)); err != nil {
+			return nil, fmt.Errorf("session touch: %w", err)
+		}
+	}
+	return &Session{UserID: userID, CreatedAt: createdAt, ExpiresAt: expiresAt}, nil
 }
 
 // CreateSession opens a session and returns its token. The only time the token

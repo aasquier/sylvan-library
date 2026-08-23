@@ -1,31 +1,23 @@
-// Package door is the front door: the one binary that takes the listening
-// port, and in front of *both* runtimes for the whole of the migration
-// (docs/go-migration/PLAN.md section 4, ADR 38 decision 2).
+// Package door is the HTTP server: the one process that takes the listening
+// port and answers everything the app serves.
 //
 // What it does, in request order:
 //
-//  1. Resolves the caller from the `sid` cookie and refuses, before anything
-//     is routed, what `api/auth.py`'s middleware refuses: 401 outside the
-//     public list without a session, 403 under the admin prefix without an
-//     admin. Same sentences, same JSON envelope, same normalisation of the
-//     path -- the contract suite (`tests/contract/`) holds the two doors to
-//     one table, `tests/contract/routes.json`.
-//  2. Serves the built frontend and the tarot pictures itself -- the shell,
-//     `/assets/*`, `/tarot/*` -- with the same content types, the same
-//     `Cache-Control: no-cache`, and the same refusals Python's mounts give.
-//  3. Answers the routes that have moved across (`internal/api`, the port
-//     board in docs/go-migration/PLAN.md section 10) itself, and proxies
-//     everything else under `/api` to the Python server on loopback -- a
-//     shrinking set as the families move; `routes.go` is the rule for which
-//     request is whose.
+//  1. Resolves the caller from the `sid` cookie -- touching the session's
+//     `last_seen_at` and deleting an expired row on the way past -- and
+//     refuses, before anything is routed, everything auth refuses: 401
+//     outside the public list without a session, 403 under the admin prefix
+//     without an admin. The public list is `tests/contract/routes.json`'s,
+//     the one table the contract suite holds this middleware to.
+//  2. Serves the built frontend and the tarot pictures -- the shell,
+//     `/assets/*`, `/tarot/*` -- and compresses what crosses the gzip floor.
+//  3. Answers `/api` from `internal/api`'s route table; a path no route
+//     claims is the catch-all's 404 and a matched path on the wrong method
+//     is the router's 405, both written by `dispatch`.
 //
-// Every response the door writes itself carries the hardening headers
-// `api/app.py:security_headers` sets, so the middleware's own refusals look
-// the same from either runtime.
-//
-// Python's middleware stays on behind the door for the duration -- defence
-// in depth, costing microseconds -- and is the one that writes the session
-// touch; this door never writes `app.db` (see `internal/auth`).
+// Every response carries the hardening headers `securityHeaders` sets, and
+// every request lands in the visitor ledger (`internal/traffic`) exactly
+// once, by route template.
 package door
 
 import (
@@ -34,7 +26,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 
@@ -66,8 +57,6 @@ type Config struct {
 	WebDist string
 	// TarotDir is the packaged tarot art; same rule.
 	TarotDir string
-	// Upstream is where everything under /api not yet served here goes.
-	Upstream *url.URL
 	// Pool is the card pool the ported routes read, leased (`internal/pool`);
 	// nil is an instance with no pool, answered in the degraded shapes
 	// `service._connect()` returning None produces.
@@ -97,9 +86,7 @@ type Config struct {
 
 // Door is a built handler and the things it holds open.
 type Door struct {
-	// jobs is this process's job registry (Phase 5). Every job the door's own
-	// routes submit lives here; Python's live in Python's, which is why the
-	// poll routes consult both.
+	// jobs is this process's job registry: every job a route submits.
 	jobs *jobs.Registry
 	// simCache is ADR 18's `sim_cache` table, or nil on an instance with no
 	// `app.db`. A nil store caches nothing and no caller branches on it.
@@ -111,25 +98,19 @@ type Door struct {
 	writeDB  *sql.DB
 	recorder *decklog.Recorder
 	static   *staticSite
-	proxy    http.Handler
 	table    *routeTable
-	// traffic is the visitor ledger's recorder (schema v9), counting what
-	// the door itself answers -- a proxied request is Python's middleware's
-	// to count during coexistence, so the two ledgers partition the traffic
-	// rather than double-counting it. Nil on an instance with no app.db.
+	// traffic is the visitor ledger's recorder (schema v9), counting every
+	// request this process answers. Nil on an instance with no app.db.
 	traffic *traffic.Recorder
 }
 
 // New builds a door. It opens `app.db` read-only when auth is required (and
 // proves it can read the users table, so a wrong data directory fails at
-// start rather than as a 401 on every request), lists the bundle's root
-// files once from the trusted directory, and wires the proxy.
+// start rather than as a 401 on every request), and lists the bundle's root
+// files once from the trusted directory.
 func New(cfg Config) (*Door, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
-	}
-	if cfg.Upstream == nil {
-		return nil, fmt.Errorf("door: no upstream configured")
 	}
 	d := &Door{cfg: cfg, log: cfg.Logger}
 	if cfg.RequireAuth {
@@ -138,14 +119,12 @@ func New(cfg Config) (*Door, error) {
 			return nil, err
 		}
 		d.db = db
-		d.resolver = dbResolver{db: db}
 	}
 	site, err := newStaticSite(cfg.WebDist, cfg.TarotDir, cfg.Logger)
 	if err != nil {
 		return nil, err
 	}
 	d.static = site
-	d.proxy = newProxy(cfg.Upstream, cfg.Logger)
 	var shelf *shelves.Shelves
 	if cfg.DataDir != "" {
 		shelf = shelves.New(cfg.DataDir, nil, cfg.Logger)
@@ -160,20 +139,24 @@ func New(cfg Config) (*Door, error) {
 	if err := d.openWriteSide(cfg); err != nil {
 		return nil, err
 	}
-	// The job registry and ADR 18's cache, for the sim family (Phase 5).
-	//
-	// The registry is this process's, and that is the whole reason the two
-	// generic poll routes are a hybrid rather than a port: jobs Go submits live
-	// here, jobs Python submits live over there, and a caller's list is the
-	// union. `d.proxy` goes in as a plain `http.Handler` so `api` can ask the
-	// upstream without importing anything of the door's -- see the note on
-	// `api.Config.Upstream`.
+	// The resolver, preferring the write handle: a live server owes the
+	// sessions table its expired-row deletes and its `last_seen_at` touches,
+	// and only a write handle can pay them. Without one -- a test against a
+	// read-only file, a broken disk -- sessions still resolve, untouched.
+	if cfg.RequireAuth {
+		if d.writeDB != nil {
+			d.resolver = dbResolver{db: d.writeDB, touch: true}
+		} else {
+			d.resolver = dbResolver{db: d.db}
+		}
+	}
+	// The job registry and ADR 18's cache.
 	d.jobs = jobs.New(jobs.Config{Logger: cfg.Logger})
 	d.openSimCache(cfg)
 	d.traffic = traffic.New(d.writeDB, cfg.Logger)
 
 	ported := api.New(api.Config{Logger: cfg.Logger, Pool: cfg.Pool, AppDB: d.db,
-		Jobs: d.jobs, SimCache: d.simCache, Upstream: d.proxy,
+		Jobs: d.jobs, SimCache: d.simCache,
 		AppDBPath: cfg.AppDB, DecksDir: cfg.DecksDir, ScryfallDir: cfg.ScryfallDir,
 		DataDir: cfg.DataDir, PoolPath: cfg.PoolPath, Traffic: d.traffic,
 		AdminEmail: cfg.AdminEmail,
@@ -198,7 +181,7 @@ func New(cfg Config) (*Door, error) {
 		// environment when a message is actually being sent -- and a test
 		// passes a recorder, which is how no test here sends mail.
 		EmailSender: cfg.EmailSender})
-	table, err := newRouteTable(ported.Routes(), ported.Proxied())
+	table, err := newRouteTable(ported.Routes())
 	if err != nil {
 		return nil, err
 	}
@@ -255,11 +238,13 @@ func (d *Door) Close() error {
 
 // Handler is the whole door as one http.Handler, outermost layer first: the
 // visitor ledger's counter (so a refusal that never reached routing is still
-// a request the instance answered — `(unrouted)`, exactly the bucket
-// Python's middleware shares), then security headers, then the auth
-// middleware, then dispatch.
+// a request the instance answered — `(unrouted)`), then security headers,
+// then the auth middleware, then compression, then dispatch. Compression
+// sits innermost deliberately: the floor reads the real response, so 304s
+// and small JSON stay whole, and the middleware refusals outside it go out
+// uncompressed — the same layering the app has always had.
 func (d *Door) Handler() http.Handler {
-	base := d.securityHeaders(d.authenticate(http.HandlerFunc(d.dispatch)))
+	base := d.securityHeaders(d.authenticate(gzipped(http.HandlerFunc(d.dispatch))))
 	if d.traffic == nil {
 		return base
 	}
@@ -268,24 +253,19 @@ func (d *Door) Handler() http.Handler {
 		r = r.WithContext(context.WithValue(r.Context(), tallyKey{}, t))
 		sw := &statusWriter{ResponseWriter: w}
 		base.ServeHTTP(sw, r)
-		if !t.skip {
-			status := sw.status
-			if status == 0 {
-				status = http.StatusOK
-			}
-			d.traffic.Record(t.template, status)
+		status := sw.status
+		if status == 0 {
+			status = http.StatusOK
 		}
+		d.traffic.Record(t.template, status)
 	})
 }
 
 // tally carries the matched template from dispatch back out to the counting
-// layer — the pointer-in-context form of Starlette setting
-// `request.scope["route"]` during routing.
+// layer — never the concrete path: a path can carry a slug and a slug can
+// carry a person.
 type tally struct {
 	template string
-	// skip marks a proxied request: Python's own middleware counts what
-	// Python answers, and one request must land in exactly one ledger.
-	skip bool
 }
 
 type tallyKey struct{}
@@ -293,12 +273,6 @@ type tallyKey struct{}
 func note(r *http.Request, template string) {
 	if t, ok := r.Context().Value(tallyKey{}).(*tally); ok {
 		t.template = template
-	}
-}
-
-func noteProxied(r *http.Request) {
-	if t, ok := r.Context().Value(tallyKey{}).(*tally); ok {
-		t.skip = true
 	}
 }
 
@@ -325,12 +299,14 @@ func (s *statusWriter) WriteHeader(code int) {
 func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
 // dispatch is the router, and deliberately a small one: it decides which of
-// three things a path is. The API check is made on the *normalised* path,
-// exactly as the auth middleware and the SPA catch-all make it in Python, so
-// `//api/decks` and `/api/./decks` go to the runtime that will refuse them as
-// JSON rather than being served the shell. Under /api the ported routes are
-// asked first (`routes.go` says on what terms) and the proxy takes the rest.
-// The static mounts match the raw path, as Starlette's `Mount` does.
+// three things a path is. The API check is made on the *normalised* path, so
+// `//api/decks` and `/api/./decks` are refused as JSON rather than being
+// served the shell. Under /api a request either matches a route (`routes.go`
+// says on what terms), matches a route's path on another method — the
+// router's own 405, `Allow` carrying the first matching route's method — or
+// is nothing at all, which is the catch-all's 404: `no such endpoint`, with
+// the normalised path, exactly the sentence the SPA catch-all has always
+// answered a stray /api request with. The static mounts match the raw path.
 func (d *Door) dispatch(w http.ResponseWriter, r *http.Request) {
 	raw := r.URL.Path
 	if raw == DoorHealthPath {
@@ -344,8 +320,20 @@ func (d *Door) dispatch(w http.ResponseWriter, r *http.Request) {
 			h.ServeHTTP(w, r)
 			return
 		}
-		noteProxied(r)
-		d.proxy.ServeHTTP(w, r)
+		if allow, ok := d.table.allowed(r); ok {
+			// The router refuses before any route runs, so no route template
+			// lands in the ledger: `(unrouted)`, the same bucket every
+			// before-routing refusal shares.
+			w.Header().Set("Allow", allow)
+			writeJSON(w, http.StatusMethodNotAllowed,
+				map[string]any{"detail": "Method Not Allowed"})
+			return
+		}
+		// The catch-all's refusal — a route template of its own, because the
+		// catch-all is a route and the ledger has always counted it as one.
+		note(r, "/{full_path}")
+		writeJSON(w, http.StatusNotFound,
+			map[string]any{"detail": "no such endpoint: " + NormalisePath(raw)})
 		return
 	}
 	// The static tiers record their mount prefix and the shell records the
@@ -362,15 +350,12 @@ func (d *Door) dispatch(w http.ResponseWriter, r *http.Request) {
 	d.static.ServeHTTP(w, r)
 }
 
-// DoorHealthPath is the door's own liveness answer -- outside `/api`, where
-// both runtimes agree every path is public, and therefore not a route the
-// shared classification has to carry. `/api/health` is the *instance's*
-// health -- the pool, the decks, the staleness flag -- and since Phase 8 the
-// door answers it itself; the child's liveness is the supervisor's business
-// (a dead child stops the door), not something the health body proxies to
-// prove. The platform's check, the image's HEALTHCHECK and the deploy's
-// smoke test all ask `/api/health`; this path stays for asking the door
-// alone.
+// DoorHealthPath is the process's own liveness answer -- outside `/api`,
+// where every path is public, and therefore not a route the shared
+// classification has to carry. `/api/health` is the *instance's* health --
+// the pool, the decks, the staleness flag; this path answers with nothing
+// but "the process is up", which is what the platform's check, the image's
+// HEALTHCHECK and the deploy's smoke test each want first.
 const DoorHealthPath = "/door/health"
 
 func (d *Door) health(w http.ResponseWriter, r *http.Request) {

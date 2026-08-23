@@ -40,7 +40,20 @@ var Local = Scope{IsAdmin: true}
 // the redundancy is cheap and the failure it covers is an account holder
 // keeping access after somebody believed they had removed it.
 func Resolve(ctx context.Context, db *sql.DB, token string) (Scope, error) {
-	session, err := Lookup(ctx, db, token)
+	return scopeFor(ctx, db, token, Lookup)
+}
+
+// ResolveTouching is Resolve over `LookupTouching`: the serving process's
+// resolver, which deletes an expired row on the way past and keeps
+// `last_seen_at` fresh. It needs a write handle; a read-only one keeps
+// `Resolve`.
+func ResolveTouching(ctx context.Context, db *sql.DB, token string) (Scope, error) {
+	return scopeFor(ctx, db, token, LookupTouching)
+}
+
+func scopeFor(ctx context.Context, db *sql.DB, token string,
+	lookup func(context.Context, *sql.DB, string) (*Session, error)) (Scope, error) {
+	session, err := lookup(ctx, db, token)
 	if err != nil || session == nil {
 		return Anonymous, err
 	}

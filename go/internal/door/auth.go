@@ -88,9 +88,20 @@ type Resolver interface {
 	Resolve(ctx context.Context, token string) (auth.Scope, error)
 }
 
-type dbResolver struct{ db *sql.DB }
+// dbResolver resolves against app.db. With a write handle it also carries
+// the two writes a live server owes the sessions table -- the expired-row
+// delete and the `last_seen_at` touch (`auth.ResolveTouching`); a read-only
+// handle resolves without them, the degraded shape a test or a broken disk
+// gets.
+type dbResolver struct {
+	db    *sql.DB
+	touch bool
+}
 
 func (r dbResolver) Resolve(ctx context.Context, token string) (auth.Scope, error) {
+	if r.touch {
+		return auth.ResolveTouching(ctx, r.db, token)
+	}
 	return auth.Resolve(ctx, r.db, token)
 }
 
@@ -100,9 +111,9 @@ func (r dbResolver) Resolve(ctx context.Context, token string) (auth.Scope, erro
 // rather than that it needs to be somebody else.
 //
 // A lookup that *fails* (app.db unreadable, say) resolves to anonymous and is
-// logged: the door must not pass a request through on an error, and must not
-// 500 the whole site over one lookup either. Python's middleware behind it
-// will see the same cookie and make its own decision.
+// logged: the middleware must not pass a request through on an error, and
+// must not 500 the whole site over one lookup either -- an anonymous caller
+// is refused everything private, which is the safe answer.
 func (d *Door) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !d.cfg.RequireAuth {
@@ -131,8 +142,7 @@ func (d *Door) authenticate(next http.Handler) http.Handler {
 			writeJSON(w, http.StatusForbidden, map[string]any{"detail": adminOnly})
 			return
 		}
-		// The caller rides on the context for the ported routes; the proxy
-		// sends the cookie on and Python resolves it again for its own.
+		// The caller rides on the context for the routes.
 		next.ServeHTTP(w, r.WithContext(auth.WithScope(r.Context(), caller)))
 	})
 }
