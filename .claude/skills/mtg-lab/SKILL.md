@@ -13,14 +13,13 @@ Local toolkit for Commander deckbuilding, simulation, and shopping.
 Every card mentioned in any output must be looked up first:
 
 ```bash
-python -c "
-from mtglab.cards import db
-con = db.connect('data/mtg.duckdb')
-for n, r in db.get_cards(con, ['Arahbo, Roar of the World']).items():
-    print(r.name, r.mana_cost, r.type_line, sorted(r.color_identity))
-    print(r.oracle_text)
-"
+mtglab cards show 'Arahbo, Roar of the World'
 ```
+
+(From `go/` in a checkout that has not installed the binary:
+`go run ./cmd/mtglab cards show '<name>'` — cost, types, color identity and
+oracle text, straight from the pool. Several names may be passed at once;
+a name the pool lacks is a refusal that names it.)
 
 This rule exists because of two real errors:
 - *Ajani, Nacatl Pariah* was proposed for a G/W deck. Its back face is R/W, so
