@@ -936,7 +936,39 @@ apart — and surviving exactly that gap is what `wire.go` is written for. One
 binary makes the skew impossible instead of merely handled; the worker image
 lost its Python interpreter, its venv, DuckDB and numpy either way. *Gate: a
 real hosted match on the instance, bar ticking, ledger row written —
-photographed, commandment 14.*
+photographed, commandment 14.* **Met 2026-08-23 on v195.**
+
+**The gate, as it actually ran.** Arahbo's cats against Atla Palani's
+dinosaurs — the pairing CLAUDE.md names as the one Forge plays *well*, so the
+numbers mean something — ten games, seed 7, driven through the Simulator in a
+browser on the `claude` seat. The theater lit ("the forge is lighting"), the
+anvil ticked to 10/10, and the tale of the tape read **7–3, no draws, nothing
+on the clock, 5.2s median and 17.3s longest** — a median inside the 4.6–6.8s
+band ADR 35 measured, and medians-and-tails reporting as required. **10 games
+in 83s, 15s of it lighting the forge**, against 15.7s of JVM startup measured
+on the dev Mac. `mtglab sim matches` on the instance reads back match #4
+`(worker, Forge 2.0.14, seed 7)` with both seats' labels snapshotted — a row
+the **Go** recorder wrote and the **Python** CLI read, which is the
+cross-runtime compatibility of that table proven rather than assumed.
+
+**And the flip is proven three ways**, none of which is "the tests pass".
+*The same route before and after the same deploy*: six refusal cases captured
+on v194 (Python) and re-asked on v195 (Go) came back **byte-identical**,
+`no deck '['x']'` included — the exact case `wire.PyStr` was written for.
+*Who logged it*: three requests each to `/api/forge` and `/api/health` on the
+live instance produced **0** uvicorn access lines for the first and **3** for
+the second, the control being what makes that a proof rather than an absence.
+*And the worker really is Pythonless*: `fly ssh console -C
+"/opt/venv/bin/mtglab …"` against the forge-worker machine now answers `no
+such file or directory`.
+
+One thing the gate did **not** cover, said plainly rather than left implied.
+The deploy updates the app first and the worker several minutes later, so
+there is a real window in which the Go route talks to the **old Python
+shim** — the deploy skew `wire.go` is written to survive. The window opened
+during this release and closed about a minute before the match started; it
+was watched, not tested. The next deploy is another chance at it, and it is
+worth taking deliberately rather than hoping to catch.
 
 **Phase 8 — Retirement and the comparison** *(~¼–½ day; **re-priced ~2–3
 hours** — the retirement itself is small, and Appendix B's measurements are
