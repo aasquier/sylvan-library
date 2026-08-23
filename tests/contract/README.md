@@ -19,29 +19,25 @@ pytest tests/contract --update-golden       # re-record golden/ from what the se
 
 The in-process mode runs inside the ordinary suite and CI's `test` job. The
 `contract` CI job runs `--live`, which is the mode that proves the rig:
-nothing on the far side of the socket is stubbed. The external mode is for
-the coexistence pair from Phase 2 on — the Go front door on one port,
-uvicorn behind it, both started against a directory this harness seeded —
-and, at retirement, for Go alone. **The `contract` job runs that too**,
-since Phase 2 (2026-08-21): it builds the door from `go/`, seeds a scratch
-with this harness, starts the pair, and runs the suite `--base-url` against
-the door. To do the same by hand:
+nothing on the far side of the socket is stubbed. The external mode drives a
+server somebody else started against a directory this harness seeded — which
+is how **the `contract` job also runs the suite against the Go server
+alone**, the exact process the container runs. To do the same by hand:
 
 ```bash
 # 1. seed a scratch the way --live does
-PYTHONPATH=tests python -c 'from pathlib import Path; from contract import harness; harness.seed(harness.make_scratch(Path("/tmp/pair")))'
+PYTHONPATH=tests python -c 'from pathlib import Path; from contract import harness; harness.seed(harness.make_scratch(Path("/tmp/solo")))'
 # 2. the environment the harness gives its child (contract.harness.SERVER_ENV), plus the dirs
-export MTGLAB_REQUIRE_AUTH=1 MTGLAB_SECURE_COOKIES=0 MTGLAB_DATA_DIR=/tmp/pair/data MTGLAB_DECKS_DIR=/tmp/pair/decks MTGLAB_FORGE_HOME=/tmp/pair/no-forge-here
+export MTGLAB_REQUIRE_AUTH=1 MTGLAB_SECURE_COOKIES=0 MTGLAB_DATA_DIR=/tmp/solo/data MTGLAB_DECKS_DIR=/tmp/solo/decks MTGLAB_FORGE_HOME=/tmp/solo/no-forge-here
 export MTGLAB_ADMIN_EMAIL= MTGLAB_ADMIN_USERNAME= ANTHROPIC_API_KEY= ANTHROPIC_AUTH_TOKEN= RESEND_API_KEY= FLY_METRICS_TOKEN= MTGLAB_FORGE_WORKER= MTGLAB_FLY_API_TOKEN= MTGLAB_CLIENT_IP_HEADER= MTGLAB_BASE_URL=
 # every SERVER_ENV name, or a credential in your shell leaks into the run: a
 # real ANTHROPIC_* answers "Claude available", a real Forge home plays a JVM
 # match mid-suite, and MTGLAB_ADMIN_EMAIL bootstraps a maintainer beside the
 # seeded accounts -- each of which reads as dozens of failures, not one.
-# 3. Python behind, the door in front (from go/; cwd outside the repo for Python so .env cannot leak in)
-(cd /tmp/pair && python -m mtglab.cli ui --no-open --host 127.0.0.1 --port 8766 &)
-(cd go && go run ./cmd/mtglab ui --host 127.0.0.1 --port 8765 --upstream http://127.0.0.1:8766 --web-dist ../src/mtglab/web_dist --tarot ../src/mtglab/assets/tarot &)
-# 4. the suite, through the door
-pytest tests/contract --base-url http://127.0.0.1:8765 --data-dir /tmp/pair/data --decks-dir /tmp/pair/decks
+# 3. the server (from go/; on this Mac export the toolchain and CGO_LDFLAGS first — see CLAUDE.md §Setup)
+(cd go && go run ./cmd/mtglab ui --host 127.0.0.1 --port 8765 --web-dist ../src/mtglab/web_dist --tarot ../src/mtglab/assets/tarot &)
+# 4. the suite
+pytest tests/contract --base-url http://127.0.0.1:8765 --data-dir /tmp/solo/data --decks-dir /tmp/solo/decks
 ```
 
 ## What is in here

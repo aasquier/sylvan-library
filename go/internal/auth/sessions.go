@@ -17,9 +17,10 @@ const TokenBytes = 32
 // Lifetime is a session's life, matching the cookie's Max-Age.
 const Lifetime = 14 * 24 * time.Hour
 
-// TouchInterval is how often Python writes `last_seen_at`. Recorded here
-// because the door deliberately does *not* perform the touch (see the
-// package comment); Python's middleware behind it does.
+// TouchInterval is how often `last_seen_at` is worth a write. Every
+// authenticated request would otherwise be one, and the value is only ever
+// read by a human wondering when an account was last used. `LookupTouching`
+// pays it; the read-only `Lookup` below never writes at all.
 const TouchInterval = 5 * time.Minute
 
 // Session is what a token resolved to. Never the token itself.

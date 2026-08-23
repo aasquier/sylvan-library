@@ -121,20 +121,6 @@ type Config struct {
 	// `app.db`. A nil `*cache.Store` is a working store that caches nothing,
 	// so no caller branches on it.
 	SimCache *cache.Store
-	// Upstream is the door's proxy, and it exists for exactly one reason: the
-	// **hybrid poll handler**.
-	//
-	// PLAN section 10 named this as the awkward part -- "it inverts the door's
-	// dependency (the proxy is chosen in `door` when `match` misses; `door`
-	// imports `api`, not the reverse)". The inversion is avoided by passing a
-	// plain `http.Handler` rather than importing anything: the door builds its
-	// proxy before it builds this package, and hands it over. `api` never
-	// learns what an upstream is.
-	//
-	// Nil means "no upstream", and the poll routes then answer from Go's
-	// registry alone -- correct for a test, and correct after Phase 8 when
-	// there is no Python left to ask.
-	Upstream http.Handler
 }
 
 // API holds the ported routes' dependencies.
@@ -154,7 +140,6 @@ type API struct {
 	email         auth.EmailSender
 	jobs          *jobs.Registry
 	simCache      *cache.Store
-	upstream      http.Handler
 	matchLedgerOf *matchledger.Recorder
 	forgeClient   *tier3.Worker
 
@@ -197,7 +182,7 @@ func New(cfg Config) *API {
 		adminEmail: cfg.AdminEmail,
 		shelves:    cfg.Shelves, log28: cfg.Recorder, requireAuth: cfg.RequireAuth,
 		secureCookies: cfg.SecureCookies, email: cfg.EmailSender,
-		jobs: cfg.Jobs, simCache: cfg.SimCache, upstream: cfg.Upstream,
+		jobs: cfg.Jobs, simCache: cfg.SimCache,
 		claudeLedger: cfg.ClaudeLedger, matchLedgerOf: cfg.MatchLedger,
 		forgeClient: cfg.ForgeWorker}
 }
@@ -442,27 +427,13 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPost, Pattern: "/api/sim/shelf", Handler: a.simShelf},
 		{Method: http.MethodPost, Pattern: "/api/sim/policy", Handler: a.simPolicy},
 
-		// Tier 3 (ADR 35), Phase 7's flip and the last job-submitting family
-		// to cross. `GET /api/forge` is the gate the Simulator asks first;
-		// `POST /api/sim/forge` is the match. With these two here, no route
-		// the door serves creates a job in Python's registry -- which is what
-		// `jobruns.go`'s proxy branch had rested on, and why its test now
-		// plants a real job upstream rather than asserting an absence.
+		// Tier 3 (ADR 35). `GET /api/forge` is the gate the Simulator asks
+		// first; `POST /api/sim/forge` is the match.
 		{Method: http.MethodGet, Pattern: "/api/forge", Handler: a.forgeGate},
 		{Method: http.MethodPost, Pattern: "/api/sim/forge", Handler: a.simForge},
 		{Method: http.MethodGet, Pattern: "/api/jobs", Handler: a.listJobs},
 		{Method: http.MethodGet, Pattern: "/api/jobs/{job_id}", Handler: a.getJob},
 	}
-}
-
-// Proxied is every exact path that a pattern above would capture but that
-// still belongs to Python: the door hands these to the proxy before any
-// pattern is consulted. FastAPI resolves a literal declared before a
-// template by order; here a literal Go has not ported is named, and each
-// entry leaves this list the day its route arrives in Routes.
-// `/api/colors/progress` was the first entry, and left with the deck reads.
-func (a *API) Proxied() []string {
-	return []string{}
 }
 
 // usePool is `service._connect()` followed by the work: fn runs against a
