@@ -3,7 +3,11 @@ package claude
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/aasquier/sylvan-library/go/internal/claude/tools"
+	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
 // The pipe, proved against the real API.
@@ -139,5 +143,64 @@ func TestLiveAToolRoundTripAndACacheRead(t *testing.T) {
 			"-- a byte-stable prefix cannot get less cacheable on the second "+
 			"identical call, so something in it is drifting",
 			second.CacheReadTokens, first.CacheReadTokens)
+	}
+}
+
+// The first mode's own live case, and the gate Phase 6 sets for each of them
+// as it lands: a real deck, a real pool, a real key, and the mode's own
+// response schema round-tripping through the API.
+//
+// What only a live call can answer here is whether the API **accepts the
+// schema** -- `RATIONALE_INTERVIEW`'s is generated data crossed from Python,
+// and a schema the API rejects is a 400 that no scripted server would ever
+// produce. The rest is worth watching rather than asserting hard: the model is
+// asked for three to five questions and `OnlyQuestions` drops anything that is
+// not one, so a drop count above zero is a real signal about the prompt and
+// not a test failure.
+func TestLiveTheRationaleInterviewAsksRealQuestions(t *testing.T) {
+	liveOrSkip(t)
+	d := fixtureDeck(t, "kaheera")
+	stance, err := Preset("second-opinion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report InterviewReport
+	withPool(t, func(c *pool.Conn) {
+		var runErr error
+		report, runErr = Interview(context.Background(), c, d, "Sol Ring", InterviewRequest{
+			Requested: stance,
+			Deps:      tools.Deps{Pool: c},
+			Limit:     &Collaborator,
+		})
+		if runErr != nil {
+			t.Fatalf("the interview did not answer: %v", runErr)
+		}
+	})
+	if !report.Asked {
+		t.Fatalf("no call was made: %s", report.Reason)
+	}
+	if report.Reason != "" {
+		t.Fatalf("the conversation ended early: %s", report.Reason)
+	}
+	if len(report.Questions) == 0 {
+		t.Fatal("the interview came back with nothing to ask")
+	}
+	for i, q := range report.Questions {
+		if !strings.HasSuffix(strings.TrimSpace(q.Question), "?") {
+			t.Errorf("question %d is not a question: %q", i, q.Question)
+		}
+		if strings.TrimSpace(q.Fact) == "" {
+			t.Errorf("question %d rests on nothing", i)
+		}
+	}
+	if report.Never != NeverSentence {
+		t.Errorf("the payload's promise is %q", report.Never)
+	}
+	t.Logf("%d questions (%d dropped) from %s, %d in / %d out / %d cached",
+		len(report.Questions), report.QuestionsDropped, report.Model,
+		report.Usage.InputTokens, report.Usage.OutputTokens,
+		report.Usage.CacheReadTokens)
+	for _, q := range report.Questions {
+		t.Logf("  [%s] %s  (%s)", q.Angle, q.Question, q.Fact)
 	}
 }

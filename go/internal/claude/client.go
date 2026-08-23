@@ -116,12 +116,34 @@ func Available() bool { return CredentialPresent() }
 // work.
 func Require() error {
 	if !CredentialPresent() {
-		return fmt.Errorf("%w: no ANTHROPIC_API_KEY in the environment -- put "+
-			"one in .env (see .env.example), or `fly secrets set` it when "+
-			"deployed", ErrUnavailable)
+		return &unavailable{reason: "no ANTHROPIC_API_KEY in the environment " +
+			"-- put one in .env (see .env.example), or `fly secrets set` it " +
+			"when deployed"}
 	}
 	return nil
 }
+
+// unavailable is ErrUnavailable carrying the fixable reason and NOTHING else.
+//
+// A `fmt.Errorf("%w: ...", ErrUnavailable)` would read "claude is unavailable:
+// no ANTHROPIC_API_KEY ...", and that string is not internal: `str(exc)` on
+// Python's `ClaudeUnavailable` is the bare reason, the route puts it straight
+// into a 422/503 `detail`, and the deck page renders `detail` verbatim. So the
+// sentinel's own words would have shipped as a prefix nobody wrote, on the
+// first Claude surface to answer from the door.
+//
+// Found by curling the pair rather than by any test: the contract goldens
+// record this body as `{"detail": "string"}`, which is true of both spellings.
+// Same shape as `stanceRejection` -- match on the sentinel, answer in Python's
+// words -- and the same lesson as `converse` handing the model `no deck 'x'`
+// where Python's `DeckNotFound` stringifies to the bare slug.
+type unavailable struct{ reason string }
+
+func (e *unavailable) Error() string { return e.reason }
+
+// Is makes `errors.Is(err, ErrUnavailable)` true without the sentinel's text
+// reaching anybody.
+func (e *unavailable) Is(target error) bool { return target == ErrUnavailable }
 
 // Connect is an SDK client, or `ErrUnavailable` with a fixable reason.
 //

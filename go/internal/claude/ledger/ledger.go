@@ -217,3 +217,21 @@ func now() string {
 // a route's vocabulary underneath the accounting, and this needs one quote
 // character, not an escaping table.
 func pyQuote(s string) string { return "'" + s + "'" }
+
+// RecorderFrom is a Recorder over an app.db handle somebody else opened.
+//
+// The door already holds one: `decklog.NewRecorder` opens app.db `mode=rw` for
+// ADR 28's activity log, and the two ledgers write different tables in the same
+// file. Sharing the handle means one connection pool and one place that decides
+// what "no app.db" means, rather than a second `mode=rw` open that could fail
+// on its own and leave the process half-accounted.
+//
+// A nil handle is passed straight through, because `Record` on a Recorder with
+// no database already warns and returns -- the honest answer on an instance
+// Python has not created a database for yet.
+func RecorderFrom(db *sql.DB, logger *slog.Logger) *Recorder {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &Recorder{db: db, log: logger}
+}

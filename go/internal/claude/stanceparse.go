@@ -3,6 +3,7 @@ package claude
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -148,6 +149,37 @@ func pyReprAny(v any) string {
 	return fmt.Sprintf("%v", v)
 }
 
+// ErrStanceRejected marks a refusal that came from reading the caller's own
+// stance rather than from anything the conversation did.
+//
+// It exists because a route has to answer differently: `api/app.py` maps a
+// malformed stance to 422 and a failed call to 502, and it can do that without
+// a sentinel only because `stance.resolve` is a separate statement in Python,
+// raising ValueError before `converse` is ever reached. A mode's orchestration
+// here does both in one function, so the difference has to travel on the error.
+//
+// **Wrapped in `Resolve` rather than in each mode**, so the sixth mode inherits
+// it the way it inherits everything else. A rule enforced by nothing drifts,
+// and this one would drift silently: a mode that forgot would answer 502 for a
+// typo in a client's stance, which reads as "the model broke" rather than "you
+// sent nonsense".
+//
+// The message is the parser's own, unchanged -- the stance corpus compares
+// refusal text against Python's, so this may add a category and never a word.
+var ErrStanceRejected = errors.New("the stance could not be read")
+
+// stanceRejection carries a parse refusal under ErrStanceRejected while
+// answering with exactly the sentence the parser wrote.
+type stanceRejection struct{ err error }
+
+func (e *stanceRejection) Error() string { return e.err.Error() }
+
+// Is makes `errors.Is(err, ErrStanceRejected)` true without putting the
+// sentinel's own words anywhere a caller could read them.
+func (e *stanceRejection) Is(target error) bool { return target == ErrStanceRejected }
+
+func (e *stanceRejection) Unwrap() error { return e.err }
+
 // Resolve is the stance that actually applies: what was asked, defaulted, then
 // capped. The one function callers should need.
 //
@@ -166,7 +198,7 @@ func Resolve(requested any, deck DeckStatused, limit *Stance) (Stance, error) {
 	} else {
 		parsed, err := StanceFromObj(requested)
 		if err != nil {
-			return Stance{}, err
+			return Stance{}, &stanceRejection{err: err}
 		}
 		asked = parsed
 	}
