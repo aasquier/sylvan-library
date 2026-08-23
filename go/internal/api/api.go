@@ -298,10 +298,14 @@ func (a *API) Routes() []Route {
 		// the same source goes to the tools the conversation may reach for.
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/interview", Handler: a.rationaleInterview},
 		// The slot argument (ADR 25), the interview's twin: same shape, same
-		// status codes, opposite direction. `.../argue/deck` is the same mode
-		// swept across a selection and is a JOB, so it stays Python's until
-		// that lane crosses -- a prefix is not a family.
+		// status codes, opposite direction. The single card is a plain route
+		// on its measured seconds...
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/argue", Handler: a.argueSlot},
+		// ...and the same mode swept across a selection, which is a JOB: one
+		// call per card, so a few dozen slots is minutes. One job for the
+		// whole sweep and sequential inside it, because N jobs would occupy
+		// the two-wide NET lane and starve every sibling surface.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/argue/deck", Handler: a.argueSweep},
 		// The commander dossier (ADR 19), both halves: the free GET that reads
 		// the store and never calls, and the POST that writes one as a JOB on
 		// the NET lane -- the first Claude job family to answer from the door,

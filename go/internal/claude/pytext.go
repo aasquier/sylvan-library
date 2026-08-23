@@ -46,6 +46,12 @@ func pyIsSpace(r rune) bool {
 	return false
 }
 
+// PyStrip is `str.strip()`, exported for `internal/api`: the argue sweep
+// strips names somebody typed, and Python's whitespace set is not Go's --
+// U+001C-U+001F are whitespace to `str.strip()` and not to
+// `strings.TrimSpace`.
+func PyStrip(s string) string { return pyStrip(s) }
+
 // pyStrip is `str.strip()` with no argument.
 func pyStrip(s string) string { return strings.TrimFunc(s, pyIsSpace) }
 

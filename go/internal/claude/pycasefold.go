@@ -72,6 +72,12 @@ func init() {
 // byte below 0x80 folds to itself. Both facts are in the table too, so the
 // fast path is an optimisation and never a second definition -- a test
 // walks all 128 through both.
+// PyCasefold is `str.casefold()`, exported for `internal/api`: the argue
+// sweep folds a NAME SOMEBODY TYPED against the deck's own spelling, which is
+// two different strings and therefore the one place in this family where
+// `casefold` and `lower` can genuinely disagree.
+func PyCasefold(s string) string { return pyCasefold(s) }
+
 func pyCasefold(s string) string {
 	if ascii, done := pyCasefoldASCII(s); done {
 		return ascii
