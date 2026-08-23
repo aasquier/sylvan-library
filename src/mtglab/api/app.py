@@ -1014,8 +1014,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         answers flattened into one string.
         """
         from mtglab.api.themeruns import plan_proposal
-        from mtglab.claude.client import ClaudeUnavailable
         from mtglab.claude import theme as theme_mod
+        from mtglab.claude.client import ClaudeUnavailable
         from mtglab.claude.theme import NotReady, TranscriptRejected
 
         try:

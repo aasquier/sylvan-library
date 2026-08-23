@@ -128,6 +128,7 @@ _ORACLES = [
     ("research", "RESEARCH_PATH", "render_research_cases"),
     ("the theme interview", "THEME_PATH", "render_theme_cases"),
     ("CPython's case folding", "CASEFOLD_PATH", "render_casefold_payload"),
+    ("the camera's reader", "SCAN_PATH", "render_scan_cases"),
     # `DIGITS_PATH` is deliberately NOT here: it is the one oracle in this
     # file whose fresh render legitimately differs between the two supported
     # interpreters, so exact equality is the wrong rule. See
