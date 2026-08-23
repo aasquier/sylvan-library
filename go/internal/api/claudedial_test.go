@@ -2,8 +2,14 @@ package api
 
 import (
 	"encoding/json"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 )
 
 // The dial's route. `internal/claude`'s corpus already holds the payload to
@@ -222,5 +228,110 @@ func TestTheDialCannotSeeAnotherAccountsPrivateDeck(t *testing.T) {
 	// visibility rather than about the route being broken for other owners.
 	if status, _, raw := as(t, a, alice, "/api/claude?owner=bob&slug=bobs-public"); status != 200 {
 		t.Errorf("bob's shared deck answered %d to alice, want 200: %s", status, raw)
+	}
+}
+
+// **The slug arrives as a QUERY parameter here, which no other deck route
+// does** -- everywhere else it is a path segment the door has already
+// canonicalised, so `..` cannot reach a handler. This route is the one place
+// a caller hands the library an arbitrary string.
+//
+// CodeQL flagged exactly that on the PR that added this route: two high
+// `go/path-injection` alerts on `FileSource.path`, which this handler had
+// given a new taint source. The sanitiser is real -- `path()` refuses a slug
+// containing a separator, and one that is only dots -- but CodeQL does not
+// recognise `strings.ContainsAny` plus `strings.Trim` as one, and a comment
+// saying "the door normalises it" stopped being the whole answer the moment a
+// query parameter could carry it.
+//
+// **The first version of this test proved nothing, and the mutation run said
+// so.** It asked for `../../../../etc/passwd` and asserted a 404 -- but
+// `path()` also stats the file, so that 404 arrives whether the guard fires
+// or not. Deleting the guard entirely left the test green. So the target here
+// is a **real deck.yaml planted outside the root**: with the guard it is a
+// 404, and without it the handler reads a deck it must never see. That is a
+// probe that can fail differently, which is the only kind worth writing about
+// a security boundary.
+func TestTheDialsSlugCannotWalkOutOfTheLibrary(t *testing.T) {
+	// Two decks the caller must never reach, both outside the library. The
+	// second one is directly in the parent, and it is what makes the
+	// **dot-only** branch testable: without it `..` joins to
+	// `<parent>/deck.yaml`, so there has to be a readable deck exactly there
+	// or the 404 arrives for the boring reason. Found by mutation -- the
+	// first version planted only the nested one and the dot-only mutant
+	// survived.
+	outside := t.TempDir()
+	planted := filepath.Join(outside, "planted")
+	if err := os.MkdirAll(planted, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := []byte("name: Planted\nstatus: built\ncards: []\n")
+	if err := os.WriteFile(filepath.Join(planted, "deck.yaml"), body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outside, "deck.yaml"), body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(outside, "library")
+	if err := os.MkdirAll(filepath.Join(root, "mono-green"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "mono-green", "deck.yaml"),
+		[]byte("name: Real\nstatus: theoretical\ncards: []\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	db, err := auth.Open(appDB(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	a := New(Config{Pool: pooltest.Open(t), DecksDir: root,
+		AdminEmail: "alice@example.com", AppDB: db})
+
+	for _, slug := range []string{
+		// The load-bearing ones: each of these RESOLVES to the planted deck
+		// if the guard is removed.
+		"../planted",
+		"./../planted",
+		"mono-green/../../planted",
+		// Percent-encoded, so the decoder hands the handler a real separator
+		// rather than the literal text -- the case a guard written against
+		// the raw query string would miss.
+		"..%2fplanted",
+		// A backslash is refused too. **On this OS that is belt and braces
+		// and a mutation survives removing it**, since `\` is an ordinary
+		// filename character on darwin and linux; the check earns its place
+		// only where `\` separates, and it is kept rather than trimmed
+		// because the cost is one `ContainsAny` argument.
+		`..\..\planted`,
+		// And the shapes the dot-only branch exists for.
+		"..", "...", ".",
+		"mono-green\x00.txt",
+	} {
+		target := "/api/claude?slug=" + url.QueryEscape(slug)
+		status, payload, raw := as(t, a, alice, target)
+		if status != 404 {
+			t.Errorf("slug %q answered %d, want 404 -- it may have READ a deck "+
+				"outside the library: %s", slug, status, raw)
+			continue
+		}
+		// The refusal is Python's own `no deck '<slug>'` and nothing more. It
+		// ECHOES what the caller sent, which is not a leak -- they typed it --
+		// but it must not carry the server's own paths or the OS's errno text,
+		// which is what a handler reporting `os.ReadFile`'s error would do.
+		detail, _ := payload["detail"].(string)
+		if !strings.HasPrefix(detail, "no deck ") {
+			t.Errorf("slug %q refused with %q, want the deck's own 404", slug, detail)
+		}
+		for _, leak := range []string{"no such file", "permission denied", "deck.yaml", outside} {
+			if strings.Contains(detail, leak) {
+				t.Errorf("slug %q leaked the server's %q: %q", slug, leak, detail)
+			}
+		}
+	}
+	// A real slug inside the library still resolves, so this is not passing
+	// because everything 404s.
+	if status, _, raw := as(t, a, alice, "/api/claude?slug=mono-green"); status != 200 {
+		t.Errorf("a real deck answered %d, want 200: %s", status, raw)
 	}
 }
