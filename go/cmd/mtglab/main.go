@@ -26,6 +26,8 @@ func main() {
 	root.AddCommand(shimCommand())
 	root.AddCommand(dataCommand())
 	root.AddCommand(usersCommand())
+	root.AddCommand(cardsCommand())
+	root.AddCommand(claudeCommand())
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "mtglab:", err)
 		os.Exit(1)
