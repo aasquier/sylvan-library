@@ -40,6 +40,13 @@
   {"note":"a unicode digit that is not base64","image":"YWJ０","error":"the capture was not valid base64"},
   {"note":"a nul byte in the string","image":"YWJj\u0000","error":"the capture was not valid base64"}
  ],
+ "not_a_string": [
+  {"note":"a list","raw":[1,2,3],"error":"the capture must be a base64 string"},
+  {"note":"an object","raw":{"a":1},"error":"the capture must be a base64 string"},
+  {"note":"a number","raw":7,"error":"the capture must be a base64 string"},
+  {"note":"a float","raw":7.5,"error":"the capture must be a base64 string"},
+  {"note":"true","raw":true,"error":"the capture must be a base64 string"}
+ ],
  "sizes": [
   {"note":"one under the cap","bytes":4194303,"ok":true},
   {"note":"exactly the cap","bytes":4194304,"ok":true},

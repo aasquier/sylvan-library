@@ -30,6 +30,12 @@ type scanCorpus struct {
 		Data  string `json:"data"`
 		Error string `json:"error"`
 	} `json:"captures"`
+	NotAString []struct {
+		Note  string          `json:"note"`
+		Raw   json.RawMessage `json:"raw"`
+		OK    bool            `json:"ok"`
+		Error string          `json:"error"`
+	} `json:"not_a_string"`
 	Sizes []struct {
 		Note  string `json:"note"`
 		Bytes int    `json:"bytes"`
@@ -336,35 +342,60 @@ func TestTheImageBlockComesFirst(t *testing.T) {
 	}
 }
 
-// **A wart, pinned.** A capture that is neither a string nor bytes reaches
-// `len()` in Python and raises an uncaught `TypeError`, so the route answers
-// 500 to a request that is plainly malformed.
+// A capture that is neither a string nor bytes is **one 422 like every other
+// bad capture**, and it was an uncaught 500 until 2026-08-23.
 //
-// It is the theme proposal's budget bug in a second module -- that one was
-// ruled with Aaron on 2026-08-23 and fixed in both runtimes at once; this one
-// was found the same day and is reproduced pending the same call. The test
-// asserts it is NOT an `ErrScanRefused`, because that distinction is the whole
-// mechanism: the route maps refusals to 422 and this to Python's 500.
-func TestANonStringCaptureIsPythonsUncaughtTypeError(t *testing.T) {
-	for _, image := range []any{[]any{1, 2, 3}, map[string]any{"a": 1}, float64(7), true} {
-		_, _, err := ScanMessage(image, "image/jpeg")
-		if err == nil {
-			t.Errorf("%T was accepted", image)
+// Python's `_payload` took whatever it was handed, so a list or an object
+// reached `len()` and raised a `TypeError` nothing caught -- the theme
+// proposal's `float(budget)` wart in a second module, found by this port on
+// the day that one was ruled and ruled with it. This test is the wart's own,
+// kept and inverted: it asserts the refusal IS an `ErrScanRefused` now, since
+// that is the mechanism the route reads to answer 422 rather than 500.
+func TestACaptureThatIsNotTextIsARefusalLikeAnyOther(t *testing.T) {
+	c := loadScanCorpus(t)
+	if len(c.NotAString) == 0 {
+		t.Fatal("the corpus no longer holds a capture that is not text")
+	}
+	for _, row := range c.NotAString {
+		var raw any
+		dec := json.NewDecoder(bytes.NewReader(row.Raw))
+		dec.UseNumber()
+		if err := dec.Decode(&raw); err != nil {
+			t.Fatal(err)
+		}
+		_, _, err := ScanMessage(raw, "image/jpeg")
+		if row.OK {
+			if err != nil {
+				t.Errorf("%s: refused with %q where Python accepted it", row.Note, err)
+			}
 			continue
 		}
-		if !ErrScanImageType(err) {
-			t.Errorf("%T refused with %q, want the type wart", image, err)
+		if err == nil {
+			t.Errorf("%s: accepted where Python refused", row.Note)
+			continue
 		}
-		if errors.Is(err, ErrScanRefused) {
-			t.Errorf("%T reads as a 422; Python answers 500 for it", image)
+		if err.Error() != row.Error {
+			t.Errorf("%s: refused with\n  %q\nPython says\n  %q", row.Note, err, row.Error)
+		}
+		// The mechanism, not just the sentence: the route maps this sentinel
+		// to 422, and before the ruling this branch deliberately did not
+		// carry it.
+		if !errors.Is(err, ErrScanRefused) {
+			t.Errorf("%s: the refusal will not read as a 422 at the route", row.Note)
+		}
+		// Commandment 10: no type name, no language, nothing that computes.
+		for _, leak := range []string{"TypeError", "[]interface", "map[", "float64", "int"} {
+			if strings.Contains(err.Error(), leak) {
+				t.Errorf("%s: the refusal leaks %q: %q", row.Note, leak, err)
+			}
 		}
 	}
-	// And the two that ARE refusals, so this is not passing because
-	// everything takes the wart branch.
+	// And the two that are EMPTY rather than mistyped keep their own sentence,
+	// so the fix did not flatten three cases into one.
 	for _, image := range []any{"", nil} {
 		_, _, err := ScanMessage(image, "image/jpeg")
-		if !errors.Is(err, ErrScanRefused) || ErrScanImageType(err) {
-			t.Errorf("%#v refused with %q, want the empty-capture 422", image, err)
+		if err == nil || err.Error() != "the capture was empty" {
+			t.Errorf("%#v refused with %v, want the empty-capture sentence", image, err)
 		}
 	}
 }

@@ -2879,10 +2879,14 @@ def dial_cases() -> list[dict[str, Any]]:
     handler's library resolution is left to the route tests, where a 404 can
     actually be asserted.
 
-    Two rows exist to pin warts and are labelled as such: `?surface=scan`
-    resolves `off` because `_SURFACE_DEFAULTS` was never extended when ADR 34
-    landed, and the `modes` list is six of the seven for the same reason one
-    layer along. Both were measured against the running app.
+    Two rows were **warts until 2026-08-23** and are kept for it: for three
+    months `?surface=scan` resolved `off` -- `_SURFACE_DEFAULTS` was never
+    extended when ADR 34 landed (#180), while `scan.stance_for` sat there with
+    a docstring saying it existed to prevent exactly that -- and the `modes`
+    list was six of the seven for the same omission one layer along. Found by
+    the Go port and ruled with Aaron; both fixed in both runtimes at once.
+    Neither was reachable from the app, which is how they survived, so the
+    rows stay here as the thing that would notice.
     """
     from mtglab.api import service
 
@@ -2892,10 +2896,10 @@ def dial_cases() -> list[dict[str, Any]]:
         ("no deck, no surface", None, None, "", None),
         ("a theme surface with no deck", None, None, "theme", None),
         ("a research surface with no deck", None, None, "research", None),
-        # The wart: `scan.stance_for` exists and says in its docstring that it
-        # is public so this will not answer `off`. `_SURFACE_DEFAULTS` does
-        # not name it, so this answers `off`.
-        ("WART: a scan surface answers off", None, None, "scan", None),
+        # `consultant` and not `second-opinion`: this is a transcription,
+        # where volunteering is the failure mode rather than the feature. It
+        # answered `off` until 2026-08-23.
+        ("a scan surface with no deck", None, None, "scan", None),
         ("a surface nobody owns", None, None, "nonsense", None),
         ("a built deck", None, "built", None, None),
         ("a theoretical deck", None, "theoretical", None, None),
@@ -7405,10 +7409,12 @@ def scan_cases() -> dict[str, Any]:
       `second-opinion`: this is a transcription, where volunteering is the
       failure mode rather than the feature.
 
-    One row is a **wart** and is labelled: a capture that is neither a string
-    nor bytes reaches `len()` and raises an uncaught `TypeError`, which is a
-    500 for a plainly malformed request. It is the theme proposal's budget bug
-    in a second module, and unlike that one it is not yet ruled.
+    The `not_a_string` rows were a **wart** until 2026-08-23: a capture that
+    is neither a string nor bytes reached `len()` and raised an uncaught
+    `TypeError`, so a plainly malformed request was a 500. It was the theme
+    proposal's `float(budget)` bug in a second module, found by the Go port on
+    the day that one was ruled and ruled with it. They are ordinary refusals
+    now, and they are here so the fix cannot silently come undone.
     """
     import base64 as b64
 
@@ -7461,6 +7467,21 @@ def scan_cases() -> dict[str, Any]:
         except scan.ScanRefused as exc:
             row["error"] = str(exc)
         captures.append(row)
+
+    # A capture that is not text at all. `payload.get("image") or b""` in the
+    # route means a falsy value never reaches here, so these are the shapes
+    # that DO: a list, an object, a number, a true. All one refusal since the
+    # 2026-08-23 ruling; all an uncaught TypeError before it.
+    not_a_string: list[dict[str, Any]] = []
+    for note, raw in [("a list", [1, 2, 3]), ("an object", {"a": 1}),
+                      ("a number", 7), ("a float", 7.5), ("true", True)]:
+        row = {"note": note, "raw": raw}
+        try:
+            scan.message(raw, "image/jpeg")
+            row["ok"] = True
+        except scan.ScanRefused as exc:
+            row["error"] = str(exc)
+        not_a_string.append(row)
 
     # The size gate, at the three points that matter. Recorded by LENGTH
     # rather than by payload: a 4MB base64 string in a corpus would be 5.6MB
@@ -7545,6 +7566,7 @@ def scan_cases() -> dict[str, Any]:
         "media_types": sorted(scan.MEDIA_TYPES),
         "media_type_cases": media_types,
         "captures": captures,
+        "not_a_string": not_a_string,
         "sizes": sizes,
         "sightings": sightings,
         "stances": stances,

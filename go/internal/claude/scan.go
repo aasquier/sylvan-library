@@ -140,18 +140,14 @@ func scanPayload(image any, mediaType string) (string, error) {
 		// arrives as empty bytes and refuses as empty below, never as a type.
 		raw = nil
 	default:
-		// **A wart, reproduced.** Python's `else: raw = image` takes whatever
-		// it was handed, so a list or an object reaches `len()` and
-		// `b64encode` and raises an **uncaught TypeError** -- a 500 for a
-		// request that is plainly malformed, which is the theme proposal's
-		// budget bug in a second module. That one was ruled on 2026-08-23 and
-		// fixed in both runtimes; this one is raised and reproduced, because a
-		// flip that changes behaviour is not a flip.
-		//
-		// The status is Python's, the body is the door's: Starlette writes a
-		// plain-text `Internal Server Error` because nothing caught the
-		// exception, and every 500 the door writes is `{"detail": ...}`.
-		return "", errScanImageType
+		// **Refused since 2026-08-23, and a 500 before that.** Python's
+		// `else: raw = image` took whatever it was handed, so a list or an
+		// object reached `len()` and `b64encode` and raised an uncaught
+		// `TypeError` -- an internal error for a request that is plainly
+		// malformed, which is the theme proposal's `float(budget)` wart in a
+		// second module. Found by this port on the day that one was ruled, and
+		// ruled with it: a bad field is a 422 here, in a sentence we wrote.
+		return "", refuseScan("the capture must be a base64 string")
 	}
 	if len(raw) == 0 {
 		return "", refuseScan("the capture was empty")
@@ -163,14 +159,6 @@ func scanPayload(image any, mediaType string) (string, error) {
 	}
 	return base64.StdEncoding.EncodeToString(raw), nil
 }
-
-// errScanImageType stands for the `TypeError` `_payload` does not catch. Not
-// wrapped in ErrScanRefused, deliberately: the route maps that to 422 and this
-// is Python's 500, so keeping them apart is the whole point of the type.
-var errScanImageType = errors.New("the capture is not a string or bytes")
-
-// ErrScanImageType reports whether err is the uncaught-TypeError wart.
-func ErrScanImageType(err error) bool { return errors.Is(err, errScanImageType) }
 
 // pyB64Decode is `base64.b64decode(s, validate=True)`, which is
 // `binascii.a2b_base64(s, strict_mode=True)`.

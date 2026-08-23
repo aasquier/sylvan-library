@@ -97,22 +97,20 @@ func TestTheDialAgreesWithPython(t *testing.T) {
 	}
 }
 
-// The list of modes the dial publishes is **six of the seven**, in Python's
-// order, and `scan` is the one missing.
+// The dial publishes **every mode**, in Python's order.
 //
-// This test exists to pin a wart in both directions at once, which is unusual
-// enough to argue. `service.claude_status` builds its list by naming five
-// functions and splatting a sixth; ADR 34's scan landed in #180 and never
-// joined it, so the payload whose own comment calls itself "the modes that
-// exist" has been one short since. Reproducing that is the rule -- a flip that
-// changes behaviour is not a flip -- but reproducing it silently would make
-// the Go side look like it had merely forgotten too.
+// It published six of the seven until 2026-08-23: the list was last extended
+// by #93 when research became the sixth, and ADR 34's scan landed in #180
+// without joining it, so a payload whose own comment called itself "the modes
+// that exist" was one short for three months. Ruled with Aaron and fixed in
+// both runtimes.
 //
-// So: the ORDER is asserted, because it is contract; the ABSENCE is asserted,
-// because it is a bug; and the absence is asserted against the *derived* list
-// rather than a second literal, so the day a mode is added this fails and asks
-// whether the dial should learn about it.
-func TestTheDialListsPythonsSixModesAndNotTheSeventh(t *testing.T) {
+// **The absence check is what stops it rotting again**, and it is against the
+// DERIVED list rather than a second literal: `dialModeOrder` is written out
+// (Python's is, since each mode's object lives behind its own lazy import
+// there), so this holds it equal to `ModeNames()` as a set. The next mode
+// added fails here rather than three months later.
+func TestTheDialListsEveryMode(t *testing.T) {
 	got := DialModes()
 	names := make([]string, 0, len(got))
 	for _, m := range got {
@@ -120,48 +118,62 @@ func TestTheDialListsPythonsSixModesAndNotTheSeventh(t *testing.T) {
 	}
 	want := []string{
 		ModeRationaleInterview, ModeSlotArgument, ModeCommanderDossier,
-		ModeResearch, ModeThemeConversation, ModeThemeProposal,
+		ModeResearch, ModeThemeConversation, ModeThemeProposal, ModeScan,
 	}
 	if !reflect.DeepEqual(names, want) {
 		t.Errorf("the dial lists\n  %v\nPython lists\n  %v", names, want)
 	}
-	// Every mode that exists, minus the ones the dial names: exactly `scan`.
+	// Every mode that exists, minus the ones the dial names: none.
 	missing := []string{}
 	for _, name := range ModeNames() {
 		if !slices.Contains(names, name) {
 			missing = append(missing, name)
 		}
 	}
-	if !reflect.DeepEqual(missing, []string{ModeScan}) {
-		t.Errorf("the dial omits %v; Python omits exactly [scan]. If a mode "+
-			"was just added, the question is whether `/api/claude` should "+
-			"report it -- in BOTH runtimes, since this reproduces Python's "+
-			"list rather than deriving one", missing)
+	if len(missing) > 0 {
+		t.Errorf("the dial does not report %v. A mode was added and "+
+			"`/api/claude` was not told -- which is exactly how `scan` went "+
+			"unreported for three months. Add it to `dialModeOrder` AND to "+
+			"`service.claude_status`'s list, in one change", missing)
 	}
 }
 
-// `?surface=scan` resolves `off`, and `scan.stance_for` exists to stop exactly
-// that. The same omission as the modes list, one layer along: `_SURFACE_DEFAULTS`
-// names `theme` and `research` and was never extended when ADR 34 landed.
+// Each deckless surface resolves to what its own module says, and `scan`'s is
+// `consultant` -- the narrowest preset that still permits a call, because this
+// is a transcription where volunteering is the failure mode rather than the
+// feature.
 //
-// Pinned rather than fixed, and pinned with the two surfaces that DO work
-// beside it -- so this reads as "scan is the odd one out" rather than as an
-// assertion that off is right.
-func TestAScanSurfaceStillResolvesOffWhichIsPythonsWart(t *testing.T) {
+// `scan` answered `off` until 2026-08-23, which is the bug `scan.stance_for`'s
+// docstring described accurately and was never wired up to prevent. The three
+// that DO have owners are checked beside the one that does not, so this reads
+// as a table rather than as four separate claims.
+func TestEveryDecklessSurfaceResolvesToItsOwnDefault(t *testing.T) {
 	withDialEnv(t, "")
 	for surface, want := range map[string]string{
 		"theme":    "second-opinion",
 		"research": "second-opinion",
-		"scan":     "off",
+		"scan":     "consultant",
+		// No surface named at all is still `off`: "I have no idea what this is
+		// about" is the one case where silence is right.
 		"":         "off",
+		"nonsense": "off",
 	} {
 		dial, err := Status(nil, nil, surface)
 		if err != nil {
 			t.Fatalf("surface %q: %v", surface, err)
 		}
-		if dial.Stance.Preset == nil || *dial.Stance.Preset != want {
-			t.Errorf("surface %q resolved %v, Python resolves %q",
-				surface, dial.Stance.Preset, want)
+		if dial.Stance.Preset == nil {
+			t.Errorf("surface %q resolved to no preset at all", surface)
+			continue
+		}
+		if *dial.Stance.Preset != want {
+			t.Errorf("surface %q resolved %q, want %q", surface, *dial.Stance.Preset, want)
+		}
+		// And `default` answers the same question with no pin, which is the
+		// field the settings gear renders as "what happens if you touch
+		// nothing".
+		if dial.Default.Preset == nil || *dial.Default.Preset != want {
+			t.Errorf("surface %q defaults to %v, want %q", surface, dial.Default.Preset, want)
 		}
 	}
 }

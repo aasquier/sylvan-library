@@ -147,6 +147,15 @@ def stance_for(requested: Any = None) -> stance_mod.Stance:
     the same bug: `/api/claude` would render `off` for a surface that was
     about to run.
 
+    **And it did, for three months.** This function was written with that
+    sentence in its docstring and `service._SURFACE_DEFAULTS` was never
+    extended to name `scan`, so `?surface=scan` answered `off` from ADR 34
+    landing (#180) until 2026-08-23 -- a guard that described itself
+    accurately and was never wired up. Found by the Go port, which had to ask
+    what the dial answered rather than what it meant to. Nothing in the app
+    sends `surface=scan`, which is exactly how it survived: a docstring is not
+    a test, and an unused parameter is not a caller.
+
     Nothing here is meaningfully steerable in any case -- a stance widens what
     a mode *does*, and there is no more or less forward way to read a
     collector number off a picture. It resolves so the call happens, not so it
@@ -177,8 +186,17 @@ def _payload(image: bytes | str, media_type: str) -> str:
             raw = base64.b64decode(image, validate=True)
         except (binascii.Error, ValueError) as exc:
             raise ScanRefused("the capture was not valid base64") from exc
+    elif isinstance(image, (bytes, bytearray)):
+        raw = bytes(image)
     else:
-        raw = image
+        # **Refused here since 2026-08-23, and it was a 500 before that.** The
+        # `else` took whatever it was handed, so a list or an object reached
+        # `len()` and raised an uncaught `TypeError` -- an internal error for a
+        # request that is plainly malformed. Found by the Go port on the same
+        # day the theme proposal's identical `float(budget)` wart was ruled,
+        # and ruled with it: a bad field is a 422 in this project, and the
+        # sentence it answers with is one we wrote.
+        raise ScanRefused("the capture must be a base64 string")
     if not raw:
         raise ScanRefused("the capture was empty")
     if len(raw) > MAX_BYTES:

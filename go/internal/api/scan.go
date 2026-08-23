@@ -106,26 +106,13 @@ func (a *API) claudeScan(w http.ResponseWriter, r *http.Request) {
 
 	// Built here, before anything is queued: this is what validates the
 	// capture, and every one of its refusals is a 422 the page acts on.
+	// Every way a capture can fail is one 422, including the one that used to
+	// be a 500: an image that is neither a string nor bytes reached `len()` in
+	// Python and raised an uncaught `TypeError`. Ruled with Aaron 2026-08-23
+	// alongside the theme proposal's identical `float(budget)` wart, and fixed
+	// in both runtimes at once. See `claude.scanPayload`.
 	ask, data, err := claude.ScanMessage(image, mediaType)
 	if err != nil {
-		if claude.ErrScanImageType(err) {
-			// **A wart, reproduced.** Python's `_payload` takes whatever it
-			// was handed when the image is not a string, so a list or an
-			// object reaches `len()` and raises an uncaught `TypeError` -- a
-			// 500 for a request that is plainly malformed. It is the theme
-			// proposal's budget bug in a second module; that one was ruled on
-			// 2026-08-23 and fixed in both runtimes, and this one is raised
-			// and reproduced, because a flip that changes behaviour is not a
-			// flip.
-			//
-			// The status is Python's; the body is the door's, which writes
-			// `{"detail": ...}` for every 500 where Starlette writes
-			// plain-text `Internal Server Error` for an uncaught one.
-			a.log.Error("the scan route failed", "error", err)
-			wire.Detail(w, http.StatusInternalServerError,
-				"the scan surface could not answer that right now")
-			return
-		}
 		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}

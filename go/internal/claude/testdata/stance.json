@@ -6618,7 +6618,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -6749,7 +6750,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -6880,7 +6882,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7011,12 +7014,13 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
   {
-   "note": "WART: a scan surface answers off",
+   "note": "a scan surface with no deck",
    "requested": null,
    "deck_status": null,
    "surface": "scan",
@@ -7026,11 +7030,11 @@
     "configured": false,
     "model": "claude-sonnet-5",
     "stance": {
-     "preset": "off",
-     "allows_calls": false,
+     "preset": "consultant",
+     "allows_calls": true,
      "may_write": false,
      "axes": [
-      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
       {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
       {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
      ]
@@ -7046,11 +7050,11 @@
      ]
     },
     "default": {
-     "preset": "off",
-     "allows_calls": false,
+     "preset": "consultant",
+     "allows_calls": true,
      "may_write": false,
      "axes": [
-      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
       {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
       {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
      ]
@@ -7142,7 +7146,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7273,7 +7278,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7404,7 +7410,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7535,7 +7542,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7666,7 +7674,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7797,7 +7806,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7928,7 +7938,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8059,7 +8070,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8190,7 +8202,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8321,7 +8334,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8469,7 +8483,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8600,7 +8615,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8731,7 +8747,8 @@
       "tools": ["search_cards","get_cards"],
       "server_tools": ["web_search"],
       "writes": []
-     }
+     },
+     {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]}
     ]
    }
   }

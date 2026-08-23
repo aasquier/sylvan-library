@@ -98,24 +98,45 @@ func TestTheCaptureIsRefusedBeforeTheStanceAndTheKey(t *testing.T) {
 	}
 }
 
-// **A wart, pinned at the route.** A capture that is neither a string nor
-// bytes reaches `len()` in Python and raises an uncaught `TypeError`, so this
-// is a 500 for a request that is plainly malformed -- the theme proposal's
-// budget bug in a second module, found the same day that one was ruled and
-// reproduced pending the same call.
-func TestANonStringCaptureIsPythonsUncaught500(t *testing.T) {
+// A capture that is neither a string nor bytes is a **422 like every other bad
+// capture**, and it was an uncaught 500 until 2026-08-23.
+//
+// Python's `_payload` took whatever it was handed, so a list or an object
+// reached `len()` and raised a `TypeError` nothing caught. It is the theme
+// proposal's `float(budget)` wart in a second module, found by this port on
+// the day that one was ruled and ruled with it. This test is the wart's own,
+// kept and inverted.
+func TestACaptureThatIsNotTextIsA422(t *testing.T) {
 	noCredential(t)
 	rig := newJobRig(t)
 	defer rig.close()
-	for _, image := range []string{`[1,2,3]`, `{"a":1}`, `7`, `true`} {
-		status, _, raw := callAs(t, rig.api, alice, "POST", scanAt,
+	for _, image := range []string{`[1,2,3]`, `{"a":1}`, `7`, `7.5`, `true`} {
+		status, payload, raw := callAs(t, rig.api, alice, "POST", scanAt,
 			scanBody(`"image":`+image))
-		if status != 500 {
-			t.Errorf("image %s answered %d, want Python's 500: %s", image, status, raw)
+		if status != 422 {
+			t.Errorf("image %s answered %d, want 422: %s", image, status, raw)
+			continue
+		}
+		if detail, _ := payload["detail"].(string); detail != "the capture must be a base64 string" {
+			t.Errorf("image %s said %q", image, detail)
+		}
+	}
+	// `payload.get("image") or b""` means a FALSY value never reaches the type
+	// branch, so those keep their own sentence -- the fix did not flatten
+	// three cases into one.
+	for _, image := range []string{`null`, `""`, `0`, `false`, `[]`} {
+		status, payload, raw := callAs(t, rig.api, alice, "POST", scanAt,
+			scanBody(`"image":`+image))
+		if status != 422 {
+			t.Errorf("image %s answered %d, want 422: %s", image, status, raw)
+			continue
+		}
+		if detail, _ := payload["detail"].(string); detail != "the capture was empty" {
+			t.Errorf("falsy image %s said %q, want the empty-capture sentence", image, detail)
 		}
 	}
 	if got := rig.jobs.All(alice.UserID); len(got) != 0 {
-		t.Errorf("%d jobs were queued by a 500", len(got))
+		t.Errorf("%d jobs were queued by refused requests", len(got))
 	}
 }
 

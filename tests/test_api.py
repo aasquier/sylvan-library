@@ -2312,6 +2312,69 @@ def test_the_theme_surface_reports_its_own_default_not_off(client):
     assert theme["stance"]["may_write"] is False
 
 
+def test_every_deckless_surface_reports_its_own_default(client):
+    """The one above, generalised — and the generalisation is the fix.
+
+    `?surface=scan` answered `off` from ADR 34 landing (#180) until
+    2026-08-23, for three months, while `scan.stance_for` sat in the module
+    with a docstring saying in as many words that it existed to prevent
+    exactly that. `_SURFACE_DEFAULTS` was simply never extended, and there was
+    a second copy of the dispatch inside `claude_status` to not extend as
+    well. Found by the Go port, which had to ask what the dial *answered*
+    rather than what it meant to; ruled with Aaron and fixed in both runtimes.
+
+    Nothing in the app sends `surface=scan`, which is exactly how it survived.
+    So this is a **table** rather than one more single-surface test: the next
+    deckless surface is added to a list here, and if its module is not wired
+    up the row fails.
+    """
+    for surface, want in (("theme", "second-opinion"),
+                          ("research", "second-opinion"),
+                          ("scan", "consultant"),
+                          # Naming nothing is still `off`: "I have no idea
+                          # what this is about" is the one case where silence
+                          # is right. A surface nobody owns is the same.
+                          (None, "off"), ("nonsense", "off")):
+        params = {"surface": surface} if surface else {}
+        got = client.get("/api/claude", params=params).json()
+        assert got["stance"]["preset"] == want, f"{surface!r} resolved wrong"
+        assert got["default"]["preset"] == want, f"{surface!r} defaults wrong"
+
+
+def test_the_dial_reports_every_mode_that_exists(client):
+    """The other half of the same three-month omission.
+
+    `claude_status`'s `modes` list is written out by hand and its own comment
+    calls it "the modes that exist". It was last extended by #93, when
+    research became the sixth; ADR 34's scan landed in #180 and never joined
+    it, so the payload was one short and nothing noticed — the frontend types
+    the field and renders none of it.
+
+    **Discovered, not listed.** `mtglab.claude` is swept for `Mode` objects by
+    *type*, which is the lesson #257 paid for: the first version of the Go
+    generator grepped for `= Mode(` and lost `scan.py`, which spells it
+    `modes.Mode(...)`. A test that hard-coded seven names would have to be
+    edited by the same person who forgot to edit the list.
+    """
+    import importlib
+    import pkgutil
+
+    import mtglab.claude
+    from mtglab.claude.modes import Mode
+
+    exists = set()
+    for found in pkgutil.iter_modules(mtglab.claude.__path__):
+        module = importlib.import_module(f"mtglab.claude.{found.name}")
+        exists |= {v.name for v in vars(module).values() if isinstance(v, Mode)}
+
+    reported = {m["name"] for m in client.get("/api/claude").json()["modes"]}
+    assert reported == exists, (
+        f"the dial does not report {sorted(exists - reported)}. A mode was "
+        f"added and `/api/claude` was not told, which is how `scan` went "
+        f"unreported for three months. Add it to `claude_status`'s list AND "
+        f"to Go's `dialModeOrder`, in one change.")
+
+
 def test_a_named_surface_never_widens_past_a_pin_or_the_ceiling(client):
     """`surface` picks a *default*; it is not a second way to ask for more.
 

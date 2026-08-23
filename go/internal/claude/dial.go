@@ -39,24 +39,35 @@ const DialNever = "One rule holds at every setting: Claude never writes a " +
 // dialSurfaces is `service._SURFACE_DEFAULTS`: the surfaces that own their own
 // answer to "no preference", because they run with no deck to derive one from.
 //
-// **`scan` is missing, and that is Python's, not a slip here.** `scan.py`
-// defines `stance_for` and its docstring says in as many words that it is
-// public so `/api/claude` will not "render `off` for a surface that was about
-// to run" -- but `_SURFACE_DEFAULTS` was never extended when ADR 34 landed
-// (#180), so the dial never asks it and `?surface=scan` answers `off` to this
-// day. Measured against the running app, reproduced here, and raised with
-// Aaron: a flip that changes behaviour is not a flip. See `DialModes` for the
-// same omission wearing its other hat.
-var dialSurfaces = map[string]bool{"theme": true, "research": true}
+// **`scan` joined it on 2026-08-23, and its absence had been a bug for three
+// months.** `scan.py` has defined `stance_for` since ADR 34 landed (#180) with
+// a docstring saying in as many words that it is public so `/api/claude` will
+// not "render `off` for a surface that was about to run" -- and nothing ever
+// asked it, because this set was not extended. Found by this port, which had
+// to ask what the dial *answered* rather than what it meant to, and ruled with
+// Aaron: fixed in both runtimes at once, the way `edit.set_shared` and the
+// stance and budget warts went. Nothing in the app sends `surface=scan`, which
+// is exactly how it survived -- a docstring is not a test, and an unused
+// parameter is not a caller.
+var dialSurfaces = map[string]bool{"theme": true, "research": true, "scan": true}
 
-// surfaceStanceFor asks the module that owns `surface` what it means by "no
-// preference". A literal here would be a second copy of an answer two other
-// files already give, and the two would drift the first time one moved.
+// surfaceStanceFor asks the module that owns `surface` what it makes of
+// `requested`.
+//
+// **One dispatch, and in Python that is the fix rather than a tidy-up.** This
+// sat beside a second identical copy inside `claude_status`, differing only in
+// passing the caller's pin -- so adding a surface meant editing two places,
+// and the day `scan` arrived neither was edited. A literal here would be a
+// third copy of an answer three other files already give.
 func surfaceStanceFor(surface string, requested any) (Stance, error) {
-	if surface == "research" {
+	switch surface {
+	case "research":
 		return ResearchStanceFor(requested, nil)
+	case "scan":
+		return ScanStanceFor(requested, nil)
+	default:
+		return ThemeStanceFor(requested, nil)
 	}
-	return ThemeStanceFor(requested, nil)
 }
 
 // DialDefault is `service._default_stance`: what "no preference" resolves to,
@@ -140,22 +151,21 @@ type Dial struct {
 	Modes      []DialMode    `json:"modes"`
 }
 
-// dialModeOrder is the order `service.claude_status` lists them in, and it is
-// **six of the seven**: the interview, the argument, the dossier, research,
-// then the theme interview's two halves.
+// dialModeOrder is the order `service.claude_status` lists them in: the
+// interview, the argument, the dossier, research, the theme interview's two
+// halves, and the camera.
 //
-// **`scan` is absent, and that is Python's omission reproduced.** The list was
-// last extended by #93 when research became the sixth mode; ADR 34's scan
-// landed in #180 and never touched it, so a payload whose own comment calls
-// itself "the modes that exist" has been one short ever since. It is the sixth
-// completeness claim in this project to rot and the reason `ModeNames` is
-// derived rather than written down.
+// **Seven, and it was six until 2026-08-23.** The list was last extended by
+// #93 when research became the sixth; ADR 34's scan landed in #180 and never
+// touched it, so a payload whose own comment called itself "the modes that
+// exist" was one short for three months -- the sixth completeness claim in
+// this project to rot. Ruled with Aaron and fixed in both runtimes at once.
 //
-// Written as an explicit list rather than derived, precisely because it cannot
-// be derived: the correct derivation gives seven. `TestTheDialListsPythonsSix`
-// pins both halves -- the order, and the absence -- so this cannot drift
-// quietly in either direction, and fixing it is one line in each runtime on
-// the day it is ruled.
+// Still an explicit list rather than a derivation, because Python's is one:
+// each mode's object lives behind its own lazy import there, so the order is a
+// decision somebody makes. `TestTheDialListsEveryMode` is what stops it
+// rotting again -- it holds this list equal to `ModeNames()` as a SET, so the
+// next mode added fails here rather than three months later.
 var dialModeOrder = []string{
 	ModeRationaleInterview,
 	ModeSlotArgument,
@@ -163,6 +173,7 @@ var dialModeOrder = []string{
 	ModeResearch,
 	ModeThemeConversation,
 	ModeThemeProposal,
+	ModeScan,
 }
 
 // DialModes is the built modes as the dial publishes them.
