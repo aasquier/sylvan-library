@@ -15,10 +15,10 @@ import (
 // openReadWrite opens `app.db` for the log's inserts.
 //
 // **`mode=rw`, never `rwc`.** `internal/auth` gives the reason for read-only
-// and this gives the reason for not creating: Python owns the schema ladder
-// until Phase 8, and a file this created would be a database at version zero
-// that Python would have to migrate -- or worse, one Go had filled in from a
-// second copy of the schema. An absent `app.db` is a warned, dropped entry.
+// and this gives the reason for not creating: the ladder (`auth.Migrate`)
+// runs once at boot and is the only creator, so a file this created would be
+// a database at version zero beside the real one. An absent `app.db` is a
+// warned, dropped entry.
 //
 // One writer, and it is worth saying which. Python still performs the session
 // touch and the expired-row delete on every authenticated request, so this

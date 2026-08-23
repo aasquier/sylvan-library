@@ -6,12 +6,14 @@
 // ("Argon2id PHC hashes verify as-is") is proven by a test rather than by a
 // sentence.
 //
-// **This package never writes `app.db`.** Python owns the schema ladder until
-// Phase 8 and, during coexistence, Python's own middleware still runs behind
-// the door and performs the session touch and the expired-row delete that
-// `auth/sessions.py:lookup` does. Two writers is the risk the plan names
-// (risk 6), so the door opens the file read-only and the cost is nil: a
-// reader in WAL mode blocks nobody and is blocked by nobody.
+// **The schema ladder lives here too** (`schema.go`, Phase 8): `Migrate`
+// is the one caller allowed to create `app.db`, run once by the serving
+// command before anything opens the file. Every other handle in the module
+// stays `mode=ro` or `mode=rw` — the door's middleware resolves cookies
+// over a read-only handle (a reader in WAL mode blocks nobody and is
+// blocked by nobody), and the account routes write through `OpenReadWrite`,
+// which still refuses to mint a file: a database created anywhere but the
+// ladder would be one at version zero beside the real one.
 //
 // The driver is modernc.org/sqlite, the pure-Go translation, decided at this
 // spike over mattn/go-sqlite3 (CGO): DuckDB is already the one CGO dependency
@@ -30,14 +32,14 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// Open opens `app.db` at path, read-only. It does not create the file: an
-// instance whose Python half has not booted yet has no `app.db`, and the
-// honest answer to a cookie then is "anonymous", not an empty database that
-// Python's ladder would later have to migrate from version zero.
+// Open opens `app.db` at path, read-only. It does not create the file: a
+// process that has not run `Migrate` yet has no business minting one, and
+// the honest answer to a cookie then is "anonymous", not an empty database
+// at version zero.
 //
-// The busy timeout matches `auth/db.py` (5000ms). Journal mode is not set
-// here -- WAL is persistent in the file, Python set it, and a read-only
-// connection may not change it anyway.
+// The busy timeout matches every other handle here (5000ms). Journal mode is
+// not set -- WAL is persistent in the file, `Migrate` set it at creation,
+// and a read-only connection may not change it anyway.
 func Open(path string) (*sql.DB, error) {
 	dsn := "file:" + url.PathEscape(path) + "?mode=ro&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite", dsn)

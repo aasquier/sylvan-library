@@ -548,9 +548,9 @@ func TestStatsAndClear(t *testing.T) {
 
 // TestOpenWillNotCreateTheDatabase is `mode=rw`, never `rwc`.
 //
-// Python owns the schema ladder until Phase 8; a file this created would be a
-// database at version zero, or worse one Go had filled in from a second copy
-// of the schema.
+// The ladder (`auth.Migrate`) runs once at boot and is the only creator; a
+// file this created would be a database at version zero, or worse one filled
+// in from a second copy of the schema.
 func TestOpenWillNotCreateTheDatabase(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.db")

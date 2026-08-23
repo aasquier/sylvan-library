@@ -69,7 +69,7 @@ func (a *API) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
 
 // adminDB is `accountsDB` with the admin surface's answer to an absent
 // database: there is nothing to administer, and nothing here creates a file
-// Python owns the ladder for. Reports whether it answered.
+// the boot ladder did not. Reports whether it answered.
 func (a *API) adminDB(w http.ResponseWriter) (*sql.DB, bool) {
 	db, present := a.accountsDB()
 	if present {

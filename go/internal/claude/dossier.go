@@ -174,11 +174,11 @@ func CacheKey(oracleID, tier string) (string, error) {
 // fingerprint, and the same rules every other app.db writer here follows. It
 // **never fails the feature** -- a miss is a call, not a 500, and a write
 // that fails is a warning -- and it opens nothing: it is handed the
-// `mode=rw` handle the door already holds, because Python owns the schema
-// ladder until Phase 8 and a file this created would be a database at
-// version zero. A nil handle is an instance with no app.db yet; every read
-// misses and every write warns. (Python's `get` would *create* app.db there,
-// since `auth.db.connect` makes the file and runs the ladder; a reader that
+// `mode=rw` handle the door already holds, because the ladder runs once at
+// boot and a file this created would be a database at version zero. A nil
+// handle is an instance with no app.db yet; every read misses and every
+// write warns. (Python's `get` would *create* app.db there, since
+// `auth.db.connect` makes the file and runs the ladder; a reader that
 // acquires a database is the one thing the Go side refuses to be.)
 type DossierStore struct {
 	db  *sql.DB

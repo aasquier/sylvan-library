@@ -11,12 +11,14 @@
 // rungs behind.
 //
 // So the bytes are generated rather than typed. `tests/go_fixtures.py` reads
-// `sqlite_master` out of a database Python's own ladder just built and writes
-// `app_schema.sql` beside this file; `tests/test_go_fixtures.py` fails when the
-// committed copy is not what Python writes today. **Go does not own the
-// ladder** (docs/go-migration/PLAN.md section 10, and `internal/auth`'s
-// `mode=rw`): this is a reading of what Python made, never a second source of
-// truth for it.
+// `sqlite_master` out of a database the Python remnant's ladder just built and
+// writes `app_schema.sql` beside this file; `tests/test_go_fixtures.py` fails
+// when the committed copy is not what that ladder writes today. Since Phase 8
+// **the Go ladder owns the deployed file** (`internal/auth/schema.go`), and
+// this fixture is the lockstep between the two:
+// `TestMigrateBuildsWhatPythonBuilt` holds `auth.Migrate`'s result to these
+// bytes, so a rung added to either ladder fails a test until the other side
+// carries it too.
 //
 // The lesson is the fixture-decks one from Phase 4's edit engine, in a new
 // place: a fixture somebody wrote by hand is not the artefact it stands in
@@ -45,13 +47,13 @@ var schema string
 func Schema() string { return schema }
 
 // NewScratchDB builds an empty `app.db` at path and returns it, in WAL mode
-// with foreign keys on -- the two pragmas `auth/db.py:connect` sets and that
-// the cascades and the busy timeout depend on.
+// with foreign keys on -- the two pragmas the ladder sets and that the
+// cascades and the busy timeout depend on.
 //
-// Creating the file is the one thing production may not do, which is why this
-// is a test helper and not a function in `internal/auth`: `OpenReadWrite` is
-// `mode=rw` and `Open` is `mode=ro`, and a test standing in for Python's
-// ladder is the only caller entitled to make the file at all.
+// It executes the fixture rather than calling `auth.Migrate` so that this
+// package needs no import of `internal/auth` (whose own tests import this
+// one) -- and so a ladder bug cannot quietly shape every fixture that would
+// otherwise have been built through it.
 func NewScratchDB(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return fmt.Errorf("scratch app.db: %w", err)

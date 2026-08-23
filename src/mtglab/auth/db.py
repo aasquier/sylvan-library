@@ -47,6 +47,13 @@ SCHEMA_VERSION = 12
 # version 1 -- a migration you can no longer see is a migration nobody can
 # reason about, and by the time this was written there was already an `app.db`
 # on a laptop with an account in it.
+#
+# **The deployed file is migrated by the Go twin of this ladder**
+# (go/internal/auth/schema.go, byte-identical scripts, Phase 8). A new rung is
+# authored there first and mirrored here; `tests/test_go_fixtures.py` and Go's
+# TestMigrateBuildsWhatPythonBuilt hold the two equal through the generated
+# go/internal/auth/authtest/app_schema.sql, so drift on either side is a red
+# test rather than a divergent schema.
 _MIGRATIONS: tuple[str, ...] = (
     # -- 1 ------------------------------------------------------------------
     """

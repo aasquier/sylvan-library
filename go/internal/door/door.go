@@ -139,11 +139,12 @@ func New(cfg Config) (*Door, error) {
 		shelf = shelves.New(cfg.DataDir, nil, cfg.Logger)
 	}
 	// The write side of `app.db`, opened once for the deck writes and the
-	// activity log (Phase 4). Both are absent on an instance whose database
-	// does not exist yet, and both say so rather than creating one: Python
-	// owns the schema ladder until Phase 8. A failure to open a database that
-	// *is* there is loud and at start, because a write discovering it at the
-	// insert is a write that has already changed a deck file.
+	// activity log (Phase 4). The serving command runs the ladder before the
+	// door stands (`auth.Migrate`), so an absent file here is a caller that
+	// skipped it -- a test, a bare library use -- and both halves degrade
+	// rather than minting one. A failure to open a database that *is* there
+	// is loud and at start, because a write discovering it at the insert is a
+	// write that has already changed a deck file.
 	if err := d.openWriteSide(cfg); err != nil {
 		return nil, err
 	}
@@ -199,13 +200,13 @@ func (d *Door) openWriteSide(cfg Config) error {
 		return nil
 	}
 	if _, err := os.Stat(cfg.AppDB); err != nil {
-		// Not a failure: an instance whose Python half has not created the
-		// database yet is a real state, and both halves of the write side say
-		// so -- the SQL deck tier reports itself read-only, the log drops the
-		// entry with a warning. Creating one here would be Go owning the
-		// schema ladder, which is Python's until Phase 8.
-		d.log.Info("no app.db yet; deck writes stay on the file tier and the "+
-			"activity log waits for Python to create one", "path", cfg.AppDB)
+		// Not a failure: a door built without the ladder having run -- a
+		// test, a bare library use -- is a real state, and both halves of the
+		// write side say so rather than creating a file the ladder did not:
+		// the SQL deck tier reports itself read-only, the log drops the entry
+		// with a warning.
+		d.log.Info("no app.db; deck writes stay on the file tier and the "+
+			"activity log drops its entries", "path", cfg.AppDB)
 		return nil //nolint:nilerr // an absent database is a state, not a failure
 	}
 	recorder, err := decklog.NewRecorder(cfg.AppDB, cfg.Logger)

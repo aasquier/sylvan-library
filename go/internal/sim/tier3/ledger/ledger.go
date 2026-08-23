@@ -33,9 +33,9 @@
 //     what they did.
 //
 // `app.db` is opened `mode=rw` and never `rwc`, like the activity log's and
-// the Claude ledger's handles: Python owns the schema ladder until Phase 8, so
-// a missing file is a broken deployment that must say so loudly rather than a
-// silently-created empty database this runtime then writes into.
+// the Claude ledger's handles: the ladder runs once at boot (`auth.Migrate`),
+// so a missing file is a broken deployment that must say so loudly rather
+// than a silently-created empty database this handle then writes into.
 package ledger
 
 import (

@@ -12,12 +12,11 @@ import (
 // The write side of `app.db`, and the two transaction shapes `mtglab/auth`
 // uses.
 //
-// **`mode=rw`, never `rwc`.** Python owns the schema ladder until Phase 8
-// (`auth/db.py` is a twelve-step migration list), so a file this created would
-// be a database at version zero that Python would then have to migrate -- or
-// worse, one Go had filled in from a second copy of the schema. The same rule
-// `internal/decklog` states, and the same one `Open` above it states for the
-// read side.
+// **`mode=rw`, never `rwc`.** The ladder (`schema.go`) runs once, at the
+// serving command's boot, and is the only creator: a file this created would
+// be a database at version zero beside the real one, discovered at whatever
+// write happened to come first. The same rule `internal/decklog` states, and
+// the same one `Open` above it states for the read side.
 //
 // An absent `app.db` is therefore **read as an empty one**, never created, and
 // that is the honest answer rather than a shortcut. Measured against Python

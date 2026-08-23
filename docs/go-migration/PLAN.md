@@ -1043,7 +1043,8 @@ Ordered by expected pain, each with the mitigation already in the plan:
    busy_timeout from Phase 2; write-owning families flip atomically so no
    table has two owners; the ladder (forward-only, applies on boot) migrates
    from exactly one runtime — the Python one until Phase 8, a rule not a
-   habit.
+   habit. **Phase 8 moved it**: `auth.Migrate` (Go) owns the deployed file,
+   with the two ladders held byte-equal through `authtest/app_schema.sql`.
 7. **Session/auth continuity turns out fiddly.** *Mitigation:* compat proven
    in Phase 2 against fixtures; the deliberate fallback (one global
    sign-out) is cheap for this instance's population but is Aaron's call in
@@ -1145,8 +1146,12 @@ There is more than one Claude in this house now. Rules for the duration:
   command, so **write rows that name the command** (`grep` for the pattern,
   `git show origin/main:` for the file) and run it before merging.
 - **Schema changes keep their standing rule** — own branch, merged while
-  watched — and during coexistence they land in the runtime that owns the
-  ladder (Python until Phase 8).
+  watched — and they land in the runtime that owns the ladder: **Go, since
+  Phase 8** (`go/internal/auth/schema.go`, applied by `mtglab ui` at boot).
+  A new rung is authored there and mirrored into the Python remnant's
+  `auth/db.py`; the generated `authtest/app_schema.sql` and Go's
+  `TestMigrateBuildsWhatPythonBuilt` hold the two ladders equal from both
+  directions.
 - Session-end rituals unchanged (commandments 12/13); the roadmap artifact
   carries the port board's state so a fresh session knows the frontier.
 
