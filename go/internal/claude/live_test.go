@@ -37,6 +37,23 @@ import (
 //
 //	MTGLAB_LIVE_CLAUDE=1 ANTHROPIC_API_KEY=$(...) go test -run Live -v ./internal/claude/
 //
+// **Two of these are genuinely non-deterministic, and it is not flakiness in
+// the port.** The dossier and research cases assert *model outcomes* -- that
+// at least one cited page survives `KeepSources`, and that a research answer
+// carries structured findings rather than putting everything in its prose --
+// and both vary run to run. Measured on 2026-08-23: one run gave the dossier
+// "no source survived checking" in 344s and research an answer with six
+// sources and `Findings:[]` in 31s; an immediate re-run of the same binary
+// against the same code passed both, in 693s and 44s. Nothing in the port had
+// moved between them (`modes.json` and both corpora were untouched, and a
+// 36-case pair diff was byte-identical).
+//
+// So: **a red dossier or research case is a question, not a verdict.** Re-run
+// it before believing it, and look at what the failure actually says -- a 400
+// from the API, a prefix on an error, a shape that will not decode are all
+// this port's business; "the model wrote fewer findings this time" is not.
+// The four other cases assert structure rather than judgement and do not vary.
+//
 // It is skipped everywhere else, CI included.
 func liveOrSkip(t *testing.T) {
 	t.Helper()
