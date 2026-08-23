@@ -34,6 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 DOCKERFILE = ROOT / "Dockerfile"
+FORGE_DOCKERFILE = ROOT / "Dockerfile.forge"
 FLY_TOML = ROOT / "fly.toml"
 CI_YML = ROOT / ".github" / "workflows" / "ci.yml"
 CLAUDE_MD = ROOT / "CLAUDE.md"
@@ -595,6 +596,55 @@ def test_the_container_runs_the_front_door_with_the_library_behind_it():
     child_port = child[child.index("--port") + 1]
     assert upstream == f"http://127.0.0.1:{child_port}", (
         f"the door proxies to {upstream} but the child listens on {child_port}")
+
+
+def test_the_forge_worker_image_runs_the_go_shim_and_carries_no_python():
+    """Phase 7: the worker's door is `mtglab forge-shim`, not a Python module.
+
+    Three claims, each of which a one-line edit could undo while the image
+    still built. **The CMD is the Go subcommand** -- the shim is a second hat
+    on the binary the app image already serves, so the two images ship one
+    artefact and a version skew between them is impossible rather than merely
+    unlikely. **The runtime stage is not a Python image**, because the whole
+    point of the flip was to stop shipping an interpreter, a venv, DuckDB and
+    numpy to run a three-endpoint HTTP server. And **the binary is the one
+    the app image builds**, from the same module with the same Go, so a
+    deploy that updates the app and the worker minutes apart cannot put two
+    different codebases on the two ends of `wire.go`.
+
+    The `fetch` stage may still be a Python image -- it runs
+    `scripts/fetch_forge.py` at build time and ships nothing.
+    """
+    text = FORGE_DOCKERFILE.read_text(encoding="utf-8")
+
+    import json
+    found = re.search(r"^CMD (\[.*?\])\s*$", text, re.MULTILINE | re.DOTALL)
+    assert found, "no CMD in Dockerfile.forge"
+    cmd = json.loads(found.group(1).replace("\\\n", ""))
+    assert cmd == ["mtglab", "forge-shim"], (
+        f"the worker runs {cmd}; Phase 7 made it the Go binary's subcommand")
+
+    runtime = re.search(r"^FROM (\S+) AS runtime$", text, re.MULTILINE)
+    assert runtime, "Dockerfile.forge has no runtime stage"
+    assert "python" not in runtime.group(1), (
+        f"the worker's runtime stage is {runtime.group(1)}; it needs a JRE "
+        "and a static binary, not an interpreter")
+
+    builder = re.search(r"^FROM golang:(\d+\.\d+)\S* AS builder$", text, re.MULTILINE)
+    assert builder, "Dockerfile.forge has no `golang:<minor>` builder stage"
+    assert builder.group(1) == "1.26", (
+        f"the worker builds with golang:{builder.group(1)} while go.mod pins 1.26")
+    assert re.search(r"CGO_ENABLED=1 go build .*\./cmd/mtglab", text), (
+        "the worker must build the same `./cmd/mtglab` the app image builds, "
+        "with CGO on -- the shim shares that binary with the front door, "
+        "which links DuckDB")
+    assert "libstdc++6" in text, (
+        "a CGO build links libstdc++; the runtime stage must name it rather "
+        "than inherit it from the JRE by luck")
+
+    # And nothing installs the Python package into the shipped stage.
+    assert "pip install" not in text.split("AS runtime", 1)[1], (
+        "the worker's runtime stage installs Python packages")
 
 
 def test_the_go_module_pins_the_last_go_that_runs_on_this_mac():

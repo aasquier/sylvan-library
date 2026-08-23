@@ -604,7 +604,8 @@ func TestOnlyACanonicalRequestIsTheDoors(t *testing.T) {
 		// `/api/claude` is **not** among them any more: the dial flipped with
 		// the last of the Claude family, once every mode it reports on and
 		// every surface default it asks for had crossed.
-		{"GET", "/api/forge"},
+		// `/api/forge` is **not** among them any more either: it flipped with
+		// Tier 3 in Phase 7, and with it the last job-submitting family.
 		{"POST", "/api/decks/local/mono-green/wheel"},
 	}
 	for _, c := range proxied {
@@ -776,14 +777,16 @@ func TestPathValuesReachTheHandler(t *testing.T) {
 
 // TestTheJobListIsTheUnion is the property the sim-family flip turns on.
 //
-// A caller's jobs are spread across two registries -- Go's, holding whatever
-// the ported sim routes submitted, and Python's, holding the five Claude
-// families and Forge -- and `/api/jobs` has to show both. A handler that
-// answered from one would be wrong in the way nobody can see: the missing rows
-// look exactly like jobs that were never submitted.
+// A caller's jobs are spread across two registries and `/api/jobs` has to show
+// both. A handler that answered from one would be wrong in the way nobody can
+// see: the missing rows look exactly like jobs that were never submitted.
 //
-// The stub upstream stands in for Python and answers with one running dossier.
-// Anything the door adds must appear beside it, not instead of it.
+// **Since Phase 7 no Python route submits a job**, so what the upstream still
+// holds is the past: ids minted before the deploy that flipped the last
+// family, which clients are still polling. That makes the stub upstream the
+// whole point of this test rather than a convenience -- it plants a real row
+// on the other side of the boundary, and a merge that dropped it would go red
+// here instead of passing because nothing answered.
 func TestTheJobListIsTheUnion(t *testing.T) {
 	srv := build(t, false, fakeResolver{})
 	resp := get(t, srv, "GET", "/api/jobs", "")
@@ -812,9 +815,14 @@ func TestTheJobListIsTheUnion(t *testing.T) {
 
 // TestAJobIdTheDoorDoesNotHoldIsProxied is the other half of the hybrid.
 //
-// Go's registry is empty in this door, so every id belongs to Python and every
-// lookup must go on to it. A handler that 404'd here would tell `followJob`
-// the run had died -- on all seven of its call sites.
+// Go's registry is empty in this door, so every id belongs to the upstream and
+// every lookup must go on to it. A handler that 404'd here would tell
+// `followJob` the run had died -- on all seven of its call sites.
+//
+// The echo upstream is what keeps this from being a test that passes for the
+// boring reason: it answers with the path it was asked for, so removing the
+// proxy branch fails the assertion below rather than producing the same 404 an
+// empty registry would.
 func TestAJobIdTheDoorDoesNotHoldIsProxied(t *testing.T) {
 	srv := build(t, false, fakeResolver{})
 	resp := get(t, srv, "GET", "/api/jobs/some-python-id", "")

@@ -1,0 +1,46 @@
+{
+ "space_ranges": [[9,13],[28,32],[133,133],[160,160],[5760,5760],[8192,8202],[8232,8233],[8239,8239],[8287,8287],[12288,12288]],
+ "break_ranges": [[10,13],[28,30],[133,133],[8232,8233]],
+ "strips": [
+  {"note":"nothing to strip","text":"plain","stripped":"plain","rstripped":"plain","split_join":"plain"},
+  {"note":"ascii space","text":"  padded  ","stripped":"padded","rstripped":"  padded","split_join":"padded"},
+  {"note":"a tab and a newline","text":"\t\nx\n\t","stripped":"x","rstripped":"\t\nx","split_join":"x"},
+  {"note":"the information separators","text":"\u001cx\u001f","stripped":"x","rstripped":"\u001cx","split_join":"x"},
+  {"note":"a no-break space","text":" x ","stripped":"x","rstripped":" x","split_join":"x"},
+  {"note":"a line separator","text":" x ","stripped":"x","rstripped":" x","split_join":"x"},
+  {"note":"an ideographic space","text":"　x　","stripped":"x","rstripped":"　x","split_join":"x"},
+  {"note":"all whitespace","text":" \t\n\u001f","stripped":"","rstripped":"","split_join":""},
+  {"note":"empty","text":"","stripped":"","rstripped":"","split_join":""},
+  {"note":"a zero-width space is NOT whitespace","text":"​x​","stripped":"​x​","rstripped":"​x​","split_join":"​x​"},
+  {"note":"a Mongolian vowel separator is NOT whitespace","text":"᠎x᠎","stripped":"᠎x᠎","rstripped":"᠎x᠎","split_join":"᠎x᠎"}
+ ],
+ "splits": [
+  {"note":"no boundary at all","text":"one line","lines":["one line"]},
+  {"note":"a trailing newline yields no empty tail","text":"a\nb\n","lines":["a","b"]},
+  {"note":"two trailing newlines do","text":"a\nb\n\n","lines":["a","b",""]},
+  {"note":"CRLF is one boundary","text":"a\r\nb\r\n","lines":["a","b"]},
+  {"note":"a bare CR is a boundary","text":"a\rb","lines":["a","b"]},
+  {"note":"a lone LF after text","text":"a\nb","lines":["a","b"]},
+  {"note":"a vertical tab","text":"a\u000bb","lines":["a","b"]},
+  {"note":"a form feed","text":"a\fb","lines":["a","b"]},
+  {"note":"the file separator","text":"a\u001cb","lines":["a","b"]},
+  {"note":"the group separator","text":"a\u001db","lines":["a","b"]},
+  {"note":"the record separator","text":"a\u001eb","lines":["a","b"]},
+  {"note":"the UNIT separator is not a boundary","text":"a\u001fb","lines":["a\u001fb"]},
+  {"note":"NEL","text":"ab","lines":["a","b"]},
+  {"note":"a line separator","text":"a b","lines":["a","b"]},
+  {"note":"a paragraph separator","text":"a b","lines":["a","b"]},
+  {"note":"empty","text":"","lines":[]},
+  {"note":"one newline alone","text":"\n","lines":[""]},
+  {"note":"a mix","text":"a\r\nb\rc\nd\u000be\ffg h","lines":["a","b","c","d","e","f","g","h"]},
+  {"note":"multibyte around a boundary","text":"Bösium\nDéjà","lines":["Bösium","Déjà"]}
+ ],
+ "heads": [
+  {"note":"ascii, under","text":"abc","n":5,"len":3,"head":"abc"},
+  {"note":"ascii, exact","text":"abcde","n":5,"len":5,"head":"abcde"},
+  {"note":"ascii, over","text":"abcdefgh","n":5,"len":8,"head":"abcde"},
+  {"note":"accents count as one each","text":"éééééé","n":5,"len":6,"head":"ééééé"},
+  {"note":"an emoji is one code point","text":"😀😀😀","n":2,"len":3,"head":"😀😀"},
+  {"note":"empty","text":"","n":3,"len":0,"head":""}
+ ]
+}

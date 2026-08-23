@@ -2,10 +2,11 @@ package tier1
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 )
 
 // Python's `repr`, for the three dataclasses the determinism gate hashes.
@@ -153,66 +154,13 @@ func reprOptNumber(v *Number) string {
 	}
 }
 
-// ReprFloat is CPython's `repr(float)`.
+// ReprFloat is CPython's `repr(float)`, now `pyfloat.Repr`.
 //
-// The shortest decimal that round-trips, rendered fixed when the decimal
-// point sits within reach and exponential when it does not: Python switches
-// at a decimal exponent below -3 or above 16, so `1e16` reads `1e+16` while
-// `1e15` reads `1000000000000000.0`, and `0.0001` stays fixed while
-// `0.00001` becomes `1e-05`. A fixed rendering always carries a decimal
-// point (`100.0`, never `100`); an exponential one never gains a spurious
-// `.0`, and its exponent is at least two digits.
-//
-// Go's shortest formatting supplies the digits; only the presentation is
-// Python's. The boundaries above are pinned by a corpus taken from CPython
-// rather than trusted from this comment.
-func ReprFloat(v float64) string {
-	switch {
-	case math.IsNaN(v):
-		return "nan"
-	case math.IsInf(v, 1):
-		return "inf"
-	case math.IsInf(v, -1):
-		return "-inf"
-	}
-	sign := ""
-	if math.Signbit(v) {
-		sign, v = "-", -v
-	}
-	if v == 0 {
-		return sign + "0.0"
-	}
-
-	// Shortest round-trip digits, and where the decimal point falls.
-	s := strconv.FormatFloat(v, 'e', -1, 64)
-	epos := strings.IndexByte(s, 'e')
-	digits := strings.Replace(s[:epos], ".", "", 1)
-	exp, err := strconv.Atoi(s[epos+1:])
-	if err != nil {
-		panic("tier1: unreadable float exponent in " + s)
-	}
-	decpt := exp + 1
-
-	if decpt < -3 || decpt > 16 {
-		out := digits[:1]
-		if len(digits) > 1 {
-			out += "." + digits[1:]
-		}
-		e, esign := decpt-1, "+"
-		if e < 0 {
-			e, esign = -e, "-"
-		}
-		return fmt.Sprintf("%s%se%s%02d", sign, out, esign, e)
-	}
-	switch {
-	case decpt <= 0:
-		return sign + "0." + strings.Repeat("0", -decpt) + digits
-	case decpt >= len(digits):
-		return sign + digits + strings.Repeat("0", decpt-len(digits)) + ".0"
-	default:
-		return sign + digits[:decpt] + "." + digits[decpt:]
-	}
-}
+// It left this package when the Forge result needed the same renderer: a
+// payload's float fields must read `4.0` where Python writes `4.0`, and a
+// second copy of the exponent boundaries is how two halves of a reproduction
+// drift. The corpus that pins those boundaries did not move.
+func ReprFloat(v float64) string { return pyfloat.Repr(v) }
 
 // ReprString is CPython's `repr(str)`.
 //

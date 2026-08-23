@@ -35,6 +35,8 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/shelves"
 	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
+	matchledger "github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
 )
 
 // Config is what the ported routes need. It grew with the families: the
@@ -71,6 +73,15 @@ type Config struct {
 	// and the conversation still answers, because the call has already been paid
 	// for by the time there is anything to record.
 	ClaudeLedger *ledger.Recorder
+	// MatchLedger is where a finished Forge match lands (ADR 36), or nil on
+	// an instance with no `app.db` -- where the row is dropped with a warning
+	// and the match still answers, because the JVM minutes have already been
+	// spent by the time there is anything to record.
+	MatchLedger *matchledger.Recorder
+	// ForgeWorker is the hosted Forge client, or nil for the default one. A
+	// field so a test can point the pre-flight and the match at a stub shim
+	// without an environment variable deciding where the real one lives.
+	ForgeWorker *tier3.Worker
 	// RequireAuth mirrors MTGLAB_REQUIRE_AUTH. Two account routes read it and
 	// nothing else does: `me` reports it, and `logout` deletes the session row
 	// only when it is on -- both exactly as `auth.install(require=…)` does.
@@ -126,6 +137,8 @@ type API struct {
 	jobs          *jobs.Registry
 	simCache      *cache.Store
 	upstream      http.Handler
+	matchLedgerOf *matchledger.Recorder
+	forgeClient   *tier3.Worker
 
 	lazy        sync.Mutex
 	lazyDB      *sql.DB
@@ -148,7 +161,8 @@ func New(cfg Config) *API {
 		shelves: cfg.Shelves, log28: cfg.Recorder, requireAuth: cfg.RequireAuth,
 		secureCookies: cfg.SecureCookies, email: cfg.EmailSender,
 		jobs: cfg.Jobs, simCache: cfg.SimCache, upstream: cfg.Upstream,
-		claudeLedger: cfg.ClaudeLedger}
+		claudeLedger: cfg.ClaudeLedger, matchLedgerOf: cfg.MatchLedger,
+		forgeClient: cfg.ForgeWorker}
 }
 
 // background runs fn after the response has gone, which is Starlette's
@@ -373,13 +387,20 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodDelete, Pattern: "/api/admin/users/{username}/sessions", Handler: a.revokeSessions},
 
 		// The sim family, and with it the two generic job routes -- Phase 5's
-		// flip. `/api/sim/forge` is deliberately absent: it needs `sim/tier3`,
-		// which is Phase 7's, so it stays Python's and keeps the hybrid poll
-		// handler's proxy branch live alongside the five Claude families.
+		// flip.
 		{Method: http.MethodPost, Pattern: "/api/sim/mana", Handler: a.simMana},
 		{Method: http.MethodPost, Pattern: "/api/sim/lands", Handler: a.simLands},
 		{Method: http.MethodPost, Pattern: "/api/sim/shelf", Handler: a.simShelf},
 		{Method: http.MethodPost, Pattern: "/api/sim/policy", Handler: a.simPolicy},
+
+		// Tier 3 (ADR 35), Phase 7's flip and the last job-submitting family
+		// to cross. `GET /api/forge` is the gate the Simulator asks first;
+		// `POST /api/sim/forge` is the match. With these two here, no route
+		// the door serves creates a job in Python's registry -- which is what
+		// `jobruns.go`'s proxy branch had rested on, and why its test now
+		// plants a real job upstream rather than asserting an absence.
+		{Method: http.MethodGet, Pattern: "/api/forge", Handler: a.forgeGate},
+		{Method: http.MethodPost, Pattern: "/api/sim/forge", Handler: a.simForge},
 		{Method: http.MethodGet, Pattern: "/api/jobs", Handler: a.listJobs},
 		{Method: http.MethodGet, Pattern: "/api/jobs/{job_id}", Handler: a.getJob},
 	}

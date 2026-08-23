@@ -85,3 +85,63 @@ func TestASimulationJobStoresItsResultAfterTheRequestHasGone(t *testing.T) {
 		t.Errorf("the second run reports cached=%v", result["cached"])
 	}
 }
+
+// TestAMissingDeckCarriesTheBareSlugIntoTheJob is the divergence the pair
+// diff found: a job's `error` becomes a JS `Error` in `lib/api.ts` and the
+// screen shows it, so the two runtimes must say the same sentence.
+//
+// Python's `DeckNotFound(slug)` has no `__str__` of its own, so `str(exc)` is
+// the slug alone; the 404's "no deck 'x'" is built by the route's exception
+// handler and belongs only there. Go's `library.ErrNotFound` renders the
+// sentence — right for the handler, wrong for the job — and the door carried
+// it into every deferred failure from Phase 5 until 2026-08-23.
+func TestAMissingDeckCarriesTheBareSlugIntoTheJob(t *testing.T) {
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	db, err := auth.Open(appDB(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	reg := jobs.New(jobs.Config{Logger: quiet})
+	a := New(Config{Logger: quiet, Pool: pooltest.Open(t), DecksDir: decksDir(t),
+		AdminEmail: "alice@example.com", AppDB: db, Jobs: reg})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a.simMana(w, r.WithContext(auth.WithScope(r.Context(), alice)))
+	}))
+	defer srv.Close()
+
+	for _, c := range []struct{ note, body, want string }{
+		{"a slug nobody has", `{"slug":"nope"}`, "nope"},
+		// `str(["x"])` is `"['x']"`, quotes and all — the other half of the
+		// same finding, in the coercion rather than in the error.
+		{"a list where a slug belongs", `{"slug":["x"]}`, "['x']"},
+	} {
+		t.Run(c.note, func(t *testing.T) {
+			resp, err := http.Post(srv.URL+"/api/sim/mana", "application/json",
+				strings.NewReader(c.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			var payload map[string]any
+			if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+				t.Fatal(err)
+			}
+			id, ok := payload["id"].(string)
+			if !ok {
+				t.Fatalf("the route answered %d %v rather than a job", resp.StatusCode, payload)
+			}
+			reg.Wait()
+			job := reg.Get(id, alice.UserID)
+			if job == nil || job.Status() != "error" {
+				t.Fatalf("the job did not fail: %v", job)
+			}
+			got := job.Payload().Error
+			if got == nil || *got != c.want {
+				t.Errorf("the job's error is %v, want %q — Python says the "+
+					"bare slug, and the browser renders this verbatim", got, c.want)
+			}
+		})
+	}
+}

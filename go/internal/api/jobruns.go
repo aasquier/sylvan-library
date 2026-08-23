@@ -28,13 +28,21 @@ import (
 //
 // PLAN section 10 left exactly two shapes: all eight families and both these
 // routes in one change, or the hybrid built *with the first family flip*,
-// where both of its branches are finally live. **The first is not reachable**
-// -- five of the eight families need `claude/` and one needs `sim/tier3`, and
-// neither engine has crossed -- so the second is not a preference, it is the
-// only shape available. The sim family is what makes the Go branch non-empty;
-// `/api/sim/forge` and the five Claude families keep the proxy branch
-// non-empty. The argument against building this *today* was that every live
-// branch would be the proxy, and that stopped being true in this commit.
+// where both of its branches are finally live. **The first was not
+// reachable** -- five of the eight families needed `claude/` and one needed
+// `sim/tier3`, and neither engine had crossed -- so the second was not a
+// preference, it was the only shape available.
+//
+// **As of Phase 7 no Python route creates a job at all**, and that changes
+// what the proxy branch is *for* rather than whether it is needed. The
+// families are all the door's; what is still on the other side is **the past**
+// -- an id minted by the Python process before the deploy that flipped the
+// last of them, which a client is still polling. Every merge deploys (ADR 23)
+// and a Forge match runs for minutes, so a match submitted to Python thirty
+// seconds before a release is exactly the row this branch exists to keep
+// answerable. It stays until Phase 8 takes the upstream away entirely, and its
+// tests plant a real row on a stub upstream rather than asserting the 404 an
+// absent producer would give for free.
 //
 // # The rule each route follows
 //

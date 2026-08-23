@@ -109,6 +109,17 @@ const asciiDigits = "0123456789"
 // both.
 var errNotAnInt = fmt.Errorf("not an integer")
 
+// PyInt is `int(v)` over a JSON-decoded value, exported beside [PyFloat] and
+// for the same reason it is: a second family needs Python's own integer
+// grammar. The theme proposal's budget was the first; `POST /api/sim/forge`'s
+// games count and seed are the second, and `strconv.Atoi` is not this — `1_0`
+// is ten, a float truncates, a bool is 0 or 1, and a fullwidth digit reads.
+//
+// A `*big.Int` because Python's integers are unbounded and a Forge seed is
+// echoed back to the caller: narrowing here would answer a different number
+// than the one somebody asked with.
+func PyInt(v any) (*big.Int, error) { return pyInt(v) }
+
 // pyInt is `int(v)` over a JSON-decoded value.
 func pyInt(v any) (*big.Int, error) {
 	switch value := v.(type) {

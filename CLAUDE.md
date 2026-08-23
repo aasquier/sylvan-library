@@ -393,7 +393,10 @@ src/mtglab/
                           and ledger.py (ADR 36: every match recorded into
                           app.db from the two places one finishes -- the API
                           job and the CLI, never the worker; games stored as
-                          parsed, labels snapshotted, `record` never raises)
+                          parsed, labels snapshotted, `record` never raises).
+                          FLIPPED to go/internal/sim/tier3 2026-08-23
+                          (Phase 7), ledger and all; the worker image runs
+                          `mtglab forge-shim` and carries no Python
   artifacts/generate.py   the five deliverables. `render_all` returns them as
                           text and `store` writes them somewhere -- split when
                           the API learned to build, because a `DeckSource` may
@@ -450,7 +453,11 @@ src/mtglab/
                           .dck directory; hosted, the same match runs on the
                           forge-worker machine (Dockerfile.forge) -- woken
                           per job, stopped when idle, gate flipped by
-                          MTGLAB_FORGE_WORKER + MTGLAB_FLY_API_TOKEN
+                          MTGLAB_FORGE_WORKER + MTGLAB_FLY_API_TOKEN.
+                          FLIPPED to go/internal/api/forge.go 2026-08-23
+                          (Phase 7): both routes, and with them the LAST
+                          job-submitting family -- no Python route creates a
+                          job any more
   api/themeruns.py        both theme halves, same shape (226s / 134s, ADR 20)
   api/dossierruns.py      the commander dossier, same shape (236s, ADR 19).
                           FLIPPED to go/internal/api/dossier.go 2026-08-23
@@ -1515,6 +1522,48 @@ go/                       the Go module (ADR 38; module path
                           is NOT this family and never was -- it is the admin
                           roll-up, still Python for the coupling Phase 4
                           recorded.
+                          **Then Forge and the ledger, 2026-08-23, and with
+                          them the LAST job-submitting family**:
+                          internal/sim/tier3 is the whole bridge (.dck,
+                          coverage over Forge's own 34,532 card scripts, the
+                          log parser, the subprocess runner, the wire, the
+                          Machines API client), internal/sim/tier3/ledger is
+                          ADR 36, internal/api/forge.go is both routes, and
+                          `mtglab forge-shim` is the worker's door -- so
+                          Dockerfile.forge carries no interpreter, no venv,
+                          no DuckDB and no numpy to run three endpoints. The
+                          shim is a SUBCOMMAND rather than a second binary,
+                          which is the phase's one correction to its own
+                          plan: the door links DuckDB, so a static build is
+                          not available, and one artefact makes an app/worker
+                          version skew impossible where two would merely
+                          handle it. Three findings. **`encoding/json` writes
+                          `4` where Python writes `4.0`** -- the third of the
+                          three ways it differs from json.dumps, after HTML
+                          escaping and ensure_ascii, and the only one with no
+                          encoder option -- so every float on the match
+                          payload goes through `pyfloat.Float`, and
+                          `ReprFloat` left internal/sim/tier1 to become
+                          `pyfloat.Repr` for it. **internal/pytext is the
+                          fifth reproduction** after pyrand, pyyaml, pyfloat
+                          and pycasefold, for `str.strip()` and
+                          `str.splitlines()`: a form feed in a deck name
+                          splits a winner line in Python and leaves it whole
+                          in Go, which is one game against none. And **the
+                          seed is a *big.Int**, because it is echoed into the
+                          result, the dedupe key and Forge's own command
+                          line. Two warts reproduced and pinned rather than
+                          fixed: a deck played against itself reports the
+                          COMBINED wins on both lines (`wins` is keyed on the
+                          slug), and `{"games": null}` is an uncaught 500
+                          because `dict.get`'s default only fires for an
+                          ABSENT key. Neither is reachable from the app's own
+                          client, which is exactly when the guard beats the
+                          fix. Proven twice beyond the corpus: the Go engine
+                          plays real Forge games on this Mac, and the Go
+                          client drives the Go shim through a real match over
+                          a real socket (MTGLAB_LIVE_FORGE=1, skipped in CI,
+                          which has no distribution and never will).
                           The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY

@@ -129,6 +129,9 @@ _ORACLES = [
     ("the theme interview", "THEME_PATH", "render_theme_cases"),
     ("CPython's case folding", "CASEFOLD_PATH", "render_casefold_payload"),
     ("the camera's reader", "SCAN_PATH", "render_scan_cases"),
+    ("the Forge bridge", "FORGE_PATH", "render_forge_cases"),
+    ("CPython's whitespace tables", "PYTEXT_PATH", "render_pytext_payload"),
+    ("CPython's str() and repr()", "PYSTR_PATH", "render_pystr_cases"),
     # `DIGITS_PATH` is deliberately NOT here: it is the one oracle in this
     # file whose fresh render legitimately differs between the two supported
     # interpreters, so exact equality is the wrong rule. See

@@ -21,6 +21,7 @@ func main() {
 		SilenceErrors: true,
 	}
 	root.AddCommand(uiCommand())
+	root.AddCommand(shimCommand())
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "mtglab:", err)
 		os.Exit(1)

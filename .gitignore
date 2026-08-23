@@ -104,3 +104,10 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+
+# The Go binary, when somebody builds it in place. `go build ./cmd/mtglab`
+# with no `-o` drops an 89MB Mach-O next to `go.mod`, and `git status` then
+# offers it alongside the source. The image builds to `/out`, CI builds to a
+# temp path, and a local build should use `-o` too — this is the safety net
+# for the time somebody forgets.
+go/mtglab
