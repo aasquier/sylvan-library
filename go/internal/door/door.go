@@ -304,6 +304,12 @@ func noteProxied(r *http.Request) {
 
 // statusWriter remembers the committed status for the counter. Unwrap keeps
 // http.ResponseController — and so the proxy's Flush — working through it.
+//
+// Deliberately no Write override. Every write reaches this through
+// `securityHeaders`' headerWriter, which commits WriteHeader before the first
+// body byte, so a Write that defaulted the status here would be dead code —
+// and the counting layer above still reads 0 as 200, for the response nobody
+// wrote a byte or a header of.
 type statusWriter struct {
 	http.ResponseWriter
 	status int
@@ -314,13 +320,6 @@ func (s *statusWriter) WriteHeader(code int) {
 		s.status = code
 	}
 	s.ResponseWriter.WriteHeader(code)
-}
-
-func (s *statusWriter) Write(b []byte) (int, error) {
-	if s.status == 0 {
-		s.status = http.StatusOK
-	}
-	return s.ResponseWriter.Write(b)
 }
 
 func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
