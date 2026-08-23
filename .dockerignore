@@ -21,7 +21,7 @@ data/
 .github/
 
 # Node's tree and the frontend source. The image installs the *committed*
-# bundle at `src/mtglab/web_dist/`; `web/` is what CI rebuilds it from.
+# bundle at `web_dist/`; `web/` is what CI rebuilds it from.
 web/
 
 # Local Python state. `.venv` is a macOS x86 virtualenv and would be both huge
