@@ -121,6 +121,7 @@ _ORACLES = [
     ("the Claude ledger", "LEDGER_PATH", "render_ledger_cases"),
     ("the seven tools", "TOOLS_PATH", "render_tools_payload"),
     ("the seven mode definitions", "MODES_PATH", "render_modes_payload"),
+    ("the slot argument", "ARGUE_PATH", "render_argue_cases"),
 ]
 
 

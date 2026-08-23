@@ -1221,9 +1221,60 @@ go/                       the Go module (ADR 38; module path
                           `or ""` spelling beside it -- an explicit null
                           reaches `str(None)` and asks the deck about a card
                           called "None", a different 422 from a missing field.
-                          **Still Python: the other six modes'
-                          orchestration, and the nine Claude routes that
-                          remain -- five of them job families.**
+                          **Then the slot argument, and its plain route with
+                          it** (2026-08-22): internal/claude/argue.go and
+                          internal/api/argue.go. The route is the interview's
+                          TWIN down to the status codes and shares
+                          `refuseClaude` rather than growing a second mapping
+                          -- so the stance wart is one wart in one place. Two
+                          Python-owned halves carry ADR 25 and both are held to
+                          a corpus. **OnlyCharges moves the predicate**: the
+                          interview asks whether a line ends in a question
+                          mark, because the failure there is a declarative
+                          sentence; every item here is declarative by design,
+                          so the question becomes whether it rests on anything
+                          and a charge with no `fact` is not a charge. The two
+                          enum FALLBACKS are what a port gets wrong -- an
+                          unrecognised ground or strength falls back rather
+                          than dropping the charge, and a test that counted
+                          only the good ones would never see it.
+                          **ResolveAlternatives is rule 2 made executable**,
+                          and its corpus uses this file's own first recorded
+                          error as the fixture: tiny_pool carries Ajani, Nacatl
+                          Pariah // Ajani, Nacatl Avenger, white in front and
+                          R/W in identity, asked BOTH ways -- by front face,
+                          which is how a model names it and the spelling an
+                          index keyed only on the pool's `A // B` name misses
+                          silently, and by full name. The ORDER of the verdicts
+                          is contract: already-in-deck first, because it is the
+                          most specific true thing to say and Goreclaw's
+                          Primeval Titan is both banned and in that deck.
+                          **A Python inconsistency was found and reproduced**:
+                          `_report`'s default for `alternatives_dropped` lists
+                          FOUR keys where `resolve_alternatives` returns FIVE,
+                          so a stance-off report and a real run carry different
+                          key sets -- two Go types, because one struct would
+                          have put a fifth key on the wire in exactly the cases
+                          Python leaves it off. Five of eighteen mutations
+                          survived the first round and every one was a real gap
+                          the corpus could not reach: the input dedupe (masked
+                          downstream by the pool-name dedupe for any name that
+                          RESOLVES -- only a duplicated name that does NOT
+                          resolve can observe it), the five-charge cap, the
+                          command zone in the in-deck set, and the route's
+                          source and tier.
+                          **Still Python, and ENUMERATED rather than
+                          counted** (this file's own lesson about numbers):
+                          the orchestration of dossier, research, both theme
+                          halves and scan; and the routes `/api/claude`,
+                          `/api/claude/research`, `/api/claude/scan`,
+                          `/api/claude/theme`, `/api/claude/theme/proposal`,
+                          `.../argue/deck` and `.../dossier` (a GET and a
+                          POST). Five of those are job families, so each waits
+                          on its own submit-and-poll rather than on this one.
+                          `/api/admin/stats/claude` is NOT this family and
+                          never was -- it is the admin roll-up, still Python
+                          for the coupling Phase 4 recorded.
                           The contract
                           suite runs through the door locally and in CI
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the LIBRARY
