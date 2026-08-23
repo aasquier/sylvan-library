@@ -586,3 +586,37 @@ func TestTwoIdenticalAsksAreOneMatch(t *testing.T) {
 	}
 	reg.Wait()
 }
+
+// TestAGamesCountThatIsNotANumberIsTheFiveHundredPythonGives is the pin the
+// [forgeGames] comment promised and, until Phase 8's wheel port, did not
+// have -- and what it pins moved when the real bytes were measured: an
+// uncaught ValueError in `plan_forge` is Starlette's **plain-text** three
+// words, not a JSON detail. The first Go version answered
+// `{"detail": "invalid literal ..."}` here, a divergence no golden could see
+// because the goldens record shape and no golden records this case at all.
+func TestAGamesCountThatIsNotANumberIsTheFiveHundredPythonGives(t *testing.T) {
+	shim := &stubShim{stream: true}
+	a, _, _ := forgeAPI(t, shim)
+	srv := forgeServer(t, a)
+	for _, body := range []string{
+		`{"a_slug":"kaheera","b_slug":"mono-green","games":"many"}`,
+		`{"a_slug":"kaheera","b_slug":"mono-green","seed":"soon"}`,
+	} {
+		resp, err := http.Post(srv.URL+"/api/sim/forge", "application/json",
+			strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("%s answered %d: %s", body, resp.StatusCode, raw)
+		}
+		if ct := resp.Header.Get("Content-Type"); ct != "text/plain; charset=utf-8" {
+			t.Fatalf("%s: Content-Type %q", body, ct)
+		}
+		if string(raw) != "Internal Server Error" {
+			t.Fatalf("%s: body %q", body, raw)
+		}
+	}
+}

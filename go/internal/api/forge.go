@@ -410,10 +410,11 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 	plan, err := a.planForge(decks, addresses, ownerIDs, body, hosted)
 	if err != nil {
 		// `int()` refused the games count or the seed. **Python's 500**, and
-		// reproduced: `plan_forge` runs in the request with nothing catching a
-		// ValueError there. See [forgeGames].
-		a.log.Error("a Forge match could not be planned", "error", err)
-		wire.Detail(w, http.StatusInternalServerError, err.Error())
+		// reproduced exactly: `plan_forge` runs in the request with nothing
+		// catching a ValueError there, so Starlette answers its plain-text
+		// three words -- not a JSON detail, which is what this wrote until
+		// Phase 8's wheel port measured the real bytes. See [forgeGames].
+		pythonUncaught(w, a.log, "forge", err)
 		return
 	}
 	a.submit(w, r, plan)

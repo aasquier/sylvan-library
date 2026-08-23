@@ -286,15 +286,15 @@ func TestWithAuthOffNothingIsRefused(t *testing.T) {
 
 func TestTheProxyPassesTheRequestThroughFaithfully(t *testing.T) {
 	srv := build(t, true, fakeResolver{})
-	// A POST on a deck path that Python still owns. It was `.../swap` until
-	// Phase 4 flipped the writes and `.../interview` until Phase 6 flipped the
-	// first Claude surface; each move is the test noticing a flip rather than
-	// the test being fragile. What it needs is segments, a query and a body,
-	// and the upstream here is an echo server -- so the path only has to be
-	// unported, never a route the real Python would accept this method on.
-	// `.../wheel` is deliberately the pick: it is the deck route furthest from
-	// the port board, being neither a Claude surface nor a simulation.
-	req, _ := http.NewRequest("POST", srv.URL+"/api/decks/local/mono-green/wheel?dry=1&q=a%20b", strings.NewReader(`{"x":1}`))
+	// A body-carrying method on a path Python still owns. It was `.../swap`
+	// until Phase 4 flipped the writes, `.../interview` until Phase 6 flipped
+	// the first Claude surface, and `.../wheel` until Phase 8's first route
+	// batch; each move is the test noticing a flip rather than the test being
+	// fragile. What it needs is segments, a query and a body, and the
+	// upstream here is an echo server -- so the path only has to be unported,
+	// never a route the real Python would accept this method on. The account
+	// delete is the pick now: the last Python literal that takes a payload.
+	req, _ := http.NewRequest("DELETE", srv.URL+"/api/admin/users/doomed?dry=1&q=a%20b", strings.NewReader(`{"x":1}`))
 	req.AddCookie(&http.Cookie{Name: CookieName, Value: "alice"})
 	req.Header.Set("X-Forwarded-For", "1.2.3.4") // a client picking its own bucket
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -308,8 +308,8 @@ func TestTheProxyPassesTheRequestThroughFaithfully(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&echo); err != nil {
 		t.Fatal(err)
 	}
-	if echo["path"] != "/api/decks/local/mono-green/wheel" || echo["query"] != "dry=1&q=a%20b" ||
-		echo["method"] != "POST" || echo["body"] != `{"x":1}` {
+	if echo["path"] != "/api/admin/users/doomed" || echo["query"] != "dry=1&q=a%20b" ||
+		echo["method"] != "DELETE" || echo["body"] != `{"x":1}` {
 		t.Fatalf("the upstream saw %v", echo)
 	}
 	if echo["host"] != "sylvan-libraries.com" {
@@ -352,7 +352,9 @@ func TestAnUpstreamThatIsDownIsA502InTheEnvelope(t *testing.T) {
 	}
 	srv := httptest.NewServer(d.Handler())
 	defer srv.Close()
-	resp := get(t, srv, "GET", "/api/health", "")
+	// `/api/health` was the probe until Phase 8's first route batch made it
+	// the door's own; the stats family is the last still proxied.
+	resp := get(t, srv, "GET", "/api/admin/stats/system", "")
 	if resp.StatusCode != 502 {
 		t.Fatalf("a dead upstream answered %d", resp.StatusCode)
 	}
@@ -606,7 +608,10 @@ func TestOnlyACanonicalRequestIsTheDoors(t *testing.T) {
 		// every surface default it asks for had crossed.
 		// `/api/forge` is **not** among them any more either: it flipped with
 		// Tier 3 in Phase 7, and with it the last job-submitting family.
-		{"POST", "/api/decks/local/mono-green/wheel"},
+		// And the wheel, the health check and the upcoming sets flipped with
+		// Phase 8's first route batch, so the last Python-owned literals are
+		// the admin family: the stats six and the account delete.
+		{"GET", "/api/admin/stats/system"},
 	}
 	for _, c := range proxied {
 		resp := get(t, srv, c.method, c.path, "alice")
