@@ -1,0 +1,2349 @@
+{
+ "oracle": [
+  {
+   "raw": {
+    "oracle_id": "2588f348-d7a3-46c8-9ace-dca53ed5ef99",
+    "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+    "mana_cost": "{1}{W}",
+    "cmc": 2.0,
+    "type_line": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+    "oracle_text": null,
+    "colors": [],
+    "color_identity": [
+     "R",
+     "W"
+    ],
+    "keywords": [
+     "Transform"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "transform",
+    "reserved": false,
+    "edhrec_rank": 4482,
+    "released_at": "2024-06-14",
+    "set": "mh3",
+    "card_faces": [
+     {
+      "object": "card_face",
+      "name": "Ajani, Nacatl Pariah",
+      "mana_cost": "{1}{W}",
+      "type_line": "Legendary Creature — Cat Warrior",
+      "oracle_text": "When Ajani enters, create a 2/1 white Cat Warrior creature token.\nWhenever one or more other Cats you control die, you may exile Ajani, then return him to the battlefield transformed under his owner's control.",
+      "colors": [
+       "W"
+      ],
+      "power": "1",
+      "toughness": "2",
+      "flavor_text": "His pride denied him; his brother did not.",
+      "artist": "Chris Rallis",
+      "artist_id": "a8e7b854-b15a-421a-b66d-6e68187ae285",
+      "illustration_id": "3dff950b-68c7-4b2d-a8e5-419b140d897e",
+      "image_uris": {
+       "small": "https://cards.scryfall.io/small/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "normal": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "large": "https://cards.scryfall.io/large/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "png": "https://cards.scryfall.io/png/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.png?1783911238",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "border_crop": "https://cards.scryfall.io/border_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "thumb": "https://cards.scryfall.io/thumb/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "grid": "https://cards.scryfall.io/grid/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "display": "https://cards.scryfall.io/display/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "art": "https://cards.scryfall.io/art/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "crop": "https://cards.scryfall.io/crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238"
+      }
+     },
+     {
+      "object": "card_face",
+      "name": "Ajani, Nacatl Avenger",
+      "mana_cost": "",
+      "type_line": "Legendary Planeswalker — Ajani",
+      "oracle_text": "+2: Put a +1/+1 counter on each Cat you control.\n0: Create a 2/1 white Cat Warrior creature token. When you do, if you control a red permanent other than Ajani, he deals damage equal to the number of creatures you control to any target.\n−4: Each opponent chooses an artifact, a creature, an enchantment, and a planeswalker from among the nonland permanents they control, then sacrifices the rest.",
+      "colors": [
+       "R",
+       "W"
+      ],
+      "color_indicator": [
+       "R",
+       "W"
+      ],
+      "loyalty": "3",
+      "artist": "Chris Rallis",
+      "artist_id": "a8e7b854-b15a-421a-b66d-6e68187ae285",
+      "illustration_id": "941b8c13-e0db-4ef8-8182-17ae977e65a7",
+      "image_uris": {
+       "small": "https://cards.scryfall.io/small/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "normal": "https://cards.scryfall.io/normal/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "large": "https://cards.scryfall.io/large/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "png": "https://cards.scryfall.io/png/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.png?1783911238",
+       "art_crop": "https://cards.scryfall.io/art_crop/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "border_crop": "https://cards.scryfall.io/border_crop/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "thumb": "https://cards.scryfall.io/thumb/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "grid": "https://cards.scryfall.io/grid/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "display": "https://cards.scryfall.io/display/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "art": "https://cards.scryfall.io/art/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "crop": "https://cards.scryfall.io/crop/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238"
+      }
+     }
+    ]
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "2588f348-d7a3-46c8-9ace-dca53ed5ef99",
+    "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+    "mana_cost": "{1}{W}",
+    "cmc": 2.0,
+    "type_line": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+    "oracle_text": null,
+    "colors": [],
+    "color_identity": [
+     "R",
+     "W"
+    ],
+    "keywords": [
+     "Transform"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "transform",
+    "card_faces": [
+     {
+      "object": "card_face",
+      "name": "Ajani, Nacatl Pariah",
+      "mana_cost": "{1}{W}",
+      "type_line": "Legendary Creature — Cat Warrior",
+      "oracle_text": "When Ajani enters, create a 2/1 white Cat Warrior creature token.\nWhenever one or more other Cats you control die, you may exile Ajani, then return him to the battlefield transformed under his owner's control.",
+      "colors": [
+       "W"
+      ],
+      "power": "1",
+      "toughness": "2",
+      "flavor_text": "His pride denied him; his brother did not.",
+      "artist": "Chris Rallis",
+      "artist_id": "a8e7b854-b15a-421a-b66d-6e68187ae285",
+      "illustration_id": "3dff950b-68c7-4b2d-a8e5-419b140d897e",
+      "image_uris": {
+       "small": "https://cards.scryfall.io/small/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "normal": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "large": "https://cards.scryfall.io/large/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "png": "https://cards.scryfall.io/png/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.png?1783911238",
+       "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "border_crop": "https://cards.scryfall.io/border_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "thumb": "https://cards.scryfall.io/thumb/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "grid": "https://cards.scryfall.io/grid/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "display": "https://cards.scryfall.io/display/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "art": "https://cards.scryfall.io/art/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "crop": "https://cards.scryfall.io/crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238"
+      }
+     },
+     {
+      "object": "card_face",
+      "name": "Ajani, Nacatl Avenger",
+      "mana_cost": "",
+      "type_line": "Legendary Planeswalker — Ajani",
+      "oracle_text": "+2: Put a +1/+1 counter on each Cat you control.\n0: Create a 2/1 white Cat Warrior creature token. When you do, if you control a red permanent other than Ajani, he deals damage equal to the number of creatures you control to any target.\n−4: Each opponent chooses an artifact, a creature, an enchantment, and a planeswalker from among the nonland permanents they control, then sacrifices the rest.",
+      "colors": [
+       "R",
+       "W"
+      ],
+      "color_indicator": [
+       "R",
+       "W"
+      ],
+      "loyalty": "3",
+      "artist": "Chris Rallis",
+      "artist_id": "a8e7b854-b15a-421a-b66d-6e68187ae285",
+      "illustration_id": "941b8c13-e0db-4ef8-8182-17ae977e65a7",
+      "image_uris": {
+       "small": "https://cards.scryfall.io/small/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "normal": "https://cards.scryfall.io/normal/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "large": "https://cards.scryfall.io/large/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "png": "https://cards.scryfall.io/png/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.png?1783911238",
+       "art_crop": "https://cards.scryfall.io/art_crop/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "border_crop": "https://cards.scryfall.io/border_crop/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+       "thumb": "https://cards.scryfall.io/thumb/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "grid": "https://cards.scryfall.io/grid/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "display": "https://cards.scryfall.io/display/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "art": "https://cards.scryfall.io/art/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238",
+       "crop": "https://cards.scryfall.io/crop/back/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.webp?1783911238"
+      }
+     }
+    ],
+    "reserved": false,
+    "edhrec_rank": 4482,
+    "released_at": "2024-06-14",
+    "set_code": "mh3",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+    "power": "1",
+    "toughness": "2",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": "His pride denied him; his brother did not.",
+    "artist": "Chris Rallis"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "900ca697-ad38-4b2b-bc74-2ff7eb6ea951",
+    "name": "Emrakul, the Aeons Torn",
+    "mana_cost": "{15}",
+    "cmc": 15.0,
+    "type_line": "Legendary Creature — Eldrazi",
+    "oracle_text": "This spell can't be countered.\nWhen you cast this spell, take an extra turn after this one.\nFlying, protection from spells that are one or more colors, annihilator 6\nWhen Emrakul is put into a graveyard from anywhere, its owner shuffles their graveyard into their library.",
+    "colors": [],
+    "color_identity": [],
+    "keywords": [
+     "Flying",
+     "Annihilator",
+     "Protection"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "banned"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": null,
+    "released_at": "2022-07-08",
+    "set": "2x2",
+    "power": "15",
+    "toughness": "15",
+    "artist": "Mark Tedin",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/2/4/249db4d4-2542-47ee-a216-e13ffbc2319c.jpg?1783921940",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/249db4d4-2542-47ee-a216-e13ffbc2319c.jpg?1783921940"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "900ca697-ad38-4b2b-bc74-2ff7eb6ea951",
+    "name": "Emrakul, the Aeons Torn",
+    "mana_cost": "{15}",
+    "cmc": 15.0,
+    "type_line": "Legendary Creature — Eldrazi",
+    "oracle_text": "This spell can't be countered.\nWhen you cast this spell, take an extra turn after this one.\nFlying, protection from spells that are one or more colors, annihilator 6\nWhen Emrakul is put into a graveyard from anywhere, its owner shuffles their graveyard into their library.",
+    "colors": [],
+    "color_identity": [],
+    "keywords": [
+     "Flying",
+     "Annihilator",
+     "Protection"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "banned"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": null,
+    "released_at": "2022-07-08",
+    "set_code": "2x2",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/2/4/249db4d4-2542-47ee-a216-e13ffbc2319c.jpg?1783921940",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/2/4/249db4d4-2542-47ee-a216-e13ffbc2319c.jpg?1783921940",
+    "power": "15",
+    "toughness": "15",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Mark Tedin"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "0f1b5cea-2035-444c-9f63-87dcb9782c74",
+    "name": "Gyome, Master Chef",
+    "mana_cost": "{2}{B}{G}",
+    "cmc": 4.0,
+    "type_line": "Legendary Creature — Troll Warlock",
+    "oracle_text": "Trample\nAt the beginning of your end step, create a number of Food tokens equal to the number of nontoken creatures you had enter the battlefield under your control this turn.\n{1}, Sacrifice a Food: Target creature gains indestructible until end of turn. Tap it.",
+    "colors": [
+     "B",
+     "G"
+    ],
+    "color_identity": [
+     "B",
+     "G"
+    ],
+    "keywords": [
+     "Food",
+     "Trample"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 4740,
+    "released_at": "2026-04-24",
+    "set": "soc",
+    "power": "5",
+    "toughness": "3",
+    "artist": "Steve Prescott",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "0f1b5cea-2035-444c-9f63-87dcb9782c74",
+    "name": "Gyome, Master Chef",
+    "mana_cost": "{2}{B}{G}",
+    "cmc": 4.0,
+    "type_line": "Legendary Creature — Troll Warlock",
+    "oracle_text": "Trample\nAt the beginning of your end step, create a number of Food tokens equal to the number of nontoken creatures you had enter the battlefield under your control this turn.\n{1}, Sacrifice a Food: Target creature gains indestructible until end of turn. Tap it.",
+    "colors": [
+     "B",
+     "G"
+    ],
+    "color_identity": [
+     "B",
+     "G"
+    ],
+    "keywords": [
+     "Food",
+     "Trample"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 4740,
+    "released_at": "2026-04-24",
+    "set_code": "soc",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751",
+    "power": "5",
+    "toughness": "3",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Steve Prescott"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+    "name": "Sol Ring",
+    "mana_cost": "{1}",
+    "cmc": 1.0,
+    "type_line": "Artifact",
+    "oracle_text": "{T}: Add {C}{C}.",
+    "colors": [],
+    "color_identity": [],
+    "keywords": [],
+    "produced_mana": [
+     "C"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 1,
+    "released_at": "2026-06-26",
+    "set": "msc",
+    "artist": "Myles Wohl",
+    "flavor_text": "\"The subject of innovation will always be near and dear to my heart.\"\n—Tony Stark",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/9/1/91fdb56b-54d5-4272-8319-505ff987fe9b.jpg?1783903215",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/9/1/91fdb56b-54d5-4272-8319-505ff987fe9b.jpg?1783903215"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+    "name": "Sol Ring",
+    "mana_cost": "{1}",
+    "cmc": 1.0,
+    "type_line": "Artifact",
+    "oracle_text": "{T}: Add {C}{C}.",
+    "colors": [],
+    "color_identity": [],
+    "keywords": [],
+    "produced_mana": [
+     "C"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 1,
+    "released_at": "2026-06-26",
+    "set_code": "msc",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/9/1/91fdb56b-54d5-4272-8319-505ff987fe9b.jpg?1783903215",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/9/1/91fdb56b-54d5-4272-8319-505ff987fe9b.jpg?1783903215",
+    "power": null,
+    "toughness": null,
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": "\"The subject of innovation will always be near and dear to my heart.\"\n—Tony Stark",
+    "artist": "Myles Wohl"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
+    "name": "Swamp",
+    "mana_cost": "",
+    "cmc": 0.0,
+    "type_line": "Basic Land — Swamp",
+    "oracle_text": "({T}: Add {B}.)",
+    "colors": [],
+    "color_identity": [
+     "B"
+    ],
+    "keywords": [],
+    "produced_mana": [
+     "B"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": null,
+    "released_at": "2026-11-13",
+    "set": "trk",
+    "artist": "Bastien Grivet",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/b/7/b7387103-1df1-4fd0-9e91-1544509792c7.jpg?1785981659",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/b/7/b7387103-1df1-4fd0-9e91-1544509792c7.jpg?1785981659"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
+    "name": "Swamp",
+    "mana_cost": "",
+    "cmc": 0.0,
+    "type_line": "Basic Land — Swamp",
+    "oracle_text": "({T}: Add {B}.)",
+    "colors": [],
+    "color_identity": [
+     "B"
+    ],
+    "keywords": [],
+    "produced_mana": [
+     "B"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": null,
+    "released_at": "2026-11-13",
+    "set_code": "trk",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/b/7/b7387103-1df1-4fd0-9e91-1544509792c7.jpg?1785981659",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/b/7/b7387103-1df1-4fd0-9e91-1544509792c7.jpg?1785981659",
+    "power": null,
+    "toughness": null,
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Bastien Grivet"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "ae83ef2c-960f-4c5b-97cc-52465c687c18",
+    "name": "Primeval Titan",
+    "mana_cost": "{4}{G}{G}",
+    "cmc": 6.0,
+    "type_line": "Creature — Giant",
+    "oracle_text": "Trample\nWhenever this creature enters or attacks, you may search your library for up to two land cards, put them onto the battlefield tapped, then shuffle.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Trample"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "banned"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": null,
+    "released_at": "2017-11-17",
+    "set": "ima",
+    "power": "6",
+    "toughness": "6",
+    "artist": "Aleksi Briclot",
+    "flavor_text": "When nature calls, *run*.",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "ae83ef2c-960f-4c5b-97cc-52465c687c18",
+    "name": "Primeval Titan",
+    "mana_cost": "{4}{G}{G}",
+    "cmc": 6.0,
+    "type_line": "Creature — Giant",
+    "oracle_text": "Trample\nWhenever this creature enters or attacks, you may search your library for up to two land cards, put them onto the battlefield tapped, then shuffle.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Trample"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "banned"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": null,
+    "released_at": "2017-11-17",
+    "set_code": "ima",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d5537da-112e-4679-a113-b5d7ce32a66b.jpg?1783935516",
+    "power": "6",
+    "toughness": "6",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": "When nature calls, *run*.",
+    "artist": "Aleksi Briclot"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "153376c9-dffd-458c-8ce3-a4c8269bc4e9",
+    "name": "Smothering Tithe",
+    "mana_cost": "{3}{W}",
+    "cmc": 4.0,
+    "type_line": "Enchantment",
+    "oracle_text": "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+    "colors": [
+     "W"
+    ],
+    "color_identity": [
+     "W"
+    ],
+    "keywords": [
+     "Treasure"
+    ],
+    "produced_mana": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 63,
+    "released_at": "2023-08-04",
+    "set": "cmm",
+    "artist": "Mark Behm",
+    "flavor_text": "\"I await your donation.\"\n—Dasha, Orzhov priest",
+    "game_changer": true,
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/8/6/861b5889-0183-4bee-afeb-a4b2aa700a8e.jpg?1783915712",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/8/6/861b5889-0183-4bee-afeb-a4b2aa700a8e.jpg?1783915712"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "153376c9-dffd-458c-8ce3-a4c8269bc4e9",
+    "name": "Smothering Tithe",
+    "mana_cost": "{3}{W}",
+    "cmc": 4.0,
+    "type_line": "Enchantment",
+    "oracle_text": "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+    "colors": [
+     "W"
+    ],
+    "color_identity": [
+     "W"
+    ],
+    "keywords": [
+     "Treasure"
+    ],
+    "produced_mana": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 63,
+    "released_at": "2023-08-04",
+    "set_code": "cmm",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/8/6/861b5889-0183-4bee-afeb-a4b2aa700a8e.jpg?1783915712",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/8/6/861b5889-0183-4bee-afeb-a4b2aa700a8e.jpg?1783915712",
+    "power": null,
+    "toughness": null,
+    "loyalty": null,
+    "defense": null,
+    "game_changer": true,
+    "flavor_text": "\"I await your donation.\"\n—Dasha, Orzhov priest",
+    "artist": "Mark Behm"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "befb211f-37ca-4083-98d4-9ff1f28be3f2",
+    "name": "Goreclaw, Terror of Qal Sisma",
+    "mana_cost": "{3}{G}",
+    "cmc": 4.0,
+    "type_line": "Legendary Creature — Bear",
+    "oracle_text": "Creature spells you cast with power 4 or greater cost {2} less to cast.\nWhenever Goreclaw attacks, each creature you control with power 4 or greater gets +1/+1 and gains trample until end of turn.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 674,
+    "released_at": "2023-08-04",
+    "set": "cmm",
+    "power": "4",
+    "toughness": "3",
+    "artist": "Svetlin Velinov",
+    "flavor_text": "You don't want to know how she got that name.",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/e/e/ee47f23a-3ba9-4615-b170-c89d8ab99d78.jpg?1783915630",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/e/e/ee47f23a-3ba9-4615-b170-c89d8ab99d78.jpg?1783915630"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "befb211f-37ca-4083-98d4-9ff1f28be3f2",
+    "name": "Goreclaw, Terror of Qal Sisma",
+    "mana_cost": "{3}{G}",
+    "cmc": 4.0,
+    "type_line": "Legendary Creature — Bear",
+    "oracle_text": "Creature spells you cast with power 4 or greater cost {2} less to cast.\nWhenever Goreclaw attacks, each creature you control with power 4 or greater gets +1/+1 and gains trample until end of turn.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 674,
+    "released_at": "2023-08-04",
+    "set_code": "cmm",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/e/e/ee47f23a-3ba9-4615-b170-c89d8ab99d78.jpg?1783915630",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/e/e/ee47f23a-3ba9-4615-b170-c89d8ab99d78.jpg?1783915630",
+    "power": "4",
+    "toughness": "3",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": "You don't want to know how she got that name.",
+    "artist": "Svetlin Velinov"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
+    "name": "Forest",
+    "mana_cost": "",
+    "cmc": 0.0,
+    "type_line": "Basic Land — Forest",
+    "oracle_text": "({T}: Add {G}.)",
+    "colors": [],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [],
+    "produced_mana": [
+     "G"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": null,
+    "released_at": "2026-11-13",
+    "set": "trk",
+    "artist": "Bastien Grivet",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/d/c/dce15387-4114-4b3e-91aa-5b42b45c44ac.jpg?1785981675",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/d/c/dce15387-4114-4b3e-91aa-5b42b45c44ac.jpg?1785981675"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
+    "name": "Forest",
+    "mana_cost": "",
+    "cmc": 0.0,
+    "type_line": "Basic Land — Forest",
+    "oracle_text": "({T}: Add {G}.)",
+    "colors": [],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [],
+    "produced_mana": [
+     "G"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": null,
+    "released_at": "2026-11-13",
+    "set_code": "trk",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/d/c/dce15387-4114-4b3e-91aa-5b42b45c44ac.jpg?1785981675",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/d/c/dce15387-4114-4b3e-91aa-5b42b45c44ac.jpg?1785981675",
+    "power": null,
+    "toughness": null,
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Bastien Grivet"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "92acb789-0e42-465c-ac16-40fefec48805",
+    "name": "Llanowar Reborn",
+    "mana_cost": "",
+    "cmc": 0.0,
+    "type_line": "Land",
+    "oracle_text": "This land enters tapped.\n{T}: Add {G}.\nGraft 1 (This land enters with a +1/+1 counter on it. Whenever a creature enters, you may move a +1/+1 counter from this land onto it.)",
+    "colors": [],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Graft"
+    ],
+    "produced_mana": [
+     "G"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 2328,
+    "released_at": "2023-11-17",
+    "set": "lcc",
+    "artist": "Philip Straub",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/2/8/284e165e-9ab6-47fc-9685-0fb03de237df.jpg?1783913826",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/2/8/284e165e-9ab6-47fc-9685-0fb03de237df.jpg?1783913826"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "92acb789-0e42-465c-ac16-40fefec48805",
+    "name": "Llanowar Reborn",
+    "mana_cost": "",
+    "cmc": 0.0,
+    "type_line": "Land",
+    "oracle_text": "This land enters tapped.\n{T}: Add {G}.\nGraft 1 (This land enters with a +1/+1 counter on it. Whenever a creature enters, you may move a +1/+1 counter from this land onto it.)",
+    "colors": [],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Graft"
+    ],
+    "produced_mana": [
+     "G"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 2328,
+    "released_at": "2023-11-17",
+    "set_code": "lcc",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/2/8/284e165e-9ab6-47fc-9685-0fb03de237df.jpg?1783913826",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/2/8/284e165e-9ab6-47fc-9685-0fb03de237df.jpg?1783913826",
+    "power": null,
+    "toughness": null,
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Philip Straub"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "4d8505d3-c8a1-4850-95d4-5ddb8ad49770",
+    "name": "Cultivator Colossus",
+    "mana_cost": "{4}{G}{G}{G}",
+    "cmc": 7.0,
+    "type_line": "Creature — Plant Beast",
+    "oracle_text": "Trample\nCultivator Colossus's power and toughness are each equal to the number of lands you control.\nWhen this creature enters, you may put a land card from your hand onto the battlefield tapped. If you do, draw a card and repeat this process.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Trample"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 1589,
+    "released_at": "2025-01-24",
+    "set": "inr",
+    "power": "*",
+    "toughness": "*",
+    "artist": "Antonio José Manzanedo",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/4/2/426ed66e-41b3-4e44-90a2-697aafaa8c5c.jpg?1783908104",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/4/2/426ed66e-41b3-4e44-90a2-697aafaa8c5c.jpg?1783908104"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "4d8505d3-c8a1-4850-95d4-5ddb8ad49770",
+    "name": "Cultivator Colossus",
+    "mana_cost": "{4}{G}{G}{G}",
+    "cmc": 7.0,
+    "type_line": "Creature — Plant Beast",
+    "oracle_text": "Trample\nCultivator Colossus's power and toughness are each equal to the number of lands you control.\nWhen this creature enters, you may put a land card from your hand onto the battlefield tapped. If you do, draw a card and repeat this process.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Trample"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 1589,
+    "released_at": "2025-01-24",
+    "set_code": "inr",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/4/2/426ed66e-41b3-4e44-90a2-697aafaa8c5c.jpg?1783908104",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/4/2/426ed66e-41b3-4e44-90a2-697aafaa8c5c.jpg?1783908104",
+    "power": "*",
+    "toughness": "*",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Antonio José Manzanedo"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "53236dd7-845a-444c-96d5-f41ed7325d8f",
+    "name": "Rhystic Study",
+    "mana_cost": "{2}{U}",
+    "cmc": 3.0,
+    "type_line": "Enchantment",
+    "oracle_text": "Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.",
+    "colors": [
+     "U"
+    ],
+    "color_identity": [
+     "U"
+    ],
+    "keywords": [],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 44,
+    "released_at": "2022-12-02",
+    "set": "j22",
+    "artist": "Tatiana Kirgetova",
+    "flavor_text": "\"I'll teach you the leyline paratrigonometrics, no problem. But you need to show me how to make that fiery swirly thing.\"\n—Zimone, to Rootha",
+    "game_changer": true,
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/9/f/9f37c5b6-a59c-45cd-9a99-e9357fe9ea1b.jpg?1783919146",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f37c5b6-a59c-45cd-9a99-e9357fe9ea1b.jpg?1783919146"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "53236dd7-845a-444c-96d5-f41ed7325d8f",
+    "name": "Rhystic Study",
+    "mana_cost": "{2}{U}",
+    "cmc": 3.0,
+    "type_line": "Enchantment",
+    "oracle_text": "Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.",
+    "colors": [
+     "U"
+    ],
+    "color_identity": [
+     "U"
+    ],
+    "keywords": [],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 44,
+    "released_at": "2022-12-02",
+    "set_code": "j22",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/9/f/9f37c5b6-a59c-45cd-9a99-e9357fe9ea1b.jpg?1783919146",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f37c5b6-a59c-45cd-9a99-e9357fe9ea1b.jpg?1783919146",
+    "power": null,
+    "toughness": null,
+    "loyalty": null,
+    "defense": null,
+    "game_changer": true,
+    "flavor_text": "\"I'll teach you the leyline paratrigonometrics, no problem. But you need to show me how to make that fiery swirly thing.\"\n—Zimone, to Rootha",
+    "artist": "Tatiana Kirgetova"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "b1544f21-7e98-461b-aed5-e748b0168c52",
+    "name": "Swords to Plowshares",
+    "mana_cost": "{W}",
+    "cmc": 1.0,
+    "type_line": "Instant",
+    "oracle_text": "Exile target creature. Its controller gains life equal to its power.",
+    "colors": [
+     "W"
+    ],
+    "color_identity": [
+     "W"
+    ],
+    "keywords": [],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 11,
+    "released_at": "2026-06-26",
+    "set": "msc",
+    "artist": "Greg Smallwood",
+    "flavor_text": "\"Gotta get that corn planted before the world ends again.\"\n—Clint Barton",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "b1544f21-7e98-461b-aed5-e748b0168c52",
+    "name": "Swords to Plowshares",
+    "mana_cost": "{W}",
+    "cmc": 1.0,
+    "type_line": "Instant",
+    "oracle_text": "Exile target creature. Its controller gains life equal to its power.",
+    "colors": [
+     "W"
+    ],
+    "color_identity": [
+     "W"
+    ],
+    "keywords": [],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 11,
+    "released_at": "2026-06-26",
+    "set_code": "msc",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243",
+    "power": null,
+    "toughness": null,
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": "\"Gotta get that corn planted before the world ends again.\"\n—Clint Barton",
+    "artist": "Greg Smallwood"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "5089ec1a-f881-4d55-af14-5d996171203b",
+    "name": "Black Lotus",
+    "mana_cost": "{0}",
+    "cmc": 0.0,
+    "type_line": "Artifact",
+    "oracle_text": "{T}, Sacrifice this artifact: Add three mana of any one color.",
+    "colors": [],
+    "color_identity": [],
+    "keywords": [],
+    "produced_mana": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "legalities": {
+     "commander": "banned"
+    },
+    "layout": "normal",
+    "reserved": true,
+    "edhrec_rank": null,
+    "released_at": "2014-06-16",
+    "set": "vma",
+    "artist": "Chris Rahn",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/b/d/bd8fa327-dd41-4737-8f19-2cf5eb1f7cdd.jpg?1783939332",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/b/d/bd8fa327-dd41-4737-8f19-2cf5eb1f7cdd.jpg?1783939332"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "5089ec1a-f881-4d55-af14-5d996171203b",
+    "name": "Black Lotus",
+    "mana_cost": "{0}",
+    "cmc": 0.0,
+    "type_line": "Artifact",
+    "oracle_text": "{T}, Sacrifice this artifact: Add three mana of any one color.",
+    "colors": [],
+    "color_identity": [],
+    "keywords": [],
+    "produced_mana": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "legalities": {
+     "commander": "banned"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": true,
+    "edhrec_rank": null,
+    "released_at": "2014-06-16",
+    "set_code": "vma",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/b/d/bd8fa327-dd41-4737-8f19-2cf5eb1f7cdd.jpg?1783939332",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/b/d/bd8fa327-dd41-4737-8f19-2cf5eb1f7cdd.jpg?1783939332",
+    "power": null,
+    "toughness": null,
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Chris Rahn"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "2522a9dd-bcf3-4b84-abff-52b9e6dbde34",
+    "name": "Bag End Banquet",
+    "mana_cost": "{6}",
+    "cmc": 6.0,
+    "type_line": "Artifact",
+    "oracle_text": "When this artifact enters, create three Food tokens.\n{T}: Add {C} for each Food you control.",
+    "colors": [],
+    "color_identity": [],
+    "keywords": [
+     "Food"
+    ],
+    "produced_mana": [
+     "C"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 21221,
+    "released_at": "2026-08-14",
+    "set": "hoc",
+    "artist": "Dmitry Burmak",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/0/2/028f284b-4b4c-44e2-8ded-bc59ec71250f.jpg?1784377206",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/028f284b-4b4c-44e2-8ded-bc59ec71250f.jpg?1784377206"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "2522a9dd-bcf3-4b84-abff-52b9e6dbde34",
+    "name": "Bag End Banquet",
+    "mana_cost": "{6}",
+    "cmc": 6.0,
+    "type_line": "Artifact",
+    "oracle_text": "When this artifact enters, create three Food tokens.\n{T}: Add {C} for each Food you control.",
+    "colors": [],
+    "color_identity": [],
+    "keywords": [
+     "Food"
+    ],
+    "produced_mana": [
+     "C"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 21221,
+    "released_at": "2026-08-14",
+    "set_code": "hoc",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/0/2/028f284b-4b4c-44e2-8ded-bc59ec71250f.jpg?1784377206",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/0/2/028f284b-4b4c-44e2-8ded-bc59ec71250f.jpg?1784377206",
+    "power": null,
+    "toughness": null,
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Dmitry Burmak"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "797c2b1c-c373-4735-b397-f561559c7c61",
+    "name": "Regal Behemoth",
+    "mana_cost": "{4}{G}{G}",
+    "cmc": 6.0,
+    "type_line": "Creature — Dinosaur",
+    "oracle_text": "Trample\nWhen this creature enters, you become the monarch.\nWhenever you tap a land for mana while you're the monarch, add an additional one mana of any color.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Trample"
+    ],
+    "produced_mana": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 2393,
+    "released_at": "2023-11-17",
+    "set": "lcc",
+    "power": "5",
+    "toughness": "5",
+    "artist": "Jakub Kasper",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/e/3/e3a8bdfa-a39c-4ca7-b591-1c6aca4cc5ac.jpg?1783913856",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/e/3/e3a8bdfa-a39c-4ca7-b591-1c6aca4cc5ac.jpg?1783913856"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "797c2b1c-c373-4735-b397-f561559c7c61",
+    "name": "Regal Behemoth",
+    "mana_cost": "{4}{G}{G}",
+    "cmc": 6.0,
+    "type_line": "Creature — Dinosaur",
+    "oracle_text": "Trample\nWhen this creature enters, you become the monarch.\nWhenever you tap a land for mana while you're the monarch, add an additional one mana of any color.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Trample"
+    ],
+    "produced_mana": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 2393,
+    "released_at": "2023-11-17",
+    "set_code": "lcc",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/e/3/e3a8bdfa-a39c-4ca7-b591-1c6aca4cc5ac.jpg?1783913856",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/e/3/e3a8bdfa-a39c-4ca7-b591-1c6aca4cc5ac.jpg?1783913856",
+    "power": "5",
+    "toughness": "5",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Jakub Kasper"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "8c52bd39-0586-48ca-b263-17210cf9feb6",
+    "name": "Craterhoof Behemoth",
+    "mana_cost": "{5}{G}{G}{G}",
+    "cmc": 8.0,
+    "type_line": "Creature — Beast",
+    "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Haste"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 315,
+    "released_at": "2025-04-11",
+    "set": "tdm",
+    "power": "5",
+    "toughness": "5",
+    "artist": "Magali Villeneuve",
+    "flavor_text": "\"Some days, you wish you were fighting a dragon.\"\n—Eshki Dragonclaw",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "8c52bd39-0586-48ca-b263-17210cf9feb6",
+    "name": "Craterhoof Behemoth",
+    "mana_cost": "{5}{G}{G}{G}",
+    "cmc": 8.0,
+    "type_line": "Creature — Beast",
+    "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Haste"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 315,
+    "released_at": "2025-04-11",
+    "set_code": "tdm",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+    "power": "5",
+    "toughness": "5",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": "\"Some days, you wish you were fighting a dragon.\"\n—Eshki Dragonclaw",
+    "artist": "Magali Villeneuve"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "17975a20-2c13-4325-be1e-0bcda5063a2d",
+    "name": "Terastodon",
+    "mana_cost": "{6}{G}{G}",
+    "cmc": 8.0,
+    "type_line": "Creature — Elephant",
+    "oracle_text": "When this creature enters, you may destroy up to three target noncreature permanents. For each permanent put into a graveyard this way, its controller creates a 3/3 green Elephant creature token.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 1375,
+    "released_at": "2021-04-23",
+    "set": "c21",
+    "power": "9",
+    "toughness": "9",
+    "artist": "Lars Grant-West",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/6/3/63195796-197e-47ec-85f0-d4ec0065f6e6.jpg?1783927528",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/6/3/63195796-197e-47ec-85f0-d4ec0065f6e6.jpg?1783927528"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "17975a20-2c13-4325-be1e-0bcda5063a2d",
+    "name": "Terastodon",
+    "mana_cost": "{6}{G}{G}",
+    "cmc": 8.0,
+    "type_line": "Creature — Elephant",
+    "oracle_text": "When this creature enters, you may destroy up to three target noncreature permanents. For each permanent put into a graveyard this way, its controller creates a 3/3 green Elephant creature token.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 1375,
+    "released_at": "2021-04-23",
+    "set_code": "c21",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/6/3/63195796-197e-47ec-85f0-d4ec0065f6e6.jpg?1783927528",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/6/3/63195796-197e-47ec-85f0-d4ec0065f6e6.jpg?1783927528",
+    "power": "9",
+    "toughness": "9",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Lars Grant-West"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "2f70f1bb-29fa-4abb-afc2-653acd0a08b9",
+    "name": "Woodfall Primus",
+    "mana_cost": "{5}{G}{G}{G}",
+    "cmc": 8.0,
+    "type_line": "Creature — Treefolk Shaman",
+    "oracle_text": "Trample\nWhen this creature enters, destroy target noncreature permanent.\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Persist",
+     "Trample"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 3942,
+    "released_at": "2022-04-29",
+    "set": "ncc",
+    "power": "6",
+    "toughness": "6",
+    "artist": "Adam Rex",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "2f70f1bb-29fa-4abb-afc2-653acd0a08b9",
+    "name": "Woodfall Primus",
+    "mana_cost": "{5}{G}{G}{G}",
+    "cmc": 8.0,
+    "type_line": "Creature — Treefolk Shaman",
+    "oracle_text": "Trample\nWhen this creature enters, destroy target noncreature permanent.\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Persist",
+     "Trample"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 3942,
+    "released_at": "2022-04-29",
+    "set_code": "ncc",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235",
+    "power": "6",
+    "toughness": "6",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Adam Rex"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "dbf0ad03-ab31-49d2-89b1-05b45948a61f",
+    "name": "Vorinclex, Voice of Hunger",
+    "mana_cost": "{6}{G}{G}",
+    "cmc": 8.0,
+    "type_line": "Legendary Creature — Phyrexian Praetor",
+    "oracle_text": "Trample\nWhenever you tap a land for mana, add one mana of any type that land produced.\nWhenever an opponent taps a land for mana, that land doesn't untap during its controller's next untap step.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Trample"
+    ],
+    "produced_mana": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "reserved": false,
+    "edhrec_rank": 1790,
+    "released_at": "2017-11-17",
+    "set": "ima",
+    "power": "7",
+    "toughness": "6",
+    "artist": "Karl Kopinski",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/9/f/9fe3af8c-109d-486c-aa34-3f023abda5b7.jpg?1783935514",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9fe3af8c-109d-486c-aa34-3f023abda5b7.jpg?1783935514"
+    }
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "dbf0ad03-ab31-49d2-89b1-05b45948a61f",
+    "name": "Vorinclex, Voice of Hunger",
+    "mana_cost": "{6}{G}{G}",
+    "cmc": 8.0,
+    "type_line": "Legendary Creature — Phyrexian Praetor",
+    "oracle_text": "Trample\nWhenever you tap a land for mana, add one mana of any type that land produced.\nWhenever an opponent taps a land for mana, that land doesn't untap during its controller's next untap step.",
+    "colors": [
+     "G"
+    ],
+    "color_identity": [
+     "G"
+    ],
+    "keywords": [
+     "Trample"
+    ],
+    "produced_mana": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "normal",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": 1790,
+    "released_at": "2017-11-17",
+    "set_code": "ima",
+    "scryfall_uri": null,
+    "image_normal": "https://cards.scryfall.io/normal/front/9/f/9fe3af8c-109d-486c-aa34-3f023abda5b7.jpg?1783935514",
+    "image_art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9fe3af8c-109d-486c-aa34-3f023abda5b7.jpg?1783935514",
+    "power": "7",
+    "toughness": "6",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Karl Kopinski"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "id-etali",
+    "name": "Etali, Primal Conqueror // Etali, Primal Sickness",
+    "cmc": 7,
+    "type_line": "Legendary Creature — Elder Dinosaur // Legendary Creature — Phyrexian Elder Dinosaur",
+    "colors": [
+     "R"
+    ],
+    "color_identity": [
+     "G",
+     "R"
+    ],
+    "keywords": [
+     "Indestructible",
+     "Transform",
+     "Trample"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "transform",
+    "reserved": false,
+    "edhrec_rank": 790,
+    "released_at": "2023-04-21",
+    "set": "one",
+    "game_changer": false,
+    "card_faces": [
+     {
+      "name": "Etali, Primal Conqueror",
+      "mana_cost": "{5}{R}{R}",
+      "type_line": "Legendary Creature — Elder Dinosaur",
+      "oracle_text": "When this creature enters, each player exiles cards from the top of their library.",
+      "power": "7",
+      "toughness": "7",
+      "artist": "Ryan Pancoast",
+      "image_uris": {
+       "normal": "https://img/etali.jpg",
+       "art_crop": "https://img/etali-art.jpg"
+      }
+     },
+     {
+      "name": "Etali, Primal Sickness",
+      "mana_cost": "",
+      "type_line": "Legendary Creature — Phyrexian Elder Dinosaur",
+      "oracle_text": "Toxic 10. Trample.",
+      "power": "11",
+      "toughness": "11",
+      "artist": "Ryan Pancoast",
+      "flavor_text": "The contagion spreads and the Multiverse quakes."
+     }
+    ]
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "id-etali",
+    "name": "Etali, Primal Conqueror // Etali, Primal Sickness",
+    "mana_cost": "{5}{R}{R}",
+    "cmc": 7,
+    "type_line": "Legendary Creature — Elder Dinosaur // Legendary Creature — Phyrexian Elder Dinosaur",
+    "oracle_text": null,
+    "colors": [
+     "R"
+    ],
+    "color_identity": [
+     "G",
+     "R"
+    ],
+    "keywords": [
+     "Indestructible",
+     "Transform",
+     "Trample"
+    ],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "legal"
+    },
+    "layout": "transform",
+    "card_faces": [
+     {
+      "name": "Etali, Primal Conqueror",
+      "mana_cost": "{5}{R}{R}",
+      "type_line": "Legendary Creature — Elder Dinosaur",
+      "oracle_text": "When this creature enters, each player exiles cards from the top of their library.",
+      "power": "7",
+      "toughness": "7",
+      "artist": "Ryan Pancoast",
+      "image_uris": {
+       "normal": "https://img/etali.jpg",
+       "art_crop": "https://img/etali-art.jpg"
+      }
+     },
+     {
+      "name": "Etali, Primal Sickness",
+      "mana_cost": "",
+      "type_line": "Legendary Creature — Phyrexian Elder Dinosaur",
+      "oracle_text": "Toxic 10. Trample.",
+      "power": "11",
+      "toughness": "11",
+      "artist": "Ryan Pancoast",
+      "flavor_text": "The contagion spreads and the Multiverse quakes."
+     }
+    ],
+    "reserved": false,
+    "edhrec_rank": 790,
+    "released_at": "2023-04-21",
+    "set_code": "one",
+    "scryfall_uri": null,
+    "image_normal": "https://img/etali.jpg",
+    "image_art_crop": "https://img/etali-art.jpg",
+    "power": "7",
+    "toughness": "7",
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": "Ryan Pancoast"
+   }
+  },
+  {
+   "raw": {
+    "oracle_id": "28ca9176-6d8a-41fa-8be5-4b12fc73f1a2",
+    "name": "Ajani Steadfast Emblem",
+    "mana_cost": "",
+    "cmc": 0.0,
+    "type_line": "Emblem — Ajani",
+    "oracle_text": "If a source would deal damage to you or a planeswalker you control, prevent all but 1 of that damage.",
+    "colors": [],
+    "color_identity": [],
+    "keywords": [],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "not_legal"
+    },
+    "layout": "emblem",
+    "reserved": false,
+    "edhrec_rank": null,
+    "released_at": "2023-08-04",
+    "set": "tcmm"
+   },
+   "skip": false,
+   "row": {
+    "oracle_id": "28ca9176-6d8a-41fa-8be5-4b12fc73f1a2",
+    "name": "Ajani Steadfast Emblem",
+    "mana_cost": "",
+    "cmc": 0.0,
+    "type_line": "Emblem — Ajani",
+    "oracle_text": "If a source would deal damage to you or a planeswalker you control, prevent all but 1 of that damage.",
+    "colors": [],
+    "color_identity": [],
+    "keywords": [],
+    "produced_mana": [],
+    "legalities": {
+     "commander": "not_legal"
+    },
+    "layout": "emblem",
+    "card_faces": [],
+    "reserved": false,
+    "edhrec_rank": null,
+    "released_at": "2023-08-04",
+    "set_code": "tcmm",
+    "scryfall_uri": null,
+    "image_normal": null,
+    "image_art_crop": null,
+    "power": null,
+    "toughness": null,
+    "loyalty": null,
+    "defense": null,
+    "game_changer": false,
+    "flavor_text": null,
+    "artist": null
+   }
+  }
+ ],
+ "printings": [
+  {
+   "raw": {
+    "id": "5805f64c-dd88-4e94-8f0a-a01dae67e3ba",
+    "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+    "name": "Sol Ring",
+    "set": "ltc",
+    "set_name": "Tales of Middle-earth Commander",
+    "collector_number": "284",
+    "rarity": "uncommon",
+    "released_at": "2023-06-23",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil"
+    ],
+    "artist": "L J Koh",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/5/8/5805f64c-dd88-4e94-8f0a-a01dae67e3ba.jpg?1783915895"
+    },
+    "prices": {
+     "usd": "2.51",
+     "usd_foil": null,
+     "eur": "1.77"
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "5805f64c-dd88-4e94-8f0a-a01dae67e3ba",
+    "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+    "name": "Sol Ring",
+    "set_code": "ltc",
+    "set_name": "Tales of Middle-earth Commander",
+    "collector_number": "284",
+    "rarity": "uncommon",
+    "released_at": "2023-06-23",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/5/8/5805f64c-dd88-4e94-8f0a-a01dae67e3ba.jpg?1783915895",
+    "price_usd": 2.51,
+    "price_usd_foil": null,
+    "price_eur": 1.77,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "L J Koh"
+   }
+  },
+  {
+   "raw": {
+    "id": "c4300d24-1cae-4dd5-be7e-38cc677cf5bd",
+    "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+    "name": "Sol Ring",
+    "set": "lea",
+    "set_name": "Limited Edition Alpha",
+    "collector_number": "269",
+    "rarity": "uncommon",
+    "released_at": "1993-08-05",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil"
+    ],
+    "artist": "Mark Tedin",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/c/4/c4300d24-1cae-4dd5-be7e-38cc677cf5bd.jpg?1783948661"
+    },
+    "prices": {
+     "usd": null,
+     "usd_foil": null,
+     "eur": "1126.22"
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "c4300d24-1cae-4dd5-be7e-38cc677cf5bd",
+    "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+    "name": "Sol Ring",
+    "set_code": "lea",
+    "set_name": "Limited Edition Alpha",
+    "collector_number": "269",
+    "rarity": "uncommon",
+    "released_at": "1993-08-05",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/c/4/c4300d24-1cae-4dd5-be7e-38cc677cf5bd.jpg?1783948661",
+    "price_usd": null,
+    "price_usd_foil": null,
+    "price_eur": 1126.22,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "Mark Tedin"
+   }
+  },
+  {
+   "raw": {
+    "id": "95c14c4d-6c16-4826-8d93-d89ad04aee09",
+    "oracle_id": "7514e401-7aa1-405d-9f7a-312b4e630cc2",
+    "name": "Etali, Primal Conqueror // Etali, Primal Sickness",
+    "set": "mom",
+    "set_name": "March of the Machine",
+    "collector_number": "137",
+    "rarity": "rare",
+    "released_at": "2023-04-21",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "artist": "Ryan Pancoast",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/9/5/95c14c4d-6c16-4826-8d93-d89ad04aee09.jpg?1783916997"
+    },
+    "prices": {
+     "usd": "32.74",
+     "usd_foil": "37.64",
+     "eur": "20.92"
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "95c14c4d-6c16-4826-8d93-d89ad04aee09",
+    "oracle_id": "7514e401-7aa1-405d-9f7a-312b4e630cc2",
+    "name": "Etali, Primal Conqueror // Etali, Primal Sickness",
+    "set_code": "mom",
+    "set_name": "March of the Machine",
+    "collector_number": "137",
+    "rarity": "rare",
+    "released_at": "2023-04-21",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/9/5/95c14c4d-6c16-4826-8d93-d89ad04aee09.jpg?1783916997",
+    "price_usd": 32.74,
+    "price_usd_foil": 37.64,
+    "price_eur": 20.92,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "Ryan Pancoast"
+   }
+  },
+  {
+   "raw": {
+    "id": "0d16e8e0-31b2-4389-afd6-783c501f6fa0",
+    "oracle_id": "2588f348-d7a3-46c8-9ace-dca53ed5ef99",
+    "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+    "set": "mh3",
+    "set_name": "Modern Horizons 3",
+    "collector_number": "237",
+    "rarity": "mythic",
+    "released_at": "2024-06-14",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "artist": "Chris Rallis",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238"
+    },
+    "prices": {
+     "usd": "10.38",
+     "usd_foil": "10.8",
+     "eur": "10.76"
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "0d16e8e0-31b2-4389-afd6-783c501f6fa0",
+    "oracle_id": "2588f348-d7a3-46c8-9ace-dca53ed5ef99",
+    "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+    "set_code": "mh3",
+    "set_name": "Modern Horizons 3",
+    "collector_number": "237",
+    "rarity": "mythic",
+    "released_at": "2024-06-14",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+    "price_usd": 10.38,
+    "price_usd_foil": 10.8,
+    "price_eur": 10.76,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "Chris Rallis"
+   }
+  },
+  {
+   "raw": {
+    "id": "fd6ddbca-b943-49d6-b341-509bb72dd5a6",
+    "oracle_id": "ae83ef2c-960f-4c5b-97cc-52465c687c18",
+    "name": "Primeval Titan",
+    "set": "m12",
+    "set_name": "Magic 2012",
+    "collector_number": "188",
+    "rarity": "mythic",
+    "released_at": "2011-07-15",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "artist": "Aleksi Briclot",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/f/d/fd6ddbca-b943-49d6-b341-509bb72dd5a6.jpg?1783941057"
+    },
+    "prices": {
+     "usd": "8.71",
+     "usd_foil": "28.54",
+     "eur": "4.68"
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "fd6ddbca-b943-49d6-b341-509bb72dd5a6",
+    "oracle_id": "ae83ef2c-960f-4c5b-97cc-52465c687c18",
+    "name": "Primeval Titan",
+    "set_code": "m12",
+    "set_name": "Magic 2012",
+    "collector_number": "188",
+    "rarity": "mythic",
+    "released_at": "2011-07-15",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/f/d/fd6ddbca-b943-49d6-b341-509bb72dd5a6.jpg?1783941057",
+    "price_usd": 8.71,
+    "price_usd_foil": 28.54,
+    "price_eur": 4.68,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "Aleksi Briclot"
+   }
+  },
+  {
+   "raw": {
+    "id": "080a5356-61d9-46cf-9095-d59c048f9d77",
+    "oracle_id": "befb211f-37ca-4083-98d4-9ff1f28be3f2",
+    "name": "Goreclaw, Terror of Qal Sisma",
+    "set": "mul",
+    "set_name": "Multiverse Legends",
+    "collector_number": "157",
+    "rarity": "rare",
+    "released_at": "2023-04-21",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "foil"
+    ],
+    "artist": "Domenico Cava",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/0/8/080a5356-61d9-46cf-9095-d59c048f9d77.jpg?1783916808"
+    },
+    "prices": {
+     "usd": null,
+     "usd_foil": "19.75",
+     "eur": null
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "080a5356-61d9-46cf-9095-d59c048f9d77",
+    "oracle_id": "befb211f-37ca-4083-98d4-9ff1f28be3f2",
+    "name": "Goreclaw, Terror of Qal Sisma",
+    "set_code": "mul",
+    "set_name": "Multiverse Legends",
+    "collector_number": "157",
+    "rarity": "rare",
+    "released_at": "2023-04-21",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "foil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/0/8/080a5356-61d9-46cf-9095-d59c048f9d77.jpg?1783916808",
+    "price_usd": null,
+    "price_usd_foil": 19.75,
+    "price_eur": null,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "Domenico Cava"
+   }
+  },
+  {
+   "raw": {
+    "id": "f4d18240-d843-4573-b490-5ee72ceb4c1e",
+    "oracle_id": "befb211f-37ca-4083-98d4-9ff1f28be3f2",
+    "name": "Goreclaw, Terror of Qal Sisma",
+    "set": "mul",
+    "set_name": "Multiverse Legends",
+    "collector_number": "157z",
+    "rarity": "rare",
+    "released_at": "2023-04-21",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "foil"
+    ],
+    "artist": "Domenico Cava",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/f/4/f4d18240-d843-4573-b490-5ee72ceb4c1e.jpg?1783916806"
+    },
+    "prices": {
+     "usd": null,
+     "usd_foil": "499.95",
+     "eur": null
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "f4d18240-d843-4573-b490-5ee72ceb4c1e",
+    "oracle_id": "befb211f-37ca-4083-98d4-9ff1f28be3f2",
+    "name": "Goreclaw, Terror of Qal Sisma",
+    "set_code": "mul",
+    "set_name": "Multiverse Legends",
+    "collector_number": "157z",
+    "rarity": "rare",
+    "released_at": "2023-04-21",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "foil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/f/4/f4d18240-d843-4573-b490-5ee72ceb4c1e.jpg?1783916806",
+    "price_usd": null,
+    "price_usd_foil": 499.95,
+    "price_eur": null,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "Domenico Cava"
+   }
+  },
+  {
+   "raw": {
+    "id": "5dd7dd1a-6dd1-43c3-8298-7db703d384a1",
+    "oracle_id": "0f1b5cea-2035-444c-9f63-87dcb9782c74",
+    "name": "Gyome, Master Chef",
+    "set": "c21",
+    "set_name": "Commander 2021",
+    "collector_number": "5",
+    "rarity": "mythic",
+    "released_at": "2021-04-23",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "foil"
+    ],
+    "artist": "Steve Prescott",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/5/d/5dd7dd1a-6dd1-43c3-8298-7db703d384a1.jpg?1783927614"
+    },
+    "prices": {
+     "usd": null,
+     "usd_foil": "5.64",
+     "eur": null
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "5dd7dd1a-6dd1-43c3-8298-7db703d384a1",
+    "oracle_id": "0f1b5cea-2035-444c-9f63-87dcb9782c74",
+    "name": "Gyome, Master Chef",
+    "set_code": "c21",
+    "set_name": "Commander 2021",
+    "collector_number": "5",
+    "rarity": "mythic",
+    "released_at": "2021-04-23",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "foil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/5/d/5dd7dd1a-6dd1-43c3-8298-7db703d384a1.jpg?1783927614",
+    "price_usd": null,
+    "price_usd_foil": 5.64,
+    "price_eur": null,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "Steve Prescott"
+   }
+  },
+  {
+   "raw": {
+    "id": "67600383-bbb8-411c-b8e6-2296650bc747",
+    "oracle_id": "900ca697-ad38-4b2b-bc74-2ff7eb6ea951",
+    "name": "Emrakul, the Aeons Torn",
+    "set": "roe",
+    "set_name": "Rise of the Eldrazi",
+    "collector_number": "4",
+    "rarity": "mythic",
+    "released_at": "2010-04-23",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "artist": "Mark Tedin",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/6/7/67600383-bbb8-411c-b8e6-2296650bc747.jpg?1783942013"
+    },
+    "prices": {
+     "usd": "27.93",
+     "usd_foil": "194.7",
+     "eur": "24.0"
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "67600383-bbb8-411c-b8e6-2296650bc747",
+    "oracle_id": "900ca697-ad38-4b2b-bc74-2ff7eb6ea951",
+    "name": "Emrakul, the Aeons Torn",
+    "set_code": "roe",
+    "set_name": "Rise of the Eldrazi",
+    "collector_number": "4",
+    "rarity": "mythic",
+    "released_at": "2010-04-23",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/6/7/67600383-bbb8-411c-b8e6-2296650bc747.jpg?1783942013",
+    "price_usd": 27.93,
+    "price_usd_foil": 194.7,
+    "price_eur": 24.0,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "Mark Tedin"
+   }
+  },
+  {
+   "raw": {
+    "id": "c34d66f5-e782-425c-9260-e8989a9cf50b",
+    "oracle_id": "8c52bd39-0586-48ca-b263-17210cf9feb6",
+    "name": "Craterhoof Behemoth",
+    "set": "mm3",
+    "set_name": "Modern Masters 2017",
+    "collector_number": "122",
+    "rarity": "mythic",
+    "released_at": "2017-03-17",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "artist": "Chris Rahn",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/c/3/c34d66f5-e782-425c-9260-e8989a9cf50b.jpg?1783936635"
+    },
+    "prices": {
+     "usd": "24.38",
+     "usd_foil": "20.41",
+     "eur": "16.57"
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "c34d66f5-e782-425c-9260-e8989a9cf50b",
+    "oracle_id": "8c52bd39-0586-48ca-b263-17210cf9feb6",
+    "name": "Craterhoof Behemoth",
+    "set_code": "mm3",
+    "set_name": "Modern Masters 2017",
+    "collector_number": "122",
+    "rarity": "mythic",
+    "released_at": "2017-03-17",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/c/3/c34d66f5-e782-425c-9260-e8989a9cf50b.jpg?1783936635",
+    "price_usd": 24.38,
+    "price_usd_foil": 20.41,
+    "price_eur": 16.57,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "Chris Rahn"
+   }
+  },
+  {
+   "raw": {
+    "id": "b0faa7f2-b547-42c4-a810-839da50dadfe",
+    "oracle_id": "5089ec1a-f881-4d55-af14-5d996171203b",
+    "name": "Black Lotus",
+    "set": "lea",
+    "set_name": "Limited Edition Alpha",
+    "collector_number": "232",
+    "rarity": "rare",
+    "released_at": "1993-08-05",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil"
+    ],
+    "artist": "Christopher Rush",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/b/0/b0faa7f2-b547-42c4-a810-839da50dadfe.jpg?1783948669"
+    },
+    "prices": {
+     "usd": null,
+     "usd_foil": null,
+     "eur": "38719.86"
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "b0faa7f2-b547-42c4-a810-839da50dadfe",
+    "oracle_id": "5089ec1a-f881-4d55-af14-5d996171203b",
+    "name": "Black Lotus",
+    "set_code": "lea",
+    "set_name": "Limited Edition Alpha",
+    "collector_number": "232",
+    "rarity": "rare",
+    "released_at": "1993-08-05",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/b/0/b0faa7f2-b547-42c4-a810-839da50dadfe.jpg?1783948669",
+    "price_usd": null,
+    "price_usd_foil": null,
+    "price_eur": 38719.86,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "Christopher Rush"
+   }
+  },
+  {
+   "raw": {
+    "id": "6f1c8cb0-38eb-408b-94e8-16db83999b3b",
+    "oracle_id": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
+    "name": "Forest",
+    "set": "lea",
+    "set_name": "Limited Edition Alpha",
+    "collector_number": "294",
+    "rarity": "common",
+    "released_at": "1993-08-05",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil"
+    ],
+    "artist": "Christopher Rush",
+    "image_uris": {
+     "normal": "https://cards.scryfall.io/normal/front/6/f/6f1c8cb0-38eb-408b-94e8-16db83999b3b.jpg?1783948656"
+    },
+    "prices": {
+     "usd": "32.25",
+     "usd_foil": null,
+     "eur": "30.83"
+    }
+   },
+   "skip": false,
+   "row": {
+    "id": "6f1c8cb0-38eb-408b-94e8-16db83999b3b",
+    "oracle_id": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
+    "name": "Forest",
+    "set_code": "lea",
+    "set_name": "Limited Edition Alpha",
+    "collector_number": "294",
+    "rarity": "common",
+    "released_at": "1993-08-05",
+    "digital": false,
+    "promo": false,
+    "finishes": [
+     "nonfoil"
+    ],
+    "image_normal": "https://cards.scryfall.io/normal/front/6/f/6f1c8cb0-38eb-408b-94e8-16db83999b3b.jpg?1783948656",
+    "price_usd": 32.25,
+    "price_usd_foil": null,
+    "price_eur": 30.83,
+    "tcg_product_id": null,
+    "flavor_text": null,
+    "artist": "Christopher Rush"
+   }
+  }
+ ]
+}

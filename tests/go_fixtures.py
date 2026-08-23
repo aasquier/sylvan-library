@@ -115,6 +115,9 @@ TINY_POOL_PATH = POOL_DIR / "pooltest" / "testdata" / "tiny_pool.json"
 #: as the marshalled payload text, because a spin is a promise -- a seed
 #: somebody replays after the cutover must deal the same fate, face and card.
 WHEEL_PATH = ROOT / "go" / "internal" / "wheel" / "testdata" / "spins.json"
+#: The refresh's row builders (Phase 8): raw Scryfall dicts beside Python's
+#: rows, for the Appender-based loader.
+REFRESH_PATH = POOL_DIR / "testdata" / "refresh.json"
 #: The price table and its estimates (Phase 8), for the admin dashboard's
 #: dollar figure.
 PRICES_PATH = ROOT / "go" / "internal" / "prices" / "testdata" / "prices.json"
@@ -287,6 +290,51 @@ def wheel_cases() -> dict[str, object]:
 
 def render_wheel_cases() -> str:
     return json.dumps(wheel_cases(), indent=1, ensure_ascii=False) + "\n"
+
+
+# ------------------------------------------------------------- the refresh
+#
+# `cards/db.py`'s row builders (Phase 8): every raw card and printing in
+# `tiny_pool`, beside the row `_oracle_row` / `_printing_row` makes of it,
+# and the skip verdicts. The two JSON-text columns (`legalities`,
+# `card_faces`) are compared PARSED on the Go side -- Python stores
+# `json.dumps` (ASCII-escaped), Go stores its own marshalling, and nothing
+# reads those columns except a JSON parse -- so the corpus records them as
+# objects rather than as either runtime's text.
+
+
+def refresh_cases() -> dict[str, object]:
+    import tiny_pool
+    from mtglab.cards import db
+
+    def rowify(row: tuple, columns: tuple, parse: set[str]) -> dict[str, object]:
+        out: dict[str, object] = {}
+        for name, value in zip(columns, row, strict=True):
+            out[name] = json.loads(value) if name in parse and value is not None \
+                else value
+        return out
+
+    oracle = []
+    for c in tiny_pool.CARDS:
+        oracle.append({
+            "raw": c,
+            "skip": c.get("layout") in {"art_series", "token",
+                                        "double_faced_token"},
+            "row": rowify(db._oracle_row(c), db._ORACLE_COLUMNS,
+                          {"legalities", "card_faces"}),
+        })
+    printings = []
+    for p in tiny_pool.PRINTINGS:
+        printings.append({
+            "raw": p,
+            "skip": bool(p.get("digital")),
+            "row": rowify(db._printing_row(p), db._PRINTING_COLUMNS, set()),
+        })
+    return {"oracle": oracle, "printings": printings}
+
+
+def render_refresh_cases() -> str:
+    return json.dumps(refresh_cases(), indent=1, ensure_ascii=False) + "\n"
 
 
 # ------------------------------------------------------------ the price table
@@ -4671,6 +4719,9 @@ def write() -> None:
     SETS_PATH.parent.mkdir(parents=True, exist_ok=True)
     SETS_PATH.write_text(render_sets_cases(), encoding="utf-8")
     print(f"wrote {SETS_PATH}")
+    REFRESH_PATH.parent.mkdir(parents=True, exist_ok=True)
+    REFRESH_PATH.write_text(render_refresh_cases(), encoding="utf-8")
+    print(f"wrote {REFRESH_PATH}")
     PRICES_PATH.parent.mkdir(parents=True, exist_ok=True)
     PRICES_PATH.write_text(render_prices_cases(), encoding="utf-8")
     print(f"wrote {PRICES_PATH}")
