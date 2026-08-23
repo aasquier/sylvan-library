@@ -237,13 +237,13 @@ func TestRecordNeverFailsTheEdit(t *testing.T) {
 	live.Record(context.Background(), "goreclaw", nil, "", Edit{Kind: EditAdd, Card: "X"})
 }
 
-// TestTheRecorderDoesNotCreateTheDatabase pins the coexistence rule: Python
-// owns the schema ladder until Phase 8, so a Go-created `app.db` would be a
-// database at version zero with no tables in it.
+// TestTheRecorderDoesNotCreateTheDatabase pins the one-creator rule: the
+// ladder (`auth.Migrate`) runs at boot, so an `app.db` minted here would be
+// a database at version zero with no tables in it.
 func TestTheRecorderDoesNotCreateTheDatabase(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.db")
 	if _, err := NewRecorder(path, nil); err == nil {
-		t.Fatal("NewRecorder created app.db; the ladder is Python's until Phase 8")
+		t.Fatal("NewRecorder created app.db; only the boot ladder may make the file")
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("NewRecorder left a file at %s", path)

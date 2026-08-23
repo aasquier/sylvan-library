@@ -16,6 +16,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/door"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -81,6 +82,14 @@ func serve(host, port, upstream, webDist, tarot string, child []string) error {
 	if err != nil || up.Scheme == "" || up.Host == "" {
 		return fmt.Errorf("--upstream must be a URL like http://127.0.0.1:8765, got %q", upstream)
 	}
+	// The schema ladder, before anything opens the file: creating `app.db`
+	// and bringing it to `auth.SchemaVersion` is this command's job since
+	// Phase 8, and a ladder that cannot be applied is a refusal to serve,
+	// not a warning — a request answered over a half-migrated file is worse
+	// than no answer.
+	if err := auth.Migrate(config.AppDBPath()); err != nil {
+		return err
+	}
 	requireAuth := config.RequireAuth()
 	d, err := door.New(door.Config{
 		RequireAuth:   requireAuth,
@@ -123,10 +132,10 @@ func serve(host, port, upstream, webDist, tarot string, child []string) error {
 			return err
 		}
 	}
-	// The app.db check comes after the child starts, because on a fresh
-	// instance Python is what creates the file; it is advisory -- the door
-	// answers anonymous until the file is there -- and logged rather than
-	// fatal for the same reason.
+	// Advisory only: `auth.Migrate` above created the file and the schema,
+	// so a failure here is a genuinely unreadable database rather than a
+	// fresh instance -- and the door still answers anonymous, which is the
+	// degraded state a maintainer can sign in past once the disk is fixed.
 	if err := d.Check(context.Background()); err != nil && requireAuth {
 		log.Warn("app.db is not readable yet; every session is anonymous until it is", "error", err)
 	}

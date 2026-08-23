@@ -58,9 +58,9 @@
 // **It does not cache an unseeded run.** Callers guard on that rather than
 // this module doing it silently.
 //
-// **It writes no schema.** `app.db` is opened `mode=rw`, never `rwc`: Python
-// owns the migration ladder until Phase 8, and a file this created would be a
-// database at version zero.
+// **It writes no schema.** `app.db` is opened `mode=rw`, never `rwc`: the
+// ladder runs once at boot (`auth.Migrate`), and a file this created would be
+// a database at version zero.
 //
 // [ADR 18]: docs/adr/0018-a-cached-simulation-is-keyed-on-its-compiled-input.md
 package cache

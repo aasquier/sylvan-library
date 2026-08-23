@@ -781,9 +781,10 @@ def render_app_schema() -> str:
             " ORDER BY type DESC, name").fetchall()
     lines = [
         "-- app.db, as `auth/db.py`'s migration ladder leaves it at schema",
-        f"-- version {version}. Written by `python tests/go_fixtures.py`; Python",
-        "-- owns the ladder until Phase 8 and this is a reading of what it made,",
-        "-- for the Go tests that need a real table in CI. Do not hand-edit.",
+        f"-- version {version}. Written by `python tests/go_fixtures.py`. Since",
+        "-- Phase 8 the Go ladder (go/internal/auth/schema.go) owns the deployed",
+        "-- file, and TestMigrateBuildsWhatPythonBuilt holds it to these bytes --",
+        "-- the lockstep between the two ladders. Do not hand-edit.",
         f"PRAGMA user_version = {version};",
     ]
     for row in rows:

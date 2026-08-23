@@ -36,11 +36,10 @@ type Store struct {
 
 // Open attaches to `app.db` for the simulation cache.
 //
-// **`mode=rw`, never `rwc`.** Python owns the schema ladder until Phase 8, and
-// a file this created would be a database at version zero that Python would
-// then have to migrate -- or worse, one Go had filled in from a second copy of
-// the schema. An absent `app.db` is an error here and a caller that treats it
-// as "no cache" gets exactly that by holding a nil `*Store`.
+// **`mode=rw`, never `rwc`.** The ladder (`auth.Migrate`) runs once at boot
+// and is the only creator; a file this created would be a database at version
+// zero beside the real one. An absent `app.db` is an error here and a caller
+// that treats it as "no cache" gets exactly that by holding a nil `*Store`.
 //
 // Failing at Open rather than at the first lookup is deliberate: a cache that
 // discovers its own absence on the hot path discovers it in a worker thread,

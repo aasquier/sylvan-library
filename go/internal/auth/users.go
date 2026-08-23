@@ -208,9 +208,8 @@ func (u *User) AsDict(includeEmail bool) map[string]any {
 // userColumns is what every read selects. Python uses `SELECT *` and probes
 // the cursor for `model_tier`, so that a row assembled from a pre-v10 schema
 // still builds a User. Here the columns are named, which is the same tolerance
-// arrived at from the other side: the door refuses to start against a database
-// it cannot read, and Python owns the ladder, so a missing column is a
-// deployment fault to fail loudly on rather than one to paper over.
+// arrived at from the other side: the ladder runs at boot, so a missing column
+// is a deployment fault to fail loudly on rather than one to paper over.
 const userColumns = "id, username, email, is_admin, disabled_at, created_at, model_tier"
 
 type scanner interface {

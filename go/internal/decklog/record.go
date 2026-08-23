@@ -30,14 +30,13 @@ import (
 //
 // One difference from Python, and it is deliberate. Python's `record` will
 // **create** `app.db` if it is missing, because on a laptop with auth off an
-// edit is the first thing that ever touches it. This does not: the schema
-// ladder is Python's until Phase 8 (PLAN section 10), and a Go-created
-// database would be a second implementation of it. So the handle is opened
-// read-write and never read-write-create, and an absent database is a warned,
-// dropped entry rather than a new file. The gap is one case -- a laptop with
-// auth off whose `app.db` has never been created by anything else -- and it
-// closes at Phase 8 when Go owns the ladder. The deployed instance always has
-// one, since `ensure_maintainer` runs at every boot.
+// edit is the first thing that ever touches it. This does not: the ladder
+// (`auth.Migrate`) runs once at the serving command's boot and is the only
+// creator, so by the time an edit reaches this handle the file exists — a
+// missing one means the process was assembled without the ladder, which is
+// exactly the loud, warned drop this stays. The Phase 4 gap this note used
+// to record (a laptop whose `app.db` nothing had ever created) closed when
+// the boot migration landed.
 
 // Recorder writes entries. It is a struct rather than a bare function because
 // the read-write handle is opened once and shared, and because a nil Recorder

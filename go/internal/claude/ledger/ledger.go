@@ -15,9 +15,9 @@
 //   - **Record never fails the conversation that produced it.** Accounting
 //     that can fail a paid, four-minute dossier run is worse than no
 //     accounting. A failed write is a logged warning and nothing else.
-//   - **app.db is opened `mode=rw`, never `rwc`.** Python owns the schema
-//     ladder until Phase 8, so a missing file is a loud failure at startup
-//     rather than a silently-created empty database this runtime then writes
+//   - **app.db is opened `mode=rw`, never `rwc`.** The ladder runs once at
+//     boot (`auth.Migrate`), so a missing file is a loud failure at startup
+//     rather than a silently-created empty database this handle then writes
 //     into.
 //   - **Aggregate on purpose.** A row is counters, a mode name, a model id
 //     and a stop reason. No user id, no deck slug, no question text — it
@@ -46,9 +46,9 @@ type Recorder struct {
 
 // NewRecorder opens app.db for writing.
 //
-// `mode=rw` and not `rwc`, for the reason the package comment gives: Python
-// owns the ladder, so a missing app.db is a broken deployment and must say so
-// here rather than at the first roll-up somebody reads.
+// `mode=rw` and not `rwc`, for the reason the package comment gives: the
+// ladder runs at boot, so a missing app.db is a broken deployment and must
+// say so here rather than at the first roll-up somebody reads.
 func NewRecorder(path string, logger *slog.Logger) (*Recorder, error) {
 	db, err := auth.OpenReadWrite(path)
 	if err != nil {

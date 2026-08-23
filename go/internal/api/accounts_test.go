@@ -866,6 +866,6 @@ func TestWithNoDatabaseTheAnswersAreTheEmptyOnes(t *testing.T) {
 	}
 	a.WaitBackground()
 	if _, err := os.Stat(path); err == nil {
-		t.Fatal("a route created app.db; Python owns the ladder until Phase 8")
+		t.Fatal("a route created app.db; only the boot ladder may make the file")
 	}
 }

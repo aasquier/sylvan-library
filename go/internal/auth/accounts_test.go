@@ -991,6 +991,6 @@ func TestOpenReadWriteDoesNotCreateAMissingFile(t *testing.T) {
 		t.Fatal("the write handle opened a database that does not exist")
 	}
 	if _, err := os.Stat(path); err == nil {
-		t.Fatal("OpenReadWrite created app.db; Python owns the ladder until Phase 8")
+		t.Fatal("OpenReadWrite created app.db; only Migrate may make the file")
 	}
 }

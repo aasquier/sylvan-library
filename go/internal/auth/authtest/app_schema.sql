@@ -1,7 +1,8 @@
 -- app.db, as `auth/db.py`'s migration ladder leaves it at schema
--- version 12. Written by `python tests/go_fixtures.py`; Python
--- owns the ladder until Phase 8 and this is a reading of what it made,
--- for the Go tests that need a real table in CI. Do not hand-edit.
+-- version 12. Written by `python tests/go_fixtures.py`. Since
+-- Phase 8 the Go ladder (go/internal/auth/schema.go) owns the deployed
+-- file, and TestMigrateBuildsWhatPythonBuilt holds it to these bytes --
+-- the lockstep between the two ladders. Do not hand-edit.
 PRAGMA user_version = 12;
 CREATE TABLE auth_tokens (
         -- The hash of the token, for the same reason `sessions` stores one:
