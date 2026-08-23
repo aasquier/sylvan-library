@@ -133,9 +133,22 @@ Where it stands, kept here so a fresh session knows the frontier:
   choice the plan left open was made by the dependency graph rather than
   by preference: five of the eight job-submitting families need `claude/`
   and one needs `sim/tier3`, so "all eight at once" was never reachable.
-  **Next: Phase 6, the Claude surfaces** -- the pipe, the stance, the
-  personas, seven modes, the tarot table's server half, and then five of
-  those six remaining job families.
+  **Then Phase 6, the Claude surfaces**, and most of it has landed
+  (2026-08-22 to 2026-08-23): the stance and the personas, the tarot
+  table's server half, the pipe (`converse`, its two cache breakpoints
+  and its container ride-along), all seven mode definitions as generated
+  data, the seven read-only tools, and the ledger. Then the flips, mode
+  by mode: the rationale interview and the slot argument as plain
+  routes, the two searching modes as the first Claude **job** families
+  the door answers, and -- 2026-08-23 -- **the theme interview, both
+  halves and both routes**, which is the create flow's first door and
+  the biggest module in `claude/`. Nine Claude routes now answer from
+  Go. **What is left of the phase is enumerated rather than counted:**
+  `claude/scan.py` and `POST /api/claude/scan` (ADR 34), the slot
+  argument's sweep at `POST .../argue/deck`, and `GET /api/claude` --
+  the dial's readout, which needs `theme.stance_for`, and now has it.
+  Then the phase's gate: a real conversation through every mode, on the
+  pair.
 
 ### The next phase — the Simulator learns (decided 2026-08-20)
 

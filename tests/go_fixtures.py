@@ -58,6 +58,7 @@ import random
 import struct
 import sys
 import tempfile
+import unicodedata
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -3221,6 +3222,126 @@ def render_ledger_cases() -> str:
 #: The definition is data; the code that assembles a brief and reads an answer
 #: back is the mode's own and crosses when it crosses. Rendering only the ported
 #: ones would make "has this mode crossed?" a question about two places.
+DIGITS_PATH = ROOT / "go" / "internal" / "claude" / "data" / "digits.json"
+
+
+def digits_payload() -> dict[str, Any]:
+    """Where each of Unicode's decimal digit runs starts, swept from CPython.
+
+    `int()` reads **any** Unicode decimal digit, so `int("７")` is seven and
+    `int("٣")` is three -- and `theme._reading_for` spells its seed parse
+    `int(seed)`, not the Pydantic grammar the `/api/tarot/reading` query
+    string goes through. Two different functions, and the tarot lane already
+    measured that they disagree.
+
+    Go's `unicode.IsDigit` is category Nd exactly, but nothing in the standard
+    library gives a digit's *value*. The obvious trick -- walk down while the
+    neighbour is still a digit, and the distance is the value -- is **wrong
+    for 36 code points**: the mathematical digit blocks at U+1D7CE onward are
+    four runs of ten with no gap between them, so the walk crosses a boundary
+    and reads a bold `4` as fourteen. Measured before it shipped.
+
+    So the table is the run *starts*: every Nd run is exactly ten long,
+    contiguous and zero-based (asserted below over the whole of Unicode), so
+    68 numbers answer all 680. A code point's value is its distance from the
+    greatest start not above it, when that distance is under ten.
+
+    **This one really is interpreter-dependent, unlike the fold table beside
+    it.** 3.11 ships Unicode 14 and knows 66 runs; 3.12 ships 15 and knows 68,
+    having gained the Kawi digits at U+11F50 and the Nag Mundari at U+1E4F0.
+    So the committed table is **3.12's**, because that is what the container
+    runs and therefore what the deployed Python answers -- the same reasoning
+    `math.fsum` got. `unicode_version` is recorded so the freshness check can
+    say which sweep it is holding: it demands equality on a matching
+    interpreter and a **subset** on an older one, since Unicode adds digit
+    blocks and never removes them.
+    """
+    zeros = sorted({cp - int(chr(cp)) for cp in range(0x110000)
+                    if unicodedata.category(chr(cp)) == "Nd"})
+    for zero in zeros:
+        assert [int(chr(zero + i)) for i in range(10)] == list(range(10)), zero
+        # A run either starts a fresh block or butts straight onto the `9` of
+        # the one before it -- never onto that run's middle. This is the
+        # invariant the walk-down heuristic assumed and does not have.
+        before = chr(zero - 1)
+        assert (unicodedata.category(before) != "Nd"
+                or int(before) == 9), zero
+    return {
+        "note": ("The first code point of every Unicode decimal-digit run, "
+                 "swept from CPython by `python tests/go_fixtures.py`. Each "
+                 "run is exactly ten long and zero-based, so a digit's value "
+                 "is its distance from the greatest start not above it."),
+        "unicode_version": unicodedata.unidata_version,
+        "runs": len(zeros),
+        "zeros": zeros,
+    }
+
+
+def render_digits_payload() -> str:
+    return _rows_json(digits_payload()) + "\n"
+
+
+CASEFOLD_PATH = ROOT / "go" / "internal" / "claude" / "data" / "casefold.json"
+
+
+def casefold_payload() -> dict[str, Any]:
+    """`str.casefold()` as a table, swept out of the interpreter itself.
+
+    The fourth reproduction of somebody else's arithmetic, after `pyrand`,
+    `pyyaml` and `pyfloat`, and the smallest argument for one. `theme.ground`
+    folds the user's own turns and the model's claimed quote and asks whether
+    one contains the other; `strings.ToLower` is **not** that function.
+    `casefold()` applies Unicode *full* case folding, so `ß` becomes `ss`,
+    `ſ` becomes `s` and `ς` becomes `σ` -- 211 code points where the two
+    disagree, of which 104 fold to more than one character and cannot be a
+    rune-to-rune mapping at all. A German answer quoted back at a
+    fortune-teller's table would ground in Python and drop in Go, and what a
+    dropped slot looks like from the other side of the screen is a readiness
+    count that will not move.
+
+    Swept rather than transcribed, and the whole of Unicode rather than the
+    disagreements: a table of only the 211 differences would still rest on
+    Go's `unicode` tables agreeing with CPython's everywhere else, which is a
+    claim about two projects' Unicode versions and not one this port should
+    be making. Every code point whose fold is not itself is recorded, and a
+    rune absent from the table folds to itself. That is exact by
+    construction and depends on nothing.
+
+    Its own corpus, and no separate one: the table **is** the oracle, so
+    `tests/test_go_fixtures.py` holding the committed file equal to a fresh
+    sweep is the whole check.
+
+    **It carries no Unicode version, and the absence is measured.** The first
+    draft recorded `unicodedata.unidata_version` and went red on CI's 3.11
+    leg, which was the right alarm about the wrong field: 3.11 ships Unicode
+    14 and 3.12 ships 15, so the string differed -- and **nothing else did.**
+    Both interpreters answer 1,530 folds, the same 1,530 code points, the
+    same strings, 104 multi-character and 211 disagreeing with `lower()`;
+    case folding has not moved between those two releases. Recording the
+    version would have made a stable table look interpreter-dependent and
+    left the freshness check unable to run on both legs, which is where a
+    real drift would show. The counts below are the honest pin instead --
+    they are what a changed fold would move. (`digits_payload` keeps its
+    version, because that table really does differ; see there.)
+    """
+    folds = [{"cp": cp, "fold": chr(cp).casefold()}
+             for cp in range(0x110000) if chr(cp).casefold() != chr(cp)]
+    return {
+        "note": ("`str.casefold()` for every code point that does not fold to "
+                 "itself, swept from CPython by `python tests/go_fixtures.py`. "
+                 "A code point absent here folds to itself. Identical under "
+                 "3.11 and 3.12 -- verified, not assumed."),
+        "multi_char": sum(1 for f in folds if len(f["fold"]) > 1),
+        "differ_from_lower": sum(1 for f in folds
+                                 if chr(f["cp"]).lower() != f["fold"]),
+        "folds": folds,
+    }
+
+
+def render_casefold_payload() -> str:
+    return _rows_json(casefold_payload()) + "\n"
+
+
 MODES_PATH = ROOT / "go" / "internal" / "claude" / "data" / "modes.json"
 
 
@@ -3352,6 +3473,773 @@ def tools_payload() -> dict[str, Any]:
 def render_tools_payload() -> str:
     return _rows_json(tools_payload()) + "\n"
 
+
+# ------------------------------------------------------------- the theme lane
+
+THEME_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "theme.json"
+
+#: The angle `theme._closing_for` draws for an opening turn. Python spells it
+#: `random.choice` on the global RNG, so nothing reproducible rides on which
+#: one comes out -- but a corpus that could not hold it still would be a
+#: corpus of one opening question. Pinned to an index rather than the text, so
+#: a reworded angle moves in both runtimes at once.
+FROZEN_ANGLE_INDEX = 2
+
+#: A transcript the readers can be driven over, and the quotes below are all
+#: really in it. Deliberately mixed: an opening assistant turn (which is what
+#: this mode's transcripts start with), short shy answers of the kind that
+#: made the readiness count go backwards, and one turn carrying a character
+#: `str.casefold()` and `str.lower()` disagree about.
+THEME_TRANSCRIPT = [
+    {"role": "assistant", "text": "Tell me something you keep coming back to."},
+    {"role": "user", "text": "old horror films, the practical effects ones"},
+    {"role": "assistant", "text": "And when a plan falls apart?"},
+    {"role": "user", "text": "I improvise. STRASSE is where I grew up."},
+    {"role": "assistant", "text": "At game night, then -- what are you like?"},
+    {"role": "user", "text": "I make deals. quietly"},
+]
+
+
+def _theme_slot(kind: Any, value: Any, quote: Any) -> dict[str, Any]:
+    return {"kind": kind, "value": value, "quote": quote}
+
+
+def theme_ground_cases() -> list[dict[str, Any]]:
+    """`ground()` over every way a slot can fail, and the two ways it passes.
+
+    The casefold row is the one that could not have been written in Go: the
+    model quotes `Straße` where the person typed `STRASSE`, which `casefold()`
+    makes equal and `ToLower` does not. It is a real German spelling and the
+    only reachable difference between the two functions in this module.
+    """
+    from mtglab.claude import theme
+    cases = []
+    for note, slots in [
+        ("nothing at all", []),
+        ("a slot that is not an object", ["taste", 7, None]),
+        ("an unknown kind", [_theme_slot("vibe", "spooky", "old horror films")]),
+        ("no value", [_theme_slot("taste", "", "old horror films")]),
+        ("a quote below the floor", [_theme_slot("taste", "cats", "I")]),
+        ("a quote at the floor", [_theme_slot("posture", "deals", "I m")]),
+        ("a quote nobody said", [_theme_slot("taste", "blue decks", "I love blue")]),
+        ("the interviewer's own words", [
+            _theme_slot("temperament", "planner", "when a plan falls apart")]),
+        ("a quote spanning two turns", [
+            _theme_slot("taste", "both", "the practical effects ones I improvise")]),
+        ("casefold, not lower", [
+            _theme_slot("temperament", "grew up on the Strasse", "Straße")]),
+        ("control characters in the quote", [
+            _theme_slot("taste", "horror\x0cfilms", "old horror\tfilms")]),
+        ("last reading of a kind wins", [
+            _theme_slot("taste", "films", "old horror films"),
+            _theme_slot("taste", "practical effects specifically",
+                        "the practical effects ones")]),
+        ("canonical order, not the model's", [
+            _theme_slot("posture", "deals", "I make deals"),
+            _theme_slot("taste", "films", "old horror films"),
+            _theme_slot("temperament", "improviser", "I improvise")]),
+        ("a non-string kind", [_theme_slot(7, "seven", "old horror films")]),
+        ("a numeric value", [_theme_slot("taste", 7, "old horror films")]),
+    ]:
+        kept, dropped = theme.ground(list(slots), THEME_TRANSCRIPT)
+        cases.append({"note": note, "slots": slots, "kept": kept,
+                      "dropped": dropped,
+                      "may_propose": theme.may_propose(kept)})
+    return cases
+
+
+def theme_carry_cases() -> list[dict[str, Any]]:
+    """`carry()`: the floor a turn builds on, and it may not go backwards."""
+    from mtglab.claude import theme
+    taste = _theme_slot("taste", "films", "old horror films")
+    temper = _theme_slot("temperament", "improviser", "I improvise")
+    posture = _theme_slot("posture", "deals", "I make deals")
+    sharper = _theme_slot("taste", "practical effects", "the practical effects ones")
+    cases = []
+    for note, previous, fresh in [
+        ("nothing either way", [], []),
+        ("a turn that heard nothing keeps what was known", [taste, temper], []),
+        ("a turn that heard something new adds it", [taste], [temper]),
+        ("a turn refining a kind replaces it", [taste], [sharper]),
+        ("the floor is reached across turns", [taste, temper], [posture]),
+        ("canonical order out, whatever went in", [posture], [temper, taste]),
+    ]:
+        carried = theme.carry(list(previous), list(fresh))
+        cases.append({"note": note, "previous": previous, "fresh": fresh,
+                      "carried": carried,
+                      "may_propose": theme.may_propose(carried)})
+    return cases
+
+
+def theme_repeat_cases() -> list[dict[str, Any]]:
+    """`repeats()`: the deterministic half of "never the same fact twice"."""
+    from mtglab.claude import theme
+    told = [
+        "Pamela Colman Smith drew all 78 cards and was paid one flat fee.",
+        "The Fool is the only card in the deck about to have an accident.",
+    ]
+    cases = []
+    for note, text, against in [
+        ("nothing told yet", "A brand new fact.", []),
+        ("empty text", "", told),
+        ("the same sentence", told[0], told),
+        ("the same sentence, differently spaced", "  " + told[0].upper() + " ", told),
+        ("reworded, same content words",
+         "Smith drew all 78 cards of the deck and was paid a single flat fee.", told),
+        ("a genuinely different fact about the same person",
+         "Smith exhibited photographs with Alfred Stieglitz in 1907.", told),
+        ("stop words only", "the a of and", told),
+        ("a short fact that shares its whole vocabulary", "The Fool.", told),
+        # Exactly on the threshold, which `>=` keeps and `>` drops. Ten
+        # content words against a fact carrying seven of them: 7/10 is 0.7 in
+        # both languages' arithmetic, so the boundary is reachable rather
+        # than theoretical, and a mutation of the comparison dies here.
+        ("exactly at the overlap threshold",
+         "alpha bravo charlie delta echo foxtrot golf hotel india juliet",
+         ["alpha bravo charlie delta echo foxtrot golf kilo lima mike november"]),
+        ("one word below the threshold",
+         "alpha bravo charlie delta echo foxtrot juliet hotel india golf",
+         ["alpha bravo charlie delta echo foxtrot kilo lima mike november"]),
+    ]:
+        cases.append({"note": note, "text": text, "told": against,
+                      "repeats": theme.repeats(text, tuple(against))})
+    return cases
+
+
+def theme_prose_cases() -> list[dict[str, Any]]:
+    """`prose()`: control characters out, whitespace collapsed, `str(x or "")`."""
+    from mtglab.claude import theme
+    cases = []
+    for note, value in [
+        ("none", None),
+        ("false is empty", False),
+        ("zero is empty", 0),
+        ("a number", 7),
+        ("a float", 7.5),
+        ("a list", ["a", "b"]),
+        ("plain", "a plain sentence"),
+        ("the form feed that ate a letter", "than policing the \x0cight"),
+        ("DEL is not whitespace but goes anyway", "a\x7fb"),
+        ("every C0 character", "".join(chr(c) for c in range(0x20)) + "x"),
+        ("unicode whitespace collapses", "a\u00a0\u2003b\u3000c"),
+        ("the information separators", "a\x1cb\x1dc\x1ed\x1fe"),
+        ("leading and trailing", "   spaced   out   "),
+        ("nothing but whitespace", " \t\n "),
+    ]:
+        cases.append({"note": note, "value": value, "prose": theme.prose(value)})
+    return cases
+
+
+def theme_told_cases() -> list[dict[str, Any]]:
+    """`check_told()`: the door, and every refusal in its own words."""
+    from mtglab.claude import theme
+    cases = []
+    for note, raw in [
+        ("none", None),
+        ("empty", []),
+        ("plain strings", ["one", "two"]),
+        ("blanks are dropped, not refused", ["one", "   ", ""]),
+        ("stripped", ["  one  "]),
+        ("not a list", "one"),
+        ("not a list of strings", ["one", 2]),
+        ("one too long", ["x" * (theme.MAX_FACT_CHARS + 1)]),
+        ("one at the cap", ["x" * theme.MAX_FACT_CHARS]),
+        ("counted in code points", ["é" * theme.MAX_FACT_CHARS]),
+        ("more facts than exchanges", [f"fact {i}" for i in range(theme.MAX_EXCHANGES + 1)]),
+    ]:
+        row: dict[str, Any] = {"note": note, "raw": raw}
+        try:
+            row["told"] = list(theme.check_told(raw))
+        except theme.TranscriptRejected as exc:
+            row["error"] = str(exc)
+        cases.append(row)
+    return cases
+
+
+def theme_transcript_cases() -> list[dict[str, Any]]:
+    """`check_transcript()`: the door ADR 20 puts in front of client state."""
+    from mtglab.claude import theme
+    cases = []
+    for note, raw in [
+        ("none", None),
+        ("empty", []),
+        ("the fixture", THEME_TRANSCRIPT),
+        ("not a list", {"role": "user", "text": "hi"}),
+        ("a turn that is not an object", [["user", "hi"]]),
+        ("an unknown role", [{"role": "system", "text": "hi"}]),
+        ("a missing role", [{"text": "hi"}]),
+        ("a role that is not a string", [{"role": 7, "text": "hi"}]),
+        ("an empty turn", [{"role": "assistant", "text": "   "}]),
+        ("a turn over the cap", [{"role": "assistant", "text": "x" * (theme.MAX_TURN_CHARS + 1)}]),
+        ("a turn at the cap", [{"role": "assistant", "text": "x" * theme.MAX_TURN_CHARS}]),
+        ("counted in code points", [{"role": "assistant", "text": "é" * theme.MAX_TURN_CHARS}]),
+        ("the user speaking first", [{"role": "user", "text": "hi"}]),
+        ("consecutive same-role turns are allowed", [
+            {"role": "assistant", "text": "one"},
+            {"role": "user", "text": "two"},
+            {"role": "user", "text": "three"}]),
+        ("a conversation past its ceiling",
+         [{"role": "assistant", "text": "x"}] * (theme.MAX_EXCHANGES * 2 + 2)),
+        ("an anthropic message block", [
+            {"role": "user", "content": [{"type": "text", "text": "hi"}]}]),
+    ]:
+        row: dict[str, Any] = {"note": note, "raw": raw}
+        try:
+            row["turns"] = theme.check_transcript(raw)
+        except theme.TranscriptRejected as exc:
+            row["error"] = str(exc)
+        cases.append(row)
+    return cases
+
+
+def theme_fact_cases() -> list[dict[str, Any]]:
+    """`keep_fact()`: the three origins, and everything that is not one.
+
+    The `tarot:` rows carry the whole point of ADR 21's corpus: the id is the
+    ask, the model's `text` is discarded, and what the querent reads is the
+    file's own sentence.
+    """
+    from mtglab import tarotlore
+    from mtglab.claude import theme
+    real = tarotlore.DECK_FACTS[0]
+    cases = []
+    for note, raw in [
+        ("not an object", "a fact"),
+        ("no text", {"text": "", "source": "taxonomy"}),
+        ("no source", {"text": "A fact.", "source": ""}),
+        ("taxonomy", {"text": "  White wants peace.  ", "source": "taxonomy"}),
+        ("taxonomy, shouted", {"text": "White wants peace.", "source": "TAXONOMY"}),
+        ("a tarot id, paraphrased away",
+         {"text": "the model's own words", "source": f"tarot:{real.id}"}),
+        ("a tarot id, shouted",
+         {"text": "x", "source": f"TAROT:{real.id.upper()}"}),
+        ("a tarot id nobody has", {"text": "x", "source": "tarot:not-a-fact"}),
+        ("a page the search returned",
+         {"text": "A thing on a page.", "source": "https://edhrec.com/real"}),
+        ("the same page, differently spelled",
+         {"text": "A thing on a page.", "source": "https://edhrec.com/real/"}),
+        ("a page with no title",
+         {"text": "A thing.", "source": "https://mtg.wiki/Gyome"}),
+        ("a page nobody fetched",
+         {"text": "A thing.", "source": "https://example.com/invented"}),
+    ]:
+        cases.append({"note": note, "raw": raw,
+                      "fact": theme.keep_fact(raw, list(_PAGES))})
+    return cases
+
+
+def theme_seed_cases() -> list[dict[str, Any]]:
+    """`int(seed)`, which is **not** the tarot route's Pydantic grammar.
+
+    The two were measured apart in the tarot lane: `/api/tarot/reading` reads
+    its seed off a query string through `seed: int | None`, which refuses the
+    fullwidth `７` that `int()` reads as seven. This one is a JSON body going
+    through the builtin, so the fullwidth digit lands, `5.9` truncates to
+    five, and `True` is one.
+
+    Recorded from `int()` directly rather than through `theme._reading_for`:
+    what Go has to reproduce is the builtin, and routing the corpus through
+    the caller would let a change of parser hide behind a matching change of
+    expectation.
+    """
+    cases = []
+    for note, raw in [
+        ("none", None), ("zero", 0), ("an integer", 42), ("negative", -3),
+        ("unbounded", 2 ** 70), ("a float truncates toward zero", 5.9),
+        ("a negative float truncates toward zero", -5.9),
+        ("a float in exponent form", 5e2),
+        ("true is one", True), ("false is zero", False),
+        ("a decimal string", "42"), ("a padded string", "  42  "),
+        ("a signed string", "+42"), ("underscores between digits", "1_0"),
+        ("a leading underscore", "_10"), ("a trailing underscore", "10_"),
+        ("a doubled underscore", "1__0"),
+        ("an underscore next to the sign", "+_10"),
+        ("a fullwidth digit", "７"),
+        ("arabic-indic digits", "٣٤"),
+        ("a mathematical bold digit", "\U0001d7d0"),
+        ("a float as a string", "5.9"),
+        ("not a number at all", "soon"),
+        ("empty", ""), ("whitespace only", "   "),
+        ("a list", [1]), ("an object", {"seed": 1}),
+    ]:
+        row: dict[str, Any] = {"note": note, "raw": raw}
+        try:
+            row["seed"] = str(int(raw))
+        except (TypeError, ValueError, OverflowError):
+            row["error"] = f"not a usable reading seed: {raw!r}"
+        cases.append(row)
+    # And what `check_ask` does with each: a persona that does not deal drops
+    # the seed rather than refusing it.
+    return cases
+
+
+def theme_budget_cases() -> list[dict[str, Any]]:
+    """`f"{budget:g}"`, which Go's default `%g` is not."""
+    cases = []
+    for value in [50.0, 50.5, 0.5, 100.0, 1234567.0, 123456.0, 0.0001,
+                  0.00001, 1e21, 1.5e-7, -50.0, 1/3, 2**53 + 1.0]:
+        cases.append({"value": value, "formatted": f"{value:g}"})
+    for note, value in [("inf", float("inf")), ("-inf", float("-inf")),
+                        ("nan", float("nan"))]:
+        cases.append({"note": note, "value": None, "formatted": f"{value:g}"})
+    return cases
+
+
+def theme_prompt_cases() -> dict[str, Any]:
+    """The bytes that reach the model: the frame, the closing, and the ask.
+
+    All three are assembled in Python from data Python owns, and all three are
+    prompt rather than payload -- which is exactly why they are pinned as
+    bytes. A frame that quietly lost the spread, or a closing instruction that
+    stopped naming the missing slots, changes what the model was told and
+    shows up nowhere in any report.
+    """
+    from mtglab.claude import persona as persona_mod
+    from mtglab.claude import theme
+
+    reader = persona_mod.PERSONAS["fortune-teller"]
+    plain = persona_mod.PERSONAS[persona_mod.DEFAULT]
+    told = ["Pamela Colman Smith drew all 78 cards and was paid one flat fee."]
+
+    frames = []
+    for note, who, seed, facts in [
+        ("no reading at all", plain, None, ()),
+        ("a reader with no seed", reader, None, ()),
+        ("a plain voice ignores the seed", plain, 1909, ()),
+        ("a reading, nothing told", reader, 1909, ()),
+        ("a reading, one fact told", reader, 1909, tuple(told)),
+        ("a reading, no corpus offered", reader, 1909, None),
+    ]:
+        dealt = theme._reading_for(who, seed)
+        frames.append({"note": note, "persona": who.key, "seed": seed,
+                       "told": None if facts is None else list(facts),
+                       "frame": theme._frame_for(dealt, facts)})
+
+    grounded, _ = theme.ground([
+        _theme_slot("taste", "old horror films", "old horror films"),
+        _theme_slot("temperament", "improviser", "I improvise"),
+        _theme_slot("posture", "makes deals", "I make deals"),
+    ], THEME_TRANSCRIPT)
+    one, _ = theme.ground([
+        _theme_slot("taste", "old horror films", "old horror films")],
+        THEME_TRANSCRIPT)
+
+    closings = []
+    for note, slots, transcript, facts in [
+        ("the opening turn", [], [], ()),
+        ("the opening turn ignores what it was told", [], [], tuple(told)),
+        ("two still missing", one, THEME_TRANSCRIPT, ()),
+        ("two still missing, one fact told", one, THEME_TRANSCRIPT, tuple(told)),
+        ("the floor is met", grounded, THEME_TRANSCRIPT, ()),
+        ("the floor is met, facts told", grounded, THEME_TRANSCRIPT, tuple(told)),
+    ]:
+        closings.append({"note": note, "slots": slots, "told": list(facts),
+                         "opening": not transcript,
+                         "closing": theme._closing_for(slots, transcript, facts)})
+
+    asks = []
+    for note, budget, avoid in [
+        ("nothing but the reading", None, ""),
+        ("a budget", 50.0, ""),
+        ("a zero budget is no budget", 0.0, ""),
+        ("a budget that needs six significant digits", 1234567.0, ""),
+        ("something to avoid", None, "  no blue please  "),
+        ("whitespace is not something to avoid", None, "   "),
+        ("both", 250.5, "nothing with infect"),
+    ]:
+        asks.append({"note": note, "budget": budget, "avoid": avoid,
+                     "ask": theme._proposal_ask(grounded, budget, avoid)})
+
+    return {"frames": frames, "closings": closings, "asks": asks,
+            "grounded": grounded, "reading_seed": 1909,
+            "opening_angles": list(theme.OPENING_ANGLES)}
+
+
+def theme_float_cases() -> list[dict[str, Any]]:
+    """`float(budget)`, which is not `strconv.ParseFloat`.
+
+    The route spells it `float(budget) if budget else None` **inside** a `try`
+    that catches `TranscriptRejected` and `ValueError` -- and not `TypeError`.
+    So a string that will not read is a 422 carrying Python's own message, and
+    a list is an uncaught `TypeError` and a 500. Both are reproduced;
+    collapsing them would be a flip that changes behaviour, which is not a
+    flip.
+    """
+    cases = []
+    for note, raw in [
+        ("none is no budget", None), ("zero is no budget", 0),
+        ("empty string is no budget", ""), ("false is no budget", False),
+        ("an empty list is no budget", []),
+        ("an integer", 50), ("a float", 50.5), ("a numeric string", "50"),
+        ("a padded numeric string", "  50.5  "),
+        ("a signed string", "-50"), ("an exponent", "5e2"),
+        ("underscores between digits", "1_000.5"),
+        ("a fullwidth digit", "５０"),
+        ("inf", "inf"), ("Infinity", "Infinity"), ("-inf", "-inf"),
+        ("nan", "NaN"),
+        ("a hex float Go would take", "0x1p4"),
+        ("not a number", "fifty"),
+        ("an overflowing literal", "1e400"),
+        ("true is one", True),
+        ("a list is a TypeError, not a ValueError", [1]),
+        ("an object is a TypeError", {"a": 1}),
+    ]:
+        row: dict[str, Any] = {"note": note, "raw": raw}
+        if not raw:
+            row["budget"] = None
+            cases.append(row)
+            continue
+        try:
+            value = float(raw)
+            row["budget"] = repr(value)
+        except ValueError as exc:
+            row["error"] = str(exc)
+            row["error_kind"] = "value"
+        except TypeError as exc:
+            row["error"] = str(exc)
+            row["error_kind"] = "type"
+        cases.append(row)
+    return cases
+
+
+def theme_stance_cases() -> list[dict[str, Any]]:
+    """`theme.stance_for`: the default is `second-opinion`, never `off`.
+
+    The one every other mode gets from a deck's `status`, answered for a
+    surface that runs before a deck exists. `/api/claude` reads it too, which
+    is the reason it is public: a dial that reported `off` while the
+    conversation was about to run at `second-opinion` is worse than no dial.
+    """
+    from mtglab.claude import stance as stance_mod
+    from mtglab.claude import theme
+    cases = []
+    for note, requested, ceiling in [
+        ("nothing asked for", None, None),
+        ("nothing asked for, under a ceiling", None, "off"),
+        ("nothing asked for, under a low ceiling", None, "sounding-board"),
+        ("a preset", "consultant", None),
+        ("a preset over the ceiling", "consultant", "sounding-board"),
+        ("off is reachable", "off", None),
+        ("a custom stance", {"initiative": "volunteers", "scope": "wide",
+                             "write": "none"}, None),
+        ("a malformed stance", {"initiative": 7}, None),
+        ("a stance that is not a stance", 7, None),
+    ]:
+        saved = os.environ.pop("MTGLAB_CLAUDE_STANCE_CEILING", None)
+        if ceiling:
+            os.environ["MTGLAB_CLAUDE_STANCE_CEILING"] = ceiling
+        try:
+            row: dict[str, Any] = {"note": note, "requested": requested,
+                                   "ceiling": ceiling}
+            try:
+                row["stance"] = stance_mod.describe(theme.stance_for(requested))
+            except ValueError as exc:
+                row["error"] = str(exc)
+            cases.append(row)
+        finally:
+            os.environ.pop("MTGLAB_CLAUDE_STANCE_CEILING", None)
+            if saved is not None:
+                os.environ["MTGLAB_CLAUDE_STANCE_CEILING"] = saved
+    return cases
+
+
+def theme_report_cases() -> dict[str, Any]:
+    """Every outcome of both halves, as marshalled bytes and key order.
+
+    Driven through a fake `converse` so the Go side can rebuild the same Turn
+    and compare the report it writes byte for byte -- which is the only way
+    the **two shapes** each half has are pinned. A turn that reached the model
+    carries `never` and one that did not does not; a proposal that resolved
+    something carries five keys the other four shapes leave off, and they sit
+    in the middle rather than at the end. One struct per half would put those
+    keys on the wire in exactly the cases Python leaves them off.
+    """
+    from mtglab.claude import theme
+
+    asks: list[dict[str, Any]] = []
+    proposals: list[dict[str, Any]] = []
+    real_converse = theme.converse
+
+    grounded_in = [
+        _theme_slot("taste", "old horror films", "old horror films"),
+        _theme_slot("temperament", "improviser", "I improvise"),
+        _theme_slot("posture", "makes deals", "I make deals"),
+    ]
+
+    def ask(note: str, turn: Any, *, transcript: Any = None, slots: Any = None,
+            requested: Any = "second-opinion", persona: Any = None,
+            seed: Any = None, facts: Any = None) -> None:
+        def fake(*_a: Any, **_k: Any) -> Any:
+            if turn is None:
+                raise AssertionError(f"{note}: no call may be made")
+            return turn
+        theme.converse = fake
+        try:
+            report = theme.ask(THEME_TRANSCRIPT if transcript is None else transcript,
+                               slots, requested=requested, persona=persona,
+                               seed=seed, facts=facts)
+        finally:
+            theme.converse = real_converse
+        asks.append({"note": note, "transcript": THEME_TRANSCRIPT if transcript is None else transcript,
+                     "slots": slots, "requested": requested,
+                     "persona": persona, "seed": seed, "facts": facts,
+                     "turn": _turn_record(turn) if turn is not None else None,
+                     "report": report})
+
+    def propose(note: str, turn: Any, *, slots: Any = None,
+                requested: Any = "second-opinion", budget: Any = None,
+                avoid: str = "", persona: Any = None, seed: Any = None) -> None:
+        def fake(*_a: Any, **_k: Any) -> Any:
+            if turn is None:
+                raise AssertionError(f"{note}: no call may be made")
+            return turn
+        theme.converse = fake
+        try:
+            report = theme.propose(THEME_TRANSCRIPT,
+                                   grounded_in if slots is None else slots,
+                                   requested=requested, budget=budget,
+                                   avoid=avoid, persona=persona, seed=seed)
+        finally:
+            theme.converse = real_converse
+        proposals.append({"note": note, "slots": grounded_in if slots is None else slots,
+                          "requested": requested, "budget": budget,
+                          "avoid": avoid, "persona": persona, "seed": seed,
+                          "turn": _turn_record(turn) if turn is not None else None,
+                          "report": report})
+
+    conv = theme.THEME_CONVERSATION.name
+    prop = theme.THEME_PROPOSAL.name
+
+    # --- the conversation turn
+    ask("stance off, no call", None, requested="off")
+    ask("stance off keeps what the client carried", None, requested="off",
+        slots=grounded_in)
+    ask("past the ceiling, no call", None,
+        transcript=[{"role": "assistant", "text": "q"},
+                    {"role": "user", "text": "a"}] * theme.MAX_EXCHANGES,
+        slots=grounded_in)
+    ask("the model refused",
+        _fake_turn(mode=conv, text="", stop_reason="refusal", refused=True))
+    ask("the answer did not parse",
+        _fake_turn(mode=conv, text='{"question": "trunc', stop_reason="max_tokens"))
+    ask("a declarative sentence is not a question", _fake_turn(
+        {"question": "You are clearly a green player.", "slots": []}, mode=conv))
+    ask("a whole turn", _fake_turn({
+        "question": "  What did the practical effects\x0cgive you?  ",
+        "fact": {"text": "White wants peace.", "source": "taxonomy"},
+        "slots": [
+            _theme_slot("taste", "old horror films", "old horror films"),
+            _theme_slot("temperament", "improviser", "I improvise"),
+            _theme_slot("posture", "makes deals", "I make deals"),
+            _theme_slot("anchor", "invented", "I love Sol Ring"),
+            "not an object",
+        ],
+    }, mode=conv, searched=_PAGES, input_tokens=4900, output_tokens=310,
+        cache_read_tokens=2791))
+    ask("a turn that un-knew a slot", _fake_turn({
+        "question": "And after that?",
+        "slots": [_theme_slot("posture", "makes deals", "I make deals")],
+    }, mode=conv), slots=grounded_in)
+    ask("a fact already told is dropped and counted", _fake_turn({
+        "question": "And after that?",
+        "fact": {"text": "White wants peace.", "source": "taxonomy"},
+        "slots": [],
+    }, mode=conv), facts=["White wants peace."])
+    ask("a fact from a page nobody fetched", _fake_turn({
+        "question": "And after that?",
+        "fact": {"text": "A thing.", "source": "https://example.com/invented"},
+        "slots": [],
+    }, mode=conv, searched=_PAGES))
+    ask("the fortune-teller, reading", _fake_turn({
+        "question": "The Fool steps off the cliff -- do you?",
+        "fact": {"text": "the model's paraphrase", "source": "tarot:pixie-fee"},
+        "slots": [_theme_slot("taste", "old horror films", "old horror films")],
+    }, mode=conv), persona="fortune-teller", seed=1909)
+
+    # --- the proposal
+    propose("stance off, no call", None, requested="off")
+    propose("the model refused",
+            _fake_turn(mode=prop, text="", stop_reason="refusal", refused=True))
+    propose("the answer did not parse",
+            _fake_turn(mode=prop, text='{"combinations": [', stop_reason="max_tokens"))
+    propose("nothing resolved against the pool", _fake_turn({
+        "combinations": [
+            {"key": "NOT-A-KEY", "reading": "x", "grounding": "y",
+             "commanders": [{"card": "Gyome, Master Chef", "prose": "p"}]},
+            {"key": "BG", "reading": "x", "grounding": "y",
+             "commanders": [{"card": "Not A Real Card", "prose": "p"}]},
+        ],
+        "sources": [],
+    }, mode=prop, searched=_PAGES))
+    propose("a whole proposal", _fake_turn({
+        "combinations": [
+            {"key": "bg", "reading": "  Golgari, for the practical effects.  ",
+             "grounding": "You said you improvise.",
+             "source_ids": ["s1", "s2", "nope"],
+             "commanders": [
+                 {"card": "gyome, master chef", "prose": "A troll chef.",
+                  "source_ids": ["s1"]},
+                 {"card": "Not A Real Card", "prose": "invented",
+                  "source_ids": ["s1"]},
+                 {"card": "Craterhoof Behemoth", "prose": "mono-green, wrong slot",
+                  "source_ids": ["s1"]},
+                 {"card": 7, "prose": "a number"},
+                 "not an object",
+             ]},
+            {"key": "G", "reading": "Mono-green, for the other reading.",
+             "grounding": "You said you make deals.", "source_ids": [],
+             "commanders": [{"card": "Craterhoof Behemoth", "prose": "Goes wide."}]},
+            {"key": "W", "reading": "A third nobody asked for.",
+             "grounding": "", "commanders": [
+                 {"card": "Gyome, Master Chef", "prose": "wrong colours"}]},
+        ],
+        "sources": [
+            {"id": "s1", "title": "the model's title", "url": "https://edhrec.com/real"},
+            {"id": "s2", "title": "t", "url": "https://example.com/invented"},
+        ],
+    }, mode=prop, searched=_PAGES, input_tokens=8100, output_tokens=1450,
+        cache_read_tokens=3200), budget=50.0, avoid="no blue")
+    # Both caps, reached. Nothing above gets near them -- the third
+    # combination there is dropped for having no confirmed commander, so the
+    # two-combination cap is never exercised, and no combination above names
+    # more than three legends that resolve. `tiny_pool` carries ten mono-green
+    # cards, which is what makes a fourth commander possible at all.
+    propose("more than the caps allow", _fake_turn({
+        "combinations": [
+            {"key": "G", "reading": "Mono-green.", "grounding": "You improvise.",
+             "commanders": [
+                 {"card": "Craterhoof Behemoth", "prose": "one"},
+                 {"card": "Terastodon", "prose": "two"},
+                 {"card": "Woodfall Primus", "prose": "three"},
+                 {"card": "Vorinclex, Voice of Hunger", "prose": "four -- over the cap"},
+             ]},
+            {"key": "BG", "reading": "Golgari.", "grounding": "You make deals.",
+             "commanders": [{"card": "Gyome, Master Chef", "prose": "a troll chef"}]},
+            {"key": "W", "reading": "Mono-white.", "grounding": "You said films.",
+             "commanders": [{"card": "Smothering Tithe", "prose": "third -- over the cap"}]},
+        ],
+        "sources": [{"id": "s1", "title": "t", "url": "https://edhrec.com/real"}],
+    }, mode=prop, searched=_PAGES))
+
+    return {"asks": asks, "proposals": proposals}
+
+
+def theme_refusal_cases() -> list[dict[str, Any]]:
+    """What `check_ask` and `check_proposal` refuse, in their own words.
+
+    `NotReady` is the one with a status of its own -- 409, not 422 -- because
+    nothing is malformed and nothing failed, there simply is not enough yet.
+    """
+    from mtglab.claude import theme
+    cases = []
+    one = [_theme_slot("taste", "old horror films", "old horror films")]
+    three = [
+        _theme_slot("taste", "old horror films", "old horror films"),
+        _theme_slot("temperament", "improviser", "I improvise"),
+        _theme_slot("posture", "makes deals", "I make deals"),
+    ]
+    for half, note, kwargs in [
+        ("ask", "an empty conversation is fine", {"transcript": None}),
+        ("ask", "a malformed transcript",
+         {"transcript": [{"role": "system", "text": "hi"}]}),
+        ("ask", "an unknown persona", {"persona": "not-a-voice"}),
+        ("ask", "an unusable seed",
+         {"persona": "fortune-teller", "seed": "soon"}),
+        ("ask", "a seed a plain voice never deals", {"seed": "soon"}),
+        ("ask", "a malformed stance", {"requested": {"initiative": 7}}),
+        ("ask", "malformed facts", {"facts": ["one", 2]}),
+        ("propose", "nothing known at all", {"slots": None}),
+        ("propose", "one thing known", {"slots": one}),
+        ("propose", "quotes nobody said",
+         {"slots": [_theme_slot(s["kind"], s["value"], "never typed this")
+                    for s in three]}),
+        ("propose", "three things known", {"slots": three}),
+        ("propose", "an unknown persona", {"slots": three, "persona": "not-a-voice"}),
+        ("propose", "an unusable seed",
+         {"slots": three, "persona": "fortune-teller", "seed": "soon"}),
+    ]:
+        row: dict[str, Any] = {"half": half, "note": note, **kwargs}
+        try:
+            if half == "ask":
+                req = theme.check_ask(kwargs.get("transcript", THEME_TRANSCRIPT),
+                                      kwargs.get("slots"),
+                                      requested=kwargs.get("requested"),
+                                      persona=kwargs.get("persona"),
+                                      seed=kwargs.get("seed"),
+                                      facts=kwargs.get("facts"))
+                row["ok"] = {"persona": req.persona, "seed": req.seed,
+                             "exchanges": req.exchanges,
+                             "exhausted": req.exhausted,
+                             "needs_call": req.needs_call,
+                             "carried": req.carried, "told": list(req.told)}
+            else:
+                req = theme.check_proposal(THEME_TRANSCRIPT, kwargs.get("slots"),
+                                           requested=kwargs.get("requested"),
+                                           persona=kwargs.get("persona"),
+                                           seed=kwargs.get("seed"))
+                row["ok"] = {"persona": req.persona, "seed": req.seed,
+                             "needs_call": req.needs_call,
+                             "grounded": req.grounded, "dropped": req.dropped}
+        except theme.NotReady as exc:
+            row["error"] = str(exc)
+            row["error_kind"] = "not-ready"
+        except (theme.TranscriptRejected, ValueError) as exc:
+            row["error"] = str(exc)
+            row["error_kind"] = "rejected"
+        cases.append(row)
+    return cases
+
+
+def theme_cases() -> dict[str, Any]:
+    """`claude/theme.py`'s Python-owned halves, held still for the Go port."""
+    import random as _random
+
+    from mtglab.claude import theme
+
+    with _ClaudeScratch():
+        real_choice = _random.choice
+        _random.choice = lambda seq: list(seq)[FROZEN_ANGLE_INDEX]
+        try:
+            prompts = theme_prompt_cases()
+            reports = theme_report_cases()
+        finally:
+            _random.choice = real_choice
+        return {
+            "note": ("`claude/theme.py`'s Python-owned halves, written by "
+                     "`python tests/go_fixtures.py` with the opening angle "
+                     f"pinned to index {FROZEN_ANGLE_INDEX} and the clock "
+                     f"frozen at {FROZEN_NOW}."),
+            "floor": theme.FLOOR,
+            "max_exchanges": theme.MAX_EXCHANGES,
+            "max_turn_chars": theme.MAX_TURN_CHARS,
+            "max_fact_chars": theme.MAX_FACT_CHARS,
+            "min_quote_chars": theme.MIN_QUOTE_CHARS,
+            "slot_kinds": list(theme.SLOT_KINDS),
+            "slot_questions": dict(theme.SLOT_QUESTIONS),
+            "frozen_angle_index": FROZEN_ANGLE_INDEX,
+            "transcript": THEME_TRANSCRIPT,
+            "pages": list(_PAGES),
+            "prose": theme_prose_cases(),
+            "ground": theme_ground_cases(),
+            "carry": theme_carry_cases(),
+            "repeats": theme_repeat_cases(),
+            "told": theme_told_cases(),
+            "transcripts": theme_transcript_cases(),
+            "facts": theme_fact_cases(),
+            "seeds": theme_seed_cases(),
+            "budgets": theme_budget_cases(),
+            "floats": theme_float_cases(),
+            "stances": theme_stance_cases(),
+            "prompts": prompts,
+            "refusals": theme_refusal_cases(),
+            **reports,
+        }
+
+
+def render_theme_cases() -> str:
+    return _rows_json(theme_cases()) + "\n"
+
+
 def write() -> None:
     TESTDATA.mkdir(parents=True, exist_ok=True)
     text, parsed = render()
@@ -3413,6 +4301,11 @@ def write() -> None:
     PERSONA_PATH.parent.mkdir(parents=True, exist_ok=True)
     PERSONA_PATH.write_text(render_persona_payload(), encoding="utf-8")
     print(f"wrote {len(persona_payload()['personas'])} voices into {PERSONA_PATH}")
+    CASEFOLD_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CASEFOLD_PATH.write_text(render_casefold_payload(), encoding="utf-8")
+    DIGITS_PATH.write_text(render_digits_payload(), encoding="utf-8")
+    print(f"wrote {digits_payload()['runs']} digit runs into {DIGITS_PATH}")
+    print(f"wrote {len(casefold_payload()['folds'])} case foldings into {CASEFOLD_PATH}")
     MODES_PATH.parent.mkdir(parents=True, exist_ok=True)
     MODES_PATH.write_text(render_modes_payload(), encoding="utf-8")
     print(f"wrote {len(modes_payload()['modes'])} mode definitions into {MODES_PATH}")
@@ -3423,6 +4316,7 @@ def write() -> None:
     SOURCES_PATH.write_text(render_sources_cases(), encoding="utf-8")
     DOSSIER_PATH.write_text(render_dossier_cases(), encoding="utf-8")
     RESEARCH_PATH.write_text(render_research_cases(), encoding="utf-8")
+    THEME_PATH.write_text(render_theme_cases(), encoding="utf-8")
     print(f"wrote the dossier and research corpora into {DOSSIER_PATH.parent}")
     _stance = stance_cases()
     print(f"wrote {len(_stance['stances'])} stances and "
