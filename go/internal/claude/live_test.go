@@ -2,12 +2,15 @@ package claude
 
 import (
 	"context"
+	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/claude/tools"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
 // The pipe, proved against the real API.
@@ -203,4 +206,84 @@ func TestLiveTheRationaleInterviewAsksRealQuestions(t *testing.T) {
 	for _, q := range report.Questions {
 		t.Logf("  [%s] %s  (%s)", q.Angle, q.Question, q.Fact)
 	}
+}
+
+// The slot argument on the real wire, and the one thing only a live call can
+// answer: does the API accept a schema whose whole design is an ABSENCE?
+//
+// ADR 25's response schema has no `defence`, `verdict` or `summary` and
+// forbids extra properties. A schema the API rejects is a 400 no scripted
+// server would produce -- and this is the mode where that would matter most,
+// because the failure mode of a rejected schema is falling back to prose,
+// which is exactly the balanced answer the absence exists to prevent.
+//
+// The assertions are on what must be true rather than on what the model
+// happened to say: every charge cites something (Python drops the ones that do
+// not, so a drop count above zero is a signal about the prompt, not a
+// failure), and nothing anywhere in the payload argues FOR the card.
+func TestLiveTheSlotArgumentMakesOnlyTheCaseAgainst(t *testing.T) {
+	liveOrSkip(t)
+	d := fixtureDeck(t, "kaheera")
+	stance, err := Preset("second-opinion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report []wire.KV
+	withPool(t, func(c *pool.Conn) {
+		var runErr error
+		report, runErr = Argue(context.Background(), c, d, "Sol Ring", ArgueRequest{
+			Requested: stance,
+			Deps:      tools.Deps{Pool: c},
+			Limit:     &Collaborator,
+		})
+		if runErr != nil {
+			t.Fatalf("the argument did not answer: %v", runErr)
+		}
+	})
+	field := func(key string) any {
+		for _, row := range report {
+			if row.Key == key {
+				return row.Value
+			}
+		}
+		return nil
+	}
+	if asked, _ := field("asked").(bool); !asked {
+		t.Fatalf("no call was made: %v", field("reason"))
+	}
+	if reason, _ := field("reason").(string); reason != "" {
+		t.Fatalf("the conversation ended early: %s", reason)
+	}
+	charges, _ := field("charges").([]Charge)
+	if len(charges) == 0 {
+		t.Fatal("the argument came back with no case at all")
+	}
+	for i, c := range charges {
+		if strings.TrimSpace(c.Fact) == "" {
+			t.Errorf("charge %d rests on nothing", i)
+		}
+		if !slices.Contains(Grounds, c.Ground) {
+			t.Errorf("charge %d has ground %q, which is not one of %v", i, c.Ground, Grounds)
+		}
+		if !slices.Contains(Strengths, c.Strength) {
+			t.Errorf("charge %d has strength %q", i, c.Strength)
+		}
+	}
+	// The absence, checked on the bytes that came back rather than on the
+	// schema that went out.
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{`"defence"`, `"verdict"`, `"summary"`, `"in_favour"`} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Errorf("the answer carried a %s field", forbidden)
+		}
+	}
+	t.Logf("%d charges (%d dropped) from %v", len(charges),
+		field("charges_dropped"), field("model"))
+	for _, c := range charges {
+		t.Logf("  [%s/%s] %s  (%s)", c.Ground, c.Strength, c.Claim, c.Fact)
+	}
+	t.Logf("alternatives: %v", field("alternatives_dropped"))
 }

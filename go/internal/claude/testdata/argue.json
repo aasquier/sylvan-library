@@ -1,0 +1,263 @@
+{
+ "note": "`argue.only_charges` and `argue.resolve_alternatives`, ADR 25's two Python-owned halves. Written by `python tests/go_fixtures.py`.",
+ "why": "The charges half is the citation predicate and the two enum fallbacks. The alternatives half is rule 2 made executable: resolved through the pool, dropped and COUNTED SEPARATELY for each of four reasons, because `you invented that card` and `that card is off-colour` are different failures. The order of the verdicts is part of it -- already-in-deck is checked first because it is the most specific true thing to say.",
+ "charges": [
+  {
+   "note": "a whole charge",
+   "items": [{"claim":"Six other cards already do this.","ground":"redundancy","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"redundancy","strength":"serious"}],
+   "dropped": 0
+  },
+  {"note":"nothing at all","items":[],"kept":[],"dropped":0},
+  {"note":"no fact is not a charge","items":[{"claim":"It is simply bad.","ground":"cost","strength":"minor"}],"kept":[],"dropped":1},
+  {"note":"an empty fact is no fact","items":[{"claim":"Six other cards already do this.","ground":"redundancy","fact":"   ","strength":"serious"}],"kept":[],"dropped":1},
+  {"note":"no claim is not a charge","items":[{"claim":"","ground":"redundancy","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"}],"kept":[],"dropped":1},
+  {
+   "note": "an unknown ground falls back to ceiling",
+   "items": [{"claim":"Six other cards already do this.","ground":"vibes","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"ceiling","strength":"serious"}],
+   "dropped": 0
+  },
+  {
+   "note": "an unknown strength falls back to minor",
+   "items": [{"claim":"Six other cards already do this.","ground":"redundancy","fact":"ramp holds 12 against a target of 8-12.","strength":"fatal"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"redundancy","strength":"minor"}],
+   "dropped": 0
+  },
+  {
+   "note": "a missing ground falls back",
+   "items": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12."}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"ceiling","strength":"minor"}],
+   "dropped": 0
+  },
+  {
+   "note": "whitespace is stripped",
+   "items": [{"claim":"  spaced  ","ground":" cost ","fact":"  a fact  ","strength":" minor "}],
+   "kept": [{"claim":"spaced","fact":"a fact","ground":"cost","strength":"minor"}],
+   "dropped": 0
+  },
+  {"note":"a non-object is dropped","items":["a charge",7,null,[]],"kept":[],"dropped":4},
+  {
+   "note": "mixed: two kept, three dropped",
+   "items": [
+    {"claim":"Six other cards already do this.","ground":"redundancy","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"},
+    "nope",
+    {"claim":"Six other cards already do this.","ground":"redundancy","fact":"","strength":"serious"},
+    {"claim":"Another.","ground":"redundancy","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"},
+    {}
+   ],
+   "kept": [
+    {"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"redundancy","strength":"serious"},
+    {"claim":"Another.","fact":"ramp holds 12 against a target of 8-12.","ground":"redundancy","strength":"serious"}
+   ],
+   "dropped": 3
+  },
+  {
+   "note": "ground redundancy",
+   "items": [{"claim":"Six other cards already do this.","ground":"redundancy","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"redundancy","strength":"serious"}],
+   "dropped": 0
+  },
+  {
+   "note": "ground cost",
+   "items": [{"claim":"Six other cards already do this.","ground":"cost","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"cost","strength":"serious"}],
+   "dropped": 0
+  },
+  {
+   "note": "ground speed",
+   "items": [{"claim":"Six other cards already do this.","ground":"speed","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"speed","strength":"serious"}],
+   "dropped": 0
+  },
+  {
+   "note": "ground conditionality",
+   "items": [{"claim":"Six other cards already do this.","ground":"conditionality","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"conditionality","strength":"serious"}],
+   "dropped": 0
+  },
+  {
+   "note": "ground count",
+   "items": [{"claim":"Six other cards already do this.","ground":"count","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"count","strength":"serious"}],
+   "dropped": 0
+  },
+  {
+   "note": "ground ceiling",
+   "items": [{"claim":"Six other cards already do this.","ground":"ceiling","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"ceiling","strength":"serious"}],
+   "dropped": 0
+  },
+  {
+   "note": "ground legality",
+   "items": [{"claim":"Six other cards already do this.","ground":"legality","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"legality","strength":"serious"}],
+   "dropped": 0
+  },
+  {
+   "note": "strength decisive",
+   "items": [{"claim":"Six other cards already do this.","ground":"redundancy","fact":"ramp holds 12 against a target of 8-12.","strength":"decisive"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"redundancy","strength":"decisive"}],
+   "dropped": 0
+  },
+  {
+   "note": "strength serious",
+   "items": [{"claim":"Six other cards already do this.","ground":"redundancy","fact":"ramp holds 12 against a target of 8-12.","strength":"serious"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"redundancy","strength":"serious"}],
+   "dropped": 0
+  },
+  {
+   "note": "strength minor",
+   "items": [{"claim":"Six other cards already do this.","ground":"redundancy","fact":"ramp holds 12 against a target of 8-12.","strength":"minor"}],
+   "kept": [{"claim":"Six other cards already do this.","fact":"ramp holds 12 against a target of 8-12.","ground":"redundancy","strength":"minor"}],
+   "dropped": 0
+  }
+ ],
+ "alternatives": [
+  {
+   "note": "a green card for a green deck",
+   "names": ["Craterhoof Behemoth"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": ["Craterhoof Behemoth"],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":[]}
+  },
+  {"note":"nothing asked","names":[],"identity":["G"],"in_deck":[],"kept":[],"dropped":{"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":[]}},
+  {
+   "note": "a card nobody has heard of",
+   "names": ["Bolas's Citadel of Lies"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": [],
+   "dropped": {"not_in_pool":["Bolas's Citadel of Lies"],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "banned is banned",
+   "names": ["Primeval Titan"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": [],
+   "dropped": {"not_in_pool":[],"banned":["Primeval Titan"],"off_colour":[],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "the DFC by its front face, off-colour",
+   "names": ["Ajani, Nacatl Pariah"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": [],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":["Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "the DFC by its full name, off-colour",
+   "names": ["Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": [],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":["Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "the same DFC is in identity for a Boros deck",
+   "names": ["Ajani, Nacatl Pariah"],
+   "identity": ["R","W"],
+   "in_deck": [],
+   "kept": ["Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "colourless fits any identity",
+   "names": ["Sol Ring"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": ["Sol Ring"],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "already in the deck beats banned",
+   "names": ["Primeval Titan"],
+   "identity": ["G"],
+   "in_deck": ["primeval titan"],
+   "kept": [],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":["Primeval Titan"],"no_pool":[]}
+  },
+  {
+   "note": "already in the deck beats off-colour",
+   "names": ["Ajani, Nacatl Pariah"],
+   "identity": ["G"],
+   "in_deck": ["ajani, nacatl pariah // ajani, nacatl avenger"],
+   "kept": [],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":["Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"],"no_pool":[]}
+  },
+  {
+   "note": "both faces of one card are one card",
+   "names": ["Ajani, Nacatl Pariah","Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"],
+   "identity": ["R","W"],
+   "in_deck": [],
+   "kept": ["Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "case and whitespace do not matter",
+   "names": ["  craterhoof behemoth  "],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": ["Craterhoof Behemoth"],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "duplicates are asked once",
+   "names": ["Sol Ring","sol ring","SOL RING"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": ["Sol Ring"],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "duplicate names that do not resolve are still counted once",
+   "names": ["Ghost Card","ghost card","GHOST CARD"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": [],
+   "dropped": {"not_in_pool":["Ghost Card"],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "empty and blank names are skipped",
+   "names": ["","   ",null,"Sol Ring"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": ["Sol Ring"],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "a mixed bag",
+   "names": ["Craterhoof Behemoth","Primeval Titan","Ajani, Nacatl Pariah","Not A Real Card","Terastodon"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": ["Craterhoof Behemoth","Terastodon"],
+   "dropped": {"not_in_pool":["Not A Real Card"],"banned":["Primeval Titan"],"off_colour":["Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "more than the cap",
+   "names": ["Craterhoof Behemoth","Terastodon","Woodfall Primus","Vorinclex, Voice of Hunger","Regal Behemoth","Cultivator Colossus","Goreclaw, Terror of Qal Sisma"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": ["Craterhoof Behemoth","Terastodon","Woodfall Primus","Vorinclex, Voice of Hunger","Regal Behemoth","Cultivator Colossus"],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "an empty identity admits only colourless",
+   "names": ["Sol Ring","Craterhoof Behemoth"],
+   "identity": [],
+   "in_deck": [],
+   "kept": ["Sol Ring"],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":["Craterhoof Behemoth"],"already_in_deck":[],"no_pool":[]}
+  },
+  {
+   "note": "no pool at all",
+   "names": ["Sol Ring","Craterhoof Behemoth"],
+   "identity": ["G"],
+   "in_deck": [],
+   "kept": [],
+   "dropped": {"not_in_pool":[],"banned":[],"off_colour":[],"already_in_deck":[],"no_pool":["Sol Ring","Craterhoof Behemoth"]}
+  }
+ ]
+}

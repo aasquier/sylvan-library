@@ -289,6 +289,11 @@ func (a *API) Routes() []Route {
 		// exactly as far as the deck does -- `Library` resolves the owner, and
 		// the same source goes to the tools the conversation may reach for.
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/interview", Handler: a.rationaleInterview},
+		// The slot argument (ADR 25), the interview's twin: same shape, same
+		// status codes, opposite direction. `.../argue/deck` is the same mode
+		// swept across a selection and is a JOB, so it stays Python's until
+		// that lane crosses -- a prefix is not a family.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/argue", Handler: a.argueSlot},
 		// The accounts (Phase 4's last flip): the five public doors of
 		// `api/auth.py` and the `me` that says who is standing in them, then
 		// the admin surface of `api/admin.py`. The middleware half of

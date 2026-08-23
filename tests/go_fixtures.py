@@ -1895,6 +1895,171 @@ def render_crypto_cases() -> str:
 # ------------------------------------------------------------- the stance dial
 
 #: Where `internal/claude`'s stance corpus lands.
+ARGUE_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "argue.json"
+
+
+def only_charges_cases() -> list[dict[str, Any]]:
+    """`argue.only_charges` over what a model might actually return.
+
+    The predicate here is not the interview's. Every item this mode returns is
+    declarative by design, so "does it end in a question mark" would delete the
+    feature; what separates an argument from an opinion is **whether it cites
+    anything**, and a charge with no `fact` is not a charge.
+
+    The enum handling is the half worth pinning: an unrecognised `ground` or
+    `strength` FALLS BACK rather than dropping the charge, because a labelling
+    miss is not a reason to throw away a cited argument -- and a port that
+    dropped it instead would pass any test that only counted the good ones.
+    """
+    from mtglab.claude.argue import GROUNDS, STRENGTHS, only_charges
+    cases: list[dict[str, Any]] = []
+
+    def add(note: str, items: Any) -> None:
+        kept, dropped = only_charges(items)
+        cases.append({"note": note, "items": items,
+                      "kept": kept, "dropped": dropped})
+
+    good = {"claim": "Six other cards already do this.", "ground": "redundancy",
+            "fact": "ramp holds 12 against a target of 8-12.",
+            "strength": "serious"}
+    add("a whole charge", [good])
+    add("nothing at all", [])
+    add("no fact is not a charge", [{"claim": "It is simply bad.",
+                                     "ground": "cost", "strength": "minor"}])
+    add("an empty fact is no fact", [dict(good, fact="   ")])
+    add("no claim is not a charge", [dict(good, claim="")])
+    add("an unknown ground falls back to ceiling", [dict(good, ground="vibes")])
+    add("an unknown strength falls back to minor", [dict(good, strength="fatal")])
+    add("a missing ground falls back", [{"claim": good["claim"], "fact": good["fact"]}])
+    add("whitespace is stripped", [{"claim": "  spaced  ", "ground": " cost ",
+                                    "fact": "  a fact  ", "strength": " minor "}])
+    add("a non-object is dropped", ["a charge", 7, None, []])
+    add("mixed: two kept, three dropped",
+        [good, "nope", dict(good, fact=""), dict(good, claim="Another."), {}])
+    # Every ground and every strength, so a transcription slip in either table
+    # is a failure rather than a coin flip.
+    for ground in GROUNDS:
+        add(f"ground {ground}", [dict(good, ground=ground)])
+    for strength in STRENGTHS:
+        add(f"strength {strength}", [dict(good, strength=strength)])
+    return cases
+
+
+def resolve_alternative_cases() -> list[dict[str, Any]]:
+    """`argue.resolve_alternatives` against the 21-card pool.
+
+    Rule 2 made executable, and the reason the function exists: CLAUDE.md's
+    first recorded error is *Ajani, Nacatl Pariah* proposed for a G/W deck,
+    whose back face is R/W. `tiny_pool` carries that exact card, so the case is
+    the real one rather than a stand-in -- and it is asked for **by its front
+    face**, which is how a model would name it and the one spelling an index
+    keyed only on the pool's `A // B` name would miss silently.
+
+    The ORDER of the verdicts is pinned too. Primeval Titan is banned; put it
+    in the deck as well and the answer must be `already_in_deck`, because that
+    is the most specific true thing to say.
+    """
+    from mtglab.claude.argue import resolve_alternatives
+    cases: list[dict[str, Any]] = []
+
+    def add(note: str, names: Any, identity: list[str],
+            in_deck: set[str] = frozenset()) -> None:
+        kept, dropped = resolve_alternatives(names, identity=identity,
+                                             in_deck=in_deck)
+        cases.append({
+            "note": note, "names": names, "identity": identity,
+            "in_deck": sorted(in_deck),
+            "kept": [c["name"] for c in kept], "dropped": dropped,
+        })
+
+    green = ["G"]
+    add("a green card for a green deck", ["Craterhoof Behemoth"], green)
+    add("nothing asked", [], green)
+    add("a card nobody has heard of", ["Bolas's Citadel of Lies"], green)
+    add("banned is banned", ["Primeval Titan"], green)
+    # The whole reason this function exists.
+    add("the DFC by its front face, off-colour",
+        ["Ajani, Nacatl Pariah"], green)
+    add("the DFC by its full name, off-colour",
+        ["Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"], green)
+    add("the same DFC is in identity for a Boros deck",
+        ["Ajani, Nacatl Pariah"], ["R", "W"])
+    add("colourless fits any identity", ["Sol Ring"], green)
+    add("already in the deck beats banned",
+        ["Primeval Titan"], green, {"primeval titan"})
+    add("already in the deck beats off-colour",
+        ["Ajani, Nacatl Pariah"], green, {"ajani, nacatl pariah // ajani, nacatl avenger"})
+    add("both faces of one card are one card",
+        ["Ajani, Nacatl Pariah", "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"],
+        ["R", "W"])
+    add("case and whitespace do not matter",
+        ["  craterhoof behemoth  "], green)
+    add("duplicates are asked once", ["Sol Ring", "sol ring", "SOL RING"], green)
+    # And the case that makes the INPUT dedupe observable at all. Three
+    # spellings of a card that resolves collapse anyway, on the pool's name,
+    # further down -- so dropping the `seen` check changes nothing there and a
+    # mutation of it survives. Three spellings of a card that does NOT resolve
+    # have nothing to collapse them, so `not_in_pool` lists it once or three
+    # times depending on whether the check is there.
+    add("duplicate names that do not resolve are still counted once",
+        ["Ghost Card", "ghost card", "GHOST CARD"], green)
+    add("empty and blank names are skipped", ["", "   ", None, "Sol Ring"], green)
+    add("a mixed bag", ["Craterhoof Behemoth", "Primeval Titan",
+                        "Ajani, Nacatl Pariah", "Not A Real Card",
+                        "Terastodon"], green)
+    add("more than the cap", ["Craterhoof Behemoth", "Terastodon",
+                              "Woodfall Primus", "Vorinclex, Voice of Hunger",
+                              "Regal Behemoth", "Cultivator Colossus",
+                              "Goreclaw, Terror of Qal Sisma"], green)
+    add("an empty identity admits only colourless",
+        ["Sol Ring", "Craterhoof Behemoth"], [])
+    return cases
+
+
+def argue_cases() -> dict[str, Any]:
+    import tiny_pool
+    from mtglab import config
+    from mtglab.cards import db
+    with tempfile.TemporaryDirectory() as tmp:
+        pool_path = tiny_pool.build(Path(tmp) / "mtg.duckdb")
+        con = db.connect_readonly(pool_path)
+        try:
+            with config.use_paths(data_dir=Path(tmp)):
+                alternatives = resolve_alternative_cases()
+        finally:
+            con.close()
+    # The no-pool answer is its own case and cannot be produced beside a pool:
+    # every name comes back unresolved, and filing that under `not_in_pool`
+    # would accuse the model of inventing six cards.
+    from mtglab.claude.argue import resolve_alternatives
+    with tempfile.TemporaryDirectory() as tmp:
+        from mtglab import config as cfg
+        with cfg.use_paths(data_dir=Path(tmp)):
+            kept, dropped = resolve_alternatives(
+                ["Sol Ring", "Craterhoof Behemoth"], identity=["G"])
+            no_pool = {"note": "no pool at all", "names": ["Sol Ring", "Craterhoof Behemoth"],
+                       "identity": ["G"], "in_deck": [],
+                       "kept": [c["name"] for c in kept], "dropped": dropped}
+    return {"charges": only_charges_cases(),
+            "alternatives": [*alternatives, no_pool]}
+
+
+def render_argue_cases() -> str:
+    return _rows_json({
+        "note": "`argue.only_charges` and `argue.resolve_alternatives`, ADR "
+                "25's two Python-owned halves. Written by "
+                "`python tests/go_fixtures.py`.",
+        "why": "The charges half is the citation predicate and the two enum "
+               "fallbacks. The alternatives half is rule 2 made executable: "
+               "resolved through the pool, dropped and COUNTED SEPARATELY for "
+               "each of four reasons, because `you invented that card` and "
+               "`that card is off-colour` are different failures. The order "
+               "of the verdicts is part of it -- already-in-deck is checked "
+               "first because it is the most specific true thing to say.",
+        **argue_cases(),
+    }) + "\n"
+
+
 STANCE_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "stance.json"
 
 
@@ -2605,6 +2770,8 @@ def write() -> None:
     print(f"wrote {len(modes_payload()['modes'])} mode definitions into {MODES_PATH}")
     STANCE_PATH.parent.mkdir(parents=True, exist_ok=True)
     STANCE_PATH.write_text(render_stance_cases(), encoding="utf-8")
+    ARGUE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ARGUE_PATH.write_text(render_argue_cases(), encoding="utf-8")
     _stance = stance_cases()
     print(f"wrote {len(_stance['stances'])} stances and "
           f"{len(_stance['clamps'])} clamp pairs into {STANCE_PATH}")
