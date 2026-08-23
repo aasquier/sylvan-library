@@ -59,7 +59,7 @@ import struct
 import sys
 import tempfile
 import unicodedata
-from datetime import date
+from datetime import UTC, date
 from pathlib import Path
 from typing import Any
 
@@ -115,6 +115,11 @@ TINY_POOL_PATH = POOL_DIR / "pooltest" / "testdata" / "tiny_pool.json"
 #: as the marshalled payload text, because a spin is a promise -- a seed
 #: somebody replays after the cutover must deal the same fate, face and card.
 WHEEL_PATH = ROOT / "go" / "internal" / "wheel" / "testdata" / "spins.json"
+#: The price table and its estimates (Phase 8), for the admin dashboard's
+#: dollar figure.
+PRICES_PATH = ROOT / "go" / "internal" / "prices" / "testdata" / "prices.json"
+#: The visitor ledger's roll-up (Phase 8).
+TRAFFIC_PATH = ROOT / "go" / "internal" / "traffic" / "testdata" / "summary.json"
 #: The upcoming-sets filter (Phase 8): Scryfall payloads through the real
 #: `service.upcoming_sets`, clock and network stubbed, rendered as the bytes
 #: the route answers.
@@ -282,6 +287,134 @@ def wheel_cases() -> dict[str, object]:
 
 def render_wheel_cases() -> str:
     return json.dumps(wheel_cases(), indent=1, ensure_ascii=False) + "\n"
+
+
+# ------------------------------------------------------------ the price table
+#
+# `claude/prices.py` for the admin dashboard's dollar figure (Phase 8): the
+# table itself (so the Go copy cannot drift from this one), and `estimate`
+# over ledger-shaped rows -- the Sonnet window on both sides of its
+# changeover, the unpriced counting, and `round(x, 4)`'s half-to-even, all
+# rendered as the `as_dict()` bytes the stats route serialises.
+
+
+def prices_cases() -> dict[str, object]:
+    from mtglab.claude import prices
+
+    table = {
+        model: {
+            "input": priced.rate.input, "output": priced.rate.output,
+            **({"then_input": priced.then.input, "then_output": priced.then.output,
+                "until": priced.until.isoformat()}
+               if priced.then is not None and priced.until is not None else {}),
+        }
+        for model, priced in sorted(prices.PRICES.items())
+    }
+
+    def rows(*specs: tuple[str, int, int, int, int]) -> list[dict[str, object]]:
+        return [{"model": m, "conversations": c, "input_tokens": i,
+                 "output_tokens": o, "cache_read_tokens": r}
+                for m, c, i, o, r in specs]
+
+    cases = []
+    for name, when, row_specs in [
+        ("empty", "2026-08-23", []),
+        ("one sonnet before the changeover", "2026-08-23",
+         [("claude-sonnet-5", 3, 1_234_567, 89_012, 456_789)]),
+        ("the same sonnet after it", "2026-09-01",
+         [("claude-sonnet-5", 3, 1_234_567, 89_012, 456_789)]),
+        ("the boundary day itself", "2026-08-31",
+         [("claude-sonnet-5", 1, 1_000_000, 1_000_000, 0)]),
+        ("a mixed month", "2026-08-23",
+         [("claude-sonnet-5", 11, 5_432_100, 654_321, 9_876_543),
+          ("claude-opus-5", 2, 111_111, 22_222, 0),
+          ("claude-haiku-4-5", 7, 999_999, 88_888, 777_777)]),
+        ("unpriced beside priced", "2026-08-23",
+         [("claude-sonnet-5", 1, 100, 100, 0),
+          ("experimental-model", 4, 1, 1, 1),
+          ("", 2, 5, 5, 5)]),
+        ("a rounding edge", "2026-08-23",
+         [("claude-haiku-4-5", 1, 123, 45, 67)]),
+    ]:
+        built = prices.estimate(rows(*row_specs), when=date.fromisoformat(when))
+        cases.append({"name": name, "when": when, "rows": rows(*row_specs),
+                      "rendered": _wire_dumps(built.as_dict())})
+    return {"table": table, "cache_read_fraction": 0.1, "cases": cases}
+
+
+def render_prices_cases() -> str:
+    return json.dumps(prices_cases(), indent=1, ensure_ascii=False) + "\n"
+
+
+# ------------------------------------------------------ the visitor ledger
+#
+# `traffic.summary` over a seeded `request_log` with the clock frozen: the
+# seeded 2xx/4xx/5xx keys on every day row, a 3xx appended in encounter
+# order, the cutoff, and the top-routes order -- rendered as the bytes the
+# stats route wraps.
+
+
+def traffic_cases() -> list[dict[str, object]]:
+    import tempfile
+    from datetime import datetime
+
+    from mtglab import config
+    from mtglab.api import traffic
+    from mtglab.auth import db as authdb
+
+    frozen = datetime(2026, 8, 23, 12, 0, 0, tzinfo=UTC)
+
+    class FrozenDateTime:
+        @staticmethod
+        def now(tz: object = None) -> datetime:
+            del tz
+            return frozen
+
+    row_sets: dict[str, list[tuple[str, str, str, int]]] = {
+        "empty": [],
+        "a fortnight": [
+            ("2026-08-10", "/api/health", "2xx", 240),
+            ("2026-08-10", "/api/decks", "2xx", 31),
+            ("2026-08-10", "(unrouted)", "4xx", 17),
+            ("2026-08-11", "/api/health", "2xx", 260),
+            ("2026-08-11", "/{full_path}", "2xx", 12),
+            ("2026-08-11", "/api/sim/mana", "5xx", 2),
+            ("2026-08-12", "/api/health", "3xx", 4),
+            ("2026-06-01", "/api/health", "2xx", 999),
+        ],
+        "top routes truncate at twelve": [
+            (f"2026-08-2{d}", f"/api/route/{n}", "2xx", n + d)
+            for d in range(2) for n in range(14)
+        ],
+    }
+
+    out = []
+    real_datetime = traffic.datetime
+    try:
+        traffic.datetime = FrozenDateTime  # type: ignore[assignment, misc]
+        for name, rows in row_sets.items():
+            with tempfile.TemporaryDirectory() as tmp, \
+                    config.use_paths(data_dir=Path(tmp)):
+                with authdb.connection() as con, con:
+                    for day, route, cls, count in rows:
+                        con.execute(
+                            "INSERT INTO request_log (day, route, status_class,"
+                            " count) VALUES (?, ?, ?, ?)"
+                            " ON CONFLICT(day, route, status_class)"
+                            " DO UPDATE SET count = count + excluded.count",
+                            (day, route, cls, count))
+                answer = traffic.summary(days=30)
+            out.append({"name": name, "now": frozen.isoformat(), "rows": [
+                {"day": d, "route": r, "status_class": c, "count": n}
+                for d, r, c, n in rows
+            ], "rendered": _wire_dumps(answer)})
+    finally:
+        traffic.datetime = real_datetime  # type: ignore[misc]
+    return out
+
+
+def render_traffic_cases() -> str:
+    return json.dumps(traffic_cases(), indent=1, ensure_ascii=False) + "\n"
 
 
 # ------------------------------------------------------ the upcoming-sets feed
@@ -4538,6 +4671,12 @@ def write() -> None:
     SETS_PATH.parent.mkdir(parents=True, exist_ok=True)
     SETS_PATH.write_text(render_sets_cases(), encoding="utf-8")
     print(f"wrote {SETS_PATH}")
+    PRICES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PRICES_PATH.write_text(render_prices_cases(), encoding="utf-8")
+    print(f"wrote {PRICES_PATH}")
+    TRAFFIC_PATH.parent.mkdir(parents=True, exist_ok=True)
+    TRAFFIC_PATH.write_text(render_traffic_cases(), encoding="utf-8")
+    print(f"wrote {TRAFFIC_PATH}")
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     (LOG_DIR / "describe.json").write_text(render_log_cases(), encoding="utf-8")
     print(f"wrote the log oracle into {LOG_DIR}")

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/tiers"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
@@ -46,16 +47,16 @@ import (
 // guarantee it of this file; `tests/test_isolation.py` pins the third -- that
 // no *other* module acquires the habit.
 //
-// **One route of this family is missing, and its absence is a decision.**
-// `DELETE /api/admin/users/{username}` stays Python's until the jobs registry
-// crosses, because deleting an account also calls `jobs.forget_owner` and that
-// registry lives in memory in the uvicorn process. It cannot be skipped:
-// `users.id` is `INTEGER PRIMARY KEY` without `AUTOINCREMENT`, so SQLite
-// re-issues a deleted account's rowid, and jobs left keyed on that integer
-// would be handed to whoever is created next -- the isolation `jobs.get`
-// enforces, defeated by arithmetic. The response even reports `jobs_dropped`,
-// so a handler here could not give an honest number. docs/go-migration/
-// PLAN.md section 10 carries it.
+// **The twelfth registration arrived last, and later than its eleven.**
+// `DELETE /api/admin/users/{username}` stayed Python's through Phase 4
+// because deleting an account also calls `jobs.forget_owner`, and a registry
+// lives in the memory of the process that filled it: `users.id` is reissued
+// by SQLite, so jobs left keyed on a freed integer would be handed to
+// whoever is created next, and only the process holding the jobs could
+// report `jobs_dropped` honestly. Phase 7 dissolved that — no Python route
+// creates a job any more, so uvicorn's registry is always empty and this
+// process's count is the total — and Phase 8 collected the route
+// (`deleteAccount`, at the bottom of this file).
 
 // requireAdmin is `deps.admin`, the second of two checks. It answers 403 and
 // reports whether it did.
@@ -515,4 +516,73 @@ func (a *API) revokeSessions(w http.ResponseWriter, r *http.Request) {
 		"username", user.Username, "count", ended)
 	wire.JSON(w, http.StatusOK, map[string]any{
 		"username": user.Username, "revoked": ended})
+}
+
+// deleteAccount is `DELETE /api/admin/users/{username}` — the twelfth
+// registration, the one Phase 4 deliberately left and Phase 8 collects. The
+// blocker dissolved with Phase 7: no Python route creates a job any more, so
+// uvicorn's registry is always empty and this process's `ForgetOwner` count
+// is the honest `jobs_dropped` — the number the response reports, dropped
+// because `users.id` is reissued by SQLite and the next account created must
+// not be handed this one's results.
+//
+// The one irreversible thing an admin can do from a browser, and it carries
+// the two guards that earns: the caller types the username back (`confirm`
+// must casefold-equal it — only somebody looking at the right account can
+// produce it, and a fetch aimed at the wrong URL cannot; 422, because the
+// body is the thing that is wrong), and an admin may not delete the account
+// their own session belongs to (409 — `LastAdmin` prevents the lockout but
+// permits the confusing case of a colleague-having admin signing themselves
+// out by their own request).
+func (a *API) deleteAccount(w http.ResponseWriter, r *http.Request) {
+	if a.requireAdmin(w, r) {
+		return
+	}
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	db, ok := a.adminDB(w)
+	if !ok {
+		return
+	}
+	user, ok := a.findAccount(w, r, db)
+	if !ok {
+		return
+	}
+	// `str(payload.get("confirm") or "").strip()`: a falsy confirm is the
+	// empty string, anything else renders as Python's str().
+	typed := ""
+	if pyTruthy(body["confirm"]) {
+		typed = claude.PyStrip(wire.PyStr(body["confirm"]))
+	}
+	if claude.PyCasefold(typed) != claude.PyCasefold(user.Username) {
+		wire.Detail(w, http.StatusUnprocessableEntity,
+			"type "+wire.PyRepr(user.Username)+" in confirm to delete it")
+		return
+	}
+	caller := auth.ScopeFrom(r.Context())
+	if user.ID == caller.UserID {
+		wire.Detail(w, http.StatusConflict,
+			"you cannot delete the account you are signed in as -- use "+
+				"`mtglab users delete` on the machine")
+		return
+	}
+	ended, err := auth.Delete(r.Context(), db, user.ID)
+	if err != nil {
+		a.refuseAdminWrite(w, err)
+		return
+	}
+	forgotten := 0
+	if a.jobs != nil {
+		forgotten = a.jobs.ForgetOwner(user.ID)
+	}
+	a.log.Warn("an account was deleted",
+		"by", caller.Username, "username", user.Username,
+		"sessions", ended, "jobs", forgotten)
+	wire.JSON(w, http.StatusOK, wire.OrderedMap{
+		{Key: "username", Value: user.Username},
+		{Key: "revoked", Value: ended},
+		{Key: "jobs_dropped", Value: forgotten},
+	})
 }

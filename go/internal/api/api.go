@@ -31,12 +31,14 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
+	"github.com/aasquier/sylvan-library/go/internal/flymetrics"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/shelves"
 	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 	matchledger "github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
+	"github.com/aasquier/sylvan-library/go/internal/traffic"
 )
 
 // Config is what the ported routes need. It grew with the families: the
@@ -56,6 +58,19 @@ type Config struct {
 	// ScryfallDir is where `data refresh` parks the bulk downloads; `health`
 	// lists them. Empty means an instance that has never refreshed.
 	ScryfallDir string
+	// DataDir is MTGLAB_DATA_DIR, for the storage and system views that size
+	// and statfs the volume.
+	DataDir string
+	// PoolPath is the card pool file, sized by the storage view and never
+	// opened by it.
+	PoolPath string
+	// Traffic is the visitor ledger's recorder, shared with the door so the
+	// stats view's read flushes the same buffer the door fills. Nil records
+	// nothing and summarises an empty ledger.
+	Traffic *traffic.Recorder
+	// Fly is the metrics panel, or nil for one built over the real
+	// transport; a test injects a Panel with a stub.
+	Fly *flymetrics.Panel
 	// AdminEmail is MTGLAB_ADMIN_EMAIL, resolved to the maintainer's handle
 	// through app.db for a signed-in caller (ADR 17, ADR 22); never rendered.
 	AdminEmail string
@@ -148,6 +163,10 @@ type API struct {
 	lazyWriteDB *sql.DB
 
 	scryfallDir string
+	dataDir     string
+	poolPath    string
+	traffic     *traffic.Recorder
+	fly         *flymetrics.Panel
 
 	// The upcoming-sets answer, held for the day it was fetched on -- the
 	// process-lifetime cache `service._SETS_CACHE` keeps, as marshalled
@@ -168,8 +187,13 @@ func New(cfg Config) *API {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
+	if cfg.Fly == nil {
+		cfg.Fly = &flymetrics.Panel{Log: cfg.Logger}
+	}
 	return &API{log: cfg.Logger, pool: cfg.Pool, db: cfg.AppDB, writeDB: cfg.AppWriteDB,
 		dbPath: cfg.AppDBPath, decksDir: cfg.DecksDir, scryfallDir: cfg.ScryfallDir,
+		dataDir: cfg.DataDir, poolPath: cfg.PoolPath, traffic: cfg.Traffic,
+		fly:        cfg.Fly,
 		adminEmail: cfg.AdminEmail,
 		shelves:    cfg.Shelves, log28: cfg.Recorder, requireAuth: cfg.RequireAuth,
 		secureCookies: cfg.SecureCookies, email: cfg.EmailSender,
@@ -401,6 +425,15 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPatch, Pattern: "/api/admin/users/{username}", Handler: a.updateAccount},
 		{Method: http.MethodPost, Pattern: "/api/admin/users/{username}/reset", Handler: a.sendAccountReset},
 		{Method: http.MethodDelete, Pattern: "/api/admin/users/{username}/sessions", Handler: a.revokeSessions},
+		// The twelfth registration and the stats six -- Phase 8's last
+		// batch, after which nothing under /api is Python's.
+		{Method: http.MethodDelete, Pattern: "/api/admin/users/{username}", Handler: a.deleteAccount},
+		{Method: http.MethodGet, Pattern: "/api/admin/stats/system", Handler: a.statsSystem},
+		{Method: http.MethodGet, Pattern: "/api/admin/stats/storage", Handler: a.statsStorage},
+		{Method: http.MethodGet, Pattern: "/api/admin/stats/claude", Handler: a.statsClaude},
+		{Method: http.MethodGet, Pattern: "/api/admin/stats/activity", Handler: a.statsActivity},
+		{Method: http.MethodGet, Pattern: "/api/admin/stats/traffic", Handler: a.statsTraffic},
+		{Method: http.MethodGet, Pattern: "/api/admin/stats/fly", Handler: a.statsFly},
 
 		// The sim family, and with it the two generic job routes -- Phase 5's
 		// flip.

@@ -1,0 +1,164 @@
+{
+ "table": {
+  "claude-fable-5": {
+   "input": 10.0,
+   "output": 50.0
+  },
+  "claude-haiku-4-5": {
+   "input": 1.0,
+   "output": 5.0
+  },
+  "claude-mythos-5": {
+   "input": 10.0,
+   "output": 50.0
+  },
+  "claude-opus-4-6": {
+   "input": 5.0,
+   "output": 25.0
+  },
+  "claude-opus-4-7": {
+   "input": 5.0,
+   "output": 25.0
+  },
+  "claude-opus-4-8": {
+   "input": 5.0,
+   "output": 25.0
+  },
+  "claude-opus-5": {
+   "input": 5.0,
+   "output": 25.0
+  },
+  "claude-sonnet-4-6": {
+   "input": 3.0,
+   "output": 15.0
+  },
+  "claude-sonnet-5": {
+   "input": 2.0,
+   "output": 10.0,
+   "then_input": 3.0,
+   "then_output": 15.0,
+   "until": "2026-08-31"
+  }
+ },
+ "cache_read_fraction": 0.1,
+ "cases": [
+  {
+   "name": "empty",
+   "when": "2026-08-23",
+   "rows": [],
+   "rendered": "{\"usd\":0.0,\"unpriced\":0,\"unpriced_models\":[],\"complete\":true,\"checked\":\"2026-08-18\"}"
+  },
+  {
+   "name": "one sonnet before the changeover",
+   "when": "2026-08-23",
+   "rows": [
+    {
+     "model": "claude-sonnet-5",
+     "conversations": 3,
+     "input_tokens": 1234567,
+     "output_tokens": 89012,
+     "cache_read_tokens": 456789
+    }
+   ],
+   "rendered": "{\"usd\":3.4506,\"unpriced\":0,\"unpriced_models\":[],\"complete\":true,\"checked\":\"2026-08-18\"}"
+  },
+  {
+   "name": "the same sonnet after it",
+   "when": "2026-09-01",
+   "rows": [
+    {
+     "model": "claude-sonnet-5",
+     "conversations": 3,
+     "input_tokens": 1234567,
+     "output_tokens": 89012,
+     "cache_read_tokens": 456789
+    }
+   ],
+   "rendered": "{\"usd\":5.1759,\"unpriced\":0,\"unpriced_models\":[],\"complete\":true,\"checked\":\"2026-08-18\"}"
+  },
+  {
+   "name": "the boundary day itself",
+   "when": "2026-08-31",
+   "rows": [
+    {
+     "model": "claude-sonnet-5",
+     "conversations": 1,
+     "input_tokens": 1000000,
+     "output_tokens": 1000000,
+     "cache_read_tokens": 0
+    }
+   ],
+   "rendered": "{\"usd\":12.0,\"unpriced\":0,\"unpriced_models\":[],\"complete\":true,\"checked\":\"2026-08-18\"}"
+  },
+  {
+   "name": "a mixed month",
+   "when": "2026-08-23",
+   "rows": [
+    {
+     "model": "claude-sonnet-5",
+     "conversations": 11,
+     "input_tokens": 5432100,
+     "output_tokens": 654321,
+     "cache_read_tokens": 9876543
+    },
+    {
+     "model": "claude-opus-5",
+     "conversations": 2,
+     "input_tokens": 111111,
+     "output_tokens": 22222,
+     "cache_read_tokens": 0
+    },
+    {
+     "model": "claude-haiku-4-5",
+     "conversations": 7,
+     "input_tokens": 999999,
+     "output_tokens": 88888,
+     "cache_read_tokens": 777777
+    }
+   ],
+   "rendered": "{\"usd\":22.016,\"unpriced\":0,\"unpriced_models\":[],\"complete\":true,\"checked\":\"2026-08-18\"}"
+  },
+  {
+   "name": "unpriced beside priced",
+   "when": "2026-08-23",
+   "rows": [
+    {
+     "model": "claude-sonnet-5",
+     "conversations": 1,
+     "input_tokens": 100,
+     "output_tokens": 100,
+     "cache_read_tokens": 0
+    },
+    {
+     "model": "experimental-model",
+     "conversations": 4,
+     "input_tokens": 1,
+     "output_tokens": 1,
+     "cache_read_tokens": 1
+    },
+    {
+     "model": "",
+     "conversations": 2,
+     "input_tokens": 5,
+     "output_tokens": 5,
+     "cache_read_tokens": 5
+    }
+   ],
+   "rendered": "{\"usd\":0.0012,\"unpriced\":6,\"unpriced_models\":[\"(none recorded)\",\"experimental-model\"],\"complete\":false,\"checked\":\"2026-08-18\"}"
+  },
+  {
+   "name": "a rounding edge",
+   "when": "2026-08-23",
+   "rows": [
+    {
+     "model": "claude-haiku-4-5",
+     "conversations": 1,
+     "input_tokens": 123,
+     "output_tokens": 45,
+     "cache_read_tokens": 67
+    }
+   ],
+   "rendered": "{\"usd\":0.0004,\"unpriced\":0,\"unpriced_models\":[],\"complete\":true,\"checked\":\"2026-08-18\"}"
+  }
+ ]
+}
