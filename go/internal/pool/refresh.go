@@ -27,6 +27,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -223,7 +224,7 @@ func IterCards(path string, yield func(map[string]any) error) error {
 	dec := json.NewDecoder(reader)
 	dec.UseNumber()
 	first, err := dec.Token()
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return nil
 	}
 	if err != nil {

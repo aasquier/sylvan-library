@@ -166,7 +166,7 @@ func EnsureMaintainer(ctx context.Context, db *sql.DB) error {
 		// no-logging rule is not protecting from the maintainer.
 		slog.Default().Error(fmt.Sprintf("MTGLAB_ADMIN_EMAIL=%s is not an email "+
 			"address; no maintainer account was reconciled", wire.PyRepr(address)))
-		return nil
+		return nil //nolint:nilerr // a malformed preference is logged and skipped, never fatal — bootstrap.py's own behavior
 	}
 	if normalised == "" { // unreachable: the `if address == ""` above
 		return nil

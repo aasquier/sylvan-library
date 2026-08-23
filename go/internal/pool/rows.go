@@ -25,15 +25,13 @@ var PrintingColumns = []string{
 	"flavor_text", "artist",
 }
 
-// frontFaceFields is `_FRONT_FACE_FIELDS`: what Scryfall puts on the *faces*
-// of a double-faced card rather than on the card itself. Reading only the
+// front reads a field that Scryfall puts on the *faces* of a double-faced
+// card rather than on the card itself (`_FRONT_FACE_FIELDS`: mana_cost,
+// power, toughness, loyalty, defense, flavor_text, artist). Reading only the
 // top level left `mana_cost` NULL for all 501 DFCs and the compiler handed
 // every one of them to the simulator as a free spell — Etali cast on turn
 // one. The front face is the face you cast from hand, which makes it the
 // right answer rather than a convenient one.
-var frontFaceFields = []string{"mana_cost", "power", "toughness", "loyalty",
-	"defense", "flavor_text", "artist"}
-
 func front(c map[string]any, field string) any {
 	if value := c[field]; value != nil {
 		return value
