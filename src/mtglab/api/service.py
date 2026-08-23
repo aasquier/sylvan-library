@@ -1362,16 +1362,36 @@ def delete_deck(*, slug: str, confirm: str,
 #: research (ADR 26) joined the theme interview here, and joined it for exactly
 #: the same reason. **The value is the owning module's own function**, never a
 #: literal; a default copied into this file is a second copy to disagree with.
-_SURFACE_DEFAULTS = {"theme", "research"}
+#: The surfaces that own their answer to "no preference", because they run
+#: with no deck to derive one from.
+#:
+#: **`scan` joined it on 2026-08-23, and its absence was a bug for three
+#: months.** `scan.py` has defined `stance_for` since ADR 34 landed (#180) with
+#: a docstring saying in as many words that it is public so `/api/claude` will
+#: not "render `off` for a surface that was about to run" -- and nothing ever
+#: asked it, because this set was not extended. Found by the Go port and ruled
+#: with Aaron; unreachable from the app, since nothing sends `surface=scan`,
+#: which is exactly how it survived.
+_SURFACE_DEFAULTS = {"theme", "research", "scan"}
 
 
-def _surface_stance_for(surface: str) -> Any:
-    """Ask the module that owns `surface` what "no preference" means to it."""
+def _surface_stance_for(surface: str, requested: Any = None) -> Any:
+    """Ask the module that owns `surface` what it makes of `requested`.
+
+    **One dispatch, and that is the fix rather than a tidy-up.** This existed
+    beside a second copy inside `claude_status`, identical but for passing the
+    caller's pin — so adding a surface meant editing two places, and the day
+    `scan` arrived only zero of them were edited. A surface's default is asked
+    of the module that owns it, and now it is asked in one place.
+    """
     if surface == "research":
         from mtglab.claude.research import stance_for as research_stance_for
-        return research_stance_for(None)
+        return research_stance_for(requested)
+    if surface == "scan":
+        from mtglab.claude.scan import stance_for as scan_stance_for
+        return scan_stance_for(requested)
     from mtglab.claude.theme import stance_for as theme_stance_for
-    return theme_stance_for(None)
+    return theme_stance_for(requested)
 
 
 def _default_stance(deck: Any, surface: str | None) -> Any:
@@ -1420,11 +1440,7 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
     # theme interview is the one mode with no deck to derive from and a default
     # that is emphatically not `off` — see `theme.stance_for`.
     if surface in _SURFACE_DEFAULTS and deck is None:
-        if surface == "research":
-            from mtglab.claude.research import stance_for as surface_stance_for
-        else:
-            from mtglab.claude.theme import stance_for as surface_stance_for
-        effective = surface_stance_for(requested)
+        effective = _surface_stance_for(surface, requested)
     else:
         effective = claude_stance.resolve(requested, deck=deck)
     limit = claude_stance.ceiling()
@@ -1456,7 +1472,16 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
         "never": "One rule holds at every setting: Claude never writes a "
                  "card's rationale. The why is always yours.",
         # The modes that exist, so a UI can offer what is built rather than
-        # what ADR 15 planned. Six today, across five features.
+        # what ADR 15 planned.
+        #
+        # **Seven, and it was six until 2026-08-23.** The list was last
+        # extended by #93 when research became the sixth; ADR 34's scan landed
+        # in #180 and never joined it, so a payload whose own comment called
+        # itself "the modes that exist" was one short for three months. It is
+        # written out rather than derived because a mode's *object* is what is
+        # wanted and each lives behind its own lazy import -- so this stays a
+        # list somebody has to remember, and the count deliberately is not
+        # written down beside it any more.
         "modes": [{
             "name": mode.name,
             "purpose": mode.purpose,
@@ -1468,7 +1493,8 @@ def claude_status(*, requested: Any = None, slug: str | None = None,
             "server_tools": [t["name"] for t in mode.server_tools],
             "writes": list(mode.may_write),
         } for mode in (interview, claude_argue_mode(), claude_dossier_mode(),
-                       claude_research_mode(), *claude_theme_modes())],
+                       claude_research_mode(), *claude_theme_modes(),
+                       claude_scan_mode())],
     }
 
 
@@ -1488,6 +1514,17 @@ def claude_argue_mode() -> Mode:
     """The slot argument's mode object (ADR 25). Imported lazily too."""
     from mtglab.claude.argue import SLOT_ARGUMENT
     return SLOT_ARGUMENT
+
+
+def claude_scan_mode() -> Mode:
+    """The camera's mode object (ADR 34). Imported lazily like the rest.
+
+    Worth reading its `response_schema` rather than trusting the name: it has
+    **no field for a card name**, which is the whole design. A UI listing this
+    mode's capabilities is listing the argument.
+    """
+    from mtglab.claude.scan import MODE
+    return MODE
 
 
 def claude_dossier_mode() -> Mode:

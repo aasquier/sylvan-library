@@ -2288,6 +2288,9 @@ def render_argue_cases() -> str:
 DOSSIER_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "dossier.json"
 RESEARCH_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "research.json"
 
+#: Where the scan corpus lands (ADR 34, the seventh mode).
+SCAN_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "scan.json"
+
 #: One instant for every stamp in the two corpora below. `generated_at` and a
 #: stored row's `created_at` are `datetime.now(UTC).isoformat()`; the Go tests
 #: freeze their clock to this same string, so a whole report compares as bytes.
@@ -2830,7 +2833,121 @@ def stance_cases() -> dict[str, Any]:
         "parses": parses,
         "ceilings": ceilings,
         "defaults": defaults,
+        "dial": dial_cases(),
     }
+
+
+#: The slug the dial corpus asks about. Any name; it exists only so the route's
+#: `if slug:` branch is the one being exercised.
+_DIAL_SLUG = "dial-probe"
+
+
+def _dial_source(status: Any) -> Any:
+    """A one-deck source whose deck has the status under test, or None.
+
+    A **real** `DeckSource` rather than a patched payload: `claude_status`
+    reads the deck itself (`Deck.from_text(decks.read_text(slug))`), so a
+    corpus that computed the two deck-dependent fields on the side would be
+    reimplementing the function it is checking -- and would stay green against
+    a mutant of it. The tarot lane paid for that lesson once already.
+    """
+    if status is None:
+        return None
+    from mtglab.decks.model import Deck
+    from mtglab.decks.source import MemoryDeckSource
+
+    text = f"name: Dial Probe\nstatus: {status}\ncards: []\n"
+    return MemoryDeckSource([Deck.from_text(text, slug=_DIAL_SLUG)])
+
+
+def dial_cases() -> list[dict[str, Any]]:
+    """`service.claude_status`, the whole payload `GET /api/claude` answers.
+
+    Recorded as the **serialised** shape rather than field by field, for the
+    reason the `stances` table above gives: a struct whose values are right
+    and whose field order is wrong marshals to different bytes, and only
+    comparing bytes sees it.
+
+    Three environment facts are pinned rather than inherited, because all
+    three are read at call time and would otherwise make the corpus a record
+    of whichever machine rendered it: the stance ceiling, the credential (so
+    `configured` is a decision rather than an accident of the shell), and the
+    model override (so `model` is the house answer).
+
+    **The deck is a status string, not a slug.** The route reads a deck only
+    to get its `status`, so the corpus exercises that field directly and the
+    handler's library resolution is left to the route tests, where a 404 can
+    actually be asserted.
+
+    Two rows were **warts until 2026-08-23** and are kept for it: for three
+    months `?surface=scan` resolved `off` -- `_SURFACE_DEFAULTS` was never
+    extended when ADR 34 landed (#180), while `scan.stance_for` sat there with
+    a docstring saying it existed to prevent exactly that -- and the `modes`
+    list was six of the seven for the same omission one layer along. Found by
+    the Go port and ruled with Aaron; both fixed in both runtimes at once.
+    Neither was reachable from the app, which is how they survived, so the
+    rows stay here as the thing that would notice.
+    """
+    from mtglab.api import service
+
+    cases = []
+    for note, requested, status, surface, ceiling in [
+        ("nothing at all", None, None, None, None),
+        ("no deck, no surface", None, None, "", None),
+        ("a theme surface with no deck", None, None, "theme", None),
+        ("a research surface with no deck", None, None, "research", None),
+        # `consultant` and not `second-opinion`: this is a transcription,
+        # where volunteering is the failure mode rather than the feature. It
+        # answered `off` until 2026-08-23.
+        ("a scan surface with no deck", None, None, "scan", None),
+        ("a surface nobody owns", None, None, "nonsense", None),
+        ("a built deck", None, "built", None, None),
+        ("a theoretical deck", None, "theoretical", None, None),
+        ("a deck with an odd status", None, "sideways", None, None),
+        # A deck present alongside a deckless surface: the deck wins, because
+        # the branch is `surface in _SURFACE_DEFAULTS AND deck is None`.
+        ("a theme surface WITH a deck", None, "built", "theme", None),
+        ("a pin", "collaborator", None, None, None),
+        ("a pin over a deck", "off", "theoretical", None, None),
+        ("a pin over a deckless surface", "consultant", None, "theme", None),
+        ("a custom stance", {"initiative": "volunteers", "scope": "rethink",
+                             "write": "none"}, None, None, None),
+        ("a malformed stance", {"initiative": 7}, None, None, None),
+        ("a stance that is not a stance", 7, None, None, None),
+        ("a preset that is not one", "nope", None, None, None),
+        # Under a cap: every preset row's `available` flips, which is the
+        # field a UI greys a control out on.
+        ("everything, capped at off", None, None, None, "off"),
+        ("a theme surface, capped at off", None, None, "theme", "off"),
+        ("a pin over the cap", "collaborator", None, None, "consultant"),
+    ]:
+        saved_ceiling = os.environ.pop("MTGLAB_CLAUDE_STANCE_CEILING", None)
+        saved_key = os.environ.pop("ANTHROPIC_API_KEY", None)
+        saved_token = os.environ.pop("ANTHROPIC_AUTH_TOKEN", None)
+        saved_model = os.environ.pop("MTGLAB_CLAUDE_MODEL", None)
+        if ceiling:
+            os.environ["MTGLAB_CLAUDE_STANCE_CEILING"] = ceiling
+        try:
+            row: dict[str, Any] = {"note": note, "requested": requested,
+                                   "deck_status": status, "surface": surface,
+                                   "ceiling": ceiling}
+            try:
+                row["payload"] = service.claude_status(
+                    requested=requested, surface=surface,
+                    slug=_DIAL_SLUG if status is not None else None,
+                    source=_dial_source(status))
+            except ValueError as exc:
+                row["error"] = str(exc)
+            cases.append(row)
+        finally:
+            os.environ.pop("MTGLAB_CLAUDE_STANCE_CEILING", None)
+            for name, value in (("MTGLAB_CLAUDE_STANCE_CEILING", saved_ceiling),
+                                ("ANTHROPIC_API_KEY", saved_key),
+                                ("ANTHROPIC_AUTH_TOKEN", saved_token),
+                                ("MTGLAB_CLAUDE_MODEL", saved_model)):
+                if value is not None:
+                    os.environ[name] = value
+    return cases
 
 
 class _Statused:
@@ -3856,15 +3973,28 @@ def theme_prompt_cases() -> dict[str, Any]:
 
 
 def theme_float_cases() -> list[dict[str, Any]]:
-    """`float(budget)`, which is not `strconv.ParseFloat`.
+    """`theme.read_budget`, whose `float()` is not `strconv.ParseFloat`.
 
-    The route spells it `float(budget) if budget else None` **inside** a `try`
-    that catches `TranscriptRejected` and `ValueError` -- and not `TypeError`.
-    So a string that will not read is a 422 carrying Python's own message, and
-    a list is an uncaught `TypeError` and a 500. Both are reproduced;
-    collapsing them would be a flip that changes behaviour, which is not a
-    flip.
+    **Driven through the real function, not through `float()` by hand.** The
+    tarot lane learnt that the expensive way: a test that reimplements the
+    call it is checking passes against a mutant of the caller. So this asks
+    `read_budget` and records what it answers.
+
+    Two halves, and the first is the one a port can get wrong. The **grammar**
+    is CPython's `float()` -- underscores between digits, any Unicode decimal
+    digit, `inf`, `Infinity`, `NaN`, a leading `+`, surrounding whitespace,
+    and *not* Go's `0x1p4` -- and every accepted value is recorded as `repr`
+    so a one-ulp difference is a diff rather than a rounding nobody sees.
+
+    The **refusal** is one sentence for every way the field can fail, which
+    it was not until 2026-08-23: `float(budget)` sat in a `try` catching
+    `ValueError` and not `TypeError`, so a list was an uncaught 500 and a bad
+    string was a 422 quoting `float()` at the user. Ruled with Aaron and
+    fixed in both runtimes at once, so `error_kind` is gone -- there is no
+    longer a distinction to record, and that absence is the fix.
     """
+    from mtglab.claude import theme
+
     cases = []
     for note, raw in [
         ("none is no budget", None), ("zero is no budget", 0),
@@ -3881,23 +4011,17 @@ def theme_float_cases() -> list[dict[str, Any]]:
         ("not a number", "fifty"),
         ("an overflowing literal", "1e400"),
         ("true is one", True),
-        ("a list is a TypeError, not a ValueError", [1]),
-        ("an object is a TypeError", {"a": 1}),
+        ("a list refuses in the same words as a bad string", [1]),
+        ("an object refuses in the same words", {"a": 1}),
+        ("what somebody actually types", "about fifty quid"),
+        ("a currency symbol", "$50"),
     ]:
         row: dict[str, Any] = {"note": note, "raw": raw}
-        if not raw:
-            row["budget"] = None
-            cases.append(row)
-            continue
         try:
-            value = float(raw)
-            row["budget"] = repr(value)
-        except ValueError as exc:
+            value = theme.read_budget(raw)
+            row["budget"] = None if value is None else repr(value)
+        except theme.BudgetRejected as exc:
             row["error"] = str(exc)
-            row["error_kind"] = "value"
-        except TypeError as exc:
-            row["error"] = str(exc)
-            row["error_kind"] = "type"
         cases.append(row)
     return cases
 
@@ -4311,6 +4435,9 @@ def write() -> None:
     print(f"wrote {len(modes_payload()['modes'])} mode definitions into {MODES_PATH}")
     STANCE_PATH.parent.mkdir(parents=True, exist_ok=True)
     STANCE_PATH.write_text(render_stance_cases(), encoding="utf-8")
+    SCAN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SCAN_PATH.write_text(render_scan_cases(), encoding="utf-8")
+    print(f"wrote the camera reader's corpus into {SCAN_PATH}")
     ARGUE_PATH.parent.mkdir(parents=True, exist_ok=True)
     ARGUE_PATH.write_text(render_argue_cases(), encoding="utf-8")
     SOURCES_PATH.write_text(render_sources_cases(), encoding="utf-8")
@@ -7249,6 +7376,231 @@ def write_sim_engine() -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body, encoding="utf-8")
         print(f"wrote {what} into {path}")
+
+
+# ------------------------------------------------------- the seventh mode
+
+def scan_cases() -> dict[str, Any]:
+    """`claude/scan.py`: the camera's reader, held to Python.
+
+    Four tables, because a failure that names its table localises itself.
+
+    * `media_types` -- every label the mode is handed, accepted or refused.
+      The membership test is `media_type not in MEDIA_TYPES` over a frozenset
+      of strings, so it is **exact**: no trimming, no case folding. The
+      tolerant version is the one a port writes by reflex, so the uppercase
+      and padded spellings are here to refuse.
+    * `captures` -- what `_payload` does with a capture, and this is the
+      table that matters. `base64.b64decode(s, validate=True)` is strict, and
+      the strictness is load-bearing rather than fussy: the **default**
+      `b64decode` silently discards characters outside the alphabet, so a
+      capture carrying a stray newline would decode shorter and be sent as a
+      corrupt image instead of refused. Whether Go's `StdEncoding` draws the
+      same line is a question about two libraries, not one this port gets to
+      answer by reading, so every edge is measured -- newlines, spaces,
+      missing padding, over-padding, the URL-safe alphabet, and a non-zero
+      trailing-bit encoding that the two could plausibly disagree about.
+    * `sightings` -- a finished turn read back as the `Sighting` the pool's
+      reader already takes. Every failure is "nothing legible": a refusal,
+      unparseable text, a non-object, a non-string field, a whitespace-only
+      field. A response schema makes the middle three nearly impossible and
+      "nearly" is why the branches exist.
+    * `stances` -- `scan.stance_for`, whose default is `consultant` and not
+      `second-opinion`: this is a transcription, where volunteering is the
+      failure mode rather than the feature.
+
+    The `not_a_string` rows were a **wart** until 2026-08-23: a capture that
+    is neither a string nor bytes reached `len()` and raised an uncaught
+    `TypeError`, so a plainly malformed request was a 500. It was the theme
+    proposal's `float(budget)` bug in a second module, found by the Go port on
+    the day that one was ruled and ruled with it. They are ordinary refusals
+    now, and they are here so the fix cannot silently come undone.
+    """
+    import base64 as b64
+
+    from mtglab.claude import modes as modes_mod
+    from mtglab.claude import scan
+    from mtglab.claude import stance as stance_mod
+
+    good = b64.b64encode(b"\x89PNG\r\n\x1a\n" + b"x" * 40).decode()
+
+    media_types = []
+    for label in ["image/jpeg", "image/png", "image/webp", "image/gif",
+                  "image/tiff", "image/jpg", "IMAGE/JPEG", "Image/Png",
+                  " image/jpeg ", "image/jpeg;charset=utf-8", "jpeg", "",
+                  "image/jpeg\n", "image/svg+xml", "application/pdf"]:
+        row: dict[str, Any] = {"media_type": label}
+        try:
+            scan.message(good, label)
+            row["ok"] = True
+        except scan.ScanRefused as exc:
+            row["ok"] = False
+            row["error"] = str(exc)
+        media_types.append(row)
+
+    captures: list[dict[str, Any]] = []
+    for note, image in [
+        ("a real capture", good),
+        ("the shortest legal capture", b64.b64encode(b"x").decode()),
+        ("two bytes", b64.b64encode(b"xy").decode()),
+        ("three bytes, no padding needed", b64.b64encode(b"xyz").decode()),
+        ("empty string", ""),
+        ("base64 of a single space", b64.b64encode(b" ").decode()),
+        ("not base64 at all", "!!!!"),
+        ("a newline inside", good[:8] + "\n" + good[8:]),
+        ("a space inside", good[:8] + " " + good[8:]),
+        ("a trailing newline", good + "\n"),
+        ("unpadded", "YWJjZA"),
+        ("over-padded", "YWJjZA==="),
+        ("one padding char where two are needed", "YWJjZA="),
+        ("the url-safe alphabet", "-_-_"),
+        ("a non-zero trailing bit", "YW=="),
+        ("lone padding", "="),
+        ("only padding", "===="),
+        ("a unicode digit that is not base64", "YWJ０"),
+        ("a nul byte in the string", "YWJj\x00"),
+    ]:
+        row = {"note": note, "image": image}
+        try:
+            message = scan.message(image, "image/jpeg")
+            row["data"] = message["content"][0]["source"]["data"]
+        except scan.ScanRefused as exc:
+            row["error"] = str(exc)
+        captures.append(row)
+
+    # A capture that is not text at all. `payload.get("image") or b""` in the
+    # route means a falsy value never reaches here, so these are the shapes
+    # that DO: a list, an object, a number, a true. All one refusal since the
+    # 2026-08-23 ruling; all an uncaught TypeError before it.
+    not_a_string: list[dict[str, Any]] = []
+    for note, raw in [("a list", [1, 2, 3]), ("an object", {"a": 1}),
+                      ("a number", 7), ("a float", 7.5), ("true", True)]:
+        row = {"note": note, "raw": raw}
+        try:
+            scan.message(raw, "image/jpeg")
+            row["ok"] = True
+        except scan.ScanRefused as exc:
+            row["error"] = str(exc)
+        not_a_string.append(row)
+
+    # The size gate, at the three points that matter. Recorded by LENGTH
+    # rather than by payload: a 4MB base64 string in a corpus would be 5.6MB
+    # of JSON for one assertion.
+    sizes: list[dict[str, Any]] = []
+    for note, size in [("one under the cap", scan.MAX_BYTES - 1),
+                       ("exactly the cap", scan.MAX_BYTES),
+                       ("one over the cap", scan.MAX_BYTES + 1),
+                       ("well over the cap", scan.MAX_BYTES * 2)]:
+        row = {"note": note, "bytes": size}
+        try:
+            scan.message(b"x" * size, "image/jpeg")
+            row["ok"] = True
+        except scan.ScanRefused as exc:
+            row["ok"] = False
+            row["error"] = str(exc)
+        sizes.append(row)
+
+    sightings = []
+    for note, refused, text in [
+        ("both fields", False, '{"title":"Birds of Paradise","corner":"196/302 R\\nDOM \\u2022 EN"}'),
+        ("a title only", False, '{"title":"Bayou","corner":""}'),
+        ("a corner only", False, '{"title":"","corner":"63/249 M"}'),
+        ("neither", False, '{"title":"","corner":""}'),
+        ("both whitespace", False, '{"title":"   ","corner":"\\t\\n"}'),
+        ("padded values are stripped", False, '{"title":"  Bayou  ","corner":" X "}'),
+        ("a non-breaking space is whitespace to str.strip", False,
+         '{"title":"\\u00a0","corner":"\\u2028"}'),
+        # **The four information separators**, U+001C-U+001F: whitespace to
+        # Python's `str.strip()` and NOT to Go's `unicode.IsSpace`, which is
+        # the one place `strings.TrimSpace` and `str.strip()` part company
+        # below U+0021. Without this row a port that reached for TrimSpace
+        # passes the whole corpus -- measured, after that mutation survived.
+        ("the information separators are whitespace to str.strip only", False,
+         '{"title":"\\u001cBayou\\u001f","corner":"\\u001d\\u001e"}'),
+        ("a refused turn", True, '{"title":"Bayou","corner":"X"}'),
+        ("empty text", False, ""),
+        ("not json", False, "sorry, I could not read that"),
+        ("truncated json", False, '{"title":"Bay'),
+        ("a list, not an object", False, '["Bayou"]'),
+        ("a bare string", False, '"Bayou"'),
+        ("null", False, "null"),
+        ("a number where a string belongs", False, '{"title":7,"corner":"X"}'),
+        ("a null field", False, '{"title":null,"corner":"X"}'),
+        ("a list field", False, '{"title":["Bayou"],"corner":"X"}'),
+        ("an extra field is ignored", False, '{"title":"Bayou","corner":"X","name":"Bayou"}'),
+    ]:
+        turn = modes_mod.Turn(mode="scan", model="m", stop_reason="end_turn",
+                              text=text, tool_calls=[], input_tokens=0,
+                              output_tokens=0, refused=refused)
+        sightings.append({"note": note, "refused": refused, "text": text,
+                          "sighting": scan.sighting(turn)})
+
+    stances = []
+    for note, requested, ceiling in [
+        ("nothing asked for is consultant, never off", None, None),
+        ("nothing asked for, under a ceiling", None, "off"),
+        ("a preset", "second-opinion", None),
+        ("a preset over the ceiling", "collaborator", "consultant"),
+        ("off is reachable", "off", None),
+        ("a malformed stance", {"initiative": 7}, None),
+        ("a stance that is not a stance", 7, None),
+    ]:
+        saved = os.environ.pop("MTGLAB_CLAUDE_STANCE_CEILING", None)
+        if ceiling:
+            os.environ["MTGLAB_CLAUDE_STANCE_CEILING"] = ceiling
+        try:
+            row = {"note": note, "requested": requested, "ceiling": ceiling}
+            try:
+                row["stance"] = stance_mod.describe(scan.stance_for(requested))
+            except ValueError as exc:
+                row["error"] = str(exc)
+            stances.append(row)
+        finally:
+            os.environ.pop("MTGLAB_CLAUDE_STANCE_CEILING", None)
+            if saved is not None:
+                os.environ["MTGLAB_CLAUDE_STANCE_CEILING"] = saved
+
+    return {
+        "max_bytes": scan.MAX_BYTES,
+        "default_preset": scan.DEFAULT_PRESET,
+        "media_types": sorted(scan.MEDIA_TYPES),
+        "media_type_cases": media_types,
+        "captures": captures,
+        "not_a_string": not_a_string,
+        "sizes": sizes,
+        "sightings": sightings,
+        "stances": stances,
+        # The ask that rides beside the picture, and the ORDER of the two
+        # blocks: the image goes first, which is the documented ordering for
+        # vision requests and the order the instruction reads in.
+        "message": _scan_message_shape(),
+    }
+
+
+def _scan_message_shape() -> dict[str, Any]:
+    """The one user message, as a shape rather than as bytes.
+
+    The image's own `data` is dropped: it is 64 characters of test PNG and
+    carries nothing, while its *position* is the claim being made.
+    """
+    import base64 as b64
+
+    from mtglab.claude import scan
+
+    message = scan.message(b64.b64encode(b"x" * 12).decode(), "image/webp")
+    blocks = []
+    for block in message["content"]:
+        if block["type"] == "image":
+            blocks.append({"type": "image",
+                           "source_type": block["source"]["type"],
+                           "media_type": block["source"]["media_type"]})
+        else:
+            blocks.append({"type": block["type"], "text": block["text"]})
+    return {"role": message["role"], "blocks": blocks}
+
+
+def render_scan_cases() -> str:
+    return _rows_json(scan_cases()) + "\n"
 
 
 if __name__ == "__main__":

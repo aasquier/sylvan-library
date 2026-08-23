@@ -1435,13 +1435,83 @@ go/                       the Go module (ADR 38; module path
                           `TypeError`, so an unreadable string is a 422 and a
                           list budget is an uncaught **500**, reproduced
                           rather than tidied.
-                          **Still Python, and ENUMERATED rather than
-                          counted** (this file's own lesson about numbers):
-                          the orchestration of scan; and the routes
-                          `/api/claude`, `/api/claude/scan` and
-                          `.../argue/deck`. Two of those are job
-                          families, so each waits on its own submit-and-poll
-                          rather than on this one. `/api/admin/stats/claude`
+                          **Then the last three, 2026-08-23, and with them
+                          the WHOLE Claude family is the door's** -- ENUMERATED
+                          rather than counted, which is this file's own lesson
+                          about numbers: everything under `/api/claude`, both
+                          `/api/claude/theme` routes, the tarot deal, and every
+                          Claude route under `/api/decks` (interview, argue,
+                          the argue sweep, and the dossier's GET and POST).
+                          `/api/admin/stats/claude` is the one exception and
+                          was never this family. All seven modes have crossed.
+                          `GET /api/claude` is the
+                          dial, and the view flips last again -- it reports
+                          which modes are built and what each surface defaults
+                          to, so it could only answer honestly once the modes
+                          and their stance owners had crossed. It lives in
+                          internal/claude rather than internal/deckread
+                          because it CANNOT live there: claude already imports
+                          deckread for the theme brief, so a builder there
+                          would be a cycle. Two of its orderings are contract
+                          and NEITHER is in the source -- the owner is
+                          resolved even with no slug (Python passes
+                          `lib.source_for(...)` as an argument, so
+                          `?owner=nobody` alone is a 404 rather than a dial),
+                          and the deck is read before the stance is parsed.
+                          Its corpus caught the `never` sentence carrying a
+                          typographic U+2019 where `service.py` writes an
+                          ASCII apostrophe -- the frontend's own fixtures
+                          spell it the curly way, and every field-by-field
+                          assertion reads the two as "the never sentence".
+                          `installed` is a constant `true` here and argued:
+                          the SDK is linked in rather than riding the `claude`
+                          extra, and the container installs `.[api,claude]`,
+                          so the two agree everywhere the door runs.
+                          `POST /api/claude/scan` is ADR 34, the seventh mode
+                          and the one route that receives a photograph -- a
+                          job keyed on the picture, whose duration is still
+                          UNMEASURED, which is the reason it is a job rather
+                          than an argument that it needs to be one.
+                          `identifyAgainst` came out of the camera route's own
+                          handler so the job and the route call ONE function,
+                          which is Python's shape and is what makes "the same
+                          scrutiny as a card read by Tesseract" structural.
+                          **Go's `base64.StdEncoding.DecodeString` is not
+                          `b64decode(validate=True)`**: it skips `\r` and
+                          `\n` wherever they appear, so the first version
+                          accepted two captures Python refuses, one a plain
+                          trailing newline. The strictness is load-bearing --
+                          the DEFAULT `b64decode` discards non-alphabet
+                          characters, so a wrapped capture would decode
+                          shorter and reach the API as a corrupt image. Both
+                          runtimes still accept non-canonical trailing bits,
+                          which makes the decode-and-re-encode a
+                          NORMALISATION (`YW==` becomes `YQ==`) and is why the
+                          dedupe key hashes the re-encoded form. And
+                          `POST .../argue/deck` is the slot argument
+                          multiplied across a selection: one job, sequential,
+                          because N jobs would occupy the two-wide NET lane
+                          and starve every sibling. Its `errors` is a
+                          `wire.OrderedMap` -- a dict built in SWEEP order, so
+                          a Go map would alphabetise the order things went
+                          wrong in. **`PyCasefold` and `PyStrip` are exported
+                          for it** and both for one reason: this is the only
+                          comparison in the family where the two sides are
+                          DIFFERENT strings, a name somebody typed against the
+                          deck's own spelling, so the exemption the
+                          neighbours have does not apply.
+                          THREE WARTS were found, reproduced and pinned, and
+                          two of them are one omission wearing two hats:
+                          `?surface=scan` resolves `off` even though
+                          `scan.stance_for` exists with a docstring saying it
+                          is public to prevent exactly that, and the dial's
+                          `modes` list is SIX of the seven -- last extended by
+                          #93 while ADR 34's scan landed in #180. Both are
+                          unreachable from the app today, which is how they
+                          survived. The third is the budget wart in a second
+                          module: a capture that is neither a string nor bytes
+                          reaches `len()` and is an uncaught 500.
+                          `/api/admin/stats/claude`
                           is NOT this family and never was -- it is the admin
                           roll-up, still Python for the coupling Phase 4
                           recorded.

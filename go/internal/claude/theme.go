@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/big"
@@ -114,6 +115,51 @@ func rejectTranscript(format string, args ...any) error {
 type ErrNotReady struct{ Msg string }
 
 func (e *ErrNotReady) Error() string { return e.Msg }
+
+// BudgetRefusal is `theme.BUDGET_REFUSAL`: what a budget that will not read
+// says back. One sentence, an example, and no mention of what could not read
+// it -- the old 422 was `could not convert string to float: 'about fifty
+// quid'`, which names a language builtin on the screen a newcomer meets
+// first (commandment 10).
+const BudgetRefusal = "the budget must be a number, like 250"
+
+// ErrBudgetRejected is `theme.BudgetRejected`, and it is a `ValueError` on the
+// Python side for a load-bearing reason: the proposal route's existing 422
+// branch already catches those, so neither runtime needed a new `except` or a
+// new status mapping. The same trick `ErrStanceRejected` uses.
+//
+// It exists because of what the route did before it. `float(budget)` sat in a
+// `try` catching `ValueError` and **not** `TypeError`, so an unreadable
+// *string* was a 422 and a *list* was an uncaught 500 -- two spellings of one
+// malformed field, answered two ways, one of them as though the server had
+// broken. Ruled with Aaron 2026-08-23 and fixed in both runtimes at once, the
+// way `edit.set_shared` and the stance wart went.
+var ErrBudgetRejected = errors.New(BudgetRefusal)
+
+// ReadBudget is `theme.read_budget`: a budget as the proposal takes it, which
+// is a number or nothing at all.
+//
+// `pyTruthyValue` first, because a falsy budget is **no budget** rather than a bad
+// one -- an empty box, a zero, an absent field, and (Python being Python) an
+// empty list.
+//
+// Everything else goes through `PyFloat` and not `strconv.ParseFloat`, and
+// the ruling did not change that: CPython's `float()` takes underscores
+// between digits, any Unicode decimal digit, a leading `+`, surrounding
+// whitespace, and the words `inf`, `Infinity` and `NaN`, while refusing the
+// `0x1p4` Go would happily read. What the ruling changed is what a refusal
+// *says*, never what is accepted -- so a budget that worked before still
+// works, byte for byte, in both runtimes.
+func ReadBudget(raw any) (*float64, error) {
+	if !pyTruthyValue(raw) {
+		return nil, nil
+	}
+	value, err := PyFloat(raw)
+	if err != nil {
+		return nil, ErrBudgetRejected
+	}
+	return &value, nil
+}
 
 // ------------------------------------------------------------ reading the answer
 

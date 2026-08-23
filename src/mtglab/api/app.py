@@ -1014,16 +1014,19 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         answers flattened into one string.
         """
         from mtglab.api.themeruns import plan_proposal
+        from mtglab.claude import theme as theme_mod
         from mtglab.claude.client import ClaudeUnavailable
         from mtglab.claude.theme import NotReady, TranscriptRejected
 
-        budget = payload.get("budget")
         try:
             plan = plan_proposal(
                 transcript=payload.get("transcript"),
                 slots=payload.get("slots"),
                 requested=payload.get("stance") or None,
-                budget=float(budget) if budget else None,
+                # `theme.read_budget` and not `float(...)`: a list used to
+                # raise the one thing this `except` does not name and left as
+                # an uncaught 500. See `theme.BudgetRejected`.
+                budget=theme_mod.read_budget(payload.get("budget")),
                 avoid=str(payload.get("avoid") or ""),
                 persona=payload.get("persona") or None,
                 seed=payload.get("seed"),

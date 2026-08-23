@@ -220,6 +220,14 @@ func (a *API) Routes() []Route {
 		// and the deal is internal/pyrand's first served caller, where a
 		// seed minted before the cutover must still deal its own spread.
 		{Method: http.MethodGet, Pattern: "/api/claude/personas", Handler: a.personaRoster},
+		// The dial itself, which crosses LAST of the free corners rather than
+		// first: it reports which modes are built and what each surface
+		// defaults to, so it could only answer honestly once the modes and
+		// their stance owners had crossed. Free, reaching no network and no
+		// pool -- but it does resolve the caller's library, because Python
+		// passes `lib.source_for(...)` as an argument and `?owner=nobody`
+		// alone is therefore a 404.
+		{Method: http.MethodGet, Pattern: "/api/claude", Handler: a.claudeStatus},
 		{Method: http.MethodGet, Pattern: "/api/tarot/reading", Handler: a.tarotReading},
 		// The pool behind the prose, and the pool's own two doors (the
 		// second family): a combination's champions and signature cards,
@@ -290,10 +298,14 @@ func (a *API) Routes() []Route {
 		// the same source goes to the tools the conversation may reach for.
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/interview", Handler: a.rationaleInterview},
 		// The slot argument (ADR 25), the interview's twin: same shape, same
-		// status codes, opposite direction. `.../argue/deck` is the same mode
-		// swept across a selection and is a JOB, so it stays Python's until
-		// that lane crosses -- a prefix is not a family.
+		// status codes, opposite direction. The single card is a plain route
+		// on its measured seconds...
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/argue", Handler: a.argueSlot},
+		// ...and the same mode swept across a selection, which is a JOB: one
+		// call per card, so a few dozen slots is minutes. One job for the
+		// whole sweep and sequential inside it, because N jobs would occupy
+		// the two-wide NET lane and starve every sibling surface.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/argue/deck", Handler: a.argueSweep},
 		// The commander dossier (ADR 19), both halves: the free GET that reads
 		// the store and never calls, and the POST that writes one as a JOB on
 		// the NET lane -- the first Claude job family to answer from the door,
@@ -307,6 +319,15 @@ func (a *API) Routes() []Route {
 		// owner and no deck -- the absence is the contract. Deduplicated in
 		// flight on the normalised question, cached never.
 		{Method: http.MethodPost, Pattern: "/api/claude/research", Handler: a.claudeResearch},
+		// The camera's fallback tier (ADR 34): the one route in the app that
+		// receives a photograph, and a JOB whose duration is UNMEASURED --
+		// which is the reason it is a job rather than an argument that it
+		// needs to be one. Like research it takes no owner and no deck; unlike
+		// research its dedupe key is the picture itself, so two presses on one
+		// shot are one paid call. What comes back is not a card: `identify`
+		// decides that, through the same function the camera's own route
+		// calls.
+		{Method: http.MethodPost, Pattern: "/api/claude/scan", Handler: a.claudeScan},
 		// The theme interview (ADR 20), both halves, both JOBS on the NET
 		// lane and both keyed on nothing -- two turns in flight are two
 		// different conversations, which is the opposite call from research's

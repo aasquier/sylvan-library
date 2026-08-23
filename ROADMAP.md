@@ -142,13 +142,35 @@ Where it stands, kept here so a fresh session knows the frontier:
   routes, the two searching modes as the first Claude **job** families
   the door answers, and -- 2026-08-23 -- **the theme interview, both
   halves and both routes**, which is the create flow's first door and
-  the biggest module in `claude/`. Nine Claude routes now answer from
-  Go. **What is left of the phase is enumerated rather than counted:**
-  `claude/scan.py` and `POST /api/claude/scan` (ADR 34), the slot
-  argument's sweep at `POST .../argue/deck`, and `GET /api/claude` --
-  the dial's readout, which needs `theme.stance_for`, and now has it.
-  Then the phase's gate: a real conversation through every mode, on the
-  pair.
+  the biggest module in `claude/`. **Then the last three, the same day:**
+  the camera's fallback tier (`claude/scan.py` and
+  `POST /api/claude/scan`, ADR 34), the slot argument's sweep at
+  `POST .../argue/deck`, and `GET /api/claude` -- the dial's readout,
+  which flipped last of all because it reports which modes are built and
+  what each surface defaults to, so it could only answer honestly once
+  the modes and their stance owners had crossed. **The whole Claude
+  family is the door's**, enumerated rather than counted: everything
+  under `/api/claude`, the tarot deal, and every Claude route under
+  `/api/decks`. `/api/admin/stats/claude` is the one exception and was
+  never this family.
+
+  The engine's last day found **four warts and Aaron ruled every one**,
+  all fixed in both runtimes at once. The theme proposal's
+  `float(budget)` sat in a `try` catching `ValueError` and not
+  `TypeError`, so a list budget was an uncaught 500 -- and the 422 it
+  did give quoted `float()` at the user, on the create flow's own
+  screen. A scan capture that was not text was the same bug in a second
+  module. And `/api/claude` had not learned about scan in the three
+  months since ADR 34: `?surface=scan` answered `off` while
+  `scan.stance_for` sat there saying it existed to prevent that, and the
+  dial's `modes` list was six of the seven. None of the four was
+  reachable from the app, which is how all four survived -- so the
+  guards that landed with the fixes matter more than the fixes:
+  the dial's mode list is now held equal to a list **discovered by
+  type**, in both runtimes.
+
+  What is left is the phase's gate: a real conversation through every
+  mode, on the pair, walked in a browser.
 
 ### The next phase — the Simulator learns (decided 2026-08-20)
 

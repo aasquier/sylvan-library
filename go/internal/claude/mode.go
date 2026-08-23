@@ -44,6 +44,14 @@ type Mode struct {
 	// one (`web_search_20260209`, ADR 19), and CLAUDE.md's no-crawler rule is
 	// why it is a *hosted* search rather than something here that fetches.
 	ServerTools []anthropic.ToolUnionParam
+	// ServerToolNames is the same tools by the name the API calls them, kept
+	// because the SDK's typed union does not hand one back and `/api/claude`
+	// publishes them: `[t["name"] for t in mode.server_tools]`.
+	//
+	// A UI says "searches the web" about one of these and says nothing at all
+	// about `get_cards`, which is the whole reason Python lists them apart
+	// from ToolNames rather than merging the two.
+	ServerToolNames []string
 	// MayWrite is what this mode may change. Empty, and checked empty -- see
 	// the file comment for why the field exists at all.
 	MayWrite []string

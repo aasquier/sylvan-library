@@ -2312,6 +2312,69 @@ def test_the_theme_surface_reports_its_own_default_not_off(client):
     assert theme["stance"]["may_write"] is False
 
 
+def test_every_deckless_surface_reports_its_own_default(client):
+    """The one above, generalised — and the generalisation is the fix.
+
+    `?surface=scan` answered `off` from ADR 34 landing (#180) until
+    2026-08-23, for three months, while `scan.stance_for` sat in the module
+    with a docstring saying in as many words that it existed to prevent
+    exactly that. `_SURFACE_DEFAULTS` was simply never extended, and there was
+    a second copy of the dispatch inside `claude_status` to not extend as
+    well. Found by the Go port, which had to ask what the dial *answered*
+    rather than what it meant to; ruled with Aaron and fixed in both runtimes.
+
+    Nothing in the app sends `surface=scan`, which is exactly how it survived.
+    So this is a **table** rather than one more single-surface test: the next
+    deckless surface is added to a list here, and if its module is not wired
+    up the row fails.
+    """
+    for surface, want in (("theme", "second-opinion"),
+                          ("research", "second-opinion"),
+                          ("scan", "consultant"),
+                          # Naming nothing is still `off`: "I have no idea
+                          # what this is about" is the one case where silence
+                          # is right. A surface nobody owns is the same.
+                          (None, "off"), ("nonsense", "off")):
+        params = {"surface": surface} if surface else {}
+        got = client.get("/api/claude", params=params).json()
+        assert got["stance"]["preset"] == want, f"{surface!r} resolved wrong"
+        assert got["default"]["preset"] == want, f"{surface!r} defaults wrong"
+
+
+def test_the_dial_reports_every_mode_that_exists(client):
+    """The other half of the same three-month omission.
+
+    `claude_status`'s `modes` list is written out by hand and its own comment
+    calls it "the modes that exist". It was last extended by #93, when
+    research became the sixth; ADR 34's scan landed in #180 and never joined
+    it, so the payload was one short and nothing noticed — the frontend types
+    the field and renders none of it.
+
+    **Discovered, not listed.** `mtglab.claude` is swept for `Mode` objects by
+    *type*, which is the lesson #257 paid for: the first version of the Go
+    generator grepped for `= Mode(` and lost `scan.py`, which spells it
+    `modes.Mode(...)`. A test that hard-coded seven names would have to be
+    edited by the same person who forgot to edit the list.
+    """
+    import importlib
+    import pkgutil
+
+    import mtglab.claude
+    from mtglab.claude.modes import Mode
+
+    exists = set()
+    for found in pkgutil.iter_modules(mtglab.claude.__path__):
+        module = importlib.import_module(f"mtglab.claude.{found.name}")
+        exists |= {v.name for v in vars(module).values() if isinstance(v, Mode)}
+
+    reported = {m["name"] for m in client.get("/api/claude").json()["modes"]}
+    assert reported == exists, (
+        f"the dial does not report {sorted(exists - reported)}. A mode was "
+        f"added and `/api/claude` was not told, which is how `scan` went "
+        f"unreported for three months. Add it to `claude_status`'s list AND "
+        f"to Go's `dialModeOrder`, in one change.")
+
+
 def test_a_named_surface_never_widens_past_a_pin_or_the_ceiling(client):
     """`surface` picks a *default*; it is not a second way to ask for more.
 
@@ -2716,6 +2779,53 @@ def test_a_proposal_without_a_key_is_a_503_rather_than_a_failed_job(client,
                     json={"transcript": THEME_TRANSCRIPT, "slots": THEME_SLOTS})
     assert r.status_code == 503
     assert "ANTHROPIC_API_KEY" in r.json()["detail"]
+    assert jobs.all_jobs() == []
+
+
+def test_every_unreadable_budget_refuses_in_one_sentence(client, monkeypatch):
+    """The wart's own test, kept and inverted (ruled with Aaron 2026-08-23).
+
+    `float(budget)` sat inside a `try` catching `TranscriptRejected` and
+    `ValueError` and **not** `TypeError`, so a list budget was an uncaught
+    500 while an unreadable string was a 422 — two spellings of one malformed
+    field, answered two ways, one of them as though the server had broken.
+    And the 422 it did give read `could not convert string to float: 'about
+    fifty quid'`, naming a language builtin on the screen a newcomer meets
+    first (commandment 10).
+
+    Both halves are asserted, because a status code cannot see the second one.
+    """
+    import mtglab.claude.client as cc
+    monkeypatch.setattr(cc, "credential_present", lambda: False)
+
+    def ask(budget):
+        return client.post("/api/claude/theme/proposal",
+                           json={"transcript": THEME_TRANSCRIPT,
+                                 "slots": THEME_SLOTS, "budget": budget})
+
+    # A list and a dict used to raise `TypeError`; the strings raised
+    # `ValueError`. One answer now, and both kinds are here so "they agree" is
+    # a claim about both.
+    for budget in ([50], {"gbp": 50}, "fifty", "about fifty quid", "$50"):
+        r = ask(budget)
+        assert r.status_code == 422, f"{budget!r} answered {r.status_code}"
+        detail = r.json()["detail"]
+        assert detail == "the budget must be a number, like 250", budget
+        for leak in ("float", "TypeError", "ValueError", "convert"):
+            assert leak not in detail, f"{budget!r} leaked {leak!r}: {detail!r}"
+
+    # The grammar is deliberately unchanged by the ruling: everything
+    # `float()` took before is still taken, proved by reaching the *next*
+    # refusal rather than this one. `1_000` and the fullwidth digits are the
+    # cases a `strconv.ParseFloat`-shaped port would silently drop.
+    for budget in (250, "250", "  250.5  ", "1_000", "２５０", "inf", True):
+        r = ask(budget)
+        assert r.status_code == 503, f"{budget!r} answered {r.status_code}"
+        assert "ANTHROPIC_API_KEY" in r.json()["detail"], budget
+
+    # A falsy budget is *no* budget rather than a bad one.
+    for budget in (0, "", None, False, []):
+        assert ask(budget).status_code == 503, f"{budget!r} was read as a bad budget"
     assert jobs.all_jobs() == []
 
 

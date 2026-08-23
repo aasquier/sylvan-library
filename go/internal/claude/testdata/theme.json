@@ -419,12 +419,14 @@
   {"note":"Infinity","raw":"Infinity","budget":"inf"},
   {"note":"-inf","raw":"-inf","budget":"-inf"},
   {"note":"nan","raw":"NaN","budget":"nan"},
-  {"note":"a hex float Go would take","raw":"0x1p4","error":"could not convert string to float: '0x1p4'","error_kind":"value"},
-  {"note":"not a number","raw":"fifty","error":"could not convert string to float: 'fifty'","error_kind":"value"},
+  {"note":"a hex float Go would take","raw":"0x1p4","error":"the budget must be a number, like 250"},
+  {"note":"not a number","raw":"fifty","error":"the budget must be a number, like 250"},
   {"note":"an overflowing literal","raw":"1e400","budget":"inf"},
   {"note":"true is one","raw":true,"budget":"1.0"},
-  {"note":"a list is a TypeError, not a ValueError","raw":[1],"error":"float() argument must be a string or a real number, not 'list'","error_kind":"type"},
-  {"note":"an object is a TypeError","raw":{"a":1},"error":"float() argument must be a string or a real number, not 'dict'","error_kind":"type"}
+  {"note":"a list refuses in the same words as a bad string","raw":[1],"error":"the budget must be a number, like 250"},
+  {"note":"an object refuses in the same words","raw":{"a":1},"error":"the budget must be a number, like 250"},
+  {"note":"what somebody actually types","raw":"about fifty quid","error":"the budget must be a number, like 250"},
+  {"note":"a currency symbol","raw":"$50","error":"the budget must be a number, like 250"}
  ],
  "stances": [
   {

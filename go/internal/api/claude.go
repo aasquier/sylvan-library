@@ -64,3 +64,77 @@ func (a *API) tarotReading(w http.ResponseWriter, r *http.Request) {
 	}
 	wire.JSON(w, http.StatusOK, tarot.Deal(seed))
 }
+
+// claudeStatus is `GET /api/claude` -- `service.claude_status`: is the Claude
+// surface installed, configured, and switched on?
+//
+// **Three separate answers**, because a UI that collapses them tells somebody
+// their key is missing when they have merely turned it off. It reaches no
+// network at all: the stance is arithmetic over a table and availability is a
+// question about this process's environment, so it answers on an instance with
+// no pool and no account.
+//
+// `surface` names which mode is asking, and it exists because of a bug worth
+// remembering: the create flow has no deck, so the dial beside it resolved
+// `off` while `theme.stance_for` was about to run that conversation at
+// `second-opinion`. All 42 tests on this endpoint passed, because every one of
+// them asked about a deck. Rendering a value is what audits it.
+//
+// Two orderings here are contract rather than convenience, both measured
+// against the running app:
+//
+//   - **The owner is resolved even with no slug.** Python passes
+//     `lib.source_for(owner or lib.my_owner)` as an *argument*, so it runs
+//     whether or not a deck is going to be read -- and `?owner=nobody` alone
+//     is a 404 rather than a dial.
+//   - **The deck is read before the stance is parsed.** `?stance=garbage&
+//     slug=nope` is the deck's 404, not the stance's 422.
+func (a *API) claudeStatus(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	// Starlette's QueryParams.get returns the LAST repeated value where Go's
+	// Query().Get returns the first -- `?slug=probe&slug=nope` asks about
+	// `nope`. Measured, not assumed; it is the difference nobody sees until a
+	// client appends rather than replaces.
+	slug := last(q, "slug")
+	owner := last(q, "owner")
+	surface := last(q, "surface")
+	stance := last(q, "stance")
+
+	lib, err := a.library(r.Context())
+	if a.refuse(w, "claude", err) {
+		return
+	}
+	if owner == "" {
+		owner = lib.MyOwner()
+	}
+	// Before the slug check, deliberately: see the second ordering above.
+	src, err := lib.SourceFor(r.Context(), owner)
+	if a.refuse(w, "claude", err) {
+		return
+	}
+	var asked claude.DeckStatused
+	if slug != "" {
+		// `Deck.from_text(decks.read_text(slug))` -- a bare parse. The stance
+		// reads one field off it and the pool is never opened, which is what
+		// lets this route answer on an instance with no cards at all.
+		d, getErr := src.Get(r.Context(), slug)
+		if a.refuse(w, "claude", getErr) {
+			return
+		}
+		asked = claude.DeckWithStatus(d.Status)
+	}
+	// `stance or None`: an empty parameter is no pin rather than a bad one.
+	var requested any
+	if stance != "" {
+		requested = stance
+	}
+	dial, err := claude.Status(requested, asked, surface)
+	if err != nil {
+		// The one thing that can fail here, and it is the caller's: a preset
+		// name that is not one. `except ValueError` in Python, and the same
+		// 422.
+		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	wire.JSON(w, http.StatusOK, dial)
+}

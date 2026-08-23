@@ -1,0 +1,157 @@
+{
+ "max_bytes": 4194304,
+ "default_preset": "consultant",
+ "media_types": ["image/gif","image/jpeg","image/png","image/webp"],
+ "media_type_cases": [
+  {"media_type":"image/jpeg","ok":true},
+  {"media_type":"image/png","ok":true},
+  {"media_type":"image/webp","ok":true},
+  {"media_type":"image/gif","ok":true},
+  {"media_type":"image/tiff","ok":false,"error":"'image/tiff' is not an image this reads. Expected one of: image/gif, image/jpeg, image/png, image/webp."},
+  {"media_type":"image/jpg","ok":false,"error":"'image/jpg' is not an image this reads. Expected one of: image/gif, image/jpeg, image/png, image/webp."},
+  {"media_type":"IMAGE/JPEG","ok":false,"error":"'IMAGE/JPEG' is not an image this reads. Expected one of: image/gif, image/jpeg, image/png, image/webp."},
+  {"media_type":"Image/Png","ok":false,"error":"'Image/Png' is not an image this reads. Expected one of: image/gif, image/jpeg, image/png, image/webp."},
+  {"media_type":" image/jpeg ","ok":false,"error":"' image/jpeg ' is not an image this reads. Expected one of: image/gif, image/jpeg, image/png, image/webp."},
+  {"media_type":"image/jpeg;charset=utf-8","ok":false,"error":"'image/jpeg;charset=utf-8' is not an image this reads. Expected one of: image/gif, image/jpeg, image/png, image/webp."},
+  {"media_type":"jpeg","ok":false,"error":"'jpeg' is not an image this reads. Expected one of: image/gif, image/jpeg, image/png, image/webp."},
+  {"media_type":"","ok":false,"error":"'' is not an image this reads. Expected one of: image/gif, image/jpeg, image/png, image/webp."},
+  {"media_type":"image/jpeg\n","ok":false,"error":"'image/jpeg\\n' is not an image this reads. Expected one of: image/gif, image/jpeg, image/png, image/webp."},
+  {"media_type":"image/svg+xml","ok":false,"error":"'image/svg+xml' is not an image this reads. Expected one of: image/gif, image/jpeg, image/png, image/webp."},
+  {"media_type":"application/pdf","ok":false,"error":"'application/pdf' is not an image this reads. Expected one of: image/gif, image/jpeg, image/png, image/webp."}
+ ],
+ "captures": [
+  {"note":"a real capture","image":"iVBORw0KGgp4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4","data":"iVBORw0KGgp4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4"},
+  {"note":"the shortest legal capture","image":"eA==","data":"eA=="},
+  {"note":"two bytes","image":"eHk=","data":"eHk="},
+  {"note":"three bytes, no padding needed","image":"eHl6","data":"eHl6"},
+  {"note":"empty string","image":"","error":"the capture was empty"},
+  {"note":"base64 of a single space","image":"IA==","data":"IA=="},
+  {"note":"not base64 at all","image":"!!!!","error":"the capture was not valid base64"},
+  {"note":"a newline inside","image":"iVBORw0K\nGgp4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4","error":"the capture was not valid base64"},
+  {"note":"a space inside","image":"iVBORw0K Ggp4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4","error":"the capture was not valid base64"},
+  {"note":"a trailing newline","image":"iVBORw0KGgp4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4\n","error":"the capture was not valid base64"},
+  {"note":"unpadded","image":"YWJjZA","error":"the capture was not valid base64"},
+  {"note":"over-padded","image":"YWJjZA===","error":"the capture was not valid base64"},
+  {"note":"one padding char where two are needed","image":"YWJjZA=","error":"the capture was not valid base64"},
+  {"note":"the url-safe alphabet","image":"-_-_","error":"the capture was not valid base64"},
+  {"note":"a non-zero trailing bit","image":"YW==","data":"YQ=="},
+  {"note":"lone padding","image":"=","error":"the capture was not valid base64"},
+  {"note":"only padding","image":"====","error":"the capture was not valid base64"},
+  {"note":"a unicode digit that is not base64","image":"YWJ０","error":"the capture was not valid base64"},
+  {"note":"a nul byte in the string","image":"YWJj\u0000","error":"the capture was not valid base64"}
+ ],
+ "not_a_string": [
+  {"note":"a list","raw":[1,2,3],"error":"the capture must be a base64 string"},
+  {"note":"an object","raw":{"a":1},"error":"the capture must be a base64 string"},
+  {"note":"a number","raw":7,"error":"the capture must be a base64 string"},
+  {"note":"a float","raw":7.5,"error":"the capture must be a base64 string"},
+  {"note":"true","raw":true,"error":"the capture must be a base64 string"}
+ ],
+ "sizes": [
+  {"note":"one under the cap","bytes":4194303,"ok":true},
+  {"note":"exactly the cap","bytes":4194304,"ok":true},
+  {"note":"one over the cap","bytes":4194305,"ok":false,"error":"the capture is 4096KB, over the 4096KB limit. Photograph one card, closer."},
+  {"note":"well over the cap","bytes":8388608,"ok":false,"error":"the capture is 8192KB, over the 4096KB limit. Photograph one card, closer."}
+ ],
+ "sightings": [
+  {"note":"both fields","refused":false,"text":"{\"title\":\"Birds of Paradise\",\"corner\":\"196/302 R\\nDOM \\u2022 EN\"}","sighting":{"title":"Birds of Paradise","corner":"196/302 R\nDOM • EN"}},
+  {"note":"a title only","refused":false,"text":"{\"title\":\"Bayou\",\"corner\":\"\"}","sighting":{"title":"Bayou"}},
+  {"note":"a corner only","refused":false,"text":"{\"title\":\"\",\"corner\":\"63/249 M\"}","sighting":{"corner":"63/249 M"}},
+  {"note":"neither","refused":false,"text":"{\"title\":\"\",\"corner\":\"\"}","sighting":{}},
+  {"note":"both whitespace","refused":false,"text":"{\"title\":\"   \",\"corner\":\"\\t\\n\"}","sighting":{}},
+  {"note":"padded values are stripped","refused":false,"text":"{\"title\":\"  Bayou  \",\"corner\":\" X \"}","sighting":{"title":"Bayou","corner":"X"}},
+  {"note":"a non-breaking space is whitespace to str.strip","refused":false,"text":"{\"title\":\"\\u00a0\",\"corner\":\"\\u2028\"}","sighting":{}},
+  {"note":"the information separators are whitespace to str.strip only","refused":false,"text":"{\"title\":\"\\u001cBayou\\u001f\",\"corner\":\"\\u001d\\u001e\"}","sighting":{"title":"Bayou"}},
+  {"note":"a refused turn","refused":true,"text":"{\"title\":\"Bayou\",\"corner\":\"X\"}","sighting":{}},
+  {"note":"empty text","refused":false,"text":"","sighting":{}},
+  {"note":"not json","refused":false,"text":"sorry, I could not read that","sighting":{}},
+  {"note":"truncated json","refused":false,"text":"{\"title\":\"Bay","sighting":{}},
+  {"note":"a list, not an object","refused":false,"text":"[\"Bayou\"]","sighting":{}},
+  {"note":"a bare string","refused":false,"text":"\"Bayou\"","sighting":{}},
+  {"note":"null","refused":false,"text":"null","sighting":{}},
+  {"note":"a number where a string belongs","refused":false,"text":"{\"title\":7,\"corner\":\"X\"}","sighting":{"corner":"X"}},
+  {"note":"a null field","refused":false,"text":"{\"title\":null,\"corner\":\"X\"}","sighting":{"corner":"X"}},
+  {"note":"a list field","refused":false,"text":"{\"title\":[\"Bayou\"],\"corner\":\"X\"}","sighting":{"corner":"X"}},
+  {"note":"an extra field is ignored","refused":false,"text":"{\"title\":\"Bayou\",\"corner\":\"X\",\"name\":\"Bayou\"}","sighting":{"title":"Bayou","corner":"X"}}
+ ],
+ "stances": [
+  {
+   "note": "nothing asked for is consultant, never off",
+   "requested": null,
+   "ceiling": null,
+   "stance": {
+    "preset": "consultant",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "note": "nothing asked for, under a ceiling",
+   "requested": null,
+   "ceiling": "off",
+   "stance": {
+    "preset": "off",
+    "allows_calls": false,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "note": "a preset",
+   "requested": "second-opinion",
+   "ceiling": null,
+   "stance": {
+    "preset": "second-opinion",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "note": "a preset over the ceiling",
+   "requested": "collaborator",
+   "ceiling": "consultant",
+   "stance": {
+    "preset": "consultant",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "note": "off is reachable",
+   "requested": "off",
+   "ceiling": null,
+   "stance": {
+    "preset": "off",
+    "allows_calls": false,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {"note":"a malformed stance","requested":{"initiative":7},"ceiling":null,"error":"7 is not a initiative level; expected one of off, on-request, volunteers, interjects"},
+  {"note":"a stance that is not a stance","requested":7,"ceiling":null,"error":"cannot read a stance from int"}
+ ],
+ "message": {"role":"user","blocks":[{"type":"image","source_type":"base64","media_type":"image/webp"},{"type":"text","text":"Transcribe this card's name and its bottom-left block."}]}
+}

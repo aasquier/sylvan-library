@@ -39,6 +39,8 @@ type stanceCorpus struct {
 		Status *string `json:"status"`
 		Stance axisMap `json:"stance"`
 	} `json:"defaults"`
+	// The whole of `GET /api/claude`, per case. See dial_test.go.
+	Dial []dialRow `json:"dial"`
 }
 
 type axisMap struct {

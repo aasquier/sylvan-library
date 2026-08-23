@@ -116,31 +116,19 @@ func (a *API) claudeThemeProposal(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// `float(budget) if budget else None`: a falsy budget is no budget, and a
-	// budget that will not read as a number is a 422 like everything else
-	// about the request.
-	budget, err := themeBudget(body["budget"])
-	if errors.Is(err, errBudgetType) {
-		// **A reproduced wart, and it should be a 422.** `float(budget)` sits
-		// inside a `try` catching `TranscriptRejected` and `ValueError`; a
-		// list or an object raises the third thing `float()` can raise, so
-		// Python answers an unhandled 500 to a request that is plainly
-		// malformed. Reproduced rather than tidied -- a flip that changes
-		// behaviour is not a flip -- and raised with Aaron, the way the stance
-		// wart was before it was ruled and fixed in both runtimes at once.
-		//
-		// The **status** is Python's; the **body** is the door's. Python's is
-		// Starlette's plain-text `Internal Server Error`, because nothing
-		// caught the exception, while every 500 the door writes is
-		// `{"detail": ...}` -- the convention `cards`, `decks` and `research`
-		// already answer with. Measured across the pair, recorded here rather
-		// than special-cased: matching one framework default in one handler
-		// would make this route the odd one out among six.
-		a.log.Error("the theme proposal route failed", "error", err)
-		wire.Detail(w, http.StatusInternalServerError,
-			"the theme surface could not answer that right now")
-		return
-	}
+	// `theme.read_budget`: a falsy budget is no budget, and anything else
+	// that will not read as a number is a 422 in one sentence.
+	//
+	// **This was a wart until 2026-08-23, and the ruling is recorded here
+	// because the comment that stood here is what raised it.** `float(budget)`
+	// sat in a `try` catching `TranscriptRejected` and `ValueError`; a list
+	// or an object raises the third thing `float()` can raise, so Python
+	// answered an unhandled 500 -- a plain-text Starlette one, no envelope --
+	// to a request that is plainly malformed, while an unreadable *string*
+	// was a 422. Two spellings of one bad field, answered two ways. Ruled
+	// with Aaron and fixed in both runtimes at once, the way
+	// `edit.set_shared` and the stance wart went.
+	budget, err := claude.ReadBudget(body["budget"])
 	if err != nil {
 		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -254,30 +242,4 @@ func strOr(body map[string]any, key string) string {
 		return ""
 	}
 	return str(body, key)
-}
-
-// errBudgetType stands for `float()`'s `TypeError`, which the route does
-// **not** catch: `except (TranscriptRejected, ValueError)` lists two, and a
-// list or an object handed to `float()` raises the third. It is a 500 in
-// Python and it is a 500 here -- reproduced rather than tidied, because a
-// flip that answers 422 where Python answers 500 is not a flip.
-var errBudgetType = errors.New("budget is not a string or a number")
-
-// themeBudget is `float(payload["budget"]) if payload["budget"] else None`.
-//
-// Python's `float()` and not `strconv.ParseFloat`: it takes underscores
-// between digits, any Unicode decimal digit, and the words `inf` and `nan`,
-// and its refusal message is the one that reaches the client as `detail`.
-func themeBudget(raw any) (*float64, error) {
-	if !pyTruthy(raw) {
-		return nil, nil
-	}
-	value, err := claude.PyFloat(raw)
-	if err != nil {
-		if errors.Is(err, claude.ErrFloatType) {
-			return nil, errBudgetType
-		}
-		return nil, err
-	}
-	return &value, nil
 }
