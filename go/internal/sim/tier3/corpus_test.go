@@ -2,10 +2,12 @@ package tier3_test
 
 import (
 	"encoding/json"
+	"io/fs"
 	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
@@ -566,4 +568,78 @@ func showInt(v *int) string {
 		return "null"
 	}
 	return big.NewInt(int64(*v)).String()
+}
+
+// TestAHostileSlugCannotNameAFile is the guard CodeQL asked for, driven
+// rather than asserted.
+//
+// **The test plants something real on the other side of the boundary.** A
+// refusal that merely returns an error proves nothing on its own — the write
+// might have failed for a dull reason — so each case checks that the escape
+// target does NOT exist afterwards, and the control case checks that an
+// ordinary slug still writes exactly where it should. A guard whose test
+// cannot tell "refused" from "wrote it somewhere else" is not a guard.
+func TestAHostileSlugCannotNameAFile(t *testing.T) {
+	// Every escape is aimed inside the running test's own directory, so a
+	// leftover from anywhere else cannot make this pass or fail. Not
+	// fastidiousness: proving the guard means *actually performing the escape*
+	// with it removed, and the first mutation run of the Python twin wrote a
+	// real `/tmp/escaped.dck` that then failed the next full suite. A test
+	// whose subject is a file outside its own sandbox is a test with a memory.
+	root := t.TempDir()
+	for _, c := range []struct{ note, slug string }{
+		{"a parent-directory escape", "../escaped"},
+		{"a deep escape", "../../escaped"},
+		{"an absolute path", filepath.Join(root, "absolute", "escaped")},
+		{"a nested path", "sub/escaped"},
+		// `<slug>.dck` goes on Forge's own command line after `-d`, so a
+		// leading hyphen is read as a flag rather than as a deck.
+		{"a slug that is a flag", "-n"},
+		{"a slug that is a long flag", "--help"},
+		{"a null byte", "ok\x00.dck"},
+		{"an upper-case slug", "Escaped"},
+		{"a dotted slug", "a.b"},
+		{"an empty slug", ""},
+		{"a space", "two words"},
+		{"a trailing hyphen", "trailing-"},
+	} {
+		t.Run(c.note, func(t *testing.T) {
+			dir := filepath.Join(root, "sandbox", c.note)
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			d := &deck.Deck{Slug: c.slug, Name: "Hostile"}
+			path, err := tier3.WriteDck(d, dir, nil)
+			if err == nil {
+				t.Fatalf("a slug of %q was accepted and wrote %s", c.slug, path)
+			}
+			// Nothing was written anywhere under this run's own directory,
+			// which is where every escape above was aimed.
+			var written []string
+			_ = filepath.WalkDir(root, func(p string, e fs.DirEntry, err error) error {
+				if err == nil && !e.IsDir() && strings.HasSuffix(p, ".dck") {
+					written = append(written, p)
+				}
+				return nil
+			})
+			if len(written) != 0 {
+				t.Errorf("a refused write produced %v", written)
+			}
+		})
+	}
+
+	// The control: an ordinary slug still writes, exactly where it should.
+	// Without this the whole table would pass against a WriteDck that refused
+	// everything.
+	ok := t.TempDir()
+	path, err := tier3.WriteDck(&deck.Deck{Slug: "arahbo-cats", Name: "Cats"}, ok, nil)
+	if err != nil {
+		t.Fatalf("an ordinary slug was refused: %v", err)
+	}
+	if want := filepath.Join(ok, "arahbo-cats.dck"); path != want {
+		t.Errorf("wrote %s, want %s", path, want)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("the file is not there: %v", err)
+	}
 }

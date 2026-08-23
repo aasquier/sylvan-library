@@ -31,6 +31,7 @@ rule 5 forbids.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from mtglab.decks.model import Deck
@@ -86,13 +87,44 @@ def to_dck(deck: Deck, names: dict[str, str] | None = None) -> str:
     return "\n".join(lines) + "\n"
 
 
+#: `service._SLUG`, checked here as well as at the door.
+#:
+#: **A slug reaches this function by two roads and only one of them has a
+#: gate.** `POST /api/decks` and `POST /api/decks/import` both refuse a slug
+#: that is not this shape, because a slug becomes a directory name. But a deck
+#: can also arrive as deck.yaml *text* -- over the private network, from the
+#: app to the worker (ADR 35) -- and `Deck.from_text` reads whatever `slug:`
+#: says. The worker is a separate machine precisely so that somebody else's
+#: rules engine is contained; trusting the caller's text to name a file is the
+#: wrong way round.
+#:
+#: It is not hypothetical in either direction. `<slug>.dck` is written into
+#: Forge's profile directory, so `../../..` escapes it; and the filename goes
+#: on Forge's own command line after `-d`, so a slug beginning with `-` is read
+#: as a flag rather than as a deck. Both are shut by the same alphabet.
+#:
+#: Found by CodeQL on the Go port of this module (2026-08-23) and fixed in both
+#: runtimes at once, the way `edit.set_shared` was: the shape is identical here
+#: and the CLI still writes these files.
+SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
 def write_dck(deck: Deck, directory: Path | str,
               names: dict[str, str] | None = None) -> Path:
     """Write `<directory>/<slug>.dck` and return the path.
 
     The filename is the slug, not the deck name: `forge sim -d` takes deck
     names on a command line, and a slug needs no quoting.
+
+    **Refused rather than sanitised.** A cleaned-up filename is a file nobody
+    asked for, and the coverage report's `slug` would then name something other
+    than what is on disk -- which is the class of silent disagreement this
+    whole package exists to prevent.
     """
+    if not SLUG.match(deck.slug):
+        raise ValueError(
+            f"{deck.slug!r} is not a usable slug -- lowercase letters, "
+            f"digits and single hyphens, e.g. 'arahbo-cats'")
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{deck.slug}.dck"

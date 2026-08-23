@@ -91,6 +91,54 @@ def test_write_dck_names_the_file_for_the_slug(tmp_path):
     assert path.read_text(encoding="utf-8").startswith("[metadata]")
 
 
+#: Slugs that must never become a filename. `{}` is filled with a directory
+#: unique to the running test, so the escape target is this run's own and a
+#: leftover from anywhere else cannot make the assertion pass or fail.
+#:
+#: That is not fastidiousness: proving this guard means *actually performing
+#: the escape* with the guard removed, and the first mutation run of it wrote
+#: a real `/tmp/escaped.dck` that then failed the next full suite. A test whose
+#: subject is a file outside its own sandbox is a test with a memory.
+HOSTILE_SLUGS = [
+    "../escaped", "../../escaped", "{}/escaped", "sub/escaped",
+    # `<slug>.dck` goes on Forge's own command line after `-d`, so a leading
+    # hyphen is read as a flag rather than as a deck.
+    "-n", "--help",
+    "ok\x00.dck", "Escaped", "a.b", "", "two words", "trailing-",
+]
+
+
+@pytest.mark.parametrize("slug", HOSTILE_SLUGS)
+def test_a_hostile_slug_cannot_name_a_file(tmp_path, slug):
+    """`create` and `import` check a slug because it becomes a directory name.
+    A deck arriving as deck.yaml **text** -- over the private network, from the
+    app to the worker (ADR 35) -- never passes either, and `Deck.from_text`
+    reads whatever `slug:` says.
+
+    The assertions go past the refusal on purpose: a test that only checked
+    for a raise could not tell "refused" from "wrote it somewhere else", which
+    is the whole thing being prevented. Found by CodeQL on the Go port and
+    fixed in both runtimes at once.
+    """
+    sandbox = tmp_path / "inside"
+    sandbox.mkdir()
+    slug = slug.format(tmp_path / "absolute")
+    with pytest.raises(ValueError, match="not a usable slug"):
+        dck.write_dck(make_deck(slug=slug), sandbox)
+    assert list(sandbox.iterdir()) == [], "the refused write left something"
+    # Nothing appeared anywhere under this run's own directory, which is where
+    # every escape above was aimed.
+    assert [p.name for p in tmp_path.rglob("*.dck")] == []
+
+
+def test_an_ordinary_slug_still_writes_where_it_should(tmp_path):
+    """The control. Without it the table above passes against a `write_dck`
+    that refused everything."""
+    path = dck.write_dck(make_deck(slug="arahbo-cats"), tmp_path)
+    assert path == tmp_path / "arahbo-cats.dck"
+    assert path.exists()
+
+
 # ------------------------------------------------------------- the coverage
 
 INDEX = frozenset({"Sol Ring", "Gyome, Master Chef", "Forest",
