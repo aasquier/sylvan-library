@@ -53,6 +53,9 @@ type Config struct {
 	AppDBPath string
 	// DecksDir is the file tier's root.
 	DecksDir string
+	// ScryfallDir is where `data refresh` parks the bulk downloads; `health`
+	// lists them. Empty means an instance that has never refreshed.
+	ScryfallDir string
 	// AdminEmail is MTGLAB_ADMIN_EMAIL, resolved to the maintainer's handle
 	// through app.db for a signed-in caller (ADR 17, ADR 22); never rendered.
 	AdminEmail string
@@ -144,6 +147,15 @@ type API struct {
 	lazyDB      *sql.DB
 	lazyWriteDB *sql.DB
 
+	scryfallDir string
+
+	// The upcoming-sets answer, held for the day it was fetched on -- the
+	// process-lifetime cache `service._SETS_CACHE` keeps, as marshalled
+	// bytes so a replay is byte-identical.
+	setsMu   sync.Mutex
+	setsDay  string
+	setsBody []byte
+
 	// bg tracks the work started after a response has gone -- Starlette's
 	// `BackgroundTasks`, which one route needs (`POST /api/auth/reset`, whose
 	// whole timing argument is that the lookup happens where nobody is
@@ -157,8 +169,9 @@ func New(cfg Config) *API {
 		cfg.Logger = slog.Default()
 	}
 	return &API{log: cfg.Logger, pool: cfg.Pool, db: cfg.AppDB, writeDB: cfg.AppWriteDB,
-		dbPath: cfg.AppDBPath, decksDir: cfg.DecksDir, adminEmail: cfg.AdminEmail,
-		shelves: cfg.Shelves, log28: cfg.Recorder, requireAuth: cfg.RequireAuth,
+		dbPath: cfg.AppDBPath, decksDir: cfg.DecksDir, scryfallDir: cfg.ScryfallDir,
+		adminEmail: cfg.AdminEmail,
+		shelves:    cfg.Shelves, log28: cfg.Recorder, requireAuth: cfg.RequireAuth,
 		secureCookies: cfg.SecureCookies, email: cfg.EmailSender,
 		jobs: cfg.Jobs, simCache: cfg.SimCache, upstream: cfg.Upstream,
 		claudeLedger: cfg.ClaudeLedger, matchLedgerOf: cfg.MatchLedger,
@@ -225,6 +238,8 @@ func (a *API) Routes() []Route {
 	return []Route{
 		// The reference prose with no pool behind it (Phase 3, the first
 		// family to move): fixed taxonomy, fixed vocabulary, fixed words.
+		{Method: http.MethodGet, Pattern: "/api/health", Handler: a.health},
+		{Method: http.MethodGet, Pattern: "/api/sets/upcoming", Handler: a.upcomingSets},
 		{Method: http.MethodGet, Pattern: "/api/colors", Handler: a.colors},
 		{Method: http.MethodGet, Pattern: "/api/glossary", Handler: a.glossary},
 		{Method: http.MethodGet, Pattern: "/api/themes", Handler: a.themes},
@@ -259,6 +274,7 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/validate", Handler: a.validateDeck},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/stats", Handler: a.deckStats},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/suggestions", Handler: a.suggestions},
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/wheel", Handler: a.deckWheel},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/commander", Handler: a.commanderDossier},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/printings", Handler: a.commanderPrintings},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/log", Handler: a.deckLog},

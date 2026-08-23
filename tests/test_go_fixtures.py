@@ -132,6 +132,8 @@ _ORACLES = [
     ("the Forge bridge", "FORGE_PATH", "render_forge_cases"),
     ("CPython's whitespace tables", "PYTEXT_PATH", "render_pytext_payload"),
     ("CPython's str() and repr()", "PYSTR_PATH", "render_pystr_cases"),
+    ("the Wheel's spins", "WHEEL_PATH", "render_wheel_cases"),
+    ("the upcoming-sets feed", "SETS_PATH", "render_sets_cases"),
     # `DIGITS_PATH` is deliberately NOT here: it is the one oracle in this
     # file whose fresh render legitimately differs between the two supported
     # interpreters, so exact equality is the wrong rule. See

@@ -72,6 +72,8 @@ type Config struct {
 	Pool *pool.Pool
 	// DecksDir is the file tier's root (MTGLAB_DECKS_DIR).
 	DecksDir string
+	// ScryfallDir is where the bulk downloads live; `/api/health` lists them.
+	ScryfallDir string
 	// DataDir is MTGLAB_DATA_DIR: the three runtime shelves live under its
 	// `cache/`. Empty means no shelves, and every shelf route a 404.
 	DataDir string
@@ -161,8 +163,9 @@ func New(cfg Config) (*Door, error) {
 
 	ported := api.New(api.Config{Logger: cfg.Logger, Pool: cfg.Pool, AppDB: d.db,
 		Jobs: d.jobs, SimCache: d.simCache, Upstream: d.proxy,
-		AppDBPath: cfg.AppDB, DecksDir: cfg.DecksDir, AdminEmail: cfg.AdminEmail,
-		Shelves: shelf, AppWriteDB: d.writeDB, Recorder: d.recorder,
+		AppDBPath: cfg.AppDB, DecksDir: cfg.DecksDir, ScryfallDir: cfg.ScryfallDir,
+		AdminEmail: cfg.AdminEmail,
+		Shelves:    shelf, AppWriteDB: d.writeDB, Recorder: d.recorder,
 		// The Claude ledger writes a different table in the same file the
 		// activity log writes, so it shares that handle rather than opening a
 		// second one. Nil handle, nil database, dropped row with a warning --
@@ -268,11 +271,13 @@ func (d *Door) dispatch(w http.ResponseWriter, r *http.Request) {
 
 // DoorHealthPath is the door's own liveness answer -- outside `/api`, where
 // both runtimes agree every path is public, and therefore not a route the
-// shared classification has to carry. `/api/health` is the *pair's* health
-// (the pool, the decks, the Python half answering) and stays proxied: the
-// platform's check, the image's HEALTHCHECK and the deploy's smoke test all
-// ask it, and a door that answered it alone would report a healthy instance
-// with nothing behind it.
+// shared classification has to carry. `/api/health` is the *instance's*
+// health -- the pool, the decks, the staleness flag -- and since Phase 8 the
+// door answers it itself; the child's liveness is the supervisor's business
+// (a dead child stops the door), not something the health body proxies to
+// prove. The platform's check, the image's HEALTHCHECK and the deploy's
+// smoke test all ask `/api/health`; this path stays for asking the door
+// alone.
 const DoorHealthPath = "/door/health"
 
 func (d *Door) health(w http.ResponseWriter, r *http.Request) {

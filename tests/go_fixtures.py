@@ -111,6 +111,14 @@ LOG_DIR = ROOT / "go" / "internal" / "decklog" / "testdata"
 POOL_DIR = ROOT / "go" / "internal" / "pool"
 SCHEMA_PATH = POOL_DIR / "schema.sql"
 TINY_POOL_PATH = POOL_DIR / "pooltest" / "testdata" / "tiny_pool.json"
+#: The Wheel's spins (Phase 8): seeded draws over the 21-card pool, recorded
+#: as the marshalled payload text, because a spin is a promise -- a seed
+#: somebody replays after the cutover must deal the same fate, face and card.
+WHEEL_PATH = ROOT / "go" / "internal" / "wheel" / "testdata" / "spins.json"
+#: The upcoming-sets filter (Phase 8): Scryfall payloads through the real
+#: `service.upcoming_sets`, clock and network stubbed, rendered as the bytes
+#: the route answers.
+SETS_PATH = ROOT / "go" / "internal" / "api" / "testdata" / "sets.json"
 
 
 def rich_deck() -> Deck:
@@ -204,6 +212,151 @@ def render_tiny_pool() -> str:
         "printing_columns": list(db._PRINTING_COLUMNS),
         "printings": printings,
     }, indent=1, ensure_ascii=False) + "\n"
+
+
+# ---------------------------------------------------------- the Wheel's spins
+#
+# `decks/wheel.py` against the 21-card pool, seeded, and recorded as the
+# **marshalled payload text** (the sim cache corpus's lesson): every way the
+# two runtimes' JSON could differ presents as the same-looking dict, so the
+# comparison is over the bytes the route would answer. Seventeen seeds sweep
+# the four fates and both faces of each; the colourless deck exercises the
+# `len(color_identity) = 0` branch and the no-candidate reason; 2**70 pins
+# the unbounded seed echoed back through `pyrand`.
+
+
+def _wire_dumps(payload: object) -> str:
+    """`json.dumps` as Starlette writes a response body -- what
+    `wire.Marshal` reproduces."""
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def wheel_cases() -> dict[str, object]:
+    import tempfile
+
+    import tiny_pool
+    from mtglab.cards import db
+    from mtglab.decks import wheel
+
+    mono = tiny_pool.mono_green_deck(clean=True)
+    bare = tiny_pool.mono_green_deck(clean=True)
+    bare.commander = []
+
+    cases: list[dict[str, object]] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        con = db.connect(tiny_pool.build(Path(tmp) / "pool.duckdb"))
+        try:
+            commander = mono.commander[0]
+            rec = db.get_cards(con, [commander]).get(commander)
+            identity = rec.color_identity if rec else frozenset()
+            for seed in [*range(16), 2**70]:
+                cases.append({
+                    "deck": "mono-green", "identity": sorted(identity),
+                    "seed": seed,
+                    "rendered": _wire_dumps(
+                        wheel.spin(mono, identity, con, seed=seed)),
+                })
+            # A five-colour identity widens the candidate pool enough that
+            # the card branch -- and the counted-offset draw inside it --
+            # is exercised across fates, not once.
+            for seed in [*range(12), 2**70 + 1]:
+                cases.append({
+                    "deck": "mono-green", "identity": list("WUBRG"),
+                    "seed": seed,
+                    "rendered": _wire_dumps(
+                        wheel.spin(mono, frozenset("WUBRG"), con, seed=seed)),
+                })
+            for seed in (0, 3, 7):
+                cases.append({
+                    "deck": "bare", "identity": [], "seed": seed,
+                    "rendered": _wire_dumps(
+                        wheel.spin(bare, frozenset(), con, seed=seed)),
+                })
+        finally:
+            con.close()
+    return {
+        "decks": {"mono-green": mono.dump(), "bare": bare.dump()},
+        "cases": cases,
+    }
+
+
+def render_wheel_cases() -> str:
+    return json.dumps(wheel_cases(), indent=1, ensure_ascii=False) + "\n"
+
+
+# ------------------------------------------------------ the upcoming-sets feed
+#
+# `service.upcoming_sets` with the clock frozen and the network stubbed --
+# the real function, so the strict `>` against today, the digital drop, the
+# stable tie order and the six-key row all come from the code under test
+# rather than from a description of it.
+
+
+def sets_cases() -> list[dict[str, object]]:
+    import io
+    import urllib.request
+
+    from mtglab.api import service
+
+    frozen = "2026-08-23"
+    payloads: dict[str, dict[str, object]] = {
+        "mixed": {"data": [
+            {"code": "old", "name": "Long Released", "released_at": "2020-01-01",
+             "card_count": 300, "icon_svg_uri": "https://svgs.scryfall.io/sets/old.svg",
+             "set_type": "expansion"},
+            {"code": "tod", "name": "Releases Today", "released_at": frozen,
+             "card_count": 50, "icon_svg_uri": "https://svgs.scryfall.io/sets/tod.svg",
+             "set_type": "expansion"},
+            {"code": "tw2", "name": "Twin Two", "released_at": "2026-11-20",
+             "card_count": 250, "icon_svg_uri": "https://svgs.scryfall.io/sets/tw2.svg",
+             "set_type": "expansion"},
+            {"code": "dig", "name": "Arena Only", "released_at": "2026-10-01",
+             "card_count": 100, "icon_svg_uri": "https://svgs.scryfall.io/sets/dig.svg",
+             "set_type": "alchemy", "digital": True},
+            {"code": "tw1", "name": "Twin One", "released_at": "2026-11-20",
+             "card_count": 90, "set_type": "commander"},
+            {"code": "mrc", "name": "Märchen der Welt — Föhn",
+             "released_at": "2026-09-30", "card_count": 271,
+             "icon_svg_uri": "https://svgs.scryfall.io/sets/mrc.svg",
+             "set_type": "expansion"},
+            {"code": "und", "name": "Undated"},
+        ]},
+        "empty": {"data": []},
+        "keyless": {"object": "list"},
+    }
+
+    class FrozenDate:
+        @staticmethod
+        def today() -> date:
+            return date(2026, 8, 23)
+
+    out = []
+    real_date, real_urlopen = service.date, urllib.request.urlopen
+    saved_cache = dict(service._SETS_CACHE)
+    try:
+        service.date = FrozenDate  # type: ignore[assignment]
+        for name, payload in payloads.items():
+            body = json.dumps(payload).encode()
+
+            def fake_urlopen(req: object, timeout: float = 0,
+                             _body: bytes = body) -> io.BytesIO:
+                del req, timeout
+                return io.BytesIO(_body)
+
+            urllib.request.urlopen = fake_urlopen  # type: ignore[assignment]
+            answer = service.upcoming_sets(force=True)
+            out.append({"name": name, "today": frozen, "payload": payload,
+                        "rendered": _wire_dumps(answer)})
+    finally:
+        service.date = real_date  # type: ignore[assignment]
+        urllib.request.urlopen = real_urlopen
+        service._SETS_CACHE.clear()
+        service._SETS_CACHE.update(saved_cache)
+    return out
+
+
+def render_sets_cases() -> str:
+    return json.dumps(sets_cases(), indent=1, ensure_ascii=False) + "\n"
 
 
 # ------------------------------------------------------------ the gate's cases
@@ -4379,6 +4532,12 @@ def write() -> None:
     SCHEMA_PATH.write_text(render_schema(), encoding="utf-8")
     TINY_POOL_PATH.write_text(render_tiny_pool(), encoding="utf-8")
     print(f"wrote {SCHEMA_PATH}\nwrote {TINY_POOL_PATH}")
+    WHEEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    WHEEL_PATH.write_text(render_wheel_cases(), encoding="utf-8")
+    print(f"wrote {WHEEL_PATH}")
+    SETS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SETS_PATH.write_text(render_sets_cases(), encoding="utf-8")
+    print(f"wrote {SETS_PATH}")
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     (LOG_DIR / "describe.json").write_text(render_log_cases(), encoding="utf-8")
     print(f"wrote the log oracle into {LOG_DIR}")
