@@ -1263,6 +1263,33 @@ go/                       the Go module (ADR 38; module path
                           resolve can observe it), the five-charge cap, the
                           command zone in the in-deck set, and the route's
                           source and tier.
+                          **Then the two searching modes' shared core**
+                          (internal/claude/sources.go, engine only, flips
+                          nothing): CanonicalURL and KeepSources, plus the two
+                          ADR 26 asymmetries the corpus hands the SAME input so
+                          neither can be tidied into the other -- a dossier
+                          passage keeps uncited prose where a research finding
+                          is dropped, and an unresolved rival is INVENTED where
+                          an unresolved research card may be SPOILED. Three
+                          payload key orders, all Python's: `oracle_text` is
+                          fifth in a research card and LAST in a competitor,
+                          and an unresolved card has exactly two keys. It found
+                          a Python bug (`_competitors` does not index
+                          `asked_as`, so a DFC named by its front face is
+                          dropped as invented there and resolves in research --
+                          reproduced, pinned, raised) and one of OUR OWN, which
+                          is the general lesson: **Python's `str()` renders a
+                          non-string where Go's `v.(string)` answers ""**, so a
+                          numeric claim is kept by Python and dropped by Go.
+                          `pyStr` is the fix, `Turn.Parsed` decodes with
+                          UseNumber (the stance parser's fix, one lane later),
+                          and the family's THREE spellings -- `str(get(k,""))`,
+                          `str(get(k) or "")`, `str(v or "")` -- are copied per
+                          call site, because each differs from the others on
+                          exactly one input. **The same bug is still live in
+                          OnlyQuestions and OnlyCharges**, near-unreachable
+                          because those fields are schema-declared strings, and
+                          named here so it is not rediscovered.
                           **Still Python, and ENUMERATED rather than
                           counted** (this file's own lesson about numbers):
                           the orchestration of dossier, research, both theme

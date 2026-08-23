@@ -1895,6 +1895,230 @@ def render_crypto_cases() -> str:
 # ------------------------------------------------------------- the stance dial
 
 #: Where `internal/claude`'s stance corpus lands.
+SOURCES_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "sources.json"
+
+
+def canonical_url_cases() -> list[dict[str, str]]:
+    """`dossier.canonical_url`, which decides when two URLs are one page.
+
+    The half a port gets wrong is the asymmetry: with a scheme, only the scheme
+    and host are lowercased and THE PATH KEEPS ITS CASE; with no scheme, the
+    whole string is lowercased. That is not a tidy rule and it is the rule.
+    """
+    from mtglab.claude.dossier import canonical_url
+    raw = [
+        "https://example.com/a", "https://example.com/a/", "HTTPS://EXAMPLE.COM/a",
+        "https://EXAMPLE.com/A", "https://example.com/A/", "https://example.com",
+        "https://example.com/", "  https://example.com/a  ",
+        "http://example.com/a", "example.com/A", "EXAMPLE.COM/A", "",
+        "   ", "/", "//", "https://example.com//a//",
+        "https://example.com/a?b=C#D", "ftp://Example.COM/Path",
+        "https://sub.Example.com/Deep/Path/Here",
+    ]
+    return [{"url": u, "canonical": canonical_url(u)} for u in raw]
+
+
+def keep_sources_cases() -> list[dict[str, Any]]:
+    """`dossier.keep_sources`: the intersection that puts something behind a URL.
+
+    A response schema suppresses the API's own citations, so a URL in the
+    payload is otherwise just a string the model typed.
+    """
+    from mtglab.claude.dossier import keep_sources
+    searched = [
+        {"url": "https://example.com/one", "title": "The First Page"},
+        {"url": "https://example.com/two/", "title": "The Second Page"},
+        {"url": "https://other.example/deep/Path", "title": ""},
+        # Absurd on its face, and the only thing that separates the two str()
+        # spellings for `url`. `str(get("url", ""))` turns an explicit null into
+        # the four-letter string "None", which then MATCHES this page;
+        # `str(get("url") or "")` turns it into "" and drops it. Every other
+        # input drops either way, so without this page the spelling is
+        # unobservable and a mutation harmonising them survives.
+        {"url": "None", "title": "A Page Called None"},
+    ]
+    cases: list[dict[str, Any]] = []
+
+    def add(note: str, claimed: Any) -> None:
+        kept, dropped = keep_sources(claimed, searched)
+        cases.append({"note": note, "claimed": claimed, "searched": searched,
+                      "kept": kept, "dropped": dropped})
+
+    add("a page the search returned",
+        [{"id": "s1", "title": "the model's title", "url": "https://example.com/one"}])
+    add("nothing claimed", [])
+    add("a page the search never returned",
+        [{"id": "s1", "title": "t", "url": "https://invented.example/page"}])
+    add("a trailing slash is the same page",
+        [{"id": "s1", "title": "t", "url": "https://example.com/two"}])
+    add("the host is case-insensitive",
+        [{"id": "s1", "title": "t", "url": "https://EXAMPLE.com/one"}])
+    # The rule that keeps a citation meaning something.
+    add("a different path on the same site is a different page",
+        [{"id": "s1", "title": "t", "url": "https://example.com/three"}])
+    add("no id falls back to the url",
+        [{"title": "t", "url": "https://example.com/one"}])
+    add("a blank id falls back to the url",
+        [{"id": "   ", "title": "t", "url": "https://example.com/one"}])
+    # The search's own title wins -- one is a fact about the page, the other a
+    # description of it.
+    add("the search's title beats the model's",
+        [{"id": "s1", "title": "the model's title", "url": "https://example.com/two"}])
+    add("an empty search title falls back to the model's",
+        [{"id": "s1", "title": "the model's title", "url": "https://other.example/deep/Path"}])
+    add("no url at all", [{"id": "s1", "title": "t"}])
+    add("a blank url", [{"id": "s1", "title": "t", "url": "  "}])
+    add("a non-object is dropped", ["https://example.com/one", 7, None])
+    add("mixed", [{"id": "s1", "url": "https://example.com/one", "title": "t"},
+                  {"id": "s2", "url": "https://nope.example/x", "title": "t"},
+                  "not an object"])
+    # **The two str() spellings, which differ on exactly one input.** `url` is
+    # `str(get("url", ""))` and reaches `str(None)`; `id` and `title` are
+    # `str(get(k) or "")` and never do. A port that harmonised them would put
+    # the four-letter string "None" in an id, or lose it from a url.
+    add("a null url is the string None",
+        [{"id": "s1", "title": "t", "url": None}])
+    add("a null id falls back to the url, not to None",
+        [{"id": None, "title": "t", "url": "https://example.com/one"}])
+    add("a null title falls back, not to None",
+        [{"id": "s1", "title": None, "url": "https://other.example/deep/Path"}])
+    add("a numeric id is rendered",
+        [{"id": 7, "title": "t", "url": "https://example.com/one"}])
+    return cases
+
+
+def grounded_cases() -> list[dict[str, Any]]:
+    """`dossier._section` beside `research.only_grounded`, the ADR 26 asymmetry.
+
+    The SAME input goes to both, because the point is that they answer
+    differently: a dossier passage may rest on its brief, so uncited prose
+    survives; a research finding has no brief, so uncited prose is resting on
+    the model's recall and is dropped and counted.
+    """
+    from mtglab.claude.dossier import _section
+    from mtglab.claude.research import only_grounded
+    allowed = {"s1", "s2", "3"}
+    # **Each item carries BOTH keys**, and that is the whole point rather than
+    # belt and braces: a dossier passage reads `prose` and a research finding
+    # reads `claim`, so an item with only one of them exercises one function and
+    # silently degenerates the other. The first draft of this corpus carried
+    # `prose` alone -- every `only_grounded` row came back dropped for a missing
+    # claim, the asymmetry looked real, and a mutation deleting the citation
+    # check survived because the claim check was already dropping everything.
+    inputs: list[tuple[str, Any]] = [
+        ("cited, and the citation survived",
+         {"prose": "A sentence.", "claim": "A sentence.", "source_ids": ["s1"]}),
+        ("cited, but every citation was dropped",
+         {"prose": "A sentence.", "claim": "A sentence.", "source_ids": ["gone"]}),
+        ("some citations survived",
+         {"prose": "A sentence.", "claim": "A sentence.", "source_ids": ["s1", "gone", "s2"]}),
+        ("no citations at all",
+         {"prose": "A sentence.", "claim": "A sentence.", "source_ids": []}),
+        ("no source_ids key", {"prose": "A sentence.", "claim": "A sentence."}),
+        ("empty text, good citation",
+         {"prose": "   ", "claim": "   ", "source_ids": ["s1"]}),
+        # A numeric id that IS allowed, so `str(i) in allowed` is exercised
+        # rather than merely executed -- with `allowed` holding "3", an id of 3
+        # survives only if it was stringified first.
+        ("a numeric id that survives",
+         {"prose": "A sentence.", "claim": "A sentence.", "source_ids": [3]}),
+        ("a numeric id that does not",
+         {"prose": "A sentence.", "claim": "A sentence.", "source_ids": [1, 2]}),
+        ("not an object", "a bare string"),
+        # `_section` is `str(get("prose") or "")` and `only_grounded` is
+        # `str(get("claim", ""))`, so a null prose is "" and a null claim is
+        # the four-letter string "None" -- which is truthy, so the finding
+        # survives on its claim being literally "None".
+        ("a numeric text is rendered",
+         {"prose": 42, "claim": 42, "source_ids": ["s1"]}),
+        ("a null prose is empty, a null claim is None",
+         {"prose": None, "claim": None, "source_ids": ["s1"]}),
+        ("a boolean text", {"prose": True, "claim": True, "source_ids": ["s1"]}),
+    ]
+    cases = []
+    for note, item in inputs:
+        section = _section(item, allowed)
+        kept, dropped = only_grounded([item], allowed)
+        cases.append({
+            "note": note, "item": item, "allowed": sorted(allowed),
+            # The dossier keeps the prose either way.
+            "section": section,
+            # Research keeps it only if something survived.
+            "grounded": kept, "grounded_dropped": dropped,
+        })
+    return cases
+
+
+def pool_name_cases() -> list[dict[str, Any]]:
+    """`dossier._competitors` beside `research.resolve_cards`, over one pool.
+
+    The second ADR 26 asymmetry, and one REAL DIVERGENCE that is a Python bug
+    rather than a design: `_competitors` indexes only the pool's own spelling,
+    where `resolve_cards` (and `argue.resolve_alternatives`) index `asked_as`
+    too. So a double-faced card named by its FRONT FACE resolves in research and
+    is dropped as invented by the dossier. Measured, pinned, and raised -- not
+    fixed here, because fixing one runtime would put the two out of step.
+    """
+    from mtglab.claude.dossier import _competitors
+    from mtglab.claude.research import resolve_cards
+    allowed = {"s1"}
+    cases: list[dict[str, Any]] = []
+
+    def add(note: str, name: Any) -> None:
+        comp, comp_dropped = _competitors(
+            [{"card": name, "prose": "p", "source_ids": ["s1"]}], allowed)
+        cards, unresolved = resolve_cards([name])
+        cases.append({
+            "note": note, "name": name, "allowed": sorted(allowed),
+            "competitors": comp, "competitors_dropped": comp_dropped,
+            "research_cards": cards, "research_unresolved": unresolved,
+        })
+
+    add("an ordinary card", "Craterhoof Behemoth")
+    add("a card the pool lacks", "Not A Real Card")
+    add("a banned card still resolves", "Primeval Titan")
+    # The divergence.
+    add("a DFC by its front face", "Ajani, Nacatl Pariah")
+    add("a DFC by its full name", "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger")
+    add("case does not matter", "craterhoof behemoth")
+    add("a numeric card name", 7)
+    return cases
+
+
+def sources_cases() -> dict[str, Any]:
+    import tiny_pool
+    from mtglab import config
+    with tempfile.TemporaryDirectory() as tmp:
+        tiny_pool.build(Path(tmp) / "mtg.duckdb")
+        with config.use_paths(data_dir=Path(tmp)):
+            pool_cases = pool_name_cases()
+    return {
+        "canonical": canonical_url_cases(),
+        "keep": keep_sources_cases(),
+        "grounded": grounded_cases(),
+        "pool": pool_cases,
+    }
+
+
+def render_sources_cases() -> str:
+    return _rows_json({
+        "note": "The two hosted-search modes' shared instruments and their two "
+                "deliberate asymmetries. Written by "
+                "`python tests/go_fixtures.py`.",
+        "why": "A response schema suppresses the API's own citations, so a URL "
+               "in a payload has nothing behind it but the model's word; "
+               "keep_sources is what puts something behind it. Past that the "
+               "two modes diverge on purpose (a dossier passage may rest on "
+               "its brief, a research finding may not; an unresolved rival is "
+               "invented, an unresolved research card may be spoiled) and once "
+               "BY ACCIDENT -- _competitors does not index `asked_as`, so a "
+               "DFC named by its front face is dropped there and resolved in "
+               "research. The three payload key ORDERS differ and all three "
+               "are the wire.",
+        **sources_cases(),
+    }) + "\n"
+
+
 ARGUE_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "argue.json"
 
 
@@ -2772,6 +2996,7 @@ def write() -> None:
     STANCE_PATH.write_text(render_stance_cases(), encoding="utf-8")
     ARGUE_PATH.parent.mkdir(parents=True, exist_ok=True)
     ARGUE_PATH.write_text(render_argue_cases(), encoding="utf-8")
+    SOURCES_PATH.write_text(render_sources_cases(), encoding="utf-8")
     _stance = stance_cases()
     print(f"wrote {len(_stance['stances'])} stances and "
           f"{len(_stance['clamps'])} clamp pairs into {STANCE_PATH}")
