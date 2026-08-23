@@ -1,0 +1,1768 @@
+{
+ "note": "`claude/theme.py`'s Python-owned halves, written by `python tests/go_fixtures.py` with the opening angle pinned to index 2 and the clock frozen at 2026-08-23T04:05:06.789012+00:00.",
+ "floor": 3,
+ "max_exchanges": 10,
+ "max_turn_chars": 2000,
+ "max_fact_chars": 600,
+ "min_quote_chars": 3,
+ "slot_kinds": ["taste","temperament","posture","anchor"],
+ "slot_questions": {
+  "taste": "A film, book, artwork, period or band they love that is not Magic.",
+  "temperament": "How they are -- their sign, planner or improviser, what they do when a plan falls apart.",
+  "posture": "How they behave at game night: going for the throat, quietly building, or making deals.",
+  "anchor": "A Magic card, character or deck they already love. Optional -- a newcomer will not have one, and that is fine."
+ },
+ "frozen_angle_index": 2,
+ "transcript": [
+  {"role":"assistant","text":"Tell me something you keep coming back to."},
+  {"role":"user","text":"old horror films, the practical effects ones"},
+  {"role":"assistant","text":"And when a plan falls apart?"},
+  {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+  {"role":"assistant","text":"At game night, then -- what are you like?"},
+  {"role":"user","text":"I make deals. quietly"}
+ ],
+ "pages": [{"url":"https://edhrec.com/real","title":"The Real Page"},{"url":"https://mtg.wiki/Gyome","title":""}],
+ "prose": [
+  {"note":"none","value":null,"prose":""},
+  {"note":"false is empty","value":false,"prose":""},
+  {"note":"zero is empty","value":0,"prose":""},
+  {"note":"a number","value":7,"prose":"7"},
+  {"note":"a float","value":7.5,"prose":"7.5"},
+  {"note":"a list","value":["a","b"],"prose":"['a', 'b']"},
+  {"note":"plain","value":"a plain sentence","prose":"a plain sentence"},
+  {"note":"the form feed that ate a letter","value":"than policing the \fight","prose":"than policing the ight"},
+  {"note":"DEL is not whitespace but goes anyway","value":"ab","prose":"a b"},
+  {
+   "note": "every C0 character",
+   "value": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001fx",
+   "prose": "x"
+  },
+  {"note":"unicode whitespace collapses","value":"a  b　c","prose":"a b c"},
+  {"note":"the information separators","value":"a\u001cb\u001dc\u001ed\u001fe","prose":"a b c d e"},
+  {"note":"leading and trailing","value":"   spaced   out   ","prose":"spaced out"},
+  {"note":"nothing but whitespace","value":" \t\n ","prose":""}
+ ],
+ "ground": [
+  {"note":"nothing at all","slots":[],"kept":[],"dropped":0,"may_propose":false},
+  {"note":"a slot that is not an object","slots":["taste",7,null],"kept":[],"dropped":3,"may_propose":false},
+  {"note":"an unknown kind","slots":[{"kind":"vibe","value":"spooky","quote":"old horror films"}],"kept":[],"dropped":1,"may_propose":false},
+  {"note":"no value","slots":[{"kind":"taste","value":"","quote":"old horror films"}],"kept":[],"dropped":1,"may_propose":false},
+  {"note":"a quote below the floor","slots":[{"kind":"taste","value":"cats","quote":"I"}],"kept":[],"dropped":1,"may_propose":false},
+  {"note":"a quote at the floor","slots":[{"kind":"posture","value":"deals","quote":"I m"}],"kept":[{"kind":"posture","value":"deals","quote":"I m"}],"dropped":0,"may_propose":false},
+  {"note":"a quote nobody said","slots":[{"kind":"taste","value":"blue decks","quote":"I love blue"}],"kept":[],"dropped":1,"may_propose":false},
+  {"note":"the interviewer's own words","slots":[{"kind":"temperament","value":"planner","quote":"when a plan falls apart"}],"kept":[],"dropped":1,"may_propose":false},
+  {"note":"a quote spanning two turns","slots":[{"kind":"taste","value":"both","quote":"the practical effects ones I improvise"}],"kept":[],"dropped":1,"may_propose":false},
+  {
+   "note": "casefold, not lower",
+   "slots": [{"kind":"temperament","value":"grew up on the Strasse","quote":"Straße"}],
+   "kept": [{"kind":"temperament","value":"grew up on the Strasse","quote":"Straße"}],
+   "dropped": 0,
+   "may_propose": false
+  },
+  {
+   "note": "control characters in the quote",
+   "slots": [{"kind":"taste","value":"horror\ffilms","quote":"old horror\tfilms"}],
+   "kept": [{"kind":"taste","value":"horror films","quote":"old horror films"}],
+   "dropped": 0,
+   "may_propose": false
+  },
+  {
+   "note": "last reading of a kind wins",
+   "slots": [{"kind":"taste","value":"films","quote":"old horror films"},{"kind":"taste","value":"practical effects specifically","quote":"the practical effects ones"}],
+   "kept": [{"kind":"taste","value":"practical effects specifically","quote":"the practical effects ones"}],
+   "dropped": 0,
+   "may_propose": false
+  },
+  {
+   "note": "canonical order, not the model's",
+   "slots": [{"kind":"posture","value":"deals","quote":"I make deals"},{"kind":"taste","value":"films","quote":"old horror films"},{"kind":"temperament","value":"improviser","quote":"I improvise"}],
+   "kept": [{"kind":"taste","value":"films","quote":"old horror films"},{"kind":"temperament","value":"improviser","quote":"I improvise"},{"kind":"posture","value":"deals","quote":"I make deals"}],
+   "dropped": 0,
+   "may_propose": true
+  },
+  {"note":"a non-string kind","slots":[{"kind":7,"value":"seven","quote":"old horror films"}],"kept":[],"dropped":1,"may_propose":false},
+  {"note":"a numeric value","slots":[{"kind":"taste","value":7,"quote":"old horror films"}],"kept":[{"kind":"taste","value":"7","quote":"old horror films"}],"dropped":0,"may_propose":false}
+ ],
+ "carry": [
+  {"note":"nothing either way","previous":[],"fresh":[],"carried":[],"may_propose":false},
+  {
+   "note": "a turn that heard nothing keeps what was known",
+   "previous": [{"kind":"taste","value":"films","quote":"old horror films"},{"kind":"temperament","value":"improviser","quote":"I improvise"}],
+   "fresh": [],
+   "carried": [{"kind":"taste","value":"films","quote":"old horror films"},{"kind":"temperament","value":"improviser","quote":"I improvise"}],
+   "may_propose": false
+  },
+  {
+   "note": "a turn that heard something new adds it",
+   "previous": [{"kind":"taste","value":"films","quote":"old horror films"}],
+   "fresh": [{"kind":"temperament","value":"improviser","quote":"I improvise"}],
+   "carried": [{"kind":"taste","value":"films","quote":"old horror films"},{"kind":"temperament","value":"improviser","quote":"I improvise"}],
+   "may_propose": false
+  },
+  {
+   "note": "a turn refining a kind replaces it",
+   "previous": [{"kind":"taste","value":"films","quote":"old horror films"}],
+   "fresh": [{"kind":"taste","value":"practical effects","quote":"the practical effects ones"}],
+   "carried": [{"kind":"taste","value":"practical effects","quote":"the practical effects ones"}],
+   "may_propose": false
+  },
+  {
+   "note": "the floor is reached across turns",
+   "previous": [{"kind":"taste","value":"films","quote":"old horror films"},{"kind":"temperament","value":"improviser","quote":"I improvise"}],
+   "fresh": [{"kind":"posture","value":"deals","quote":"I make deals"}],
+   "carried": [{"kind":"taste","value":"films","quote":"old horror films"},{"kind":"temperament","value":"improviser","quote":"I improvise"},{"kind":"posture","value":"deals","quote":"I make deals"}],
+   "may_propose": true
+  },
+  {
+   "note": "canonical order out, whatever went in",
+   "previous": [{"kind":"posture","value":"deals","quote":"I make deals"}],
+   "fresh": [{"kind":"temperament","value":"improviser","quote":"I improvise"},{"kind":"taste","value":"films","quote":"old horror films"}],
+   "carried": [{"kind":"taste","value":"films","quote":"old horror films"},{"kind":"temperament","value":"improviser","quote":"I improvise"},{"kind":"posture","value":"deals","quote":"I make deals"}],
+   "may_propose": true
+  }
+ ],
+ "repeats": [
+  {"note":"nothing told yet","text":"A brand new fact.","told":[],"repeats":false},
+  {"note":"empty text","text":"","told":["Pamela Colman Smith drew all 78 cards and was paid one flat fee.","The Fool is the only card in the deck about to have an accident."],"repeats":false},
+  {
+   "note": "the same sentence",
+   "text": "Pamela Colman Smith drew all 78 cards and was paid one flat fee.",
+   "told": ["Pamela Colman Smith drew all 78 cards and was paid one flat fee.","The Fool is the only card in the deck about to have an accident."],
+   "repeats": true
+  },
+  {
+   "note": "the same sentence, differently spaced",
+   "text": "  PAMELA COLMAN SMITH DREW ALL 78 CARDS AND WAS PAID ONE FLAT FEE. ",
+   "told": ["Pamela Colman Smith drew all 78 cards and was paid one flat fee.","The Fool is the only card in the deck about to have an accident."],
+   "repeats": true
+  },
+  {
+   "note": "reworded, same content words",
+   "text": "Smith drew all 78 cards of the deck and was paid a single flat fee.",
+   "told": ["Pamela Colman Smith drew all 78 cards and was paid one flat fee.","The Fool is the only card in the deck about to have an accident."],
+   "repeats": true
+  },
+  {
+   "note": "a genuinely different fact about the same person",
+   "text": "Smith exhibited photographs with Alfred Stieglitz in 1907.",
+   "told": ["Pamela Colman Smith drew all 78 cards and was paid one flat fee.","The Fool is the only card in the deck about to have an accident."],
+   "repeats": false
+  },
+  {
+   "note": "stop words only",
+   "text": "the a of and",
+   "told": ["Pamela Colman Smith drew all 78 cards and was paid one flat fee.","The Fool is the only card in the deck about to have an accident."],
+   "repeats": false
+  },
+  {
+   "note": "a short fact that shares its whole vocabulary",
+   "text": "The Fool.",
+   "told": ["Pamela Colman Smith drew all 78 cards and was paid one flat fee.","The Fool is the only card in the deck about to have an accident."],
+   "repeats": true
+  },
+  {
+   "note": "exactly at the overlap threshold",
+   "text": "alpha bravo charlie delta echo foxtrot golf hotel india juliet",
+   "told": ["alpha bravo charlie delta echo foxtrot golf kilo lima mike november"],
+   "repeats": true
+  },
+  {
+   "note": "one word below the threshold",
+   "text": "alpha bravo charlie delta echo foxtrot juliet hotel india golf",
+   "told": ["alpha bravo charlie delta echo foxtrot kilo lima mike november"],
+   "repeats": false
+  }
+ ],
+ "told": [
+  {"note":"none","raw":null,"told":[]},
+  {"note":"empty","raw":[],"told":[]},
+  {"note":"plain strings","raw":["one","two"],"told":["one","two"]},
+  {"note":"blanks are dropped, not refused","raw":["one","   ",""],"told":["one"]},
+  {"note":"stripped","raw":["  one  "],"told":["one"]},
+  {"note":"not a list","raw":"one","error":"facts must be a list of strings"},
+  {"note":"not a list of strings","raw":["one",2],"error":"fact 1 is not a string"},
+  {
+   "note": "one too long",
+   "raw": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "error": "fact 0 is 601 characters; the cap is 600"
+  },
+  {
+   "note": "one at the cap",
+   "raw": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "told": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ]
+  },
+  {
+   "note": "counted in code points",
+   "raw": [
+    "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+   ],
+   "told": [
+    "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+   ]
+  },
+  {
+   "note": "more facts than exchanges",
+   "raw": ["fact 0","fact 1","fact 2","fact 3","fact 4","fact 5","fact 6","fact 7","fact 8","fact 9","fact 10"],
+   "error": "11 facts is more than a 10-exchange conversation can have produced"
+  }
+ ],
+ "transcripts": [
+  {"note":"none","raw":null,"turns":[]},
+  {"note":"empty","raw":[],"turns":[]},
+  {
+   "note": "the fixture",
+   "raw": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ],
+   "turns": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ]
+  },
+  {"note":"not a list","raw":{"role":"user","text":"hi"},"error":"transcript must be a list of turns"},
+  {"note":"a turn that is not an object","raw":[["user","hi"]],"error":"turn 0 is not an object"},
+  {"note":"an unknown role","raw":[{"role":"system","text":"hi"}],"error":"turn 0 has role 'system'; only 'user' and 'assistant' cross this boundary"},
+  {"note":"a missing role","raw":[{"text":"hi"}],"error":"turn 0 has role ''; only 'user' and 'assistant' cross this boundary"},
+  {"note":"a role that is not a string","raw":[{"role":7,"text":"hi"}],"error":"turn 0 has role '7'; only 'user' and 'assistant' cross this boundary"},
+  {"note":"an empty turn","raw":[{"role":"assistant","text":"   "}],"error":"turn 0 is empty"},
+  {
+   "note": "a turn over the cap",
+   "raw": [
+    {
+     "role": "assistant",
+     "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+   ],
+   "error": "turn 0 is 2001 characters; the cap is 2000"
+  },
+  {
+   "note": "a turn at the cap",
+   "raw": [
+    {
+     "role": "assistant",
+     "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+   ],
+   "turns": [
+    {
+     "role": "assistant",
+     "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+   ]
+  },
+  {
+   "note": "counted in code points",
+   "raw": [
+    {
+     "role": "assistant",
+     "text": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+    }
+   ],
+   "turns": [
+    {
+     "role": "assistant",
+     "text": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+    }
+   ]
+  },
+  {"note":"the user speaking first","raw":[{"role":"user","text":"hi"}],"error":"a transcript starts with the interviewer's own opening question"},
+  {
+   "note": "consecutive same-role turns are allowed",
+   "raw": [{"role":"assistant","text":"one"},{"role":"user","text":"two"},{"role":"user","text":"three"}],
+   "turns": [{"role":"assistant","text":"one"},{"role":"user","text":"two"},{"role":"user","text":"three"}]
+  },
+  {
+   "note": "a conversation past its ceiling",
+   "raw": [
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"},
+    {"role":"assistant","text":"x"}
+   ],
+   "error": "this conversation is over after 10 exchanges. Propose from what it has, or start again."
+  },
+  {"note":"an anthropic message block","raw":[{"role":"user","content":[{"type":"text","text":"hi"}]}],"error":"turn 0 is empty"}
+ ],
+ "facts": [
+  {"note":"not an object","raw":"a fact","fact":null},
+  {"note":"no text","raw":{"text":"","source":"taxonomy"},"fact":null},
+  {"note":"no source","raw":{"text":"A fact.","source":""},"fact":null},
+  {"note":"taxonomy","raw":{"text":"  White wants peace.  ","source":"taxonomy"},"fact":{"text":"White wants peace.","source":"taxonomy","url":""}},
+  {"note":"taxonomy, shouted","raw":{"text":"White wants peace.","source":"TAXONOMY"},"fact":{"text":"White wants peace.","source":"taxonomy","url":""}},
+  {
+   "note": "a tarot id, paraphrased away",
+   "raw": {"text":"the model's own words","source":"tarot:pixie-fee"},
+   "fact": {
+    "text": "Pamela Colman Smith drew all 78 cards of this deck and was paid a single flat fee for the lot — no royalties, ever. It went on to become the most reproduced tarot deck in the world, and she died in 1951 owing money.",
+    "source": "Kaplan, Greer, O'Connor & Parsons, Pamela Colman Smith: The Untold Story (U.S. Games, 2018)",
+    "url": ""
+   }
+  },
+  {
+   "note": "a tarot id, shouted",
+   "raw": {"text":"x","source":"TAROT:PIXIE-FEE"},
+   "fact": {
+    "text": "Pamela Colman Smith drew all 78 cards of this deck and was paid a single flat fee for the lot — no royalties, ever. It went on to become the most reproduced tarot deck in the world, and she died in 1951 owing money.",
+    "source": "Kaplan, Greer, O'Connor & Parsons, Pamela Colman Smith: The Untold Story (U.S. Games, 2018)",
+    "url": ""
+   }
+  },
+  {"note":"a tarot id nobody has","raw":{"text":"x","source":"tarot:not-a-fact"},"fact":null},
+  {
+   "note": "a page the search returned",
+   "raw": {"text":"A thing on a page.","source":"https://edhrec.com/real"},
+   "fact": {"text":"A thing on a page.","source":"The Real Page","url":"https://edhrec.com/real"}
+  },
+  {
+   "note": "the same page, differently spelled",
+   "raw": {"text":"A thing on a page.","source":"https://edhrec.com/real/"},
+   "fact": {"text":"A thing on a page.","source":"The Real Page","url":"https://edhrec.com/real"}
+  },
+  {"note":"a page with no title","raw":{"text":"A thing.","source":"https://mtg.wiki/Gyome"},"fact":{"text":"A thing.","source":"https://mtg.wiki/Gyome","url":"https://mtg.wiki/Gyome"}},
+  {"note":"a page nobody fetched","raw":{"text":"A thing.","source":"https://example.com/invented"},"fact":null}
+ ],
+ "seeds": [
+  {"note":"none","raw":null,"error":"not a usable reading seed: None"},
+  {"note":"zero","raw":0,"seed":"0"},
+  {"note":"an integer","raw":42,"seed":"42"},
+  {"note":"negative","raw":-3,"seed":"-3"},
+  {"note":"unbounded","raw":1180591620717411303424,"seed":"1180591620717411303424"},
+  {"note":"a float truncates toward zero","raw":5.9,"seed":"5"},
+  {"note":"a negative float truncates toward zero","raw":-5.9,"seed":"-5"},
+  {"note":"a float in exponent form","raw":500.0,"seed":"500"},
+  {"note":"true is one","raw":true,"seed":"1"},
+  {"note":"false is zero","raw":false,"seed":"0"},
+  {"note":"a decimal string","raw":"42","seed":"42"},
+  {"note":"a padded string","raw":"  42  ","seed":"42"},
+  {"note":"a signed string","raw":"+42","seed":"42"},
+  {"note":"underscores between digits","raw":"1_0","seed":"10"},
+  {"note":"a leading underscore","raw":"_10","error":"not a usable reading seed: '_10'"},
+  {"note":"a trailing underscore","raw":"10_","error":"not a usable reading seed: '10_'"},
+  {"note":"a doubled underscore","raw":"1__0","error":"not a usable reading seed: '1__0'"},
+  {"note":"an underscore next to the sign","raw":"+_10","error":"not a usable reading seed: '+_10'"},
+  {"note":"a fullwidth digit","raw":"７","seed":"7"},
+  {"note":"arabic-indic digits","raw":"٣٤","seed":"34"},
+  {"note":"a mathematical bold digit","raw":"𝟐","seed":"2"},
+  {"note":"a float as a string","raw":"5.9","error":"not a usable reading seed: '5.9'"},
+  {"note":"not a number at all","raw":"soon","error":"not a usable reading seed: 'soon'"},
+  {"note":"empty","raw":"","error":"not a usable reading seed: ''"},
+  {"note":"whitespace only","raw":"   ","error":"not a usable reading seed: '   '"},
+  {"note":"a list","raw":[1],"error":"not a usable reading seed: [1]"},
+  {"note":"an object","raw":{"seed":1},"error":"not a usable reading seed: {'seed': 1}"}
+ ],
+ "budgets": [
+  {"value":50.0,"formatted":"50"},
+  {"value":50.5,"formatted":"50.5"},
+  {"value":0.5,"formatted":"0.5"},
+  {"value":100.0,"formatted":"100"},
+  {"value":1234567.0,"formatted":"1.23457e+06"},
+  {"value":123456.0,"formatted":"123456"},
+  {"value":0.0001,"formatted":"0.0001"},
+  {"value":1e-05,"formatted":"1e-05"},
+  {"value":1e+21,"formatted":"1e+21"},
+  {"value":1.5e-07,"formatted":"1.5e-07"},
+  {"value":-50.0,"formatted":"-50"},
+  {"value":0.3333333333333333,"formatted":"0.333333"},
+  {"value":9007199254740992.0,"formatted":"9.0072e+15"},
+  {"note":"inf","value":null,"formatted":"inf"},
+  {"note":"-inf","value":null,"formatted":"-inf"},
+  {"note":"nan","value":null,"formatted":"nan"}
+ ],
+ "floats": [
+  {"note":"none is no budget","raw":null,"budget":null},
+  {"note":"zero is no budget","raw":0,"budget":null},
+  {"note":"empty string is no budget","raw":"","budget":null},
+  {"note":"false is no budget","raw":false,"budget":null},
+  {"note":"an empty list is no budget","raw":[],"budget":null},
+  {"note":"an integer","raw":50,"budget":"50.0"},
+  {"note":"a float","raw":50.5,"budget":"50.5"},
+  {"note":"a numeric string","raw":"50","budget":"50.0"},
+  {"note":"a padded numeric string","raw":"  50.5  ","budget":"50.5"},
+  {"note":"a signed string","raw":"-50","budget":"-50.0"},
+  {"note":"an exponent","raw":"5e2","budget":"500.0"},
+  {"note":"underscores between digits","raw":"1_000.5","budget":"1000.5"},
+  {"note":"a fullwidth digit","raw":"５０","budget":"50.0"},
+  {"note":"inf","raw":"inf","budget":"inf"},
+  {"note":"Infinity","raw":"Infinity","budget":"inf"},
+  {"note":"-inf","raw":"-inf","budget":"-inf"},
+  {"note":"nan","raw":"NaN","budget":"nan"},
+  {"note":"a hex float Go would take","raw":"0x1p4","error":"could not convert string to float: '0x1p4'","error_kind":"value"},
+  {"note":"not a number","raw":"fifty","error":"could not convert string to float: 'fifty'","error_kind":"value"},
+  {"note":"an overflowing literal","raw":"1e400","budget":"inf"},
+  {"note":"true is one","raw":true,"budget":"1.0"},
+  {"note":"a list is a TypeError, not a ValueError","raw":[1],"error":"float() argument must be a string or a real number, not 'list'","error_kind":"type"},
+  {"note":"an object is a TypeError","raw":{"a":1},"error":"float() argument must be a string or a real number, not 'dict'","error_kind":"type"}
+ ],
+ "stances": [
+  {
+   "note": "nothing asked for",
+   "requested": null,
+   "ceiling": null,
+   "stance": {
+    "preset": "second-opinion",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "note": "nothing asked for, under a ceiling",
+   "requested": null,
+   "ceiling": "off",
+   "stance": {
+    "preset": "off",
+    "allows_calls": false,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "note": "nothing asked for, under a low ceiling",
+   "requested": null,
+   "ceiling": "sounding-board",
+   "stance": {
+    "preset": "off",
+    "allows_calls": false,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "note": "a preset",
+   "requested": "consultant",
+   "ceiling": null,
+   "stance": {
+    "preset": "consultant",
+    "allows_calls": true,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "note": "a preset over the ceiling",
+   "requested": "consultant",
+   "ceiling": "sounding-board",
+   "stance": {
+    "preset": "off",
+    "allows_calls": false,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {
+   "note": "off is reachable",
+   "requested": "off",
+   "ceiling": null,
+   "stance": {
+    "preset": "off",
+    "allows_calls": false,
+    "may_write": false,
+    "axes": [
+     {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+     {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+     {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+    ]
+   }
+  },
+  {"note":"a custom stance","requested":{"initiative":"volunteers","scope":"wide","write":"none"},"ceiling":null,"error":"'wide' is not a scope level; expected one of flagged, adjacent, rethink"},
+  {"note":"a malformed stance","requested":{"initiative":7},"ceiling":null,"error":"7 is not a initiative level; expected one of off, on-request, volunteers, interjects"},
+  {"note":"a stance that is not a stance","requested":7,"ceiling":null,"error":"cannot read a stance from int"}
+ ],
+ "prompts": {
+  "frames": [
+   {"note":"no reading at all","persona":"plain","seed":null,"told":[],"frame":"Somebody has opened the deckbuilder and does not know what to build. Interview them."},
+   {"note":"a reader with no seed","persona":"fortune-teller","seed":null,"told":[],"frame":"Somebody has opened the deckbuilder and does not know what to build. Interview them."},
+   {"note":"a plain voice ignores the seed","persona":"plain","seed":1909,"told":[],"frame":"Somebody has opened the deckbuilder and does not know what to build. Interview them."},
+   {
+    "note": "a reading, nothing told",
+    "persona": "fortune-teller",
+    "seed": 1909,
+    "told": [],
+    "frame": "Somebody has opened the deckbuilder and does not know what to build. Interview them.\n\nYou have already dealt three cards, face up, in this order. These are the cards on the table and there are no others:\n- The Root (what they already love, from long before any of this): Three of Wands, reversed\n- The Turning (how they are when the plan comes apart in their hands): Ten of Swords\n- The Table (who they become when there are other people in the room): The Devil\n\nTrue things you know about this deck and these cards. To tell one, put its id in the fact's `source` field as `tarot:<id>` — the exact words below are what they will read, so choose the one that belongs and let your question carry the connection. Never retell one, and never write your own.\n- pixie-fee: Pamela Colman Smith drew all 78 cards of this deck and was paid a single flat fee for the lot — no royalties, ever. It went on to become the most reproduced tarot deck in the world, and she died in 1951 owing money.\n- pixie-name: For most of a century the deck was called Rider-Waite: Rider was the publisher and Waite wrote the book. The artist who made every image anyone actually pictures was left out of its name, and 'Rider-Waite-Smith' is a correction that only caught on recently.\n- pixie-monogram: Her signature is on every card, if you know where to look: a tiny monogram of her initials worked into a corner of each plate, usually low and to one side. Once you have seen it you cannot stop seeing it.\n- pixie-speed: She produced all 78 designs in roughly six months of 1909 — 22 trumps and 56 minors, every one of them a composed scene. It is an extraordinary rate for work that has stayed in print for over a century.\n- sola-busca: The idea of giving the numbered cards little scenes instead of rows of cups and swords was not new — the fifteenth-century Sola Busca deck did it first. Photographs of it were exhibited at the British Museum in 1907, two years before Smith sat down to draw, and several of her cards echo it closely.\n- waite-brief: Waite gave Smith detailed instructions for the 22 trumps and then, by most accounts, left her largely to herself on the other 56. The half he specified is the half people argue about; the half he did not is the half that made the deck famous.\n- pixie-jamaica: Smith spent much of her childhood in Jamaica and later performed Jamaican folk tales on stage in London, in costume, telling Anansy stories to English audiences. She published them as a book before she ever drew a tarot card.\n- pixie-synaesthesia: She saw pictures when she heard music — she would sit at concerts and paint what the sound looked like. Some of those paintings survive, and the habit shows in the cards: they are composed like stage pictures rather than diagrams.\n- pixie-stieglitz: Alfred Stieglitz gave Smith a show at his New York gallery 291 in 1907 — she was the first non-photographer he ever exhibited there, which put her in the room where American modernism was being invented.\n- pixie-theatre: Before the tarot she worked in the theatre with Ellen Terry and Henry Irving's company, designing and making miniature stage sets. Bram Stoker, who managed that theatre and wrote Dracula, was a friend and encouraged her.\n- pixie-nickname: Everyone called her Pixie. Ellen Terry gave her the name, and she signed letters with it for the rest of her life.\n- golden-dawn: Both Smith and Waite belonged to the Hermetic Order of the Golden Dawn, the occult society whose members also included W. B. Yeats. The deck came out of a London club of poets, painters and ceremonial magicians who took each other extremely seriously.\n- roses-lilies: This deck is the original 1909 Rider printing, the one collectors call 'Roses and Lilies' after the pattern on its backs. The bright flat colours most people picture are a 1971 recolouring — a different object, and still in copyright.\n- hand-colour: The 1909 colours are muted and a little muddy compared to the deck you have probably seen, because they were printed by a process with a limited palette. What looks like an artistic choice was partly what the press could do.\n- waite-vague: Waite wrote a whole book explaining the deck and still withheld things, hinting that the real meanings were reserved for initiates. Readers have been arguing with The Pictorial Key ever since, usually while holding Smith's pictures, which explain themselves.\n- pixie-grave: Smith died in Cornwall in 1951. Her possessions were sold to cover debts, no museum took her work, and her grave is unmarked — the artist of the most recognisable deck on earth has no headstone.\n- pixie-suffrage: She drew for the women's suffrage movement, producing posters and illustrations for the cause while she was making her living from book work and theatre design.\n- seventy-eight: A tarot deck is 78 cards: 22 trumps and four suits of 14, which is an ordinary playing deck with an extra court card per suit and a storyline bolted on. The trumps came first as a trick-taking game in fifteenth-century Italy — fortune-telling arrived centuries later.\n- wands-03-back: This is the clearest back-view in the deck: a figure on a headland in a red robe and a green cloak, one hand on a staff, watching the water. You never see his face, so you are made to look where he is looking.\n- wands-03-water: Ships are out on the yellow water below him — the small marks in the bay. Wands is the fire suit and this is one of the few cards in it that is mostly about the sea.\n- wands-03-third: Two staves stand planted and he holds the third. Smith kept that arrangement from the Two and added one, so the suit reads as a sequence rather than as ten separate pictures.\n- wands-03-scarf: His cloak is patterned in a green and yellow check that appears nowhere else in the deck. Smith had been designing and making costumes for the London stage for years before this commission.\n- wands-03-height: He is standing on a cliff edge with the ground falling away, which is the same footing the Fool has on card zero. Smith liked putting people where the next step matters.\n- swords-10-dawn: The sky is black, but there is a broad band of yellow dawn along the horizon under it. The most final card in the deck has a sunrise in it.\n- swords-10-hand: His right hand is arranged in a blessing — two fingers up, the others folded. Smith gave the gesture to a man face down with ten swords in his back.\n- swords-10-water: The water beyond him is completely flat and unbroken. In a suit whose Six made choppy water mean something, this is water with nothing left to say.\n- swords-10-red: The red cloak spread under him is the strongest colour on the card and it is arranged like a pool. Smith let the cloth do what she did not draw.\n- swords-10-ten: Ten is more swords than any injury needs, and they are placed evenly down his spine. The excess is the point.\n- devil-copy: The Devil is posed exactly as the Lovers are — a man and a woman under a winged figure — with the tree and the flames turned into tails. The two cards are the same composition, and that is the argument.\n- devil-chains: The chains around the couple's necks are loose enough to lift off over their heads. Smith made the escape visible and left them standing there.\n- devil-inverted: The torch in his left hand is held pointing down, and the pentagram over his head is upside down. Both are ordinary symbols turned over rather than different symbols."
+   },
+   {
+    "note": "a reading, one fact told",
+    "persona": "fortune-teller",
+    "seed": 1909,
+    "told": ["Pamela Colman Smith drew all 78 cards and was paid one flat fee."],
+    "frame": "Somebody has opened the deckbuilder and does not know what to build. Interview them.\n\nYou have already dealt three cards, face up, in this order. These are the cards on the table and there are no others:\n- The Root (what they already love, from long before any of this): Three of Wands, reversed\n- The Turning (how they are when the plan comes apart in their hands): Ten of Swords\n- The Table (who they become when there are other people in the room): The Devil\n\nTrue things you know about this deck and these cards. To tell one, put its id in the fact's `source` field as `tarot:<id>` — the exact words below are what they will read, so choose the one that belongs and let your question carry the connection. Never retell one, and never write your own.\n- pixie-fee: Pamela Colman Smith drew all 78 cards of this deck and was paid a single flat fee for the lot — no royalties, ever. It went on to become the most reproduced tarot deck in the world, and she died in 1951 owing money.\n- pixie-name: For most of a century the deck was called Rider-Waite: Rider was the publisher and Waite wrote the book. The artist who made every image anyone actually pictures was left out of its name, and 'Rider-Waite-Smith' is a correction that only caught on recently.\n- pixie-monogram: Her signature is on every card, if you know where to look: a tiny monogram of her initials worked into a corner of each plate, usually low and to one side. Once you have seen it you cannot stop seeing it.\n- pixie-speed: She produced all 78 designs in roughly six months of 1909 — 22 trumps and 56 minors, every one of them a composed scene. It is an extraordinary rate for work that has stayed in print for over a century.\n- sola-busca: The idea of giving the numbered cards little scenes instead of rows of cups and swords was not new — the fifteenth-century Sola Busca deck did it first. Photographs of it were exhibited at the British Museum in 1907, two years before Smith sat down to draw, and several of her cards echo it closely.\n- waite-brief: Waite gave Smith detailed instructions for the 22 trumps and then, by most accounts, left her largely to herself on the other 56. The half he specified is the half people argue about; the half he did not is the half that made the deck famous.\n- pixie-jamaica: Smith spent much of her childhood in Jamaica and later performed Jamaican folk tales on stage in London, in costume, telling Anansy stories to English audiences. She published them as a book before she ever drew a tarot card.\n- pixie-synaesthesia: She saw pictures when she heard music — she would sit at concerts and paint what the sound looked like. Some of those paintings survive, and the habit shows in the cards: they are composed like stage pictures rather than diagrams.\n- pixie-stieglitz: Alfred Stieglitz gave Smith a show at his New York gallery 291 in 1907 — she was the first non-photographer he ever exhibited there, which put her in the room where American modernism was being invented.\n- pixie-theatre: Before the tarot she worked in the theatre with Ellen Terry and Henry Irving's company, designing and making miniature stage sets. Bram Stoker, who managed that theatre and wrote Dracula, was a friend and encouraged her.\n- pixie-nickname: Everyone called her Pixie. Ellen Terry gave her the name, and she signed letters with it for the rest of her life.\n- golden-dawn: Both Smith and Waite belonged to the Hermetic Order of the Golden Dawn, the occult society whose members also included W. B. Yeats. The deck came out of a London club of poets, painters and ceremonial magicians who took each other extremely seriously.\n- roses-lilies: This deck is the original 1909 Rider printing, the one collectors call 'Roses and Lilies' after the pattern on its backs. The bright flat colours most people picture are a 1971 recolouring — a different object, and still in copyright.\n- hand-colour: The 1909 colours are muted and a little muddy compared to the deck you have probably seen, because they were printed by a process with a limited palette. What looks like an artistic choice was partly what the press could do.\n- waite-vague: Waite wrote a whole book explaining the deck and still withheld things, hinting that the real meanings were reserved for initiates. Readers have been arguing with The Pictorial Key ever since, usually while holding Smith's pictures, which explain themselves.\n- pixie-grave: Smith died in Cornwall in 1951. Her possessions were sold to cover debts, no museum took her work, and her grave is unmarked — the artist of the most recognisable deck on earth has no headstone.\n- pixie-suffrage: She drew for the women's suffrage movement, producing posters and illustrations for the cause while she was making her living from book work and theatre design.\n- seventy-eight: A tarot deck is 78 cards: 22 trumps and four suits of 14, which is an ordinary playing deck with an extra court card per suit and a storyline bolted on. The trumps came first as a trick-taking game in fifteenth-century Italy — fortune-telling arrived centuries later.\n- wands-03-back: This is the clearest back-view in the deck: a figure on a headland in a red robe and a green cloak, one hand on a staff, watching the water. You never see his face, so you are made to look where he is looking.\n- wands-03-water: Ships are out on the yellow water below him — the small marks in the bay. Wands is the fire suit and this is one of the few cards in it that is mostly about the sea.\n- wands-03-third: Two staves stand planted and he holds the third. Smith kept that arrangement from the Two and added one, so the suit reads as a sequence rather than as ten separate pictures.\n- wands-03-scarf: His cloak is patterned in a green and yellow check that appears nowhere else in the deck. Smith had been designing and making costumes for the London stage for years before this commission.\n- wands-03-height: He is standing on a cliff edge with the ground falling away, which is the same footing the Fool has on card zero. Smith liked putting people where the next step matters.\n- swords-10-dawn: The sky is black, but there is a broad band of yellow dawn along the horizon under it. The most final card in the deck has a sunrise in it.\n- swords-10-hand: His right hand is arranged in a blessing — two fingers up, the others folded. Smith gave the gesture to a man face down with ten swords in his back.\n- swords-10-water: The water beyond him is completely flat and unbroken. In a suit whose Six made choppy water mean something, this is water with nothing left to say.\n- swords-10-red: The red cloak spread under him is the strongest colour on the card and it is arranged like a pool. Smith let the cloth do what she did not draw.\n- swords-10-ten: Ten is more swords than any injury needs, and they are placed evenly down his spine. The excess is the point.\n- devil-copy: The Devil is posed exactly as the Lovers are — a man and a woman under a winged figure — with the tree and the flames turned into tails. The two cards are the same composition, and that is the argument.\n- devil-chains: The chains around the couple's necks are loose enough to lift off over their heads. Smith made the escape visible and left them standing there.\n- devil-inverted: The torch in his left hand is held pointing down, and the pentagram over his head is upside down. Both are ordinary symbols turned over rather than different symbols."
+   },
+   {
+    "note": "a reading, no corpus offered",
+    "persona": "fortune-teller",
+    "seed": 1909,
+    "told": null,
+    "frame": "Somebody has opened the deckbuilder and does not know what to build. Interview them.\n\nYou have already dealt three cards, face up, in this order. These are the cards on the table and there are no others:\n- The Root (what they already love, from long before any of this): Three of Wands, reversed\n- The Turning (how they are when the plan comes apart in their hands): Ten of Swords\n- The Table (who they become when there are other people in the room): The Devil"
+   }
+  ],
+  "closings": [
+   {
+    "note": "the opening turn",
+    "slots": [],
+    "told": [],
+    "opening": true,
+    "closing": "Open the conversation. One warm, specific question about them -- not about Magic, and not a list. Introduce yourself in a sentence first so they know what this is. Tonight, open from this angle rather than whatever you usually reach for: how they are when a plan falls apart in the middle of the evening."
+   },
+   {
+    "note": "the opening turn ignores what it was told",
+    "slots": [],
+    "told": ["Pamela Colman Smith drew all 78 cards and was paid one flat fee."],
+    "opening": true,
+    "closing": "Open the conversation. One warm, specific question about them -- not about Magic, and not a list. Introduce yourself in a sentence first so they know what this is. Tonight, open from this angle rather than whatever you usually reach for: how they are when a plan falls apart in the middle of the evening."
+   },
+   {
+    "note": "two still missing",
+    "slots": [{"kind":"taste","value":"old horror films","quote":"old horror films"}],
+    "told": [],
+    "opening": false,
+    "closing": "Ask the next question. Still unknown -- temperament: How they are -- their sign, planner or improviser, what they do when a plan falls apart.; posture: How they behave at game night: going for the throat, quietly building, or making deals. Follow what they are actually interested in rather than working through that list in order, and re-state every slot you are confident of, including ones from earlier turns."
+   },
+   {
+    "note": "two still missing, one fact told",
+    "slots": [{"kind":"taste","value":"old horror films","quote":"old horror films"}],
+    "told": ["Pamela Colman Smith drew all 78 cards and was paid one flat fee."],
+    "opening": false,
+    "closing": "Ask the next question. Still unknown -- temperament: How they are -- their sign, planner or improviser, what they do when a plan falls apart.; posture: How they behave at game night: going for the throat, quietly building, or making deals. Follow what they are actually interested in rather than working through that list in order, and re-state every slot you are confident of, including ones from earlier turns.\n\nFacts you have already told them, exactly as they read them:\n- Pamela Colman Smith drew all 78 cards and was paid one flat fee.\nDo not repeat any of these, in these words or in other words -- a fact covering the same ground is omitted, never reworded."
+   },
+   {
+    "note": "the floor is met",
+    "slots": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "told": [],
+    "opening": false,
+    "closing": "You now know enough to read them, and they should hear that from you: say plainly, in your own voice, that you have what you need and they can ask for their colours whenever they like. You may close with one light, clearly optional question -- something that sharpens what you already know or might turn up an anchor, never a new line of enquiry -- and it must still end in a question mark. Re-state every slot you are confident of."
+   },
+   {
+    "note": "the floor is met, facts told",
+    "slots": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "told": ["Pamela Colman Smith drew all 78 cards and was paid one flat fee."],
+    "opening": false,
+    "closing": "You now know enough to read them, and they should hear that from you: say plainly, in your own voice, that you have what you need and they can ask for their colours whenever they like. You may close with one light, clearly optional question -- something that sharpens what you already know or might turn up an anchor, never a new line of enquiry -- and it must still end in a question mark. Re-state every slot you are confident of.\n\nFacts you have already told them, exactly as they read them:\n- Pamela Colman Smith drew all 78 cards and was paid one flat fee.\nDo not repeat any of these, in these words or in other words -- a fact covering the same ground is omitted, never reworded."
+   }
+  ],
+  "asks": [
+   {
+    "note": "nothing but the reading",
+    "budget": null,
+    "avoid": "",
+    "ask": "That is the conversation. Here is what was heard, and every one of these is quoted from something they actually typed:\n\n[\n  {\n    \"kind\": \"taste\",\n    \"value\": \"old horror films\",\n    \"quote\": \"old horror films\"\n  },\n  {\n    \"kind\": \"temperament\",\n    \"value\": \"improviser\",\n    \"quote\": \"I improvise\"\n  },\n  {\n    \"kind\": \"posture\",\n    \"value\": \"makes deals\",\n    \"quote\": \"I make deals\"\n  }\n]\n\nPropose two colour combinations and three commanders for each. The second combination should take a different reading of the same person, so the contrast shows them a choice was being made."
+   },
+   {
+    "note": "a budget",
+    "budget": 50.0,
+    "avoid": "",
+    "ask": "That is the conversation. Here is what was heard, and every one of these is quoted from something they actually typed:\n\n[\n  {\n    \"kind\": \"taste\",\n    \"value\": \"old horror films\",\n    \"quote\": \"old horror films\"\n  },\n  {\n    \"kind\": \"temperament\",\n    \"value\": \"improviser\",\n    \"quote\": \"I improvise\"\n  },\n  {\n    \"kind\": \"posture\",\n    \"value\": \"makes deals\",\n    \"quote\": \"I make deals\"\n  }\n]\n\nThey have about $50 for the whole deck, so pass price_max to search_cards and prefer commanders that do not need an expensive shell.\nPropose two colour combinations and three commanders for each. The second combination should take a different reading of the same person, so the contrast shows them a choice was being made."
+   },
+   {
+    "note": "a zero budget is no budget",
+    "budget": 0.0,
+    "avoid": "",
+    "ask": "That is the conversation. Here is what was heard, and every one of these is quoted from something they actually typed:\n\n[\n  {\n    \"kind\": \"taste\",\n    \"value\": \"old horror films\",\n    \"quote\": \"old horror films\"\n  },\n  {\n    \"kind\": \"temperament\",\n    \"value\": \"improviser\",\n    \"quote\": \"I improvise\"\n  },\n  {\n    \"kind\": \"posture\",\n    \"value\": \"makes deals\",\n    \"quote\": \"I make deals\"\n  }\n]\n\nPropose two colour combinations and three commanders for each. The second combination should take a different reading of the same person, so the contrast shows them a choice was being made."
+   },
+   {
+    "note": "a budget that needs six significant digits",
+    "budget": 1234567.0,
+    "avoid": "",
+    "ask": "That is the conversation. Here is what was heard, and every one of these is quoted from something they actually typed:\n\n[\n  {\n    \"kind\": \"taste\",\n    \"value\": \"old horror films\",\n    \"quote\": \"old horror films\"\n  },\n  {\n    \"kind\": \"temperament\",\n    \"value\": \"improviser\",\n    \"quote\": \"I improvise\"\n  },\n  {\n    \"kind\": \"posture\",\n    \"value\": \"makes deals\",\n    \"quote\": \"I make deals\"\n  }\n]\n\nThey have about $1.23457e+06 for the whole deck, so pass price_max to search_cards and prefer commanders that do not need an expensive shell.\nPropose two colour combinations and three commanders for each. The second combination should take a different reading of the same person, so the contrast shows them a choice was being made."
+   },
+   {
+    "note": "something to avoid",
+    "budget": null,
+    "avoid": "  no blue please  ",
+    "ask": "That is the conversation. Here is what was heard, and every one of these is quoted from something they actually typed:\n\n[\n  {\n    \"kind\": \"taste\",\n    \"value\": \"old horror films\",\n    \"quote\": \"old horror films\"\n  },\n  {\n    \"kind\": \"temperament\",\n    \"value\": \"improviser\",\n    \"quote\": \"I improvise\"\n  },\n  {\n    \"kind\": \"posture\",\n    \"value\": \"makes deals\",\n    \"quote\": \"I make deals\"\n  }\n]\n\nColours or things to steer away from, in their words: no blue please\nPropose two colour combinations and three commanders for each. The second combination should take a different reading of the same person, so the contrast shows them a choice was being made."
+   },
+   {
+    "note": "whitespace is not something to avoid",
+    "budget": null,
+    "avoid": "   ",
+    "ask": "That is the conversation. Here is what was heard, and every one of these is quoted from something they actually typed:\n\n[\n  {\n    \"kind\": \"taste\",\n    \"value\": \"old horror films\",\n    \"quote\": \"old horror films\"\n  },\n  {\n    \"kind\": \"temperament\",\n    \"value\": \"improviser\",\n    \"quote\": \"I improvise\"\n  },\n  {\n    \"kind\": \"posture\",\n    \"value\": \"makes deals\",\n    \"quote\": \"I make deals\"\n  }\n]\n\nPropose two colour combinations and three commanders for each. The second combination should take a different reading of the same person, so the contrast shows them a choice was being made."
+   },
+   {
+    "note": "both",
+    "budget": 250.5,
+    "avoid": "nothing with infect",
+    "ask": "That is the conversation. Here is what was heard, and every one of these is quoted from something they actually typed:\n\n[\n  {\n    \"kind\": \"taste\",\n    \"value\": \"old horror films\",\n    \"quote\": \"old horror films\"\n  },\n  {\n    \"kind\": \"temperament\",\n    \"value\": \"improviser\",\n    \"quote\": \"I improvise\"\n  },\n  {\n    \"kind\": \"posture\",\n    \"value\": \"makes deals\",\n    \"quote\": \"I make deals\"\n  }\n]\n\nThey have about $250.5 for the whole deck, so pass price_max to search_cards and prefer commanders that do not need an expensive shell.\nColours or things to steer away from, in their words: nothing with infect\nPropose two colour combinations and three commanders for each. The second combination should take a different reading of the same person, so the contrast shows them a choice was being made."
+   }
+  ],
+  "grounded": [
+   {"kind":"taste","value":"old horror films","quote":"old horror films"},
+   {"kind":"temperament","value":"improviser","quote":"I improvise"},
+   {"kind":"posture","value":"makes deals","quote":"I make deals"}
+  ],
+  "reading_seed": 1909,
+  "opening_angles": [
+   "something they keep returning to -- a film, an album, a book, a game",
+   "the last thing that completely absorbed them, whatever it was",
+   "how they are when a plan falls apart in the middle of the evening",
+   "the part they end up playing when their friends are all in one room",
+   "a place, real or fictional, or a period of history that pulls at them",
+   "what they would do with a free evening and nobody to answer to",
+   "the kind of villain -- or hero -- they catch themselves rooting for"
+  ]
+ },
+ "refusals": [
+  {"half":"ask","note":"an empty conversation is fine","transcript":null,"ok":{"persona":"plain","seed":null,"exchanges":0,"exhausted":false,"needs_call":true,"carried":[],"told":[]}},
+  {"half":"ask","note":"a malformed transcript","transcript":[{"role":"system","text":"hi"}],"error":"turn 0 has role 'system'; only 'user' and 'assistant' cross this boundary","error_kind":"rejected"},
+  {
+   "half": "ask",
+   "note": "an unknown persona",
+   "persona": "not-a-voice",
+   "error": "no persona 'not-a-voice'; there is 'plain', 'fortune-teller', 'therapist', 'scientist', 'chef', 'storyteller', 'barkeep'",
+   "error_kind": "rejected"
+  },
+  {"half":"ask","note":"an unusable seed","persona":"fortune-teller","seed":"soon","error":"not a usable reading seed: 'soon'","error_kind":"rejected"},
+  {"half":"ask","note":"a seed a plain voice never deals","seed":"soon","ok":{"persona":"plain","seed":null,"exchanges":3,"exhausted":false,"needs_call":true,"carried":[],"told":[]}},
+  {"half":"ask","note":"a malformed stance","requested":{"initiative":7},"error":"7 is not a initiative level; expected one of off, on-request, volunteers, interjects","error_kind":"rejected"},
+  {"half":"ask","note":"malformed facts","facts":["one",2],"error":"fact 1 is not a string","error_kind":"rejected"},
+  {
+   "half": "propose",
+   "note": "nothing known at all",
+   "slots": null,
+   "error": "0 of 3 things are known about this person, and every one has to be something they actually said. Keep talking.",
+   "error_kind": "not-ready"
+  },
+  {
+   "half": "propose",
+   "note": "one thing known",
+   "slots": [{"kind":"taste","value":"old horror films","quote":"old horror films"}],
+   "error": "1 of 3 things are known about this person, and every one has to be something they actually said. Keep talking.",
+   "error_kind": "not-ready"
+  },
+  {
+   "half": "propose",
+   "note": "quotes nobody said",
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"never typed this"},
+    {"kind":"temperament","value":"improviser","quote":"never typed this"},
+    {"kind":"posture","value":"makes deals","quote":"never typed this"}
+   ],
+   "error": "0 of 3 things are known about this person, and every one has to be something they actually said. Keep talking.",
+   "error_kind": "not-ready"
+  },
+  {
+   "half": "propose",
+   "note": "three things known",
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "ok": {
+    "persona": "plain",
+    "seed": null,
+    "needs_call": true,
+    "grounded": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "dropped": 0
+   }
+  },
+  {
+   "half": "propose",
+   "note": "an unknown persona",
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "persona": "not-a-voice",
+   "error": "no persona 'not-a-voice'; there is 'plain', 'fortune-teller', 'therapist', 'scientist', 'chef', 'storyteller', 'barkeep'",
+   "error_kind": "rejected"
+  },
+  {
+   "half": "propose",
+   "note": "an unusable seed",
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "persona": "fortune-teller",
+   "seed": "soon",
+   "error": "not a usable reading seed: 'soon'",
+   "error_kind": "rejected"
+  }
+ ],
+ "asks": [
+  {
+   "note": "stance off, no call",
+   "transcript": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ],
+   "slots": null,
+   "requested": "off",
+   "persona": null,
+   "seed": null,
+   "facts": null,
+   "turn": null,
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-conversation",
+    "model": "",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":0,"output_tokens":0,"cache_read_tokens":0},
+    "persona": "plain",
+    "asked": false,
+    "question": "",
+    "fact": null,
+    "facts_dropped": 0,
+    "slots": [],
+    "slots_dropped": 0,
+    "grounded": 0,
+    "floor": 3,
+    "may_propose": false,
+    "exchanges": 3,
+    "max_exchanges": 10,
+    "reason": "The stance is off, so no call was made."
+   }
+  },
+  {
+   "note": "stance off keeps what the client carried",
+   "transcript": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ],
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "requested": "off",
+   "persona": null,
+   "seed": null,
+   "facts": null,
+   "turn": null,
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-conversation",
+    "model": "",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":0,"output_tokens":0,"cache_read_tokens":0},
+    "persona": "plain",
+    "asked": false,
+    "question": "",
+    "fact": null,
+    "facts_dropped": 0,
+    "slots": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "slots_dropped": 0,
+    "grounded": 3,
+    "floor": 3,
+    "may_propose": true,
+    "exchanges": 3,
+    "max_exchanges": 10,
+    "reason": "The stance is off, so no call was made."
+   }
+  },
+  {
+   "note": "past the ceiling, no call",
+   "transcript": [
+    {"role":"assistant","text":"q"},
+    {"role":"user","text":"a"},
+    {"role":"assistant","text":"q"},
+    {"role":"user","text":"a"},
+    {"role":"assistant","text":"q"},
+    {"role":"user","text":"a"},
+    {"role":"assistant","text":"q"},
+    {"role":"user","text":"a"},
+    {"role":"assistant","text":"q"},
+    {"role":"user","text":"a"},
+    {"role":"assistant","text":"q"},
+    {"role":"user","text":"a"},
+    {"role":"assistant","text":"q"},
+    {"role":"user","text":"a"},
+    {"role":"assistant","text":"q"},
+    {"role":"user","text":"a"},
+    {"role":"assistant","text":"q"},
+    {"role":"user","text":"a"},
+    {"role":"assistant","text":"q"},
+    {"role":"user","text":"a"}
+   ],
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "requested": "second-opinion",
+   "persona": null,
+   "seed": null,
+   "facts": null,
+   "turn": null,
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-conversation",
+    "model": "",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":0,"output_tokens":0,"cache_read_tokens":0},
+    "persona": "plain",
+    "asked": false,
+    "question": "",
+    "fact": null,
+    "facts_dropped": 0,
+    "slots": [],
+    "slots_dropped": 0,
+    "grounded": 0,
+    "floor": 3,
+    "may_propose": false,
+    "exchanges": 10,
+    "max_exchanges": 10,
+    "reason": "That is 10 exchanges, which is as long as this conversation goes."
+   }
+  },
+  {
+   "note": "the model refused",
+   "transcript": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ],
+   "slots": null,
+   "requested": "second-opinion",
+   "persona": null,
+   "seed": null,
+   "facts": null,
+   "turn": {"model":"claude-sonnet-5","stop_reason":"refusal","text":"","refused":true,"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89,"searched":[],"search_errors":[]},
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-conversation",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "persona": "plain",
+    "asked": true,
+    "question": "",
+    "fact": null,
+    "facts_dropped": 0,
+    "slots": [],
+    "slots_dropped": 0,
+    "grounded": 0,
+    "floor": 3,
+    "may_propose": false,
+    "exchanges": 3,
+    "max_exchanges": 10,
+    "reason": "The model declined to answer this one."
+   }
+  },
+  {
+   "note": "the answer did not parse",
+   "transcript": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ],
+   "slots": null,
+   "requested": "second-opinion",
+   "persona": null,
+   "seed": null,
+   "facts": null,
+   "turn": {"model":"claude-sonnet-5","stop_reason":"max_tokens","text":"{\"question\": \"trunc","refused":false,"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89,"searched":[],"search_errors":[]},
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-conversation",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "persona": "plain",
+    "asked": true,
+    "question": "",
+    "fact": null,
+    "facts_dropped": 0,
+    "slots": [],
+    "slots_dropped": 0,
+    "grounded": 0,
+    "floor": 3,
+    "may_propose": false,
+    "exchanges": 3,
+    "max_exchanges": 10,
+    "reason": "The answer did not parse (stop reason: max_tokens)."
+   }
+  },
+  {
+   "note": "a declarative sentence is not a question",
+   "transcript": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ],
+   "slots": null,
+   "requested": "second-opinion",
+   "persona": null,
+   "seed": null,
+   "facts": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"question\": \"You are clearly a green player.\", \"slots\": []}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-conversation",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "persona": "plain",
+    "asked": true,
+    "question": "",
+    "fact": null,
+    "facts_dropped": 0,
+    "slots": [],
+    "slots_dropped": 0,
+    "grounded": 0,
+    "floor": 3,
+    "may_propose": false,
+    "exchanges": 3,
+    "max_exchanges": 10,
+    "reason": "Nothing usable came back.",
+    "never": "These are questions about you. What you build is your call."
+   }
+  },
+  {
+   "note": "a whole turn",
+   "transcript": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ],
+   "slots": null,
+   "requested": "second-opinion",
+   "persona": null,
+   "seed": null,
+   "facts": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"question\": \"  What did the practical effects\\fgive you?  \", \"fact\": {\"text\": \"White wants peace.\", \"source\": \"taxonomy\"}, \"slots\": [{\"kind\": \"taste\", \"value\": \"old horror films\", \"quote\": \"old horror films\"}, {\"kind\": \"temperament\", \"value\": \"improviser\", \"quote\": \"I improvise\"}, {\"kind\": \"posture\", \"value\": \"makes deals\", \"quote\": \"I make deals\"}, {\"kind\": \"anchor\", \"value\": \"invented\", \"quote\": \"I love Sol Ring\"}, \"not an object\"]}",
+    "refused": false,
+    "input_tokens": 4900,
+    "output_tokens": 310,
+    "cache_read_tokens": 2791,
+    "searched": [{"url":"https://edhrec.com/real","title":"The Real Page"},{"url":"https://mtg.wiki/Gyome","title":""}],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-conversation",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":4900,"output_tokens":310,"cache_read_tokens":2791},
+    "persona": "plain",
+    "asked": true,
+    "question": "What did the practical effects give you?",
+    "fact": {"text":"White wants peace.","source":"taxonomy","url":""},
+    "facts_dropped": 0,
+    "slots": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "slots_dropped": 2,
+    "grounded": 3,
+    "floor": 3,
+    "may_propose": true,
+    "exchanges": 3,
+    "max_exchanges": 10,
+    "reason": "",
+    "never": "These are questions about you. What you build is your call."
+   }
+  },
+  {
+   "note": "a turn that un-knew a slot",
+   "transcript": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ],
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "requested": "second-opinion",
+   "persona": null,
+   "seed": null,
+   "facts": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"question\": \"And after that?\", \"slots\": [{\"kind\": \"posture\", \"value\": \"makes deals\", \"quote\": \"I make deals\"}]}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-conversation",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "persona": "plain",
+    "asked": true,
+    "question": "And after that?",
+    "fact": null,
+    "facts_dropped": 0,
+    "slots": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "slots_dropped": 0,
+    "grounded": 3,
+    "floor": 3,
+    "may_propose": true,
+    "exchanges": 3,
+    "max_exchanges": 10,
+    "reason": "",
+    "never": "These are questions about you. What you build is your call."
+   }
+  },
+  {
+   "note": "a fact already told is dropped and counted",
+   "transcript": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ],
+   "slots": null,
+   "requested": "second-opinion",
+   "persona": null,
+   "seed": null,
+   "facts": ["White wants peace."],
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"question\": \"And after that?\", \"fact\": {\"text\": \"White wants peace.\", \"source\": \"taxonomy\"}, \"slots\": []}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-conversation",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "persona": "plain",
+    "asked": true,
+    "question": "And after that?",
+    "fact": null,
+    "facts_dropped": 1,
+    "slots": [],
+    "slots_dropped": 0,
+    "grounded": 0,
+    "floor": 3,
+    "may_propose": false,
+    "exchanges": 3,
+    "max_exchanges": 10,
+    "reason": "",
+    "never": "These are questions about you. What you build is your call."
+   }
+  },
+  {
+   "note": "a fact from a page nobody fetched",
+   "transcript": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ],
+   "slots": null,
+   "requested": "second-opinion",
+   "persona": null,
+   "seed": null,
+   "facts": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"question\": \"And after that?\", \"fact\": {\"text\": \"A thing.\", \"source\": \"https://example.com/invented\"}, \"slots\": []}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [{"url":"https://edhrec.com/real","title":"The Real Page"},{"url":"https://mtg.wiki/Gyome","title":""}],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-conversation",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "persona": "plain",
+    "asked": true,
+    "question": "And after that?",
+    "fact": null,
+    "facts_dropped": 0,
+    "slots": [],
+    "slots_dropped": 0,
+    "grounded": 0,
+    "floor": 3,
+    "may_propose": false,
+    "exchanges": 3,
+    "max_exchanges": 10,
+    "reason": "",
+    "never": "These are questions about you. What you build is your call."
+   }
+  },
+  {
+   "note": "the fortune-teller, reading",
+   "transcript": [
+    {"role":"assistant","text":"Tell me something you keep coming back to."},
+    {"role":"user","text":"old horror films, the practical effects ones"},
+    {"role":"assistant","text":"And when a plan falls apart?"},
+    {"role":"user","text":"I improvise. STRASSE is where I grew up."},
+    {"role":"assistant","text":"At game night, then -- what are you like?"},
+    {"role":"user","text":"I make deals. quietly"}
+   ],
+   "slots": null,
+   "requested": "second-opinion",
+   "persona": "fortune-teller",
+   "seed": 1909,
+   "facts": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"question\": \"The Fool steps off the cliff -- do you?\", \"fact\": {\"text\": \"the model's paraphrase\", \"source\": \"tarot:pixie-fee\"}, \"slots\": [{\"kind\": \"taste\", \"value\": \"old horror films\", \"quote\": \"old horror films\"}]}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-conversation:fortune-teller",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "persona": "fortune-teller",
+    "asked": true,
+    "question": "The Fool steps off the cliff -- do you?",
+    "fact": {
+     "text": "Pamela Colman Smith drew all 78 cards of this deck and was paid a single flat fee for the lot — no royalties, ever. It went on to become the most reproduced tarot deck in the world, and she died in 1951 owing money.",
+     "source": "Kaplan, Greer, O'Connor & Parsons, Pamela Colman Smith: The Untold Story (U.S. Games, 2018)",
+     "url": ""
+    },
+    "facts_dropped": 0,
+    "slots": [{"kind":"taste","value":"old horror films","quote":"old horror films"}],
+    "slots_dropped": 0,
+    "grounded": 1,
+    "floor": 3,
+    "may_propose": false,
+    "exchanges": 3,
+    "max_exchanges": 10,
+    "reason": "",
+    "never": "These are questions about you. What you build is your call."
+   }
+  }
+ ],
+ "proposals": [
+  {
+   "note": "stance off, no call",
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "requested": "off",
+   "budget": null,
+   "avoid": "",
+   "persona": null,
+   "seed": null,
+   "turn": null,
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-proposal",
+    "model": "",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":0,"output_tokens":0,"cache_read_tokens":0},
+    "persona": "plain",
+    "asked": false,
+    "combinations": [],
+    "sources": [],
+    "slots": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "slots_dropped": 0,
+    "reason": "The stance is off, so no call was made."
+   }
+  },
+  {
+   "note": "the model refused",
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "requested": "second-opinion",
+   "budget": null,
+   "avoid": "",
+   "persona": null,
+   "seed": null,
+   "turn": {"model":"claude-sonnet-5","stop_reason":"refusal","text":"","refused":true,"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89,"searched":[],"search_errors":[]},
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-proposal",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "persona": "plain",
+    "asked": true,
+    "combinations": [],
+    "sources": [],
+    "slots": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "slots_dropped": 0,
+    "reason": "The model declined to write this one."
+   }
+  },
+  {
+   "note": "the answer did not parse",
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "requested": "second-opinion",
+   "budget": null,
+   "avoid": "",
+   "persona": null,
+   "seed": null,
+   "turn": {"model":"claude-sonnet-5","stop_reason":"max_tokens","text":"{\"combinations\": [","refused":false,"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89,"searched":[],"search_errors":[]},
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-proposal",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "persona": "plain",
+    "asked": true,
+    "combinations": [],
+    "sources": [],
+    "slots": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "slots_dropped": 0,
+    "reason": "The answer did not parse (stop reason: max_tokens)."
+   }
+  },
+  {
+   "note": "nothing resolved against the pool",
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "requested": "second-opinion",
+   "budget": null,
+   "avoid": "",
+   "persona": null,
+   "seed": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"combinations\": [{\"key\": \"NOT-A-KEY\", \"reading\": \"x\", \"grounding\": \"y\", \"commanders\": [{\"card\": \"Gyome, Master Chef\", \"prose\": \"p\"}]}, {\"key\": \"BG\", \"reading\": \"x\", \"grounding\": \"y\", \"commanders\": [{\"card\": \"Not A Real Card\", \"prose\": \"p\"}]}], \"sources\": []}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [{"url":"https://edhrec.com/real","title":"The Real Page"},{"url":"https://mtg.wiki/Gyome","title":""}],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-proposal",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "persona": "plain",
+    "asked": true,
+    "combinations": [],
+    "sources": [],
+    "slots": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "slots_dropped": 0,
+    "reason": "Nothing came back that resolved against the pool, so there is nothing to suggest."
+   }
+  },
+  {
+   "note": "a whole proposal",
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "requested": "second-opinion",
+   "budget": 50.0,
+   "avoid": "no blue",
+   "persona": null,
+   "seed": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"combinations\": [{\"key\": \"bg\", \"reading\": \"  Golgari, for the practical effects.  \", \"grounding\": \"You said you improvise.\", \"source_ids\": [\"s1\", \"s2\", \"nope\"], \"commanders\": [{\"card\": \"gyome, master chef\", \"prose\": \"A troll chef.\", \"source_ids\": [\"s1\"]}, {\"card\": \"Not A Real Card\", \"prose\": \"invented\", \"source_ids\": [\"s1\"]}, {\"card\": \"Craterhoof Behemoth\", \"prose\": \"mono-green, wrong slot\", \"source_ids\": [\"s1\"]}, {\"card\": 7, \"prose\": \"a number\"}, \"not an object\"]}, {\"key\": \"G\", \"reading\": \"Mono-green, for the other reading.\", \"grounding\": \"You said you make deals.\", \"source_ids\": [], \"commanders\": [{\"card\": \"Craterhoof Behemoth\", \"prose\": \"Goes wide.\"}]}, {\"key\": \"W\", \"reading\": \"A third nobody asked for.\", \"grounding\": \"\", \"commanders\": [{\"card\": \"Gyome, Master Chef\", \"prose\": \"wrong colours\"}]}], \"sources\": [{\"id\": \"s1\", \"title\": \"the model's title\", \"url\": \"https://edhrec.com/real\"}, {\"id\": \"s2\", \"title\": \"t\", \"url\": \"https://example.com/invented\"}]}",
+    "refused": false,
+    "input_tokens": 8100,
+    "output_tokens": 1450,
+    "cache_read_tokens": 3200,
+    "searched": [{"url":"https://edhrec.com/real","title":"The Real Page"},{"url":"https://mtg.wiki/Gyome","title":""}],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-proposal",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":8100,"output_tokens":1450,"cache_read_tokens":3200},
+    "persona": "plain",
+    "asked": true,
+    "combinations": [
+     {
+      "key": "BG",
+      "name": "Golgari",
+      "colors": ["B","G"],
+      "tier": "guild",
+      "tagline": "Death is a stage of growth, not the end of one.",
+      "reading": "Golgari, for the practical effects.",
+      "grounding": "You said you improvise.",
+      "source_ids": ["s1"],
+      "commanders": [
+       {
+        "name": "Gyome, Master Chef",
+        "prose": "A troll chef.",
+        "source_ids": ["s1"],
+        "mana_cost": "{2}{B}{G}",
+        "type_line": "Legendary Creature — Troll Warlock",
+        "oracle_text": "Trample\nAt the beginning of your end step, create a number of Food tokens equal to the number of nontoken creatures you had enter the battlefield under your control this turn.\n{1}, Sacrifice a Food: Target creature gains indestructible until end of turn. Tap it.",
+        "color_identity": ["B","G"],
+        "image": "https://cards.scryfall.io/normal/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751",
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751"
+       }
+      ]
+     },
+     {
+      "key": "G",
+      "name": "Mono-Green",
+      "colors": ["G"],
+      "tier": "mono",
+      "tagline": "The biggest creatures, and the mana to cast them early.",
+      "reading": "Mono-green, for the other reading.",
+      "grounding": "You said you make deals.",
+      "source_ids": [],
+      "commanders": [
+       {
+        "name": "Craterhoof Behemoth",
+        "prose": "Goes wide.",
+        "source_ids": [],
+        "mana_cost": "{5}{G}{G}{G}",
+        "type_line": "Creature — Beast",
+        "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control.",
+        "color_identity": ["G"],
+        "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345"
+       }
+      ]
+     }
+    ],
+    "sources": [{"id":"s1","title":"The Real Page","url":"https://edhrec.com/real"}],
+    "sources_dropped": 1,
+    "commanders_dropped": 4,
+    "combinations_dropped": 1,
+    "searched": 2,
+    "slots": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "slots_dropped": 0,
+    "reason": "",
+    "never": "The reading is Claude's interpretation of what you said, not a finding. The cards and their colours are the pool's."
+   }
+  },
+  {
+   "note": "more than the caps allow",
+   "slots": [
+    {"kind":"taste","value":"old horror films","quote":"old horror films"},
+    {"kind":"temperament","value":"improviser","quote":"I improvise"},
+    {"kind":"posture","value":"makes deals","quote":"I make deals"}
+   ],
+   "requested": "second-opinion",
+   "budget": null,
+   "avoid": "",
+   "persona": null,
+   "seed": null,
+   "turn": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "text": "{\"combinations\": [{\"key\": \"G\", \"reading\": \"Mono-green.\", \"grounding\": \"You improvise.\", \"commanders\": [{\"card\": \"Craterhoof Behemoth\", \"prose\": \"one\"}, {\"card\": \"Terastodon\", \"prose\": \"two\"}, {\"card\": \"Woodfall Primus\", \"prose\": \"three\"}, {\"card\": \"Vorinclex, Voice of Hunger\", \"prose\": \"four -- over the cap\"}]}, {\"key\": \"BG\", \"reading\": \"Golgari.\", \"grounding\": \"You make deals.\", \"commanders\": [{\"card\": \"Gyome, Master Chef\", \"prose\": \"a troll chef\"}]}, {\"key\": \"W\", \"reading\": \"Mono-white.\", \"grounding\": \"You said films.\", \"commanders\": [{\"card\": \"Smothering Tithe\", \"prose\": \"third -- over the cap\"}]}], \"sources\": [{\"id\": \"s1\", \"title\": \"t\", \"url\": \"https://edhrec.com/real\"}]}",
+    "refused": false,
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cache_read_tokens": 89,
+    "searched": [{"url":"https://edhrec.com/real","title":"The Real Page"},{"url":"https://mtg.wiki/Gyome","title":""}],
+    "search_errors": []
+   },
+   "report": {
+    "answered_by": "claude",
+    "mode": "theme-proposal",
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "usage": {"input_tokens":1234,"output_tokens":567,"cache_read_tokens":89},
+    "persona": "plain",
+    "asked": true,
+    "combinations": [
+     {
+      "key": "G",
+      "name": "Mono-Green",
+      "colors": ["G"],
+      "tier": "mono",
+      "tagline": "The biggest creatures, and the mana to cast them early.",
+      "reading": "Mono-green.",
+      "grounding": "You improvise.",
+      "source_ids": [],
+      "commanders": [
+       {
+        "name": "Craterhoof Behemoth",
+        "prose": "one",
+        "source_ids": [],
+        "mana_cost": "{5}{G}{G}{G}",
+        "type_line": "Creature — Beast",
+        "oracle_text": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control.",
+        "color_identity": ["G"],
+        "image": "https://cards.scryfall.io/normal/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345",
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/276f5cee-a501-4658-bd4d-7a044bf1ccbc.jpg?1783907345"
+       },
+       {
+        "name": "Terastodon",
+        "prose": "two",
+        "source_ids": [],
+        "mana_cost": "{6}{G}{G}",
+        "type_line": "Creature — Elephant",
+        "oracle_text": "When this creature enters, you may destroy up to three target noncreature permanents. For each permanent put into a graveyard this way, its controller creates a 3/3 green Elephant creature token.",
+        "color_identity": ["G"],
+        "image": "https://cards.scryfall.io/normal/front/6/3/63195796-197e-47ec-85f0-d4ec0065f6e6.jpg?1783927528",
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/3/63195796-197e-47ec-85f0-d4ec0065f6e6.jpg?1783927528"
+       },
+       {
+        "name": "Woodfall Primus",
+        "prose": "three",
+        "source_ids": [],
+        "mana_cost": "{5}{G}{G}{G}",
+        "type_line": "Creature — Treefolk Shaman",
+        "oracle_text": "Trample\nWhen this creature enters, destroy target noncreature permanent.\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)",
+        "color_identity": ["G"],
+        "image": "https://cards.scryfall.io/normal/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235",
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235"
+       }
+      ]
+     },
+     {
+      "key": "BG",
+      "name": "Golgari",
+      "colors": ["B","G"],
+      "tier": "guild",
+      "tagline": "Death is a stage of growth, not the end of one.",
+      "reading": "Golgari.",
+      "grounding": "You make deals.",
+      "source_ids": [],
+      "commanders": [
+       {
+        "name": "Gyome, Master Chef",
+        "prose": "a troll chef",
+        "source_ids": [],
+        "mana_cost": "{2}{B}{G}",
+        "type_line": "Legendary Creature — Troll Warlock",
+        "oracle_text": "Trample\nAt the beginning of your end step, create a number of Food tokens equal to the number of nontoken creatures you had enter the battlefield under your control this turn.\n{1}, Sacrifice a Food: Target creature gains indestructible until end of turn. Tap it.",
+        "color_identity": ["B","G"],
+        "image": "https://cards.scryfall.io/normal/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751",
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/8279d421-dd86-49d1-93f7-65f6046c542d.jpg?1783903751"
+       }
+      ]
+     }
+    ],
+    "sources": [{"id":"s1","title":"The Real Page","url":"https://edhrec.com/real"}],
+    "sources_dropped": 0,
+    "commanders_dropped": 0,
+    "combinations_dropped": 0,
+    "searched": 2,
+    "slots": [
+     {"kind":"taste","value":"old horror films","quote":"old horror films"},
+     {"kind":"temperament","value":"improviser","quote":"I improvise"},
+     {"kind":"posture","value":"makes deals","quote":"I make deals"}
+    ],
+    "slots_dropped": 0,
+    "reason": "",
+    "never": "The reading is Claude's interpretation of what you said, not a finding. The cards and their colours are the pool's."
+   }
+  }
+ ]
+}

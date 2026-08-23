@@ -307,6 +307,15 @@ func (a *API) Routes() []Route {
 		// owner and no deck -- the absence is the contract. Deduplicated in
 		// flight on the normalised question, cached never.
 		{Method: http.MethodPost, Pattern: "/api/claude/research", Handler: a.claudeResearch},
+		// The theme interview (ADR 20), both halves, both JOBS on the NET
+		// lane and both keyed on nothing -- two turns in flight are two
+		// different conversations, which is the opposite call from research's
+		// dedupe one line up. Outside /api/decks like research and for a
+		// sharper reason: this surface runs BEFORE a deck exists, and neither
+		// handler takes a deck source. A floor not yet reached is the 409 no
+		// other Claude route has.
+		{Method: http.MethodPost, Pattern: "/api/claude/theme", Handler: a.claudeTheme},
+		{Method: http.MethodPost, Pattern: "/api/claude/theme/proposal", Handler: a.claudeThemeProposal},
 		// The accounts (Phase 4's last flip): the five public doors of
 		// `api/auth.py` and the `me` that says who is standing in them, then
 		// the admin surface of `api/admin.py`. The middleware half of

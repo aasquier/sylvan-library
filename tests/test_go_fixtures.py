@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -125,6 +126,9 @@ _ORACLES = [
     ("the shared sources", "SOURCES_PATH", "render_sources_cases"),
     ("the commander dossier", "DOSSIER_PATH", "render_dossier_cases"),
     ("research", "RESEARCH_PATH", "render_research_cases"),
+    ("the theme interview", "THEME_PATH", "render_theme_cases"),
+    ("CPython's case folding", "CASEFOLD_PATH", "render_casefold_payload"),
+    ("Unicode's digit runs", "DIGITS_PATH", "render_digits_payload"),
 ]
 
 
@@ -1051,3 +1055,52 @@ def test_the_tarot_pool_totals_separate_the_two_arithmetics():
             f"the {row['cards']}-card pool no longer separates fsum from a "
             f"naive sum; the Go fsum test would pass against either")
         assert row["fsum_bits"] != row["naive_bits"]
+
+
+def test_the_casefold_table_is_the_whole_of_unicode_not_the_differences():
+    """The table Go folds with is swept, and a sweep is what makes it exact.
+
+    Recording only the 211 code points where `casefold()` differs from
+    `lower()` would leave the other 1,319 resting on Go's `unicode` tables
+    agreeing with CPython's -- a claim about two projects' Unicode versions
+    rather than one this port gets to make. So the assertion is that the file
+    holds *every* non-identity fold, and that the two headline counts it
+    reports are really what is in it.
+    """
+    committed = json.loads(go_fixtures.CASEFOLD_PATH.read_text(encoding="utf-8"))
+    folds = {row["cp"]: row["fold"] for row in committed["folds"]}
+    assert len(folds) == len(committed["folds"]), "a code point is in there twice"
+    assert committed["multi_char"] == sum(1 for f in folds.values() if len(f) > 1)
+    assert committed["differ_from_lower"] == sum(
+        1 for cp, f in folds.items() if chr(cp).lower() != f)
+    # Every fold in the file is real, and every real fold is in the file.
+    assert all(chr(cp).casefold() == f for cp, f in folds.items())
+    missing = [cp for cp in range(0x110000)
+               if chr(cp).casefold() != chr(cp) and cp not in folds]
+    assert not missing, f"{len(missing)} code points fold and are not in the table"
+    # And the one that made it worth building: ß is not what lower() says.
+    assert folds[0xDF] == "ss" and chr(0xDF).lower() == "ß"
+
+
+def test_the_digit_runs_answer_every_unicode_decimal_digit():
+    """68 run starts answer all 680 digits, including the adjacent ones.
+
+    The walk-down heuristic Go would otherwise use -- step back while the
+    neighbour is still a digit -- is wrong for the 36 mathematical digits from
+    U+1D7CE, where four runs of ten sit with no gap between them. This asserts
+    the table gets all 680 right, and names those 36 so the reason survives.
+    """
+    committed = json.loads(go_fixtures.DIGITS_PATH.read_text(encoding="utf-8"))
+    zeros = sorted(committed["zeros"])
+    assert committed["runs"] == len(zeros) == len(set(zeros))
+
+    def value(cp):
+        below = [z for z in zeros if z <= cp]
+        return cp - below[-1] if below and cp - below[-1] < 10 else None
+
+    digits = [cp for cp in range(0x110000)
+              if unicodedata.category(chr(cp)) == "Nd"]
+    wrong = [cp for cp in digits if value(cp) != int(chr(cp))]
+    assert not wrong, f"{len(wrong)} digits read as the wrong value"
+    adjacent = [cp for cp in digits if 0x1D7CE <= cp <= 0x1D7FF]
+    assert len(adjacent) == 50 and all(value(cp) == int(chr(cp)) for cp in adjacent)

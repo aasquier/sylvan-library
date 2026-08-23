@@ -1373,12 +1373,73 @@ go/                       the Go module (ADR 38; module path
                           Python's `get` would, through `auth.db.connect`, and
                           a reader that acquires a database is the one thing
                           the door refuses to be.
+                          **Then the theme interview, 2026-08-23, both
+                          halves and both routes** -- the create flow's first
+                          door and the biggest module in `claude/` at 1,684
+                          lines. internal/claude/theme.go and
+                          internal/api/theme.go: two NET jobs, both with **no
+                          dedupe key**, which is the opposite call from
+                          research's one lane earlier and stated rather than
+                          inherited -- the transcript is client-held, so two
+                          turns in flight are two *conversations* and a
+                          second tab is a second person's evening. A **409**
+                          appears that no other Claude route has: a floor not
+                          yet reached is not a malformed request. All four of
+                          ADR 20's instruments cross and none is the prompt --
+                          `Ground` (user turns only, joined by a separator no
+                          keyboard produces, so a quote cannot span two of
+                          them), `Carry` (the floor **may not go backwards**),
+                          `MayPropose` (counted in Go; the schema has no
+                          `ready` field), and a commander whose identity is
+                          not *exactly* the combination's, dropped and
+                          counted. **`pyCasefold` is the fourth reproduction
+                          of somebody else's arithmetic** after pyrand, pyyaml
+                          and pyfloat, and the reason is one call: `Ground`
+                          folds the person's own turns and the model's claimed
+                          quote and asks whether one contains the other, and
+                          `strings.ToLower` is NOT `str.casefold()`. Full
+                          folding makes `ß` into `ss`, `ſ` into `s`, `ς` into
+                          `σ` -- 211 code points disagree with `lower()` and
+                          104 fold to more than one character, so no
+                          rune-to-rune mapping can express it. A German answer
+                          quoted back at a fortune-teller's table grounds in
+                          Python and drops in Go, and a dropped slot is a
+                          readiness count that will not move: commandment 2's
+                          failure exactly. The table is swept from a real
+                          interpreter and holds **the whole of Unicode rather
+                          than the 211 differences**, because recording only
+                          the disagreements would leave the rest resting on
+                          Go's `unicode` tables agreeing with CPython's --
+                          a claim about two projects' Unicode versions, not
+                          one this port gets to make. The neighbours still
+                          spell it `ToLower` (argue's in-deck set, interview's
+                          card match, research's in-flight key) and that is
+                          deliberate: those fold a pool name against the
+                          pool's own spelling, where both sides are the same
+                          string and the two functions cannot disagree.
+                          Two more CPython behaviours crossed with it. The
+                          seed goes through **`int()`**, not the Pydantic
+                          grammar `/api/tarot/reading` uses -- the tarot lane
+                          measured those apart, and this one reads the
+                          fullwidth `７` that route refuses; `int()` takes any
+                          Unicode decimal digit, and the obvious way to get a
+                          digit's value in Go (walk down while the neighbour
+                          is still a digit) is **wrong for 36 code points**,
+                          because the mathematical blocks from U+1D7CE are
+                          four runs of ten with no gap and a bold `4` reads as
+                          fourteen. Measured before it shipped; a second swept
+                          table of 68 run starts is the fix. And the budget is
+                          `f"{v:g}"`, which is Go's `'g'` at precision **6**
+                          rather than its default -1 -- while `float(budget)`
+                          sits inside a `try` catching `ValueError` and NOT
+                          `TypeError`, so an unreadable string is a 422 and a
+                          list budget is an uncaught **500**, reproduced
+                          rather than tidied.
                           **Still Python, and ENUMERATED rather than
                           counted** (this file's own lesson about numbers):
-                          the orchestration of both theme halves and scan; and
-                          the routes `/api/claude`, `/api/claude/scan`,
-                          `/api/claude/theme`, `/api/claude/theme/proposal`
-                          and `.../argue/deck`. Four of those are job
+                          the orchestration of scan; and the routes
+                          `/api/claude`, `/api/claude/scan` and
+                          `.../argue/deck`. Two of those are job
                           families, so each waits on its own submit-and-poll
                           rather than on this one. `/api/admin/stats/claude`
                           is NOT this family and never was -- it is the admin

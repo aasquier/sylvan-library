@@ -453,3 +453,211 @@ func TestLiveResearchAnswersFromPagesItRead(t *testing.T) {
 		t.Logf("  [%s] %s  %s", s.ID, s.Title, s.URL)
 	}
 }
+
+// ---------------------------------------------------------- the theme lane
+
+// liveTranscript is the conversation both live tests below are handed: three
+// grounded kinds, in the short, shy register a first-timer actually types.
+// That register is the point -- the readiness regression `Carry` was written
+// after only reproduced with answers this thin.
+var liveTranscript = []TranscriptTurn{
+	{Role: "assistant", Text: "What is something you keep coming back to?"},
+	{Role: "user", Text: "old horror films, the practical effects ones"},
+	{Role: "assistant", Text: "And when a plan falls apart mid-evening?"},
+	{Role: "user", Text: "I improvise"},
+	{Role: "assistant", Text: "What are you like at game night?"},
+	{Role: "user", Text: "I make deals"},
+}
+
+func liveSlots(t *testing.T) []Slot {
+	t.Helper()
+	slots, dropped := Ground([]any{
+		map[string]any{"kind": "taste", "value": "practical-effects horror",
+			"quote": "old horror films"},
+		map[string]any{"kind": "temperament", "value": "improviser", "quote": "I improvise"},
+		map[string]any{"kind": "posture", "value": "dealmaker", "quote": "I make deals"},
+	}, liveTranscript)
+	if len(slots) != 3 || dropped != 0 {
+		t.Fatalf("the fixture does not reach the floor: %d kept, %d dropped", len(slots), dropped)
+	}
+	return slots
+}
+
+// One conversation turn on the real wire: a question comes back, it ends in a
+// question mark, and every slot it claims is quoted from the transcript.
+//
+// The assertion that matters is the last one. `Ground` is the instrument ADR
+// 20 rests on, and the failure it catches -- a model that has decided who
+// somebody is and reports that back as something they said -- can only be
+// observed against a real model's output.
+func TestLiveTheThemeTurnAsksAboutThePerson(t *testing.T) {
+	liveOrSkip(t)
+	slots := liveSlots(t)
+	raw := make([]any, 0, len(slots))
+	for _, s := range slots {
+		raw = append(raw, map[string]any{"kind": s.Kind, "value": s.Value, "quote": s.Quote})
+	}
+	plan, err := CheckAsk(transcriptAsAny(liveTranscript), raw, "second-opinion",
+		nil, nil, nil, "", &Collaborator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.NeedsCall() {
+		t.Fatalf("the plan answered without a call: %s", plan.Answer.Reason)
+	}
+	var answer any
+	withRealPool(t, func(c *pool.Conn) {
+		answer, err = RunAsk(context.Background(), c, plan, ThemeRun{
+			OnTurn: func(done, max int) { t.Logf("turn %d of %d", done, max) },
+		})
+		if err != nil {
+			t.Fatalf("the turn did not answer: %v", err)
+		}
+	})
+	report, ok := answer.(AskAnswered)
+	if !ok {
+		t.Fatalf("the turn is a %T -- a call was made, so it carries `never`", answer)
+	}
+	if report.Reason != "" {
+		t.Fatalf("the turn ended early: %s", report.Reason)
+	}
+	if !strings.HasSuffix(report.Question, "?") {
+		t.Errorf("the question does not end in a question mark: %q", report.Question)
+	}
+	// The readiness the client carried survives, and every slot is still
+	// quoted from what the person typed -- re-checked here rather than trusted,
+	// because this is the one place a real model is on the other end.
+	if report.Grounded < 3 || !report.MayPropose {
+		t.Errorf("the reading fell to %d of %d", report.Grounded, report.Floor)
+	}
+	said := strings.ToLower(strings.Join([]string{
+		liveTranscript[1].Text, liveTranscript[3].Text, liveTranscript[5].Text}, " | "))
+	for _, slot := range report.Slots {
+		if !strings.Contains(said, strings.ToLower(slot.Quote)) {
+			t.Errorf("slot %q is quoted as %q, which nobody typed", slot.Kind, slot.Quote)
+		}
+	}
+	if report.Fact != nil && report.Fact.Source == "" {
+		t.Error("a fact came back from nowhere")
+	}
+	t.Logf("question: %s", report.Question)
+	if report.Fact != nil {
+		t.Logf("fact (%s): %s", report.Fact.Source, report.Fact.Text)
+	}
+	for _, slot := range report.Slots {
+		t.Logf("  %s: %s  <- %q", slot.Kind, slot.Value, slot.Quote)
+	}
+	t.Logf("%d in / %d out / %d cached", report.Usage.InputTokens,
+		report.Usage.OutputTokens, report.Usage.CacheReadTokens)
+}
+
+// The proposal on the real wire, and the two things only a real run proves:
+// every commander named resolves through the pool with an identity that is
+// *exactly* the combination's, and every citation survived the source check.
+//
+// Slow -- measured at 226 seconds in Python -- which is why it is opt-in.
+func TestLiveTheThemeProposalNamesRealCommanders(t *testing.T) {
+	liveOrSkip(t)
+	slots := liveSlots(t)
+	raw := make([]any, 0, len(slots))
+	for _, s := range slots {
+		raw = append(raw, map[string]any{"kind": s.Kind, "value": s.Value, "quote": s.Quote})
+	}
+	plan, err := CheckProposal(transcriptAsAny(liveTranscript), raw, "second-opinion",
+		nil, "", nil, nil, "", &Collaborator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.NeedsCall() {
+		t.Fatalf("the plan answered without a call: %s", plan.Answer.Reason)
+	}
+	var answer any
+	withRealPool(t, func(c *pool.Conn) {
+		answer, err = RunProposal(context.Background(), c, plan, ThemeRun{
+			OnTurn: func(done, max int) { t.Logf("turn %d of %d", done, max) },
+		})
+		if err != nil {
+			t.Fatalf("the proposal did not answer: %v", err)
+		}
+	})
+	report, ok := answer.(ProposalAnswered)
+	if !ok {
+		if thin, was := answer.(ProposalReport); was {
+			t.Fatalf("the proposal came back thin: %s", thin.Reason)
+		}
+		t.Fatalf("the proposal is a %T", answer)
+	}
+	if len(report.Combinations) == 0 {
+		t.Fatal("nothing was proposed")
+	}
+	allowed := map[string]bool{}
+	for _, s := range report.Sources {
+		allowed[s.ID] = true
+	}
+	for _, combo := range report.Combinations {
+		if len(combo.Commanders) == 0 {
+			t.Errorf("%s came back with no commander and was not dropped", combo.Key)
+		}
+		for _, id := range combo.SourceIDs {
+			if !allowed[id] {
+				t.Errorf("%s cites %q, which did not survive", combo.Key, id)
+			}
+		}
+		want := map[string]bool{}
+		for _, c := range combo.Colors {
+			want[c] = true
+		}
+		for _, cmd := range combo.Commanders {
+			if cmd.OracleText == nil {
+				t.Errorf("%s carries no pool text; it was not resolved", cmd.Name)
+			}
+			// The check a subset identity would pass and must not: a mono-white
+			// legend is legal in a Selesnya deck and leads a mono-white one.
+			//
+			// **As a set, because the two orders genuinely differ.** The first
+			// version of this compared the two joined -- and the live run
+			// found Orzhov, where `colors.py` says `[W B]` and the pool says
+			// `[B W]`. The code was right (`sameIdentity` compares sets, as
+			// Python's `set(...) != identity` does); the assertion was the
+			// thing that could only be wrong against a real answer.
+			got := map[string]bool{}
+			for _, c := range cmd.ColorIdentity {
+				got[c] = true
+			}
+			if len(got) != len(want) {
+				t.Errorf("%s leads %s with identity %v, want exactly %v",
+					cmd.Name, combo.Key, cmd.ColorIdentity, combo.Colors)
+				continue
+			}
+			for c := range want {
+				if !got[c] {
+					t.Errorf("%s leads %s with identity %v, want exactly %v",
+						cmd.Name, combo.Key, cmd.ColorIdentity, combo.Colors)
+					break
+				}
+			}
+		}
+	}
+	t.Logf("%d combinations (%d dropped), %d commanders dropped, %d sources "+
+		"(%d dropped), %d pages searched, %d in / %d out / %d cached",
+		len(report.Combinations), report.CombinationsDropped, report.CommandersDropped,
+		len(report.Sources), report.SourcesDropped, report.Searched,
+		report.Usage.InputTokens, report.Usage.OutputTokens, report.Usage.CacheReadTokens)
+	for _, combo := range report.Combinations {
+		t.Logf("%s (%s): %s", combo.Key, combo.Name, combo.Reading)
+		t.Logf("  grounded in: %s", combo.Grounding)
+		for _, cmd := range combo.Commanders {
+			t.Logf("  - %s  %v", cmd.Name, cmd.ColorIdentity)
+		}
+	}
+}
+
+// transcriptAsAny rebuilds a transcript as the `[]any` of maps a real request
+// carries, so the live tests go through the same door a client does.
+func transcriptAsAny(turns []TranscriptTurn) any {
+	out := make([]any, 0, len(turns))
+	for _, turn := range turns {
+		out = append(out, map[string]any{"role": turn.Role, "text": turn.Text})
+	}
+	return out
+}
