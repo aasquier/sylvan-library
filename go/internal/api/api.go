@@ -220,6 +220,14 @@ func (a *API) Routes() []Route {
 		// and the deal is internal/pyrand's first served caller, where a
 		// seed minted before the cutover must still deal its own spread.
 		{Method: http.MethodGet, Pattern: "/api/claude/personas", Handler: a.personaRoster},
+		// The dial itself, which crosses LAST of the free corners rather than
+		// first: it reports which modes are built and what each surface
+		// defaults to, so it could only answer honestly once the modes and
+		// their stance owners had crossed. Free, reaching no network and no
+		// pool -- but it does resolve the caller's library, because Python
+		// passes `lib.source_for(...)` as an argument and `?owner=nobody`
+		// alone is therefore a 404.
+		{Method: http.MethodGet, Pattern: "/api/claude", Handler: a.claudeStatus},
 		{Method: http.MethodGet, Pattern: "/api/tarot/reading", Handler: a.tarotReading},
 		// The pool behind the prose, and the pool's own two doors (the
 		// second family): a combination's champions and signature cards,

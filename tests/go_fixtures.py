@@ -2830,7 +2830,117 @@ def stance_cases() -> dict[str, Any]:
         "parses": parses,
         "ceilings": ceilings,
         "defaults": defaults,
+        "dial": dial_cases(),
     }
+
+
+#: The slug the dial corpus asks about. Any name; it exists only so the route's
+#: `if slug:` branch is the one being exercised.
+_DIAL_SLUG = "dial-probe"
+
+
+def _dial_source(status: Any) -> Any:
+    """A one-deck source whose deck has the status under test, or None.
+
+    A **real** `DeckSource` rather than a patched payload: `claude_status`
+    reads the deck itself (`Deck.from_text(decks.read_text(slug))`), so a
+    corpus that computed the two deck-dependent fields on the side would be
+    reimplementing the function it is checking -- and would stay green against
+    a mutant of it. The tarot lane paid for that lesson once already.
+    """
+    if status is None:
+        return None
+    from mtglab.decks.model import Deck
+    from mtglab.decks.source import MemoryDeckSource
+
+    text = f"name: Dial Probe\nstatus: {status}\ncards: []\n"
+    return MemoryDeckSource([Deck.from_text(text, slug=_DIAL_SLUG)])
+
+
+def dial_cases() -> list[dict[str, Any]]:
+    """`service.claude_status`, the whole payload `GET /api/claude` answers.
+
+    Recorded as the **serialised** shape rather than field by field, for the
+    reason the `stances` table above gives: a struct whose values are right
+    and whose field order is wrong marshals to different bytes, and only
+    comparing bytes sees it.
+
+    Three environment facts are pinned rather than inherited, because all
+    three are read at call time and would otherwise make the corpus a record
+    of whichever machine rendered it: the stance ceiling, the credential (so
+    `configured` is a decision rather than an accident of the shell), and the
+    model override (so `model` is the house answer).
+
+    **The deck is a status string, not a slug.** The route reads a deck only
+    to get its `status`, so the corpus exercises that field directly and the
+    handler's library resolution is left to the route tests, where a 404 can
+    actually be asserted.
+
+    Two rows exist to pin warts and are labelled as such: `?surface=scan`
+    resolves `off` because `_SURFACE_DEFAULTS` was never extended when ADR 34
+    landed, and the `modes` list is six of the seven for the same reason one
+    layer along. Both were measured against the running app.
+    """
+    from mtglab.api import service
+
+    cases = []
+    for note, requested, status, surface, ceiling in [
+        ("nothing at all", None, None, None, None),
+        ("no deck, no surface", None, None, "", None),
+        ("a theme surface with no deck", None, None, "theme", None),
+        ("a research surface with no deck", None, None, "research", None),
+        # The wart: `scan.stance_for` exists and says in its docstring that it
+        # is public so this will not answer `off`. `_SURFACE_DEFAULTS` does
+        # not name it, so this answers `off`.
+        ("WART: a scan surface answers off", None, None, "scan", None),
+        ("a surface nobody owns", None, None, "nonsense", None),
+        ("a built deck", None, "built", None, None),
+        ("a theoretical deck", None, "theoretical", None, None),
+        ("a deck with an odd status", None, "sideways", None, None),
+        # A deck present alongside a deckless surface: the deck wins, because
+        # the branch is `surface in _SURFACE_DEFAULTS AND deck is None`.
+        ("a theme surface WITH a deck", None, "built", "theme", None),
+        ("a pin", "collaborator", None, None, None),
+        ("a pin over a deck", "off", "theoretical", None, None),
+        ("a pin over a deckless surface", "consultant", None, "theme", None),
+        ("a custom stance", {"initiative": "volunteers", "scope": "rethink",
+                             "write": "none"}, None, None, None),
+        ("a malformed stance", {"initiative": 7}, None, None, None),
+        ("a stance that is not a stance", 7, None, None, None),
+        ("a preset that is not one", "nope", None, None, None),
+        # Under a cap: every preset row's `available` flips, which is the
+        # field a UI greys a control out on.
+        ("everything, capped at off", None, None, None, "off"),
+        ("a theme surface, capped at off", None, None, "theme", "off"),
+        ("a pin over the cap", "collaborator", None, None, "consultant"),
+    ]:
+        saved_ceiling = os.environ.pop("MTGLAB_CLAUDE_STANCE_CEILING", None)
+        saved_key = os.environ.pop("ANTHROPIC_API_KEY", None)
+        saved_token = os.environ.pop("ANTHROPIC_AUTH_TOKEN", None)
+        saved_model = os.environ.pop("MTGLAB_CLAUDE_MODEL", None)
+        if ceiling:
+            os.environ["MTGLAB_CLAUDE_STANCE_CEILING"] = ceiling
+        try:
+            row: dict[str, Any] = {"note": note, "requested": requested,
+                                   "deck_status": status, "surface": surface,
+                                   "ceiling": ceiling}
+            try:
+                row["payload"] = service.claude_status(
+                    requested=requested, surface=surface,
+                    slug=_DIAL_SLUG if status is not None else None,
+                    source=_dial_source(status))
+            except ValueError as exc:
+                row["error"] = str(exc)
+            cases.append(row)
+        finally:
+            os.environ.pop("MTGLAB_CLAUDE_STANCE_CEILING", None)
+            for name, value in (("MTGLAB_CLAUDE_STANCE_CEILING", saved_ceiling),
+                                ("ANTHROPIC_API_KEY", saved_key),
+                                ("ANTHROPIC_AUTH_TOKEN", saved_token),
+                                ("MTGLAB_CLAUDE_MODEL", saved_model)):
+                if value is not None:
+                    os.environ[name] = value
+    return cases
 
 
 class _Statused:

@@ -601,7 +601,10 @@ func TestOnlyACanonicalRequestIsTheDoors(t *testing.T) {
 		// the hybrid handler, which asks the upstream and merges rather than
 		// passing the request through. `TestTheJobListIsTheUnion` is where
 		// that behaviour is asserted instead.
-		{"GET", "/api/forge"}, {"GET", "/api/claude"},
+		// `/api/claude` is **not** among them any more: the dial flipped with
+		// the last of the Claude family, once every mode it reports on and
+		// every surface default it asks for had crossed.
+		{"GET", "/api/forge"},
 		{"POST", "/api/decks/local/mono-green/wheel"},
 	}
 	for _, c := range proxied {

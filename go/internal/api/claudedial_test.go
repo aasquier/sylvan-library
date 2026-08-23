@@ -1,0 +1,226 @@
+package api
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
+
+// The dial's route. `internal/claude`'s corpus already holds the payload to
+// Python byte for byte across twenty resolutions; what is left here is
+// everything the corpus cannot see, which is all of it request-shaped: which
+// query value wins, when the library is resolved, and in what order the two
+// refusals are decided.
+//
+// All of it was measured against the running app rather than read off the
+// source, because two of the three are emergent -- they follow from where
+// FastAPI evaluates a dependency argument, not from anything the handler says.
+
+func TestTheDialAnswersWithoutADeck(t *testing.T) {
+	a, done := deckAPI(t, true)
+	defer done()
+	status, payload, raw := as(t, a, alice, "/api/claude")
+	if status != 200 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	// The three questions that must stay apart: a UI collapsing them tells
+	// somebody their key is missing when they have turned it off.
+	for _, key := range []string{"installed", "configured", "stance", "ceiling",
+		"default", "presets", "never", "modes", "model"} {
+		if _, ok := payload[key]; !ok {
+			t.Errorf("the dial has no %q", key)
+		}
+	}
+	stance, _ := payload["stance"].(map[string]any)
+	if stance["preset"] != "off" {
+		t.Errorf("no deck and no surface resolved %v, want off", stance["preset"])
+	}
+}
+
+// The **key order in the marshalled bytes**, which no field-by-field
+// assertion sees and the settings gear renders in.
+//
+// `tier1.Number`'s lesson, and it has already paid here once: the corpus
+// caught `never` carrying a typographic apostrophe where Python writes an
+// ASCII one, a difference every structural check in this file would pass.
+func TestTheDialsKeyOrderIsPythons(t *testing.T) {
+	a, done := deckAPI(t, true)
+	defer done()
+	_, _, raw := as(t, a, alice, "/api/claude")
+	var keys []string
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	if _, err := dec.Token(); err != nil { // opening brace
+		t.Fatal(err)
+	}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			t.Fatal(err)
+		}
+		keys = append(keys, tok.(string))
+		var skip json.RawMessage
+		if err := dec.Decode(&skip); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := []string{"installed", "configured", "model", "stance", "ceiling",
+		"default", "presets", "never", "modes"}
+	if strings.Join(keys, ",") != strings.Join(want, ",") {
+		t.Errorf("key order is\n  %v\nPython's is\n  %v", keys, want)
+	}
+}
+
+// A deck's `status` is the whole of what the dial reads off it, and the two
+// values that matter resolve differently: a theoretical deck opens wider than
+// a built one, because a wild suggestion about a list costs a moment's thought
+// and one about sleeved cardboard costs a trip to the box.
+func TestTheDialReadsTheDecksStatus(t *testing.T) {
+	a, done := deckAPI(t, true)
+	defer done()
+	for slug, want := range map[string]string{
+		"rich":       "consultant",     // status: built
+		"mono-green": "second-opinion", // status: theoretical
+		"messy":      "consultant",     // status: shelved -- neither, so the narrow one
+	} {
+		status, payload, raw := as(t, a, alice, "/api/claude?slug="+slug)
+		if status != 200 {
+			t.Fatalf("%s: %d %s", slug, status, raw)
+		}
+		stance, _ := payload["stance"].(map[string]any)
+		if stance["preset"] != want {
+			t.Errorf("%s resolved %v, want %q", slug, stance["preset"], want)
+		}
+	}
+}
+
+// **The owner is resolved even when no deck is going to be read**, so
+// `?owner=nobody` with no slug at all is a 404 rather than a dial.
+//
+// That is not something the handler chooses; it follows from Python passing
+// `lib.source_for(owner or lib.my_owner)` as an *argument* to
+// `service.claude_status`, which evaluates before the call whether or not the
+// `if slug:` branch inside will ever run. Measured against the running app,
+// because reading it off the source is exactly how a port gets it wrong: the
+// natural Go shape resolves the source lazily and answers 200.
+func TestAnUnknownOwnerIsA404EvenWithNoSlug(t *testing.T) {
+	a, done := deckAPI(t, true)
+	defer done()
+	for _, target := range []string{
+		"/api/claude?owner=nobody",
+		"/api/claude?owner=nobody&slug=rich",
+	} {
+		status, payload, raw := as(t, a, alice, target)
+		if status != 404 {
+			t.Errorf("%s answered %d, want 404: %s", target, status, raw)
+			continue
+		}
+		if detail, _ := payload["detail"].(string); !strings.Contains(detail, "nobody") {
+			t.Errorf("%s said %q, want the owner named", target, detail)
+		}
+	}
+}
+
+// **The deck is read before the stance is parsed.** Both are the caller's
+// fault and they carry different codes, so which one is reported when both are
+// wrong is contract rather than taste -- and it is the deck's, measured.
+func TestTheDeckIsRefusedBeforeTheStanceIs(t *testing.T) {
+	a, done := deckAPI(t, true)
+	defer done()
+	// Both wrong: the deck wins.
+	status, payload, raw := as(t, a, alice, "/api/claude?stance=garbage&slug=nope")
+	if status != 404 {
+		t.Fatalf("both wrong answered %d, want the deck's 404: %s", status, raw)
+	}
+	if detail, _ := payload["detail"].(string); !strings.Contains(detail, "nope") {
+		t.Errorf("said %q, want the deck named", detail)
+	}
+	// The stance alone is still its own 422, carrying the preset list -- the
+	// sentence the settings gear needs in order to clear a pin it cannot
+	// honour.
+	status, payload, raw = as(t, a, alice, "/api/claude?stance=garbage")
+	if status != 422 {
+		t.Fatalf("a bad stance answered %d, want 422: %s", status, raw)
+	}
+	detail, _ := payload["detail"].(string)
+	if !strings.Contains(detail, "garbage") || !strings.Contains(detail, "collaborator") {
+		t.Errorf("said %q, want the value and the presets", detail)
+	}
+}
+
+// Starlette's QueryParams.get returns the **last** repeated value; Go's
+// Query().Get returns the first. Every one of this route's four parameters
+// goes through the same helper, so all four are checked -- the failure mode is
+// a client that appends rather than replaces, and it is silent.
+func TestTheLastQueryValueWinsOnEveryParameter(t *testing.T) {
+	a, done := deckAPI(t, true)
+	defer done()
+	// slug: the second one is the one that must 404.
+	status, payload, _ := as(t, a, alice, "/api/claude?slug=rich&slug=nope")
+	if status != 404 {
+		t.Errorf("slug: answered %d, want the LAST slug's 404", status)
+	} else if detail, _ := payload["detail"].(string); !strings.Contains(detail, "nope") {
+		t.Errorf("slug: said %q, want the last value", detail)
+	}
+	// ...and the other way round, so this is not passing because both 404.
+	if status, _, raw := as(t, a, alice, "/api/claude?slug=nope&slug=rich"); status != 200 {
+		t.Errorf("slug: answered %d, want the LAST slug's 200: %s", status, raw)
+	}
+	// stance: a good pin after a bad one wins.
+	if status, _, raw := as(t, a, alice, "/api/claude?stance=garbage&stance=off"); status != 200 {
+		t.Errorf("stance: answered %d, want the LAST stance: %s", status, raw)
+	}
+	if status, _, _ := as(t, a, alice, "/api/claude?stance=off&stance=garbage"); status != 422 {
+		t.Errorf("stance: answered %d, want the LAST stance's 422", status)
+	}
+	// surface: `theme` opens to second-opinion where an unowned name is off.
+	_, payload, _ = as(t, a, alice, "/api/claude?surface=nonsense&surface=theme")
+	stance, _ := payload["stance"].(map[string]any)
+	if stance["preset"] != "second-opinion" {
+		t.Errorf("surface: resolved %v, want the LAST surface's second-opinion", stance["preset"])
+	}
+	// owner: a good owner after a bad one is a dial rather than a 404.
+	if status, _, raw := as(t, a, alice, "/api/claude?owner=nobody&owner=alice"); status != 200 {
+		t.Errorf("owner: answered %d, want the LAST owner: %s", status, raw)
+	}
+}
+
+// The create flow's default, which is the bug this parameter exists for: with
+// no deck to derive from, the dial beside it reported `off` while
+// `theme.stance_for` was about to run the conversation at `second-opinion`.
+//
+// And the branch's other half, which is the part a port drops: a surface with
+// a default only applies **when there is no deck**, so a theme surface asking
+// about a built deck gets the deck's answer and not the surface's.
+func TestASurfacesDefaultAppliesOnlyWithNoDeck(t *testing.T) {
+	a, done := deckAPI(t, true)
+	defer done()
+	_, payload, _ := as(t, a, alice, "/api/claude?surface=theme")
+	stance, _ := payload["stance"].(map[string]any)
+	if stance["preset"] != "second-opinion" {
+		t.Errorf("the create flow's dial resolved %v, want second-opinion", stance["preset"])
+	}
+	// `rich` is built, so the deck's consultant beats the surface's default.
+	_, payload, _ = as(t, a, alice, "/api/claude?surface=theme&slug=rich")
+	stance, _ = payload["stance"].(map[string]any)
+	if stance["preset"] != "consultant" {
+		t.Errorf("a theme surface WITH a built deck resolved %v, want the "+
+			"deck's consultant -- the branch is `surface in defaults AND "+
+			"deck is None`", stance["preset"])
+	}
+}
+
+// ADR 5, reached through `Library` like every other per-deck route: a deck
+// somebody else owns and has not shared is a 404 here too, not a 403 and not a
+// dial about a stranger's deck.
+func TestTheDialCannotSeeAnotherAccountsPrivateDeck(t *testing.T) {
+	a, done := deckAPI(t, true)
+	defer done()
+	if status, _, raw := as(t, a, alice, "/api/claude?owner=bob&slug=bobs-private"); status != 404 {
+		t.Errorf("bob's private deck answered %d to alice, want 404: %s", status, raw)
+	}
+	// Shared, so it resolves -- which is what makes the 404 above about
+	// visibility rather than about the route being broken for other owners.
+	if status, _, raw := as(t, a, alice, "/api/claude?owner=bob&slug=bobs-public"); status != 200 {
+		t.Errorf("bob's shared deck answered %d to alice, want 200: %s", status, raw)
+	}
+}

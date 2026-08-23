@@ -6489,5 +6489,2251 @@
   {"status":"  Theoretical  ","stance":{"initiative":"volunteers","scope":"adjacent","write":"none"}},
   {"status":"THEORETICAL","stance":{"initiative":"volunteers","scope":"adjacent","write":"none"}},
   {"status":"nonsense","stance":{"initiative":"on-request","scope":"flagged","write":"none"}}
+ ],
+ "dial": [
+  {
+   "note": "nothing at all",
+   "requested": null,
+   "deck_status": null,
+   "surface": null,
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "no deck, no surface",
+   "requested": null,
+   "deck_status": null,
+   "surface": "",
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a theme surface with no deck",
+   "requested": null,
+   "deck_status": null,
+   "surface": "theme",
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a research surface with no deck",
+   "requested": null,
+   "deck_status": null,
+   "surface": "research",
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "WART: a scan surface answers off",
+   "requested": null,
+   "deck_status": null,
+   "surface": "scan",
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a surface nobody owns",
+   "requested": null,
+   "deck_status": null,
+   "surface": "nonsense",
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a built deck",
+   "requested": null,
+   "deck_status": "built",
+   "surface": null,
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a theoretical deck",
+   "requested": null,
+   "deck_status": "theoretical",
+   "surface": null,
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a deck with an odd status",
+   "requested": null,
+   "deck_status": "sideways",
+   "surface": null,
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a theme surface WITH a deck",
+   "requested": null,
+   "deck_status": "built",
+   "surface": "theme",
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a pin",
+   "requested": "collaborator",
+   "deck_status": null,
+   "surface": null,
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a pin over a deck",
+   "requested": "off",
+   "deck_status": "theoretical",
+   "surface": null,
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a pin over a deckless surface",
+   "requested": "consultant",
+   "deck_status": null,
+   "surface": "theme",
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "second-opinion",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a custom stance",
+   "requested": {"initiative":"volunteers","scope":"rethink","write":"none"},
+   "deck_status": null,
+   "surface": null,
+   "ceiling": null,
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": null,
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "collaborator",
+     "allows_calls": true,
+     "may_write": true,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a malformed stance",
+   "requested": {"initiative":7},
+   "deck_status": null,
+   "surface": null,
+   "ceiling": null,
+   "error": "7 is not a initiative level; expected one of off, on-request, volunteers, interjects"
+  },
+  {"note":"a stance that is not a stance","requested":7,"deck_status":null,"surface":null,"ceiling":null,"error":"cannot read a stance from int"},
+  {
+   "note": "a preset that is not one",
+   "requested": "nope",
+   "deck_status": null,
+   "surface": null,
+   "ceiling": null,
+   "error": "'nope' is not a stance preset; expected one of collaborator, consultant, off, second-opinion"
+  },
+  {
+   "note": "everything, capped at off",
+   "requested": null,
+   "deck_status": null,
+   "surface": null,
+   "ceiling": "off",
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": false
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": false
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": false
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a theme surface, capped at off",
+   "requested": null,
+   "deck_status": null,
+   "surface": "theme",
+   "ceiling": "off",
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": false
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": false
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": false
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  },
+  {
+   "note": "a pin over the cap",
+   "requested": "collaborator",
+   "deck_status": null,
+   "surface": null,
+   "ceiling": "consultant",
+   "payload": {
+    "installed": true,
+    "configured": false,
+    "model": "claude-sonnet-5",
+    "stance": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "ceiling": {
+     "preset": "consultant",
+     "allows_calls": true,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "default": {
+     "preset": "off",
+     "allows_calls": false,
+     "may_write": false,
+     "axes": [
+      {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+      {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+      {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+     ]
+    },
+    "presets": [
+     {
+      "name": "off",
+      "blurb": "No calls, ever. The gate, the solver and the simulator all still work -- this turns off opinions, not the tool.",
+      "stance": {
+       "preset": "off",
+       "allows_calls": false,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"off","means":"Never. No API calls are made at all.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "consultant",
+      "blurb": "Speaks when spoken to, about what the gate already flagged.",
+      "stance": {
+       "preset": "consultant",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"on-request","means":"Only when you ask it something.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"flagged","means":"Only the cards the gate already flagged.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": true
+     },
+     {
+      "name": "second-opinion",
+      "blurb": "Volunteers observations and looks at neighbouring cards. Still writes nothing.",
+      "stance": {
+       "preset": "second-opinion",
+       "allows_calls": true,
+       "may_write": false,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"adjacent","means":"Those cards and the ones that interact with them.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"none","means":"Nothing. It talks; you type.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": false
+     },
+     {
+      "name": "collaborator",
+      "blurb": "Questions the deck's axis and batches edits for one approval. Never writes a rationale -- that rule has no stance above it.",
+      "stance": {
+       "preset": "collaborator",
+       "allows_calls": true,
+       "may_write": true,
+       "axes": [
+        {"axis":"initiative","question":"When may it speak?","level":"volunteers","means":"It may offer an observation when it has one.","levels":["off","on-request","volunteers","interjects"]},
+        {"axis":"scope","question":"How far from the question may it range?","level":"rethink","means":"The whole deck, including its axis.","levels":["flagged","adjacent","rethink"]},
+        {"axis":"write","question":"What may it change?","level":"proposes","means":"It may assemble a batch for you to approve in one go.","levels":["none","proposes","applies"]}
+       ]
+      },
+      "available": false
+     }
+    ],
+    "never": "One rule holds at every setting: Claude never writes a card's rationale. The why is always yours.",
+    "modes": [
+     {"name":"rationale-interview","purpose":"Asks about one card's slot so the user can write its rationale.","tools":["get_cards","get_deck","deck_stats","validate_deck"],"server_tools":[],"writes":[]},
+     {
+      "name": "slot-argument",
+      "purpose": "Makes the case against one card's slot. Never the case for it.",
+      "tools": ["get_cards","search_cards","suggest_replacements","deck_stats","validate_deck"],
+      "server_tools": [],
+      "writes": []
+     },
+     {"name":"commander-dossier","purpose":"Who a deck's commander is, what archetype they define, and where they sit in Magic's history.","tools":["get_cards"],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "research",
+      "purpose": "Answers a question about Magic from pages it read: the meta, a ruling in practice, a card spoiled ahead of the pool.",
+      "tools": ["get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     },
+     {"name":"theme-conversation","purpose":"Asks about you -- not about Magic -- until it knows enough to suggest a colour combination.","tools":[],"server_tools":["web_search"],"writes":[]},
+     {
+      "name": "theme-proposal",
+      "purpose": "Turns a theme conversation into two colour combinations and six pool-checked commanders.",
+      "tools": ["search_cards","get_cards"],
+      "server_tools": ["web_search"],
+      "writes": []
+     }
+    ]
+   }
+  }
  ]
 }

@@ -15,7 +15,7 @@ import (
 // cross as **generated data** rather than as transcribed source -- the same
 // split `tools` makes, for the same reason at greater scale. A prompt is prose
 // whose bytes reach a model; `theme-proposal`'s alone runs to thousands of
-// words. Hand-copying six of them into a second language is the drift the
+// words. Hand-copying seven of them into a second language is the drift the
 // generator exists to prevent, and unlike a persona's voice a mistyped
 // instruction here changes what the model is *allowed to do* rather than how
 // it sounds.
@@ -27,9 +27,16 @@ import (
 // no field for a card name. Those **absences are the features**, and an
 // absence is precisely what a hand-copy drops with nothing looking wrong.
 //
-// All six definitions load, including the modes whose orchestration has not
+// All seven definitions load, including the modes whose orchestration has not
 // crossed. The definition is data; the code that assembles a brief and reads
 // an answer back is the mode's own.
+//
+// **Seven, and this comment said six until 2026-08-23.** The generator's first
+// version grepped for `= Mode(` and silently lost `scan.py`, which spells it
+// `modes.Mode(...)`; #257 fixed the generator to discover modes by type and
+// the prose describing it kept the old number. A count in a comment is a claim
+// to re-check against the data, which is why `ModeNames` is derived and no
+// number is written down anywhere a test cannot read it.
 
 //go:embed data/modes.json
 var modesJSON []byte
@@ -94,24 +101,27 @@ func loadModes() map[string]Mode {
 	out := make(map[string]Mode, len(file.Modes))
 	for _, row := range file.Modes {
 		servers := make([]anthropic.ToolUnionParam, 0, len(row.ServerTools))
+		names := make([]string, 0, len(row.ServerTools))
 		for _, spec := range row.ServerTools {
 			built, err := spec.param()
 			if err != nil {
 				panic(fmt.Sprintf("claude: mode %q: %v", row.Name, err))
 			}
 			servers = append(servers, built)
+			names = append(names, spec.Name)
 		}
 		out[row.Name] = MustMode(Mode{
-			Name:           row.Name,
-			Purpose:        row.Purpose,
-			Instructions:   row.Instructions,
-			ToolNames:      row.ToolNames,
-			ServerTools:    servers,
-			MayWrite:       row.MayWrite,
-			MaxTokens:      row.MaxTokens,
-			Effort:         anthropic.OutputConfigEffort(row.Effort),
-			ResponseSchema: row.ResponseSchema,
-			ScopeNotes:     row.ScopeNotes,
+			Name:            row.Name,
+			Purpose:         row.Purpose,
+			Instructions:    row.Instructions,
+			ToolNames:       row.ToolNames,
+			ServerTools:     servers,
+			ServerToolNames: names,
+			MayWrite:        row.MayWrite,
+			MaxTokens:       row.MaxTokens,
+			Effort:          anthropic.OutputConfigEffort(row.Effort),
+			ResponseSchema:  row.ResponseSchema,
+			ScopeNotes:      row.ScopeNotes,
 		})
 	}
 	return out
