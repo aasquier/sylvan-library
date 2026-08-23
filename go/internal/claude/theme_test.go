@@ -111,11 +111,10 @@ type themeCorpus struct {
 	} `json:"budgets"`
 
 	Floats []struct {
-		Note      string  `json:"note"`
-		Raw       any     `json:"raw"`
-		Budget    *string `json:"budget"`
-		Error     string  `json:"error"`
-		ErrorKind string  `json:"error_kind"`
+		Note   string  `json:"note"`
+		Raw    any     `json:"raw"`
+		Budget *string `json:"budget"`
+		Error  string  `json:"error"`
 	} `json:"floats"`
 
 	Stances []struct {
@@ -840,51 +839,82 @@ func themePlanHasField(plan, field string) bool {
 	return ok
 }
 
-// `float(budget)`, whose two refusals reach the client as two different
-// statuses -- a `ValueError` is the route's 422 and a `TypeError` is not
-// caught at all, so it is a 500. Reproduced rather than tidied.
+// `theme.read_budget`, driven as the route drives it.
+//
+// **Through `ReadBudget` and not `PyFloat` by hand**, which is the tarot
+// lane's lesson: a test that reimplements the call it is checking passes
+// against a mutant of the caller. The falsy check, the grammar and the one
+// refusal are all this function's, so all three are asked of it.
+//
+// Two halves. The **grammar** is CPython's `float()` and is what a port gets
+// wrong -- `1_000.5`, the fullwidth `５０`, `Infinity`, `1e400` overflowing to
+// inf, and the `0x1p4` Go would read and Python will not. Every accepted
+// value is compared as `repr`, so one ulp is a diff.
+//
+// The **refusal** is one sentence for every way the field can fail, which it
+// was not until 2026-08-23: a list was an uncaught 500 and a bad string a 422
+// quoting `float()` at the user. The old test asserted that split and had a
+// tripwire demanding the corpus keep it; both are gone, and what stands in
+// their place asserts the opposite -- that no refusal names anything that
+// computes, and that the corpus still holds a case of each former kind so
+// this cannot be green against a corpus that lost one.
 func TestTheBudgetParseAgreesWithPython(t *testing.T) {
 	corpus := loadThemeCorpus(t)
-	sawType := false
+	sawFormerTypeError, sawFormerValueError := false, false
 	for _, row := range corpus.Floats {
-		got, err := PyFloat(row.Raw)
-		if !pyTruthyValue(row.Raw) {
-			// `if budget` runs before `float()` ever does.
-			if row.Budget != nil || row.Error != "" {
-				t.Errorf("%s: the corpus says a falsy budget is not None", row.Note)
-			}
-			continue
-		}
+		got, err := ReadBudget(row.Raw)
 		if row.Error != "" {
 			if err == nil {
-				t.Errorf("%s: read %v where Python said %q", row.Note, got, row.Error)
+				t.Errorf("%s: read %v where Python refused with %q", row.Note, got, row.Error)
 				continue
 			}
 			if err.Error() != row.Error {
 				t.Errorf("%s: refused with\n  %q\nPython says\n  %q", row.Note, err, row.Error)
 			}
-			isType := errors.Is(err, ErrFloatType)
-			if isType != (row.ErrorKind == "type") {
-				t.Errorf("%s: the error kind is not Python's %q -- and a "+
-					"TypeError is a 500 where a ValueError is a 422",
-					row.Note, row.ErrorKind)
+			if !errors.Is(err, ErrBudgetRejected) {
+				t.Errorf("%s: refused with something other than the one refusal", row.Note)
 			}
-			if isType {
-				sawType = true
+			// Commandment 10: the half a status code cannot check. This
+			// sentence is rendered verbatim by the create flow.
+			for _, leak := range []string{"float", "TypeError", "ValueError", "convert", "strconv"} {
+				if strings.Contains(err.Error(), leak) {
+					t.Errorf("%s: the refusal leaks %q at the user: %q", row.Note, leak, err)
+				}
+			}
+			// Which of `float()`'s two exceptions this row used to be. Both
+			// must still be in the corpus, or "they answer alike" is a claim
+			// about one of them.
+			if _, isString := row.Raw.(string); isString {
+				sawFormerValueError = true
+			} else {
+				sawFormerTypeError = true
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("%s: refused with %q where Python read %s", row.Note, err, *row.Budget)
+			t.Errorf("%s: refused with %q where Python read %v", row.Note, err, row.Budget)
 			continue
 		}
-		if want := *row.Budget; pyFloatRepr(got) != want {
-			t.Errorf("%s: read %s, Python read %s", row.Note, pyFloatRepr(got), want)
+		if row.Budget == nil {
+			// A falsy budget is no budget: `if not raw` runs before `float()`
+			// ever does, so an empty list never reaches the refusal above.
+			if got != nil {
+				t.Errorf("%s: read %v where Python read None", row.Note, *got)
+			}
+			continue
+		}
+		if got == nil {
+			t.Errorf("%s: read None where Python read %s", row.Note, *row.Budget)
+			continue
+		}
+		if want := *row.Budget; pyFloatRepr(*got) != want {
+			t.Errorf("%s: read %s, Python read %s", row.Note, pyFloatRepr(*got), want)
 		}
 	}
-	if !sawType {
-		t.Fatal("the corpus no longer separates float()'s TypeError from its " +
-			"ValueError, and the two are different status codes")
+	if !sawFormerTypeError || !sawFormerValueError {
+		t.Fatal("the corpus no longer holds both of float()'s failures -- a " +
+			"list (TypeError) and an unreadable string (ValueError). They " +
+			"answer alike now, and that is only tested while both are here")
 	}
 }
 

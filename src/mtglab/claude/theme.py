@@ -119,6 +119,49 @@ class TranscriptRejected(ValueError):
     """
 
 
+class BudgetRejected(ValueError):
+    """The budget handed in is not a number this mode can read.
+
+    Its own exception for the reason `TranscriptRejected` is one, and it
+    exists because of what the route did before it: `float(budget)` sat in a
+    `try` catching `ValueError` and **not** `TypeError`, so an unreadable
+    *string* was a 422 and a *list* was an uncaught 500 -- two spellings of
+    one malformed field, answered two ways, one of them as though the server
+    had broken. Ruled with Aaron 2026-08-23 and fixed in both runtimes at
+    once, the way `edit.set_shared` and the stance wart went.
+
+    **It carries its own sentence rather than `float`'s.** The old 422 read
+    `could not convert string to float: 'about fifty quid'`, which names a
+    language builtin in a string the create flow renders -- commandment 10,
+    on the one screen a newcomer meets first. `float()`'s grammar is
+    deliberately kept (underscores, any Unicode decimal digit, `inf`), since
+    the ruling was about what a refusal says and not about what is accepted.
+    """
+
+
+#: What a refused budget says. One sentence, an example, and no mention of
+#: what could not read it.
+BUDGET_REFUSAL = "the budget must be a number, like 250"
+
+
+def read_budget(raw: Any) -> float | None:
+    """A budget as the proposal takes it: a number, or nothing at all.
+
+    `if not raw` first, because a falsy budget is **no budget** rather than a
+    bad one -- an empty box, a zero, an absent field. Everything else must
+    read as a number or it is `BudgetRejected`, which is a `ValueError` and
+    therefore already caught by the route's own 422 branch: the same trick
+    `stance.StanceRejected` uses, and the reason neither fix needed a new
+    `except`.
+    """
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError) as exc:
+        raise BudgetRejected(BUDGET_REFUSAL) from exc
+
+
 class NotReady(ValueError):
     """Asked to propose before three slots survived grounding.
 

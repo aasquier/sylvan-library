@@ -3856,15 +3856,28 @@ def theme_prompt_cases() -> dict[str, Any]:
 
 
 def theme_float_cases() -> list[dict[str, Any]]:
-    """`float(budget)`, which is not `strconv.ParseFloat`.
+    """`theme.read_budget`, whose `float()` is not `strconv.ParseFloat`.
 
-    The route spells it `float(budget) if budget else None` **inside** a `try`
-    that catches `TranscriptRejected` and `ValueError` -- and not `TypeError`.
-    So a string that will not read is a 422 carrying Python's own message, and
-    a list is an uncaught `TypeError` and a 500. Both are reproduced;
-    collapsing them would be a flip that changes behaviour, which is not a
-    flip.
+    **Driven through the real function, not through `float()` by hand.** The
+    tarot lane learnt that the expensive way: a test that reimplements the
+    call it is checking passes against a mutant of the caller. So this asks
+    `read_budget` and records what it answers.
+
+    Two halves, and the first is the one a port can get wrong. The **grammar**
+    is CPython's `float()` -- underscores between digits, any Unicode decimal
+    digit, `inf`, `Infinity`, `NaN`, a leading `+`, surrounding whitespace,
+    and *not* Go's `0x1p4` -- and every accepted value is recorded as `repr`
+    so a one-ulp difference is a diff rather than a rounding nobody sees.
+
+    The **refusal** is one sentence for every way the field can fail, which
+    it was not until 2026-08-23: `float(budget)` sat in a `try` catching
+    `ValueError` and not `TypeError`, so a list was an uncaught 500 and a bad
+    string was a 422 quoting `float()` at the user. Ruled with Aaron and
+    fixed in both runtimes at once, so `error_kind` is gone -- there is no
+    longer a distinction to record, and that absence is the fix.
     """
+    from mtglab.claude import theme
+
     cases = []
     for note, raw in [
         ("none is no budget", None), ("zero is no budget", 0),
@@ -3881,23 +3894,17 @@ def theme_float_cases() -> list[dict[str, Any]]:
         ("not a number", "fifty"),
         ("an overflowing literal", "1e400"),
         ("true is one", True),
-        ("a list is a TypeError, not a ValueError", [1]),
-        ("an object is a TypeError", {"a": 1}),
+        ("a list refuses in the same words as a bad string", [1]),
+        ("an object refuses in the same words", {"a": 1}),
+        ("what somebody actually types", "about fifty quid"),
+        ("a currency symbol", "$50"),
     ]:
         row: dict[str, Any] = {"note": note, "raw": raw}
-        if not raw:
-            row["budget"] = None
-            cases.append(row)
-            continue
         try:
-            value = float(raw)
-            row["budget"] = repr(value)
-        except ValueError as exc:
+            value = theme.read_budget(raw)
+            row["budget"] = None if value is None else repr(value)
+        except theme.BudgetRejected as exc:
             row["error"] = str(exc)
-            row["error_kind"] = "value"
-        except TypeError as exc:
-            row["error"] = str(exc)
-            row["error_kind"] = "type"
         cases.append(row)
     return cases
 

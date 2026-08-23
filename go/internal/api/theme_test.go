@@ -86,7 +86,7 @@ func TestTheThemeRoutesRefuseWhatTheyCanBeforeAnyJob(t *testing.T) {
 		{themeProposalAt, `{"transcript":` + readyTranscript + `,"slots":` + readySlots +
 			`,"persona":"not-a-voice"}`, 422, "no persona 'not-a-voice'"},
 		{themeProposalAt, `{"transcript":` + readyTranscript + `,"slots":` + readySlots +
-			`,"budget":"fifty"}`, 422, "could not convert string to float: 'fifty'"},
+			`,"budget":"fifty"}`, 422, "the budget must be a number, like 250"},
 		{themeProposalAt, `{"transcript":` + readyTranscript + `,"slots":` + readySlots + `}`,
 			503, "no ANTHROPIC_API_KEY"},
 	} {
@@ -121,17 +121,66 @@ func TestTheFloorIsRefusedBeforeTheMissingKey(t *testing.T) {
 	}
 }
 
-// `float()`'s TypeError is not in the route's `except` list, so a list budget
-// is a 500 in Python. Reproduced rather than tidied into the 422 beside it: a
-// flip that changes behaviour is not a flip.
-func TestAListBudgetIsPythonsUncaughtTypeError(t *testing.T) {
+// Every way a budget can fail refuses **in one sentence**, and that sentence
+// names nothing that computes.
+//
+// This is the wart's own test, kept and inverted. `float(budget)` sat inside
+// a `try` catching `ValueError` and not `TypeError`, so a list was an
+// uncaught 500 and an unreadable string was a 422 quoting `float()` at the
+// user -- two spellings of one bad field, answered two ways, one of them
+// naming a language builtin on the screen a newcomer meets first. Ruled with
+// Aaron 2026-08-23 and fixed in both runtimes at once.
+//
+// The **grammar is deliberately unchanged**: the ruling was about what a
+// refusal says, so everything `float()` accepted before is still accepted,
+// which is what the second half of this table checks.
+func TestEveryUnreadableBudgetRefusesInOneSentence(t *testing.T) {
 	noCredential(t)
 	rig := newJobRig(t)
 	defer rig.close()
-	status, _, raw := callAs(t, rig.api, alice, "POST", themeProposalAt,
-		`{"transcript":`+readyTranscript+`,"slots":`+readySlots+`,"budget":[50]}`)
-	if status != 500 {
-		t.Errorf("a list budget answered %d, want 500: %s", status, raw)
+	body := func(budget string) string {
+		return `{"transcript":` + readyTranscript + `,"slots":` + readySlots +
+			`,"budget":` + budget + `}`
+	}
+	// Every shape `float()` refuses, however it refuses it. A list and an
+	// object raise TypeError; the rest raise ValueError. One answer.
+	for _, budget := range []string{`[50]`, `{"gbp":50}`, `"fifty"`, `"about fifty quid"`, `"$50"`} {
+		status, payload, raw := callAs(t, rig.api, alice, "POST", themeProposalAt, body(budget))
+		if status != 422 {
+			t.Errorf("budget %s answered %d, want 422: %s", budget, status, raw)
+			continue
+		}
+		detail, _ := payload["detail"].(string)
+		if detail != "the budget must be a number, like 250" {
+			t.Errorf("budget %s said %q, want the one refusal", budget, detail)
+		}
+		// Commandment 10, which is the half a status code cannot check.
+		for _, leak := range []string{"float", "TypeError", "ValueError", "convert"} {
+			if strings.Contains(detail, leak) {
+				t.Errorf("budget %s leaked %q into the client's sentence: %q", budget, leak, detail)
+			}
+		}
+	}
+	// And the grammar `float()` accepts still gets past the budget check --
+	// proved by reaching the *next* refusal, the missing key, rather than
+	// this one. `1_000` and the fullwidth digits are the cases a
+	// `strconv.ParseFloat` port would have quietly dropped.
+	for _, budget := range []string{`250`, `"250"`, `" 250.5 "`, `"1_000"`, `"２５０"`, `"inf"`, `true`} {
+		status, payload, raw := callAs(t, rig.api, alice, "POST", themeProposalAt, body(budget))
+		if status != 503 {
+			t.Errorf("budget %s answered %d, want 503 (past the budget check): %s", budget, status, raw)
+			continue
+		}
+		if detail, _ := payload["detail"].(string); !strings.Contains(detail, "ANTHROPIC") {
+			t.Errorf("budget %s did not reach the key check: %q", budget, detail)
+		}
+	}
+	// A falsy budget is **no budget**, not a bad one.
+	for _, budget := range []string{`0`, `""`, `null`, `false`, `[]`} {
+		status, _, raw := callAs(t, rig.api, alice, "POST", themeProposalAt, body(budget))
+		if status != 503 {
+			t.Errorf("falsy budget %s answered %d, want 503: %s", budget, status, raw)
+		}
 	}
 }
 
