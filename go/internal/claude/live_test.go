@@ -1,13 +1,20 @@
 package claude
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/anthropics/anthropic-sdk-go"
 
 	"github.com/aasquier/sylvan-library/go/internal/claude/tools"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -660,4 +667,92 @@ func transcriptAsAny(turns []TranscriptTurn) any {
 		out = append(out, map[string]any{"role": turn.Role, "text": turn.Text})
 	}
 	return out
+}
+
+// The camera, on the real wire (ADR 34) -- and the test is deliberately of an
+// **unreadable** picture.
+//
+// Three things no scripted server can answer. Whether Anthropic accepts the
+// vision request this code builds at all: the image block first, base64,
+// declared `image/png`, at `low` effort with a response schema attached. And
+// whether the schema comes back honoured -- two string fields and nothing
+// else, since the schema has no field for a card name and `additionalProperties`
+// is false.
+//
+// The third is the one worth spending tokens on. The picture is a plain grey
+// square with no card in it, so the correct answer is **two empty strings**,
+// and the failure mode this mode exists to prevent is a model that fills them
+// in anyway. `INSTRUCTIONS` says an unreadable field is an empty string and
+// that inventing a bottom-left block is the worst thing it can do; nothing but
+// a live call can say whether the model obeys. A synthetic card image would
+// test the model's OCR, which is not this port's business -- this tests the
+// promise.
+func TestLiveTheCameraTranscribesNothingFromNothing(t *testing.T) {
+	liveOrSkip(t)
+	// Through the mode's own `stance_for`, clamped as a deployment would --
+	// so this exercises the resolution the route uses rather than a preset
+	// looked up by hand.
+	stance, err := ScanStanceFor(nil, &Collaborator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mode, err := GetMode(ModeScan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ask, _, err := ScanMessage(greyPNG(t), "image/png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	turn, err := Converse(context.Background(), mode, Request{
+		Messages: []anthropic.MessageParam{ask},
+		Stance:   stance,
+		// No deps at all: this mode has no tools and never sees a deck, so
+		// there is no pool to lease either.
+		Deps: tools.Deps{},
+	})
+	if err != nil {
+		t.Fatalf("the camera did not answer: %v", err)
+	}
+	t.Logf("served by %s, stop %s, %d in / %d out: %s",
+		turn.Model, turn.StopReason, turn.InputTokens, turn.OutputTokens, turn.Text)
+	if turn.Refused {
+		t.Fatalf("the call was refused: %s", turn.Text)
+	}
+	// The schema, honoured: exactly two keys, both strings.
+	var read map[string]any
+	if err := json.Unmarshal([]byte(turn.Text), &read); err != nil {
+		t.Fatalf("the answer is not JSON: %v\n%s", err, turn.Text)
+	}
+	if len(read) != 2 {
+		t.Errorf("the answer has %d keys, want exactly title and corner: %v", len(read), read)
+	}
+	for _, field := range []string{"title", "corner"} {
+		if _, isString := read[field].(string); !isString {
+			t.Errorf("%s is %T, want a string", field, read[field])
+		}
+	}
+	// **And the promise**: nothing readable means nothing reported.
+	seen := ScanSighting(turn)
+	if !seen.Empty() {
+		t.Errorf("the camera transcribed %+v from a blank grey square -- the "+
+			"one thing ADR 34's instructions forbid", seen)
+	}
+}
+
+// greyPNG is a small plain image: a real PNG the API will accept, with nothing
+// in it to read.
+func greyPNG(t *testing.T) string {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 64, 90))
+	for y := range 90 {
+		for x := range 64 {
+			img.Set(x, y, color.RGBA{R: 0x88, G: 0x88, B: 0x88, A: 0xff})
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	return base64.StdEncoding.EncodeToString(buf.Bytes())
 }
