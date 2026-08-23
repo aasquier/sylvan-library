@@ -315,6 +315,15 @@ func (a *API) Routes() []Route {
 		// owner and no deck -- the absence is the contract. Deduplicated in
 		// flight on the normalised question, cached never.
 		{Method: http.MethodPost, Pattern: "/api/claude/research", Handler: a.claudeResearch},
+		// The camera's fallback tier (ADR 34): the one route in the app that
+		// receives a photograph, and a JOB whose duration is UNMEASURED --
+		// which is the reason it is a job rather than an argument that it
+		// needs to be one. Like research it takes no owner and no deck; unlike
+		// research its dedupe key is the picture itself, so two presses on one
+		// shot are one paid call. What comes back is not a card: `identify`
+		// decides that, through the same function the camera's own route
+		// calls.
+		{Method: http.MethodPost, Pattern: "/api/claude/scan", Handler: a.claudeScan},
 		// The theme interview (ADR 20), both halves, both JOBS on the NET
 		// lane and both keyed on nothing -- two turns in flight are two
 		// different conversations, which is the opposite call from research's

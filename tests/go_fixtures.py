@@ -2288,6 +2288,9 @@ def render_argue_cases() -> str:
 DOSSIER_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "dossier.json"
 RESEARCH_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "research.json"
 
+#: Where the scan corpus lands (ADR 34, the seventh mode).
+SCAN_PATH = ROOT / "go" / "internal" / "claude" / "testdata" / "scan.json"
+
 #: One instant for every stamp in the two corpora below. `generated_at` and a
 #: stored row's `created_at` are `datetime.now(UTC).isoformat()`; the Go tests
 #: freeze their clock to this same string, so a whole report compares as bytes.
@@ -4428,6 +4431,9 @@ def write() -> None:
     print(f"wrote {len(modes_payload()['modes'])} mode definitions into {MODES_PATH}")
     STANCE_PATH.parent.mkdir(parents=True, exist_ok=True)
     STANCE_PATH.write_text(render_stance_cases(), encoding="utf-8")
+    SCAN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SCAN_PATH.write_text(render_scan_cases(), encoding="utf-8")
+    print(f"wrote the camera reader's corpus into {SCAN_PATH}")
     ARGUE_PATH.parent.mkdir(parents=True, exist_ok=True)
     ARGUE_PATH.write_text(render_argue_cases(), encoding="utf-8")
     SOURCES_PATH.write_text(render_sources_cases(), encoding="utf-8")
@@ -7366,6 +7372,213 @@ def write_sim_engine() -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body, encoding="utf-8")
         print(f"wrote {what} into {path}")
+
+
+# ------------------------------------------------------- the seventh mode
+
+def scan_cases() -> dict[str, Any]:
+    """`claude/scan.py`: the camera's reader, held to Python.
+
+    Four tables, because a failure that names its table localises itself.
+
+    * `media_types` -- every label the mode is handed, accepted or refused.
+      The membership test is `media_type not in MEDIA_TYPES` over a frozenset
+      of strings, so it is **exact**: no trimming, no case folding. The
+      tolerant version is the one a port writes by reflex, so the uppercase
+      and padded spellings are here to refuse.
+    * `captures` -- what `_payload` does with a capture, and this is the
+      table that matters. `base64.b64decode(s, validate=True)` is strict, and
+      the strictness is load-bearing rather than fussy: the **default**
+      `b64decode` silently discards characters outside the alphabet, so a
+      capture carrying a stray newline would decode shorter and be sent as a
+      corrupt image instead of refused. Whether Go's `StdEncoding` draws the
+      same line is a question about two libraries, not one this port gets to
+      answer by reading, so every edge is measured -- newlines, spaces,
+      missing padding, over-padding, the URL-safe alphabet, and a non-zero
+      trailing-bit encoding that the two could plausibly disagree about.
+    * `sightings` -- a finished turn read back as the `Sighting` the pool's
+      reader already takes. Every failure is "nothing legible": a refusal,
+      unparseable text, a non-object, a non-string field, a whitespace-only
+      field. A response schema makes the middle three nearly impossible and
+      "nearly" is why the branches exist.
+    * `stances` -- `scan.stance_for`, whose default is `consultant` and not
+      `second-opinion`: this is a transcription, where volunteering is the
+      failure mode rather than the feature.
+
+    One row is a **wart** and is labelled: a capture that is neither a string
+    nor bytes reaches `len()` and raises an uncaught `TypeError`, which is a
+    500 for a plainly malformed request. It is the theme proposal's budget bug
+    in a second module, and unlike that one it is not yet ruled.
+    """
+    import base64 as b64
+
+    from mtglab.claude import modes as modes_mod
+    from mtglab.claude import scan
+    from mtglab.claude import stance as stance_mod
+
+    good = b64.b64encode(b"\x89PNG\r\n\x1a\n" + b"x" * 40).decode()
+
+    media_types = []
+    for label in ["image/jpeg", "image/png", "image/webp", "image/gif",
+                  "image/tiff", "image/jpg", "IMAGE/JPEG", "Image/Png",
+                  " image/jpeg ", "image/jpeg;charset=utf-8", "jpeg", "",
+                  "image/jpeg\n", "image/svg+xml", "application/pdf"]:
+        row: dict[str, Any] = {"media_type": label}
+        try:
+            scan.message(good, label)
+            row["ok"] = True
+        except scan.ScanRefused as exc:
+            row["ok"] = False
+            row["error"] = str(exc)
+        media_types.append(row)
+
+    captures: list[dict[str, Any]] = []
+    for note, image in [
+        ("a real capture", good),
+        ("the shortest legal capture", b64.b64encode(b"x").decode()),
+        ("two bytes", b64.b64encode(b"xy").decode()),
+        ("three bytes, no padding needed", b64.b64encode(b"xyz").decode()),
+        ("empty string", ""),
+        ("base64 of a single space", b64.b64encode(b" ").decode()),
+        ("not base64 at all", "!!!!"),
+        ("a newline inside", good[:8] + "\n" + good[8:]),
+        ("a space inside", good[:8] + " " + good[8:]),
+        ("a trailing newline", good + "\n"),
+        ("unpadded", "YWJjZA"),
+        ("over-padded", "YWJjZA==="),
+        ("one padding char where two are needed", "YWJjZA="),
+        ("the url-safe alphabet", "-_-_"),
+        ("a non-zero trailing bit", "YW=="),
+        ("lone padding", "="),
+        ("only padding", "===="),
+        ("a unicode digit that is not base64", "YWJ０"),
+        ("a nul byte in the string", "YWJj\x00"),
+    ]:
+        row = {"note": note, "image": image}
+        try:
+            message = scan.message(image, "image/jpeg")
+            row["data"] = message["content"][0]["source"]["data"]
+        except scan.ScanRefused as exc:
+            row["error"] = str(exc)
+        captures.append(row)
+
+    # The size gate, at the three points that matter. Recorded by LENGTH
+    # rather than by payload: a 4MB base64 string in a corpus would be 5.6MB
+    # of JSON for one assertion.
+    sizes: list[dict[str, Any]] = []
+    for note, size in [("one under the cap", scan.MAX_BYTES - 1),
+                       ("exactly the cap", scan.MAX_BYTES),
+                       ("one over the cap", scan.MAX_BYTES + 1),
+                       ("well over the cap", scan.MAX_BYTES * 2)]:
+        row = {"note": note, "bytes": size}
+        try:
+            scan.message(b"x" * size, "image/jpeg")
+            row["ok"] = True
+        except scan.ScanRefused as exc:
+            row["ok"] = False
+            row["error"] = str(exc)
+        sizes.append(row)
+
+    sightings = []
+    for note, refused, text in [
+        ("both fields", False, '{"title":"Birds of Paradise","corner":"196/302 R\\nDOM \\u2022 EN"}'),
+        ("a title only", False, '{"title":"Bayou","corner":""}'),
+        ("a corner only", False, '{"title":"","corner":"63/249 M"}'),
+        ("neither", False, '{"title":"","corner":""}'),
+        ("both whitespace", False, '{"title":"   ","corner":"\\t\\n"}'),
+        ("padded values are stripped", False, '{"title":"  Bayou  ","corner":" X "}'),
+        ("a non-breaking space is whitespace to str.strip", False,
+         '{"title":"\\u00a0","corner":"\\u2028"}'),
+        # **The four information separators**, U+001C-U+001F: whitespace to
+        # Python's `str.strip()` and NOT to Go's `unicode.IsSpace`, which is
+        # the one place `strings.TrimSpace` and `str.strip()` part company
+        # below U+0021. Without this row a port that reached for TrimSpace
+        # passes the whole corpus -- measured, after that mutation survived.
+        ("the information separators are whitespace to str.strip only", False,
+         '{"title":"\\u001cBayou\\u001f","corner":"\\u001d\\u001e"}'),
+        ("a refused turn", True, '{"title":"Bayou","corner":"X"}'),
+        ("empty text", False, ""),
+        ("not json", False, "sorry, I could not read that"),
+        ("truncated json", False, '{"title":"Bay'),
+        ("a list, not an object", False, '["Bayou"]'),
+        ("a bare string", False, '"Bayou"'),
+        ("null", False, "null"),
+        ("a number where a string belongs", False, '{"title":7,"corner":"X"}'),
+        ("a null field", False, '{"title":null,"corner":"X"}'),
+        ("a list field", False, '{"title":["Bayou"],"corner":"X"}'),
+        ("an extra field is ignored", False, '{"title":"Bayou","corner":"X","name":"Bayou"}'),
+    ]:
+        turn = modes_mod.Turn(mode="scan", model="m", stop_reason="end_turn",
+                              text=text, tool_calls=[], input_tokens=0,
+                              output_tokens=0, refused=refused)
+        sightings.append({"note": note, "refused": refused, "text": text,
+                          "sighting": scan.sighting(turn)})
+
+    stances = []
+    for note, requested, ceiling in [
+        ("nothing asked for is consultant, never off", None, None),
+        ("nothing asked for, under a ceiling", None, "off"),
+        ("a preset", "second-opinion", None),
+        ("a preset over the ceiling", "collaborator", "consultant"),
+        ("off is reachable", "off", None),
+        ("a malformed stance", {"initiative": 7}, None),
+        ("a stance that is not a stance", 7, None),
+    ]:
+        saved = os.environ.pop("MTGLAB_CLAUDE_STANCE_CEILING", None)
+        if ceiling:
+            os.environ["MTGLAB_CLAUDE_STANCE_CEILING"] = ceiling
+        try:
+            row = {"note": note, "requested": requested, "ceiling": ceiling}
+            try:
+                row["stance"] = stance_mod.describe(scan.stance_for(requested))
+            except ValueError as exc:
+                row["error"] = str(exc)
+            stances.append(row)
+        finally:
+            os.environ.pop("MTGLAB_CLAUDE_STANCE_CEILING", None)
+            if saved is not None:
+                os.environ["MTGLAB_CLAUDE_STANCE_CEILING"] = saved
+
+    return {
+        "max_bytes": scan.MAX_BYTES,
+        "default_preset": scan.DEFAULT_PRESET,
+        "media_types": sorted(scan.MEDIA_TYPES),
+        "media_type_cases": media_types,
+        "captures": captures,
+        "sizes": sizes,
+        "sightings": sightings,
+        "stances": stances,
+        # The ask that rides beside the picture, and the ORDER of the two
+        # blocks: the image goes first, which is the documented ordering for
+        # vision requests and the order the instruction reads in.
+        "message": _scan_message_shape(),
+    }
+
+
+def _scan_message_shape() -> dict[str, Any]:
+    """The one user message, as a shape rather than as bytes.
+
+    The image's own `data` is dropped: it is 64 characters of test PNG and
+    carries nothing, while its *position* is the claim being made.
+    """
+    import base64 as b64
+
+    from mtglab.claude import scan
+
+    message = scan.message(b64.b64encode(b"x" * 12).decode(), "image/webp")
+    blocks = []
+    for block in message["content"]:
+        if block["type"] == "image":
+            blocks.append({"type": "image",
+                           "source_type": block["source"]["type"],
+                           "media_type": block["source"]["media_type"]})
+        else:
+            blocks.append({"type": block["type"], "text": block["text"]})
+    return {"role": message["role"], "blocks": blocks}
+
+
+def render_scan_cases() -> str:
+    return _rows_json(scan_cases()) + "\n"
 
 
 if __name__ == "__main__":

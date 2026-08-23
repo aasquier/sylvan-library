@@ -57,6 +57,12 @@ import (
 // Numbers rely on `Turn.Parsed` decoding with UseNumber: `json.Number` keeps
 // the literal, so "3" and "3.0" stay distinguishable exactly as Python's int
 // and float do.
+// Exported as PyStr for `internal/api`, which needs the same rendering at the
+// route boundary: `str(payload.get("media_type") or "image/jpeg")` turns a
+// list into "['a']" and refuses it by name. The api package's own `str` helper
+// stops at `fmt.Sprint`, which renders that list as "[a]".
+func PyStr(v any) string { return pyStr(v) }
+
 func pyStr(v any) string {
 	switch value := v.(type) {
 	case nil:

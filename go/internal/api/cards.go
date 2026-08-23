@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -98,6 +99,98 @@ type identifyReading struct {
 	Candidates []identifyCandidate `json:"candidates"`
 }
 
+// identifyAnswer is what `service.identify_cards` returns: the readings and
+// the four counts, in Python's key order.
+type identifyAnswer struct {
+	Readings []identifyReading `json:"readings"`
+	Resolved int               `json:"resolved"`
+	Offered  int               `json:"offered"`
+	Unread   int               `json:"unread"`
+	Dropped  int               `json:"dropped"`
+}
+
+// identifyAgainst is the body of `service.identify_cards`, lifted out of the
+// handler because **two callers need it and neither is the other's parent**:
+// the camera's own route, and the scan job, which resolves what Claude
+// transcribed through exactly this door (ADR 34).
+//
+// That is Python's shape too -- `scanruns` calls `service.identify_cards`, the
+// same function the route calls -- and it is the whole architecture in one
+// line: a card read by Claude gets the same scrutiny as a card read by
+// Tesseract, because it goes through the same code rather than through code
+// that merely looks like it. A corner resolves only if its set code is one of
+// the pool's real 986; a title only ever offers a shortlist.
+//
+// `resolved` and `offered` are counted apart deliberately: only a corner
+// lookup resolves, and a title is a shortlist somebody still has to choose
+// from, so adding them would report work as finished that nobody has done.
+func identifyAgainst(ctx context.Context, c *pool.Conn, sightings []cards.Sighting) (identifyAnswer, error) {
+	out := identifyAnswer{Readings: []identifyReading{}}
+	readings, err := cards.Read(ctx, c, sightings)
+	if err != nil {
+		return out, err
+	}
+	wanted := map[string]bool{}
+	for _, rd := range readings {
+		if rd.Resolved != "" {
+			wanted[rd.Resolved] = true
+		}
+		for _, cand := range rd.Candidates {
+			wanted[cand.Name] = true
+		}
+	}
+	names := make([]string, 0, len(wanted))
+	for n := range wanted {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	records, err := c.GetCards(ctx, names)
+	if err != nil {
+		return out, err
+	}
+	for _, rd := range readings {
+		var resolved *identifiedCard
+		if rd.Resolved != "" {
+			if rec := records[rd.Resolved]; rec != nil {
+				resolved = identified(rec)
+			} else {
+				out.Dropped++
+			}
+		}
+		candidates := []identifyCandidate{}
+		for _, cand := range rd.Candidates {
+			rec := records[cand.Name]
+			if rec == nil {
+				out.Dropped++
+				continue
+			}
+			candidates = append(candidates, identifyCandidate{
+				identifiedCard: *identified(rec), Score: math.Round(cand.Score*10000) / 10000})
+		}
+		// Recomputed rather than passed through: a reading whose names all
+		// dropped is a reading of nothing, whichever tier found them.
+		via := "nothing"
+		switch {
+		case resolved != nil:
+			via = "printing"
+		case len(candidates) > 0:
+			via = "title"
+		}
+		out.Readings = append(out.Readings, identifyReading{Via: via, Resolved: resolved, Candidates: candidates})
+	}
+	for _, rd := range out.Readings {
+		switch {
+		case rd.Resolved != nil:
+			out.Resolved++
+		case len(rd.Candidates) > 0:
+			out.Offered++
+		default:
+			out.Unread++
+		}
+	}
+	return out, nil
+}
+
 // identify is `POST /api/cards/identify` -- `service.identify_cards`, the
 // serving half of the camera reader: hydration, and the counts, with
 // `resolved` and `offered` counted apart because only a corner lookup
@@ -128,78 +221,11 @@ func (a *API) identify(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	type answer struct {
-		Readings []identifyReading `json:"readings"`
-		Resolved int               `json:"resolved"`
-		Offered  int               `json:"offered"`
-		Unread   int               `json:"unread"`
-		Dropped  int               `json:"dropped"`
-	}
-	out := answer{Readings: []identifyReading{}}
+	var out identifyAnswer
 	err := a.usePool(r.Context(), func(c *pool.Conn) error {
-		readings, err := cards.Read(r.Context(), c, sightings)
-		if err != nil {
-			return err
-		}
-		wanted := map[string]bool{}
-		for _, rd := range readings {
-			if rd.Resolved != "" {
-				wanted[rd.Resolved] = true
-			}
-			for _, cand := range rd.Candidates {
-				wanted[cand.Name] = true
-			}
-		}
-		names := make([]string, 0, len(wanted))
-		for n := range wanted {
-			names = append(names, n)
-		}
-		sort.Strings(names)
-		records, err := c.GetCards(r.Context(), names)
-		if err != nil {
-			return err
-		}
-		for _, rd := range readings {
-			var resolved *identifiedCard
-			if rd.Resolved != "" {
-				if rec := records[rd.Resolved]; rec != nil {
-					resolved = identified(rec)
-				} else {
-					out.Dropped++
-				}
-			}
-			candidates := []identifyCandidate{}
-			for _, cand := range rd.Candidates {
-				rec := records[cand.Name]
-				if rec == nil {
-					out.Dropped++
-					continue
-				}
-				candidates = append(candidates, identifyCandidate{
-					identifiedCard: *identified(rec), Score: math.Round(cand.Score*10000) / 10000})
-			}
-			// Recomputed rather than passed through: a reading whose names all
-			// dropped is a reading of nothing, whichever tier found them.
-			via := "nothing"
-			switch {
-			case resolved != nil:
-				via = "printing"
-			case len(candidates) > 0:
-				via = "title"
-			}
-			out.Readings = append(out.Readings, identifyReading{Via: via, Resolved: resolved, Candidates: candidates})
-		}
-		for _, rd := range out.Readings {
-			switch {
-			case rd.Resolved != nil:
-				out.Resolved++
-			case len(rd.Candidates) > 0:
-				out.Offered++
-			default:
-				out.Unread++
-			}
-		}
-		return nil
+		var readErr error
+		out, readErr = identifyAgainst(r.Context(), c, sightings)
+		return readErr
 	})
 	if errors.Is(err, pool.ErrNoPool) {
 		wire.JSON(w, http.StatusOK, map[string]any{"readings": []any{}, "resolved": 0, "offered": 0,
