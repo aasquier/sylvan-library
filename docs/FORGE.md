@@ -122,6 +122,40 @@ the same `SimRun` a local run returns — `sim/tier3/wire.py` is the seam, and
 (the image holds GPL'd Forge and is pushed only to the app's private
 registry — deployment, never distribution).
 
+**Since Phase 7 of the Go migration (2026-08-23) the worker runs `mtglab
+forge-shim`**, a subcommand of the same binary the app's front door is, so
+the image carries no interpreter at all. `shim.py` is still the CLI's local
+path and still the reference the Go side is held to.
+
+### Testing deploy skew on purpose
+
+Every release updates the app **before** the worker, by several minutes and
+deliberately: the app deploy is proven first, so a red worker sync is
+feedback about the worker rather than a rollback of the app. That leaves a
+real window in which the app talks to the *previous* image's shim, and on the
+release that flipped this package the previous image was Python's.
+
+That window opened on v195 and closed about a minute before the gate match
+started — and it can never open that way again, because both images carry the
+Go shim now. **The case is permanent even though the opportunity was not**,
+so it is tested here rather than waited for. With a distribution present:
+
+```bash
+MTGLAB_FORGE_HOME=~/.local/share/mtglab/forge \
+MTGLAB_FORGE_SHIM_PORT=8899 MTGLAB_FORGE_IDLE_SECONDS=0 \
+  python -m mtglab.sim.tier3.shim &
+
+cd go && MTGLAB_LIVE_FORGE=1 MTGLAB_PYTHON_SHIM_URL=http://127.0.0.1:8899 \
+  go test ./cmd/... -run PythonShim -v
+```
+
+The Go worker client then drives the Python shim through a real match. Five
+deliberate wire renames die against it — and the first version of that test
+survived two of them, because it asserted the seats map and a duration while
+a row whose every value is nil still decodes. The assertions follow what the
+app actually does with a game now: resolve its seat to a deck, and put a
+number on the screen.
+
 ## Reading the results
 
 `CLAUDE.md` says it and it is worth repeating here: **report per archetype,

@@ -316,3 +316,143 @@ func TestTheGoShimPlaysARealMatchForTheGoClient(t *testing.T) {
 // bigOf is the seed as the engine carries it: Python's integers are unbounded
 // and the seed is echoed back, so it travels as a big.Int rather than an int64.
 func bigOf(n int64) *big.Int { return big.NewInt(n) }
+
+// TestTheGoClientUnderstandsAPythonShim is deploy skew, tested rather than
+// watched.
+//
+// **Every release updates the app before the worker**, by several minutes and
+// on purpose (the app deploy is proven first, so a red worker sync is feedback
+// about the worker rather than a rollback of the app). So there is a real
+// window in which the Go route talks to the shim from the *previous* image —
+// and on the release that flipped this package, that previous image was
+// Python's. `wire.go` and `wire.py` are written for exactly that gap; nothing
+// had ever exercised it.
+//
+// It was not caught in production: the window opened on v195 and closed about
+// a minute before the gate match started, and it can never open that way again
+// — both images carry the Go shim now. Which is the argument for testing it
+// here instead of hoping for a deploy: **the case is permanent even though the
+// opportunity was not.**
+//
+// Point `MTGLAB_PYTHON_SHIM_URL` at a running `python -m
+// mtglab.sim.tier3.shim` (see `docs/FORGE.md`), with `MTGLAB_LIVE_FORGE=1` and
+// a distribution present:
+//
+//	MTGLAB_FORGE_HOME=~/.local/share/mtglab/forge \
+//	MTGLAB_FORGE_SHIM_PORT=8899 MTGLAB_FORGE_IDLE_SECONDS=0 \
+//	  python -m mtglab.sim.tier3.shim &
+//	MTGLAB_LIVE_FORGE=1 MTGLAB_PYTHON_SHIM_URL=http://127.0.0.1:8899 \
+//	  go test ./cmd/... -run PythonShim -v
+func TestTheGoClientUnderstandsAPythonShim(t *testing.T) {
+	if os.Getenv("MTGLAB_LIVE_FORGE") != "1" {
+		t.Skip("set MTGLAB_LIVE_FORGE=1 to run a real Forge match")
+	}
+	url := os.Getenv("MTGLAB_PYTHON_SHIM_URL")
+	if url == "" {
+		t.Skip("set MTGLAB_PYTHON_SHIM_URL to a running `python -m mtglab.sim.tier3.shim`")
+	}
+	t.Setenv("MTGLAB_FORGE_WORKER_URL", url)
+
+	var decks []*deck.Deck
+	for _, name := range []string{"mono-green-clean", "kaheera"} {
+		raw, err := os.ReadFile(filepath.Join("..", "..", "internal", "gate", "testdata", name+".yaml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		d, err := deck.FromText(string(raw), name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		decks = append(decks, d)
+	}
+
+	worker := &tier3.Worker{Boot: 30 * time.Second, Sleep: func(d time.Duration) { time.Sleep(d) }}
+
+	// The pre-flight: reports computed by Python's coverage, decoded by Go's.
+	reports, err := worker.CheckCoverage(t.Context(), decks)
+	if err != nil {
+		t.Fatalf("the Python shim's pre-flight did not cross: %v", err)
+	}
+	if len(reports) != 2 {
+		t.Fatalf("the shim sent %d reports, want 2", len(reports))
+	}
+	for _, r := range reports {
+		if !r.OK() {
+			t.Fatalf("%s", r.Summary())
+		}
+		// `resolved` is the field `wire.go` deliberately does not order. It
+		// must still arrive with its VALUES intact, which is the half that
+		// matters across the gap.
+		if len(r.Resolved) == 0 {
+			t.Errorf("%s crossed with an empty resolved map", r.Slug)
+		}
+	}
+
+	var ticks []int
+	seated := 0
+	seed := int64(7)
+	run, err := worker.RunMatch(t.Context(), decks, 2, 300, bigOf(seed),
+		func(finished int, game *tier3.GameResult) {
+			ticks = append(ticks, finished)
+			if game != nil {
+				seated++
+			}
+		})
+	if err != nil {
+		t.Fatalf("the Python shim's match did not cross: %v", err)
+	}
+	t.Logf("across the skew: %d games in %.1fs, Forge %s, seats %v",
+		len(run.Games()), run.WallSeconds, run.ForgeVersion, run.Seats)
+
+	// Everything the app needs from a match has to survive Python's encoder
+	// and Go's decoder: the games, the per-game ticks with their rows (the
+	// match theater), the seats that name a winner, and the version the
+	// ledger records.
+	if len(run.Games()) != 2 {
+		t.Fatalf("the shim played %d games, want 2", len(run.Games()))
+	}
+	if len(ticks) != 2 || seated != 2 {
+		t.Errorf("ticked %v with %d rows seated, want two of each", ticks, seated)
+	}
+	if run.Seats[1] != decks[0].Slug || run.Seats[2] != decks[1].Slug {
+		t.Errorf("the seats did not cross: %v", run.Seats)
+	}
+	if run.ForgeVersion == "" {
+		t.Error("the version did not cross; the ledger would record 'not reported'")
+	}
+
+	// **Every field the app reads off a game, not just the ones that are hard
+	// to lose.** The first version of this test asserted the seats map and a
+	// non-zero duration, and a mutation run walked a renamed `winner_seat`
+	// straight through it: the seats map is a different field, and a row whose
+	// every value is nil still decodes. So the assertions follow what the app
+	// does with a game — resolve its seat to a deck, and put a number on the
+	// screen.
+	named := 0
+	for _, g := range run.Games() {
+		if g.Milliseconds == 0 {
+			t.Errorf("game %d crossed with no duration: %+v", g.Index, g)
+		}
+		if g.Index == 0 {
+			t.Errorf("a game crossed with no index: %+v", g)
+		}
+		switch {
+		case g.Draw || g.TimedOut:
+			// A draw names nobody, which is a fact rather than a loss.
+		case g.WinnerSeat == nil:
+			t.Errorf("game %d crossed with no winner seat: %+v", g.Index, g)
+		case run.WinnerSlug(g) == "":
+			t.Errorf("game %d names seat %d, which no deck answers to",
+				g.Index, *g.WinnerSeat)
+		default:
+			named++
+		}
+		if g.Winner == nil && !g.Draw {
+			t.Errorf("game %d crossed with no winner label: %+v", g.Index, g)
+		}
+	}
+	if named == 0 {
+		t.Error("not one game crossed with a winner this run can name — " +
+			"the whole result would render as a table of blanks")
+	}
+}
