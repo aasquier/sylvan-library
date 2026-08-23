@@ -27,6 +27,7 @@ func main() {
 	root.AddCommand(dataCommand())
 	root.AddCommand(usersCommand())
 	root.AddCommand(decksCommand())
+	root.AddCommand(simCommand())
 	root.AddCommand(cardsCommand())
 	root.AddCommand(claudeCommand())
 	if err := root.Execute(); err != nil {
