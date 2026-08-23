@@ -1,0 +1,238 @@
+[
+ {
+  "name": "empty",
+  "now": "2026-08-23T12:00:00+00:00",
+  "rows": [],
+  "rendered": "{\"days\":[],\"top_routes\":[]}"
+ },
+ {
+  "name": "a fortnight",
+  "now": "2026-08-23T12:00:00+00:00",
+  "rows": [
+   {
+    "day": "2026-08-10",
+    "route": "/api/health",
+    "status_class": "2xx",
+    "count": 240
+   },
+   {
+    "day": "2026-08-10",
+    "route": "/api/decks",
+    "status_class": "2xx",
+    "count": 31
+   },
+   {
+    "day": "2026-08-10",
+    "route": "(unrouted)",
+    "status_class": "4xx",
+    "count": 17
+   },
+   {
+    "day": "2026-08-11",
+    "route": "/api/health",
+    "status_class": "2xx",
+    "count": 260
+   },
+   {
+    "day": "2026-08-11",
+    "route": "/{full_path}",
+    "status_class": "2xx",
+    "count": 12
+   },
+   {
+    "day": "2026-08-11",
+    "route": "/api/sim/mana",
+    "status_class": "5xx",
+    "count": 2
+   },
+   {
+    "day": "2026-08-12",
+    "route": "/api/health",
+    "status_class": "3xx",
+    "count": 4
+   },
+   {
+    "day": "2026-06-01",
+    "route": "/api/health",
+    "status_class": "2xx",
+    "count": 999
+   }
+  ],
+  "rendered": "{\"days\":[{\"day\":\"2026-08-10\",\"total\":288,\"2xx\":271,\"4xx\":17,\"5xx\":0},{\"day\":\"2026-08-11\",\"total\":274,\"2xx\":272,\"4xx\":0,\"5xx\":2},{\"day\":\"2026-08-12\",\"total\":4,\"2xx\":0,\"4xx\":0,\"5xx\":0,\"3xx\":4}],\"top_routes\":[{\"route\":\"/api/health\",\"count\":504},{\"route\":\"/api/decks\",\"count\":31},{\"route\":\"(unrouted)\",\"count\":17},{\"route\":\"/{full_path}\",\"count\":12},{\"route\":\"/api/sim/mana\",\"count\":2}]}"
+ },
+ {
+  "name": "top routes truncate at twelve",
+  "now": "2026-08-23T12:00:00+00:00",
+  "rows": [
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/0",
+    "status_class": "2xx",
+    "count": 0
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/1",
+    "status_class": "2xx",
+    "count": 1
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/2",
+    "status_class": "2xx",
+    "count": 2
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/3",
+    "status_class": "2xx",
+    "count": 3
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/4",
+    "status_class": "2xx",
+    "count": 4
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/5",
+    "status_class": "2xx",
+    "count": 5
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/6",
+    "status_class": "2xx",
+    "count": 6
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/7",
+    "status_class": "2xx",
+    "count": 7
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/8",
+    "status_class": "2xx",
+    "count": 8
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/9",
+    "status_class": "2xx",
+    "count": 9
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/10",
+    "status_class": "2xx",
+    "count": 10
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/11",
+    "status_class": "2xx",
+    "count": 11
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/12",
+    "status_class": "2xx",
+    "count": 12
+   },
+   {
+    "day": "2026-08-20",
+    "route": "/api/route/13",
+    "status_class": "2xx",
+    "count": 13
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/0",
+    "status_class": "2xx",
+    "count": 1
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/1",
+    "status_class": "2xx",
+    "count": 2
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/2",
+    "status_class": "2xx",
+    "count": 3
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/3",
+    "status_class": "2xx",
+    "count": 4
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/4",
+    "status_class": "2xx",
+    "count": 5
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/5",
+    "status_class": "2xx",
+    "count": 6
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/6",
+    "status_class": "2xx",
+    "count": 7
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/7",
+    "status_class": "2xx",
+    "count": 8
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/8",
+    "status_class": "2xx",
+    "count": 9
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/9",
+    "status_class": "2xx",
+    "count": 10
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/10",
+    "status_class": "2xx",
+    "count": 11
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/11",
+    "status_class": "2xx",
+    "count": 12
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/12",
+    "status_class": "2xx",
+    "count": 13
+   },
+   {
+    "day": "2026-08-21",
+    "route": "/api/route/13",
+    "status_class": "2xx",
+    "count": 14
+   }
+  ],
+  "rendered": "{\"days\":[{\"day\":\"2026-08-20\",\"total\":91,\"2xx\":91,\"4xx\":0,\"5xx\":0},{\"day\":\"2026-08-21\",\"total\":105,\"2xx\":105,\"4xx\":0,\"5xx\":0}],\"top_routes\":[{\"route\":\"/api/route/13\",\"count\":27},{\"route\":\"/api/route/12\",\"count\":25},{\"route\":\"/api/route/11\",\"count\":23},{\"route\":\"/api/route/10\",\"count\":21},{\"route\":\"/api/route/9\",\"count\":19},{\"route\":\"/api/route/8\",\"count\":17},{\"route\":\"/api/route/7\",\"count\":15},{\"route\":\"/api/route/6\",\"count\":13},{\"route\":\"/api/route/5\",\"count\":11},{\"route\":\"/api/route/4\",\"count\":9},{\"route\":\"/api/route/3\",\"count\":7},{\"route\":\"/api/route/2\",\"count\":5}]}"
+ }
+]

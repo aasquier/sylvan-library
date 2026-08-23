@@ -134,6 +134,8 @@ _ORACLES = [
     ("CPython's str() and repr()", "PYSTR_PATH", "render_pystr_cases"),
     ("the Wheel's spins", "WHEEL_PATH", "render_wheel_cases"),
     ("the upcoming-sets feed", "SETS_PATH", "render_sets_cases"),
+    ("the price table", "PRICES_PATH", "render_prices_cases"),
+    ("the visitor ledger's roll-up", "TRAFFIC_PATH", "render_traffic_cases"),
     # `DIGITS_PATH` is deliberately NOT here: it is the one oracle in this
     # file whose fresh render legitimately differs between the two supported
     # interpreters, so exact equality is the wrong rule. See

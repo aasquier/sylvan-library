@@ -159,12 +159,14 @@ func capture(seg, part string) (string, string, bool) {
 	return name, strings.TrimSuffix(part, suffix), true
 }
 
-// match finds the handler for r, setting its path values, or reports that
-// the request is not the door's to answer.
-func (t *routeTable) match(r *http.Request) (http.Handler, bool) {
+// match finds the handler for r, setting its path values — and names the
+// pattern that matched, which is the route TEMPLATE the visitor ledger
+// records (never the concrete path: a path can carry a slug and a slug can
+// carry a person) — or reports that the request is not the door's to answer.
+func (t *routeTable) match(r *http.Request) (http.Handler, string, bool) {
 	raw := r.URL.Path
 	if r.URL.RawPath != "" || raw != NormalisePath(raw) || t.reserved[raw] {
-		return nil, false
+		return nil, "", false
 	}
 	parts := strings.Split(strings.TrimPrefix(raw, "/"), "/")
 	for _, c := range t.routes {
@@ -194,9 +196,9 @@ func (t *routeTable) match(r *http.Request) (http.Handler, bool) {
 		for name, value := range values {
 			r.SetPathValue(name, value)
 		}
-		return c.handler, true
+		return c.handler, c.pattern, true
 	}
-	return nil, false
+	return nil, "", false
 }
 
 // Patterns is every ported route as `METHOD /path/{template}`, for tests

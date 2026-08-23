@@ -101,6 +101,7 @@ func serve(host, port, upstream, webDist, tarot string, child []string) error {
 		// The pool, on a lease: opened at the first ask, handed back when
 		// idle, re-opened when `data refresh` replaces the file.
 		Pool:        pool.New(config.DBPath(), log),
+		PoolPath:    config.DBPath(),
 		DecksDir:    config.DecksDir(),
 		ScryfallDir: config.ScryfallDir(),
 		DataDir:     config.DataDir(),

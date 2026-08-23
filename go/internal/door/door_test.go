@@ -2,6 +2,7 @@ package door
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/api"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
 	"github.com/aasquier/sylvan-library/go/internal/reference"
 	"github.com/aasquier/sylvan-library/go/internal/routes"
 )
@@ -286,15 +288,16 @@ func TestWithAuthOffNothingIsRefused(t *testing.T) {
 
 func TestTheProxyPassesTheRequestThroughFaithfully(t *testing.T) {
 	srv := build(t, true, fakeResolver{})
-	// A body-carrying method on a path Python still owns. It was `.../swap`
-	// until Phase 4 flipped the writes, `.../interview` until Phase 6 flipped
-	// the first Claude surface, and `.../wheel` until Phase 8's first route
-	// batch; each move is the test noticing a flip rather than the test being
-	// fragile. What it needs is segments, a query and a body, and the
-	// upstream here is an echo server -- so the path only has to be unported,
-	// never a route the real Python would accept this method on. The account
-	// delete is the pick now: the last Python literal that takes a payload.
-	req, _ := http.NewRequest("DELETE", srv.URL+"/api/admin/users/doomed?dry=1&q=a%20b", strings.NewReader(`{"x":1}`))
+	// A body-carrying method on a path the door hands to the upstream. It
+	// was `.../swap` until Phase 4 flipped the writes, `.../interview` until
+	// Phase 6, `.../wheel` until Phase 8's first batch and the account
+	// delete until its second — each move the test noticing a flip. With no
+	// canonical path left to proxy, the probe is a NON-CANONICAL one: a
+	// trailing slash goes to the upstream as it arrived (`routes.go`'s rule),
+	// and that stays true until retirement removes the proxy and this test
+	// with it. What it needs is segments, a query and a body; the upstream
+	// is an echo server, so the shape is the test, not the route.
+	req, _ := http.NewRequest("DELETE", srv.URL+"/api/admin/users/doomed/?dry=1&q=a%20b", strings.NewReader(`{"x":1}`))
 	req.AddCookie(&http.Cookie{Name: CookieName, Value: "alice"})
 	req.Header.Set("X-Forwarded-For", "1.2.3.4") // a client picking its own bucket
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -308,7 +311,7 @@ func TestTheProxyPassesTheRequestThroughFaithfully(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&echo); err != nil {
 		t.Fatal(err)
 	}
-	if echo["path"] != "/api/admin/users/doomed" || echo["query"] != "dry=1&q=a%20b" ||
+	if echo["path"] != "/api/admin/users/doomed/" || echo["query"] != "dry=1&q=a%20b" ||
 		echo["method"] != "DELETE" || echo["body"] != `{"x":1}` {
 		t.Fatalf("the upstream saw %v", echo)
 	}
@@ -352,9 +355,10 @@ func TestAnUpstreamThatIsDownIsA502InTheEnvelope(t *testing.T) {
 	}
 	srv := httptest.NewServer(d.Handler())
 	defer srv.Close()
-	// `/api/health` was the probe until Phase 8's first route batch made it
-	// the door's own; the stats family is the last still proxied.
-	resp := get(t, srv, "GET", "/api/admin/stats/system", "")
+	// `/api/health` was the probe until Phase 8's first route batch, the
+	// stats family until its second; with nothing canonical left to proxy,
+	// a doubled slash is what still reaches the upstream.
+	resp := get(t, srv, "GET", "//api/decks", "")
 	if resp.StatusCode != 502 {
 		t.Fatalf("a dead upstream answered %d", resp.StatusCode)
 	}
@@ -608,10 +612,11 @@ func TestOnlyACanonicalRequestIsTheDoors(t *testing.T) {
 		// every surface default it asks for had crossed.
 		// `/api/forge` is **not** among them any more either: it flipped with
 		// Tier 3 in Phase 7, and with it the last job-submitting family.
-		// And the wheel, the health check and the upcoming sets flipped with
-		// Phase 8's first route batch, so the last Python-owned literals are
-		// the admin family: the stats six and the account delete.
-		{"GET", "/api/admin/stats/system"},
+		// And with Phase 8's two route batches — the app's last three, then
+		// the admin family — **no canonical path is Python's at all**: the
+		// non-canonical forms above are the whole of what still proxies,
+		// until retirement replaces the fall-through with the router's own
+		// 404 and 405.
 	}
 	for _, c := range proxied {
 		resp := get(t, srv, c.method, c.path, "alice")
@@ -676,7 +681,7 @@ func TestTheRouteTableChoosesTheMostSpecificPattern(t *testing.T) {
 	}
 	for path, want := range map[string]string{"/api/colors/progress": "literal", "/api/colors/G": "template"} {
 		req := httptest.NewRequest("GET", path, nil)
-		h, ok := table.match(req)
+		h, _, ok := table.match(req)
 		if !ok {
 			t.Fatalf("%s: no match", path)
 		}
@@ -721,10 +726,10 @@ func TestTheRouteTableChoosesTheMostSpecificPattern(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := reserved.match(httptest.NewRequest("GET", "/api/colors/progress", nil)); ok {
+	if _, _, ok := reserved.match(httptest.NewRequest("GET", "/api/colors/progress", nil)); ok {
 		t.Fatal("a reserved path was answered by the door")
 	}
-	if _, ok := reserved.match(httptest.NewRequest("GET", "/api/colors/G", nil)); !ok {
+	if _, _, ok := reserved.match(httptest.NewRequest("GET", "/api/colors/G", nil)); !ok {
 		t.Fatal("the template stopped matching beside a reservation")
 	}
 }
@@ -739,7 +744,7 @@ func TestPathValuesReachTheHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest("GET", "/api/decks/local/mono-green/validate", nil)
-	h, ok := table.match(req)
+	h, _, ok := table.match(req)
 	if !ok {
 		t.Fatal("no match")
 	}
@@ -749,7 +754,7 @@ func TestPathValuesReachTheHandler(t *testing.T) {
 	}
 	for _, miss := range []string{"/api/decks/local/mono-green", "/api/decks/local/mono-green/validate/",
 		"/api/decks/local//validate", "/api/decks/local/mono-green/stats"} {
-		if _, ok := table.match(httptest.NewRequest("GET", miss, nil)); ok {
+		if _, _, ok := table.match(httptest.NewRequest("GET", miss, nil)); ok {
 			t.Errorf("%s matched", miss)
 		}
 	}
@@ -761,7 +766,7 @@ func TestPathValuesReachTheHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 	req = httptest.NewRequest("GET", "/api/symbols/W.svg", nil)
-	if h, ok := suffixed.match(req); !ok {
+	if h, _, ok := suffixed.match(req); !ok {
 		t.Fatal("W.svg did not match")
 	} else {
 		h.ServeHTTP(httptest.NewRecorder(), req)
@@ -770,7 +775,7 @@ func TestPathValuesReachTheHandler(t *testing.T) {
 		t.Fatalf("code %q", code)
 	}
 	for _, miss := range []string{"/api/symbols/W", "/api/symbols/.svg", "/api/symbols/W.png", "/api/symbols/W.svg/x"} {
-		if _, ok := suffixed.match(httptest.NewRequest("GET", miss, nil)); ok {
+		if _, _, ok := suffixed.match(httptest.NewRequest("GET", miss, nil)); ok {
 			t.Errorf("%s matched the suffixed parameter", miss)
 		}
 	}
@@ -840,5 +845,72 @@ func TestAJobIdTheDoorDoesNotHoldIsProxied(t *testing.T) {
 	}
 	if echo["path"] != "/api/jobs/some-python-id" {
 		t.Fatalf("the id was not proxied as it arrived: %v", echo["path"])
+	}
+}
+
+// The visitor ledger, end to end: what the door answers lands in
+// `request_log` under the TEMPLATE (never the concrete path), refusals that
+// never reached routing share `(unrouted)`, the static tiers record their
+// mount prefix, the shell records the catch-all's `/{full_path}` — and a
+// proxied request lands in NEITHER, because during coexistence Python's own
+// middleware counts what Python answers and one request must land in
+// exactly one ledger.
+func TestTheDoorCountsWhatItAnswers(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "app.db")
+	if err := authtest.NewScratchDB(dbPath); err != nil {
+		t.Fatal(err)
+	}
+	up := upstream(t)
+	web, tarot := site(t)
+	d, err := New(Config{RequireAuth: true, WebDist: web, TarotDir: tarot,
+		Upstream: up, AppDB: dbPath,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.resolver = fakeResolver{}
+	srv := httptest.NewServer(d.Handler())
+	defer srv.Close()
+
+	get(t, srv, "GET", "/api/glossary", "alice")    // a ported route
+	get(t, srv, "GET", "/api/health", "")           // public: the template, anonymously
+	get(t, srv, "GET", "/api/decks", "")            // refused before routing
+	get(t, srv, "GET", "/assets/app.js", "")        // a mount
+	get(t, srv, "GET", "/tarot/00-fool.webp", "")   // the other mount
+	get(t, srv, "GET", "/", "")                     // the shell
+	get(t, srv, "GET", "/api/nonexistent", "alice") // table miss -> proxied
+	get(t, srv, "GET", "//api/glossary", "alice")   // non-canonical -> proxied
+
+	d.traffic.Flush()
+	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	counts := map[string]int{}
+	rows, err := db.Query("SELECT route, sum(count) FROM request_log GROUP BY route")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var route string
+		var n int
+		if err := rows.Scan(&route, &n); err != nil {
+			t.Fatal(err)
+		}
+		counts[route] = n
+	}
+	want := map[string]int{
+		"/api/glossary": 1, "/api/health": 1, "(unrouted)": 1, "/assets": 1,
+		"/tarot": 1, "/{full_path}": 1,
+	}
+	for route, n := range want {
+		if counts[route] != n {
+			t.Errorf("%s counted %d, want %d (all: %v)", route, counts[route], n, counts)
+		}
+	}
+	if len(counts) != len(want) {
+		t.Errorf("extra templates recorded: %v (a proxied request must land in Python's ledger, not this one)", counts)
 	}
 }

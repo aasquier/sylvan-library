@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/tiers"
 )
 
@@ -34,6 +36,13 @@ var adminRoutes = []struct{ method, target, payload string }{
 	{"PATCH", "/api/admin/users/bob", `{"is_admin":true}`},
 	{"POST", "/api/admin/users/bob/reset", ""},
 	{"DELETE", "/api/admin/users/bob/sessions", ""},
+	{"DELETE", "/api/admin/users/bob", `{"confirm":"bob"}`},
+	{"GET", "/api/admin/stats/system", ""},
+	{"GET", "/api/admin/stats/storage", ""},
+	{"GET", "/api/admin/stats/claude", ""},
+	{"GET", "/api/admin/stats/activity", ""},
+	{"GET", "/api/admin/stats/traffic", ""},
+	{"GET", "/api/admin/stats/fly", ""},
 }
 
 // The second check, on every route. 403 and **not** ADR 5's 404, which is the
@@ -62,24 +71,104 @@ func TestEveryAdminRouteRefusesANonAdminItself(t *testing.T) {
 	}
 }
 
-// **The one route that is deliberately not here.** `DELETE
-// /api/admin/users/{username}` calls `jobs.forget_owner` on a registry held in
-// the uvicorn process's memory, and `users.id` is re-issued by SQLite, so jobs
-// left keyed on a freed id would be handed to whoever is created next. A DELETE
-// on that path must therefore match no route on this side and fall through to
-// the proxy as it arrived.
-//
-// Asserted rather than left implicit, because the failure mode of somebody
-// "finishing the family" later is silent: the route would answer, the account
-// would go, and the jobs would stay.
-func TestDeletingAnAccountIsStillPythons(t *testing.T) {
-	for _, route := range New(Config{}).Routes() {
-		if route.Method == http.MethodDelete && route.Pattern == "/api/admin/users/{username}" {
-			t.Fatal("DELETE /api/admin/users/{username} has been ported, but " +
-				"`jobs.forget_owner` runs in the Python process and `users.id` " +
-				"is re-issued -- see internal/api/admin.go and PLAN section 10")
+// The twelfth registration, at last. Until Phase 8 a tripwire here pinned
+// its ABSENCE — `jobs.forget_owner` ran in the Python process, and a route
+// on this side would have deleted the account and stranded the jobs — and
+// the tripwire failing was the flip announcing itself. These are the pins
+// that replaced it.
+
+func TestDeletingAnAccountTakesItsSessionsAndItsJobs(t *testing.T) {
+	rig := newAccountRig(t, true)
+	defer rig.close()
+	rig.api.jobs = jobs.New(jobs.Config{Logger: rig.api.log})
+	rig.api.jobs.Completed("sim.mana", map[string]any{}, "a run", 2)
+	rig.api.jobs.Completed("sim.mana", map[string]any{}, "not bob's", 1)
+	if _, err := auth.CreateSession(context.Background(), rig.db, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Casefolded on purpose: only somebody looking at the right account can
+	// produce the name, and how they capitalise it is not the test.
+	rec := rig.call(t, adminScope, "DELETE", "/api/admin/users/bob",
+		`{"confirm":"BOB"}`, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	want := `{"username":"bob","revoked":1,"jobs_dropped":1}`
+	if rec.Body.String() != want {
+		t.Fatalf("got %s\nwant %s", rec.Body.String(), want)
+	}
+	// The registry really forgot: only alice's job remains.
+	if left := rig.api.jobs.All(1); len(left) != 1 {
+		t.Fatalf("alice's registry view holds %d jobs", len(left))
+	}
+	if left := rig.api.jobs.All(2); len(left) != 0 {
+		t.Fatalf("the freed id still sees %d jobs", len(left))
+	}
+}
+
+func TestAWrongConfirmIsA422ThatNamesTheAccount(t *testing.T) {
+	rig := newAccountRig(t, true)
+	defer rig.close()
+	for _, body := range []string{`{}`, `{"confirm":"alice"}`, `{"confirm":0}`} {
+		rec := rig.call(t, adminScope, "DELETE", "/api/admin/users/bob", body, "")
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("%s -> %d %s", body, rec.Code, rec.Body)
+		}
+		if d := body22(t, rec); d != "type 'bob' in confirm to delete it" {
+			t.Fatalf("%s -> detail %q", body, d)
 		}
 	}
+}
+
+func TestAnAdminCannotDeleteTheirOwnSession(t *testing.T) {
+	rig := newAccountRig(t, true)
+	defer rig.close()
+	rec := rig.call(t, adminScope, "DELETE", "/api/admin/users/alice",
+		`{"confirm":"alice"}`, "")
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if d := body22(t, rec); d != "you cannot delete the account you are "+
+		"signed in as -- use `mtglab users delete` on the machine" {
+		t.Fatalf("detail %q", d)
+	}
+}
+
+func TestDeletingTheLastUsableAdminIsRefused(t *testing.T) {
+	rig := newAccountRig(t, true)
+	defer rig.close()
+	// A second admin scope that is not alice, so the self-delete guard does
+	// not fire first and `refuseIfLastAdmin` gets to answer.
+	other := auth.Scope{UserID: 99, Username: "carol", IsAdmin: true, Authenticated: true}
+	rec := rig.call(t, other, "DELETE", "/api/admin/users/alice",
+		`{"confirm":"alice"}`, "")
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestDeletingNobodyIsA404(t *testing.T) {
+	rig := newAccountRig(t, true)
+	defer rig.close()
+	rec := rig.call(t, adminScope, "DELETE", "/api/admin/users/zed",
+		`{"confirm":"zed"}`, "")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if d := body22(t, rec); d != "no account 'zed'" {
+		t.Fatalf("detail %q", d)
+	}
+}
+
+func body22(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("not JSON: %s", rec.Body)
+	}
+	d, _ := payload["detail"].(string)
+	return d
 }
 
 // ---- the account list ------------------------------------------------------
@@ -547,7 +636,10 @@ func TestTheAdminSurfaceWithNoDatabase(t *testing.T) {
 		t.Errorf("the roster is %v", got["tiers"])
 	}
 	// Every per-account route is a 404, because there is no such account.
-	for _, route := range adminRoutes[2:] {
+	// (The stats six are not per-account — they answer over an absent
+	// database the way Python answers over the empty one it would mint:
+	// content, with nulls and zeroes.)
+	for _, route := range adminRoutes[2:6] {
 		rec := rig.call(t, adminScope, route.method, route.target, route.payload, "")
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("%s %s answered %d with no database", route.method, route.target, rec.Code)

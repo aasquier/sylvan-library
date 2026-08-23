@@ -49,6 +49,7 @@ something this file can decide, because the directory is resolved at import.
 """
 
 import os
+from pathlib import Path
 
 import pytest
 from hypothesis import HealthCheck, settings
@@ -61,6 +62,34 @@ from mtglab import caches, config
 _REAL_APP_DB = config.APP_DB_PATH.resolve()
 
 
+def _watched_db_is_the_external_servers(pytest_config: pytest.Config) -> bool:
+    """In external contract mode, the watched app.db may be the server's own.
+
+    The contract suite's `--base-url` mode drives a server somebody else
+    started on the directories `--data-dir`/`--decks-dir` name -- and the CI
+    door leg (and the local pair recipe in tests/contract/README.md) exports
+    that same `MTGLAB_DATA_DIR` into the shell that runs pytest, so
+    `_REAL_APP_DB` resolves to the server-under-test's database, not the
+    developer's. That file moves on the server's own clock -- sessions on
+    login, the activity log on the edit sequences, the door's visitor ledger
+    since it learned to record, WAL checkpoints whenever the last connection
+    closes -- so watching it makes the detector fail whichever test is
+    underway when a write lands. Exactly the footgun `_no_request_counts`
+    records for a local `mtglab ui`, except here the server is the thing
+    under test and cannot be stopped.
+
+    The stand-down is deliberately narrow: only when `--base-url` is in
+    play *and* the watched path is precisely the `--data-dir`'s app.db.
+    An external run whose ambient environment still points at the real
+    database keeps the guard armed, as do `--live` (the child server writes
+    a pytest tmp scratch, never the ambient path) and every ordinary run.
+    """
+    data_dir = pytest_config.getoption("--data-dir")
+    if not (pytest_config.getoption("--base-url") and data_dir):
+        return False
+    return (Path(data_dir) / "app.db").resolve() == _REAL_APP_DB
+
+
 def _real_app_db_state() -> tuple[int, int] | None:
     """`None` if it is absent, else enough to notice any write to it."""
     try:
@@ -71,7 +100,7 @@ def _real_app_db_state() -> tuple[int, int] | None:
 
 
 @pytest.fixture(autouse=True)
-def _real_app_db_untouched():
+def _real_app_db_untouched(request):
     """No test opens the developer's real `app.db` -- and now it is checked.
 
     The third door, after `_no_usage_ledger` and `_no_deck_log` below. Those
@@ -99,7 +128,17 @@ def _real_app_db_untouched():
     what they were before the test ran; on a fresh checkout, or in CI, that
     reduces to "it was not created". `git status data/` cannot do this job and
     never could -- `app.db` is gitignored, so it is invisible to a status.
+
+    One mode stands the detector down: the contract suite's external mode,
+    where the watched file is the server-under-test's own database and moves
+    on the server's clock, not a test's. `_watched_db_is_the_external_servers`
+    above is the predicate and carries the argument; `tests/test_suite_guards.py`
+    holds its judgment, and the CI door leg is the wiring's own test -- it went
+    red the day the door grew a traffic recorder.
     """
+    if _watched_db_is_the_external_servers(request.config):
+        yield
+        return
     before = _real_app_db_state()
     yield
     after = _real_app_db_state()
@@ -163,8 +202,10 @@ def _no_request_counts(monkeypatch):
     every minute the server sees traffic, and an open Admin tab refreshes
     every thirty seconds. Run the suite with the local server up and the
     detector above will fail whichever test happens to be underway when
-    that flush lands. Stop the server before a full run; CI has no server
-    and never sees this.
+    that flush lands. Stop the server before a full run. CI's `test` job has
+    no server and never sees this; its contract door leg deliberately runs
+    one on the suite's own data dir, which is the one place the detector
+    stands down (`_watched_db_is_the_external_servers` above).
     """
     from mtglab.api import traffic
     monkeypatch.setattr(traffic, "record", lambda template, status: None)

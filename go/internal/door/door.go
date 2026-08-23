@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/api"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
@@ -46,6 +47,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/shelves"
 	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
 	matchledger "github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
+	"github.com/aasquier/sylvan-library/go/internal/traffic"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -74,6 +76,9 @@ type Config struct {
 	DecksDir string
 	// ScryfallDir is where the bulk downloads live; `/api/health` lists them.
 	ScryfallDir string
+	// PoolPath is the card pool file itself, for the storage view that sizes
+	// it without ever opening it.
+	PoolPath string
 	// DataDir is MTGLAB_DATA_DIR: the three runtime shelves live under its
 	// `cache/`. Empty means no shelves, and every shelf route a 404.
 	DataDir string
@@ -108,6 +113,11 @@ type Door struct {
 	static   *staticSite
 	proxy    http.Handler
 	table    *routeTable
+	// traffic is the visitor ledger's recorder (schema v9), counting what
+	// the door itself answers -- a proxied request is Python's middleware's
+	// to count during coexistence, so the two ledgers partition the traffic
+	// rather than double-counting it. Nil on an instance with no app.db.
+	traffic *traffic.Recorder
 }
 
 // New builds a door. It opens `app.db` read-only when auth is required (and
@@ -160,10 +170,12 @@ func New(cfg Config) (*Door, error) {
 	// `api.Config.Upstream`.
 	d.jobs = jobs.New(jobs.Config{Logger: cfg.Logger})
 	d.openSimCache(cfg)
+	d.traffic = traffic.New(d.writeDB, cfg.Logger)
 
 	ported := api.New(api.Config{Logger: cfg.Logger, Pool: cfg.Pool, AppDB: d.db,
 		Jobs: d.jobs, SimCache: d.simCache, Upstream: d.proxy,
 		AppDBPath: cfg.AppDB, DecksDir: cfg.DecksDir, ScryfallDir: cfg.ScryfallDir,
+		DataDir: cfg.DataDir, PoolPath: cfg.PoolPath, Traffic: d.traffic,
 		AdminEmail: cfg.AdminEmail,
 		Shelves:    shelf, AppWriteDB: d.writeDB, Recorder: d.recorder,
 		// The Claude ledger writes a different table in the same file the
@@ -231,19 +243,86 @@ func (d *Door) Check(ctx context.Context) error {
 	return auth.Ping(ctx, d.db)
 }
 
-// Close releases what New opened.
+// Close releases what New opened — and flushes the visitor ledger, which is
+// Python's shutdown flush: a stopped door loses nothing it counted.
 func (d *Door) Close() error {
+	d.traffic.Flush()
 	if d.db != nil {
 		return d.db.Close()
 	}
 	return nil
 }
 
-// Handler is the whole door as one http.Handler, outermost layer first:
-// security headers, then the auth middleware, then dispatch.
+// Handler is the whole door as one http.Handler, outermost layer first: the
+// visitor ledger's counter (so a refusal that never reached routing is still
+// a request the instance answered — `(unrouted)`, exactly the bucket
+// Python's middleware shares), then security headers, then the auth
+// middleware, then dispatch.
 func (d *Door) Handler() http.Handler {
-	return d.securityHeaders(d.authenticate(http.HandlerFunc(d.dispatch)))
+	base := d.securityHeaders(d.authenticate(http.HandlerFunc(d.dispatch)))
+	if d.traffic == nil {
+		return base
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t := &tally{template: traffic.Unrouted}
+		r = r.WithContext(context.WithValue(r.Context(), tallyKey{}, t))
+		sw := &statusWriter{ResponseWriter: w}
+		base.ServeHTTP(sw, r)
+		if !t.skip {
+			status := sw.status
+			if status == 0 {
+				status = http.StatusOK
+			}
+			d.traffic.Record(t.template, status)
+		}
+	})
 }
+
+// tally carries the matched template from dispatch back out to the counting
+// layer — the pointer-in-context form of Starlette setting
+// `request.scope["route"]` during routing.
+type tally struct {
+	template string
+	// skip marks a proxied request: Python's own middleware counts what
+	// Python answers, and one request must land in exactly one ledger.
+	skip bool
+}
+
+type tallyKey struct{}
+
+func note(r *http.Request, template string) {
+	if t, ok := r.Context().Value(tallyKey{}).(*tally); ok {
+		t.template = template
+	}
+}
+
+func noteProxied(r *http.Request) {
+	if t, ok := r.Context().Value(tallyKey{}).(*tally); ok {
+		t.skip = true
+	}
+}
+
+// statusWriter remembers the committed status for the counter. Unwrap keeps
+// http.ResponseController — and so the proxy's Flush — working through it.
+//
+// Deliberately no Write override. Every write reaches this through
+// `securityHeaders`' headerWriter, which commits WriteHeader before the first
+// body byte, so a Write that defaulted the status here would be dead code —
+// and the counting layer above still reads 0 as 200, for the response nobody
+// wrote a byte or a header of.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusWriter) WriteHeader(code int) {
+	if s.status == 0 {
+		s.status = code
+	}
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
 // dispatch is the router, and deliberately a small one: it decides which of
 // three things a path is. The API check is made on the *normalised* path,
@@ -255,16 +334,30 @@ func (d *Door) Handler() http.Handler {
 func (d *Door) dispatch(w http.ResponseWriter, r *http.Request) {
 	raw := r.URL.Path
 	if raw == DoorHealthPath {
+		note(r, DoorHealthPath)
 		d.health(w, r)
 		return
 	}
 	if isAPI(NormalisePath(raw)) {
-		if h, ok := d.table.match(r); ok {
+		if h, pattern, ok := d.table.match(r); ok {
+			note(r, pattern)
 			h.ServeHTTP(w, r)
 			return
 		}
+		noteProxied(r)
 		d.proxy.ServeHTTP(w, r)
 		return
+	}
+	// The static tiers record their mount prefix and the shell records the
+	// catch-all's template -- `/{full_path}`, read off the deployed ledger --
+	// exactly as Starlette's router stamps them.
+	switch {
+	case raw == "/assets" || strings.HasPrefix(raw, "/assets/"):
+		note(r, "/assets")
+	case raw == "/tarot" || strings.HasPrefix(raw, "/tarot/"):
+		note(r, "/tarot")
+	default:
+		note(r, "/{full_path}")
 	}
 	d.static.ServeHTTP(w, r)
 }
