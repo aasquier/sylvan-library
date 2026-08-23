@@ -10,15 +10,17 @@ import (
 
 // diskUsage is `shutil.disk_usage`: statvfs arithmetic — total from the
 // fragment size, used as total minus free-for-root, free as free-for-us.
+// Frsize is already an int64 on this platform; the block counts are uint64
+// and fit comfortably (nine exabytes of volume would overflow first).
 func diskUsage(path string) (total, used, free int64) {
 	var fs unix.Statfs_t
 	if err := unix.Statfs(path, &fs); err != nil {
 		return 0, 0, 0
 	}
-	frsize := int64(fs.Frsize)
-	total = frsize * int64(fs.Blocks)
-	used = total - frsize*int64(fs.Bfree)
-	free = frsize * int64(fs.Bavail)
+	frsize := fs.Frsize
+	total = frsize * int64(fs.Blocks)     // #nosec G115 -- see above
+	used = total - frsize*int64(fs.Bfree) // #nosec G115 -- see above
+	free = frsize * int64(fs.Bavail)      // #nosec G115 -- see above
 	return total, used, free
 }
 
