@@ -2207,6 +2207,24 @@ right-skewed: heads-up medians sit at 4.6–6.8s, but one Trostani game took
   under both interpreters is **not** this check: that exercises
   `tests/go_fixtures.py`, never `tests/`. A second venv is the whole cost —
   `uv venv --python 3.11 .venv311 && uv pip install --python .venv311/bin/python -e ".[dev]"`.
+- **Float arithmetic is not the only thing that moves between them: so do the
+  Unicode tables.** 3.11 ships Unicode 14 and 3.12 ships 15, so
+  `unicodedata`, `str.isdigit` and category lookups answer differently — and
+  a generated corpus that sweeps a character property is a corpus with two
+  right answers. Found the same way the `fsum` one was, by CI's 3.11 leg
+  fail-fast-cancelling 3.12 (2026-08-23, the theme lane's two swept tables).
+  **Measure the divergence before deciding what to do about it**, because the
+  two tables that failed together were not the same case at all: `casefold`
+  is *identical* on both — 1,530 folds, same code points, same strings — and
+  only the `unicode_version` field it recorded had varied, so the fix was to
+  stop recording a version that made a stable table look unstable. The digit
+  runs genuinely differ (3.12 knows two blocks 3.11 does not), so that one is
+  committed **as 3.12's**, the interpreter the container runs, exactly as
+  `fsum` is chosen for being nobody's dialect. And its freshness test asserts
+  something real on *both* legs — equality on a matching Unicode, a strict
+  subset on an older one — because a skip is a finding filed as an absence.
+  The general rule: **a sweep over a character property needs the same "which
+  interpreter is the truth" answer a float sum does.**
 - Go, from `go/`: `go vet`, `go test -race` and `golangci-lint run` before
   pushing — the three checks CI requires, and on this Mac all three want the
   environment the Setup section spells out (CGO on, the 1.26 toolchain on

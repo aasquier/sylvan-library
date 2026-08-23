@@ -3245,6 +3245,16 @@ def digits_payload() -> dict[str, Any]:
     contiguous and zero-based (asserted below over the whole of Unicode), so
     68 numbers answer all 680. A code point's value is its distance from the
     greatest start not above it, when that distance is under ten.
+
+    **This one really is interpreter-dependent, unlike the fold table beside
+    it.** 3.11 ships Unicode 14 and knows 66 runs; 3.12 ships 15 and knows 68,
+    having gained the Kawi digits at U+11F50 and the Nag Mundari at U+1E4F0.
+    So the committed table is **3.12's**, because that is what the container
+    runs and therefore what the deployed Python answers -- the same reasoning
+    `math.fsum` got. `unicode_version` is recorded so the freshness check can
+    say which sweep it is holding: it demands equality on a matching
+    interpreter and a **subset** on an older one, since Unicode adds digit
+    blocks and never removes them.
     """
     zeros = sorted({cp - int(chr(cp)) for cp in range(0x110000)
                     if unicodedata.category(chr(cp)) == "Nd"})
@@ -3299,16 +3309,28 @@ def casefold_payload() -> dict[str, Any]:
 
     Its own corpus, and no separate one: the table **is** the oracle, so
     `tests/test_go_fixtures.py` holding the committed file equal to a fresh
-    sweep is the whole check. CI runs it under 3.11 and 3.12, which is where
-    a Unicode version moving under the project would show up.
+    sweep is the whole check.
+
+    **It carries no Unicode version, and the absence is measured.** The first
+    draft recorded `unicodedata.unidata_version` and went red on CI's 3.11
+    leg, which was the right alarm about the wrong field: 3.11 ships Unicode
+    14 and 3.12 ships 15, so the string differed -- and **nothing else did.**
+    Both interpreters answer 1,530 folds, the same 1,530 code points, the
+    same strings, 104 multi-character and 211 disagreeing with `lower()`;
+    case folding has not moved between those two releases. Recording the
+    version would have made a stable table look interpreter-dependent and
+    left the freshness check unable to run on both legs, which is where a
+    real drift would show. The counts below are the honest pin instead --
+    they are what a changed fold would move. (`digits_payload` keeps its
+    version, because that table really does differ; see there.)
     """
     folds = [{"cp": cp, "fold": chr(cp).casefold()}
              for cp in range(0x110000) if chr(cp).casefold() != chr(cp)]
     return {
         "note": ("`str.casefold()` for every code point that does not fold to "
                  "itself, swept from CPython by `python tests/go_fixtures.py`. "
-                 "A code point absent here folds to itself."),
-        "unicode_version": unicodedata.unidata_version,
+                 "A code point absent here folds to itself. Identical under "
+                 "3.11 and 3.12 -- verified, not assumed."),
         "multi_char": sum(1 for f in folds if len(f["fold"]) > 1),
         "differ_from_lower": sum(1 for f in folds
                                  if chr(f["cp"]).lower() != f["fold"]),

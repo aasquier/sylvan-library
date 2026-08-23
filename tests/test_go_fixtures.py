@@ -128,7 +128,10 @@ _ORACLES = [
     ("research", "RESEARCH_PATH", "render_research_cases"),
     ("the theme interview", "THEME_PATH", "render_theme_cases"),
     ("CPython's case folding", "CASEFOLD_PATH", "render_casefold_payload"),
-    ("Unicode's digit runs", "DIGITS_PATH", "render_digits_payload"),
+    # `DIGITS_PATH` is deliberately NOT here: it is the one oracle in this
+    # file whose fresh render legitimately differs between the two supported
+    # interpreters, so exact equality is the wrong rule. See
+    # `test_the_digit_runs_are_the_containers_unicode` below.
 ]
 
 
@@ -179,7 +182,11 @@ def test_every_oracle_this_module_writes_is_checked_for_drift():
     """
     named = {name for _what, name, _render in _ORACLES} | {
         "YAML_PATH", "JSON_PATH", "RENDER_PATH", "SCHEMA_PATH", "TINY_POOL_PATH",
-        "APP_SCHEMA_PATH", "CRYPTO_PATH"}
+        "APP_SCHEMA_PATH", "CRYPTO_PATH",
+        # Checked by `test_the_digit_runs_are_the_containers_unicode`, which
+        # cannot be an exact-equality row: it is the one oracle whose fresh
+        # render legitimately differs between the two supported interpreters.
+        "DIGITS_PATH"}
     writes = {name for name in dir(go_fixtures)
               if name.endswith("_PATH") and isinstance(getattr(go_fixtures, name), Path)}
     assert writes - named == set(), (
@@ -1068,6 +1075,11 @@ def test_the_casefold_table_is_the_whole_of_unicode_not_the_differences():
     reports are really what is in it.
     """
     committed = json.loads(go_fixtures.CASEFOLD_PATH.read_text(encoding="utf-8"))
+    assert "unicode_version" not in committed, (
+        "the fold table records a Unicode version again. It was removed "
+        "deliberately: 3.11 and 3.12 answer the same 1,530 folds and differ "
+        "only in that string, so recording it made a stable table look "
+        "interpreter-dependent and took the freshness check off one CI leg.")
     folds = {row["cp"]: row["fold"] for row in committed["folds"]}
     assert len(folds) == len(committed["folds"]), "a code point is in there twice"
     assert committed["multi_char"] == sum(1 for f in folds.values() if len(f) > 1)
@@ -1080,6 +1092,40 @@ def test_the_casefold_table_is_the_whole_of_unicode_not_the_differences():
     assert not missing, f"{len(missing)} code points fold and are not in the table"
     # And the one that made it worth building: ß is not what lower() says.
     assert folds[0xDF] == "ss" and chr(0xDF).lower() == "ß"
+
+
+def test_the_digit_runs_are_the_containers_unicode():
+    """The committed digit table is 3.12's, and an older leg may only lack rows.
+
+    **The one oracle here that is interpreter-dependent, and it was found by
+    CI rather than reasoned out.** 3.11 ships Unicode 14 and knows 66 decimal
+    digit runs; 3.12 ships 15 and knows 68, having gained the Kawi digits at
+    U+11F50 and the Nag Mundari at U+1E4F0. The container runs 3.12, so the
+    committed sweep is 3.12's — the same call `math.fsum` forces for the same
+    reason.
+
+    A skip on the other leg would be a finding filed as an absence, so the
+    rule is a real assertion on both: **equality when the interpreter's
+    Unicode matches the file's, a subset when it is older.** Unicode adds
+    digit blocks and never removes them, so a superset on any leg means the
+    table was regenerated on the wrong interpreter, and a row this
+    interpreter knows and the file does not means it is stale.
+    """
+    committed = json.loads(go_fixtures.DIGITS_PATH.read_text(encoding="utf-8"))
+    fresh = go_fixtures.digits_payload()
+    if fresh["unicode_version"] == committed["unicode_version"]:
+        assert go_fixtures.DIGITS_PATH.read_text(encoding="utf-8") == \
+            go_fixtures.render_digits_payload(), (
+                f"{go_fixtures.DIGITS_PATH} is stale; regenerate with "
+                "`python tests/go_fixtures.py`")
+        return
+    here, there = set(fresh["zeros"]), set(committed["zeros"])
+    assert here < there, (
+        f"this interpreter's Unicode ({fresh['unicode_version']}) knows "
+        f"{sorted(hex(z) for z in here - there)} which the committed table "
+        f"({committed['unicode_version']}) does not — either it is stale, or "
+        f"it was regenerated on the wrong interpreter. The container runs "
+        f"3.12; regenerate there.")
 
 
 def test_the_digit_runs_answer_every_unicode_decimal_digit():
@@ -1098,6 +1144,9 @@ def test_the_digit_runs_answer_every_unicode_decimal_digit():
         below = [z for z in zeros if z <= cp]
         return cp - below[-1] if below and cp - below[-1] < 10 else None
 
+    # Every digit *this* interpreter knows. The committed table may know more
+    # (it is 3.12's, and 3.11 has two fewer blocks); it may never know fewer,
+    # which the test above is what checks.
     digits = [cp for cp in range(0x110000)
               if unicodedata.category(chr(cp)) == "Nd"]
     wrong = [cp for cp in digits if value(cp) != int(chr(cp))]

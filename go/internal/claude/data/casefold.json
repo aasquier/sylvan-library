@@ -1,6 +1,5 @@
 {
- "note": "`str.casefold()` for every code point that does not fold to itself, swept from CPython by `python tests/go_fixtures.py`. A code point absent here folds to itself.",
- "unicode_version": "15.0.0",
+ "note": "`str.casefold()` for every code point that does not fold to itself, swept from CPython by `python tests/go_fixtures.py`. A code point absent here folds to itself. Identical under 3.11 and 3.12 -- verified, not assumed.",
  "multi_char": 104,
  "differ_from_lower": 211,
  "folds": [
