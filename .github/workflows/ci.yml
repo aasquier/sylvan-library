@@ -474,28 +474,29 @@ jobs:
           fi
           echo "no decks in the image"
 
-      # The tarot art ships as `package-data`, not as part of the built bundle,
-      # so nothing else in this pipeline would notice it going missing: the
-      # tests read it from the source tree and pass either way. What breaks is
-      # only ever the *installed* package, which is only ever built here.
-      # 78 exactly -- a glob that half-matches is worse than one that fails.
+      # The tarot art is copied into the image beside the binary, and nothing
+      # else in this pipeline would notice it going missing: the tests read
+      # it from the source tree and pass either way. 78 exactly -- a glob
+      # that half-matches is worse than one that fails. Counted with sh,
+      # because the image carries no interpreter to ask any other way.
       - name: The tarot deck must survive being packaged
         run: |
-          docker run --rm --entrypoint python sylvan-library:ci -c \
-            "import mtglab, pathlib, sys; d = pathlib.Path(mtglab.__file__).parent / 'assets/tarot'; n = len(list(d.glob('*.webp'))); print(d, n, 'cards'); sys.exit(0 if n == 78 else 1)"
+          n=$(docker run --rm --entrypoint sh sylvan-library:ci -c \
+            'ls /app/tarot/*.webp 2>/dev/null | wc -l' | tr -d ' ')
+          echo "/app/tarot: $n cards"
+          [ "$n" = "78" ]
 
-      # And they must be served as pictures. `mimetypes` reads the *host's*
-      # database, and this image has no `/etc/mime.types` — so `.webp`
-      # resolved to nothing and every card went out as
-      # `application/octet-stream`. macOS knows the type and so does this
-      # runner, which is exactly why neither the suite nor a local browser
-      # could see it. `api/app.py` registers it explicitly now; this asserts
-      # that the registration is what the *container* ends up doing, which is
-      # the only place the question has ever had a different answer.
-      - name: A packaged card must resolve as an image, not as bytes
+      # And the image must carry no interpreter at all: a python or a pip
+      # reappearing in a layer is the retirement running backwards, at the
+      # only place it could go unnoticed.
+      - name: The image must carry no Python
         run: |
-          docker run --rm --entrypoint python sylvan-library:ci -c \
-            "import mtglab.api.app, mimetypes, sys; t = mimetypes.guess_type('x.webp')[0]; print('webp ->', t); sys.exit(0 if t == 'image/webp' else 1)"
+          found=$(docker run --rm --entrypoint sh sylvan-library:ci -c \
+            'command -v python python3 pip pip3 2>/dev/null; ls -d /opt/venv 2>/dev/null' || true)
+          if [ -n "$found" ]; then
+            echo "::error::an interpreter is back in the image:"; echo "$found"; exit 1
+          fi
+          echo "no interpreter in the image"
 
       - name: Run it
         run: |
@@ -528,12 +529,10 @@ jobs:
           grep -q '"pool": *false' health.json
           echo "health reports an unseeded instance, as it should"
 
-      # PID 1 is the Go front door now (ADR 38), with the Python server
-      # supervised behind it on loopback. Its own liveness path answers, and
-      # an asset it serves itself carries the content type the *door* names
-      # rather than whatever the host's mime table would have said -- the
-      # same property the contract suite found Python needed on 2026-08-21.
-      - name: The front door answers, and serves the bundle itself
+      # The process's own liveness path answers, and an asset carries the
+      # content type the server names rather than whatever the host's mime
+      # table would have said.
+      - name: The server answers, and serves the bundle itself
         run: |
           curl -fsS http://127.0.0.1:8080/door/health; echo
           ct=$(curl -sS -o /dev/null -w '%{content_type}' http://127.0.0.1:8080/assets/app.js)
