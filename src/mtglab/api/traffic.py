@@ -152,6 +152,26 @@ def _write(rows: dict[tuple[str, str, str, str], int]) -> None:
                      type(exc).__name__, exc)
 
 
+#: Every bucket a day row carries, seeded at zero.
+#:
+#: **Seeded rather than filled in as they arrive**, which was the shape until
+#: 2026-08-23: `row[cls] = count` set only the classes that actually happened,
+#: so a quiet day had no `5xx` key at all and the chart's series simply
+#: vanished for it. Found by the Go migration's Phase 7 — flipping
+#: `/api/sim/forge` removed the last route that made *this* process answer a
+#: 5xx during the contract run, and the recorded wire shape lost a key. That
+#: is the honest reading of it: a payload whose keys depend on its data is not
+#: a shape, and no golden can hold one.
+STATUS_CLASSES = ("2xx", "4xx", "5xx")
+
+
+def _empty_day(day: str) -> dict[str, Any]:
+    row: dict[str, Any] = {"day": day, "total": 0}
+    for cls in STATUS_CLASSES:
+        row[cls] = 0
+    return row
+
+
 def summary(*, days: int = 30) -> dict[str, Any]:
     """What the ledger holds: requests per day by class, and the top routes.
 
@@ -169,7 +189,7 @@ def summary(*, days: int = 30) -> dict[str, Any]:
                 "SELECT day, status_class, sum(count) FROM request_log"
                 " WHERE day >= ? GROUP BY day, status_class ORDER BY day",
                 (cutoff,)).fetchall():
-            row = by_day.setdefault(day, {"day": day, "total": 0})
+            row = by_day.setdefault(day, _empty_day(day))
             row[cls] = count
             row["total"] += count
         top = [

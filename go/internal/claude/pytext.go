@@ -1,9 +1,9 @@
 package claude
 
 import (
-	"strings"
 	"time"
-	"unicode/utf8"
+
+	"github.com/aasquier/sylvan-library/go/internal/pytext"
 )
 
 // The handful of Python string and time behaviours the two searching modes
@@ -18,33 +18,13 @@ import (
 // test can freeze it.
 var now = func() string { return pyIsoformat(time.Now()) }
 
-func pyIsoformat(t time.Time) string {
-	t = t.UTC().Truncate(time.Microsecond)
-	if t.Nanosecond() == 0 {
-		return t.Format("2006-01-02T15:04:05") + "+00:00"
-	}
-	return t.Format("2006-01-02T15:04:05.000000") + "+00:00"
-}
+func pyIsoformat(t time.Time) string { return pytext.Isoformat(t) }
 
-// pyIsSpace is `str.isspace()` for one character: Unicode whitespace as
-// Python counts it, which is **wider than Go's `unicode.IsSpace`** by the
-// four information separators U+001C..U+001F (bidirectional class B or S)
-// and agrees with it everywhere else -- the ASCII five, NEL, no-break
-// space, and every category-Zs space. `str.split()` and `str.strip()` both
-// use this set, so a question whose only "whitespace" is a file separator is
-// empty to Python and two characters to `strings.TrimSpace`.
-func pyIsSpace(r rune) bool {
-	switch r {
-	case ' ', '\t', '\n', '\v', '\f', '\r',
-		0x1c, 0x1d, 0x1e, 0x1f,
-		0x85, 0xa0, 0x1680,
-		0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007,
-		0x2008, 0x2009, 0x200a,
-		0x2028, 0x2029, 0x202f, 0x205f, 0x3000:
-		return true
-	}
-	return false
-}
+// pyIsSpace is `str.isspace()` for one character. It lives in
+// `internal/pytext` now, with `str.splitlines()` beside it: `sim/tier3`
+// needed the same whitespace table for Forge's log, and a second copy of a
+// table this exact is how the two halves of a reproduction drift apart.
+func pyIsSpace(r rune) bool { return pytext.IsSpace(r) }
 
 // PyStrip is `str.strip()`, exported for `internal/api`: the argue sweep
 // strips names somebody typed, and Python's whitespace set is not Go's --
@@ -53,32 +33,18 @@ func pyIsSpace(r rune) bool {
 func PyStrip(s string) string { return pyStrip(s) }
 
 // pyStrip is `str.strip()` with no argument.
-func pyStrip(s string) string { return strings.TrimFunc(s, pyIsSpace) }
+func pyStrip(s string) string { return pytext.Strip(s) }
 
 // PyRStrip is `str.rstrip()` with no argument.
-func PyRStrip(s string) string { return strings.TrimRightFunc(s, pyIsSpace) }
+func PyRStrip(s string) string { return pytext.RStrip(s) }
 
 // pySplitJoin is `" ".join(s.split())`: runs of whitespace collapsed to one
 // space, none at either end.
-func pySplitJoin(s string) string {
-	return strings.Join(strings.FieldsFunc(s, pyIsSpace), " ")
-}
+func pySplitJoin(s string) string { return pytext.SplitJoin(s) }
 
 // PyLen is `len(s)` for a `str`: code points, not bytes. A question of 2,000
 // accented characters is 2,000 to Python and well over the ceiling in bytes.
-func PyLen(s string) int { return utf8.RuneCountInString(s) }
+func PyLen(s string) int { return pytext.Len(s) }
 
 // PyHead is `s[:n]` for a `str`: the first n code points.
-func PyHead(s string, n int) string {
-	if PyLen(s) <= n {
-		return s
-	}
-	count := 0
-	for i := range s {
-		if count == n {
-			return s[:i]
-		}
-		count++
-	}
-	return s
-}
+func PyHead(s string, n int) string { return pytext.Head(s, n) }

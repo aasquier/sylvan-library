@@ -139,6 +139,36 @@ def test_the_traffic_view_reports_days_and_top_routes(client):
     assert "never records" in body["note"]
 
 
+def test_every_day_carries_every_bucket_even_at_zero(client):
+    """A day with no failures still reports `4xx: 0` and `5xx: 0`.
+
+    The keys used to appear only when the class did, so a quiet day simply had
+    no `5xx` and the chart's series vanished for it. **Found by the Go
+    migration**: flipping `/api/sim/forge` removed the last route that made
+    this process answer a 5xx during a contract run, and the recorded wire
+    shape lost a key -- which is the honest reading of a payload whose keys
+    depend on its data. Nothing here fails 4xx or 5xx, which is exactly the
+    case that used to be short.
+    """
+    for _ in range(3):
+        assert client.get("/api/health").status_code == 200
+
+    body = client.get("/api/admin/stats/traffic").json()
+    assert body["days"], "the ledger saw requests and reported no days"
+    for day in body["days"]:
+        assert set(day) == {"day", "total", *traffic.STATUS_CLASSES}, day
+        assert day["total"] == sum(day[cls] for cls in traffic.STATUS_CLASSES)
+
+
+def test_a_refused_request_lands_in_its_own_bucket(client):
+    """And the buckets are still counted, not merely present."""
+    assert client.get("/api/decks/local/nope-not-a-deck").status_code == 404
+    body = client.get("/api/admin/stats/traffic").json()
+    today = body["days"][-1]
+    assert today["4xx"] > 0, today
+    assert today["5xx"] == 0, today
+
+
 def test_a_broken_database_costs_counts_not_requests(client, tmp_path):
     """`_write` swallows and warns; the request that triggered the flush
     (and every one after it) must keep answering."""

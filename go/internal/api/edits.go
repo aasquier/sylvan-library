@@ -259,22 +259,19 @@ func decodeOffset(err error) int {
 	return 1
 }
 
+// str is `str(payload.get(key) or "")` — the coercion four route families
+// apply to a body field before it becomes a slug, an owner or a card name.
+//
+// An absent or null value is `""` and not `"None"`, because every call site
+// spells it `or ""`; everything else goes through Python's own `str()`, which
+// is **not** `fmt.Sprint` for a container. `str(["x"])` is `"['x']"` where
+// `fmt.Sprint` gives `"[x]"`, and that lands in a 404's `detail` verbatim.
+// Found by diffing the pair; see [wire.PyStr].
 func str(body map[string]any, key string) string {
-	switch v := body[key].(type) {
-	case nil:
+	if v, ok := body[key]; !ok || v == nil {
 		return ""
-	case string:
-		return v
-	case json.Number:
-		return v.String()
-	case bool:
-		if v {
-			return "True"
-		}
-		return "False"
-	default:
-		return fmt.Sprint(v)
 	}
+	return wire.PyStr(body[key])
 }
 
 // ---- the nine routes -------------------------------------------------------

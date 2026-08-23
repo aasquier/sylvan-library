@@ -1,0 +1,723 @@
+{
+ "index": [
+  "Atla Palani, Nest Tender",
+  "Sol Ring",
+  "Forest",
+  "Plains",
+  "Island",
+  "Ancient Bronze Dragon",
+  "Birds of Paradise",
+  "Arahbo, Roar of the World",
+  "Kaheera, the Orphanguard",
+  "Thrasios, Triton Hero",
+  "Tymna the Weaver",
+  "Ajani, Nacatl Pariah",
+  "Ajani, Nacatl Avenger",
+  "Barkchannel Pathway",
+  "Tidechannel Pathway",
+  "Alive",
+  "Well",
+  "Zuran Orb",
+  "Bösium Strip"
+ ],
+ "logs": [
+  {
+   "note": "a clean win",
+   "text": "Game Result: Game 1 ended in 5421 ms. Ai(2)-Atla Palani has won!\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [{"index":1,"milliseconds":5421,"draw":false,"winner":"Ai(2)-Atla Palani","winner_seat":2,"turns":null,"timed_out":false}],
+   "is_game_result": [true]
+  },
+  {
+   "note": "a turn count arrives first",
+   "text": "Game Outcome: Turn 11\nGame Result: Game 1 ended in 5421 ms. Ai(1)-Arahbo has won!\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [{"index":1,"milliseconds":5421,"draw":false,"winner":"Ai(1)-Arahbo","winner_seat":1,"turns":11,"timed_out":false}],
+   "is_game_result": [false,true]
+  },
+  {
+   "note": "a real draw",
+   "text": "Game Result: Game 3 ended in a Draw! Took 900 ms.\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [{"index":3,"milliseconds":900,"draw":true,"winner":null,"winner_seat":null,"turns":null,"timed_out":false}],
+   "is_game_result": [true]
+  },
+  {
+   "note": "a clock-out wears a winner",
+   "text": "Stopping slow match as draw\nGame Result: Game 2 ended in 300000 ms. Ai(1)-Tivit has won!\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [{"index":2,"milliseconds":300000,"draw":false,"winner":"Ai(1)-Tivit","winner_seat":1,"turns":null,"timed_out":true}],
+   "is_game_result": [false,true]
+  },
+  {
+   "note": "a clock-out with no winner",
+   "text": "Stopping slow match as draw\nGame Result: Game 2 ended in a Draw! Took 300000 ms.\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [{"index":2,"milliseconds":300000,"draw":true,"winner":null,"winner_seat":null,"turns":null,"timed_out":true}],
+   "is_game_result": [false,true]
+  },
+  {
+   "note": "the pending state does not leak into the next game",
+   "text": "Game Outcome: Turn 7\nStopping slow match as draw\nGame Result: Game 1 ended in 300000 ms. Ai(1)-A has won!\nGame Result: Game 2 ended in 4000 ms. Ai(2)-B has won!\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [
+    {"index":1,"milliseconds":300000,"draw":false,"winner":"Ai(1)-A","winner_seat":1,"turns":7,"timed_out":true},
+    {"index":2,"milliseconds":4000,"draw":false,"winner":"Ai(2)-B","winner_seat":2,"turns":null,"timed_out":false}
+   ],
+   "is_game_result": [false,false,true,true]
+  },
+  {
+   "note": "an unsupported card, and the game plays on",
+   "text": "An unsupported card was requested: \"Nonexistent Card 1\" from \"[N.A.]\".\nForge could not find this card in the Database. Please report it.\nGame Result: Game 1 ended in 7212 ms. Ai(2)-Goreclaw has won!\n",
+   "trustworthy": false,
+   "unsupported": ["Nonexistent Card 1"],
+   "deck_load_failures": [],
+   "games": [{"index":1,"milliseconds":7212,"draw":false,"winner":"Ai(2)-Goreclaw","winner_seat":2,"turns":null,"timed_out":false}],
+   "is_game_result": [false,false,true]
+  },
+  {
+   "note": "the same complaint repeated per copy is one name",
+   "text": "An unsupported card was requested: \"Nonexistent Card 1\" from \"[N.A.]\".\nAn unsupported card was requested: \"Nonexistent Card 1\" from \"[N.A.]\".\nAn unsupported card was requested: \"Other Card\" from \"[N.A.]\".\n",
+   "trustworthy": false,
+   "unsupported": ["Nonexistent Card 1","Other Card"],
+   "deck_load_failures": [],
+   "games": [],
+   "is_game_result": [false,false,false]
+  },
+  {
+   "note": "a deck that would not load",
+   "text": "Could not load deck - cat-tribal, match cannot start\n",
+   "trustworthy": false,
+   "unsupported": [],
+   "deck_load_failures": ["cat-tribal"],
+   "games": [],
+   "is_game_result": [false]
+  },
+  {
+   "note": "a label with no seat",
+   "text": "Game Result: Game 1 ended in 100 ms. Somebody has won!\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [{"index":1,"milliseconds":100,"draw":false,"winner":"Somebody","winner_seat":null,"turns":null,"timed_out":false}],
+   "is_game_result": [true]
+  },
+  {
+   "note": "a deck name with an em dash and an accent",
+   "text": "Game Result: Game 1 ended in 100 ms. Ai(2)-Bösium — Strip has won!\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [{"index":1,"milliseconds":100,"draw":false,"winner":"Ai(2)-Bösium — Strip","winner_seat":2,"turns":null,"timed_out":false}],
+   "is_game_result": [true]
+  },
+  {
+   "note": "noise between results is ignored",
+   "text": "[main] WARN forge.ai — could not evaluate\nGame Result: Game 1 ended in 42 ms. Ai(1)-A has won!\nLoading card database...\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [{"index":1,"milliseconds":42,"draw":false,"winner":"Ai(1)-A","winner_seat":1,"turns":null,"timed_out":false}],
+   "is_game_result": [false,true,false]
+  },
+  {"note":"nothing at all","text":"","trustworthy":true,"unsupported":[],"deck_load_failures":[],"games":[],"is_game_result":[]},
+  {"note":"only noise","text":"Loading card database...\nDone.\n","trustworthy":true,"unsupported":[],"deck_load_failures":[],"games":[],"is_game_result":[false,false]},
+  {
+   "note": "a form feed splits a line for str.splitlines",
+   "text": "Game Result: Game 1 ended in 100 ms. Ai(1)-A has won!\fGame Result: Game 2 ended in 200 ms. Ai(2)-B has won!\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [
+    {"index":1,"milliseconds":100,"draw":false,"winner":"Ai(1)-A","winner_seat":1,"turns":null,"timed_out":false},
+    {"index":2,"milliseconds":200,"draw":false,"winner":"Ai(2)-B","winner_seat":2,"turns":null,"timed_out":false}
+   ],
+   "is_game_result": [true,true]
+  },
+  {
+   "note": "a NEL splits a line too",
+   "text": "Game Result: Game 1 ended in 100 ms. Ai(1)-A has won!Game Outcome: Turn 3\nGame Result: Game 2 ended in 200 ms. Ai(2)-B has won!\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [
+    {"index":1,"milliseconds":100,"draw":false,"winner":"Ai(1)-A","winner_seat":1,"turns":null,"timed_out":false},
+    {"index":2,"milliseconds":200,"draw":false,"winner":"Ai(2)-B","winner_seat":2,"turns":3,"timed_out":false}
+   ],
+   "is_game_result": [true,false,true]
+  },
+  {
+   "note": "CRLF is one boundary",
+   "text": "Game Result: Game 1 ended in 100 ms. Ai(1)-A has won!\r\nGame Result: Game 2 ended in 200 ms. Ai(2)-B has won!\r\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [
+    {"index":1,"milliseconds":100,"draw":false,"winner":"Ai(1)-A","winner_seat":1,"turns":null,"timed_out":false},
+    {"index":2,"milliseconds":200,"draw":false,"winner":"Ai(2)-B","winner_seat":2,"turns":null,"timed_out":false}
+   ],
+   "is_game_result": [true,true]
+  },
+  {
+   "note": "a unit separator is stripped, never split",
+   "text": "\u001fGame Result: Game 1 ended in 100 ms. Ai(1)-A has won!\u001f\n",
+   "trustworthy": true,
+   "unsupported": [],
+   "deck_load_failures": [],
+   "games": [{"index":1,"milliseconds":100,"draw":false,"winner":"Ai(1)-A","winner_seat":1,"turns":null,"timed_out":false}],
+   "is_game_result": [true]
+  }
+ ],
+ "dck": [
+  {
+   "note": "plain",
+   "deck": "slug: atla-palani\nname: Atla Palani, Nest Tender - Dinos\nstatus: theoretical\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\ncards:\n  - name: Sol Ring\n    category: utility\n    why: because\n  - name: Forest\n    category: utility\n    why: because\n    qty: 36\n  - name: Ancient Bronze Dragon\n    category: utility\n    why: because\n  - name: Birds of Paradise\n    category: utility\n    why: because\n",
+   "bare": "[metadata]\nname=Atla Palani, Nest Tender - Dinos\n[Commander]\n1 Atla Palani, Nest Tender\n[Main]\n1 Ancient Bronze Dragon\n1 Birds of Paradise\n36 Forest\n1 Sol Ring\n[Sideboard]\n",
+   "resolved": "[metadata]\nname=Atla Palani, Nest Tender - Dinos\n[Commander]\n1 Atla Palani, Nest Tender\n[Main]\n1 Ancient Bronze Dragon\n1 Birds of Paradise\n36 Forest\n1 Sol Ring\n[Sideboard]\n"
+  },
+  {
+   "note": "companion",
+   "deck": "slug: arahbo\nname: Arahbo, Roar of the World - Cats\nstatus: theoretical\nstage: curated\ncommander:\n  - Arahbo, Roar of the World\ncompanion: Kaheera, the Orphanguard\ncards:\n  - name: Plains\n    category: utility\n    why: because\n    qty: 20\n  - name: Sol Ring\n    category: utility\n    why: because\n",
+   "bare": "[metadata]\nname=Arahbo, Roar of the World - Cats\n[Commander]\n1 Arahbo, Roar of the World\n[Main]\n20 Plains\n1 Sol Ring\n[Sideboard]\n1 Kaheera, the Orphanguard\n",
+   "resolved": "[metadata]\nname=Arahbo, Roar of the World - Cats\n[Commander]\n1 Arahbo, Roar of the World\n[Main]\n20 Plains\n1 Sol Ring\n[Sideboard]\n1 Kaheera, the Orphanguard\n"
+  },
+  {
+   "note": "partners",
+   "deck": "slug: partners\nname: Two Commanders\nstatus: theoretical\nstage: curated\ncommander:\n  - Thrasios, Triton Hero\n  - Tymna the Weaver\ncards:\n  - name: Island\n    category: utility\n    why: because\n    qty: 30\n",
+   "bare": "[metadata]\nname=Two Commanders\n[Commander]\n1 Thrasios, Triton Hero\n1 Tymna the Weaver\n[Main]\n30 Island\n[Sideboard]\n",
+   "resolved": "[metadata]\nname=Two Commanders\n[Commander]\n1 Thrasios, Triton Hero\n1 Tymna the Weaver\n[Main]\n30 Island\n[Sideboard]\n"
+  },
+  {
+   "note": "dfc",
+   "deck": "slug: dfc\nname: Faces\nstatus: theoretical\nstage: curated\ncommander:\n  - Ajani, Nacatl Pariah // Ajani, Nacatl Avenger\ncards:\n  - name: Barkchannel Pathway // Tidechannel Pathway\n    category: utility\n    why: because\n  - name: Alive // Well\n    category: utility\n    why: because\n  - name: Forest\n    category: utility\n    why: because\n    qty: 30\n",
+   "bare": "[metadata]\nname=Faces\n[Commander]\n1 Ajani, Nacatl Pariah // Ajani, Nacatl Avenger\n[Main]\n1 Alive // Well\n1 Barkchannel Pathway // Tidechannel Pathway\n30 Forest\n[Sideboard]\n",
+   "resolved": "[metadata]\nname=Faces\n[Commander]\n1 Ajani, Nacatl Pariah\n[Main]\n1 Alive\n1 Barkchannel Pathway\n30 Forest\n[Sideboard]\n"
+  },
+  {
+   "note": "odd",
+   "deck": "slug: odd\nname: Odd\nstatus: theoretical\nstage: curated\ncommander: []\ncards:\n  - name: Zuran Orb\n    category: utility\n    why: because\n  - name: Ancestral Recall\n    category: utility\n    why: because\n  - name: Zuran Orb\n    category: utility\n    why: because\n    qty: 2\n  - name: Bösium Strip\n    category: utility\n    why: because\n",
+   "bare": "[metadata]\nname=Odd\n[Main]\n1 Ancestral Recall\n1 Bösium Strip\n1 Zuran Orb\n2 Zuran Orb\n[Sideboard]\n",
+   "resolved": "[metadata]\nname=Odd\n[Main]\n1 Ancestral Recall\n1 Bösium Strip\n1 Zuran Orb\n2 Zuran Orb\n[Sideboard]\n"
+  },
+  {
+   "note": "empty",
+   "deck": "slug: empty\nname: Empty\nstatus: theoretical\nstage: curated\ncommander: []\ncards: []\n",
+   "bare": "[metadata]\nname=Empty\n[Main]\n[Sideboard]\n",
+   "resolved": "[metadata]\nname=Empty\n[Main]\n[Sideboard]\n"
+  },
+  {
+   "note": "faces",
+   "deck": "slug: faces\nname: Faces Tried In Order\nstatus: theoretical\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\ncards:\n  - name: Unprinted Front // Tidechannel Pathway\n    category: utility\n    why: because\n  - name: Ajani, Nacatl Pariah // Ajani, Nacatl Avenger\n    category: utility\n    why: because\n  - name: Nothing Here // Nor Here\n    category: utility\n    why: because\n  - name: Forest\n    category: utility\n    why: because\n    qty: 30\n",
+   "bare": "[metadata]\nname=Faces Tried In Order\n[Commander]\n1 Atla Palani, Nest Tender\n[Main]\n1 Ajani, Nacatl Pariah // Ajani, Nacatl Avenger\n30 Forest\n1 Nothing Here // Nor Here\n1 Unprinted Front // Tidechannel Pathway\n[Sideboard]\n",
+   "resolved": "[metadata]\nname=Faces Tried In Order\n[Commander]\n1 Atla Palani, Nest Tender\n[Main]\n1 Ajani, Nacatl Pariah\n30 Forest\n1 Nothing Here // Nor Here\n1 Tidechannel Pathway\n[Sideboard]\n"
+  }
+ ],
+ "coverage": [
+  {
+   "note": "plain",
+   "deck": "slug: atla-palani\nname: Atla Palani, Nest Tender - Dinos\nstatus: theoretical\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\ncards:\n  - name: Sol Ring\n    category: utility\n    why: because\n  - name: Forest\n    category: utility\n    why: because\n    qty: 36\n  - name: Ancient Bronze Dragon\n    category: utility\n    why: because\n  - name: Birds of Paradise\n    category: utility\n    why: because\n",
+   "slug": "atla-palani",
+   "checked": 5,
+   "resolved": {"Atla Palani, Nest Tender":"Atla Palani, Nest Tender","Sol Ring":"Sol Ring","Forest":"Forest","Ancient Bronze Dragon":"Ancient Bronze Dragon","Birds of Paradise":"Birds of Paradise"},
+   "missing": [],
+   "ok": true,
+   "renamed": [],
+   "summary": "atla-palani: all 5 cards implemented by Forge",
+   "refusal": null
+  },
+  {
+   "note": "companion",
+   "deck": "slug: arahbo\nname: Arahbo, Roar of the World - Cats\nstatus: theoretical\nstage: curated\ncommander:\n  - Arahbo, Roar of the World\ncompanion: Kaheera, the Orphanguard\ncards:\n  - name: Plains\n    category: utility\n    why: because\n    qty: 20\n  - name: Sol Ring\n    category: utility\n    why: because\n",
+   "slug": "arahbo",
+   "checked": 4,
+   "resolved": {"Arahbo, Roar of the World":"Arahbo, Roar of the World","Kaheera, the Orphanguard":"Kaheera, the Orphanguard","Plains":"Plains","Sol Ring":"Sol Ring"},
+   "missing": [],
+   "ok": true,
+   "renamed": [],
+   "summary": "arahbo: all 4 cards implemented by Forge",
+   "refusal": null
+  },
+  {
+   "note": "partners",
+   "deck": "slug: partners\nname: Two Commanders\nstatus: theoretical\nstage: curated\ncommander:\n  - Thrasios, Triton Hero\n  - Tymna the Weaver\ncards:\n  - name: Island\n    category: utility\n    why: because\n    qty: 30\n",
+   "slug": "partners",
+   "checked": 3,
+   "resolved": {"Thrasios, Triton Hero":"Thrasios, Triton Hero","Tymna the Weaver":"Tymna the Weaver","Island":"Island"},
+   "missing": [],
+   "ok": true,
+   "renamed": [],
+   "summary": "partners: all 3 cards implemented by Forge",
+   "refusal": null
+  },
+  {
+   "note": "dfc",
+   "deck": "slug: dfc\nname: Faces\nstatus: theoretical\nstage: curated\ncommander:\n  - Ajani, Nacatl Pariah // Ajani, Nacatl Avenger\ncards:\n  - name: Barkchannel Pathway // Tidechannel Pathway\n    category: utility\n    why: because\n  - name: Alive // Well\n    category: utility\n    why: because\n  - name: Forest\n    category: utility\n    why: because\n    qty: 30\n",
+   "slug": "dfc",
+   "checked": 4,
+   "resolved": {"Ajani, Nacatl Pariah // Ajani, Nacatl Avenger":"Ajani, Nacatl Pariah","Barkchannel Pathway // Tidechannel Pathway":"Barkchannel Pathway","Alive // Well":"Alive","Forest":"Forest"},
+   "missing": [],
+   "ok": true,
+   "renamed": [["Ajani, Nacatl Pariah // Ajani, Nacatl Avenger","Ajani, Nacatl Pariah"],["Alive // Well","Alive"],["Barkchannel Pathway // Tidechannel Pathway","Barkchannel Pathway"]],
+   "summary": "dfc: all 4 cards implemented by Forge (3 resolved to a face name)",
+   "refusal": null
+  },
+  {
+   "note": "odd",
+   "deck": "slug: odd\nname: Odd\nstatus: theoretical\nstage: curated\ncommander: []\ncards:\n  - name: Zuran Orb\n    category: utility\n    why: because\n  - name: Ancestral Recall\n    category: utility\n    why: because\n  - name: Zuran Orb\n    category: utility\n    why: because\n    qty: 2\n  - name: Bösium Strip\n    category: utility\n    why: because\n",
+   "slug": "odd",
+   "checked": 3,
+   "resolved": {"Zuran Orb":"Zuran Orb","Bösium Strip":"Bösium Strip"},
+   "missing": ["Ancestral Recall"],
+   "ok": false,
+   "renamed": [],
+   "summary": "odd: Forge does not implement 1 of 3 cards:\n  Ancestral Recall",
+   "refusal": "Forge does not implement every card, so no result would mean anything:\nodd: Forge does not implement 1 of 3 cards:\n  Ancestral Recall"
+  },
+  {
+   "note": "empty",
+   "deck": "slug: empty\nname: Empty\nstatus: theoretical\nstage: curated\ncommander: []\ncards: []\n",
+   "slug": "empty",
+   "checked": 0,
+   "resolved": {},
+   "missing": [],
+   "ok": true,
+   "renamed": [],
+   "summary": "empty: all 0 cards implemented by Forge",
+   "refusal": null
+  },
+  {
+   "note": "faces",
+   "deck": "slug: faces\nname: Faces Tried In Order\nstatus: theoretical\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\ncards:\n  - name: Unprinted Front // Tidechannel Pathway\n    category: utility\n    why: because\n  - name: Ajani, Nacatl Pariah // Ajani, Nacatl Avenger\n    category: utility\n    why: because\n  - name: Nothing Here // Nor Here\n    category: utility\n    why: because\n  - name: Forest\n    category: utility\n    why: because\n    qty: 30\n",
+   "slug": "faces",
+   "checked": 5,
+   "resolved": {
+    "Atla Palani, Nest Tender": "Atla Palani, Nest Tender",
+    "Unprinted Front // Tidechannel Pathway": "Tidechannel Pathway",
+    "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger": "Ajani, Nacatl Pariah",
+    "Forest": "Forest"
+   },
+   "missing": ["Nothing Here // Nor Here"],
+   "ok": false,
+   "renamed": [["Ajani, Nacatl Pariah // Ajani, Nacatl Avenger","Ajani, Nacatl Pariah"],["Unprinted Front // Tidechannel Pathway","Tidechannel Pathway"]],
+   "summary": "faces: Forge does not implement 1 of 5 cards:\n  Nothing Here // Nor Here",
+   "refusal": "Forge does not implement every card, so no result would mean anything:\nfaces: Forge does not implement 1 of 5 cards:\n  Nothing Here // Nor Here"
+  },
+  {
+   "note": "two broken decks, one message",
+   "deck": "slug: broken\nname: Broken\nstatus: theoretical\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\ncards:\n  - name: Nonexistent Card 1\n    category: utility\n    why: x\n  - name: Sol Ring\n    category: ramp\n    why: x\n  - name: Nonexistent Card 2\n    category: utility\n    why: x\n",
+   "second_deck": "slug: also-broken\nname: Also Broken\nstatus: theoretical\nstage: curated\ncommander:\n  - Nobody At All\ncards:\n  - name: Forest\n    category: land\n    why: x\n",
+   "slug": "broken",
+   "checked": 4,
+   "resolved": {"Atla Palani, Nest Tender":"Atla Palani, Nest Tender","Sol Ring":"Sol Ring"},
+   "missing": ["Nonexistent Card 1","Nonexistent Card 2"],
+   "ok": false,
+   "renamed": [],
+   "summary": "broken: Forge does not implement 2 of 4 cards:\n  Nonexistent Card 1\n  Nonexistent Card 2",
+   "second_summary": "also-broken: Forge does not implement 1 of 2 cards:\n  Nobody At All",
+   "refusal": "Forge does not implement every card, so no result would mean anything:\nbroken: Forge does not implement 2 of 4 cards:\n  Nonexistent Card 1\n  Nonexistent Card 2\nalso-broken: Forge does not implement 1 of 2 cards:\n  Nobody At All"
+  }
+ ],
+ "wire": {
+  "decks": [
+   "slug: atla-palani\nname: Atla Palani, Nest Tender - Dinos\nstatus: theoretical\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\ncards:\n  - name: Sol Ring\n    category: utility\n    why: because\n  - name: Forest\n    category: utility\n    why: because\n    qty: 36\n  - name: Ancient Bronze Dragon\n    category: utility\n    why: because\n  - name: Birds of Paradise\n    category: utility\n    why: because\n",
+   "slug: arahbo\nname: Arahbo, Roar of the World - Cats\nstatus: theoretical\nstage: curated\ncommander:\n  - Arahbo, Roar of the World\ncompanion: Kaheera, the Orphanguard\ncards:\n  - name: Plains\n    category: utility\n    why: because\n    qty: 20\n  - name: Sol Ring\n    category: utility\n    why: because\n"
+  ],
+  "reports": [
+   {
+    "slug": "atla-palani",
+    "checked": 5,
+    "resolved": {"Atla Palani, Nest Tender":"Atla Palani, Nest Tender","Sol Ring":"Sol Ring","Forest":"Forest","Ancient Bronze Dragon":"Ancient Bronze Dragon","Birds of Paradise":"Birds of Paradise"},
+    "missing": []
+   },
+   {
+    "slug": "arahbo",
+    "checked": 4,
+    "resolved": {"Arahbo, Roar of the World":"Arahbo, Roar of the World","Kaheera, the Orphanguard":"Kaheera, the Orphanguard","Plains":"Plains","Sol Ring":"Sol Ring"},
+    "missing": []
+   }
+  ],
+  "games": [
+   {"index":1,"milliseconds":5421,"draw":false,"winner":"Ai(1)-Atla","winner_seat":1,"turns":11,"timed_out":false},
+   {"index":2,"milliseconds":900,"draw":true,"winner":null,"winner_seat":null,"turns":4,"timed_out":false},
+   {"index":3,"milliseconds":300000,"draw":false,"winner":"Ai(2)-Arahbo","winner_seat":2,"turns":null,"timed_out":true}
+  ],
+  "run": {
+   "games": [
+    {"index":1,"milliseconds":5421,"draw":false,"winner":"Ai(1)-Atla","winner_seat":1,"turns":11,"timed_out":false},
+    {"index":2,"milliseconds":900,"draw":true,"winner":null,"winner_seat":null,"turns":4,"timed_out":false},
+    {"index":3,"milliseconds":300000,"draw":false,"winner":"Ai(2)-Arahbo","winner_seat":2,"turns":null,"timed_out":true}
+   ],
+   "seats": {"1":"atla-palani","2":"arahbo"},
+   "wall_seconds": 61.5,
+   "forge_version": "2.0.14"
+  },
+  "run_json": "{\"games\": [{\"index\": 1, \"milliseconds\": 5421, \"draw\": false, \"winner\": \"Ai(1)-Atla\", \"winner_seat\": 1, \"turns\": 11, \"timed_out\": false}, {\"index\": 2, \"milliseconds\": 900, \"draw\": true, \"winner\": null, \"winner_seat\": null, \"turns\": 4, \"timed_out\": false}, {\"index\": 3, \"milliseconds\": 300000, \"draw\": false, \"winner\": \"Ai(2)-Arahbo\", \"winner_seat\": 2, \"turns\": null, \"timed_out\": true}], \"seats\": {\"1\": \"atla-palani\", \"2\": \"arahbo\"}, \"wall_seconds\": 61.5, \"forge_version\": \"2.0.14\"}",
+  "game_json": [
+   "{\"index\": 1, \"milliseconds\": 5421, \"draw\": false, \"winner\": \"Ai(1)-Atla\", \"winner_seat\": 1, \"turns\": 11, \"timed_out\": false}",
+   "{\"index\": 2, \"milliseconds\": 900, \"draw\": true, \"winner\": null, \"winner_seat\": null, \"turns\": 4, \"timed_out\": false}",
+   "{\"index\": 3, \"milliseconds\": 300000, \"draw\": false, \"winner\": \"Ai(2)-Arahbo\", \"winner_seat\": 2, \"turns\": null, \"timed_out\": true}"
+  ],
+  "rebuilt_startup_seconds": 0.0,
+  "rebuilt_seats": {"1":"atla-palani","2":"arahbo"},
+  "rebuilt_wall_seconds": 61.5,
+  "old_shim_run": {"games":[{"index":1,"milliseconds":5421,"draw":false,"winner":"Ai(1)-Atla","winner_seat":1,"turns":11,"timed_out":false}],"seats":{"1":"a","2":"b"},"wall_seconds":1.0,"forge_version":null},
+  "old_shim_run_json": "{\"games\": [{\"index\": 1, \"milliseconds\": 5421, \"draw\": false, \"winner\": \"Ai(1)-Atla\", \"winner_seat\": 1, \"turns\": 11, \"timed_out\": false}], \"seats\": {\"1\": \"a\", \"2\": \"b\"}, \"wall_seconds\": 1.0, \"forge_version\": null}"
+ },
+ "shape": {
+  "caveat": "Forge's AI is best with aggro and midrange, poor with control, and bad with most combo — read results per archetype, never as a single ranking. Games that hit the clock are reported apart from draws: a clock-out is the measurement giving up, not a game outcome.",
+  "clock": 300,
+  "games_default": 10,
+  "games_max": 20,
+  "decks": {
+   "plain": "slug: atla-palani\nname: Atla Palani, Nest Tender - Dinos\nstatus: theoretical\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\ncards:\n  - name: Sol Ring\n    category: utility\n    why: because\n  - name: Forest\n    category: utility\n    why: because\n    qty: 36\n  - name: Ancient Bronze Dragon\n    category: utility\n    why: because\n  - name: Birds of Paradise\n    category: utility\n    why: because\n",
+   "companion": "slug: arahbo\nname: Arahbo, Roar of the World - Cats\nstatus: theoretical\nstage: curated\ncommander:\n  - Arahbo, Roar of the World\ncompanion: Kaheera, the Orphanguard\ncards:\n  - name: Plains\n    category: utility\n    why: because\n    qty: 20\n  - name: Sol Ring\n    category: utility\n    why: because\n",
+   "partners": "slug: partners\nname: Two Commanders\nstatus: theoretical\nstage: curated\ncommander:\n  - Thrasios, Triton Hero\n  - Tymna the Weaver\ncards:\n  - name: Island\n    category: utility\n    why: because\n    qty: 30\n",
+   "dfc": "slug: dfc\nname: Faces\nstatus: theoretical\nstage: curated\ncommander:\n  - Ajani, Nacatl Pariah // Ajani, Nacatl Avenger\ncards:\n  - name: Barkchannel Pathway // Tidechannel Pathway\n    category: utility\n    why: because\n  - name: Alive // Well\n    category: utility\n    why: because\n  - name: Forest\n    category: utility\n    why: because\n    qty: 30\n",
+   "odd": "slug: odd\nname: Odd\nstatus: theoretical\nstage: curated\ncommander: []\ncards:\n  - name: Zuran Orb\n    category: utility\n    why: because\n  - name: Ancestral Recall\n    category: utility\n    why: because\n  - name: Zuran Orb\n    category: utility\n    why: because\n    qty: 2\n  - name: Bösium Strip\n    category: utility\n    why: because\n",
+   "empty": "slug: empty\nname: Empty\nstatus: theoretical\nstage: curated\ncommander: []\ncards: []\n",
+   "faces": "slug: faces\nname: Faces Tried In Order\nstatus: theoretical\nstage: curated\ncommander:\n  - Atla Palani, Nest Tender\ncards:\n  - name: Unprinted Front // Tidechannel Pathway\n    category: utility\n    why: because\n  - name: Ajani, Nacatl Pariah // Ajani, Nacatl Avenger\n    category: utility\n    why: because\n  - name: Nothing Here // Nor Here\n    category: utility\n    why: because\n  - name: Forest\n    category: utility\n    why: because\n    qty: 30\n"
+  },
+  "shapes": [
+   {
+    "note": "an ordinary match",
+    "run": {
+     "games": [
+      {"index":1,"milliseconds":5421,"draw":false,"winner":"Ai(1)-x","winner_seat":1,"turns":11,"timed_out":false},
+      {"index":2,"milliseconds":4000,"draw":false,"winner":"Ai(2)-y","winner_seat":2,"turns":9,"timed_out":false},
+      {"index":3,"milliseconds":6800,"draw":false,"winner":"Ai(1)-x","winner_seat":1,"turns":12,"timed_out":false}
+     ],
+     "seats": {"1":"atla-palani","2":"arahbo"},
+     "wall_seconds": 30.5,
+     "forge_version": "2.0.14"
+    },
+    "slugs": ["atla-palani","arahbo"],
+    "addresses": ["local/atla-palani","local/arahbo"],
+    "games_asked": 10,
+    "seed": 7,
+    "shape": {
+     "decks": [{"slug":"atla-palani","name":"Atla Palani, Nest Tender - Dinos","address":"local/atla-palani","wins":2},{"slug":"arahbo","name":"Arahbo, Roar of the World - Cats","address":"local/arahbo","wins":1}],
+     "games": 10,
+     "played": 3,
+     "draws": 0,
+     "timed_out": 0,
+     "median_seconds": 5.4,
+     "max_seconds": 6.8,
+     "startup_seconds": 14.3,
+     "wall_seconds": 30.5,
+     "clock": 300,
+     "seed": 7,
+     "rows": [
+      {"game":1,"winner":"atla-palani","seconds":5.4,"turns":11,"draw":false,"timed_out":false},
+      {"game":2,"winner":"arahbo","seconds":4.0,"turns":9,"draw":false,"timed_out":false},
+      {"game":3,"winner":"atla-palani","seconds":6.8,"turns":12,"draw":false,"timed_out":false}
+     ],
+     "caveat": "Forge's AI is best with aggro and midrange, poor with control, and bad with most combo — read results per archetype, never as a single ranking. Games that hit the clock are reported apart from draws: a clock-out is the measurement giving up, not a game outcome."
+    }
+   },
+   {
+    "note": "an even number of games",
+    "run": {
+     "games": [
+      {"index":1,"milliseconds":1000,"draw":false,"winner":"Ai(1)-x","winner_seat":1,"turns":null,"timed_out":false},
+      {"index":2,"milliseconds":2000,"draw":false,"winner":"Ai(2)-y","winner_seat":2,"turns":null,"timed_out":false},
+      {"index":3,"milliseconds":3000,"draw":true,"winner":null,"winner_seat":null,"turns":null,"timed_out":false},
+      {"index":4,"milliseconds":4000,"draw":false,"winner":"Ai(1)-x","winner_seat":1,"turns":null,"timed_out":false}
+     ],
+     "seats": {"1":"atla-palani","2":"arahbo"},
+     "wall_seconds": 20.0,
+     "forge_version": "2.0.14"
+    },
+    "slugs": ["atla-palani","arahbo"],
+    "addresses": ["local/atla-palani","local/arahbo"],
+    "games_asked": 10,
+    "seed": 7,
+    "shape": {
+     "decks": [{"slug":"atla-palani","name":"Atla Palani, Nest Tender - Dinos","address":"local/atla-palani","wins":2},{"slug":"arahbo","name":"Arahbo, Roar of the World - Cats","address":"local/arahbo","wins":1}],
+     "games": 10,
+     "played": 4,
+     "draws": 1,
+     "timed_out": 0,
+     "median_seconds": 2.5,
+     "max_seconds": 4.0,
+     "startup_seconds": 10.0,
+     "wall_seconds": 20.0,
+     "clock": 300,
+     "seed": 7,
+     "rows": [
+      {"game":1,"winner":"atla-palani","seconds":1.0,"turns":null,"draw":false,"timed_out":false},
+      {"game":2,"winner":"arahbo","seconds":2.0,"turns":null,"draw":false,"timed_out":false},
+      {"game":3,"winner":null,"seconds":3.0,"turns":null,"draw":true,"timed_out":false},
+      {"game":4,"winner":"atla-palani","seconds":4.0,"turns":null,"draw":false,"timed_out":false}
+     ],
+     "caveat": "Forge's AI is best with aggro and midrange, poor with control, and bad with most combo — read results per archetype, never as a single ranking. Games that hit the clock are reported apart from draws: a clock-out is the measurement giving up, not a game outcome."
+    }
+   },
+   {
+    "note": "a clock-out wearing a trophy",
+    "run": {
+     "games": [
+      {"index":1,"milliseconds":300000,"draw":false,"winner":"Ai(1)-x","winner_seat":1,"turns":null,"timed_out":true},
+      {"index":2,"milliseconds":5000,"draw":false,"winner":"Ai(2)-y","winner_seat":2,"turns":null,"timed_out":false}
+     ],
+     "seats": {"1":"atla-palani","2":"arahbo"},
+     "wall_seconds": 310.0,
+     "forge_version": "2.0.14"
+    },
+    "slugs": ["atla-palani","arahbo"],
+    "addresses": ["local/atla-palani","local/arahbo"],
+    "games_asked": 10,
+    "seed": 7,
+    "shape": {
+     "decks": [{"slug":"atla-palani","name":"Atla Palani, Nest Tender - Dinos","address":"local/atla-palani","wins":0},{"slug":"arahbo","name":"Arahbo, Roar of the World - Cats","address":"local/arahbo","wins":1}],
+     "games": 10,
+     "played": 2,
+     "draws": 0,
+     "timed_out": 1,
+     "median_seconds": 152.5,
+     "max_seconds": 300.0,
+     "startup_seconds": 5.0,
+     "wall_seconds": 310.0,
+     "clock": 300,
+     "seed": 7,
+     "rows": [{"game":1,"winner":null,"seconds":300.0,"turns":null,"draw":false,"timed_out":true},{"game":2,"winner":"arahbo","seconds":5.0,"turns":null,"draw":false,"timed_out":false}],
+     "caveat": "Forge's AI is best with aggro and midrange, poor with control, and bad with most combo — read results per archetype, never as a single ranking. Games that hit the clock are reported apart from draws: a clock-out is the measurement giving up, not a game outcome."
+    }
+   },
+   {
+    "note": "a real draw is not a clock-out",
+    "run": {
+     "games": [{"index":1,"milliseconds":900,"draw":true,"winner":null,"winner_seat":null,"turns":4,"timed_out":false}],
+     "seats": {"1":"atla-palani","2":"arahbo"},
+     "wall_seconds": 10.0,
+     "forge_version": "2.0.14"
+    },
+    "slugs": ["atla-palani","arahbo"],
+    "addresses": ["local/atla-palani","local/arahbo"],
+    "games_asked": 10,
+    "seed": 7,
+    "shape": {
+     "decks": [{"slug":"atla-palani","name":"Atla Palani, Nest Tender - Dinos","address":"local/atla-palani","wins":0},{"slug":"arahbo","name":"Arahbo, Roar of the World - Cats","address":"local/arahbo","wins":0}],
+     "games": 10,
+     "played": 1,
+     "draws": 1,
+     "timed_out": 0,
+     "median_seconds": 0.9,
+     "max_seconds": 0.9,
+     "startup_seconds": 9.1,
+     "wall_seconds": 10.0,
+     "clock": 300,
+     "seed": 7,
+     "rows": [{"game":1,"winner":null,"seconds":0.9,"turns":4,"draw":true,"timed_out":false}],
+     "caveat": "Forge's AI is best with aggro and midrange, poor with control, and bad with most combo — read results per archetype, never as a single ranking. Games that hit the clock are reported apart from draws: a clock-out is the measurement giving up, not a game outcome."
+    }
+   },
+   {
+    "note": "no games at all",
+    "run": {"games":[],"seats":{"1":"atla-palani","2":"arahbo"},"wall_seconds":3.0,"forge_version":"2.0.14"},
+    "slugs": ["atla-palani","arahbo"],
+    "addresses": ["local/atla-palani","local/arahbo"],
+    "games_asked": 10,
+    "seed": 7,
+    "shape": {
+     "decks": [{"slug":"atla-palani","name":"Atla Palani, Nest Tender - Dinos","address":"local/atla-palani","wins":0},{"slug":"arahbo","name":"Arahbo, Roar of the World - Cats","address":"local/arahbo","wins":0}],
+     "games": 10,
+     "played": 0,
+     "draws": 0,
+     "timed_out": 0,
+     "median_seconds": null,
+     "max_seconds": null,
+     "startup_seconds": 3.0,
+     "wall_seconds": 3.0,
+     "clock": 300,
+     "seed": 7,
+     "rows": [],
+     "caveat": "Forge's AI is best with aggro and midrange, poor with control, and bad with most combo — read results per archetype, never as a single ranking. Games that hit the clock are reported apart from draws: a clock-out is the measurement giving up, not a game outcome."
+    }
+   },
+   {
+    "note": "rounding at the half",
+    "run": {
+     "games": [
+      {"index":1,"milliseconds":1050,"draw":false,"winner":"Ai(1)-x","winner_seat":1,"turns":null,"timed_out":false},
+      {"index":2,"milliseconds":1150,"draw":false,"winner":"Ai(2)-y","winner_seat":2,"turns":null,"timed_out":false},
+      {"index":3,"milliseconds":2250,"draw":true,"winner":null,"winner_seat":null,"turns":null,"timed_out":false},
+      {"index":4,"milliseconds":2350,"draw":true,"winner":null,"winner_seat":null,"turns":null,"timed_out":false}
+     ],
+     "seats": {"1":"atla-palani","2":"arahbo"},
+     "wall_seconds": 12.35,
+     "forge_version": "2.0.14"
+    },
+    "slugs": ["atla-palani","arahbo"],
+    "addresses": ["local/atla-palani","local/arahbo"],
+    "games_asked": 10,
+    "seed": 7,
+    "shape": {
+     "decks": [{"slug":"atla-palani","name":"Atla Palani, Nest Tender - Dinos","address":"local/atla-palani","wins":1},{"slug":"arahbo","name":"Arahbo, Roar of the World - Cats","address":"local/arahbo","wins":1}],
+     "games": 10,
+     "played": 4,
+     "draws": 2,
+     "timed_out": 0,
+     "median_seconds": 1.7,
+     "max_seconds": 2.4,
+     "startup_seconds": 5.5,
+     "wall_seconds": 12.3,
+     "clock": 300,
+     "seed": 7,
+     "rows": [
+      {"game":1,"winner":"atla-palani","seconds":1.1,"turns":null,"draw":false,"timed_out":false},
+      {"game":2,"winner":"arahbo","seconds":1.1,"turns":null,"draw":false,"timed_out":false},
+      {"game":3,"winner":null,"seconds":2.2,"turns":null,"draw":true,"timed_out":false},
+      {"game":4,"winner":null,"seconds":2.4,"turns":null,"draw":true,"timed_out":false}
+     ],
+     "caveat": "Forge's AI is best with aggro and midrange, poor with control, and bad with most combo — read results per archetype, never as a single ranking. Games that hit the clock are reported apart from draws: a clock-out is the measurement giving up, not a game outcome."
+    }
+   },
+   {
+    "note": "a deck played against itself",
+    "run": {
+     "games": [
+      {"index":1,"milliseconds":1000,"draw":false,"winner":"Ai(1)-x","winner_seat":1,"turns":null,"timed_out":false},
+      {"index":2,"milliseconds":1000,"draw":false,"winner":"Ai(2)-x","winner_seat":2,"turns":null,"timed_out":false}
+     ],
+     "seats": {"1":"atla-palani","2":"atla-palani"},
+     "wall_seconds": 5.0,
+     "forge_version": "2.0.14"
+    },
+    "slugs": ["atla-palani","atla-palani"],
+    "addresses": ["local/atla-palani","local/atla-palani"],
+    "games_asked": 10,
+    "seed": 7,
+    "shape": {
+     "decks": [
+      {"slug":"atla-palani","name":"Atla Palani, Nest Tender - Dinos","address":"local/atla-palani","wins":2},
+      {"slug":"atla-palani","name":"Atla Palani, Nest Tender - Dinos","address":"local/atla-palani","wins":2}
+     ],
+     "games": 10,
+     "played": 2,
+     "draws": 0,
+     "timed_out": 0,
+     "median_seconds": 1.0,
+     "max_seconds": 1.0,
+     "startup_seconds": 3.0,
+     "wall_seconds": 5.0,
+     "clock": 300,
+     "seed": 7,
+     "rows": [{"game":1,"winner":"atla-palani","seconds":1.0,"turns":null,"draw":false,"timed_out":false},{"game":2,"winner":"atla-palani","seconds":1.0,"turns":null,"draw":false,"timed_out":false}],
+     "caveat": "Forge's AI is best with aggro and midrange, poor with control, and bad with most combo — read results per archetype, never as a single ranking. Games that hit the clock are reported apart from draws: a clock-out is the measurement giving up, not a game outcome."
+    }
+   },
+   {
+    "note": "a seat the run does not name",
+    "run": {
+     "games": [{"index":1,"milliseconds":1000,"draw":false,"winner":"Ai(9)-?","winner_seat":9,"turns":null,"timed_out":false}],
+     "seats": {"1":"atla-palani","2":"arahbo"},
+     "wall_seconds": 5.0,
+     "forge_version": "2.0.14"
+    },
+    "slugs": ["atla-palani","arahbo"],
+    "addresses": ["local/atla-palani","local/arahbo"],
+    "games_asked": 10,
+    "seed": 7,
+    "shape": {
+     "decks": [{"slug":"atla-palani","name":"Atla Palani, Nest Tender - Dinos","address":"local/atla-palani","wins":0},{"slug":"arahbo","name":"Arahbo, Roar of the World - Cats","address":"local/arahbo","wins":0}],
+     "games": 10,
+     "played": 1,
+     "draws": 0,
+     "timed_out": 0,
+     "median_seconds": 1.0,
+     "max_seconds": 1.0,
+     "startup_seconds": 4.0,
+     "wall_seconds": 5.0,
+     "clock": 300,
+     "seed": 7,
+     "rows": [{"game":1,"winner":null,"seconds":1.0,"turns":null,"draw":false,"timed_out":false}],
+     "caveat": "Forge's AI is best with aggro and midrange, poor with control, and bad with most combo — read results per archetype, never as a single ranking. Games that hit the clock are reported apart from draws: a clock-out is the measurement giving up, not a game outcome."
+    }
+   }
+  ],
+  "rows": [
+   {
+    "note": "a win",
+    "game": {"index":1,"milliseconds":5421,"draw":false,"winner":"Ai(1)-x","winner_seat":1,"turns":11,"timed_out":false},
+    "slug": "atla-palani",
+    "row": {"game":1,"winner":"atla-palani","seconds":5.4,"turns":11,"draw":false,"timed_out":false}
+   },
+   {
+    "note": "a draw",
+    "game": {"index":2,"milliseconds":900,"draw":true,"winner":null,"winner_seat":null,"turns":4,"timed_out":false},
+    "slug": null,
+    "row": {"game":2,"winner":null,"seconds":0.9,"turns":4,"draw":true,"timed_out":false}
+   },
+   {
+    "note": "a clock-out keeps its slug out of the row",
+    "game": {"index":3,"milliseconds":300000,"draw":false,"winner":"Ai(1)-x","winner_seat":1,"turns":null,"timed_out":true},
+    "slug": "atla-palani",
+    "row": {"game":3,"winner":null,"seconds":300.0,"turns":null,"draw":false,"timed_out":true}
+   },
+   {
+    "note": "a clock-out that Forge called a draw",
+    "game": {"index":4,"milliseconds":300000,"draw":true,"winner":null,"winner_seat":null,"turns":null,"timed_out":true},
+    "slug": null,
+    "row": {"game":4,"winner":null,"seconds":300.0,"turns":null,"draw":false,"timed_out":true}
+   },
+   {
+    "note": "no turn count",
+    "game": {"index":5,"milliseconds":100,"draw":false,"winner":"Ai(2)-y","winner_seat":2,"turns":null,"timed_out":false},
+    "slug": "arahbo",
+    "row": {"game":5,"winner":"arahbo","seconds":0.1,"turns":null,"draw":false,"timed_out":false}
+   }
+  ],
+  "games_dial": [
+   {"note":"absent","payload":{},"games":10},
+   {"note":"a plain number","payload":{"games":3},"games":3},
+   {"note":"the default","payload":{"games":10},"games":10},
+   {"note":"over the cap","payload":{"games":500},"games":20},
+   {"note":"exactly the cap","payload":{"games":20},"games":20},
+   {"note":"zero clamps up","payload":{"games":0},"games":1},
+   {"note":"negative clamps up","payload":{"games":-7},"games":1},
+   {"note":"a string","payload":{"games":"4"},"games":4},
+   {"note":"an underscore separator","payload":{"games":"1_2"},"games":12},
+   {"note":"a fullwidth digit","payload":{"games":"５"},"games":5},
+   {"note":"padded","payload":{"games":"  6  "},"games":6},
+   {"note":"a float truncates","payload":{"games":7.9},"games":7},
+   {"note":"a bool is an int","payload":{"games":true},"games":1},
+   {"note":"null falls to the default","payload":{"games":null},"raises":"TypeError"},
+   {"note":"not a number at all","payload":{"games":"many"},"raises":"ValueError"},
+   {"note":"a list","payload":{"games":[3]},"raises":"TypeError"}
+  ],
+  "seed_dial": [
+   {"note":"absent","payload":{},"seed":"7"},
+   {"note":"null is the default","payload":{"seed":null},"seed":"7"},
+   {"note":"empty string is the default","payload":{"seed":""},"seed":"7"},
+   {"note":"a number","payload":{"seed":12345},"seed":"12345"},
+   {"note":"a string","payload":{"seed":"99"},"seed":"99"},
+   {"note":"negative","payload":{"seed":-1},"seed":"-1"},
+   {"note":"zero is a seed, not an absence","payload":{"seed":0},"seed":"0"},
+   {"note":"past int64","payload":{"seed":1180591620717411303424},"seed":"1180591620717411303424"},
+   {"note":"a float truncates","payload":{"seed":7.9},"seed":"7"},
+   {"note":"not a number","payload":{"seed":"lucky"},"raises":"ValueError"}
+  ],
+  "labels": [
+   {"slugs":["a","b"],"games":10,"label":"Forge: a vs b, 10 games"},
+   {"slugs":["a","b"],"games":1,"label":"Forge: a vs b, 1 game"},
+   {"slugs":["atla-palani","arahbo"],"games":20,"label":"Forge: atla-palani vs arahbo, 20 games"}
+  ],
+  "keys": [
+   {"addresses":["local/atla-palani","local/arahbo"],"games":10,"seed":"7","key":"forge|local/atla-palani|local/arahbo|10|7"},
+   {"addresses":["alice/x","bob/y"],"games":1,"seed":"0","key":"forge|alice/x|bob/y|1|0"},
+   {"addresses":["local/atla-palani","local/arahbo"],"games":20,"seed":"1180591620717411303424","key":"forge|local/atla-palani|local/arahbo|20|1180591620717411303424"}
+  ]
+ }
+}

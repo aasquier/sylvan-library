@@ -19,5 +19,11 @@ import "embed"
 // about it: a file leaving a package is the one edit the per-package
 // completeness test cannot see.
 //
-//go:embed pyfloat.go source.go
+// `repr.go` joined on 2026-08-23, arriving from `internal/sim/tier1` when the
+// Forge result needed CPython's float rendering — and it was
+// `TestEveryFingerprintedPackageEmbedsItsWholeSelf` that noticed, not the
+// author. A file ARRIVING is the edit the per-package test *can* see, which is
+// the half of the pair that works.
+//
+//go:embed pyfloat.go repr.go source.go
 var SourceFS embed.FS

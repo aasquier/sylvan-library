@@ -45,6 +45,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/shelves"
 	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
+	matchledger "github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -166,6 +167,11 @@ func New(cfg Config) (*Door, error) {
 		// second one. Nil handle, nil database, dropped row with a warning --
 		// the same degradation the log makes on an instance with no app.db.
 		ClaudeLedger: ledger.RecorderFrom(d.writeDB, cfg.Logger),
+		// The match ledger (ADR 36) writes a third table in that same file
+		// and shares the handle for the same reason. Nil handle, nil
+		// database, a match recorded nowhere and a warning -- never a match
+		// somebody watched play out and then lost.
+		MatchLedger: matchledger.FromDB(d.writeDB, cfg.Logger),
 		// The two switches the account routes read, passed rather than looked
 		// up so the door and the routes it serves cannot disagree about what
 		// this process is: `me` reports RequireAuth, `logout` deletes a

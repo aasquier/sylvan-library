@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -706,7 +707,26 @@ func (a *API) sweep(ctx context.Context, slug string, d *deck.Deck, commander *s
 // caller as a job in state `error`, and the UI knows how to show one. So the
 // error is caught, carried, and returned from the worker -- same message, same
 // 200-then-error shape.
+//
+// **A missing deck carries the BARE SLUG**, which is the one place the message
+// and the route's `detail` part company. `decks.DeckNotFound(slug)` has no
+// `__str__` of its own, so `str(exc)` is its single argument -- the slug --
+// while the 404's sentence is built by the route's exception handler. Go's
+// `library.ErrNotFound` renders the sentence, which is right for the handler
+// and wrong here: a job's `error` becomes a JS `Error` in `lib/api.ts` and the
+// screen shows it, so the door said "no deck '['x']'" where Python said
+// "['x']".
+//
+// The same shape as `converse` handing the model `no deck 'x'` where Python
+// hands it the slug -- fixed there in Phase 6, found here on 2026-08-23 by
+// diffing the pair, live since Phase 5. It is unreachable from the app's own
+// client (nothing offers a deck that is not on the shelf), which is exactly
+// why nothing had noticed.
 func deferredFailure(err error) jobs.Runner {
+	var missing library.ErrNotFound
+	if errors.As(err, &missing) {
+		err = errors.New(missing.Slug)
+	}
 	return func(jobs.Progress) (any, error) { return nil, err }
 }
 

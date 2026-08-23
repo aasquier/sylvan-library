@@ -4438,6 +4438,20 @@ def write() -> None:
     SCAN_PATH.parent.mkdir(parents=True, exist_ok=True)
     SCAN_PATH.write_text(render_scan_cases(), encoding="utf-8")
     print(f"wrote the camera reader's corpus into {SCAN_PATH}")
+    PYSTR_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PYSTR_PATH.write_text(render_pystr_cases(), encoding="utf-8")
+    print(f"wrote {len(pystr_cases())} str()/repr() cases into {PYSTR_PATH}")
+    PYTEXT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PYTEXT_PATH.write_text(render_pytext_payload(), encoding="utf-8")
+    _pytext = pytext_payload()
+    print(f"wrote {len(_pytext['space_ranges'])} whitespace spans and "
+          f"{len(_pytext['break_ranges'])} line-boundary spans into {PYTEXT_PATH}")
+    FORGE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FORGE_PATH.write_text(render_forge_cases(), encoding="utf-8")
+    _forge = forge_cases()
+    print(f"wrote {len(_forge['logs'])} Forge logs, {len(_forge['dck'])} dck "
+          f"exports and {len(_forge['shape']['shapes'])} shaped matches "
+          f"into {FORGE_PATH}")
     ARGUE_PATH.parent.mkdir(parents=True, exist_ok=True)
     ARGUE_PATH.write_text(render_argue_cases(), encoding="utf-8")
     SOURCES_PATH.write_text(render_sources_cases(), encoding="utf-8")
@@ -7601,6 +7615,728 @@ def _scan_message_shape() -> dict[str, Any]:
 
 def render_scan_cases() -> str:
     return _rows_json(scan_cases()) + "\n"
+
+
+# ------------------------------------------------------------ the Forge bridge
+#
+# `sim/tier3` ported to `go/internal/sim/tier3` (Phase 7). Most of what that
+# package does is a JVM and a private network, which no corpus can hold and
+# which the Go tests and a real local match do instead. What a corpus CAN hold
+# is every pure transformation between Forge's text and the client's payload:
+# the log parser, the `.dck` exporter, the coverage reading, the wire codec,
+# and the shaped result the deck page renders.
+#
+# Two decisions about the shape of it.
+#
+# **Decks travel as deck.yaml text.** Go re-parses with `deck.FromText`, which
+# is already held to Python by 2,051 render cases and 514 edit steps, so a
+# failure here is a failure of *this* lane rather than of the parser under it.
+#
+# **The log fixtures are Forge's real format strings**, read out of
+# `forge.view.SimulateMatch` the way `parse.py`'s docstring says, plus the
+# pathological lines that only ever appeared once — the unsupported-card
+# complaint that plays on, the slow-match warning that arrives before the
+# result it belongs to, and the deck that would not load.
+
+PYSTR_PATH = ROOT / "go" / "internal" / "wire" / "testdata" / "pystr.json"
+
+
+def pystr_cases() -> list[dict[str, Any]]:
+    """`str()` and `repr()` over a JSON-decoded value.
+
+    Four route families coerce a body field with `str(payload.get(k) or "")`
+    before it becomes a slug, and for every value a real client sends — a
+    string — `str` is the identity. For the values a client does not send it is
+    not, and the answer lands in a 404's `detail`, which the deck page renders
+    verbatim: `str(["x"])` is `"['x']"` and Go's `fmt.Sprint` of the same
+    decoded list is `"[x]"`.
+
+    **Found by diffing the pair, live since Phase 5.** The cases are JSON
+    *documents* rather than Python literals, so both sides decode the same
+    bytes with their own decoder — which is the only way this checks the
+    coercion rather than two hand-written value trees.
+    """
+    import json as _json
+
+    documents = [
+        ("a string", '"mono-green"'),
+        ("an empty string", '""'),
+        ("a string with a quote", '"it\'s"'),
+        ("a string with both quotes", '"it\'s a \\"deck\\""'),
+        ("a non-ascii string", '"B\u00f6sium Strip"'),
+        ("null", "null"),
+        ("true", "true"),
+        ("false", "false"),
+        ("an integer", "7"),
+        ("a negative integer", "-7"),
+        ("a huge integer", "1180591620717411303424"),
+        # `1.0` is `1.0` to Python and `1` to a naive Go renderer.
+        ("a whole float", "1.0"),
+        ("a float", "1.5"),
+        ("an exponent", "1e16"),
+        ("a small exponent", "1e-05"),
+        ("a list of strings", '["x"]'),
+        ("a longer list", '["x","y"]'),
+        ("an empty list", "[]"),
+        ("a nested list", '[["x"],2]'),
+        ("a list with a null and a bool", "[null,true,false]"),
+        ("a list of numbers", "[1,1.0,-2]"),
+        ("an object", '{"a":"x"}'),
+        ("an empty object", "{}"),
+        # **The one row where Go cannot agree**, and it is recorded as such
+        # rather than left out: a JSON object decodes to a Go map, whose
+        # iteration order is randomised, so the port sorts the keys where
+        # Python keeps the document's. `sorted` says which answer Go gives, and
+        # the Go test asserts THAT — so the limit is checked rather than
+        # merely written down, and the day somebody decodes bodies through an
+        # ordered map this row tells them to update it.
+        ("an object whose key order Go cannot keep", '{"b":2,"a":1}'),
+        ("an object inside a list", '[{"a":"x"}]'),
+        ("a string with a newline", '"a\\nb"'),
+    ]
+    rows = []
+    for note, document in documents:
+        value = _json.loads(document)
+        row = {"note": note, "document": document,
+               "str": str(value), "repr": repr(value)}
+        if isinstance(value, dict) and len(value) > 1:
+            # What Go answers instead: the same rendering with the keys
+            # sorted. Computed here so the two spellings sit side by side and
+            # a reader can see exactly how far apart they are.
+            row["go_sorts_to"] = repr(dict(sorted(value.items())))
+        rows.append(row)
+    return rows
+
+
+def render_pystr_cases() -> str:
+    return _rows_json(pystr_cases()) + "\n"
+
+
+PYTEXT_PATH = ROOT / "go" / "internal" / "pytext" / "testdata" / "pytext.json"
+
+
+def pytext_payload() -> dict[str, Any]:
+    """CPython's whitespace and line-boundary tables, swept whole.
+
+    **The whole of Unicode rather than the differences**, for the reason
+    `pycasefold`'s table gives: recording only the code points where Python
+    and Go disagree would leave the rest resting on Go's `unicode` tables
+    agreeing with CPython's, which is a claim about two projects' Unicode
+    versions rather than one this port gets to make.
+
+    Two tables, and they are NOT the same set — which is the near-miss this
+    package exists for. U+001C..U+001E are both whitespace and line
+    boundaries; **U+001F is whitespace and not a boundary**; U+2028 and
+    U+2029 are both. Get either direction wrong and a Forge log line is one
+    game or none.
+
+    Recorded as run-length spans rather than code points, because the answer
+    is False almost everywhere and 1.1 million rows of it would be a corpus
+    nobody could read.
+    """
+    spaces: list[list[int]] = []
+    breaks: list[list[int]] = []
+
+    def sweep(predicate: Any, into: list[list[int]]) -> None:
+        start: int | None = None
+        for cp in range(0x110000):
+            # Surrogates are not characters, and Go cannot put one in a
+            # string at all — so they are excluded on both sides rather than
+            # asked about.
+            hit = False if 0xD800 <= cp <= 0xDFFF else predicate(chr(cp))
+            if hit and start is None:
+                start = cp
+            elif not hit and start is not None:
+                into.append([start, cp - 1])
+                start = None
+        if start is not None:
+            into.append([start, 0x10FFFF])
+
+    sweep(lambda c: c.isspace(), spaces)
+    # A character is a line boundary exactly when splitting a string on it
+    # yields two pieces. Asked of the function rather than of a table, so the
+    # corpus records what `str.splitlines()` DOES rather than what a document
+    # says it does.
+    sweep(lambda c: len(("a" + c + "b").splitlines()) == 2, breaks)
+
+    strips = []
+    for note, raw in [
+        ("nothing to strip", "plain"),
+        ("ascii space", "  padded  "),
+        ("a tab and a newline", "\t\nx\n\t"),
+        ("the information separators", "\u001cx\u001f"),
+        ("a no-break space", "\u00a0x\u00a0"),
+        ("a line separator", "\u2028x\u2029"),
+        ("an ideographic space", "\u3000x\u3000"),
+        ("all whitespace", " \t\n\u001f"),
+        ("empty", ""),
+        ("a zero-width space is NOT whitespace", "\u200bx\u200b"),
+        ("a Mongolian vowel separator is NOT whitespace", "\u180ex\u180e"),
+    ]:
+        strips.append({"note": note, "text": raw, "stripped": raw.strip(),
+                       "rstripped": raw.rstrip(),
+                       "split_join": " ".join(raw.split())})
+
+    splits = []
+    for note, raw in [
+        ("no boundary at all", "one line"),
+        ("a trailing newline yields no empty tail", "a\nb\n"),
+        ("two trailing newlines do", "a\nb\n\n"),
+        ("CRLF is one boundary", "a\r\nb\r\n"),
+        ("a bare CR is a boundary", "a\rb"),
+        ("a lone LF after text", "a\nb"),
+        ("a vertical tab", "a\vb"),
+        ("a form feed", "a\fb"),
+        ("the file separator", "a\u001cb"),
+        ("the group separator", "a\u001db"),
+        ("the record separator", "a\u001eb"),
+        ("the UNIT separator is not a boundary", "a\u001fb"),
+        ("NEL", "a\u0085b"),
+        ("a line separator", "a\u2028b"),
+        ("a paragraph separator", "a\u2029b"),
+        ("empty", ""),
+        ("one newline alone", "\n"),
+        ("a mix", "a\r\nb\rc\nd\ve\ff\u0085g\u2028h"),
+        # A multi-byte character either side of a boundary: a byte-wise split
+        # would cut one in half.
+        ("multibyte around a boundary", "B\u00f6sium\nD\u00e9j\u00e0"),
+    ]:
+        splits.append({"note": note, "text": raw, "lines": raw.splitlines()})
+
+    heads = []
+    for note, raw, n in [
+        ("ascii, under", "abc", 5),
+        ("ascii, exact", "abcde", 5),
+        ("ascii, over", "abcdefgh", 5),
+        # `len()` and slicing are CODE POINTS, not bytes: five accented
+        # characters are five to Python and ten in UTF-8.
+        ("accents count as one each", "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9", 5),
+        ("an emoji is one code point", "\U0001f600\U0001f600\U0001f600", 2),
+        ("empty", "", 3),
+    ]:
+        heads.append({"note": note, "text": raw, "n": n,
+                      "len": len(raw), "head": raw[:n]})
+
+    return {"space_ranges": spaces, "break_ranges": breaks,
+            "strips": strips, "splits": splits, "heads": heads}
+
+
+def render_pytext_payload() -> str:
+    return _rows_json(pytext_payload()) + "\n"
+
+
+FORGE_PATH = ROOT / "go" / "internal" / "sim" / "tier3" / "testdata" / "forge.json"
+
+
+def forge_log_cases() -> list[dict[str, Any]]:
+    """Every shape a `forge sim -q` stream can take, parsed.
+
+    Recorded as the WHOLE parse rather than as a game count, because the
+    fields that separate a real draw from a clock-out and a winner from a
+    seat are exactly the ones a careless port folds together.
+    """
+    from mtglab.sim.tier3 import parse
+
+    texts: list[tuple[str, str]] = [
+        ("a clean win",
+         "Game Result: Game 1 ended in 5421 ms. Ai(2)-Atla Palani has won!\n"),
+        ("a turn count arrives first",
+         (
+          "Game Outcome: Turn 11\n"
+          "Game Result: Game 1 ended in 5421 ms. Ai(1)-Arahbo has won!\n"
+         )),
+        ("a real draw",
+         "Game Result: Game 3 ended in a Draw! Took 900 ms.\n"),
+        # The slow-match warning is printed BEFORE the result line it belongs
+        # to, so a parser that forgot to hold it would file the clock-out
+        # against the next game instead of this one.
+        ("a clock-out wears a winner",
+         ("Stopping slow match as draw\n"
+          "Game Result: Game 2 ended in 300000 ms. Ai(1)-Tivit has won!\n")),
+        ("a clock-out with no winner",
+         (
+          "Stopping slow match as draw\n"
+          "Game Result: Game 2 ended in a Draw! Took 300000 ms.\n"
+         )),
+        ("the pending state does not leak into the next game",
+         (
+          "Game Outcome: Turn 7\n"
+          "Stopping slow match as draw\n"
+          "Game Result: Game 1 ended in 300000 ms. Ai(1)-A has won!\n"
+          "Game Result: Game 2 ended in 4000 ms. Ai(2)-B has won!\n"
+         )),
+        # The experiment CLAUDE.md records: three unimplemented cards, and
+        # then Forge played the game anyway and reported a winner.
+        ("an unsupported card, and the game plays on",
+         ('An unsupported card was requested: "Nonexistent Card 1" from "[N.A.]".\n'
+          "Forge could not find this card in the Database. Please report it.\n"
+          "Game Result: Game 1 ended in 7212 ms. Ai(2)-Goreclaw has won!\n")),
+        ("the same complaint repeated per copy is one name",
+         (
+          'An unsupported card was requested: "Nonexistent Card 1" from "[N.A.]".\n'
+          'An unsupported card was requested: "Nonexistent Card 1" from "[N.A.]".\n'
+          'An unsupported card was requested: "Other Card" from "[N.A.]".\n'
+         )),
+        ("a deck that would not load",
+         "Could not load deck - cat-tribal, match cannot start\n"),
+        ("a label with no seat",
+         "Game Result: Game 1 ended in 100 ms. Somebody has won!\n"),
+        # A deck name is under the user's control and rides inside the winner
+        # label, so the label's own alphabet is part of the contract.
+        ("a deck name with an em dash and an accent",
+         "Game Result: Game 1 ended in 100 ms. Ai(2)-Bösium — Strip has won!\n"),
+        ("noise between results is ignored",
+         (
+          "[main] WARN forge.ai — could not evaluate\n"
+          "Game Result: Game 1 ended in 42 ms. Ai(1)-A has won!\n"
+          "Loading card database...\n"
+         )),
+        ("nothing at all", ""),
+        ("only noise", "Loading card database...\nDone.\n"),
+        # `str.splitlines()` splits on eight boundaries `split("\n")` does
+        # not. A form feed inside a deck name splits the winner line in
+        # Python and leaves it whole in Go — one game against none.
+        ("a form feed splits a line for str.splitlines",
+         ("Game Result: Game 1 ended in 100 ms. Ai(1)-A has won!\x0c"
+          "Game Result: Game 2 ended in 200 ms. Ai(2)-B has won!\n")),
+        ("a NEL splits a line too",
+         (
+          "Game Result: Game 1 ended in 100 ms. Ai(1)-A has won!\u0085"
+          "Game Outcome: Turn 3\n"
+          "Game Result: Game 2 ended in 200 ms. Ai(2)-B has won!\n"
+         )),
+        # A carriage return alone is a line boundary; CRLF is ONE boundary.
+        ("CRLF is one boundary",
+         ("Game Result: Game 1 ended in 100 ms. Ai(1)-A has won!\r\n"
+          "Game Result: Game 2 ended in 200 ms. Ai(2)-B has won!\r\n")),
+        # U+001F is whitespace to `strip` and NOT a line boundary, which is
+        # the near-miss `pytext` exists for: get it wrong in either direction
+        # and this row moves.
+        ("a unit separator is stripped, never split",
+         "\u001fGame Result: Game 1 ended in 100 ms. Ai(1)-A has won!\u001f\n"),
+    ]
+
+    rows: list[dict[str, Any]] = []
+    for note, text in texts:
+        output = parse.parse(text)
+        rows.append({
+            "note": note,
+            "text": text,
+            "trustworthy": output.trustworthy,
+            "unsupported": output.unsupported,
+            "deck_load_failures": output.deck_load_failures,
+            "games": [
+                {"index": g.index, "milliseconds": g.milliseconds,
+                 "draw": g.draw, "winner": g.winner,
+                 "winner_seat": g.winner_seat, "turns": g.turns,
+                 "timed_out": g.timed_out}
+                for g in output.games
+            ],
+            # The stateless predicate, asked of every line, because it is a
+            # separate seam older tests pin and a port could get it right in
+            # one place and wrong in the other.
+            "is_game_result": [parse.is_game_result(line)
+                               for line in text.splitlines()],
+        })
+    return rows
+
+
+def forge_decks() -> dict[str, Any]:
+    """The decks the exporter and the pre-flight are asked about.
+
+    Small and hand-built rather than real: what is being checked is section
+    order, quantity lines, sorting, the companion's place, and how a `A // B`
+    name resolves — none of which wants a 99-card file to read through.
+    """
+    from mtglab.decks.model import CardEntry as Card
+    from mtglab.decks.model import Deck
+
+    def card(name: str, qty: int = 1) -> Card:
+        return Card(name=name, category="utility", why="because", qty=qty)
+
+    plain = Deck(slug="atla-palani", name="Atla Palani, Nest Tender - Dinos",
+                 commander=["Atla Palani, Nest Tender"],
+                 cards=[card("Sol Ring"), card("Forest", 36),
+                        card("Ancient Bronze Dragon"), card("Birds of Paradise")])
+    companion = Deck(slug="arahbo", name="Arahbo, Roar of the World - Cats",
+                     commander=["Arahbo, Roar of the World"],
+                     companion="Kaheera, the Orphanguard",
+                     cards=[card("Plains", 20), card("Sol Ring")])
+    partners = Deck(slug="partners", name="Two Commanders",
+                    commander=["Thrasios, Triton Hero", "Tymna the Weaver"],
+                    cards=[card("Island", 30)])
+    # A modal DFC: Scryfall's combined name is what deck.yaml holds, and the
+    # face name is the only thing Forge's index has.
+    dfc = Deck(slug="dfc", name="Faces",
+               commander=["Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"],
+               cards=[card("Barkchannel Pathway // Tidechannel Pathway"),
+                      card("Alive // Well"), card("Forest", 30)])
+    # No commander at all, and a card repeated under two entries — the deck
+    # the exporter's sort and the pre-flight's dedupe are asked about.
+    odd = Deck(slug="odd", name="Odd",
+               cards=[card("Zuran Orb"), card("Ancestral Recall"),
+                      card("Zuran Orb", 2), card("Bösium Strip")])
+    empty = Deck(slug="empty", name="Empty")
+    # **The faces are tried IN ORDER, and a later one can be the answer.**
+    # Every `A // B` above resolves on its front, so a `resolve` that tried
+    # only the front passed the whole corpus -- measured, after that mutation
+    # survived. These three separate it: a front the index lacks and a back it
+    # has, a name where neither face is known, and a pair where BOTH are known
+    # so front-first is observable rather than assumed.
+    faces = Deck(slug="faces", name="Faces Tried In Order",
+                 commander=["Atla Palani, Nest Tender"],
+                 cards=[card("Unprinted Front // Tidechannel Pathway"),
+                        card("Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"),
+                        card("Nothing Here // Nor Here"),
+                        card("Forest", 30)])
+    return {"plain": plain, "companion": companion, "partners": partners,
+            "dfc": dfc, "odd": odd, "empty": empty, "faces": faces}
+
+
+#: What a hand-built index knows, standing in for Forge's 34,532 names. Face
+#: names only, which is the fact the exporter depends on: a modal DFC
+#: contributes two entries and never the combined `A // B`.
+FORGE_INDEX = [
+    "Atla Palani, Nest Tender", "Sol Ring", "Forest", "Plains", "Island",
+    "Ancient Bronze Dragon", "Birds of Paradise",
+    "Arahbo, Roar of the World", "Kaheera, the Orphanguard",
+    "Thrasios, Triton Hero", "Tymna the Weaver",
+    "Ajani, Nacatl Pariah", "Ajani, Nacatl Avenger",
+    "Barkchannel Pathway", "Tidechannel Pathway", "Alive", "Well",
+    "Zuran Orb", "Bösium Strip",
+]
+
+
+def forge_dck_cases() -> list[dict[str, Any]]:
+    """Each deck as `.dck` text, byte for byte, resolved and unresolved."""
+    from mtglab.sim.tier3 import coverage, dck
+
+    index = frozenset(FORGE_INDEX)
+    rows: list[dict[str, Any]] = []
+    for name, deck in forge_decks().items():
+        report = coverage.check(deck, index)
+        rows.append({
+            "note": name,
+            "deck": deck.dump(),
+            # Unresolved: every name written as deck.yaml holds it, which is
+            # what a caller with no Forge install gets.
+            "bare": dck.to_dck(deck),
+            # Resolved: exactly what the pre-flight verified, which is the
+            # property that makes a clean report mean something.
+            "resolved": dck.to_dck(deck, report.resolved),
+        })
+    return rows
+
+
+def forge_coverage_cases() -> list[dict[str, Any]]:
+    """The pre-flight's reading of each deck, and the sentence it says."""
+    from mtglab.sim.tier3 import coverage
+    from mtglab.sim.tier3.run import CoverageFailed, raise_unless_covered
+
+    index = frozenset(FORGE_INDEX)
+    rows: list[dict[str, Any]] = []
+    for name, deck in forge_decks().items():
+        report = coverage.check(deck, index)
+        row = {
+            "note": name,
+            "deck": deck.dump(),
+            "slug": report.slug,
+            "checked": report.checked,
+            "resolved": report.resolved,
+            "missing": report.missing,
+            "ok": report.ok,
+            "renamed": [list(pair) for pair in report.renamed],
+            "summary": report.summary(),
+        }
+        try:
+            raise_unless_covered([report])
+            row["refusal"] = None
+        except CoverageFailed as exc:
+            row["refusal"] = str(exc)
+        rows.append(row)
+
+    # A deck Forge cannot fully play, which is the whole reason the pre-flight
+    # exists — and the two-deck refusal, because the message joins them.
+    from mtglab.decks.model import CardEntry as Card
+    from mtglab.decks.model import Deck
+
+    broken = Deck(slug="broken", name="Broken",
+                  commander=["Atla Palani, Nest Tender"],
+                  cards=[Card(name="Nonexistent Card 1", category="utility",
+                              why="x", qty=1),
+                         Card(name="Sol Ring", category="ramp", why="x", qty=1),
+                         Card(name="Nonexistent Card 2", category="utility",
+                              why="x", qty=1)])
+    alsobroken = Deck(slug="also-broken", name="Also Broken",
+                      commander=["Nobody At All"],
+                      cards=[Card(name="Forest", category="land", why="x", qty=1)])
+    reports = [coverage.check(d, index) for d in (broken, alsobroken)]
+    try:
+        raise_unless_covered(reports)
+        joined = None
+    except CoverageFailed as exc:
+        joined = str(exc)
+    rows.append({
+        "note": "two broken decks, one message",
+        "deck": broken.dump(),
+        "second_deck": alsobroken.dump(),
+        "slug": reports[0].slug,
+        "checked": reports[0].checked,
+        "resolved": reports[0].resolved,
+        "missing": reports[0].missing,
+        "ok": reports[0].ok,
+        "renamed": [list(p) for p in reports[0].renamed],
+        "summary": reports[0].summary(),
+        "second_summary": reports[1].summary(),
+        "refusal": joined,
+    })
+    return rows
+
+
+def forge_wire_cases() -> dict[str, Any]:
+    """The seam, in both directions, as the bytes that actually cross."""
+    from mtglab.sim.tier3 import coverage, parse, wire
+    from mtglab.sim.tier3.run import SimRun
+
+    index = frozenset(FORGE_INDEX)
+    decks = forge_decks()
+    pair = [decks["plain"], decks["companion"]]
+
+    reports = [coverage.check(d, index) for d in pair]
+    games = [
+        parse.GameResult(index=1, milliseconds=5421, winner="Ai(1)-Atla",
+                         winner_seat=1, turns=11),
+        parse.GameResult(index=2, milliseconds=900, draw=True, turns=4),
+        parse.GameResult(index=3, milliseconds=300000, winner="Ai(2)-Arahbo",
+                         winner_seat=2, timed_out=True),
+    ]
+    run = SimRun(argv=["java", "-jar", "forge.jar"],
+                 output=parse.SimOutput(games=games),
+                 wall_seconds=61.5, seats={1: "atla-palani", 2: "arahbo"},
+                 coverage=reports, forge_version="2.0.14")
+    rebuilt = wire.run_from_wire(wire.run_to_wire(run))
+    return {
+        "decks": wire.decks_to_wire(pair),
+        "reports": wire.reports_to_wire(reports),
+        "games": [wire.game_to_wire(g) for g in games],
+        "run": wire.run_to_wire(run),
+        # The bytes, not just the shape: key order is the contract on a wire
+        # a Python shim and a Go app may be on opposite ends of.
+        "run_json": json.dumps(wire.run_to_wire(run)),
+        "game_json": [json.dumps(wire.game_to_wire(g)) for g in games],
+        # A run rebuilt from the wire computes the same derived numbers.
+        "rebuilt_startup_seconds": rebuilt.startup_seconds,
+        "rebuilt_seats": {str(k): v for k, v in rebuilt.seats.items()},
+        "rebuilt_wall_seconds": rebuilt.wall_seconds,
+        # Deploy skew: a shim from before the field omits it, and the app must
+        # read that as "not reported" rather than as an error.
+        "old_shim_run": wire.run_to_wire(
+            SimRun(argv=[], output=parse.SimOutput(games=games[:1]),
+                   wall_seconds=1.0, seats={1: "a", 2: "b"})),
+        # **A whole-second wall clock**, recorded as bytes: Python writes
+        # `1.0` and `encoding/json` writes `1` for the same float64, and a
+        # round trip that only decodes would never see it. This row is what
+        # `pyfloat.Float` on the wire exists for.
+        "old_shim_run_json": json.dumps(wire.run_to_wire(
+            SimRun(argv=[], output=parse.SimOutput(games=games[:1]),
+                   wall_seconds=1.0, seats={1: "a", 2: "b"}))),
+    }
+
+
+def forge_shape_cases() -> dict[str, Any]:
+    """The payload the deck page renders, and the two dials that make it."""
+    from mtglab.api import forgeruns
+    from mtglab.sim.tier3 import parse, wire
+    from mtglab.sim.tier3.run import SimRun
+
+    decks = forge_decks()
+    pair = [decks["plain"], decks["companion"]]
+    addresses = ["local/atla-palani", "local/arahbo"]
+
+    def run_of(games: list[Any], wall: float,
+               seats: dict[int, str] | None = None) -> SimRun:
+        return SimRun(argv=[], output=parse.SimOutput(games=games),
+                      wall_seconds=wall,
+                      seats=seats or {1: "atla-palani", 2: "arahbo"},
+                      forge_version="2.0.14")
+
+    def game(index: int, ms: int, **kw: Any) -> parse.GameResult:
+        return parse.GameResult(index=index, milliseconds=ms, **kw)
+
+    shapes: list[dict[str, Any]] = []
+    for note, games, wall, seats, decks_used, addr in [
+        ("an ordinary match",
+         [game(1, 5421, winner="Ai(1)-x", winner_seat=1, turns=11),
+          game(2, 4000, winner="Ai(2)-y", winner_seat=2, turns=9),
+          game(3, 6800, winner="Ai(1)-x", winner_seat=1, turns=12)],
+         30.5, None, pair, addresses),
+        # An even count: the median is the mean of the two middle values, not
+        # a middle element — the arithmetic a port most often gets wrong.
+        ("an even number of games",
+         [game(1, 1000, winner="Ai(1)-x", winner_seat=1),
+          game(2, 2000, winner="Ai(2)-y", winner_seat=2),
+          game(3, 3000, draw=True),
+          game(4, 4000, winner="Ai(1)-x", winner_seat=1)],
+         20.0, None, pair, addresses),
+        # A clock-out counts for NOBODY even though Forge printed a winner.
+        ("a clock-out wearing a trophy",
+         [game(1, 300000, winner="Ai(1)-x", winner_seat=1, timed_out=True),
+          game(2, 5000, winner="Ai(2)-y", winner_seat=2)],
+         310.0, None, pair, addresses),
+        ("a real draw is not a clock-out",
+         [game(1, 900, draw=True, turns=4)], 10.0, None, pair, addresses),
+        ("no games at all", [], 3.0, None, pair, addresses),
+        # Half-millisecond rounding: `round(x, 1)` is half-to-EVEN, so 1050ms
+        # is 1.0 and 1150ms is 1.2. A port reaching for `math.Round` answers
+        # 1.1 and 1.2, and only one of those rows separates them.
+        ("rounding at the half",
+         [game(1, 1050, winner="Ai(1)-x", winner_seat=1),
+          game(2, 1150, winner="Ai(2)-y", winner_seat=2),
+          game(3, 2250, draw=True),
+          game(4, 2350, draw=True)],
+         12.35, None, pair, addresses),
+        # **The self-match wart**: `wins` is keyed on the slug, so one deck
+        # played against itself collapses two seats into one counter and both
+        # lines report the total.
+        ("a deck played against itself",
+         [game(1, 1000, winner="Ai(1)-x", winner_seat=1),
+          game(2, 1000, winner="Ai(2)-x", winner_seat=2)],
+         5.0, {1: "atla-palani", 2: "atla-palani"},
+         [decks["plain"], decks["plain"]],
+         ["local/atla-palani", "local/atla-palani"]),
+        # A winner seat nothing maps: `seats.get` answers None and the row
+        # reports no winner rather than raising.
+        ("a seat the run does not name",
+         [game(1, 1000, winner="Ai(9)-?", winner_seat=9)],
+         5.0, None, pair, addresses),
+    ]:
+        run = run_of(games, wall, seats)
+        shapes.append({
+            "note": note,
+            # The INPUT, in the wire codec both runtimes already agree on, so
+            # the Go side rebuilds the exact run rather than reverse-
+            # engineering one out of the answer. A test that has to invert its
+            # own subject is a test that will agree with a wrong inversion.
+            "run": wire.run_to_wire(run),
+            "slugs": [d.slug for d in decks_used],
+            "addresses": addr,
+            "games_asked": 10,
+            "seed": 7,
+            "shape": forgeruns._shape(decks_used, addr, 10, 7, run),
+        })
+
+    # `_row` alone, at the moment a tick carries it — the same builder, and a
+    # theater that showed one shape live and another in the tally would be the
+    # drift the wire codec exists to prevent.
+    rows = []
+    for note, g, slug in [
+        ("a win", game(1, 5421, winner="Ai(1)-x", winner_seat=1, turns=11), "atla-palani"),
+        ("a draw", game(2, 900, draw=True, turns=4), None),
+        ("a clock-out keeps its slug out of the row",
+         game(3, 300000, winner="Ai(1)-x", winner_seat=1, timed_out=True), "atla-palani"),
+        ("a clock-out that Forge called a draw",
+         game(4, 300000, draw=True, timed_out=True), None),
+        ("no turn count", game(5, 100, winner="Ai(2)-y", winner_seat=2), "arahbo"),
+    ]:
+        rows.append({"note": note, "game": wire.game_to_wire(g),
+                     "slug": slug, "row": forgeruns._row(g, slug)})
+
+    games_dial = []
+    for note, payload in [
+        ("absent", {}),
+        ("a plain number", {"games": 3}),
+        ("the default", {"games": forgeruns.GAMES_DEFAULT}),
+        ("over the cap", {"games": 500}),
+        ("exactly the cap", {"games": forgeruns.GAMES_MAX}),
+        ("zero clamps up", {"games": 0}),
+        ("negative clamps up", {"games": -7}),
+        ("a string", {"games": "4"}),
+        # Python's `int()` grammar, which is not `strconv.Atoi`.
+        ("an underscore separator", {"games": "1_2"}),
+        ("a fullwidth digit", {"games": "\uff15"}),
+        ("padded", {"games": "  6  "}),
+        ("a float truncates", {"games": 7.9}),
+        ("a bool is an int", {"games": True}),
+        ("null falls to the default", {"games": None}),
+        ("not a number at all", {"games": "many"}),
+        ("a list", {"games": [3]}),
+    ]:
+        row: dict[str, Any] = {"note": note, "payload": payload}
+        try:
+            row["games"] = forgeruns._games(payload)
+        except (TypeError, ValueError) as exc:
+            # **A wart, pinned**: `plan_forge` runs in the request with
+            # nothing catching this, so it is an uncaught 500 rather than the
+            # 422 it should be.
+            row["raises"] = type(exc).__name__
+        games_dial.append(row)
+
+    seed_dial = []
+    for note, payload in [
+        ("absent", {}),
+        ("null is the default", {"seed": None}),
+        ("empty string is the default", {"seed": ""}),
+        ("a number", {"seed": 12345}),
+        ("a string", {"seed": "99"}),
+        ("negative", {"seed": -1}),
+        ("zero is a seed, not an absence", {"seed": 0}),
+        # Python's integers are unbounded and the seed is echoed back, so a
+        # value past 2**63 must not silently become a different number.
+        ("past int64", {"seed": 1180591620717411303424}),
+        ("a float truncates", {"seed": 7.9}),
+        ("not a number", {"seed": "lucky"}),
+    ]:
+        row = {"note": note, "payload": payload}
+        try:
+            row["seed"] = str(forgeruns._seed(payload))
+        except (TypeError, ValueError) as exc:
+            row["raises"] = type(exc).__name__
+        seed_dial.append(row)
+
+    labels = []
+    for slugs, games in [(["a", "b"], 10), (["a", "b"], 1),
+                         (["atla-palani", "arahbo"], 20)]:
+        labels.append({
+            "slugs": slugs, "games": games,
+            "label": (f"Forge: {' vs '.join(slugs)}, "
+                      f"{games} game{'s' if games != 1 else ''}"),
+        })
+
+    keys = []
+    for addr, games, seed in [(addresses, 10, 7),
+                              (["alice/x", "bob/y"], 1, 0),
+                              (addresses, 20, 1180591620717411303424)]:
+        keys.append({"addresses": addr, "games": games, "seed": str(seed),
+                     "key": "forge|" + "|".join(addr) + f"|{games}|{seed}"})
+
+    return {
+        "caveat": forgeruns.FORGE_CAVEAT,
+        "clock": forgeruns.CLOCK,
+        "games_default": forgeruns.GAMES_DEFAULT,
+        "games_max": forgeruns.GAMES_MAX,
+        "decks": {name: deck.dump() for name, deck in forge_decks().items()},
+        "shapes": shapes,
+        "rows": rows,
+        "games_dial": games_dial,
+        "seed_dial": seed_dial,
+        "labels": labels,
+        "keys": keys,
+    }
+
+
+def forge_cases() -> dict[str, Any]:
+    return {
+        "index": FORGE_INDEX,
+        "logs": forge_log_cases(),
+        "dck": forge_dck_cases(),
+        "coverage": forge_coverage_cases(),
+        "wire": forge_wire_cases(),
+        "shape": forge_shape_cases(),
+    }
+
+
+def render_forge_cases() -> str:
+    return _rows_json(forge_cases()) + "\n"
 
 
 if __name__ == "__main__":
