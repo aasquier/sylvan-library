@@ -123,6 +123,8 @@ _ORACLES = [
     ("the seven mode definitions", "MODES_PATH", "render_modes_payload"),
     ("the slot argument", "ARGUE_PATH", "render_argue_cases"),
     ("the shared sources", "SOURCES_PATH", "render_sources_cases"),
+    ("the commander dossier", "DOSSIER_PATH", "render_dossier_cases"),
+    ("research", "RESEARCH_PATH", "render_research_cases"),
 ]
 
 

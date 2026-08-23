@@ -1069,6 +1069,16 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
         except ValueError as exc:
             # A malformed stance. `CardNotInDeck` is a ValueError too, which is
             # why it is caught above this rather than below it.
+            #
+            # **This branch was dead code until 2026-08-23.** The service
+            # layer re-raised only `ClaudeUnavailable`, `CardNotInDeck` and
+            # `DeckNotFound`, so a stance ValueError was swallowed by its broad
+            # `except Exception` and arrived here as `ClaudeFailed` -- a 502
+            # for a request that was merely wrong. The Go port reproduced the
+            # 502 rather than quietly improve on it, raised it, and the ruling
+            # was 422 in both runtimes at once: `stance.StanceRejected` is the
+            # name the service layer now re-raises by, and it is still a
+            # ValueError, so this is the branch that finally answers.
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ClaudeUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -1111,7 +1121,8 @@ def create_app(*, dev: bool = False, require_auth: bool | None = None,
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ValueError as exc:
             # A malformed stance. `CardNotInDeck` is a ValueError too, which is
-            # why it is caught above this rather than below it.
+            # why it is caught above this rather than below it. Live since
+            # 2026-08-23, for the reason the interview's twin branch gives.
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ClaudeUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc

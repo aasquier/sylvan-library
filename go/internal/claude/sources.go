@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/deckread"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
 // The two hosted-search modes' shared instruments: what counts as a source,
@@ -76,8 +78,45 @@ func pyStr(v any) string {
 		// that this path matches Python. The guard against needing it is
 		// UseNumber, not this.
 		return strconv.FormatFloat(value, 'f', -1, 64)
+	case []any, map[string]any:
+		// `str()` of a list or a dict is its repr: `['a', 1, None, True]`.
+		// Reachable from one place a PERSON controls -- `check_question`'s
+		// `str(raw or "")`, when a body carries a list where a string was
+		// expected -- which is why it is reproduced at all.
+		return pyReprJSON(value)
 	default:
 		return fmt.Sprint(value)
+	}
+}
+
+// pyReprJSON is `repr()` over a decoded JSON value, as far as it can be: a
+// list keeps its order and its Python spellings (`None`, `True`, single-quoted
+// strings, a number's literal). **A dict's keys come out sorted**, because
+// `readBody` decodes an object into a Go map and the insertion order Python
+// would print is already gone by the time anything can repr it; that residue
+// is documented here and pinned nowhere, since a question that is a JSON
+// object is a client bug rather than anything a person types.
+func pyReprJSON(v any) string {
+	switch x := v.(type) {
+	case []any:
+		parts := make([]string, 0, len(x))
+		for _, item := range x {
+			parts = append(parts, pyReprJSON(item))
+		}
+		return "[" + strings.Join(parts, ", ") + "]"
+	case map[string]any:
+		names := make([]string, 0, len(x))
+		for name := range x {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		parts := make([]string, 0, len(names))
+		for _, name := range names {
+			parts = append(parts, wire.PyRepr(name)+": "+pyReprJSON(x[name]))
+		}
+		return "{" + strings.Join(parts, ", ") + "}"
+	default:
+		return pyReprAny(v)
 	}
 }
 
@@ -134,7 +173,7 @@ func pyTruthyValue(v any) bool {
 	}
 }
 
-// MaxFindings caps a research answer's findings.// MaxFindings caps a research answer's findings. The reader has to read every
+// MaxFindings caps a research answer's findings. The reader has to read every
 // one; the dossier and the slot argument cap their lists for the same reason.
 const MaxFindings = 6
 
@@ -297,18 +336,16 @@ type Competitor struct {
 
 // Competitors resolves the rivals against the pool, or drops them.
 //
-// **This does NOT index a card by the face it was asked for, and that is a
-// reproduction rather than a choice.** `argue.resolve_alternatives` and
-// `research.resolve_cards` both index `asked_as` as well as the pool's
-// spelling, so a double-faced card named by its front face resolves; this one
-// indexes only `record["name"].casefold()`, so the same name is dropped and
-// counted as a card the model invented. Measured against the real pool:
-// "Ajani, Nacatl Pariah" resolves in research and is dropped here.
-//
-// Commanders are exactly the population most likely to be double-faced, so the
-// consequence is real -- but a flip is not the place to fix it, and fixing it
-// in one runtime would put the two out of step. It is reproduced, pinned by a
-// test that says so, and raised with Aaron.
+// Indexed under both spellings, like `ResolveCards` below and
+// `ResolveAlternatives`: a double-faced card resolves from either face and
+// comes back under its full `A // B` name, and a model names a competitor by
+// the face it knows. **Until 2026-08-23 this indexed the pool's spelling
+// alone, and that was a reproduction rather than a choice** -- Python's
+// `_competitors` did the same, so "Ajani, Nacatl Pariah" resolved in
+// research and was dropped here as a card the model had invented. Measured
+// against the real pool, pinned by the corpus, raised with Aaron, and fixed
+// in both runtimes in one change; commanders are exactly the population most
+// likely to be double-faced.
 func Competitors(ctx context.Context, conn *pool.Conn, raw []any,
 	allowed map[string]bool) ([]Competitor, int, error) {
 	items := []map[string]any{}
@@ -340,6 +377,9 @@ func Competitors(ctx context.Context, conn *pool.Conn, raw []any,
 	found := map[string]deckread.NamedCard{}
 	for _, c := range looked.Cards {
 		found[strings.ToLower(c.Name)] = c
+		if c.AskedAs != nil && *c.AskedAs != "" {
+			found[strings.ToLower(*c.AskedAs)] = c
+		}
 	}
 
 	out := []Competitor{}
@@ -419,7 +459,7 @@ func ResolveCards(ctx context.Context, conn *pool.Conn, names []any,
 	if err != nil {
 		return nil, 0, err
 	}
-	// Indexed under both spellings, unlike Competitors above: a double-faced
+	// Indexed under both spellings, as Competitors above is: a double-faced
 	// card resolves from either face and comes back under its full `A // B`
 	// name.
 	byKey := map[string]deckread.NamedCard{}

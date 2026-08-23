@@ -418,7 +418,17 @@ func (a *API) planMana(ctx context.Context, src library.Source, slug string, bod
 			Seed: int64Ptr(p.seed), Progress: progressOf(rep),
 		})
 		result := manaResultFrom(slug, d, summary, p)
-		a.simCache.Put(ctx, key, "sim.mana", result)
+		// The job's own context, NOT the request's. net/http cancels the
+		// request's context the moment the handler returns, and this runs
+		// after that -- so a write through `ctx` failed with `context
+		// canceled`, warned, and stored nothing. **From v183 to 2026-08-23
+		// the Go sim cache never stored a row**: every run paid full price
+		// and every second ask recomputed. Found by the dossier lane, which
+		// had to decide what context a Claude job runs under and asked the
+		// same question of its siblings; proved by a test that drives this
+		// route through a real server rather than a recorder, whose context
+		// is never cancelled and so had never seen it.
+		a.simCache.Put(context.Background(), key, "sim.mana", result)
 		result.Cached, result.ComputedAt, result.DeckCheck = false, nil, &check
 		return result, nil
 	}}
@@ -617,7 +627,10 @@ func (a *API) planLands(ctx context.Context, src library.Source, slug string, bo
 	}
 
 	return jobs.Plan{Kind: "sim.lands", Label: label, Run: func(rep jobs.Progress) (any, error) {
-		out := a.sweep(ctx, slug, d, commander, resized, p, rep)
+		// The job's own context -- see planMana. The sweep both reads and
+		// writes the cache, and under the request's cancelled context it did
+		// neither: every count was recomputed and none was kept.
+		out := a.sweep(context.Background(), slug, d, commander, resized, p, rep)
 		out.DeckCheck = &check
 		return out, nil
 	}}

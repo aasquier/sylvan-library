@@ -216,3 +216,37 @@ def test_a_stance_cannot_be_mutated_by_the_mode_it_is_handed_to():
     """A mode that could edit its own dial would be widening it."""
     with pytest.raises(dataclasses.FrozenInstanceError):
         st.CONSULTANT.write = "applies"  # type: ignore[misc]
+
+
+# ------------------------------------------------------------- rejections
+
+@pytest.mark.parametrize("requested", [
+    "emperor",                       # not a preset
+    {"scope": "everywhere"},         # not a level
+    {"tempo": "fast"},               # not an axis
+    7,                               # not a shape that can hold one
+    ["off"],
+])
+def test_an_unreadable_stance_is_a_stance_rejected(requested):
+    """One name for every spelling of "that is not a stance".
+
+    `resolve()` is the one function callers use, and every way it can refuse
+    a request now comes out as `StanceRejected` -- still a `ValueError`, so
+    nothing that caught one stops catching it, and still carrying the same
+    sentence. What the name buys is the service layer's re-raise tuple:
+    without it a malformed stance fell into `except Exception` there and was
+    answered 502 as a failed call, while the route's own 422 branch sat dead.
+    """
+    with pytest.raises(st.StanceRejected) as rejected:
+        st.resolve(requested)
+    assert isinstance(rejected.value, ValueError)
+    # The sentence is `from_obj`'s own, unchanged: only the name moved.
+    with pytest.raises(ValueError) as raw:
+        st.Stance.from_obj(requested)
+    assert str(rejected.value) == str(raw.value)
+
+
+def test_a_readable_stance_is_never_a_rejection():
+    assert st.resolve("consultant") == st.CONSULTANT
+    assert st.resolve({"initiative": "on-request"}) == st.Stance(
+        "on-request", "flagged", "none")

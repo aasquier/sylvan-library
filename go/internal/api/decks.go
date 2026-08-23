@@ -262,7 +262,10 @@ func (a *API) suggestions(w http.ResponseWriter, r *http.Request) {
 
 // commanderDossier is `GET .../commander` -- `service.commander_dossier`:
 // everything interesting the pool knows about a deck's commander, every
-// part of it a query, not a recollection.
+// part of it a query, not a recollection. The payload is built by
+// `deckread.CommanderDossier`, which the Claude dossier's brief shares: the
+// counted strip on the deck page and the facts the model is handed are one
+// query, so the prose underneath the strip cannot disagree with it (ADR 19).
 func (a *API) commanderDossier(w http.ResponseWriter, r *http.Request) {
 	src, ok := a.sourceFor(w, r)
 	if !ok {
@@ -272,102 +275,12 @@ func (a *API) commanderDossier(w http.ResponseWriter, r *http.Request) {
 	if a.refuse(w, "commander", err) {
 		return
 	}
-	empty := []wire.KV{{Key: "slug", Value: d.Slug}, {Key: "card", Value: nil}, {Key: "subtypes", Value: []any{}}, {Key: "other_cards", Value: []any{}}, {Key: "printings", Value: nil}}
-	if len(d.Commander) == 0 {
-		raw, _ := wire.MarshalOrdered(empty)
-		wire.Raw(w, http.StatusOK, raw)
-		return
-	}
-	name := d.Commander[0]
-	var body []wire.KV
-	err = a.usePool(r.Context(), func(c *pool.Conn) error {
-		ctx := r.Context()
-		found, err := c.GetCards(ctx, []string{name})
-		if err != nil {
-			return err
-		}
-		rec := found[name]
-		if rec == nil {
-			body = empty
-			return nil
-		}
-		supertypes, subtypes := deckread.TypeParts(rec.TypeLine)
-		subtypeRows := []wire.OrderedMap{}
-		for _, sub := range subtypes {
-			pattern := "%" + sub + "%"
-			var total, legends int64
-			if err := c.DB().QueryRowContext(ctx, "SELECT count(*) FROM oracle_cards WHERE type_line ILIKE ?", pattern).Scan(&total); err != nil {
-				return err
-			}
-			if err := c.DB().QueryRowContext(ctx, "SELECT count(*) FROM oracle_cards WHERE type_line ILIKE ? "+
-				"AND type_line ILIKE '%Legendary%'", pattern).Scan(&legends); err != nil {
-				return err
-			}
-			subtypeRows = append(subtypeRows, wire.OrderedMap([]wire.KV{{Key: "name", Value: sub}, {Key: "total", Value: total}, {Key: "legendary", Value: legends}}))
-		}
-		character := strings.TrimSpace(strings.SplitN(name, ",", 2)[0])
-		others := []wire.OrderedMap{}
-		rows, err := c.DB().QueryContext(ctx, "SELECT name, type_line, mana_cost, image_normal, image_art_crop "+
-			"FROM oracle_cards WHERE name ILIKE ? AND name <> ? ORDER BY edhrec_rank NULLS LAST LIMIT 6",
-			"%"+character+"%", name)
-		if err != nil {
-			return err
-		}
-		for rows.Next() {
-			var v [5]any
-			ptrs := []any{&v[0], &v[1], &v[2], &v[3], &v[4]}
-			if err := rows.Scan(ptrs...); err != nil {
-				_ = rows.Close()
-				return err
-			}
-			others = append(others, wire.OrderedMap([]wire.KV{{Key: "name", Value: pool.AsStringPtr(v[0])}, {Key: "type_line", Value: pool.AsStringPtr(v[1])},
-				{Key: "mana_cost", Value: pool.AsStringPtr(v[2])}, {Key: "image", Value: pool.AsStringPtr(v[3])}, {Key: "art_crop", Value: pool.AsStringPtr(v[4])}}))
-		}
-		_ = rows.Close()
-		var oracleID any
-		_ = c.DB().QueryRowContext(ctx, "SELECT oracle_id FROM oracle_cards WHERE name = ? LIMIT 1", name).Scan(&oracleID)
-		var count int64
-		var first any
-		if err := c.DB().QueryRowContext(ctx, "SELECT count(*), min(released_at) FROM printings "+
-			"WHERE oracle_id = (SELECT oracle_id FROM oracle_cards WHERE name = ? LIMIT 1)", name).Scan(&count, &first); err != nil {
-			return err
-		}
-		var firstReleased, firstSet *string
-		if t, ok := first.(time.Time); ok {
-			s := t.Format("2006-01-02")
-			firstReleased = &s
-			var setName any
-			if err := c.DB().QueryRowContext(ctx, "SELECT set_name FROM printings WHERE oracle_id = "+
-				"(SELECT oracle_id FROM oracle_cards WHERE name = ? LIMIT 1) AND released_at = ? LIMIT 1",
-				name, t).Scan(&setName); err == nil {
-				firstSet = pool.AsStringPtr(setName)
-			}
-		}
-		artist, flavor := rec.Artist, rec.FlavorText
-		if d.CommanderArt != "" {
-			arts, err := deckread.ChosenArts(ctx, c, []string{d.CommanderArt})
-			if err != nil {
-				return err
-			}
-			if chosen, ok := arts[d.CommanderArt]; ok {
-				artist, flavor = chosen.Artist, chosen.FlavorText
-			}
-		}
-		card := []wire.KV{{Key: "name", Value: rec.Name}, {Key: "oracle_id", Value: pool.AsStringPtr(oracleID)}, {Key: "mana_cost", Value: rec.ManaCost},
-			{Key: "type_line", Value: rec.TypeLine}, {Key: "oracle_text", Value: rec.OracleText}, {Key: "flavor_text", Value: flavor}, {Key: "artist", Value: artist},
-			{Key: "power", Value: rec.Power}, {Key: "toughness", Value: rec.Toughness}, {Key: "loyalty", Value: rec.Loyalty}, {Key: "image", Value: rec.ImageNormal},
-			{Key: "art_crop", Value: rec.ImageArtCrop}, {Key: "color_identity", Value: rec.ColorIdentity}, {Key: "edhrec_rank", Value: rec.EdhrecRank},
-			{Key: "game_changer", Value: rec.GameChanger}}
-		body = []wire.KV{{Key: "slug", Value: d.Slug}, {Key: "card", Value: wire.OrderedMap(card)}, {Key: "supertypes", Value: supertypes}, {Key: "subtypes", Value: subtypeRows},
-			{Key: "other_cards", Value: others}, {Key: "printings", Value: wire.OrderedMap([]wire.KV{
-				{Key: "count", Value: count}, {Key: "first_released", Value: firstReleased},
-				{Key: "first_set", Value: firstSet}})}}
-		return nil
+	var body wire.OrderedMap
+	err = a.withPool(r.Context(), func(c *pool.Conn) error {
+		var buildErr error
+		body, buildErr = deckread.CommanderDossier(r.Context(), c, d)
+		return buildErr
 	})
-	if errors.Is(err, pool.ErrNoPool) {
-		body = empty
-		err = nil
-	}
 	if a.refuse(w, "commander", err) {
 		return
 	}

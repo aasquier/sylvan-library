@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
@@ -38,6 +39,12 @@ type scriptedClaude struct {
 	replies  []string
 	requests []map[string]any
 	served   int
+	// hold, when set, is waited on before every reply: a way to keep a job
+	// in flight long enough for a second request to find it there.
+	hold chan struct{}
+	// mu guards the three above. Two jobs in flight are two server goroutines
+	// here, which the race detector saw the day the first job family landed.
+	mu sync.Mutex
 }
 
 func (s *scriptedClaude) start(t *testing.T) {
@@ -46,14 +53,20 @@ func (s *scriptedClaude) start(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		var parsed map[string]any
 		_ = json.Unmarshal(body, &parsed)
+		s.mu.Lock()
 		s.requests = append(s.requests, parsed)
 		if s.served >= len(s.replies) {
+			s.mu.Unlock()
 			t.Errorf("the script ran out: request %d had no reply", s.served)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		reply := s.replies[s.served]
 		s.served++
+		s.mu.Unlock()
+		if s.hold != nil {
+			<-s.hold
+		}
 		w.Header().Set("Content-Type", "application/json")
 		if strings.HasPrefix(reply, "!") { // "!<status>" is an API failure
 			var status int
@@ -163,27 +176,34 @@ func TestTheInterviewRefusesACardTheDeckDoesNotRun(t *testing.T) {
 	}
 }
 
-// A stance that will not parse is a 502, and that is Python's answer rather
-// than the right one.
+// A stance that will not parse is a 422, in both runtimes -- and for one day
+// it was a 502 here on purpose.
 //
 // `api/app.py` carries an `except ValueError` branch commented "A malformed
-// stance" that raises 422 -- and it is unreachable, because
-// `service.claude_interview` re-raises only three exception types and a stance
-// ValueError is not among them, so the broad `except Exception` has already
-// turned it into `ClaudeFailed`. **Measured against the running pair**: Python
-// answers 502. The port reproduces warts; it does not quietly improve on them,
-// because a flip that changes behaviour is not a flip.
+// stance" that raises 422, and until 2026-08-23 it was unreachable:
+// `service.claude_interview` re-raised only three exception types and a stance
+// ValueError was not among them, so the broad `except Exception` had already
+// turned it into `ClaudeFailed`. **Measured against the running pair** when
+// this route flipped: Python answered 502, and so did the door -- the port
+// reproduces warts rather than quietly improving on one runtime, because a
+// flip that changes behaviour is not a flip. Then it was ruled, and both moved
+// together: `stance.StanceRejected` there, one line in `refuseClaude` here.
 //
-// What IS asserted as correct is the sentence: the parser's own words, so a
-// person reads "'emperor' is not a stance preset" either way.
-func TestAMalformedStanceIsPythons502(t *testing.T) {
+// What was always asserted as correct is the sentence: the parser's own words,
+// so a person reads "'emperor' is not a stance preset" either way.
+func TestAMalformedStanceIs422InBothRuntimes(t *testing.T) {
 	noCredential(t)
 	a, done := deckAPI(t, true)
 	defer done()
 	status, payload, raw := callAs(t, a, alice, "POST", kaheera,
 		`{"card":"Sol Ring","stance":"emperor"}`)
-	if status != 502 {
-		t.Fatalf("%d %s -- Python answers 502 here, measured", status, raw)
+	// 422 since 2026-08-23, in both runtimes at once. Python answered 502
+	// here -- measured -- because its service layer swallowed the stance's
+	// ValueError before the route's own 422 branch was reached; this route
+	// reproduced that for a day rather than improve on one runtime, then the
+	// ruling moved both. See refuseClaude.
+	if status != 422 {
+		t.Fatalf("%d %s -- the request was wrong, not the call", status, raw)
 	}
 	detail, _ := payload["detail"].(string)
 	if !strings.Contains(detail, "'emperor' is not a stance preset") {
@@ -450,11 +470,11 @@ func TestAStanceMayArriveAsAnObjectOfAxes(t *testing.T) {
 		t.Fatalf("a well-formed stance object answered %d %s", status, raw)
 	}
 	// An axis that is not one takes the same path as a bad preset, so it is
-	// Python's 502 as well -- and the sentence carries Python's list repr
-	// rather than Go's.
+	// a 422 as well -- and the sentence carries Python's list repr rather
+	// than Go's.
 	status, payload, raw := callAs(t, a, alice, "POST", kaheera,
 		`{"card":"Sol Ring","stance":{"vibe":"on-request"}}`)
-	if status != 502 {
+	if status != 422 {
 		t.Fatalf("an unknown axis answered %d %s", status, raw)
 	}
 	if detail, _ := payload["detail"].(string); !strings.Contains(detail, "['vibe'] are not stance axes") {
@@ -489,16 +509,13 @@ func TestATieredSeatIsAskedOfItsOwnModel(t *testing.T) {
 
 // A client's typo is not an incident.
 //
-// The stance branch and the default branch both answer 502 while the wart
-// above stands, so `ErrStanceRejected` currently changes exactly one thing a
-// test can observe -- and this is it. A malformed stance is somebody
-// mistyping into a form; a failed call is the instance having a bad day, and
-// only the second belongs in the error log. Without this the sentinel is an
-// equivalent mutant, which a mutation run said out loud.
-//
-// It also keeps the branch honest for the day the wart is fixed: whoever
-// changes that 502 to a 422 finds a test already standing here saying what
-// the branch is for.
+// A malformed stance is somebody mistyping into a form; a failed call is the
+// instance having a bad day, and only the second belongs in the error log.
+// While the stance branch and the default branch both answered 502 (until
+// 2026-08-23) this was the one thing `ErrStanceRejected` changed that a test
+// could observe -- without it the sentinel was an equivalent mutant, which a
+// mutation run said out loud. Now the branch answers 422 as well, and this
+// test still says what it is for.
 func TestAClientsTypoIsNotLoggedAsAFailure(t *testing.T) {
 	noCredential(t)
 	var logged bytes.Buffer
@@ -506,7 +523,7 @@ func TestAClientsTypoIsNotLoggedAsAFailure(t *testing.T) {
 	defer done()
 
 	if status, _, raw := callAs(t, a, alice, "POST", kaheera,
-		`{"card":"Sol Ring","stance":"emperor"}`); status != 502 {
+		`{"card":"Sol Ring","stance":"emperor"}`); status != 422 {
 		t.Fatalf("%d %s", status, raw)
 	}
 	if strings.Contains(logged.String(), "the Claude route failed") {

@@ -28,10 +28,10 @@ func TestTheArgumentIsTheInterviewsTwinOnRefusals(t *testing.T) {
 		{`{}`, 422, "card is required"},
 		{`{"card":"   "}`, 422, "card is required"},
 		{`{"card":"Black Lotus"}`, 422, "'Black Lotus' is not in kaheera"},
-		// The same wart the interview reproduces, in the same place: Python's
-		// service layer swallows a stance ValueError before the route's own
-		// 422 branch is reached. One wart, one mapping, shared.
-		{`{"card":"Sol Ring","stance":"emperor"}`, 502, "is not a stance preset"},
+		// One mapping, shared with the interview: a stance that will not read
+		// is the caller's to fix. (502 until 2026-08-23, when both runtimes
+		// moved together -- see refuseClaude.)
+		{`{"card":"Sol Ring","stance":"emperor"}`, 422, "is not a stance preset"},
 		{`{"card":"Sol Ring"}`, 503, "no ANTHROPIC_API_KEY"},
 	} {
 		status, payload, raw := callAs(t, a, alice, "POST", argueAt, row.body)

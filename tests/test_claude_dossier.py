@@ -452,3 +452,28 @@ def test_the_scope_axis_changes_the_prompt_and_the_tools_never_move():
                for s in stance.SCOPE}
     assert len(set(prompts.values())) == 3
     assert len({tuple(mode.tool_names) for _ in stance.SCOPE}) == 1
+
+
+def test_a_competitor_named_by_its_front_face_resolves(pool):
+    """A double-faced card resolves from either face and comes back under its
+    full `A // B` name -- and a model names a competitor by the face it knows.
+
+    Until 2026-08-23 `_competitors` indexed the pool's spelling alone, so
+    *Ajani, Nacatl Pariah* -- in `tiny_pool` for CLAUDE.md's first recorded
+    error -- was dropped and counted as a card the model had invented, while
+    `research.resolve_cards` and `argue.resolve_alternatives` resolved the same
+    name. Commanders are the population most likely to be double-faced. Found
+    by the Go port, which reproduced the drop; fixed in both runtimes at once.
+    """
+    kept, dropped = dossier._competitors(
+        [{"card": "Ajani, Nacatl Pariah", "prose": "x", "source_ids": []}],
+        allowed=set())
+    assert dropped == 0
+    assert [c["name"] for c in kept] == [
+        "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger"]
+    # The full name still resolves too; the index carries both spellings.
+    kept, dropped = dossier._competitors(
+        [{"card": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+          "prose": "y", "source_ids": []}],
+        allowed=set())
+    assert dropped == 0 and len(kept) == 1

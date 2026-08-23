@@ -2416,6 +2416,23 @@ def test_the_interview_at_a_stance_of_off_makes_no_call(client):
     assert body["answered_by"] == "claude", "labelled even when it said nothing"
 
 
+def test_the_interview_answers_a_malformed_stance_with_422_not_502(client):
+    """The request was wrong, not the call.
+
+    Until 2026-08-23 this answered 502: the service layer's re-raise tuple did
+    not name the stance's ValueError, so it was swallowed by the broad
+    `except Exception` and reported as a failed call, and the route's own
+    `except ValueError` branch -- commented "A malformed stance" -- was dead
+    code. The Go port reproduced the 502 rather than improve on one runtime,
+    raised it, and both moved together. No key is needed to see it: the stance
+    is resolved before any call could be made.
+    """
+    r = client.post("/api/decks/local/mono-green/interview",
+                    json={"card": "Sol Ring", "stance": "emperor"})
+    assert r.status_code == 422
+    assert "is not a stance preset" in r.json()["detail"]
+
+
 # ------------------------------------------------------- the slot argument
 #
 # The same paths as the interview above, and the same reason for stopping
@@ -2485,6 +2502,14 @@ def test_the_argument_is_a_different_mode_from_the_interview(client):
     r = client.post("/api/decks/local/mono-green/argue",
                     json={"card": "Sol Ring", "stance": "off"})
     assert r.json()["mode"] == "slot-argument"
+
+
+def test_the_argument_answers_a_malformed_stance_with_422_not_502(client):
+    """The interview's twin, down to the status code -- see its test."""
+    r = client.post("/api/decks/local/mono-green/argue",
+                    json={"card": "Sol Ring", "stance": {"scope": "everywhere"}})
+    assert r.status_code == 422
+    assert "is not a scope level" in r.json()["detail"]
 
 
 # ------------------------------------------------- the commander dossier

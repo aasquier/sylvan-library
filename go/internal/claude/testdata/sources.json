@@ -399,8 +399,21 @@
    "note": "a DFC by its front face",
    "name": "Ajani, Nacatl Pariah",
    "allowed": ["s1"],
-   "competitors": [],
-   "competitors_dropped": 1,
+   "competitors": [
+    {
+     "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+     "prose": "p",
+     "source_ids": ["s1"],
+     "mana_cost": "{1}{W}",
+     "type_line": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+     "color_identity": ["R","W"],
+     "image": "https://cards.scryfall.io/normal/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d16e8e0-31b2-4389-afd6-783c501f6fa0.jpg?1783911238",
+     "legal_commander": true,
+     "oracle_text": ""
+    }
+   ],
+   "competitors_dropped": 0,
    "research_cards": [
     {
      "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",

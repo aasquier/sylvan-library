@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/packages/param"
 
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/claude/tools"
@@ -46,7 +47,43 @@ import (
 // Returned rather than handing back whatever the last turn happened to say. A
 // truncated answer that looks complete is the failure mode worth avoiding
 // here -- the same shape as a Forge game that plays on with 96 cards.
+//
+// A sentinel to match on, never a string to read: the error `Converse`
+// actually returns is an `exhausted`, whose text is Python's `ModeExhausted`
+// sentence and nothing else -- see `unavailable` in client.go for why the
+// sentinel's own words must not ship as a prefix.
 var ErrModeExhausted = errors.New("mode exhausted")
+
+// exhausted is ErrModeExhausted carrying `str(ModeExhausted(...))` verbatim.
+//
+// A job's `error` field and a route's 502 `detail` are both `str(exc)` in
+// Python, so the sentence is the wire. Until 2026-08-23 this was
+// `fmt.Errorf("%w: %s ...", ErrModeExhausted, ...)`, which read "mode
+// exhausted: commander-dossier still wanted tools..." -- the sentinel's two
+// words in front and Python's full stop missing from the end.
+type exhausted struct{ msg string }
+
+func (e *exhausted) Error() string { return e.msg }
+
+// Is makes `errors.Is(err, ErrModeExhausted)` true without the sentinel's
+// text reaching anybody.
+func (e *exhausted) Is(target error) bool { return target == ErrModeExhausted }
+
+// apiFailure is the SDK refusing or failing a request, as the caller reads
+// it: `Error()` is `Explain(err)` -- the sentence somebody reads at 2am --
+// and `Unwrap()` is the SDK's own error, so `errors.As` still finds the
+// status code underneath.
+//
+// Python lets the SDK's exception propagate out of `converse` raw, and every
+// caller renders it with `explain(exc)`: a route's 502 `detail`, a job's
+// `error`. So the text that reaches a person is the explanation alone. Until
+// 2026-08-23 this was `fmt.Errorf("%s: %s", mode.Name, Explain(err))`, which
+// put the mode's name in front of every one of those sentences -- a prefix
+// Python never writes, on the first Claude surfaces the door answered.
+type apiFailure struct{ err error }
+
+func (e *apiFailure) Error() string { return Explain(e.err) }
+func (e *apiFailure) Unwrap() error { return e.err }
 
 // MaxToolTurns is enough for a lookup, a search and a reconsider. A mode that
 // has not finished by then is looping rather than working, and the ceiling
@@ -268,7 +305,7 @@ func Converse(ctx context.Context, mode Mode, req Request) (Turn, error) {
 			// `converse` before its `finish` runs. Reproduced deliberately: the
 			// roll-up counts conversations, and a request the API refused is
 			// not one.
-			return Turn{}, fmt.Errorf("%s: %s", mode.Name, Explain(err))
+			return Turn{}, &apiFailure{err: err}
 		}
 		requests++
 		tokensIn += resp.Usage.InputTokens
@@ -307,7 +344,7 @@ func Converse(ctx context.Context, mode Mode, req Request) (Turn, error) {
 
 		// Appended whole, thinking blocks included. Sonnet 5 returns them with
 		// empty text by default and they still have to go back unedited.
-		history = append(history, resp.ToParam())
+		history = append(history, assistantTurn(resp))
 
 		// A server-side tool loop that hits its own iteration limit stops with
 		// `pause_turn` and hands back text that reads finished. Returning it
@@ -396,9 +433,42 @@ func Converse(ctx context.Context, mode Mode, req Request) (Turn, error) {
 	// would misattribute exactly the spend the tiers were added to make
 	// visible.
 	record("exhausted", answering)
-	return Turn{}, fmt.Errorf("%w: %s still wanted tools after %d turns "+
-		"(%d calls made). Nothing was written; nothing is half-done",
-		ErrModeExhausted, mode.Name, maxTurns, len(calls))
+	return Turn{}, &exhausted{msg: fmt.Sprintf("%s still wanted tools after %d turns "+
+		"(%d calls made). Nothing was written; nothing is half-done.",
+		mode.Name, maxTurns, len(calls))}
+}
+
+// assistantTurn is the response, re-sent as the next request's assistant
+// message: **every block exactly as it arrived**, which is what Python does
+// with `resp.content`, rather than through the SDK's typed `ToParam`.
+//
+// Found on the real wire, 2026-08-23, by the dossier's live case and by
+// nothing else. The dated web search filters its results inside a
+// code-execution container, and the turn that ran it comes back carrying a
+// `code_execution_tool_result` whose content is the **encrypted** result
+// variant (`encrypted_code_execution_result`, `encrypted_stdout`).
+// `anthropic-sdk-go` v1.66.0's `ToParam` has no branch for that variant: it
+// falls into the plain-result branch, renders an empty `code_execution_result`
+// with its required `content` elided, and the API refuses the whole request
+// with a 400 naming the union it failed to match -- on the second turn of
+// every dossier, after the search has been paid for. (`param.Override` on the
+// block is the SDK's own escape hatch, used in its own `ToParam` for the text
+// editor's variant of the same shape.) PLAN section 9 named exactly this risk:
+// "anthropic-sdk-go beta-surface lag (server-tool details)". Research passed
+// its live case the same hour only because its search happened not to run
+// the filter.
+//
+// Raw for every block rather than for the one that broke, because that is
+// the Python behaviour being reproduced and because the next variant the SDK
+// has not heard of would otherwise fail the same way, silently, in a
+// conversation that had already cost four minutes.
+func assistantTurn(resp *anthropic.Message) anthropic.MessageParam {
+	content := make([]anthropic.ContentBlockParamUnion, 0, len(resp.Content))
+	for _, block := range resp.Content {
+		content = append(content,
+			param.Override[anthropic.ContentBlockParamUnion](json.RawMessage(block.RawJSON())))
+	}
+	return anthropic.MessageParam{Role: anthropic.MessageParamRoleAssistant, Content: content}
 }
 
 // toolResult runs one tool call and says what the model should be told: the

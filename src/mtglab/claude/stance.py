@@ -80,6 +80,23 @@ def _index(axis: str, level: str) -> int:
             f"{', '.join(LEVELS[axis])}") from None
 
 
+class StanceRejected(ValueError):
+    """A requested stance that could not be read: an unknown preset, an axis
+    that is not one, a level that is not one, a value of the wrong type.
+
+    A `ValueError` still, so every caller that catches one goes on catching
+    this -- the sentence is unchanged too. What the subclass adds is a name a
+    service layer can re-raise by. Until 2026-08-23 `service.claude_interview`
+    and `claude_argue` re-raised only `ClaudeUnavailable`, `CardNotInDeck` and
+    `DeckNotFound`, so a malformed stance fell into their broad
+    `except Exception` and was answered **502** as a failed call -- and the
+    `except ValueError` branch in `api/app.py` that says "A malformed stance"
+    and answers 422 was dead code. Found by the Go port, which reproduced the
+    502 rather than fix one runtime alone, and ruled with Aaron: 422 in both,
+    in one change. The request was wrong, not the call.
+    """
+
+
 @dataclass(frozen=True)
 class Stance:
     """One setting of the three axes.
@@ -267,12 +284,22 @@ def resolve(requested: Any = None, *, deck: Any = None,
     preset name, a partial mapping, or None -- None means "use the deck's
     default", which is how a UI that has never been touched still behaves
     sensibly.
+
+    Everything this cannot read is raised as `StanceRejected`, whatever part of
+    the reading refused it -- a preset name, an axis, a level's type or value
+    -- so the service layer has one name to re-raise and the route answers 422
+    for every spelling of "that is not a stance".
     """
-    if requested is None:
-        asked = default_for(deck) if deck is not None else OFF
-    else:
-        asked = Stance.from_obj(requested)
-    return clamp(asked, ceiling() if limit is None else limit)
+    try:
+        if requested is None:
+            asked = default_for(deck) if deck is not None else OFF
+        else:
+            asked = Stance.from_obj(requested)
+        return clamp(asked, ceiling() if limit is None else limit)
+    except StanceRejected:
+        raise
+    except ValueError as exc:
+        raise StanceRejected(str(exc)) from exc
 
 
 def describe(stance: Stance) -> dict[str, Any]:
