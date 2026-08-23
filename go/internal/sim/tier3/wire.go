@@ -153,23 +153,30 @@ func GameFromWire(w WireGame) GameResult { return GameResult(w) }
 // `coverage` is not repeated — the pre-flight already crossed on its own.
 // `startup_seconds` is derived from games and wall clock, so it is not
 // serialised; the rebuilt run computes the same number.
+// **This struct carries no JSON tags, deliberately.** Both halves of its
+// codec are hand-written — [WireRun.MarshalJSON] names the keys in Python's
+// order and [WireRun.UnmarshalJSON] reads them through its own inner struct —
+// so tags here would be read by nothing while looking authoritative. They were
+// here, and a mutation run proved them dead: renaming `forge_version` on the
+// field changed no byte in either direction. The names live in those two
+// methods, which is where to change them.
 type WireRun struct {
-	Games []WireGame `json:"games"`
+	Games []WireGame
 	// Seats is written through an ordered encode because JSON keys are
 	// strings and a Go map would alphabetise them: `"10"` sorts before
 	// `"2"`. Heads-up never reaches ten seats and the CLI's pods reach four,
 	// so nothing observable turns on it today — which is exactly when a
 	// difference like this is cheap to get right.
-	Seats map[int]string `json:"seats"`
+	Seats map[int]string
 	// WallSeconds renders through `pyfloat.Float` in MarshalJSON below:
 	// Python writes `1.0` for a whole-second match and `encoding/json`
 	// writes `1`, on a wire a Python shim and a Go app can be on
 	// opposite ends of.
-	WallSeconds float64 `json:"wall_seconds"`
+	WallSeconds float64
 	// ForgeVersion is for the match ledger (ADR 36). Optional in both
 	// directions on purpose: an old shim omits it and an old app ignores it,
 	// so deploy skew degrades to "not reported" rather than to an error.
-	ForgeVersion *string `json:"forge_version"`
+	ForgeVersion *string
 }
 
 // MarshalJSON writes the run in Python's key order, with `seats` in seat
