@@ -204,6 +204,101 @@ attached and fixed alongside a real change to the same package, so the cache is
 discarded once for a reason rather than twice for tidiness. Ledger: Colorless,
 2026-08-24.
 
+**Red —**
+
+**1. The walk owed on Red's PR, and it is four minutes.** Five surfaces that
+used to answer a wait with a motionless `Loading…` now turn the shared spinner.
+Start both halves — `./mtglab ui` (port 8765) and `npm --prefix web run dev`
+(port 5173, which proxies `/api` and `/tarot` to it) — then look at
+**`/learn`** (Words tab: "Reading the glossary…"; Colours tab: "Reading the
+colour guide…") and **`/decks/new`** ("Reading the colour guide…", and at the
+tarot door "Gathering the readers…" and "Opening the interview…"). **Cycle
+time: the spinner turns once per second, but the state itself is only on
+screen for about 200ms against a local API** — those endpoints do 0.6–0.7ms of
+server work — so throttle the network in devtools (Slow 4G) or you will watch
+a hole. · *Cost of leaving it:* nothing; the PR is green and unmerged. ·
+**Recommendation:** walk it, merge it. The change is **unwalked on the
+deployed instance because it never deployed** — nothing merged tonight.
+Ledger: Red, 2026-08-24.
+
+**2. `tools` gated nothing at all, and half of that is still yours to flip.**
+`deploy`'s `needs` named six of the file's seven other jobs: the `tools` job
+arrived with the Go crossing and nothing wired it in, so **every deploy since
+has shipped without the toolbox gate ever having had to be green** — and that
+gate holds every committed asset to its recipe, which is commandment 9's
+provenance half, not a lint. Red's PR fixes `needs` and rebuilds the guard
+that derives the set from `ci.yml`'s own job list (this is 2026-08-23's item 3
+with the hypothetical removed — it had already happened). `tools` is also not
+a *required context*, which is a repository setting. · *Cost of leaving it:* a
+red toolbox still merges, silently. · **Recommendation:** `gh api -X POST
+…/protection/required_status_checks/contexts -f 'contexts[]=tools'`, and while
+you are in settings, `allowed_actions` is still `"all"` and non-provider
+secret patterns are still off — both free. Ledger: Red, 2026-08-24, queued 9.
+
+**3. Five CodeQL alerts stand open against Python that no longer exists, and
+nothing will ever close them.** Four `py/polynomial-redos` and one
+`py/stack-trace-exposure`, all pointing into `src/mtglab/**`. `codeql.yml`'s
+matrix is now `javascript-typescript` and `go`, so Python is never re-analysed
+and the alerts can never auto-close. · *Cost of leaving it:* the Security tab
+permanently reads "5 open", so the next real Go or TypeScript alert arrives in
+a list nobody has been able to empty — the "cries wolf, gets muted" failure
+`codeql.yml`'s own header warns about. · **Recommendation:** dismiss all five
+as `won't fix`, citing #272. Yours because dismissing a security alert is a
+security action. Ledger: Red, 2026-08-24, queued 10.
+
+**4. The volume restore drill is now due on its own rule, not just wished
+for.** Red's checklist says a drill older than the newest schema migration is
+due, because the ladder is forward-only and a restore crosses it — and the
+crossing rebuilt the ladder entirely (twelve scripts under
+`go/internal/auth/migrations/`). The restore path has still never been walked;
+HOSTING §5 says so honestly. Snapshots are healthy: five, newest 21h, 5-day
+retention, 798 MiB. · *Cost of leaving it:* the library's one standing copy
+(ADR 30) is behind a procedure nobody has ever run, and five days is all the
+retention there is. · **Recommendation:** walk it once against a **scratch**
+volume forked from the newest snapshot and a throwaway machine — never against
+`mtglab_data` — then date it in HOSTING §5. Cents of volume for an hour.
+Ledger: Red, 2026-08-24, queued 11.
+
+**5. 91% of the api suite's allocation is one password hash, in the package
+that is the CI critical path.** `go (amd64)` is the longest job in 20 of 22
+runs, and its whole cost is one step (171s of tests; the arm64 sibling runs
+the identical step in 89s). Profiling the suite: `internal/api` is 87.63s of
+473 package-seconds, and **1,805 MB of its 1,981 MB of allocation is
+`argon2.initBlocks`** — the test rig hashes at the production
+`MemoryCostKiB = 19_456`, roughly 95 real Argon2id hashes per run. CPU cost is
+only 1.9%; this is GC pressure. · *Cost of leaving it:* CI stays as slow as it
+is, and every contributor waits for it. · **Recommendation:** hand it to
+Black, not to a quick fix — the caveat is that `MemoryCostKiB` is load-bearing
+for `NeedsRehash`, so a cheap test profile must not become the thing the
+rehash check compares against. Red found *where*; whether and how is Black's
+by the skill's own division. Ledger: Red, 2026-08-24, queued 12 note.
+
+**6. Seven controls start async work and never stop accepting clicks — two of
+them write.** Re-measured tonight: 131 buttons outside tests, 21 whose
+`onClick` starts async work, 7 with no `disabled`. The two that matter are
+`DeckDetail.tsx`'s `save()` and `returnCard()`, so a double click is a double
+edit and ADR 28 records both. This is your standing complaint from 2026-08-23,
+still true. · *Cost of leaving it:* a duplicated edit in somebody's deck, and
+five other controls that read as broken when nothing happens. ·
+**Recommendation:** yes, as its own small branch — the two writes first. The
+pattern is a busy flag driving `disabled` **and** a visible pending state,
+both halves or neither; `Spinner` and `.btn:disabled` already exist. Not
+attempted tonight because doing it properly inside `DeckDetail`'s state is
+more than the night had left. Ledger: Red, 2026-08-24, queued 12.
+
+**7. Two dates inside the next three weeks, and nothing watches either.**
+**Sonnet 5's introductory pricing ends 2026-08-31 — seven days** — after which
+the same traffic costs 50% more; `prices.Table` already models both sides, so
+there is nothing to build and nothing will break, but the bill changes. **The
+Anthropic key expires around 2026-09-10 — eighteen days**; expiry presents as
+a 401 on every Claude surface, which reads exactly like a broken integration.
+Everything else is comfortable: TLS 2026-11-11, `FLY_API_TOKEN` 2027-08-14,
+the domain 2027-08-13. · *Cost of leaving it:* one surprise bill and one
+morning spent debugging an integration that is merely lapsed. ·
+**Recommendation:** put both in your own calendar — the project has no place
+to hold a date, which is itself the honest answer until queued item 1's
+external monitoring exists. Ledger: Red, 2026-08-24, expiry calendar.
+
 **Green —**
 
 **1. Two guards Green built for itself were deleted by the Go crossing, and for
