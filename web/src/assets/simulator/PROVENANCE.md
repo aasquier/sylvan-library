@@ -1,6 +1,6 @@
 # simulator assets -- provenance
 
-The rule here is the tarot deck's (`src/mtglab/assets/tarot/PROVENANCE.md`):
+The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`):
 every transformation applied is written down, so the derivation is
 reproducible from the source. Like the séance room and the About Claude
 masthead, everything in this directory is **authored** rather than fetched --
@@ -41,7 +41,7 @@ the known one: the pipeline still has no `authored` source kind
   around video models was moving when the séance check was made, so re-check
   rather than inherit this paragraph.
 - **Transformations** (ffmpeg 7.1 via imageio-ffmpeg, and **not** through
-  `mtglab animist`):
+  `animist`):
   - The delivered clip is 1920x1080, 10.04s, 241 frames at 24fps, video only
     (no audio track was delivered).
   - Scaled to 1280x720 (Lanczos) -- the masthead renders the loop at ~260px

@@ -16,14 +16,14 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/deckedit"
 )
 
-// The write side of a Source, Phase 4's addition to the read-only tiers.
+// The write side of a Source.
 //
-// Five verbs, and they arrived in three flips on purpose. `WriteText` came
-// with the nine editing routes; `Create`, `Delete` and `SetShared` came with
-// the lifecycle, because an update and a create have opposite safety
+// Five verbs, grouped in three families on purpose. `WriteText` belongs to
+// the nine editing routes; `Create`, `Delete` and `SetShared` to the
+// lifecycle, because an update and a create have opposite safety
 // requirements -- an update to a deck that has vanished is a bug, a create
 // over a deck that exists destroys somebody's work -- and a method that exists
-// but refuses is a method somebody wires up. `WriteArtifacts` came with the
+// but refuses is a method somebody wires up. `WriteArtifacts` belongs to the
 // rebuild, for the same reason again: it is the only write here that does not
 // touch `deck.yaml` at all.
 //
@@ -40,22 +40,21 @@ import (
 // deck is *absent* rather than forbidden -- so a 403 here is only ever an
 // answer about a deck the caller can already read (ADR 5, ADR 22).
 
-// ErrReadOnly is `ReadOnlySource`: this caller may see these decks and may not
-// change them. The route layer turns it into a 403, which is the one refusal
-// in the deck family that is not a 404 -- because the caller has already been
-// shown the deck, so its existence is not the secret.
+// ErrReadOnly is the read-only refusal: this caller may see these decks and
+// may not change them. The route layer turns it into a 403, which is the one
+// refusal in the deck family that is not a 404 -- because the caller has
+// already been shown the deck, so its existence is not the secret.
 //
-// **The message is `api/app.py`'s exception handler, not the exception's.**
-// Python raises the subject alone and a handler wraps it, which Go has no
-// place for; the sentence is assembled here so the two runtimes answer a 403
-// in the same words. It said something else until 2026-08-22, and the contract
-// suite could not see it -- a golden records `{"detail": "string"}` and a
-// user reads the string.
+// **The whole served sentence is assembled here, not at the route layer.**
+// The subject and its wrapping are one string on purpose: built in one
+// place, every route answers a 403 in the same words. It said the wrong
+// words until 2026-08-22, and a shape test could not see that -- a shape
+// records `{"detail": "string"}` and a user reads the string.
 type ErrReadOnly struct{ Slug string }
 
 func (e ErrReadOnly) Error() string {
-	// `service._WHOLE_LIBRARY`, for a refusal about a deck that does not exist
-	// yet: a create has no slug to name.
+	// The whole-library subject, for a refusal about a deck that does not
+	// exist yet: a create has no slug to name.
 	subject := e.Slug
 	if subject == "" {
 		subject = "this library"
@@ -63,7 +62,7 @@ func (e ErrReadOnly) Error() string {
 	return "read-only: " + subject + " is not yours to change"
 }
 
-// ErrExists is `DeckExists`: raised rather than overwriting a deck that is
+// ErrExists refuses to overwrite a deck that is
 // already there. The route layer turns it into the refusal `create` and
 // `import` both answer with, which names the slug and asks for another.
 type ErrExists struct{ Slug string }
@@ -118,15 +117,14 @@ func WriterFor(s Source, slug string) (Writer, error) {
 
 // WriteText replaces `<root>/<slug>/deck.yaml`.
 //
-// **Written through a temporary file and renamed**, where Python writes the
-// path directly. The bytes that land are identical and nothing observable
-// changes; what changes is the failure mode. `deck.yaml` is the source of
-// truth (ADR 1), a truncating write that dies halfway leaves it truncated, and
+// **Written through a temporary file and renamed**, where a plain
+// truncating write would leave the same bytes. Nothing observable changes;
+// what changes is the failure mode. `deck.yaml` is the source of truth
+// (ADR 1), a truncating write that dies halfway leaves it truncated, and
 // since ADR 30 there is no revision to restore it from. A rename within the
-// same directory is atomic, so the file is either the old deck or the new one.
-// This is a deliberate improvement on the original rather than a port of it,
-// recorded here so it is not mistaken for a divergence somebody should
-// "fix" back.
+// same directory is atomic, so the file is either the old deck or the new
+// one. The rename is deliberate hardening, recorded here so it is not
+// mistaken for ceremony somebody should simplify away.
 func (f *FileSource) WriteText(ctx context.Context, slug, text string) error {
 	if !f.writable {
 		return ErrReadOnly{Slug: slug}
@@ -180,8 +178,8 @@ func writeAtomically(path, text string) error {
 
 // WriteArtifacts writes a build into `<root>/<slug>/artifacts/`.
 //
-// Writability first, ahead of the deck's own existence, which is the order
-// `FileDeckSource._writable_or_raise` establishes and the reason it gives: a
+// Writability first, ahead of the deck's own existence, which is the tier's
+// standing order and the reason for it: a
 // caller who may not write gets the same answer whether or not the deck is
 // there, so no sequence of refused builds maps out the library. The route
 // above has already resolved the deck, so this ordering is never what a client
@@ -217,18 +215,18 @@ func (f *FileSource) Create(_ context.Context, slug, text string) error {
 	if slug == "" || strings.Trim(slug, ".") == "" || strings.ContainsAny(slug, `/\`) {
 		return ErrExists{Slug: slug}
 	}
-	// 0755 and 0644 are what Python's `mkdir` and `write_text` leave under an
-	// 022 umask, which is what the container runs. Tighter modes would be
-	// safer in the abstract and are wrong here: both runtimes write this
-	// directory as the same user, nothing else reads it, and a library whose
-	// decks wear two different sets of permissions depending on which door
-	// made them is a difference somebody has to explain to a volume backup.
-	// `writeAtomically` preserves an existing file's mode for the same reason.
+	// 0755 and 0644 are what a 022 umask leaves, which is what the container
+	// runs. Tighter modes would be safer in the abstract and are wrong here:
+	// the server and the CLI write this directory as the same user, nothing
+	// else reads it, and a library whose decks wear two different sets of
+	// permissions depending on which surface made them is a difference
+	// somebody has to explain to a volume backup. `writeAtomically` preserves
+	// an existing file's mode for the same reason.
 	dir := filepath.Join(f.Root, slug)
-	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // matches Python's umask
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // the library's standing 022-umask mode
 		return fmt.Errorf("create deck %q: %w", slug, err)
 	}
-	file, err := os.OpenFile(filepath.Join(dir, "deck.yaml"), //nolint:gosec // matches Python's umask
+	file, err := os.OpenFile(filepath.Join(dir, "deck.yaml"), //nolint:gosec // the library's standing 022-umask mode
 		os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
@@ -268,12 +266,11 @@ func (f *FileSource) Delete(_ context.Context, slug string) (string, error) {
 		return "", fmt.Errorf("delete deck %q: %w", slug, err)
 	}
 	// Import, delete, re-import, delete again inside one second is a real
-	// sequence, and the stamp is only second-resolution. This matters more
-	// than it looks in Python, where `shutil.move` onto an existing directory
-	// moves the source *inside* it rather than failing, so a collision would
-	// bury the earlier deletion instead of reporting anything. `os.Rename`
-	// here would fail on a non-empty target instead, which is louder and
-	// still not what anybody wants.
+	// sequence, and the stamp is only second-resolution. A collision must
+	// not bury the earlier deletion -- `.trash` exists to make a mistake
+	// survivable -- and `os.Rename` onto a non-empty target fails, which is
+	// louder and still not what anybody wants. So the loop below finds a
+	// free name instead.
 	if _, err := os.Stat(trash); err == nil {
 		for n := 2; ; n++ {
 			candidate := trash + "-" + strconv.Itoa(n)
@@ -295,14 +292,14 @@ func (f *FileSource) Delete(_ context.Context, slug string) (string, error) {
 // truth.
 //
 // A **surgical** edit like every other write (ADR 12), through
-// `deckedit.SetShared`. It was a load-and-dump round trip in Python until
-// 2026-08-22 -- and the only thing on the write path that called `dump` on an
-// existing file -- so one press of the deck page's share toggle took a
-// hand-written deck's section banners, its trailing comments and its folded
-// blocks with it. This port had to reproduce the bytes and so had to ask what
-// they were; Aaron ruled, and both runtimes were fixed at once.
+// `deckedit.SetShared`. It was a load-and-dump round trip until 2026-08-22
+// -- the only thing on the write path that rewrote a whole existing file --
+// so one press of the deck page's share toggle took a hand-written deck's
+// section banners, its trailing comments and its folded blocks with it.
+// Reproducing the bytes meant asking what they should be; Aaron ruled, and
+// the surgical edit is the ruling.
 //
-// Unchanged from Python: nothing is written when the flag already says what
+// Two standing rules: nothing is written when the flag already says what
 // was asked for, and `true` removes the key rather than asserting the default.
 func (f *FileSource) SetShared(ctx context.Context, slug string, shared bool) error {
 	if !f.writable {
@@ -345,9 +342,9 @@ func (f *FileSource) SetShared(ctx context.Context, slug string, shared bool) er
 // card's rationale would silently republish, or silently hide, the deck it
 // belongs to.
 //
-// This writes `app.db`, which Python also writes. Same argument as the
-// activity log's: WAL is persistent in the file, the busy timeout is set on
-// the handle, and the two runtimes are not racing for one row -- a deck edit
+// This writes `app.db`, which the auth layer also writes. Same argument as
+// the activity log's: WAL is persistent in the file, the busy timeout is set
+// on the handle, and no two writers race for one row -- a deck edit
 // goes through the door or through the CLI, never both at once.
 func (s *SQLSource) WriteText(ctx context.Context, slug, text string) error {
 	if !s.writable {
@@ -381,9 +378,9 @@ func (s *SQLSource) WriteText(ctx context.Context, slug, text string) error {
 	return nil
 }
 
-// nowISO is `_now()` in `decks/sqlsource.py`:
-// `datetime.now(UTC).isoformat(timespec="seconds")`, which carries an offset
-// rather than a `Z`. `parseISO` on the read side accepts it.
+// nowISO is the tier's timestamp: UTC to the second, carrying an offset
+// rather than a `Z` -- the recorded column format. `parseISO` on the read
+// side accepts it.
 func nowISO() string {
 	return time.Now().UTC().Format("2006-01-02T15:04:05-07:00")
 }
@@ -405,8 +402,7 @@ func (s *SQLSource) Create(ctx context.Context, slug, text string) error {
 	now := nowISO()
 	// The partial unique index is the real guard and this INSERT leans on it:
 	// a SELECT-then-INSERT would let two creates racing for one slug both pass
-	// the look. Python keeps the friendly SELECT as well and lands here when
-	// it loses; the answer is the same either way.
+	// the look, and the index answers the same refusal however the race falls.
 	_, err = s.write.ExecContext(ctx,
 		"INSERT INTO user_decks"+
 			" (owner_id, slug, name, yaml, shared, created_at, updated_at)"+

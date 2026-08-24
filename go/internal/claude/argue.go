@@ -36,7 +36,8 @@ import (
 // predicate moved from "is it a question" to "does it rest on anything", since
 // every item here is declarative by design.
 //
-// **Alternatives are bare names and Python judges them.** `ResolveAlternatives`
+// **Alternatives are bare names and deterministic code judges them.**
+// `ResolveAlternatives`
 // is where rule 2 becomes executable: each name is resolved through the pool
 // and dropped if it does not exist, is banned, is already in the deck, or falls
 // outside the deck's colour identity -- counted separately in each case,
@@ -44,7 +45,7 @@ import (
 // failures.
 //
 // The third -- a weak case is reported as weak via `strength` -- lives in the
-// schema, which crossed as generated data.
+// schema, which is recorded data in modes.json.
 
 // MaxCharges caps the case. More than five and it stops being an argument and
 // starts being a pile.
@@ -64,7 +65,7 @@ var Grounds = []string{"redundancy", "cost", "speed", "conditionality",
 var Strengths = []string{"decisive", "serious", "minor"}
 
 // Charge is one argument against the slot, and the fact it rests on. Key order
-// is Python's, because this reaches a client.
+// is the recorded one, because this reaches a client.
 type Charge struct {
 	Claim    string `json:"claim"`
 	Ground   string `json:"ground"`
@@ -129,13 +130,13 @@ func oneOf(value string, allowed []string, fallback string) string {
 // neither.
 //
 // **`AlreadyInDeck` is `omitempty` and the other four are not**, which is a
-// wart reproduced rather than tidied. `argue._report`'s default for a run that
+// wart recorded rather than tidied. The report's default for a run that
 // never happened lists FOUR keys -- `not_in_pool`, `banned`, `off_colour`,
-// `no_pool` -- while `resolve_alternatives` returns FIVE. So a stance-off
+// `no_pool` -- while a real resolution returns FIVE. So a stance-off
 // report and a refused report carry four keys and a real one carries five, and
-// a Go struct that always rendered five would differ from Python on exactly the
-// paths where no call was made. See argueReport, which builds the empty case
-// through a separate type for the same reason.
+// a struct that always rendered five would differ from the recorded shape on
+// exactly the paths where no call was made. See argueReport, which builds the
+// empty case through a separate type for the same reason.
 type DroppedAlternatives struct {
 	NotInPool     []string `json:"not_in_pool"`
 	Banned        []string `json:"banned"`
@@ -161,8 +162,8 @@ func noneDropped() emptyDropped {
 // ResolveAlternatives resolves suggested names against the pool and drops what
 // does not survive.
 //
-// Four filters, and Python owns all four because all four have right answers
-// (ADR 14). A name that does not resolve is a card the model made up or
+// Four filters, and deterministic code owns all four because all four have
+// right answers (ADR 14). A name that does not resolve is a card the model made up or
 // misspelled. A card that is banned cannot go in. **A card outside the
 // commander's colour identity cannot go in either, and that check is the reason
 // this function exists** -- CLAUDE.md's first recorded error is *Ajani, Nacatl
@@ -310,7 +311,7 @@ type ArgueRequest struct {
 // `alternatives_dropped` block has a DIFFERENT SET OF KEYS depending on whether
 // a call happened -- see DroppedAlternatives. A single struct cannot express
 // that, and smoothing it over would put a fifth key on the wire in the two
-// cases Python leaves it off.
+// cases the recorded shape leaves it off.
 func argueReport(turn *Turn, slug, card string, effective Stance,
 	charges []Charge, dropped int, alternatives []deckread.NamedCard,
 	altDropped any, asked bool, reason string) []wire.KV {
@@ -422,7 +423,7 @@ func Argue(ctx context.Context, conn *pool.Conn, d *deck.Deck, card string,
 
 	// The deck's own names, read off the deck we already hold rather than
 	// carried in the brief: the brief is what the model reads, and 99 names in
-	// the prompt would be tokens spent teaching it a rule Python enforces
+	// the prompt would be tokens spent teaching it a rule this code enforces
 	// anyway.
 	inDeck := map[string]bool{}
 	for _, c := range d.Cards {

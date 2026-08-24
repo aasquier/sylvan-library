@@ -11,10 +11,10 @@ import (
 	"sync"
 )
 
-// CardRecord is `cards/db.py:CardRecord`: one card as the pool knows it.
+// CardRecord is one card as the pool knows it.
 // Immutable by convention -- `GetCards` hands the same record to every caller
-// that asks, the way Python's frozen dataclass lets its cache share one.
-// Pointer fields are the columns that may be NULL; a nil is Python's None
+// that asks, which is what lets its cache share one.
+// Pointer fields are the columns that may be NULL; a nil is an absent value
 // and serialises as `null`.
 type CardRecord struct {
 	Name       string
@@ -22,8 +22,8 @@ type CardRecord struct {
 	CMC        float64
 	TypeLine   string
 	OracleText string
-	// Sorted, because every place Python serialises it writes
-	// `sorted(rec.color_identity)` and the set is kept sorted here so the
+	// Sorted, because every recorded serialisation writes the identity
+	// sorted, and the set is kept sorted here so the
 	// wire never depends on a map walk.
 	ColorIdentity  []string
 	ProducedMana   []string
@@ -84,7 +84,8 @@ func (r *CardRecord) IsLand() bool {
 	return false
 }
 
-// readColumns is `cards/db.py:_READ_COLUMNS`, in the order `toRecord` reads.
+// readColumns is the pool's read column list, in the order `toRecord`
+// reads.
 var readColumns = []string{
 	"name", "mana_cost", "cmc", "type_line", "oracle_text", "color_identity",
 	"produced_mana", "reserved", "legalities", "edhrec_rank",
@@ -249,7 +250,7 @@ func asStrings(v any) []string {
 	return out
 }
 
-// GetCards is `cards/db.py:get_cards`: many cards at once, case-insensitively,
+// GetCards is many cards at once, case-insensitively,
 // a double-faced card by either face name as well as by its combined
 // `Front // Back` name, and the record returned is always the WHOLE card so
 // `ColorIdentity` covers every face (Ajani, Nacatl Pariah looked up by its
@@ -262,7 +263,9 @@ func (c *Conn) GetCards(ctx context.Context, names []string) (map[string]*CardRe
 	}
 	key := strings.Join(names, "\x00")
 	if cache := c.cache(); cache != nil {
-		if hit, ok := cache.get(key); ok {
+		hit, ok := cache.get(key)
+		c.pool.note(MemoCards, ok)
+		if ok {
 			return hit, nil
 		}
 	}
@@ -274,7 +277,7 @@ func (c *Conn) GetCards(ctx context.Context, names []string) (map[string]*CardRe
 	if err != nil {
 		return nil, err
 	}
-	// The CTE form Python settled on (2026-08-19): one list parameter, three
+	// The CTE form settled on 2026-08-19: one list parameter, three
 	// hash semi-joins, and the face split gated on the cards that have one.
 	rows, err := c.db.QueryContext(ctx,
 		`WITH wanted(w) AS (SELECT unnest(?::VARCHAR[])) `+sel+
@@ -321,10 +324,10 @@ func (c *Conn) GetCards(ctx context.Context, names []string) (map[string]*CardRe
 	return copyOf(out), nil
 }
 
-// Search is `cards/db.py:search`: an ad-hoc WHERE over `oracle_cards`, with
+// Search is an ad-hoc WHERE over `oracle_cards`, with
 // an ordering (without one a LIMIT is an arbitrary slice) and an offset that
 // only means anything with one. The shape is interpolated and the values are
-// bound, which is the line `cards/db.py` keeps too: `where` and `orderBy` are
+// bound, and the line holds: `where` and `orderBy` are
 // the caller's own SQL, never a request's.
 func (c *Conn) Search(ctx context.Context, where string, args []any, limit int, orderBy string, offset int) ([]*CardRecord, error) {
 	sel, err := c.selectClause(ctx)
@@ -355,7 +358,7 @@ func (c *Conn) Search(ctx context.Context, where string, args []any, limit int, 
 	return out, rows.Err()
 }
 
-// ArtCropFrom is `cards/db.py:art_crop_from`: the art_crop URL for a
+// ArtCropFrom is the art_crop URL for a
 // printing whose normal URL we have -- Scryfall's image URLs differ only in
 // the size segment. Anything not of that shape is nil rather than a guess.
 func ArtCropFrom(imageNormal *string) *string {
@@ -385,7 +388,7 @@ func copyOf(m map[string]*CardRecord) map[string]*CardRecord {
 	return out
 }
 
-// cardCache is `cards/db.py:_CARD_CACHE`: the last sixteen `GetCards` answers,
+// cardCache is the last sixteen `GetCards` answers,
 // keyed on the exact name list, least-recently-used first out. The shelf asks
 // the same few hundred names on every page load until a deck is edited, and a
 // lookup was a full scan of 35,390 rows (`lower(name)` cannot use the index).

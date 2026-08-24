@@ -19,27 +19,27 @@ import (
 //
 //	no code path passes a model response into set_card_field(field="why")
 //
-// This file is that assertion for the Go runtime, and it is deliberately
-// written before the modes exist. That is the same argument stance.py makes
+// This file is that assertion, and it is deliberately
+// written before the modes exist -- the same argument the stance makes
 // for itself: retrofitting a gate around modes that already exist is how the
 // gate ends up with holes in it. The failure it guards against is not a bug in
 // code that exists — it is the code somebody adds later. "Tidy that rationale
 // up" is one helpful-looking commit away at all times, and a test that only
 // exercises today's call paths would pass right through it.
 //
-// # Stronger than the Python guard, in two specific ways
+// # Stronger than a name check, in two specific ways
 //
-// tests/test_claude_boundary.py walks each module's syntax tree and matches
-// identifiers by NAME. That is blunt on purpose and it is what Python can
-// cheaply do, but it has two blind spots this pass does not:
+// The cheap version of this guard walks each file's syntax tree and matches
+// identifiers by NAME. That is blunt on purpose,
+// and it has two blind spots this pass does not:
 //
-//  1. **It cannot see an indirect path.** `claude/foo.py` importing a helper
-//     that itself writes a deck passes the name check completely. The first
+//  1. **A name check cannot see an indirect path.** A file importing a helper
+//     that itself writes a deck passes it completely. The first
 //     test below bans the write engine across the whole TRANSITIVE import
 //     graph, so an intermediary is not an escape.
-//  2. **It matches strings, not objects.** A local variable called
-//     `set_card_field` trips it, and an aliased import (`import
-//     mtglab.decks.edit as e`) can slip past it. The second test resolves
+//  2. **A name check matches strings, not objects.** A local variable called
+//     `SetCardField` trips it, and an aliased import
+//     can slip past it. The second test resolves
 //     every identifier through the type checker, so it is the actual function
 //     being named that matters and neither confusion is possible.
 //
@@ -101,14 +101,15 @@ func loadClaudePackages(t *testing.T) []*packages.Package {
 }
 
 // TestNothingUnderTheClaudeSurfacesCanReachTheWriteEngine is the graph half,
-// and the one Python cannot express.
+// and the half a name check cannot express.
 //
 // `internal/deckedit` is the nine surgical operations and nothing else: every
-// deck change on either runtime goes through it. Banning it across the whole
+// deck change goes through it. Banning it across the whole
 // transitive import graph means an intermediary package is not a way around
 // the rule — which is exactly how a determined-but-well-meaning commit would
 // otherwise land it.
 func TestNothingUnderTheClaudeSurfacesCanReachTheWriteEngine(t *testing.T) {
+	t.Parallel()
 	for _, root := range loadClaudePackages(t) {
 		if path, reached := findImport(root, writeEngine, map[string]bool{}); reached {
 			t.Errorf("%s reaches the deck editor: %s\n\nNothing under the "+
@@ -149,13 +150,14 @@ func findImport(p *packages.Package, target string, seen map[string]bool) ([]str
 // TestNoIdentifierUnderTheClaudeSurfacesResolvesToAWrite is the typed half.
 //
 // Every identifier is resolved through the type checker rather than matched as
-// text, which is what makes this stronger than the Python guard: an aliased
+// text, which is what makes this stronger than a name check: an aliased
 // import resolves to the same object and is caught, while a local variable
 // that merely shares a name resolves to a different one and is not. Comments
 // and docstrings are not identifiers at all, which is what lets the packages
 // here discuss `SetCardField` by name — as they must, to explain why it is
 // absent.
 func TestNoIdentifierUnderTheClaudeSurfacesResolvesToAWrite(t *testing.T) {
+	t.Parallel()
 	banned := map[string]map[string]bool{}
 	for pkg, names := range writeSurface {
 		banned[pkg] = map[string]bool{}
@@ -200,10 +202,10 @@ func TestNoIdentifierUnderTheClaudeSurfacesResolvesToAWrite(t *testing.T) {
 // If `SetCardField` is renamed, the tests above keep passing while checking for
 // a function nobody can call any more — a green suite that guards nothing. So
 // assert the names are real, and let a rename fail loudly here where the fix is
-// obvious. This is the Python guard's `test_the_write_surface_named_here_still_exists`,
-// and it is the half that has to exist in both runtimes because it is the half
-// that decays on its own.
+// obvious. This is the half of the guard
+// that decays on its own, which is why it exists at all.
 func TestTheWriteSurfaceNamedHereStillExists(t *testing.T) {
+	t.Parallel()
 	cfg := &packages.Config{Mode: packages.NeedName | packages.NeedTypes}
 	paths := make([]string, 0, len(writeSurface))
 	for pkg := range writeSurface {
@@ -253,10 +255,10 @@ func TestTheWriteSurfaceNamedHereStillExists(t *testing.T) {
 // TestTheGuardCoversThePackagesThatExist is the last piece of anti-rot: a
 // guard that loads zero files passes silently.
 //
-// The Python side asserts `files` is non-empty for the same reason. Here the
-// risk is sharper, because the pattern is a prefix and a package moved out of
-// the tree would simply stop being checked rather than fail.
+// The risk is sharp here, because the pattern is a prefix and a package moved
+// out of the tree would simply stop being checked rather than fail.
 func TestTheGuardCoversThePackagesThatExist(t *testing.T) {
+	t.Parallel()
 	loaded := loadClaudePackages(t)
 	var covered []string
 	for _, p := range loaded {

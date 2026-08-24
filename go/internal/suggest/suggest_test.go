@@ -13,10 +13,11 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/suggest"
 )
 
-// The differential case: `service.suggestions_for` over the mono-green
+// The differential case: the suggestions payload over the mono-green
 // fixture -- the banned Titan's slot, its four candidates, their scores and
-// their reasons -- as Python answers it (`tests/go_fixtures.py`).
-func TestReplacementsAgreeWithPython(t *testing.T) {
+// their reasons -- against the recorded answer.
+func TestReplacementsMatchTheRecordedAnswer(t *testing.T) {
+	t.Parallel()
 	dir := filepath.Join("..", "gate", "testdata")
 	text, err := os.ReadFile(filepath.Join(dir, "mono-green.yaml"))
 	if err != nil {
@@ -88,7 +89,8 @@ func TestReplacementsAgreeWithPython(t *testing.T) {
 	}
 }
 
-func TestTheScorersReadAsPythonDoes(t *testing.T) {
+func TestTheScorersReadCardsAsRecorded(t *testing.T) {
+	t.Parallel()
 	if suggest.PrimaryType("Legendary Artifact Creature — Golem") != "Creature" {
 		t.Fatal("a creature is a creature first")
 	}

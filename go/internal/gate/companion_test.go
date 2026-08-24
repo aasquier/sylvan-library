@@ -20,6 +20,7 @@ func rec(name, typeLine, cost, text string, cmc float64) *pool.CardRecord {
 }
 
 func TestConditionTextIsTheCompanionSentence(t *testing.T) {
+	t.Parallel()
 	kaheera := rec("Kaheera, the Orphanguard", "Legendary Creature — Cat Beast", "{1}{G/W}{G/W}",
 		"Companion — Each creature card in your starting deck is a Cat, Elemental, Nightmare, Dinosaur, or Beast card. (If this card is your chosen companion, you may put it into your hand from outside the game for {3} any time you could cast a sorcery.)\nVigilance", 3)
 	if got := ConditionText(kaheera); got != "Companion — Each creature card in your starting deck is a Cat, Elemental, Nightmare, Dinosaur, or Beast card." {
@@ -35,6 +36,7 @@ func TestConditionTextIsTheCompanionSentence(t *testing.T) {
 }
 
 func TestTheCheckersReadTheStartingDeck(t *testing.T) {
+	t.Parallel()
 	kaheera := rec("Kaheera, the Orphanguard", "Legendary Creature — Cat Beast", "{1}{G/W}{G/W}",
 		"Companion — Each creature card in your starting deck is a Cat, Elemental, Nightmare, Dinosaur, or Beast card.", 3)
 	cat := rec("Arahbo, Roar of the World", "Legendary Creature — Cat Avatar", "{3}{G}{W}", "Eminence", 5)

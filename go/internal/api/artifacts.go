@@ -15,9 +15,9 @@ import (
 )
 
 // The rebuild: `POST /api/decks/{owner}/{slug}/artifacts`, over
-// `service.build_artifacts` over `artifacts.RenderAll`. The two GETs beside it
-// -- the shelf and one deliverable -- flipped with the deck reads in Phase 3
-// and live in `decks.go`; `artifactsJSON` below is what all three answer with,
+// `artifacts.RenderAll`. The two GETs beside it
+// -- the shelf and one deliverable -- live with the deck reads
+// in `decks.go`; `artifactsJSON` below is what all three answer with,
 // so the shelf a build returns and the shelf a reader asks for cannot differ.
 //
 // **A plain route rather than a job, and the number is why.** 70-83ms warm
@@ -31,8 +31,8 @@ import (
 // `deck.yaml` from one call site, and a build changes no deck field -- it
 // derives files *from* the deck. Logging it would mean a second call site
 // outside `commit`, which CLAUDE.md names as a decision to take deliberately
-// rather than by drift. Python took that decision and answered no; this is
-// the same no, and it is why this handler does not go through `commit` even
+// rather than by drift. The decision was taken, and the answer was no; it
+// is why this handler does not go through `commit` even
 // though it is a write.
 //
 // Two refusals, and only one of them is forceable. A **draft** is refused by
@@ -40,31 +40,30 @@ import (
 // rationales and promote it (ADR 13). **Gate errors** are refused by default
 // and `force` overrides them, mirroring `mtglab decks build --force`.
 
-// buildArtifacts is `POST .../artifacts` -- `service.build_artifacts`.
+// buildArtifacts is `POST .../artifacts`.
 func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
-	// The body first, then the deck, because that is the order FastAPI
-	// resolves them in: `payload: dict[str, Any]` is validated while the
-	// dependencies are being solved, and `lib.source_for(owner)` is not
-	// reached until the handler's own first line. So a malformed body is a
+	// The body first, then the deck -- the recorded order: the body is
+	// validated before the owner is resolved, so a malformed body is a
 	// 422 before any 404 about the deck it was aimed at.
 	body, ok := readBody(w, r)
 	if !ok {
 		return
 	}
-	force := pyTruthy(body["force"])
+	force := truthy(body["force"])
 
 	src, d, ok := a.writeTarget(w, r)
 	if !ok {
 		return
 	}
-	// **The URL's slug, not the deck's own.** `service.build_artifacts` takes
-	// the slug as an argument and passes that to `read_baseline` and
-	// `write_artifacts`, while `_artifacts_json` below asks the *deck* for its
+	// **The URL's slug, not the deck's own.** The build takes
+	// the slug as an argument and hands that to the baseline read and
+	// the artifact write, while `artifactsJSON` below asks the *deck* for
+	// its
 	// slug -- so a file whose `slug:` disagrees with its directory is written
 	// under one and listed under the other. Every deck in the library has them
 	// equal and this has never differed in practice, which is exactly why it
-	// is reproduced rather than tidied: a flip is not the place to decide
-	// which of two spellings Python meant.
+	// is recorded rather than tidied: nothing has ever had to decide
+	// which of the two spellings was meant.
 	slug := r.PathValue("slug")
 
 	// **Nil and not empty, which is a difference the gate makes and this has to
@@ -74,15 +73,13 @@ func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
 	// a pool that has never heard of any of these cards and every one of them
 	// comes back `unknown-card`.
 	//
-	// This built an empty map until 2026-08-22, deliberately, because
-	// `service.build_artifacts` wrote `_pool_for(deck, con)` where
-	// `service.validate_deck` wrote `_pool_for(deck, con) if con is not None
-	// else None` and `_pool_for` answered `{}` for a missing connection -- so on
-	// a pool-less instance the validate route warned and this one refused the
-	// build outright. The flip reproduced that rather than ruling on it, which
-	// is the rule; it has since been ruled on, `_pool_for` answers `None`, and
-	// the shape here is the ordinary one every other gate caller in this package
-	// already used.
+	// This built an empty map until 2026-08-22 -- an inherited wrinkle:
+	// on a pool-less instance the validate route warned `unverified` while
+	// this one refused the
+	// build outright, because only one of the two distinguished "no pool"
+	// from "an empty pool". It has since been ruled on, and
+	// the shape here is the ordinary one every other gate caller in this
+	// package already used.
 	var cards map[string]*pool.CardRecord
 	err := a.withPool(r.Context(), func(c *pool.Conn) error {
 		if c == nil {
@@ -116,7 +113,7 @@ func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
 
 	files, err := artifacts.RenderAll(d, artifacts.Options{Cards: cards, Previous: previous})
 	if errors.Is(err, artifacts.ErrDraft) {
-		// `BuildRejected(str(exc))` -- the renderer's own sentence, naming the
+		// The renderer's own sentence, naming the
 		// cards still owed a rationale, is what the caller reads.
 		wire.Detail(w, http.StatusUnprocessableEntity, artifacts.Message(err))
 		return
@@ -139,7 +136,7 @@ func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
 	}
 	shelf = append(shelf,
 		wire.KV{Key: "issues", Value: map[string]any{"errors": report.Errors(), "warnings": report.Warnings()}},
-		// `report.errors and force` -- true only when the flag actually
+		// True only when the flag actually
 		// overrode something, so a clean build never claims to have been
 		// forced.
 		wire.KV{Key: "forced", Value: failing > 0 && force})
@@ -155,8 +152,8 @@ func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
 // None is ordinary rather than exceptional: a deck built for the first time
 // has no baseline and so gets no `swaps.md`, and decks built before the
 // snapshot mechanism existed (ADR 30) are in the same position. A snapshot
-// that will not parse is the same answer, which is Python's
-// `contextlib.suppress(*_UNPARSEABLE)`: the next build simply overwrites it,
+// that will not parse is the same answer, deliberately
+// swallowed: the next build simply overwrites it,
 // and reporting it as an error would fail a rebuild over the one file a
 // rebuild is about to replace.
 func (a *API) baselineDeck(r *http.Request, src library.Source, slug string) (*deck.Deck, error) {

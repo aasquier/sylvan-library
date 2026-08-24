@@ -12,12 +12,13 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// The two hosted-search modes' shared instruments, held to Python by a corpus.
+// The two hosted-search modes' shared instruments, held to the recorded
+// corpus.
 //
 // What this file is really guarding is the pair of ASYMMETRIES: the same input
 // handed to a dossier passage and a research finding must come back different,
 // and the same card name handed to `Competitors` and `ResolveCards` must come
-// back different. Both are ADR 26, and both are the kind of thing a port
+// back different. Both are ADR 26, and both are the kind of thing a rewrite
 // "tidies" into consistency without noticing it has deleted a decision.
 
 type sourcesCorpus struct {
@@ -69,7 +70,7 @@ func loadSourcesCorpus(t *testing.T) sourcesCorpus {
 		t.Fatalf("decoding the corpus: %v", err)
 	}
 	if len(corpus.Canonical) == 0 || len(corpus.Pool) == 0 {
-		t.Fatal("the corpus is empty; run `python tests/go_fixtures.py`")
+		t.Fatal("the corpus is empty; testdata/sources.json is a frozen golden and always carries both")
 	}
 	return corpus
 }
@@ -82,26 +83,29 @@ func allowedSet(ids []string) map[string]bool {
 	return out
 }
 
-// The asymmetry a port flattens: with a scheme, only the scheme and host are
-// lowercased and THE PATH KEEPS ITS CASE; with no scheme, everything goes down.
-func TestCanonicalURLAgreesWithPython(t *testing.T) {
+// The asymmetry a tidier rewrite flattens: with a scheme, only the scheme
+// and host are lowercased and THE PATH KEEPS ITS CASE; with no scheme,
+// everything goes down.
+func TestCanonicalURLMatchesTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadSourcesCorpus(t)
 	for _, row := range corpus.Canonical {
 		if got := CanonicalURL(row.URL); got != row.Canonical {
-			t.Errorf("%q\n go     %q\n python %q", row.URL, got, row.Canonical)
+			t.Errorf("%q\n got    %q\n corpus %q", row.URL, got, row.Canonical)
 		}
 	}
 }
 
-func TestKeepSourcesAgreesWithPython(t *testing.T) {
+func TestKeepSourcesAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadSourcesCorpus(t)
 	for _, row := range corpus.Keep {
 		kept, dropped := KeepSources(row.Claimed, row.Searched)
 		if dropped != row.Dropped {
-			t.Errorf("%s: dropped %d, python %d", row.Note, dropped, row.Dropped)
+			t.Errorf("%s: dropped %d, corpus %d", row.Note, dropped, row.Dropped)
 		}
 		if !reflect.DeepEqual(kept, row.Kept) {
-			t.Errorf("%s:\n go     %+v\n python %+v", row.Note, kept, row.Kept)
+			t.Errorf("%s:\n got    %+v\n corpus %+v", row.Note, kept, row.Kept)
 		}
 	}
 }
@@ -110,19 +114,20 @@ func TestKeepSourcesAgreesWithPython(t *testing.T) {
 // this cannot pass by treating them alike: a dossier passage keeps its prose
 // when every citation failed, and a research finding does not.
 func TestAPassageAndAFindingAnswerDifferently(t *testing.T) {
+	t.Parallel()
 	corpus := loadSourcesCorpus(t)
 	sawTheAsymmetry, sawAFindingSurvive := false, false
 	for _, row := range corpus.Grounded {
 		allowed := allowedSet(row.Allowed)
 		if got := Section(row.Item, allowed); !reflect.DeepEqual(got, row.Section) {
-			t.Errorf("%s: section\n go     %+v\n python %+v", row.Note, got, row.Section)
+			t.Errorf("%s: section\n got    %+v\n corpus %+v", row.Note, got, row.Section)
 		}
 		kept, dropped := OnlyGrounded([]any{row.Item}, allowed)
 		if dropped != row.GroundedDropped {
-			t.Errorf("%s: grounded dropped %d, python %d", row.Note, dropped, row.GroundedDropped)
+			t.Errorf("%s: grounded dropped %d, corpus %d", row.Note, dropped, row.GroundedDropped)
 		}
 		if !reflect.DeepEqual(kept, row.Grounded) {
-			t.Errorf("%s: grounded\n go     %+v\n python %+v", row.Note, kept, row.Grounded)
+			t.Errorf("%s: grounded\n got    %+v\n corpus %+v", row.Note, kept, row.Grounded)
 		}
 		// The case that makes the two modes visibly different.
 		if row.Section.Prose != "" && len(row.Section.SourceIDs) == 0 && len(row.Grounded) == 0 {
@@ -154,7 +159,8 @@ func TestAPassageAndAFindingAnswerDifferently(t *testing.T) {
 // may be one spoiled since the last refresh, so research labels it. The
 // accident is that a DFC named by its front face resolves in one and not the
 // other -- see Competitors.
-func TestCompetitorsAndResearchCardsAgreeWithPython(t *testing.T) {
+func TestCompetitorsAndResearchCardsAgreeWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadSourcesCorpus(t)
 	withPool(t, func(c *pool.Conn) {
 		for _, row := range corpus.Pool {
@@ -166,7 +172,7 @@ func TestCompetitorsAndResearchCardsAgreeWithPython(t *testing.T) {
 				t.Fatalf("%s: %v", row.Note, err)
 			}
 			if compDropped != row.CompetitorsDropped {
-				t.Errorf("%s: competitors dropped %d, python %d",
+				t.Errorf("%s: competitors dropped %d, corpus %d",
 					row.Note, compDropped, row.CompetitorsDropped)
 			}
 			assertSameJSON(t, row.Note+" / competitors", comp, row.Competitors)
@@ -177,7 +183,7 @@ func TestCompetitorsAndResearchCardsAgreeWithPython(t *testing.T) {
 				t.Fatalf("%s: %v", row.Note, err)
 			}
 			if unresolved != row.ResearchUnresolved {
-				t.Errorf("%s: research unresolved %d, python %d",
+				t.Errorf("%s: research unresolved %d, corpus %d",
 					row.Note, unresolved, row.ResearchUnresolved)
 			}
 			assertSameJSON(t, row.Note+" / research", cards, row.ResearchCards)
@@ -187,8 +193,8 @@ func TestCompetitorsAndResearchCardsAgreeWithPython(t *testing.T) {
 
 // assertSameJSON compares as MARSHALLED BYTES, because the key order is the
 // contract here and no struct comparison carries it. `Competitor` and
-// `ResearchCard` hold the same facts in a DIFFERENT order, and both orders are
-// Python's.
+// `ResearchCard` hold the same facts in a DIFFERENT order, and both orders
+// are recorded.
 func assertSameJSON(t *testing.T, what string, got any, want []json.RawMessage) {
 	t.Helper()
 	raw, err := json.Marshal(got)
@@ -200,7 +206,7 @@ func assertSameJSON(t *testing.T, what string, got any, want []json.RawMessage) 
 		t.Fatal(err)
 	}
 	if len(gotRows) != len(want) {
-		t.Errorf("%s: %d rows, python %d\n go     %s", what, len(gotRows), len(want), raw)
+		t.Errorf("%s: %d rows, corpus %d\n got    %s", what, len(gotRows), len(want), raw)
 		return
 	}
 	for i := range gotRows {
@@ -208,12 +214,12 @@ func assertSameJSON(t *testing.T, what string, got any, want []json.RawMessage) 
 		_ = json.Unmarshal(gotRows[i], &a)
 		_ = json.Unmarshal(want[i], &b)
 		if !reflect.DeepEqual(a, b) {
-			t.Errorf("%s row %d:\n go     %s\n python %s", what, i, gotRows[i], want[i])
+			t.Errorf("%s row %d:\n got    %s\n corpus %s", what, i, gotRows[i], want[i])
 			continue
 		}
 		// Values agreeing is not enough: the ORDER of the keys is the wire.
 		if string(gotRows[i]) != compactJSON(t, want[i]) {
-			t.Errorf("%s row %d: key order differs\n go     %s\n python %s",
+			t.Errorf("%s row %d: key order differs\n got    %s\n corpus %s",
 				what, i, gotRows[i], compactJSON(t, want[i]))
 		}
 	}
@@ -233,9 +239,10 @@ func compactJSON(t *testing.T, raw json.RawMessage) string {
 
 // The three payload shapes, asserted as bytes. `oracle_text` is FIFTH in a
 // research card and LAST in a competitor; an unresolved card has exactly TWO
-// keys. All three are Python's, none is tidy, and a single shared type would
+// keys. All three are recorded, none is tidy, and a single shared type would
 // break at least two of them.
 func TestTheThreeCardShapesKeepTheirOwnKeyOrders(t *testing.T) {
+	t.Parallel()
 	cost, line, text := "{2}{G}", "Creature", "Trample"
 	comp, err := json.Marshal(Competitor{
 		Name: "X", Prose: "p", SourceIDs: []string{"s1"},

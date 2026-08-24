@@ -44,6 +44,7 @@ func (h *hold) count() int {
 }
 
 func TestManyGoroutinesAskingAtOnceGetExactlyOneJob(t *testing.T) {
+	t.Parallel()
 	// The stress form of the money bug: sixty-four tabs, one commander. The
 	// window `submit` closes is exactly the one two concurrent requests race
 	// in, and the lookup and the insert being one locked step is the whole
@@ -97,6 +98,7 @@ func TestManyGoroutinesAskingAtOnceGetExactlyOneJob(t *testing.T) {
 }
 
 func TestConcurrentSubmitsAcrossKeysAndOwnersDoNotBleed(t *testing.T) {
+	t.Parallel()
 	// The same pressure with the identity varying, which is what would catch
 	// a dedupe that matched on too little: a key alone would collapse two
 	// accounts' jobs into one and hand the second a 404 for a job it had just
@@ -179,10 +181,11 @@ func TestConcurrentSubmitsAcrossKeysAndOwnersDoNotBleed(t *testing.T) {
 }
 
 func TestPollingWhileAJobRunsIsNotARace(t *testing.T) {
-	// What the race detector is here for. Python's worker writes `status`,
-	// `done` and `result` with no lock at all while a request thread reads
-	// them in `as_dict`; the GIL makes that survivable and `-race` makes it a
-	// hard failure, so the mutable half of a Job is guarded here and this is
+	t.Parallel()
+	// What the race detector is here for. A worker writes `status`,
+	// `done` and `result` while request goroutines read
+	// them for polls; unguarded, `-race` makes that a
+	// hard failure, so the mutable half of a Job is guarded and this is
 	// the test that would have found it if it were not.
 	r := quietRegistry(t, Config{CPUWorkers: 4})
 	const jobs, pollers = 8, 8
@@ -238,6 +241,7 @@ func TestPollingWhileAJobRunsIsNotARace(t *testing.T) {
 }
 
 func TestForgettingAnOwnerWhileWorkIsInFlightIsNotARace(t *testing.T) {
+	t.Parallel()
 	// Deleting an account happens while that account's jobs are running, by
 	// construction: `forget_owner` is called from the delete route and the
 	// lanes have no cancellation, so the two genuinely overlap.

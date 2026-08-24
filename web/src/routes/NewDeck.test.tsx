@@ -6,7 +6,7 @@
  * pinning here is not the markup but the four claims the ADR makes:
  *
  * * The proposal is a **proposal**. Picking a commander fills in the create
- *   form; it does not make a deck. Nothing under `src/mtglab/claude/` can
+ *   form; it does not make a deck. Nothing under `go/internal/claude/` can
  *   reach a write path and the UI has to tell the same story.
  * * A reading and a claim are **labelled differently**, all the way to the
  *   page. One of them can be wrong.
@@ -696,7 +696,7 @@ describe('the proposal', () => {
   })
 
   it('says a lost run is lost rather than showing a bare 404', async () => {
-    // Jobs live in the server's memory and die with it (`api/jobs.py`). A
+    // Jobs live in the server's memory and die with it. A
     // restart mid-run is the one way this fails that is nobody's mistake.
     const { ApiError } = await import('../lib/api')
     vi.mocked(followJob).mockImplementation((_id, _onTick, _ms, initial) => (
@@ -781,7 +781,7 @@ describe('when the surface is not available', () => {
 
   it('offers the door that always works', async () => {
     vi.mocked(api.claudeStatus).mockResolvedValue(
-      { ...CLAUDE_STATUS, installed: false } as never)
+      { ...CLAUDE_STATUS, configured: false } as never)
     open()
     fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
 

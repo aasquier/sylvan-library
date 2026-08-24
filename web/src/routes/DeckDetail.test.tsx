@@ -607,7 +607,7 @@ describe('DeckDetail wheel of fortune', () => {
     vi.mocked(api.wheelSpin).mockResolvedValue({
       pool_available: true, symbol: 'cup', label: 'The Cup',
       meaning: 'The cup runneth over — a card that refills your hand.',
-      seed: 7, answered_by: 'python',
+      seed: 7, answered_by: 'dice',
       caveat: 'The wheel is blind dice over the card pool. The rationale, '
             + 'if it earns one, is yours to write.',
       card: { name: 'Harmonize', mana_cost: '{2}{G}{G}', type_line: 'Sorcery',
@@ -638,7 +638,7 @@ describe('DeckDetail wheel of fortune', () => {
   it('reports an empty fate honestly', async () => {
     vi.mocked(api.wheelSpin).mockResolvedValue({
       pool_available: true, symbol: 'skull', label: 'The Skull',
-      meaning: 'The skull grins.', seed: 3, answered_by: 'python',
+      meaning: 'The skull grins.', seed: 3, answered_by: 'dice',
       caveat: 'Deterministic.', card: null,
       reason: 'The pool holds no legal card in these colours that answers '
             + 'to this fate.',
@@ -876,17 +876,18 @@ describe('DeckDetail rationale editor', () => {
     await within(row).findByText(/stance is off/)
   })
 
-  it('offers nothing to press when the SDK is not installed', async () => {
-    // Three different answers, kept apart: not installed, no key, and nothing
-    // asked yet. Collapsing them tells someone their key is missing when they
-    // simply never installed the extra.
+  it('offers nothing to press when the server has no key', async () => {
+    // Two different answers, kept apart: no key, and nothing asked yet. A
+    // server without Claude at all is the third and cannot happen — the
+    // client is linked into the binary — so this asserts the state the door
+    // can actually report.
     vi.mocked(api.deck).mockResolvedValue(DRAFT)
     vi.mocked(api.claudeStatus).mockResolvedValue({
-      ...CLAUDE_STATUS, installed: false,
+      ...CLAUDE_STATUS, configured: false,
     })
     const row = await openEditorFor('Sol Ring')
 
-    await within(row).findByText(/isn’t available on this server/)
+    await within(row).findByText(/no key to call with/)
     expect(within(row).queryByRole('button', { name: /ask for questions/i }))
       .toBeNull()
   })
@@ -1616,7 +1617,7 @@ describe('DeckDetail rationale interview discoverability', () => {
 /**
  * A deck somebody may read but not change.
  *
- * The mirror of `tests/test_library_write_gate.py`, and it exists for the same
+ * The mirror of the server's own write-gate tests, and it exists for the same
  * reason: before the write gate landed, every account that could see the
  * curated six could also edit and delete them, and no test on either side of
  * the wire ever logged in as a second person to find out.

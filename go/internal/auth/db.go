@@ -1,12 +1,12 @@
-// Package auth is the Go reading of `mtglab/auth`: who a session token
-// belongs to, and whether a password matches its Argon2id hash. In Phase 2
-// of the migration (docs/go-migration/PLAN.md) the front door needs exactly
+// Package auth is `app.db`: who a session token
+// belongs to, and whether a password matches its Argon2id hash. The front
+// door needs exactly
 // one thing from it -- resolve the `sid` cookie to a caller before routing --
 // and the password half is here so the compatibility ADR 38 promises
 // ("Argon2id PHC hashes verify as-is") is proven by a test rather than by a
 // sentence.
 //
-// **The schema ladder lives here too** (`schema.go`, Phase 8): `Migrate`
+// **The schema ladder lives here too** (`schema.go`): `Migrate`
 // is the one caller allowed to create `app.db`, run once by the serving
 // command before anything opens the file. Every other handle in the module
 // stays `mode=ro` or `mode=rw` — the door's middleware resolves cookies
@@ -15,11 +15,10 @@
 // which still refuses to mint a file: a database created anywhere but the
 // ladder would be one at version zero beside the real one.
 //
-// The driver is modernc.org/sqlite, the pure-Go translation, decided at this
-// spike over mattn/go-sqlite3 (CGO): DuckDB is already the one CGO dependency
-// this module carries, and keeping SQLite out of CGO means the front door is
-// a static binary with no C toolchain in its build and the auth tests run
-// race-detected without one. PLAN.md section 6 records the call.
+// The driver is modernc.org/sqlite, the pure-Go translation, chosen over
+// mattn/go-sqlite3 (CGO) deliberately: DuckDB is already the one CGO
+// dependency the app carries, and keeping SQLite out of CGO means no second
+// C library in the build and the auth tests run race-detected without one.
 package auth
 
 import (

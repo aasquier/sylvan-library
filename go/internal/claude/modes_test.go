@@ -9,16 +9,17 @@ import (
 	"testing"
 )
 
-// Every mode Python defines is loadable here, and the count is not a number
+// Every defined mode is loadable here, and the count is not a number
 // this file remembers.
 //
-// `data/modes.json` is generated **by discovery** rather than from a list, for
-// a reason worth keeping: the first version of that generator was a hand-list
-// gathered by grepping for `= Mode(`, and it silently missed `scan.py`, which
-// spells it `modes.Mode(...)`. Seven became six with nothing looking wrong.
-// So the assertion here is that Go loads exactly what the file holds, and
-// `tests/test_go_fixtures.py` is what holds the file to Python.
+// `data/modes.json` was built **by discovery** rather than from a list, for
+// a reason worth keeping: an earlier hand list silently missed the scan
+// mode, whose definition is spelled differently from its siblings. Seven
+// became six with nothing looking wrong.
+// So the assertion here is that the loader loads exactly what the file
+// holds; the file itself is frozen recorded data.
 func TestEveryDefinedModeLoads(t *testing.T) {
+	t.Parallel()
 	var file modeFile
 	raw, err := os.ReadFile("data/modes.json")
 	if err != nil {
@@ -54,6 +55,7 @@ func TestEveryDefinedModeLoads(t *testing.T) {
 // declaring a write would panic the process -- this is the assertion that the
 // data really is empty rather than the check being vacuous.
 func TestNoModeDeclaresAWrite(t *testing.T) {
+	t.Parallel()
 	for _, name := range ModeNames() {
 		m, err := GetMode(name)
 		if err != nil {
@@ -87,6 +89,7 @@ func properties(t *testing.T, m Mode) map[string]any {
 // its place, grounded in the user's own deck, is a `why` in everything but
 // authorship. Guarding it in the UI would not be guarding it.
 func TestTheSlotArgumentHasNowhereToPutADefence(t *testing.T) {
+	t.Parallel()
 	m, err := GetMode(ModeSlotArgument)
 	if err != nil {
 		t.Fatal(err)
@@ -104,8 +107,8 @@ func TestTheSlotArgumentHasNowhereToPutADefence(t *testing.T) {
 			"can invent the field the schema deliberately omits")
 	}
 	if _, present := props["charges"]; !present {
-		t.Error("the slot argument lost its charges array: the schema crossed " +
-			"as something other than itself")
+		t.Error("the slot argument lost its charges array: the schema no " +
+			"longer carries itself")
 	}
 }
 
@@ -113,6 +116,7 @@ func TestTheSlotArgumentHasNowhereToPutADefence(t *testing.T) {
 // schema has no field for a card name -- `identify` decides what card it is,
 // against the pool. A better camera, never a better judge.
 func TestTheScanHasNoFieldForACardName(t *testing.T) {
+	t.Parallel()
 	m, err := GetMode(ModeScan)
 	if err != nil {
 		t.Fatal(err)
@@ -141,7 +145,8 @@ func TestTheScanHasNoFieldForACardName(t *testing.T) {
 // its search -- silently, since the request is still valid without it. Loading
 // panics instead; this proves the ones actually declared do build, and that
 // the modes ADR 19 and ADR 26 give a search to still have one.
-func TestTheHostedSearchSurvivesTheCrossing(t *testing.T) {
+func TestTheCitingModesKeepAWorkingHostedSearch(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{ModeCommanderDossier, ModeResearch} {
 		m, err := GetMode(name)
 		if err != nil {
@@ -174,6 +179,7 @@ func TestTheHostedSearchSurvivesTheCrossing(t *testing.T) {
 // An unknown hosted tool type must be loud. The loader panics, and this is
 // what proves the branch exists rather than trusting the comment.
 func TestAnUnknownHostedToolIsRefused(t *testing.T) {
+	t.Parallel()
 	_, err := serverToolSpec{Type: "web_search_29991231", Name: "web_search"}.param()
 	if err == nil {
 		t.Fatal("an unknown hosted tool type was accepted")
@@ -183,10 +189,11 @@ func TestAnUnknownHostedToolIsRefused(t *testing.T) {
 	}
 }
 
-// Every mode's prompt actually crossed. A blank instruction block would still
+// Every mode's prompt is really there. A blank instruction block would still
 // build a valid request and would produce an answer -- a much worse one, from
 // a model told nothing about what it is doing.
 func TestEveryModeCarriesItsPromptAndSchema(t *testing.T) {
+	t.Parallel()
 	for _, name := range ModeNames() {
 		m, err := GetMode(name)
 		if err != nil {

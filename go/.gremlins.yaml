@@ -1,0 +1,85 @@
+# Gremlins, the mutation tester (`gremlins unleash`, from `go/`).
+#
+# Mutation testing answers the question coverage cannot: not "did a test run
+# this line" but "would a test have *noticed* if this line were wrong". It
+# edits the source -- flips a `>` to a `>=`, negates a condition, changes a
+# `+` to a `-` -- and reruns the tests. A mutant that survives is a change
+# nobody's assertions object to, which is a hole shaped exactly like the bug
+# that will one day land there.
+#
+# Read two numbers:
+#
+#   - **Efficacy** is KILLED / (KILLED + LIVED): of the mutants some test
+#     could have caught, how many did. This is the one to hold high.
+#   - **Mutant coverage** is (KILLED + LIVED) / all mutants: how much of the
+#     source the tests reach at all. Low means untested code, not weak tests.
+#
+# A TIMED OUT mutant is one whose edit made the code loop forever -- the tests
+# did notice, in the bluntest way. It is not a failure, and it is counted apart
+# from KILLED rather than with it, so efficacy neither rewards nor punishes it.
+#
+# **This is a tool for the packages where being wrong is expensive**, which
+# here means the determinism kernels: `mt19937`, `floats`, `textutil`,
+# `yamlemit` and the compile/gate rules the frozen goldens rest on. Running it
+# over the whole module is slow and mostly re-proves things the goldens already
+# hold; `--diff` against the merge base is the mode CI uses.
+
+unleash:
+  # Workers: mutation testing runs a full package test per mutant, so this is
+  # the wall-clock dial. Left unset (0) it uses the machine's CPUs; the CI job
+  # pins it explicitly instead of inheriting a runner's core count.
+  workers: 0
+
+  # Each mutant's test run is allowed baseline x this. The default of 2 was too
+  # tight here: a package whose baseline is dominated by *process startup*
+  # rather than by the tests has very little headroom, and a mutant that would
+  # have been KILLED in 2.1x gets reported as TIMED OUT instead -- which is not
+  # wrong, but it hides the honest signal behind a blunter one.
+  timeout-coefficient: 4
+
+  # Integration mode reruns the *whole* suite per mutant rather than the
+  # mutated package's tests. Off: this module's packages are tested in place,
+  # and the cost of the other spelling is minutes per mutant.
+  integration: false
+
+  # Quality gates. Both are off by default so a first run reports rather than
+  # refuses; the CI job passes the thresholds it wants on the command line, so
+  # raising the bar is a change to the workflow and not a silent edit here.
+  threshold-efficacy: 0
+  threshold-mcover: 0
+
+  # Nothing generated, vendored, or golden. A mutant in a testdata corpus is
+  # not a bug somebody could fix -- and the corpora are frozen by rule, so an
+  # edit there is exactly what must never be treated as an improvement.
+  exclude-files:
+    - ".*/testdata/.*"
+    - ".*\\.pb\\.go"
+
+# The mutant families.
+#
+# The four on by default are the ones that map to real mistakes in this code:
+# an off-by-one in a curve bucket, an inverted guard in the gate, a sign error
+# in the arithmetic the goldens pin. The rest are off because they mostly
+# produce mutants that are either trivially killed or not worth the minutes --
+# turn one on deliberately when hunting something specific.
+mutants:
+  arithmetic-base:
+    enabled: true
+  conditionals-boundary:
+    enabled: true
+  conditionals-negation:
+    enabled: true
+  increment-decrement:
+    enabled: true
+  invert-assignments:
+    enabled: false
+  invert-bitwise:
+    enabled: false
+  invert-loopctrl:
+    enabled: false
+  invert-logical:
+    enabled: false
+  invert-negatives:
+    enabled: false
+  remove-self-assignments:
+    enabled: false

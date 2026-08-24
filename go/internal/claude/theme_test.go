@@ -19,16 +19,17 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// `claude/theme.py` held to Python, over the corpus `tests/go_fixtures.py`
-// writes with the opening angle pinned and the clock frozen.
+// The theme interview, held to the recorded corpus `testdata/theme.json`
+// with the opening angle pinned and the clock frozen.
 //
 // Two things in here are the point rather than the coverage.
 //
 // **The casefold row.** `Ground` folds the person's own turns and the quote
-// the model claims they said; Python casefolds and `strings.ToLower` does
-// not, so a German answer grounds there and drops here. The corpus carries a
-// slot quoting `Straße` against a transcript that says `STRASSE`, and a test
-// below names it, because a passing corpus of ASCII would have said nothing.
+// the model claims they said with Unicode full case folding, which
+// `strings.ToLower` is not: ToLower leaves `ß` alone, and a German answer
+// would silently stop grounding under it. The corpus carries a slot quoting
+// `Straße` against a transcript that says `STRASSE`, and a test below names
+// it, because a passing corpus of ASCII would have said nothing.
 //
 // **Two report shapes per half.** A turn that reached the model carries
 // `never`; one that did not does not. A proposal that resolved something
@@ -193,8 +194,8 @@ func loadThemeCorpus(t *testing.T) themeCorpus {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("testdata", "theme.json"))
 	if err != nil {
-		t.Fatalf("the theme corpus is missing; regenerate with "+
-			"`python tests/go_fixtures.py`: %v", err)
+		t.Fatalf("the theme corpus is missing; testdata/theme.json is a "+
+			"frozen golden: %v", err)
 	}
 	var corpus themeCorpus
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
@@ -205,9 +206,9 @@ func loadThemeCorpus(t *testing.T) themeCorpus {
 	return corpus
 }
 
-// freezeAngle pins the opening angle the way the corpus was written. Python
-// spells it `random.choice`, so nothing reproducible rides on which one comes
-// out -- only that a test can hold it still.
+// freezeAngle pins the opening angle the way the corpus was written. The
+// draw is OS-seeded and nothing reproducible rides on which one comes out --
+// only that a test can hold it still.
 func freezeAngle(t *testing.T, index int) {
 	t.Helper()
 	was := openingAngle
@@ -216,12 +217,13 @@ func freezeAngle(t *testing.T, index int) {
 }
 
 // The constants the whole module is built out of. Cheap, and the one check
-// that fails loudly when a cap moves in Python and not here.
-func TestTheThemeConstantsAgreeWithPython(t *testing.T) {
+// that fails loudly when a cap moves here and not in the corpus.
+func TestTheThemeConstantsMatchTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range []struct {
-		what     string
-		go_, py_ int
+		what      string
+		got, want int
 	}{
 		{"FLOOR", Floor, corpus.Floor},
 		{"MAX_EXCHANGES", MaxExchanges, corpus.MaxExchanges},
@@ -229,12 +231,12 @@ func TestTheThemeConstantsAgreeWithPython(t *testing.T) {
 		{"MAX_FACT_CHARS", MaxFactChars, corpus.MaxFactChars},
 		{"MIN_QUOTE_CHARS", MinQuoteChars, corpus.MinQuoteChars},
 	} {
-		if row.go_ != row.py_ {
-			t.Errorf("%s is %d here and %d in Python", row.what, row.go_, row.py_)
+		if row.got != row.want {
+			t.Errorf("%s is %d here and %d in the corpus", row.what, row.got, row.want)
 		}
 	}
 	if strings.Join(SlotKinds, ",") != strings.Join(corpus.SlotKinds, ",") {
-		t.Errorf("the slot kinds are %v here and %v in Python", SlotKinds, corpus.SlotKinds)
+		t.Errorf("the slot kinds are %v here and %v in the corpus", SlotKinds, corpus.SlotKinds)
 	}
 	for kind, want := range corpus.SlotQuestions {
 		if SlotQuestions[kind] != want {
@@ -242,46 +244,49 @@ func TestTheThemeConstantsAgreeWithPython(t *testing.T) {
 		}
 	}
 	if len(SlotQuestions) != len(corpus.SlotQuestions) {
-		t.Errorf("%d slot questions here, %d in Python", len(SlotQuestions), len(corpus.SlotQuestions))
+		t.Errorf("%d slot questions here, %d in the corpus", len(SlotQuestions), len(corpus.SlotQuestions))
 	}
 	if strings.Join(OpeningAngles, "|") != strings.Join(corpus.Prompts.OpeningAngles, "|") {
-		t.Error("the opening angles have drifted from Python's")
+		t.Error("the opening angles have drifted from the corpus")
 	}
 }
 
-func TestProseAgreesWithPython(t *testing.T) {
+func TestProseAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Prose {
 		if got := Prose(row.Value); got != row.Prose {
-			t.Errorf("%s: prose(%#v) is %q, Python says %q", row.Note, row.Value, got, row.Prose)
+			t.Errorf("%s: Prose(%#v) is %q, the corpus says %q", row.Note, row.Value, got, row.Prose)
 		}
 	}
 }
 
-func TestGroundAgreesWithPython(t *testing.T) {
+func TestGroundMatchesTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Ground {
 		kept, dropped := Ground(row.Slots, corpus.Transcript)
 		assertSameJSONValue(t, "ground: "+row.Note, kept, row.Kept)
 		if dropped != row.Dropped {
-			t.Errorf("%s: dropped %d, Python dropped %d", row.Note, dropped, row.Dropped)
+			t.Errorf("%s: dropped %d, the corpus dropped %d", row.Note, dropped, row.Dropped)
 		}
 		if got := MayPropose(kept); got != row.MayPropose {
-			t.Errorf("%s: may_propose is %v, Python says %v", row.Note, got, row.MayPropose)
+			t.Errorf("%s: may_propose is %v, the corpus says %v", row.Note, got, row.MayPropose)
 		}
 	}
 }
 
-// The row that could not have been written in Go, named so the reason
-// survives a corpus refresh.
+// The row an ASCII-only corpus could never have carried, named so the
+// reason survives.
 //
-// `casefold()` folds `ß` to `ss`; `strings.ToLower` leaves it alone. The
-// person typed STRASSE and the model quoted Straße, which is a real German
-// spelling and the only reachable disagreement between the two functions in
-// this module. Grounding it is the difference between a readiness count that
-// moves and one that does not, which is what a newcomer reads as answering
-// wrong.
-func TestGroundFoldsTheWayPythonFolds(t *testing.T) {
+// Full case folding folds `ß` to `ss`; `strings.ToLower` leaves it alone.
+// The person typed STRASSE and the model quoted Straße, which is a real
+// German spelling and the only reachable disagreement between the two
+// foldings in this module. Grounding it is the difference between a
+// readiness count that moves and one that does not, which is what a newcomer
+// reads as answering wrong.
+func TestGroundFoldsFullyWhereToLowerWouldNot(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	found := false
 	for _, row := range corpus.Ground {
@@ -300,25 +305,26 @@ func TestGroundFoldsTheWayPythonFolds(t *testing.T) {
 			"reachable difference between casefold and ToLower is untested")
 	}
 	// And directly, so the reason is legible without the corpus.
-	if pyCasefold("Straße") != pyCasefold("STRASSE") {
+	if casefold("Straße") != casefold("STRASSE") {
 		t.Error("casefold does not make Straße and STRASSE equal")
 	}
 	// Spelled out rather than compared inline: the point is what `ToLower`
 	// does to these two strings, which is the function a tidier `EqualFold`
-	// would replace and the reason `pyCasefold` exists.
+	// would replace and the reason `casefold` exists.
 	lowered, shouted := strings.ToLower("Straße"), strings.ToLower("STRASSE")
 	if lowered == shouted {
 		t.Error("ToLower now agrees with casefold here, so this test is moot")
 	}
 }
 
-func TestCarryAgreesWithPython(t *testing.T) {
+func TestCarryAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Carry {
 		carried := Carry(row.Previous, row.Fresh)
 		assertSameJSONValue(t, "carry: "+row.Note, carried, row.Carried)
 		if got := MayPropose(carried); got != row.MayPropose {
-			t.Errorf("%s: may_propose is %v, Python says %v", row.Note, got, row.MayPropose)
+			t.Errorf("%s: may_propose is %v, the corpus says %v", row.Note, got, row.MayPropose)
 		}
 	}
 }
@@ -326,6 +332,7 @@ func TestCarryAgreesWithPython(t *testing.T) {
 // The floor may not go backwards, stated as a property rather than a row.
 // This is what `Carry` exists for and the failure it was written after.
 func TestTheReadinessCountNeverFalls(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	known := []Slot{}
 	for _, row := range corpus.Carry {
@@ -337,70 +344,74 @@ func TestTheReadinessCountNeverFalls(t *testing.T) {
 	}
 }
 
-func TestRepeatsAgreesWithPython(t *testing.T) {
+func TestRepeatsMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Repeats {
 		if got := Repeats(row.Text, row.Told); got != row.Repeats {
-			t.Errorf("%s: repeats is %v, Python says %v", row.Note, got, row.Repeats)
+			t.Errorf("%s: repeats is %v, the corpus says %v", row.Note, got, row.Repeats)
 		}
 	}
 }
 
-func TestCheckToldAgreesWithPython(t *testing.T) {
+func TestCheckToldMatchesTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Told {
 		told, err := CheckTold(row.Raw)
 		if row.Error != "" {
 			if err == nil {
-				t.Errorf("%s: kept %v where Python said %q", row.Note, told, row.Error)
+				t.Errorf("%s: kept %v where the corpus says %q", row.Note, told, row.Error)
 				continue
 			}
 			if err.Error() != row.Error {
-				t.Errorf("%s: refused with\n  %q\nPython says\n  %q", row.Note, err, row.Error)
+				t.Errorf("%s: refused with\n  %q\nthe corpus says\n  %q", row.Note, err, row.Error)
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("%s: refused with %q where Python kept %v", row.Note, err, row.Told)
+			t.Errorf("%s: refused with %q where the corpus kept %v", row.Note, err, row.Told)
 			continue
 		}
 		if strings.Join(told, "|") != strings.Join(row.Told, "|") {
-			t.Errorf("%s: kept %v, Python kept %v", row.Note, told, row.Told)
+			t.Errorf("%s: kept %v, the corpus kept %v", row.Note, told, row.Told)
 		}
 	}
 }
 
-func TestCheckTranscriptAgreesWithPython(t *testing.T) {
+func TestCheckTranscriptAgreesWithTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Transcripts {
 		turns, err := CheckTranscript(row.Raw)
 		if row.Error != "" {
 			if err == nil {
-				t.Errorf("%s: accepted %d turns where Python said %q", row.Note, len(turns), row.Error)
+				t.Errorf("%s: accepted %d turns where the corpus says %q", row.Note, len(turns), row.Error)
 				continue
 			}
 			if err.Error() != row.Error {
-				t.Errorf("%s: refused with\n  %q\nPython says\n  %q", row.Note, err, row.Error)
+				t.Errorf("%s: refused with\n  %q\nthe corpus says\n  %q", row.Note, err, row.Error)
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("%s: refused with %q where Python accepted", row.Note, err)
+			t.Errorf("%s: refused with %q where the corpus accepts", row.Note, err)
 			continue
 		}
 		if len(turns) != len(row.Turns) {
-			t.Errorf("%s: %d turns, Python had %d", row.Note, len(turns), len(row.Turns))
+			t.Errorf("%s: %d turns, the corpus has %d", row.Note, len(turns), len(row.Turns))
 			continue
 		}
 		for i, turn := range turns {
 			if turn != row.Turns[i] {
-				t.Errorf("%s: turn %d is %+v, Python has %+v", row.Note, i, turn, row.Turns[i])
+				t.Errorf("%s: turn %d is %+v, the corpus has %+v", row.Note, i, turn, row.Turns[i])
 			}
 		}
 	}
 }
 
-func TestKeepFactAgreesWithPython(t *testing.T) {
+func TestKeepFactMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Facts {
 		assertSameJSONValue(t, "keep_fact: "+row.Note, KeepFact(row.Raw, corpus.Pages), row.Fact)
@@ -412,6 +423,7 @@ func TestKeepFactAgreesWithPython(t *testing.T) {
 // back only because the schema requires it, and a fun fact paraphrased at a
 // fortune-teller's table is the one thing at that table that would be a lie.
 func TestATarotFactIsTheCorpussWordsNotTheModels(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Facts {
 		if !strings.Contains(row.Note, "paraphrased away") {
@@ -429,26 +441,27 @@ func TestATarotFactIsTheCorpussWordsNotTheModels(t *testing.T) {
 	t.Fatal("the corpus no longer carries a paraphrased tarot citation")
 }
 
-// `int(seed)`, and it is deliberately not the tarot route's Pydantic grammar.
-// The fullwidth digit is the row that tells them apart: `/api/tarot/reading`
-// refuses `７` and this reads it as seven.
-func TestTheSeedGrammarIsPythonsIntNotPydantics(t *testing.T) {
+// The seed grammar is the lenient one, deliberately not the tarot route's
+// strict decimal grammar. The fullwidth digit is the row that tells them
+// apart: `/api/tarot/reading` refuses `７` and this reads it as seven.
+func TestTheSeedGrammarIsTheLenientOneNotTheRoutes(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	sawFullwidth := false
 	for _, row := range corpus.Seeds {
-		got, err := pyInt(row.Raw)
+		got, err := intValue(row.Raw)
 		if row.Error != "" {
 			if err == nil {
-				t.Errorf("%s: read %s where Python refused", row.Note, got)
+				t.Errorf("%s: read %s where the corpus refuses", row.Note, got)
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("%s: refused where Python read %s", row.Note, row.Seed)
+			t.Errorf("%s: refused where the corpus reads %s", row.Note, row.Seed)
 			continue
 		}
 		if got.String() != row.Seed {
-			t.Errorf("%s: read %s, Python read %s", row.Note, got, row.Seed)
+			t.Errorf("%s: read %s, the corpus reads %s", row.Note, got, row.Seed)
 		}
 		if strings.Contains(row.Note, "fullwidth") {
 			sawFullwidth = true
@@ -456,45 +469,46 @@ func TestTheSeedGrammarIsPythonsIntNotPydantics(t *testing.T) {
 	}
 	if !sawFullwidth {
 		t.Fatal("the corpus no longer carries the fullwidth digit, which is " +
-			"the one row separating int() from Pydantic's grammar")
+			"the one row separating the lenient grammar from the route's")
 	}
 }
 
-func TestTheBudgetFormatAgreesWithPython(t *testing.T) {
+func TestTheBudgetFormatMatchesTheGolden(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Budgets {
 		var got string
 		switch row.Note {
 		case "inf":
-			got = pyFormatG(inf(1))
+			got = formatG(inf(1))
 		case "-inf":
-			got = pyFormatG(inf(-1))
+			got = formatG(inf(-1))
 		case "nan":
-			got = pyFormatG(nan())
+			got = formatG(nan())
 		default:
 			if row.Value == nil {
 				t.Fatalf("a budget row with no value and no note: %+v", row)
 			}
-			got = pyFormatG(*row.Value)
+			got = formatG(*row.Value)
 		}
 		if got != row.Formatted {
-			t.Errorf("%v: formatted %q, Python says %q", row.Value, got, row.Formatted)
+			t.Errorf("%v: formatted %q, the golden says %q", row.Value, got, row.Formatted)
 		}
 	}
 }
 
-func TestThemeStanceForAgreesWithPython(t *testing.T) {
+func TestThemeStanceForMatchesTheCorpus(t *testing.T) {
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Stances {
 		t.Setenv(CeilingEnv, row.Ceiling)
 		stance, err := ThemeStanceFor(row.Requested, nil)
 		if row.Error != "" {
 			if err == nil {
-				t.Errorf("%s: resolved where Python said %q", row.Note, row.Error)
+				t.Errorf("%s: resolved where the corpus says %q", row.Note, row.Error)
 				continue
 			}
 			if err.Error() != row.Error {
-				t.Errorf("%s: refused with\n  %q\nPython says\n  %q", row.Note, err, row.Error)
+				t.Errorf("%s: refused with\n  %q\nthe corpus says\n  %q", row.Note, err, row.Error)
 			}
 			continue
 		}
@@ -524,7 +538,7 @@ func TestThePromptsAreBytes(t *testing.T) {
 			seed = big.NewInt(*row.Seed)
 		}
 		if got := frameFor(readingFor(who, seed), row.Told); got != row.Frame {
-			t.Errorf("frame %q:\n go     %q\n python %q", row.Note, got, row.Frame)
+			t.Errorf("frame %q:\n got    %q\n corpus %q", row.Note, got, row.Frame)
 		}
 	}
 
@@ -534,13 +548,13 @@ func TestThePromptsAreBytes(t *testing.T) {
 			transcript = nil
 		}
 		if got := closingFor(row.Slots, transcript, row.Told); got != row.Closing {
-			t.Errorf("closing %q:\n go     %q\n python %q", row.Note, got, row.Closing)
+			t.Errorf("closing %q:\n got    %q\n corpus %q", row.Note, got, row.Closing)
 		}
 	}
 
 	for _, row := range corpus.Prompts.Asks {
 		if got := proposalAsk(corpus.Prompts.Grounded, row.Budget, row.Avoid); got != row.Ask {
-			t.Errorf("ask %q:\n go     %q\n python %q", row.Note, got, row.Ask)
+			t.Errorf("ask %q:\n got    %q\n corpus %q", row.Note, got, row.Ask)
 		}
 	}
 }
@@ -550,6 +564,7 @@ func TestThePromptsAreBytes(t *testing.T) {
 // failed, there simply is not enough yet, and a 422 would read as "you sent
 // something wrong" to a client that sent exactly the right thing too early.
 func TestWhatTheTwoChecksRefuse(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Refusals {
 		var err error
@@ -569,28 +584,28 @@ func TestWhatTheTwoChecksRefuse(t *testing.T) {
 		}
 		if row.Error == "" {
 			if err != nil {
-				t.Errorf("%s/%s: refused with %q where Python did not", row.Half, row.Note, err)
+				t.Errorf("%s/%s: refused with %q where the corpus does not", row.Half, row.Note, err)
 			}
 			continue
 		}
 		if err == nil {
-			t.Errorf("%s/%s: accepted where Python said %q", row.Half, row.Note, row.Error)
+			t.Errorf("%s/%s: accepted where the corpus says %q", row.Half, row.Note, row.Error)
 			continue
 		}
 		if err.Error() != row.Error {
-			t.Errorf("%s/%s: refused with\n  %q\nPython says\n  %q", row.Half, row.Note, err, row.Error)
+			t.Errorf("%s/%s: refused with\n  %q\nthe corpus says\n  %q", row.Half, row.Note, err, row.Error)
 		}
 		var notReady *ErrNotReady
 		if isNotReady(err, &notReady) != (row.ErrorKind == "not-ready") {
-			t.Errorf("%s/%s: the error kind is not Python's %q -- and the two "+
-				"have different status codes", row.Half, row.Note, row.ErrorKind)
+			t.Errorf("%s/%s: the error kind is not the corpus's %q -- and the "+
+				"two have different status codes", row.Half, row.Note, row.ErrorKind)
 		}
 	}
 }
 
-// Every outcome of a conversation turn, driven with the Turn Python's fake
-// converse returned and compared as marshalled bytes.
-func TestEveryThemeAskOutcomeAgreesWithPython(t *testing.T) {
+// Every outcome of a conversation turn, driven with the corpus's recorded
+// Turn and compared as marshalled bytes.
+func TestEveryThemeAskOutcomeMatchesTheGolden(t *testing.T) {
 	noEnvOverrides(t)
 	corpus := loadThemeCorpus(t)
 	freezeAngle(t, corpus.AngleIndex)
@@ -603,12 +618,12 @@ func TestEveryThemeAskOutcomeAgreesWithPython(t *testing.T) {
 		var got any
 		if plan.Answer != nil {
 			if row.Turn != nil {
-				t.Fatalf("%s: Python made a call and this plan did not", row.Note)
+				t.Fatalf("%s: the corpus made a call and this plan did not", row.Note)
 			}
 			got = *plan.Answer
 		} else {
 			if row.Turn == nil {
-				t.Fatalf("%s: this plan would call where Python did not", row.Note)
+				t.Fatalf("%s: this plan would call where the corpus did not", row.Note)
 			}
 			who, err := GetPersona(plan.Persona)
 			if err != nil {
@@ -626,7 +641,7 @@ func TestEveryThemeAskOutcomeAgreesWithPython(t *testing.T) {
 
 // Every outcome of a proposal, the same way -- and this one needs the pool,
 // because every commander named is resolved through it or dropped.
-func TestEveryThemeProposalOutcomeAgreesWithPython(t *testing.T) {
+func TestEveryThemeProposalOutcomeAgreesWithTheCorpus(t *testing.T) {
 	noEnvOverrides(t)
 	corpus := loadThemeCorpus(t)
 	withPool(t, func(c *pool.Conn) {
@@ -640,12 +655,12 @@ func TestEveryThemeProposalOutcomeAgreesWithPython(t *testing.T) {
 			var got any
 			if plan.Answer != nil {
 				if row.Turn != nil {
-					t.Fatalf("%s: Python made a call and this plan did not", row.Note)
+					t.Fatalf("%s: the corpus made a call and this plan did not", row.Note)
 				}
 				got = *plan.Answer
 			} else {
 				if row.Turn == nil {
-					t.Fatalf("%s: this plan would call where Python did not", row.Note)
+					t.Fatalf("%s: this plan would call where the corpus did not", row.Note)
 				}
 				who, err := GetPersona(plan.Persona)
 				if err != nil {
@@ -672,6 +687,7 @@ func TestEveryThemeProposalOutcomeAgreesWithPython(t *testing.T) {
 // one: `Converse`'s own moving marker only ever lands on a tool-result block
 // it created, so nothing downstream would notice this going missing.
 func TestTheCacheBreakpointRidesTheClosingInstruction(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	messages := themeMessages(corpus.Transcript, "CLOSING", "FRAME")
 
@@ -711,6 +727,7 @@ func TestTheCacheBreakpointRidesTheClosingInstruction(t *testing.T) {
 // A transcript that ends on the interviewer's own question gets the closing as
 // a turn of its own rather than an edit to somebody else's.
 func TestAnUnansweredQuestionGetsItsOwnClosingTurn(t *testing.T) {
+	t.Parallel()
 	messages := themeMessages([]TranscriptTurn{
 		{Role: "assistant", Text: "What do you love?"},
 	}, "CLOSING", "FRAME")
@@ -726,6 +743,7 @@ func TestAnUnansweredQuestionGetsItsOwnClosingTurn(t *testing.T) {
 // ADR 20's first decision, held in the types: neither plan can carry a deck.
 // The same shape `TestTheResearchPlanCannotHoldADeck` holds for ADR 26.
 func TestNeitherThemePlanCanHoldADeck(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"AskPlan", "ProposalPlan"} {
 		for _, banned := range []string{"Deck", "Source", "Slug", "Owner", "Library"} {
 			if themePlanHasField(name, banned) {
@@ -736,17 +754,18 @@ func TestNeitherThemePlanCanHoldADeck(t *testing.T) {
 	}
 }
 
-// The ASCII fast path in `pyCasefold` is an optimisation, never a second
+// The ASCII fast path in `casefold` is an optimisation, never a second
 // definition. All 128 through both, plus the whole table.
 func TestTheCasefoldFastPathAgreesWithTheTable(t *testing.T) {
+	t.Parallel()
 	for r := rune(0); r < 0x80; r++ {
 		s := string(r)
-		fast, ok := pyCasefoldASCII(s)
+		fast, ok := casefoldASCII(s)
 		if !ok {
 			t.Fatalf("U+%04X is not ASCII to the fast path", r)
 		}
 		want := s
-		if folded, in := pyFolds[r]; in {
+		if folded, in := folds[r]; in {
 			want = folded
 		}
 		if fast != want {
@@ -754,7 +773,7 @@ func TestTheCasefoldFastPathAgreesWithTheTable(t *testing.T) {
 		}
 	}
 	// And the table is a table of real folds: nothing maps to itself.
-	for r, folded := range pyFolds {
+	for r, folded := range folds {
 		if folded == string(r) {
 			t.Errorf("U+%04X is in the table and folds to itself", r)
 		}
@@ -765,13 +784,14 @@ func TestTheCasefoldFastPathAgreesWithTheTable(t *testing.T) {
 // mathematical runs that sit adjacent with no gap -- which is what the
 // walk-down heuristic gets wrong and the table gets right.
 func TestEveryUnicodeDigitReadsAsItsValue(t *testing.T) {
+	t.Parallel()
 	seen, bold := 0, 0
 	for r := rune(0); r <= 0x10FFFF; r++ {
 		if !unicode.IsDigit(r) {
 			continue
 		}
 		seen++
-		value, ok := pyDigitValue(r)
+		value, ok := digitValue(r)
 		if !ok {
 			t.Fatalf("U+%04X is category Nd and has no value", r)
 			continue
@@ -839,37 +859,39 @@ func themePlanHasField(plan, field string) bool {
 	return ok
 }
 
-// `theme.read_budget`, driven as the route drives it.
+// `ReadBudget`, driven as the route drives it.
 //
-// **Through `ReadBudget` and not `PyFloat` by hand**, which is the tarot
+// **Through `ReadBudget` and not `FloatValue` by hand**, which is the tarot
 // lane's lesson: a test that reimplements the call it is checking passes
 // against a mutant of the caller. The falsy check, the grammar and the one
 // refusal are all this function's, so all three are asked of it.
 //
-// Two halves. The **grammar** is CPython's `float()` and is what a port gets
-// wrong -- `1_000.5`, the fullwidth `５０`, `Infinity`, `1e400` overflowing to
-// inf, and the `0x1p4` Go would read and Python will not. Every accepted
-// value is compared as `repr`, so one ulp is a diff.
+// Two halves. The **grammar** is the recorded one and is what a
+// reimplementation gets wrong -- `1_000.5`, the fullwidth `５０`, `Infinity`,
+// `1e400` overflowing to inf, and the `0x1p4` that `strconv` would read and
+// this grammar refuses. Every accepted value is compared by its canonical
+// decimal spelling, so one ulp is a diff.
 //
 // The **refusal** is one sentence for every way the field can fail, which it
-// was not until 2026-08-23: a list was an uncaught 500 and a bad string a 422
-// quoting `float()` at the user. The old test asserted that split and had a
-// tripwire demanding the corpus keep it; both are gone, and what stands in
-// their place asserts the opposite -- that no refusal names anything that
-// computes, and that the corpus still holds a case of each former kind so
-// this cannot be green against a corpus that lost one.
-func TestTheBudgetParseAgreesWithPython(t *testing.T) {
+// was not until 2026-08-23: a list was an uncaught 500 and a bad string a
+// 422 quoting machinery at the user. The old test asserted that split and
+// had a tripwire demanding the corpus keep it; both are gone, and what
+// stands in their place asserts the opposite -- that no refusal names
+// anything that computes, and that the corpus still holds a case of each
+// former kind so this cannot be green against a corpus that lost one.
+func TestTheBudgetParseMatchesTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
-	sawFormerTypeError, sawFormerValueError := false, false
+	sawFormerTypeFailure, sawFormerStringFailure := false, false
 	for _, row := range corpus.Floats {
 		got, err := ReadBudget(row.Raw)
 		if row.Error != "" {
 			if err == nil {
-				t.Errorf("%s: read %v where Python refused with %q", row.Note, got, row.Error)
+				t.Errorf("%s: read %v where the corpus refuses with %q", row.Note, got, row.Error)
 				continue
 			}
 			if err.Error() != row.Error {
-				t.Errorf("%s: refused with\n  %q\nPython says\n  %q", row.Note, err, row.Error)
+				t.Errorf("%s: refused with\n  %q\nthe corpus says\n  %q", row.Note, err, row.Error)
 			}
 			if !errors.Is(err, ErrBudgetRejected) {
 				t.Errorf("%s: refused with something other than the one refusal", row.Note)
@@ -881,47 +903,49 @@ func TestTheBudgetParseAgreesWithPython(t *testing.T) {
 					t.Errorf("%s: the refusal leaks %q at the user: %q", row.Note, leak, err)
 				}
 			}
-			// Which of `float()`'s two exceptions this row used to be. Both
-			// must still be in the corpus, or "they answer alike" is a claim
-			// about one of them.
+			// Which of the two former failure families this row belongs to --
+			// a wrong type or an unreadable string. Both must still be in the
+			// corpus, or "they answer alike" is a claim about one of them.
 			if _, isString := row.Raw.(string); isString {
-				sawFormerValueError = true
+				sawFormerStringFailure = true
 			} else {
-				sawFormerTypeError = true
+				sawFormerTypeFailure = true
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("%s: refused with %q where Python read %v", row.Note, err, row.Budget)
+			t.Errorf("%s: refused with %q where the corpus reads %v", row.Note, err, row.Budget)
 			continue
 		}
 		if row.Budget == nil {
-			// A falsy budget is no budget: `if not raw` runs before `float()`
-			// ever does, so an empty list never reaches the refusal above.
+			// A falsy budget is no budget: the truthiness check runs before
+			// the grammar ever does, so an empty list never reaches the
+			// refusal above.
 			if got != nil {
-				t.Errorf("%s: read %v where Python read None", row.Note, *got)
+				t.Errorf("%s: read %v where the corpus reads none", row.Note, *got)
 			}
 			continue
 		}
 		if got == nil {
-			t.Errorf("%s: read None where Python read %s", row.Note, *row.Budget)
+			t.Errorf("%s: read nothing where the corpus reads %s", row.Note, *row.Budget)
 			continue
 		}
-		if want := *row.Budget; pyFloatRepr(*got) != want {
-			t.Errorf("%s: read %s, Python read %s", row.Note, pyFloatRepr(*got), want)
+		if want := *row.Budget; floatLiteral(*got) != want {
+			t.Errorf("%s: read %s, the corpus reads %s", row.Note, floatLiteral(*got), want)
 		}
 	}
-	if !sawFormerTypeError || !sawFormerValueError {
-		t.Fatal("the corpus no longer holds both of float()'s failures -- a " +
-			"list (TypeError) and an unreadable string (ValueError). They " +
-			"answer alike now, and that is only tested while both are here")
+	if !sawFormerTypeFailure || !sawFormerStringFailure {
+		t.Fatal("the corpus no longer holds both budget failures -- a wrong " +
+			"type (a list) and an unreadable string. They answer alike now, " +
+			"and that is only tested while both are here")
 	}
 }
 
-// pyFloatRepr is `repr(float)` for the handful of shapes this corpus carries:
-// the three special values, and otherwise Go's shortest round-tripping form,
-// which is CPython's `repr` for every finite double.
-func pyFloatRepr(f float64) string {
+// floatLiteral is the corpus's decimal spelling of a float: the three special
+// values spelled `nan`, `inf` and `-inf`, and otherwise the shortest
+// round-tripping form, with a trailing `.0` where nothing else marks it a
+// float.
+func floatLiteral(f float64) string {
 	switch {
 	case math.IsNaN(f):
 		return "nan"
@@ -939,13 +963,15 @@ func pyFloatRepr(f float64) string {
 
 // The `d < 10` guard, driven against a table that does not know every digit.
 //
-// Through `pyDigitValue` this is unreachable: `unicode.IsDigit` rejects
+// Through `digitValue` this is unreachable: `unicode.IsDigit` rejects
 // anything outside a known run before the guard is consulted, so a mutation
-// dropping it survives a sweep of all 680 digits. The case it exists for is a
-// Unicode version moving under one runtime and not the other -- Go calling a
-// rune a digit that CPython's sweep never saw -- and `digitValueIn` takes its
-// table as an argument precisely so that case can be built.
+// dropping it survives a sweep of all 680 digits. The case it exists for is
+// a Unicode version moving under the toolchain while the recorded table
+// stands still -- Go calling a rune a digit the table has never heard of --
+// and `digitValueIn` takes its table as an argument precisely so that case
+// can be built.
 func TestADigitBeyondTheKnownRunsIsRefusedRatherThanGuessed(t *testing.T) {
+	t.Parallel()
 	// A table that stops at ASCII, standing in for one written before a block
 	// existed. `\u0660` (Arabic-Indic zero) is a digit Go knows and this table
 	// does not.
@@ -972,7 +998,7 @@ func TestADigitBeyondTheKnownRunsIsRefusedRatherThanGuessed(t *testing.T) {
 	// would look identical to a correct one.
 	last := digitZeros[len(digitZeros)-1]
 	for i := rune(0); i < 10; i++ {
-		if value, ok := pyDigitValue(last + i); !ok || value != int(i) {
+		if value, ok := digitValue(last + i); !ok || value != int(i) {
 			t.Errorf("U+%04X reads as %d/%v", last+i, value, ok)
 		}
 	}

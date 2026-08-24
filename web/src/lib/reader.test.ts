@@ -1,7 +1,7 @@
 /** Every byte of the OCR engine comes from us.
  *
- * `ocr.py` fetches the three engine files once, **pins each by SHA-256**, and
- * serves them from `/api/ocr`. That pin is the whole security argument for
+ * The server fetches the three engine files once, **pins each by SHA-256**,
+ * and serves them from `/api/ocr`. That pin is the whole security argument for
  * running six megabytes of somebody else's compiler output in a visitor's
  * browser -- and it has exactly one bypass: tesseract.js's own defaults point
  * at a CDN, so a `createWorker` call that forgot an option would fetch

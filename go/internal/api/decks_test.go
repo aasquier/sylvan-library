@@ -61,7 +61,7 @@ func decksDir(t *testing.T) string {
 	return root
 }
 
-// appDB writes an app.db in Python's shape with alice (the maintainer, by
+// appDB writes a real app.db with alice (the maintainer, by
 // email), bob, one of bob's decks shared and one private, a log line for
 // the file tier's mono-green, and returns its path.
 func appDB(t *testing.T) string {
@@ -72,9 +72,9 @@ func appDB(t *testing.T) string {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	// The schema Python's ladder leaves, not a transcription of it. This was
+	// The recorded schema, not a transcription of it. This was
 	// the **fourth** hand-written copy in the module and the last to go: the
-	// accounts flip needed `auth_tokens` and `login_attempts`, which no
+	// accounts family needed `auth_tokens` and `login_attempts`, which no
 	// transcription had, and `users.model_tier`, which two of the other three
 	// were eight rungs too old to have. `authtest`'s package comment carries
 	// the story.
@@ -139,6 +139,7 @@ var (
 )
 
 func TestTheShelfListsWhatTheCallerMaySee(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	// Alice is the maintainer: the file tier under her name, writable, and
@@ -216,6 +217,7 @@ func TestTheShelfListsWhatTheCallerMaySee(t *testing.T) {
 }
 
 func TestADeckIsReachableExactlyAsFarAsItsLibrary(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	// Another account's private deck is a 404, never a 403; a shared one
@@ -257,6 +259,7 @@ func TestADeckIsReachableExactlyAsFarAsItsLibrary(t *testing.T) {
 }
 
 func TestTheDeckPayloadIsServiceGetDeck(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, false)
 	defer done()
 	status, body, raw := as(t, a, auth.Local, "/api/decks/local/mono-green")
@@ -308,6 +311,7 @@ func TestTheDeckPayloadIsServiceGetDeck(t *testing.T) {
 }
 
 func TestValidateStatsSuggestionsAgreeWithTheFixtures(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, false)
 	defer done()
 	dir := filepath.Join("..", "gate", "testdata")
@@ -317,7 +321,7 @@ func TestValidateStatsSuggestionsAgreeWithTheFixtures(t *testing.T) {
 			continue
 		}
 		slug := strings.TrimSuffix(e.Name(), ".yaml")
-		// validate: Python's report, errors and warnings apart.
+		// validate: the recorded report, errors and warnings apart.
 		wantRaw, _ := os.ReadFile(filepath.Join(dir, slug+".report.json"))
 		var want struct {
 			WithPool []map[string]any `json:"with_pool"`
@@ -351,8 +355,9 @@ func TestValidateStatsSuggestionsAgreeWithTheFixtures(t *testing.T) {
 		if canonicalJSON(t, raw) != canonicalJSON(t, wantStats) {
 			t.Errorf("%s stats disagree\n got %s\nwant %s", slug, raw, strings.TrimSpace(string(wantStats)))
 		}
-		// suggestions: the whole document where Python had something to say.
-		// Both runtimes echo the *requested* slug; the fixture was rendered
+		// suggestions: the whole recorded document where there was
+		// something to say. The route echoes the *requested* slug; the
+		// fixture was rendered
 		// by the deck's own (`draft.yaml` says `slug: mono-green`), so that
 		// one field is normalised before the compare.
 		if wantSugg, err := os.ReadFile(filepath.Join(dir, slug+".suggestions.json")); err == nil {
@@ -387,6 +392,7 @@ func canonicalJSON(t *testing.T, raw []byte) string {
 }
 
 func TestCommanderPrintingsLogAndArtifacts(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	// The commander's panel: counted, not recalled.
@@ -461,8 +467,9 @@ func TestCommanderPrintingsLogAndArtifacts(t *testing.T) {
 	if body["text"] != "1 Sol Ring\n" || body["name"] != "moxfield.txt" {
 		t.Fatalf("artifact %v", body)
 	}
-	// (A `../deck.yaml` never reaches the handler: the door proxies a path
-	// that is not canonical, and Python's router answers its own 404.)
+	// (A `../deck.yaml` never reaches the handler: the door matches routes
+	// on the canonical path, and a non-canonical one is the catch-all's
+	// 404.)
 	for _, name := range []string{"notes.txt", "deck.last-built.yaml", "primer-advanced.md"} {
 		if status, body, _ := as(t, a, alice, "/api/decks/alice/kaheera/artifacts/"+name); status != 404 ||
 			!strings.HasPrefix(body["detail"].(string), "no artifact '") {
@@ -480,6 +487,7 @@ func TestCommanderPrintingsLogAndArtifacts(t *testing.T) {
 }
 
 func TestChallengeProgressScoresTheLibrary(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, false)
 	defer done()
 	_, body, raw := as(t, a, auth.Local, "/api/colors/progress")

@@ -6,12 +6,13 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 )
 
-// Equal is `SimCard.__eq__`, and it is not decoration: it is what
-// `list.remove` means inside Tier 1, so a field it forgets to compare is a
+// Equal is not decoration: it is what removing a card from a hand means
+// inside Tier 1, so a field it forgets to compare is a
 // card the engine takes out of the wrong slot in a hand. Each case below
 // differs from the base card in exactly one field, which is the shape that
 // catches a forgotten one.
 func TestEqualComparesEveryField(t *testing.T) {
+	t.Parallel()
 	base := func() sim.Card {
 		return sim.Card{
 			Name:     "Golgari Signet",
@@ -53,11 +54,12 @@ func TestEqualComparesEveryField(t *testing.T) {
 	}
 }
 
-// A pip tuple is ordered and its colours are a set: `{G}{W}` is not `{W}{G}`,
-// but `{G/W}` is `{W/G}`. Python holds the first in a tuple and the second in
-// a frozenset, and the distinction decides which cards a hand treats as the
-// same card.
+// A pip sequence is ordered and each pip's colours are a set: `{G}{W}` is
+// not `{W}{G}`,
+// but `{G/W}` is `{W/G}`. The distinction decides which cards a hand treats
+// as the same card.
 func TestPipOrderMattersAndColourOrderDoesNot(t *testing.T) {
+	t.Parallel()
 	gw := sim.Card{Cost: sim.Cost{Pips: [][]string{{"G"}, {"W"}}}}
 	wg := sim.Card{Cost: sim.Cost{Pips: [][]string{{"W"}, {"G"}}}}
 	if gw.Equal(wg) {
@@ -70,10 +72,12 @@ func TestPipOrderMattersAndColourOrderDoesNot(t *testing.T) {
 	}
 }
 
-// An empty production and an absent one are the same `()` in Python, and the
+// An empty production and an absent one are the same answer under the
+// recorded equality, and the
 // corpus writes neither -- so a comparison that distinguished nil from empty
-// would separate cards Python calls equal.
+// would separate cards the contract calls equal.
 func TestNilAndEmptyProductionAreTheSameCard(t *testing.T) {
+	t.Parallel()
 	absent := sim.Card{Name: "Spell"}
 	empty := sim.Card{Name: "Spell", Produces: []sim.Source{}}
 	if !absent.Equal(empty) {
@@ -85,6 +89,7 @@ func TestNilAndEmptyProductionAreTheSameCard(t *testing.T) {
 }
 
 func TestIntersectsIsSetIntersection(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		unit, pip []string
 		want      bool

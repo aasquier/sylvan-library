@@ -9,13 +9,12 @@ import (
 	"time"
 )
 
-// The write side of ADR 28, and the three properties `decks/log.py` argues
-// carry over unchanged.
+// The write side of ADR 28, and its three argued properties.
 //
 // **Record never returns an error.** A history that can fail an edit is worse
 // than no history: the deck write has already happened by the time this is
 // called, so a failure here would report a failure for work that succeeded. A
-// failed write is a logged warning, exactly as in Python.
+// failed write is a logged warning, and nothing more.
 //
 // **One call site.** The commit path is the single place every deck write
 // passes through, so "an edit nobody logged" is not something a new route can
@@ -28,15 +27,13 @@ import (
 // a table nobody edits would go stale and would be a place a rationale could
 // be read back out of by something that is not allowed to write one.
 //
-// One difference from Python, and it is deliberate. Python's `record` will
-// **create** `app.db` if it is missing, because on a laptop with auth off an
-// edit is the first thing that ever touches it. This does not: the ladder
-// (`auth.Migrate`) runs once at the serving command's boot and is the only
-// creator, so by the time an edit reaches this handle the file exists — a
-// missing one means the process was assembled without the ladder, which is
-// exactly the loud, warned drop this stays. The Phase 4 gap this note used
-// to record (a laptop whose `app.db` nothing had ever created) closed when
-// the boot migration landed.
+// One decision worth stating: Record never **creates** `app.db`. The
+// ladder (`auth.Migrate`) runs once at the serving command's boot and is
+// the only creator, so by the time an edit reaches this handle the file
+// exists — a missing one means the process was assembled without the
+// ladder, which is exactly the loud, warned drop this stays. The Phase 4
+// gap this note used to record (a laptop whose `app.db` nothing had ever
+// created) closed when the boot migration landed.
 
 // Recorder writes entries. It is a struct rather than a bare function because
 // the read-write handle is opened once and shared, and because a nil Recorder
@@ -50,9 +47,9 @@ type Recorder struct {
 // NewRecorder opens `app.db` read-write for the log's inserts.
 //
 // `mode=rw` and not `rwc`: see the note above. The busy timeout matches
-// `auth/db.py` (5000ms) so two writers collide as a short wait rather than as
-// an error, and foreign keys are on because SQLite keeps that per connection
-// and `deck_log` has one.
+// the auth side's (5000ms) so two writers collide as a short wait rather
+// than as an error, and foreign keys are on because SQLite keeps that per
+// connection and `deck_log` has one.
 func NewRecorder(path string, logger *slog.Logger) (*Recorder, error) {
 	db, err := openReadWrite(path)
 	if err != nil {
@@ -125,22 +122,21 @@ func (r *Recorder) Record(ctx context.Context, slug string, ownerID *int64, acto
 }
 
 func now() string {
-	// Python writes `datetime.now(UTC).isoformat()`, which is
-	// `2026-08-22T01:23:45.678901+00:00` -- microseconds, and an offset
-	// rather than a `Z`. The column is text and the panel renders it, so the
-	// shape is part of the contract.
+	// The recorded stamp shape is `2026-08-22T01:23:45.678901+00:00` --
+	// microseconds, and an offset rather than a `Z`. The column is text and
+	// the panel renders it, so the shape is part of the contract.
 	//
-	// One hair of difference, recorded rather than chased: `isoformat` omits
-	// the microseconds entirely when they are exactly zero, and this always
-	// writes six digits. Both are ISO-8601 and both parse; the case arrives
-	// about once in a million entries.
+	// One hair of licence, taken rather than chased: a recorded stamp may
+	// omit the microseconds entirely when they are exactly zero, and this
+	// always writes six digits. Both are ISO-8601 and both parse; the case
+	// arrives about once in a million entries.
 	return time.Now().UTC().Format("2006-01-02T15:04:05.000000-07:00")
 }
 
-// EditKind names which of `describe`'s branches an operation takes. Python
-// asks "is this key in the keywords"; Go says which shape it is, because a Go
-// zero value cannot tell an absent field from an empty one -- and clearing a
-// deck field to empty is a real edit this has to report as one.
+// EditKind names which of `Describe`'s branches an operation takes --
+// stated as a shape rather than sniffed from which fields are set, because
+// a zero value cannot tell an absent field from an empty one, and clearing
+// a deck field to empty is a real edit this has to report as one.
 type EditKind string
 
 const (
@@ -182,7 +178,7 @@ var fieldWords = map[string]string{
 
 // Describe turns one operation into a verb and a sentence.
 //
-// Two rules, both Python's. The sentence is rendered **here**, once, rather
+// Two rules, both load-bearing. The sentence is rendered **here**, once, rather
 // than at read time: the CLI and the deck panel would otherwise be two
 // renderers of the same row in two languages, and they would drift. And the
 // verb is returned beside it so the row stays queryable without parsing prose.
@@ -272,9 +268,9 @@ func fieldWord(field string) string {
 	return field
 }
 
-// valueText renders a set value for the sentence. A list is joined rather than
-// printed, because `themes` is a list and Python's `str(list)` would put
-// brackets and quotes in a sentence people read.
+// valueText renders a set value for the sentence. A list is joined rather
+// than dumped, because `themes` is a list and a container's default
+// rendering would put brackets and quotes in a sentence people read.
 func valueText(value any) string {
 	switch v := value.(type) {
 	case nil:

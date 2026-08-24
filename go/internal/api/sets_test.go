@@ -19,15 +19,16 @@ type setsFile []struct {
 	Rendered string         `json:"rendered"`
 }
 
-// TestTheSetFilterAnswersWhatPythonAnswers is the corpus:
-// `service.upcoming_sets` run with the clock frozen and the network stubbed,
+// TestTheSetFilterMatchesTheGolden is the corpus:
+// the filter run with the clock frozen and the network stubbed,
 // compared as the bytes the route answers -- the strict `>` against today,
 // the digital drop, the six-key row and the stable tie order all come from
 // the recorded run, not from a description of it.
-func TestTheSetFilterAnswersWhatPythonAnswers(t *testing.T) {
+func TestTheSetFilterMatchesTheGolden(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("testdata/sets.json")
 	if err != nil {
-		t.Fatalf("sets.json: %v (regenerate with `python tests/go_fixtures.py`)", err)
+		t.Fatalf("sets.json: %v (a frozen golden; never regenerated)", err)
 	}
 	var cases setsFile
 	dec := json.NewDecoder(bytes.NewReader(raw))
@@ -50,8 +51,8 @@ func TestTheSetFilterAnswersWhatPythonAnswers(t *testing.T) {
 }
 
 // The answer is cached for the day it was fetched on: a second ask is the
-// same bytes and no second request -- `service._SETS_CACHE`'s behaviour,
-// which is what keeps a dashboard from asking Scryfall once per render.
+// same bytes and no second request -- the standing behaviour
+// that keeps a dashboard from asking Scryfall once per render.
 func TestASecondAskIsTheCacheNotAFetch(t *testing.T) {
 	var hits atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -85,8 +86,8 @@ func TestASecondAskIsTheCacheNotAFetch(t *testing.T) {
 }
 
 // A transport failure is the one 503 that says so plainly, and an upstream
-// error status is the same refusal -- urllib raises HTTPError, an OSError,
-// for those, so Python's route answers 503 there too.
+// error status is the same refusal -- the recorded contract folds both
+// into "could not reach Scryfall".
 func TestScryfallDownIsA503ThatSaysSo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
@@ -112,10 +113,10 @@ func TestScryfallDownIsA503ThatSaysSo(t *testing.T) {
 	}
 }
 
-// A payload that is not the JSON this expects raises where Python's
-// `json.load` raises -- outside the `except OSError`, so an uncaught 500:
-// Starlette's plain-text three words, nothing about the cause.
-func TestAMalformedFeedIsPythonsUncaught500(t *testing.T) {
+// A payload that is not the JSON this expects raises outside the
+// transport-failure branch, so it is the recorded uncaught 500:
+// plain-text three words, nothing about the cause.
+func TestAMalformedFeedIsTheRecordedUncaught500(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("<html>not json</html>"))
 	}))

@@ -13,11 +13,11 @@ import (
 
 // The argue sweep. `internal/claude` holds the mode itself to a corpus; what
 // these prove is the job around it -- which refusal lands on which status and
-// BEFORE any job, that the selection is normalised the way Python normalises
-// it, that a failed card does not cost the rest of the sweep, and that the six
-// keys come back in Python's order with the errors in SWEEP order.
+// BEFORE any job, that the selection is normalised the recorded way,
+// that a failed card does not cost the rest of the sweep, and that the six
+// keys come back in the recorded order with the errors in SWEEP order.
 //
-// Every refusal below was diffed against the running Python route rather than
+// Every refusal below was diffed against the live wire rather than
 // read off the source, which is how the deck-before-stance ordering got
 // pinned: both wrong at once answers the deck's.
 
@@ -74,7 +74,7 @@ func TestTheSweepRefusesWhatItCanBeforeAnyJob(t *testing.T) {
 }
 
 // The selection is checked **before** the stance, so both-wrong answers the
-// deck's. Measured against the running Python route; the natural Go shape
+// deck's. Measured on the live wire; the natural Go shape
 // resolves the stance while it has the body open and answers the other way.
 func TestTheSelectionIsRefusedBeforeTheStance(t *testing.T) {
 	noCredential(t)
@@ -101,8 +101,8 @@ func TestTheSelectionIsRefusedBeforeTheStance(t *testing.T) {
 // ---- what a run answers with --------------------------------------------
 
 // A stance of `off` is a job born finished, carrying ONE report for the sweep
-// rather than N copies of "no call was made" -- and the six keys in Python's
-// order.
+// rather than N copies of "no call was made" -- and the six keys in the
+// recorded order.
 func TestASweepAtStanceOffIsAJobBornFinished(t *testing.T) {
 	noCredential(t)
 	rig := newJobRig(t)
@@ -132,7 +132,7 @@ func TestASweepAtStanceOffIsAJobBornFinished(t *testing.T) {
 		t.Errorf("reports is %v, want []", reports)
 	}
 	if got := resultKeys(t, raw); got != "slug,asked,reason,total,reports,errors" {
-		t.Errorf("result keys are %s, Python's are slug,asked,reason,total,reports,errors", got)
+		t.Errorf("result keys are %s, the record says slug,asked,reason,total,reports,errors", got)
 	}
 	// `[]` and `{}`, not two nulls: a client that iterates must not meet one.
 	if !strings.Contains(string(raw), `"reports":[],"errors":{}`) {
@@ -151,7 +151,7 @@ func TestTheSweepLabelCountsInEnglish(t *testing.T) {
 	}
 }
 
-// The selection is normalised the way Python normalises it: matched by
+// The selection is normalised the recorded way: matched by
 // casefold, stored in the DECK's spelling, stripped, de-duplicated, and in the
 // order it was asked for.
 //
@@ -159,8 +159,8 @@ func TestTheSweepLabelCountsInEnglish(t *testing.T) {
 // count is what separates "de-duplicated" from "not".
 //
 // **One half of this is unobservable here, and is recorded rather than
-// arranged.** Python matches with `casefold()` and the port uses
-// `PyCasefold`, but no card in any fixture deck holds a character where
+// arranged.** The match is `claude.Casefold`,
+// but no card in any fixture deck holds a character where
 // `casefold` and `lower` disagree -- it takes an `ß`, an `ſ` or a `ς`, and
 // Magic's English names have none. So a `ToLower` mutation survives this
 // test. It is still wrong: this is the one comparison in the family where the
@@ -168,7 +168,7 @@ func TestTheSweepLabelCountsInEnglish(t *testing.T) {
 // own spelling -- which is exactly the case CLAUDE.md says the neighbours are
 // exempt from. Manufacturing a fixture card for it would be arranging the
 // evidence; naming the gap is the honest version.
-func TestTheSelectionIsNormalisedLikePythons(t *testing.T) {
+func TestTheSelectionIsNormalisedTheRecordedWay(t *testing.T) {
 	noCredential(t)
 	rig := newJobRig(t)
 	defer rig.close()
@@ -185,9 +185,10 @@ func TestTheSelectionIsNormalisedLikePythons(t *testing.T) {
 		{"a blank among the real", `["Sol Ring","  "]`, 1},
 		{"two distinct", `["Sol Ring","Regal Behemoth"]`, 2},
 		{"two distinct, one duplicated", `["Sol Ring","Regal Behemoth","SOL RING"]`, 2},
-		// **`str.strip()` and not `strings.TrimSpace`.** U+001C-U+001F are
-		// whitespace to Python and not to Go, so a name wrapped in them
-		// strips clean in one runtime and stays unmatched in the other -- a
+		// **`textutil.Strip` and not `strings.TrimSpace`.** U+001C-U+001F
+		// are whitespace to the recorded strip and not to Go's, so a name
+		// wrapped in them
+		// strips clean under one and stays unmatched under the other -- a
 		// 422 saying the card is not in a deck that holds it. This row is
 		// what kills that mutation; without it the reflex spelling passes.
 		{"the information separators strip", `["\u001cSol Ring\u001f"]`, 1},
@@ -291,7 +292,7 @@ func TestOneFailedCardDoesNotCostTheSweep(t *testing.T) {
 	}
 }
 
-// The errors dict is built in **sweep order** and Python's dict keeps it. A
+// The errors dict is built in **sweep order** and the wire keeps it. A
 // `map[string]string` would alphabetise a list whose order is the order things
 // went wrong in.
 func TestTheErrorsKeepSweepOrder(t *testing.T) {

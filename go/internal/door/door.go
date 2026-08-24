@@ -7,8 +7,9 @@
 //     `last_seen_at` and deleting an expired row on the way past -- and
 //     refuses, before anything is routed, everything auth refuses: 401
 //     outside the public list without a session, 403 under the admin prefix
-//     without an admin. The public list is `tests/contract/routes.json`'s,
-//     the one table the contract suite holds this middleware to.
+//     without an admin. The public list is code (`PublicPaths`), and the
+//     door's own sweeps derive from the served route table, so a new route
+//     is deny-by-default.
 //  2. Serves the built frontend and the tarot pictures -- the shell,
 //     `/assets/*`, `/tarot/*` -- and compresses what crosses the gzip floor.
 //  3. Answers `/api` from `internal/api`'s route table; a path no route
@@ -47,19 +48,19 @@ type Config struct {
 	// RequireAuth mirrors MTGLAB_REQUIRE_AUTH: off, every caller is LOCAL and
 	// nothing is refused; on, the middleware in auth.go runs on every request.
 	RequireAuth bool
-	// SecureCookies mirrors MTGLAB_SECURE_COOKIES and decides HSTS, exactly as
-	// it does in Python: TLS fronts the app, so the header is safe to send.
+	// SecureCookies mirrors MTGLAB_SECURE_COOKIES and decides HSTS with the
+	// same flag: TLS fronts the app, so the header is safe to send.
 	SecureCookies bool
 	// AppDB is the path to `app.db`; read-only, and only when RequireAuth.
 	AppDB string
 	// WebDist is the built frontend directory; empty or missing means the door
-	// serves no shell, as `api/app.py` registers no SPA route without one.
+	// serves no shell at all rather than a broken one.
 	WebDist string
 	// TarotDir is the packaged tarot art; same rule.
 	TarotDir string
-	// Pool is the card pool the ported routes read, leased (`internal/pool`);
-	// nil is an instance with no pool, answered in the degraded shapes
-	// `service._connect()` returning None produces.
+	// Pool is the card pool the routes read, leased (`internal/pool`);
+	// nil is an instance with no pool, answered in the recorded degraded
+	// shapes rather than refused.
 	Pool *pool.Pool
 	// DecksDir is the file tier's root (MTGLAB_DECKS_DIR).
 	DecksDir string
@@ -76,10 +77,17 @@ type Config struct {
 	// rendered.
 	AdminEmail string
 	// EmailSender is ADR 16's seam, handed to the account routes. Nil is what
-	// a real process wants -- the sender is decided from the environment when
-	// a message is actually being sent -- and a test passes a recorder, which
-	// is how no test in this module sends mail.
+	// a real process wants -- the sender is chosen from Mail when a message is
+	// actually being sent -- and a test passes a recorder, which is how no test
+	// in this module sends mail.
 	EmailSender auth.EmailSender
+	// Mail is what that choice is made from when EmailSender is nil: settings
+	// resolved once at config.Load and carried here, never read again from the
+	// environment.
+	Mail auth.MailSettings
+	// ClientIPHeader is MTGLAB_CLIENT_IP_HEADER, handed to the rate limiter.
+	// Empty trusts only the peer, which is the safe default.
+	ClientIPHeader string
 	// Logger, or slog.Default().
 	Logger *slog.Logger
 }
@@ -130,7 +138,7 @@ func New(cfg Config) (*Door, error) {
 		shelf = shelves.New(cfg.DataDir, nil, cfg.Logger)
 	}
 	// The write side of `app.db`, opened once for the deck writes and the
-	// activity log (Phase 4). The serving command runs the ladder before the
+	// activity log. The serving command runs the ladder before the
 	// door stands (`auth.Migrate`), so an absent file here is a caller that
 	// skipped it -- a test, a bare library use -- and both halves degrade
 	// rather than minting one. A failure to open a database that *is* there
@@ -155,7 +163,7 @@ func New(cfg Config) (*Door, error) {
 	d.openSimCache(cfg)
 	d.traffic = traffic.New(d.writeDB, cfg.Logger)
 
-	ported := api.New(api.Config{Logger: cfg.Logger, Pool: cfg.Pool, AppDB: d.db,
+	routes := api.New(api.Config{Logger: cfg.Logger, Pool: cfg.Pool, AppDB: d.db,
 		Jobs: d.jobs, SimCache: d.simCache,
 		AppDBPath: cfg.AppDB, DecksDir: cfg.DecksDir, ScryfallDir: cfg.ScryfallDir,
 		DataDir: cfg.DataDir, PoolPath: cfg.PoolPath, Traffic: d.traffic,
@@ -175,13 +183,14 @@ func New(cfg Config) (*Door, error) {
 		// up so the door and the routes it serves cannot disagree about what
 		// this process is: `me` reports RequireAuth, `logout` deletes a
 		// session row only when it is on, and the session cookie carries
-		// `Secure` exactly when Python's would.
+		// `Secure` exactly when the flag says the wire is TLS.
 		RequireAuth: cfg.RequireAuth, SecureCookies: cfg.SecureCookies,
 		// ADR 16's seam. Nil is the real process's answer -- decide from the
 		// environment when a message is actually being sent -- and a test
 		// passes a recorder, which is how no test here sends mail.
-		EmailSender: cfg.EmailSender})
-	table, err := newRouteTable(ported.Routes())
+		EmailSender: cfg.EmailSender, Mail: cfg.Mail,
+		ClientIPHeader: cfg.ClientIPHeader})
+	table, err := newRouteTable(routes.Routes())
 	if err != nil {
 		return nil, err
 	}
@@ -226,8 +235,8 @@ func (d *Door) Check(ctx context.Context) error {
 	return auth.Ping(ctx, d.db)
 }
 
-// Close releases what New opened — and flushes the visitor ledger, which is
-// Python's shutdown flush: a stopped door loses nothing it counted.
+// Close releases what New opened — and flushes the visitor ledger, the
+// shutdown flush: a stopped door loses nothing it counted.
 func (d *Door) Close() error {
 	d.traffic.Flush()
 	if d.db != nil {
@@ -338,7 +347,7 @@ func (d *Door) dispatch(w http.ResponseWriter, r *http.Request) {
 	}
 	// The static tiers record their mount prefix and the shell records the
 	// catch-all's template -- `/{full_path}`, read off the deployed ledger --
-	// exactly as Starlette's router stamps them.
+	// exactly the templates the ledger has always carried.
 	switch {
 	case raw == "/assets" || strings.HasPrefix(raw, "/assets/"):
 		note(r, "/assets")
@@ -366,15 +375,14 @@ func (d *Door) health(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// securityHeaders is `api/app.py:security_headers`, setdefault semantics
-// included: an explicit header on a particular response wins over the
-// blanket one, and a proxied response already carrying Python's is left as
-// it is.
+// securityHeaders sets the hardening headers with setdefault semantics:
+// an explicit header on a particular response wins over the
+// blanket one.
 //
-// Applied at WriteHeader time, not before the handler runs -- the contract
-// suite caught the difference on the first run through the door: the
-// reverse proxy copies the upstream's headers with Add, so a value set here
-// beforehand met Python's copy and the wire said `nosniff, nosniff`.
+// Applied at WriteHeader time, not before the handler runs -- learned the
+// hard way on the door's first run: a middleware that stamps headers up
+// front meets whatever a handler adds later as a *second* copy, and the
+// wire once said `nosniff, nosniff`.
 func (d *Door) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hw := &headerWriter{ResponseWriter: w, apply: func(h http.Header) {
@@ -423,10 +431,10 @@ func setDefault(h http.Header, name, value string) {
 	}
 }
 
-// writeJSON answers in FastAPI's envelope: `application/json`, and for an
+// writeJSON answers in the app's envelope: `application/json`, and for an
 // error a body with `detail`, which `web/src/lib/api.ts` reads off every
 // non-2xx response. `wire` is the one encoder for both the door's own
-// refusals and the ported routes' answers.
+// refusals and the routes' answers.
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	wire.JSON(w, status, body)
 }
@@ -435,10 +443,10 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 //
 // Absent, unreadable or schema-less leaves it nil, which is a working store
 // that caches nothing: a simulation still runs, it just pays full price every
-// time. That is the trade `sim/cache.py` makes in every one of its own error
-// paths -- an optimisation that can turn a working simulation into a failed
-// one is a bad trade -- so a failure here is a log line and not a refusal to
-// start.
+// time. That is the trade `internal/sim/cache` makes in every one of its own
+// error paths -- an optimisation that can turn a working simulation into a
+// failed one is a bad trade -- so a failure here is a log line and not a
+// refusal to start.
 func (d *Door) openSimCache(cfg Config) {
 	if cfg.AppDB == "" {
 		return

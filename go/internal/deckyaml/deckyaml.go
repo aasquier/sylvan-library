@@ -1,24 +1,20 @@
-// Package deckyaml parses a deck file the way PyYAML does -- and only parses.
+// Package deckyaml parses a deck file -- and only parses.
 //
-// The load-bearing discovery of the migration plan (docs/go-migration/PLAN.md
-// section 6): `decks/edit.py` is hand-rolled text surgery, so Go never
-// serialises a deck. What it needs YAML for is reading -- to validate, and to
-// check an edit against a parse-mutate-dump oracle -- and the residual risk is
-// parser divergence on the shapes PyYAML emits (single-quoted scalars folded
-// at width 100, doubled apostrophes, plain multi-line scalars, quoted
-// look-alikes of booleans and nulls). This package is the Phase 2 spike for
-// that: goccy/go-yaml behind one function, proven against a fixture Python
-// wrote and PyYAML's own reading of it (`tests/go_fixtures.py`).
+// A load-bearing shape decision: deck writes are hand-rolled text surgery
+// (`deckedit`), so nothing here ever serialises a deck. What the app needs
+// YAML for is reading -- to validate, and to check an edit against a
+// parse-mutate-dump oracle -- and the residual risk is parser divergence on
+// the shapes the emitter writes (single-quoted scalars folded at width 100,
+// doubled apostrophes, plain multi-line scalars, quoted look-alikes of
+// booleans and nulls). This package is the answer: goccy/go-yaml behind one
+// function, held to a recorded fixture and the recorded reading of it.
 //
-// The parse is into plain Go values (map[string]any, []any, string, int64,
-// float64, bool, nil), which is what `yaml.safe_load` yields in Python terms;
-// a typed Deck arrives in Phase 3 and will be built over this.
+// The parse is into plain values (map[string]any, []any, string, int64,
+// float64, bool, nil); the typed Deck is built over this.
 //
 // **`Parse` throws the key order away, and `ParseOrdered` is where it is
-// kept.** Python has no such split: a `dict` is ordered, so `yaml.safe_load`
-// hands `Deck.from_text` the file's order for free and `Deck.dump`'s
-// `sort_keys=False` writes it straight back out. A Go map has no order at
-// all, and for almost everything here that costs nothing -- the deck's own
+// kept.** A map has no order at all, and for almost everything here that
+// costs nothing -- the deck's own
 // fields are named one at a time by `FromText` and written back in an order
 // `Dump` builds by hand. The exception is `notes:`, whose keys are the
 // author's rather than the model's; the artifacts snapshot dumps a *parsed*
@@ -47,7 +43,7 @@ type Pair struct {
 
 // Map is a YAML mapping in the order the document wrote it.
 //
-// The same shape as `pyyaml.Map` next door and deliberately not the same
+// The same shape as `yamlemit.Map` next door and deliberately not the same
 // type: that one is a payload somebody is about to *emit*, built key by key
 // by a dumper, and this one is what a file said. They meet in
 // `deck.Dump`, which converts.
@@ -65,13 +61,12 @@ func (m Map) Get(key string) (any, bool) {
 	return nil, false
 }
 
-// MarshalJSON writes the mapping as a JSON object in the file's order, which
-// is what Python does without being asked: a `dict` keeps its insertion order
-// and `json.dumps` writes it back. Go's encoder sorts a map's keys instead, so
-// a deck's `notes:` used to reach the wire alphabetised while FastAPI served
-// it as written. Nothing in the app reads the order -- but the two runtimes
-// answering the same request with differently ordered bytes is the kind of
-// difference that is only ever noticed by whoever is diffing them at the time.
+// MarshalJSON writes the mapping as a JSON object in the file's order --
+// the recorded wire order. The stock encoder sorts a map's keys instead, and
+// a deck's `notes:` once reached the wire alphabetised for exactly that
+// reason. Nothing in the app reads the order -- but the same request
+// answering with differently ordered bytes across releases is the kind of
+// difference that is only ever noticed by whoever is diffing at the time.
 func (m Map) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteByte('{')
@@ -131,7 +126,7 @@ func ParseOrdered(text []byte) (Map, error) {
 }
 
 // orderedValue turns goccy's MapSlice/MapItem into Map, and normalises the
-// scalars PyYAML and goccy disagree about.
+// scalars where goccy's own choice is not the recorded one.
 func orderedValue(v any) any {
 	switch t := v.(type) {
 	case yaml.MapSlice:
@@ -166,9 +161,10 @@ func orderedValue(v any) any {
 		}
 		return out
 	case uint64:
-		// goccy reads a non-negative integer as uint64; PyYAML gives an int.
-		// A value that does not fit int64 is left as it is -- nothing in a
-		// deck file is that large, and a silent wrap would be worse.
+		// goccy reads a non-negative integer as uint64; the recorded value
+		// shape is a signed integer. A value that does not fit int64 is
+		// left as it is -- nothing in a deck file is that large, and a
+		// silent wrap would be worse.
 		if t <= math.MaxInt64 {
 			return int64(t)
 		}

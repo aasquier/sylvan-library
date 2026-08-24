@@ -6,27 +6,30 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 )
 
-// Python's `repr`, for the three dataclasses the determinism gate hashes.
+// The canonical rendering of the three result records the determinism gate
+// hashes.
 //
-// `tests/test_determinism.py` pins REFERENCE_DIGEST as a sha256 over
-// `repr()` of one game, one run and a three-point sweep. So reproducing the
+// ReferenceDigest is pinned as a sha256 over this rendering
+// of one game, one run and a three-point sweep. So reproducing the
 // simulation is only half of reproducing the digest: the *text* is what is
-// hashed, and Python's number formatting is part of it. `100.0` is not
+// hashed, and the number formatting is part of it. `100.0` is not
 // `100`, `1e-05` is not `0.00001`, and a float renders as the shortest
 // decimal that reads back as the same double.
 //
-// Nothing serves these strings. They exist so a Go run and a CPython run can
-// be compared as bytes rather than field by field, which is what turns "the
-// port looks right" into "the port is the same simulator".
+// Nothing serves these strings. They exist so a run can be compared with the
+// recorded reference as bytes rather than field by field, which is what
+// turns "the
+// engine looks right" into "the engine is the same simulator".
 //
-// The float renderer is held to Python by a corpus in testdata: every float
-// the reference run produces, plus the boundaries where Python switches
-// between fixed and exponential notation, recorded from CPython itself.
+// The float renderer is held to a corpus in testdata: every float
+// the reference run produces, plus the boundaries where the rendering
+// switches
+// between fixed and exponential notation -- all of it a frozen golden.
 
-// Repr is `repr(GameResult)`.
+// Repr is the canonical rendering of a GameResult.
 func (g GameResult) Repr() string {
 	var b strings.Builder
 	b.WriteString("GameResult(commander_turn=")
@@ -45,7 +48,7 @@ func (g GameResult) Repr() string {
 	return b.String()
 }
 
-// Repr is `repr(CardTiming)`.
+// Repr is the canonical rendering of a CardTiming.
 func (c CardTiming) Repr() string {
 	return "CardTiming(name=" + ReprString(c.Name) +
 		", mv=" + strconv.Itoa(c.MV) +
@@ -54,7 +57,7 @@ func (c CardTiming) Repr() string {
 		", by_t8=" + ReprFloat(c.ByT8) + ")"
 }
 
-// Repr is `repr(SimSummary)`.
+// Repr is the canonical rendering of a SimSummary.
 func (s SimSummary) Repr() string {
 	var b strings.Builder
 	b.WriteString("SimSummary(games=" + strconv.Itoa(s.Games))
@@ -82,9 +85,9 @@ func (s SimSummary) Repr() string {
 	return b.String()
 }
 
-// reprCommanderByTurn renders `dict[int, float]` in the order Python built
-// it, which is 1..turns -- the loop that fills it counts up, and a CPython
-// dict keeps insertion order.
+// reprCommanderByTurn renders the by-turn table in the order it was built,
+// which is 1..turns -- the loop that fills it counts up, and the recorded
+// rendering keeps that insertion order.
 func (s SimSummary) reprCommanderByTurn() string {
 	parts := make([]string, 0, s.Turns)
 	for t := 1; t <= s.Turns; t++ {
@@ -154,23 +157,24 @@ func reprOptNumber(v *Number) string {
 	}
 }
 
-// ReprFloat is CPython's `repr(float)`, now `pyfloat.Repr`.
+// ReprFloat is the canonical float rendering, now `floats.Repr`.
 //
 // It left this package when the Forge result needed the same renderer: a
-// payload's float fields must read `4.0` where Python writes `4.0`, and a
+// payload's float fields must read `4.0` where the recorded wire says
+// `4.0`, and a
 // second copy of the exponent boundaries is how two halves of a reproduction
 // drift. The corpus that pins those boundaries did not move.
-func ReprFloat(v float64) string { return pyfloat.Repr(v) }
+func ReprFloat(v float64) string { return floats.Repr(v) }
 
-// ReprString is CPython's `repr(str)`.
+// ReprString is the canonical string rendering.
 //
 // Single quotes, unless the string holds one and no double quote. Backslash,
 // the chosen quote and the three whitespace escapes go out as escapes;
 // anything unprintable goes out as `\xNN`, `\uXXXX` or `\UXXXXXXXX`.
 //
 // One narrowing, stated because it is a narrowing: printability is Go's
-// `unicode.IsPrint`, which is that language's reading of the same Unicode
-// categories CPython's `Py_UNICODE_ISPRINTABLE` reads. They agree on
+// `unicode.IsPrint`, one reading of the Unicode categories the recorded
+// rendering read. The two agree on
 // everything a card name or a keep-rule sentence has ever held, and the
 // corpus in testdata checks the strings this package actually renders rather
 // than asserting the general claim.

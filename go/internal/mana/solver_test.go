@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-// `tests/test_mana.py`'s castability cases, as a table.
+// The long-pinned castability cases, as a table.
 //
 // These are not samples. Every one of them is somewhere somebody was once
-// wrong -- CLAUDE.md says `mana.py` is subtle and that this is the file
+// wrong -- the mana reading is subtle, and this is the file
 // pinning "the cases where naive source-counting gives the wrong answer" --
 // and they are carried over one for one because a port that passes the
 // enumerated case set and fails one of these has reproduced the arithmetic
@@ -26,6 +26,7 @@ var (
 )
 
 func TestCastabilityTraps(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		why     string
 		cost    string
@@ -48,7 +49,8 @@ func TestCastabilityTraps(t *testing.T) {
 		// matching that does not reset its search between pips never looks at
 		// the Plains again and calls this uncastable.
 		//
-		// This one is not from `test_mana.py`. It is the counterexample the
+		// This one is not from the long-pinned set. It is the counterexample
+		// the
 		// **enumerated case set cannot express**: its pips are drawn with
 		// `combinations_with_replacement` over an alphabet whose hybrid is
 		// last, so no cost among the 13,944 puts a two-colour pip ahead of a
@@ -149,11 +151,13 @@ func TestCastabilityTraps(t *testing.T) {
 	}
 }
 
-// A source's amount is Python's, including the parts of it that look like
+// A source's amount is the recorded semantics, including the parts of it
+// that look like
 // mistakes. `ManaSource(colors)` defaults to one mana and Go's zero value
 // cannot; `ManaSource(colors, 0)` really does produce nothing, and
 // `[colors] * -1` is the empty list rather than an error.
 func TestASourcesAmountIsExactlyWhatItSays(t *testing.T) {
+	t.Parallel()
 	if got := NewSource([]string{"W"}, 1).Units(); len(got) != 1 {
 		t.Errorf("NewSource(W, 1) made %d units, want 1", len(got))
 	}
@@ -188,6 +192,7 @@ func TestASourcesAmountIsExactlyWhatItSays(t *testing.T) {
 // one mana that is worth two, and the expansion in [Source.Units] is the only
 // thing that makes the matching see it that way.
 func TestOneSourceOfNEqualsNSourcesOfOne(t *testing.T) {
+	t.Parallel()
 	for _, cost := range []string{"{2}", "{C}{C}", "{G}{G}", "{1}{C}", "{W}{U}"} {
 		for amount := 1; amount <= 4; amount++ {
 			var spread []Source
@@ -205,12 +210,15 @@ func TestOneSourceOfNEqualsNSourcesOfOne(t *testing.T) {
 }
 
 // The colour packing has a slow path for strings that are not one of the six
-// producible mana symbols, because Python compares sets of arbitrary strings
+// producible mana symbols, because the contract compares sets of arbitrary
+// strings
 // and nothing structural stops a caller doing the same here. It is unreachable
-// through `Parse` and through `compile.py`, which filters `produced_mana` to
+// through `Parse` and through `sim/compile`, which filters `produced_mana`
+// to
 // WUBRGC -- and this project's standing lesson is that unreachable-by-argument
 // is exactly the claim that rots, so the path is exercised rather than argued.
 func TestAColourOutsideTheSixStillComparesAsASet(t *testing.T) {
+	t.Parallel()
 	odd := Cost{Pips: [][]string{{"Z"}}}
 	if !CanPay(odd, []Source{NewSource([]string{"Z"}, 1)}, 0) {
 		t.Error("a Z source did not pay a Z pip")
@@ -232,10 +240,12 @@ func TestAColourOutsideTheSixStillComparesAsASet(t *testing.T) {
 	}
 }
 
-// String() is the case set's renderer, so it is checked against Python's
+// String() is the case set's renderer, so it is checked against the
+// recorded
 // wording for the shapes the enumeration cannot reach: X, Phyrexian, and the
 // empty cost.
-func TestCostRendersAsPythonDoes(t *testing.T) {
+func TestCostRendersAsRecorded(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"":                 "{0}",
 		"{0}":              "{0}",

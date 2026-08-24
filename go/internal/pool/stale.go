@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Stale is `cards/db.py:pool_is_stale`: does this pool predate the columns
+// Stale asks: does this pool predate the columns
 // the app now reads? A database loaded before those columns existed answers
 // every query about them with NULL, which reads exactly like "this card has
 // no power" — the quiet wrong answer rule 1 exists to prevent, arriving
@@ -17,7 +17,31 @@ import (
 // Cheap: one probe per table, short-circuited by LIMIT. Creatures are over
 // half the pool and paper printings essentially all name a painter, so a
 // current database answers immediately.
+//
+// **Memoised per open**, for the reason `Columns` is: the pool is read-only,
+// so the verdict is a property of the *file*, and a refresh re-opens. Cheap
+// is not free -- the walk below is four probes and two `Columns` lookups, and
+// even a DuckDB query that answers off an index costs about half a
+// millisecond, so `/api/health` spent eight statements answering a question
+// with two. That route is the most frequently asked one on the instance,
+// because the platform's own health check is a caller and the shell asks on
+// every visit. Measured on the full pool: 4.4ms a call, 1.4ms once memoised.
 func Stale(ctx context.Context, c *Conn) (bool, error) {
+	if known, ok := c.staleness(); ok {
+		return known, nil
+	}
+	answer, err := probeStaleness(ctx, c)
+	if err != nil {
+		// Deliberately not remembered: a failed walk is a fact about the
+		// query, not about the file, and filing "not stale" here would make
+		// one transient error the answer for the rest of the open.
+		return false, err
+	}
+	c.rememberStaleness(answer)
+	return answer, nil
+}
+
+func probeStaleness(ctx context.Context, c *Conn) (bool, error) {
 	any, err := probe(ctx, c, "SELECT 1 FROM oracle_cards LIMIT 1")
 	if err != nil {
 		return false, err

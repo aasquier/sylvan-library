@@ -1,17 +1,16 @@
 package main
 
 // The `mtglab decks` family, driven exactly as main wires it -- a root with
-// the same silences, `decks <cmd>` in argv -- against a scratch library the
-// way Python's CLI tests point `config.use_paths` at one: MTGLAB_DECKS_DIR
-// and MTGLAB_DATA_DIR into temp dirs, the 21-card pool copied to
-// `<data>/mtg.duckdb` when a test wants card-level checks, `app.db` seeded
-// through `authtest.Schema` when one wants history.
+// the same silences, `decks <cmd>` in argv -- against a scratch library:
+// MTGLAB_DECKS_DIR and MTGLAB_DATA_DIR into temp dirs, the 21-card pool
+// copied to `<data>/mtg.duckdb` when a test wants card-level checks,
+// `app.db` seeded through `authtest.Schema` when one wants history.
 //
-// The commands print with fmt.Printf (matching `cli.py`'s bare `print`), so
-// stdout is captured with a pipe rather than through cobra's own writer --
-// which keeps the command code plain. Expected strings are written as
-// literals, not rebuilt with the same format verbs, so a wrong verb fails
-// here instead of agreeing with itself.
+// The commands print with bare fmt.Printf, so stdout is captured with a
+// pipe rather than through cobra's own writer -- which keeps the command
+// code plain. Expected strings are written as literals, not rebuilt with
+// the same format verbs, so a wrong verb fails here instead of agreeing
+// with itself.
 
 import (
 	"bytes"
@@ -107,8 +106,8 @@ func installPool(t *testing.T, dataDir string) {
 	}
 }
 
-// seedAppDB writes an `app.db` in Python's shape (the generated ladder) and
-// runs the given inserts.
+// seedAppDB writes an `app.db` in the ladder's recorded shape
+// (`authtest.Schema`) and runs the given inserts.
 func seedAppDB(t *testing.T, dataDir string, stmts ...string) {
 	t.Helper()
 	db, err := sql.Open("sqlite", "file:"+filepath.Join(dataDir, "app.db"))
@@ -212,7 +211,7 @@ func TestDecksListPrintsTheTable(t *testing.T) {
 		"  nameless               B?     0 cards   ?\n" +
 		"  sprouts                B?     2 cards   Goreclaw, Terror of Qal Sisma  draft, 1 to justify\n"
 	if out != want {
-		t.Fatalf("the table diverged from cli.py's:\nwant:\n%q\ngot:\n%q", want, out)
+		t.Fatalf("the table diverged from the recorded layout:\nwant:\n%q\ngot:\n%q", want, out)
 	}
 }
 
@@ -450,8 +449,8 @@ func TestDecksLogAnswersEmptyWithoutCreatingAppDB(t *testing.T) {
 	if out != want {
 		t.Fatalf("the empty answer diverged:\nwant:\n%q\ngot:\n%q", want, out)
 	}
-	// Python's reader would create app.db on the way past; the Go CLI must
-	// not -- the ladder belongs to the serving command.
+	// A reader must never create app.db on the way past -- the ladder
+	// belongs to the serving command.
 	if _, err := os.Stat(filepath.Join(dataDir, "app.db")); !os.IsNotExist(err) {
 		t.Fatal("`decks log` acquired an app.db it had no business creating")
 	}

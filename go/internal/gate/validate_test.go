@@ -14,11 +14,10 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 )
 
-// The differential cases: `tests/go_fixtures.py` writes each fixture deck's
-// text and Python's own report over it -- with the 21-card pool and without
-// -- and this test must produce the same issues, in the same order, with the
-// same sentences. That is the Phase 3 gate for the gate (PLAN section 7):
-// validate agrees with Python case for case.
+// The differential cases: each fixture deck's text beside its recorded
+// report -- with the 21-card pool and without -- and this test must produce
+// the same issues, in the same order, with the same sentences. That is the
+// Phase 3 gate for the gate: validate matches the golden case for case.
 
 type issue struct {
 	Level   string  `json:"level"`
@@ -45,7 +44,7 @@ func cases(t *testing.T) []string {
 		}
 	}
 	if len(names) < 5 {
-		t.Fatalf("only %d cases; regenerate with `python tests/go_fixtures.py`", len(names))
+		t.Fatalf("only %d cases; the testdata decks are frozen goldens and at least 5 should be here", len(names))
 	}
 	return names
 }
@@ -84,11 +83,12 @@ func same(t *testing.T, name, mode string, got, want []issue) {
 	g, _ := json.MarshalIndent(got, "", " ")
 	w, _ := json.MarshalIndent(want, "", " ")
 	if string(g) != string(w) {
-		t.Errorf("%s (%s): the Go gate disagrees with Python's report\n--- got\n%s\n--- want\n%s", name, mode, g, w)
+		t.Errorf("%s (%s): the gate disagrees with the recorded report\n--- got\n%s\n--- want\n%s", name, mode, g, w)
 	}
 }
 
-func TestTheGateAgreesWithPythonCaseForCase(t *testing.T) {
+func TestTheGateMatchesTheGoldenCaseForCase(t *testing.T) {
+	t.Parallel()
 	p := pooltest.Open(t)
 	ctx := context.Background()
 	for _, name := range cases(t) {
@@ -123,6 +123,7 @@ func TestTheGateAgreesWithPythonCaseForCase(t *testing.T) {
 }
 
 func TestTheReportKnowsItsErrorsFromItsWarnings(t *testing.T) {
+	t.Parallel()
 	// Without a pool the banned card cannot be seen: the report is OK, and
 	// carries exactly the one warning that says so.
 	d, _ := load(t, "mono-green")

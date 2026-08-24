@@ -32,7 +32,7 @@ void main() {
 
 // Depth displaces the sample point along the camera offset; a small zoom
 // keeps the warp from ever sampling past the canvas edge. Lighter depth =
-// nearer = moves more, matching `cardmotion/depth.py`'s polarity.
+// nearer = moves more, matching `tools/cardmotion/depth.py`'s polarity.
 //
 // `uvScale`/`uvOffset` are the cover-crop window (see `coverTopWindow`):
 // the canvas box and the painting have different aspects, so the shader

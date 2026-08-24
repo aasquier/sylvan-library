@@ -9,17 +9,18 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 )
 
-func TestFromCornerReadsTheBlockAsPythonDoes(t *testing.T) {
+func TestFromCornerReadsTheBlockAsMeasured(t *testing.T) {
+	t.Parallel()
 	codes := map[string]bool{"LTC": true, "CHR": true, "MH3": true, "LTR": true}
-	// The real Lord of the Rings Sol Ring capture from the module docstring.
+	// The real Lord of the Rings Sol Ring capture ADR 34 records.
 	s := cards.FromCorner("U0284\nLTCENLIK", codes)
 	if s.SetCode != "LTC" || s.CollectorNumber != "0284" {
 		t.Fatalf("%+v", s)
 	}
 	// The artist never gets a vote: CHRISRAHN on its own line has CHR as a
 	// prefix but is not the first token of the set-code line... it IS the
-	// first token of its line, so it matches -- which is the measured
-	// Python behaviour too (the longest real prefix of a line's first token).
+	// first token of its line, so it matches -- which is the measured,
+	// recorded behaviour (the longest real prefix of a line's first token).
 	s = cards.FromCorner("CHRISRAHN", codes)
 	if s.SetCode != "CHR" {
 		t.Fatalf("%+v", s)
@@ -39,6 +40,7 @@ func TestFromCornerReadsTheBlockAsPythonDoes(t *testing.T) {
 }
 
 func TestReadResolvesOnlyThroughAPrinting(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	p := pooltest.Open(t)
 	if err := p.Use(ctx, func(c *pool.Conn) error {

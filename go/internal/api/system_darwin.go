@@ -20,7 +20,7 @@ func processRSS() (int64, string) {
 }
 
 // machineMemory: total from the kernel, no MemAvailable — absent rather
-// than approximated, as Python leaves it off any box without /proc.
+// than approximated, the recorded shape for a box without /proc.
 func machineMemory() (total, available *int64) {
 	size, err := unix.SysctlUint64("hw.memsize")
 	if err != nil {
@@ -30,9 +30,9 @@ func machineMemory() (total, available *int64) {
 	return &v, nil
 }
 
-// diskUsage is `shutil.disk_usage`'s statvfs arithmetic; darwin's statfs
-// carries no fragment size, so the block size stands in, as Python's
-// statvfs shim on this platform effectively does.
+// diskUsage is the statvfs arithmetic; darwin's statfs
+// carries no fragment size, so the block size stands in -- the same
+// substitution every statvfs shim on this platform makes.
 func diskUsage(path string) (total, used, free int64) {
 	var fs unix.Statfs_t
 	if err := unix.Statfs(path, &fs); err != nil {

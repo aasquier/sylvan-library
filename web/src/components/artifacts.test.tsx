@@ -3,7 +3,7 @@
  *
  * - **`baseline` is a readout, never recomputed.** The server compares the
  *   stored snapshot against the deck; this renders that answer. A second copy
- *   of the comparison here would disagree with the Python one silently — the
+ *   of the comparison here would disagree with the served one silently — the
  *   rule the stance dial and the labels editor already follow.
  * - **`unknown` is a real third state**, not a stale boolean wearing a
  *   disguise. Every artifact on the volume was in it on 2026-08-21.

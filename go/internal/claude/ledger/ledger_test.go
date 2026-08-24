@@ -27,6 +27,7 @@ func scratch(t *testing.T) *Recorder {
 }
 
 func TestARecordedConversationCanBeRolledUp(t *testing.T) {
+	t.Parallel()
 	r := scratch(t)
 	ctx := context.Background()
 	for _, row := range []Row{
@@ -80,6 +81,7 @@ func TestARecordedConversationCanBeRolledUp(t *testing.T) {
 // if either moved, the Admin panel would render "Another Claude" for every
 // rolled-up row and look like a model nobody recognised.
 func TestTheMarkerIsTheSameWordInBothPackages(t *testing.T) {
+	t.Parallel()
 	if Various != tiers.Various {
 		t.Fatalf("ledger says %q, tiers says %q", Various, tiers.Various)
 	}
@@ -89,6 +91,7 @@ func TestTheMarkerIsTheSameWordInBothPackages(t *testing.T) {
 }
 
 func TestSinceFiltersOnTheTextTimestamp(t *testing.T) {
+	t.Parallel()
 	r := scratch(t)
 	ctx := context.Background()
 	r.Record(ctx, Row{"research", "claude-sonnet-5", "end_turn", 1, 10, 5, 0})
@@ -117,6 +120,7 @@ func TestSinceFiltersOnTheTextTimestamp(t *testing.T) {
 // cannot be bound as a parameter, so the safety comes entirely from the value
 // never being caller-controlled.
 func TestAnUnknownAxisIsRefusedRatherThanInterpolated(t *testing.T) {
+	t.Parallel()
 	r := scratch(t)
 	for _, bad := range []string{
 		"", "slug", "MODE", "mode; DROP TABLE claude_usage",
@@ -128,7 +132,7 @@ func TestAnUnknownAxisIsRefusedRatherThanInterpolated(t *testing.T) {
 			continue
 		}
 		if !strings.HasPrefix(err.Error(), "cannot group by ") {
-			t.Errorf("%q: refusal is not Python's wording: %v", bad, err)
+			t.Errorf("%q: refusal is not the recorded wording: %v", bad, err)
 		}
 	}
 	// And the table is still there, which is the point of the paragraph above.
@@ -142,6 +146,7 @@ func TestAnUnknownAxisIsRefusedRatherThanInterpolated(t *testing.T) {
 // losing it because the accounting could not be written would be strictly
 // worse than having no accounting at all.
 func TestRecordNeverFailsTheConversationThatProducedIt(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	row := Row{"commander-dossier", "claude-opus-5", "end_turn", 1, 1, 1, 1}
 
@@ -172,6 +177,7 @@ func TestRecordNeverFailsTheConversationThatProducedIt(t *testing.T) {
 // would be that a table of what everybody asked Claude is a chat log. Keeping
 // the columns to counters is what makes that conversation unnecessary.
 func TestTheRowIsCountersAndNeverAChatLog(t *testing.T) {
+	t.Parallel()
 	r := scratch(t)
 	rows, err := r.db.Query("SELECT name FROM pragma_table_info('claude_usage')")
 	if err != nil {
@@ -211,11 +217,11 @@ type ledgerCorpus struct {
 	} `json:"queries"`
 }
 
-// TestTheRollUpAgreesWithPython drives both axes and four `since` bounds
-// against Python's own answers.
+// TestTheRollUpAgreesWithTheCorpus drives both axes and four `since` bounds
+// against the recorded answers.
 //
 // The SQL is short and the temptation is to call it obvious. Three things in
-// it are not, and each has a shape a careful port still gets wrong. **Scan
+// it are not, and each is a shape a careful rewrite still gets wrong. **Scan
 // order depends on the axis** — the grouped column is SELECTed first, so mode
 // and model swap positions between the two queries, and a fixed scan order
 // puts the right numbers under the wrong names. **The marker fills the column
@@ -223,7 +229,8 @@ type ledgerCorpus struct {
 // arbitrary winner. And **`since` is a TEXT comparison**, inclusive at `>=`,
 // which the corpus probes at exactly a row's timestamp and one microsecond
 // past it.
-func TestTheRollUpAgreesWithPython(t *testing.T) {
+func TestTheRollUpAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile(filepath.Join("testdata", "ledger.json"))
 	if err != nil {
 		t.Fatalf("reading the ledger corpus: %v", err)

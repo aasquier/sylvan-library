@@ -1,42 +1,249 @@
 # Blue — Craft & Knowledge
 
-Four facets: Python best practices, TypeScript/React best practices, the
-Claude-first documentation and memory audit, and the spirit of Magic. Blue is
-the color of perfected craft and of knowing things — including knowing
-yourself, which is what the third facet is, and knowing the game whose name
-is on the door, which is the fourth.
+Five facets: Go craft (plus the animist toolbox in `tools/`), the boot
+sequence and its configuration, TypeScript/React craft, the Claude-first
+documentation and memory audit, and the spirit of Magic. Blue is the color of perfected craft and of knowing
+things: knowing the language well enough to write this year's Go rather than
+the Go with the most text behind it, knowing yourself (the third facet), and
+knowing the game whose name is on the door (the fourth).
 
-## Facet: Python craft
+## Facet: Go craft
 
-The backend's standards are already codified; the audit is whether the tree
-still meets them and whether the standards themselves have fallen behind.
+The backend's standards are the gates plus a handful of repo rules; the
+audit is whether the tree still meets them and whether the rules themselves
+have fallen behind.
 
-- Strict mypy's exception list (`pyproject.toml`) is meant to shrink:
-  **`cli.py` is all that remains** (`cards/db.py` graduated 2026-08-16).
-  Chipping a module off that list is a classic safe fix — measure the error
-  count first and queue it if it is a rewrite rather than annotations. Measure
-  by *removing the override block and re-running*, not by estimating: the
-  recorded count can be years stale, and `cli.py`'s had grown 79 → 109.
-- Ruff's excluded groups were excluded on *measured* cost. Re-measure
-  occasionally — a group whose count has collapsed is now nearly free to
-  adopt. **Measure `src` and `tests` separately**: as of 2026-08-16 ARG, PT and
-  SLF are ~100% test-side (16/604, 0/112, 0/67), so the headline number badly
-  overstates what adopting them would cost `src`. Current totals are in the
-  ledger; update them there so the next run knows.
-- ADR 24 decided **no autoformatter** — do not propose black/ruff-format
-  again; the revisit trigger is a second human contributor.
-- The layering rules are checkable: `api/` never imports `cli.py`; DuckDB
-  stays behind `cards/db.py`; `mana.py` and `sim/` stay stdlib+numpy;
-  optional extras are lazy-imported inside functions (the `claude`,
-  `animist`, dotenv pattern). Grep, don't trust.
-- Idiom sweep, judged surgically: dataclasses/Protocols where dicts have
-  grown fields, `pathlib` throughout (PTH is enforced), timezone-aware
-  datetimes (DTZ), no bare `except` (BLE). New code follows
-  `requires-python >= 3.11` — the floor, not the local 3.12; a 3.12-only
-  construct in `src/` is a bug.
+- The gates are the floor, not the audit: `go vet ./...`,
+  `go test -race ./...`, `golangci-lint run ./...`, `gofmt -l .` printing
+  nothing (all from `go/`, CGO on — the linter cannot typecheck
+  `internal/pool` without it). The audit is what they cannot see.
+- **Package comments carry the argument** — a package whose doc comment
+  merely names its contents is a finding; the standard is the determinism
+  kernels' docs (`internal/mt19937`, `internal/floats`), which say what
+  would break and why the code is shaped as it is.
+- The layering is checkable: `internal/door` owns HTTP concerns and auth
+  sweeps; `internal/api` never reaches around the door; DuckDB stays behind
+  `internal/pool`; the determinism kernels import nothing above them. Grep,
+  don't trust.
+- **The corpora under `testdata/` are frozen goldens** — a diff touching one
+  is a finding in itself, whatever the tests say.
+- Exact-arithmetic discipline: served float sums go through `floats.Fsum`,
+  FMA-sensitive expressions through `floats.Rounded`; a bare `+=` over
+  served floats beside either is a bug (the package doc says why).
+- Platform-tagged files are only type-checked where they build — CI's lint
+  is the first reader of a `_linux.go` file, so treat a green local lint as
+  a partial answer on this Mac.
+- **`t.Parallel()` belongs to White's testing facet, but its *cause* is often
+  here**: a test that cannot run in parallel is usually a subject reaching for
+  process-wide state — the environment, the working directory, a package-level
+  variable. When White reports a test left serial, ask whether the design is
+  what is serial.
+- The `tools/` toolbox is the one thing here that is not Go, and it keeps its
+  own gates (`ruff check .`, `mypy`, `pytest`, strict, all from `tools/`). It
+  is the animist and cardmotion media pipelines only — dev-machine tooling
+  that never ships and never serves — so a proposal to grow it is a proposal
+  to grow the one non-Go surface, and belongs in the queue. ADR 24's
+  no-autoformatter call still binds there, and its revisit trigger is still a
+  second human contributor.
 - Performance-adjacent craft belongs to Black; here the question is
-  readability, typing, and structure. A function that needs a comment to
+  readability, naming, and structure. A function that needs a comment to
   parse is a finding; so is a comment restating its line.
+
+### The modern-Go sweep, and why it is a standing item
+
+**Assume your Go is out of date.** A model's sense of idiomatic Go is
+weighted toward the years with the most text in them, which is the years
+before generics — so the *default* suggestion skews old, and it skews old in
+a way that reads fine and passes review. This facet is where that gets
+corrected on purpose, every run, rather than left to whichever session
+happens to notice.
+
+Two habits, and the first is the one that keeps this alive:
+
+- **Audit the toolchain's release notes, not your memory.** Read the notes
+  for every Go release since the version recorded in the ledger, and write
+  the version you audited *to* in the ledger. New library packages,
+  deprecations, `go vet` checks and language changes each get one question:
+  *does this tree contain the thing it replaces?* This is the same shape as
+  the Anthropic-currency bullet below, for the same reason — the platform
+  moves and prose does not.
+- **Grep for the old spelling, not for the new one.** The tree cannot tell
+  you what it is missing; it can tell you what it still has. A sweep is a
+  list of *outgoing* forms, and this one starts from a real inventory taken
+  2026-08-23: `interface{}` 0, `ioutil` 0, `rand.Seed` 0, `strings.Title` 0
+  — this tree is already clean of the classic tells — against
+  **`sort.Slice` 18**, which is the live one.
+
+The sweep list, roughly by how much the replacement buys:
+
+| Still in the tree | The modern spelling | Note |
+|---|---|---|
+| `sort.Slice` / `sort.SliceStable` | `slices.SortFunc` / `slices.SortStableFunc` | **Not a free swap here** — see the warning below |
+| hand-rolled contains/index loops | `slices.Contains`, `slices.Index`, `maps.Keys` | plainer, and harder to get wrong |
+| `interface{}` | `any` | |
+| a `for` loop counting to n | `for range n` | |
+| a loop variable copied into the body | nothing — per-iteration since 1.22 | delete the copy, keep the comment if it explains *why it used to be there* |
+| `errors.Is` chains built by hand | `errors.Join`, `%w` | |
+| a mutex guarding a read-mostly map | `sync.RWMutex`, or `atomic.Pointer` for swap-whole | **0 `RWMutex` against 15 `sync.Mutex`** — worth one honest look, not a blanket conversion |
+| `var wg sync.WaitGroup` + `wg.Add(1)` + `go func(){defer wg.Done()…}` | `wg.Go(func(){…})` | one line, and it cannot leak an `Add`/`Done` mismatch |
+| a `WaitGroup` plus a shared error variable | `errgroup.Group` | **already available**: `golang.org/x/sync` is an indirect dependency, so this costs no new module — only promoting it to direct |
+| `time.Sleep` in a concurrency test | `testing/synctest` | fake clock; the flake goes away rather than getting a longer sleep |
+
+**Two warnings, both load-bearing here:**
+
+- **A sort swap can move ties, and ties are what the goldens record.** This
+  repo's `testdata/` corpora are frozen, and `sort.Slice` is unstable exactly
+  like `slices.SortFunc`, so an "identical" swap can still reorder equal
+  elements under a different algorithm. Convert one call site, run the
+  package, and if a golden moves the conversion is **wrong** — not the
+  golden. Prefer the `Stable` form anywhere the output is recorded.
+- **Concurrency is not free and this app is not starved for it.** Adding a
+  goroutine to something already fast buys nothing and costs a race surface.
+  The question is never "could this be concurrent" but "what is waiting" —
+  and if the answer is a profile Black has not taken yet, the finding belongs
+  to Black. What belongs *here* is the shape: a goroutine with no way to
+  report its error, a `context` that is accepted and never checked, a
+  goroutine whose lifetime is longer than the request that started it, a
+  channel where a mutex would read plainer. **Every new goroutine gets a
+  race-detected test** — `go test -race -count=2` — or it is not a safe fix.
+
+## Facet: the boot sequence and its configuration
+
+The door's start is the one code path every user depends on and nobody
+audits, because it works on the laptop. It is also where the app's switches
+live, and a switch has a way of acquiring a second reader, a third default and
+no documentation at all.
+
+**Read `internal/config`'s package comment before proposing anything here.**
+Two decisions are already settled and are not this facet's business to
+re-litigate: config is **read at call time and never bound at start**, so a
+test can point the process at a scratch directory and a container at its
+volume without a restart ceremony; and there is **no `.env` reader and no
+secret in the package at all** — "a value we never hold is a value we cannot
+log". Cobra is likewise settled, throughout, by Aaron's explicit requirement
+(ADR 38 decision 5). So the audit is never "bind it all to a config library".
+It is whether those decisions are held *consistently*, and whether the things
+read-at-call-time cannot catch are caught somewhere else.
+
+Work the list:
+
+- **One reader per switch.** `internal/config` is the named place. Measure how
+  much of the app agrees, and re-measure rather than trusting this sentence:
+
+  ```bash
+  grep -rn "os.Getenv\|os.LookupEnv" go/ --include='*.go' | grep -v "_test.go" \
+    | cut -d: -f1 | sort | uniq -c | sort -rn
+  ```
+
+  Measured 2026-08-23: **33 reads outside tests in 8 files — 9 of them inside
+  `internal/config` and 24 outside it**, with `internal/sim/tier3/worker.go`
+  holding ten on its own, plus a **second local reader**, `envOr`, in
+  `cmd/mtglab/ui.go`. Not every outside read is a bug (a worker process that
+  is configured entirely by its environment is a reasonable shape), but every
+  one is a question: **does this switch have exactly one place that decides
+  its default?** Two readers mean two defaults, and the second one is
+  discovered in production.
+- **Documented, or it does not exist.** CLAUDE.md says `.env.example`
+  documents the names. That is an absolute claim; check it rather than
+  inheriting it:
+
+  ```bash
+  grep -oE '^#? *(MTGLAB|ANTHROPIC|RESEND)_[A-Z0-9_]+' .env.example | sed 's/^#* *//' | sort -u > /tmp/documented
+  grep -rhoE '"(MTGLAB|ANTHROPIC|RESEND)_[A-Z0-9_]+"' go/ --include='*.go' | tr -d '"' | sort -u > /tmp/incode
+  comm -13 /tmp/documented /tmp/incode   # read by code, documented nowhere
+  comm -23 /tmp/documented /tmp/incode   # documented, read by nothing
+  ```
+
+  Measured 2026-08-23: **35 names in code, 15 documented, 20 undocumented** —
+  every `MTGLAB_FORGE_*`, both `MTGLAB_LIVE_*`, both `MTGLAB_TEST_*`,
+  `MTGLAB_CLAUDE_MODEL`, `MTGLAB_CLAUDE_STANCE_CEILING`, `MTGLAB_TAROT_DIR`
+  and `MTGLAB_WEB_DIST` among them. **CLOSED 2026-08-24 with the check rather
+  than the paragraph**: `go/cmd/mtglab/configrecord_test.go` holds the code's
+  names and `.env.example`'s equal in both directions, and holds the
+  `MTGLAB_TEST_*`/`MTGLAB_LIVE_*` boundary besides — those six are read only
+  by `_test.go` files, so they are not compiled into the binary at all, which
+  is a stronger answer than the test-switch bullet below was expecting. Re-run
+  the two greps anyway when this facet comes round; what to watch now is
+  whether the *extractor* still matches, not whether the list is even.
+- ~~**A flag that is parsed and thrown away is help text lying.**~~ **CLOSED
+  2026-08-24**: `--no-open` is gone from `cmd/mtglab/ui.go` and from the four
+  `.claude/launch.json` entries that passed it, with a comment where it was
+  saying why it will not come back — nothing in the process ever opened a
+  browser, so the help text promised behaviour the command has never had. The
+  same test file now holds `.claude/launch.json` against `newRoot()`, so a
+  flag or subcommand that dies takes the dev-server entries with it at commit
+  time rather than at the moment Aaron is waiting to look at something.
+- **Precedence, stated and tested.** `envOr` is used *inside* two flag
+  defaults, so an explicit flag beats the environment which beats the built-in
+  default. That is the right order and it is written down nowhere and tested
+  nowhere. And only two switches got flags at all: when a switch deserves one,
+  say which side wins, and pin it with a test that sets both.
+- **A test switch must not be reachable in production.** `MTGLAB_TEST_POOL`,
+  `MTGLAB_TEST_FLAG`, `MTGLAB_LIVE_CLAUDE`, `MTGLAB_LIVE_FORGE`. For each,
+  ask what happens if it is set on the instance. If the answer is anything but
+  "nothing", it wants a build tag, a boot-time refusal, or a name that cannot
+  be set by accident — not a comment asking nicely.
+- **Fail fast on the pairs that must agree.** Read-at-call-time is right for a
+  path and wrong for a *relationship*: auth on with no `BaseURL` or
+  `EmailFrom` is reset links that go nowhere, discovered by the first person
+  who needs one; `SecureCookies` silently defaults from `RequireAuth`; a
+  half-set `MTGLAB_FORGE_*` is a tier that fails on the first match. **Four of
+  those landed 2026-08-24** as `configComplaints()` in `cmd/mtglab/ui.go`:
+  auth-on against `RESEND_API_KEY`, `MTGLAB_BASE_URL`, `MTGLAB_EMAIL_FROM` and
+  `MTGLAB_ADMIN_EMAIL`. **Warnings, never a refusal** — merging deploys
+  (ADR 23), so a boot that refuses takes the site down for a setting the site
+  does not need to serve an anonymous page, and the argument is written where
+  the function is. Still open: the half-set `MTGLAB_FORGE_*` pair, which needs
+  a predicate `tier3` does not export yet (`Configured()` answers the whole
+  question, not which half is missing).
+- ~~**Say what it decided, once, at boot.**~~ **CLOSED 2026-08-24**:
+  `serve()` logs one `configuration` line — auth, cookie mode, schema, data
+  dir, decks dir, web-dist, tarot, pool present, base URL, which mail sender,
+  whether the Forge worker is configured — immediately after the ladder, so a
+  boot that dies still has its own configuration above the error.
+  `TestTheBootSummaryLeaksNoSecret` is the half worth keeping: it *discovers*
+  the credential-shaped switches off the same walk that holds `.env.example`
+  honest, sets each to a sentinel, and demands none of them come back out. A
+  credential added tomorrow is covered the day it lands. If a run adds a field
+  to that line, the sentinel test is what makes the addition safe.
+- **Where you run it decides what it writes.** `DataDir()` defaults to a
+  *relative* `data`, so `mtglab ui` inside a checkout mints `data/app.db` in
+  the repo — the trap behind "never `git add -A` after running the app". Any
+  new default path answers the same question: what does this create, and
+  where, when nobody set anything?
+- **The startup order is a contract.** In `serve()`: the schema ladder first,
+  and a ladder that cannot apply is a **refusal to serve** rather than a
+  warning; the ADR 17 maintainer reconciliation; the listener; then an
+  **advisory** readability check that degrades to anonymous instead of dying;
+  then serve. Reordering any of those converts "refuses to boot" into "answers
+  requests over a half-migrated file", which is the worse failure by a wide
+  margin. If a run touches this function, the order is the thing to protect
+  and the comments there are the argument.
+- **Shutdown is part of startup.** `SIGINT`/`SIGTERM` into a 20-second
+  graceful `Shutdown`, with `ReadHeaderTimeout` and `IdleTimeout` set. Merging
+  deploys (ADR 23), so this handler is precisely what makes "a few seconds of
+  downtime" true rather than "a few seconds of dropped requests". Every new
+  long-lived goroutine, lease or worker has to end on the same signal, or the
+  window grows and nobody notices until a deploy drops a write.
+- **Cobra hygiene.** `RunE` rather than `Run` so errors return instead of
+  exiting (the tree is already `RunE` throughout, with `os.Exit` confined to
+  `main.go` and an injectable `osExit`); `SilenceUsage` and `SilenceErrors` set
+  at the root so an operational failure prints one error rather than a wall of
+  usage; `Args:` declared on every command; no orphan flag, and no flag
+  described in words the code does not honour.
+- **Fly's half of the same question.** `fly.toml` is the only Fly-specific
+  file and holds no secrets; deployed switches travel by `fly secrets set`.
+  Drift between the code's names and the instance's is invisible until a
+  feature quietly degrades, so compare the names on the instance against the
+  in-code list, and treat a name that appears in neither `.env.example` nor
+  the instance as **dead config to delete** rather than mystery to preserve.
+
+What is already right here, so a later run does not "fix" it: the config
+package's stated argument for call-time reads, the ladder-first ordering with
+its refusal, the advisory degrade that keeps the door open anonymous, the
+graceful shutdown, and the two flags whose help text names the environment
+variable behind them. Those are the standard; the findings above are the
+places the standard is not being held.
 
 ## Facet: TypeScript / React craft
 
@@ -44,7 +251,7 @@ still meets them and whether the standards themselves have fallen behind.
   `--deny-warnings`, Vitest). The audit is what the gauntlet *cannot* see:
   - **No regex lookbehind anywhere under `web/src`** — it is a SyntaxError at
     parse time below the Safari 16.4 floor, which takes the whole module with
-    it rather than degrading. `tests/test_browser_floor.py` checks the
+    it rather than degrading. The bundle-floor check in CI covers the
     *bundle*, which is the half a grep of `web/src` cannot reach; the grep is
     still worth running on new source, remembering that `(?<name>…)` is a
     named capture group and not the hazard.
@@ -110,6 +317,17 @@ files against them.
 - **Doc changes ride the run's branch** — this facet is the one place a
   mostly-doc PR is legitimate, because the corrections are the work. Still
   batch them; still never open a PR for one paragraph.
+- **The comment standard, held at review time.** A comment's only audience is
+  a future Claude session and its only job is discovery of the code itself
+  (the primary-developer frame in SKILL.md): the invariant, the trap, what
+  would break, why the obvious alternative loses. Dates, development process,
+  who found what when — git and the ledger hold history; comments hold
+  discovery. The one date that stays is a date that *is* the fact: an expiry,
+  a version floor, a cutover. This facet holds that bar on every line of code
+  it reviews and every line a fix writes; **the sweep of the existing stock
+  belongs to Colorless** (part five of its reference), where the artifact
+  pass owns relics at every granularity — one owner per job, which is that
+  file's own rule.
 - **Scrub context that has stopped earning its tokens** (Aaron's ask,
   2026-08-16). These files are read by Claude at the top of every session,
   so their length is a per-session cost and their clarity is a correctness
@@ -159,14 +377,14 @@ the talking, or has conversational English taken its place?*
 - **"Within reason" is a real boundary, and commandment 2 draws it.** A term
   qualifies only if a newcomer can still act on the sentence — flavour that
   obscures what a control does is a regression wearing a costume. The glossary
-  (`glossary.py`) is what squares the two commandments: a Magic term the UI
+  (`internal/reference`'s served table) is what squares the two commandments: a Magic term the UI
   teaches on hover is beginner-safe in a way a bare one is not, so "use the
   term *and* glossary it" beats both the plain word and the unexplained term.
   A flavour fix that needs a new glossary entry is still a safe fix; the entry
   rides along.
 - **Some words are load-bearing; renaming them is not a safe fix.** Wire
-  tokens, `glossary.py` keys (`SIMULATOR_KEYS` pins them), YAML fields and CLI
-  verbs are API. The pattern is flavouring the *rendered label* over an
+  tokens, the served glossary's keys (the Simulator pins the ones it needs),
+  YAML fields and CLI verbs are API. The pattern is flavouring the *rendered label* over an
   unchanged token — `lib/claudecopy.ts` is exactly that seam — and renaming
   the token underneath is a queued item. Commandment 10 still governs: a
   flavourful sentence that names a seed, model or database has made things
@@ -183,8 +401,8 @@ the surgical cap binds it hardest.
 Where the easy wins live, roughly in order of cost:
 
 - **A bare number or word that has a symbol.** Mana costs, colour identity,
-  card types and rarities all have official marks (`symbols.py`, with
-  `managlyphs.ts` as the offline fallback). Anywhere identity renders as the
+  card types and rarities all have official marks (the app draws its own —
+  `managlyphs.ts` and the SVG set beside it). Anywhere identity renders as the
   letters `WUBRG`, a coloured dot, or the word "green", the pip is the Magic
   way to say it. Sweep for `color_identity`, `mana_cost` and `type_line` in
   `web/src` and look at what each one draws.
@@ -196,8 +414,9 @@ Where the easy wins live, roughly in order of cost:
 - **A card that could speak for itself.** Oracle text and flavour text are
   already in the pool, free, licensed to render, and better written than
   anything a checklist will produce. An empty state, a loading line or a
-  section header can carry a real card's words — `lore.py`, `colors.py` and
-  `tarotlore.py` are the checked-in prose shelves, and rule 1 still binds:
+  section header can carry a real card's words — `internal/reference` holds
+  the checked-in prose shelves (colors, glossary, lore, tarot lore), and
+  rule 1 still binds:
   **card facts come from the pool, never from recall.** A flavour line quoted
   from memory is exactly the error the first non-negotiable exists to stop,
   and it is worse here because it will be *rendered*.
@@ -210,6 +429,26 @@ Where the easy wins live, roughly in order of cost:
   can carry its painter's name; a colour pair can carry its guild. These are
   the cheapest wins of all, because the sentence is already written and
   checked in — it is only not being shown.
+
+Two standing checks before the shortlist, both commandment-owned:
+
+- **The shelves must be true (commandment 3).** `internal/reference`'s prose
+  — colors, glossary, lore, tarot lore — is hand-written, checked in, and
+  read by exactly the audience that will catch an error in it: Magic nerds.
+  Each run, fact-check a sample of entries against the pool and the game's
+  actual history (rule 1 binds — look facts up, never recall them), and read
+  the dropped-name counter: a card name a shelf cites that the pool cannot
+  resolve is being silently dropped *and counted*, and a count nobody reads
+  is a silence. A wrong date, a wrong painter, a wrong ruling in the lore is
+  a worse flavour failure than any plain-English button, because it teaches a
+  newcomer something false about the game.
+- **Visit the fortune-teller's table (commandment 15).** Once per spirit run,
+  open the tarot room on the live instance and ask the commandment's own
+  question: is it still the belle of the ball — the realest art, the richest
+  motion, the most care on the site? Effort rations there *last*, so if this
+  run's enrichment shortlist has one item in it, it goes there; and if the
+  room has slipped behind a newer page anywhere else, that is a finding even
+  though nothing is broken.
 
 Three bounds, all of them hard:
 

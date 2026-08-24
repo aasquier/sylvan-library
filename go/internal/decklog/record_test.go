@@ -12,9 +12,9 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
 )
 
-// describeCase is one row of the oracle: the keywords `_commit` handed
-// `describe`, and the verb and sentence it gave back. Written by
-// `tests/go_fixtures.py`.
+// describeCase is one row of the oracle (testdata/describe.json, a frozen
+// golden): the keywords one recorded edit carried, and the verb and
+// sentence rendered for it.
 type describeCase struct {
 	Extra   map[string]any `json:"extra"`
 	Action  string         `json:"action"`
@@ -22,8 +22,9 @@ type describeCase struct {
 }
 
 // editFor turns one recorded `extra` back into the typed Edit this package
-// takes. Python asks "is this key present"; the switch below asks the same
-// question in the same order, which is what makes the two comparable at all.
+// takes. The corpus discriminates by which key is present; the switch below
+// asks the same question in the same order, which is what makes the rows
+// comparable at all.
 func editFor(extra map[string]any) Edit {
 	str := func(key string) string { s, _ := extra[key].(string); return s }
 	switch {
@@ -63,11 +64,12 @@ func strings2(items []any) []string {
 	return out
 }
 
-// TestDescribeWritesPythonsSentences is the log's half of the family's gate.
-// The sentence is rendered once, at write time, so a Go route that wrote a
-// different one would change the History panel's wording the day it flipped --
-// silently, and only for edits made after the flip.
-func TestDescribeWritesPythonsSentences(t *testing.T) {
+// TestDescribeWritesTheRecordedSentences is the log's half of the family's
+// gate. The sentence is rendered once, at write time, so a route that wrote
+// a different one would change the History panel's wording from that day on
+// -- silently, and only for edits made after the change.
+func TestDescribeWritesTheRecordedSentences(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("testdata/describe.json")
 	if err != nil {
 		t.Fatalf("reading the oracle: %v", err)
@@ -77,22 +79,23 @@ func TestDescribeWritesPythonsSentences(t *testing.T) {
 		t.Fatalf("decoding the oracle: %v", err)
 	}
 	if len(cases) < 30 {
-		t.Fatalf("the oracle has %d cases; regenerate with `python tests/go_fixtures.py`", len(cases))
+		t.Fatalf("the oracle has %d cases; testdata/describe.json is a frozen golden and should hold at least 30", len(cases))
 	}
 	for _, c := range cases {
 		action, summary := Describe(editFor(c.Extra))
 		if action != c.Action || summary != c.Summary {
-			t.Errorf("%v\n  Python: %q / %q\n      Go: %q / %q",
+			t.Errorf("%v\n  golden: %q / %q\n     got: %q / %q",
 				c.Extra, c.Action, c.Summary, action, summary)
 		}
 	}
 }
 
 // TestNoRationaleReachesASentence pins ADR 28's hardest rule, which no
-// equality check can hold on its own: the oracle only proves Go says what
-// Python says, and if Python ever started leaking a rationale the two would
+// equality check can hold on its own: the oracle only proves the sentences
+// match the recording, and a corpus recorded from a leaking renderer would
 // agree all the way into the table.
 func TestNoRationaleReachesASentence(t *testing.T) {
+	t.Parallel()
 	const secret = "A rationale that must not appear in any log line."
 	raw, err := os.ReadFile("testdata/describe.json")
 	if err != nil {
@@ -123,6 +126,7 @@ func TestNoRationaleReachesASentence(t *testing.T) {
 // branch most likely to be "simplified" away by somebody who notices nothing
 // reaches it. The tenth edit operation is the one somebody adds in a year.
 func TestAnUnknownOperationStillSaysSomething(t *testing.T) {
+	t.Parallel()
 	action, summary := Describe(Edit{})
 	if action != "edit" || summary != "edited the deck" {
 		t.Errorf("an unrecognised operation said %q / %q; silence is the one "+
@@ -130,10 +134,8 @@ func TestAnUnknownOperationStillSaysSomething(t *testing.T) {
 	}
 }
 
-// newScratchDB builds an `app.db` from the schema Python's ladder produced,
-// which `tests/go_fixtures.py` reads out of `sqlite_master` and commits. Go
-// does not own the ladder (PLAN section 10), so this is a reading of it rather
-// than a second copy.
+// newScratchDB builds an `app.db` from the ladder's recorded schema -- a
+// reading of the real ladder, never a second copy of it.
 //
 // The bytes lived in this package's own `testdata` until 2026-08-22, when the
 // accounts flip found two other packages had each transcribed the ladder by
@@ -149,6 +151,7 @@ func newScratchDB(t *testing.T) string {
 }
 
 func TestRecordWritesAnEntryTheReaderFinds(t *testing.T) {
+	t.Parallel()
 	path := newScratchDB(t)
 	recorder, err := NewRecorder(path, nil)
 	if err != nil {
@@ -189,10 +192,10 @@ func TestRecordWritesAnEntryTheReaderFinds(t *testing.T) {
 	if entries[0].Actor != nil {
 		t.Errorf("an empty actor should be null, got %q", *entries[0].Actor)
 	}
-	// Python writes an ISO-8601 stamp with microseconds and an offset, and
-	// the panel renders it, so the shape is part of the contract.
+	// The stamp is ISO-8601 with microseconds and an offset, and the panel
+	// renders it, so the shape is part of the contract.
 	if got := entries[0].CreatedAt; !strings.HasSuffix(got, "+00:00") || len(got) != 32 {
-		t.Errorf("created_at is %q; Python writes `2026-08-22T01:23:45.678901+00:00`", got)
+		t.Errorf("created_at is %q; the contract is `2026-08-22T01:23:45.678901+00:00`", got)
 	}
 
 	owned, err := Entries(ctx, db, &owner, "goreclaw", DefaultLimit)
@@ -207,6 +210,7 @@ func TestRecordWritesAnEntryTheReaderFinds(t *testing.T) {
 // TestRecordNeverFailsTheEdit is the property the whole module is built
 // around: the deck write has already happened by the time this runs.
 func TestRecordNeverFailsTheEdit(t *testing.T) {
+	t.Parallel()
 	// No database at all -- a laptop with auth off that nothing has yet
 	// created `app.db` on.
 	missing := filepath.Join(t.TempDir(), "nothing", "app.db")
@@ -241,6 +245,7 @@ func TestRecordNeverFailsTheEdit(t *testing.T) {
 // ladder (`auth.Migrate`) runs at boot, so an `app.db` minted here would be
 // a database at version zero with no tables in it.
 func TestTheRecorderDoesNotCreateTheDatabase(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "app.db")
 	if _, err := NewRecorder(path, nil); err == nil {
 		t.Fatal("NewRecorder created app.db; only the boot ladder may make the file")

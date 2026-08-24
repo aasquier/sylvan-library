@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "mtglab-ui",
-      "runtimeExecutable": ".venv/bin/mtglab",
-      "runtimeArgs": ["ui", "--no-open", "--port", "8765"],
+      "runtimeExecutable": "go/mtglab",
+      "runtimeArgs": ["ui", "--port", "8765"],
       "port": 8765
     },
     {
@@ -12,7 +12,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "MTGLAB_DATA_DIR=$(mktemp -d) .venv/bin/mtglab ui --no-open --port 8766"
+        "MTGLAB_DATA_DIR=$(mktemp -d) go/mtglab ui --port 8766"
       ],
       "port": 8766
     },
@@ -21,7 +21,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "MTGLAB_DATA_DIR=${TMPDIR:-/tmp}/mtglab-auth-demo MTGLAB_REQUIRE_AUTH=1 MTGLAB_BASE_URL=http://127.0.0.1:8767 .venv/bin/mtglab ui --no-open --port 8767"
+        "MTGLAB_DATA_DIR=${TMPDIR:-/tmp}/mtglab-auth-demo MTGLAB_REQUIRE_AUTH=1 MTGLAB_BASE_URL=http://127.0.0.1:8767 go/mtglab ui --port 8767"
       ],
       "port": 8767
     },
@@ -30,7 +30,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "MTGLAB_DECKS_DIR=$(mktemp -d) .venv/bin/mtglab ui --no-open --port 8768"
+        "MTGLAB_DECKS_DIR=$(mktemp -d) go/mtglab ui --port 8768"
       ],
       "port": 8768
     },
@@ -41,7 +41,7 @@
         "entry serves the frontend, that one serves the data.",
         "",
         "The other four entries serve the *committed* bundle out of",
-        "`src/mtglab/web_dist`, so a change under `web/src` is invisible to",
+        "`web_dist`, so a change under `web/src` is invisible to",
         "them until `npm --prefix web run build`. That is the right thing for",
         "testing what ships and the wrong thing for iterating on a colour."
       ],

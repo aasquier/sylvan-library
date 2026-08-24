@@ -7,7 +7,8 @@ import (
 	"testing"
 )
 
-// The rich fixture Python writes to trip a second parser (tests/go_fixtures.py).
+// The rich fixture recorded to trip a careless parser: every shape the
+// dumper writes, in one committed deck.
 func richDeck(t *testing.T) *Deck {
 	t.Helper()
 	_, here, _, _ := runtime.Caller(0)
@@ -23,7 +24,8 @@ func richDeck(t *testing.T) *Deck {
 	return d
 }
 
-func TestFromTextReadsTheRichFixtureAsPythonDoes(t *testing.T) {
+func TestFromTextReadsTheRichFixtureAsRecorded(t *testing.T) {
+	t.Parallel()
 	d := richDeck(t)
 	if d.Slug != "rich-fixture" || d.Name != "Rich Fixture: Every Shape the Dumper Writes" {
 		t.Fatalf("%q %q", d.Slug, d.Name)
@@ -77,6 +79,7 @@ func TestFromTextReadsTheRichFixtureAsPythonDoes(t *testing.T) {
 }
 
 func TestTheDefaultsAreTheModels(t *testing.T) {
+	t.Parallel()
 	d, err := FromText("name: Bare\ncards:\n  - Sol Ring\n  - name: Forest\n    qty: 2\n", "bare-slug")
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +109,7 @@ func TestTheDefaultsAreTheModels(t *testing.T) {
 	if c.Archetype() != "combo" {
 		t.Fatalf("archetype %q", c.Archetype())
 	}
-	// What Python would raise on, this refuses.
+	// What has no honest parse, this refuses.
 	if _, err := FromText("cards:\n  - category: ramp\n", "x"); err == nil {
 		t.Fatal("a card with no name was accepted")
 	}
@@ -116,6 +119,7 @@ func TestTheDefaultsAreTheModels(t *testing.T) {
 }
 
 func TestPayloadIsTheDumpsProjection(t *testing.T) {
+	t.Parallel()
 	d := richDeck(t)
 	p := d.Payload()
 	if p["shared"] != false || p["pilot"] != "Mark's wife" || p["archetype"] != "midrange" || p["bracket"] != 3 {

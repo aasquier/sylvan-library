@@ -13,7 +13,7 @@ import (
 )
 
 // The rebuild route's own tests. `internal/artifacts` already proves the
-// *bytes* against Python's over 18 fixture decks; what these prove is the
+// *bytes* against its golden over 18 fixture decks; what these prove is the
 // layer above -- that the two refusals land on the right status in the right
 // order, that nothing is written when one fires, that the shelf a build
 // answers with is the shelf a reader asks for, and that a build is not an
@@ -79,6 +79,7 @@ func names(body map[string]any) []string {
 // The whole happy path: four deliverables and a baseline on a first build,
 // the shelf reporting them, and the files on disk being the renderer's own.
 func TestABuildWritesTheDeliverablesAndAnswersTheShelf(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -161,10 +162,11 @@ func TestABuildWritesTheDeliverablesAndAnswersTheShelf(t *testing.T) {
 // differed in practice -- so it is reproduced rather than tidied, and pinned
 // here so the next person to notice finds the reason instead of a surprise.
 //
-// Confirmed against Python before it was written: a directory whose file
+// Measured on the live wire before it was written: a directory whose file
 // declares a slug that is not a deck at all answers **404 after a successful
 // write**, the files sitting on disk under the name that was asked for.
 func TestABuildReportsUnderTheDecksOwnSlug(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -208,6 +210,7 @@ func TestABuildReportsUnderTheDecksOwnSlug(t *testing.T) {
 // function (`service._artifacts_json`), so they cannot describe one build two
 // ways.
 func TestTheBuildAndTheShelfAgree(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -239,6 +242,7 @@ func TestTheBuildAndTheShelfAgree(t *testing.T) {
 // The gate's errors are refused by default and `force` overrides them, which
 // mirrors `mtglab decks build --force`. A refused build writes nothing.
 func TestTheGateRefusesAndForceOverrides(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -280,11 +284,12 @@ func TestTheGateRefusesAndForceOverrides(t *testing.T) {
 // draft is not wrong but unfinished, and the way out is to write the
 // rationales and promote it.
 func TestADraftIsRefusedAndForceDoesNotReachIt(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
 	// The `draft` fixture also carries a banned card, which the gate refuses
-	// *first* -- Python checks the gate before it renders. So the flag is
+	// *first* -- the gate runs before the renderer. So the flag is
 	// needed to get past the gate at all, and then the draft rule refuses it
 	// anyway. That is the whole shape of ADR 13's exception: `force`
 	// overrides what the deck got *wrong*, and a draft is not wrong but
@@ -316,6 +321,7 @@ func TestADraftIsRefusedAndForceDoesNotReachIt(t *testing.T) {
 // indistinguishable from current -- and the snapshot beside it is not a
 // deliverable and must survive.
 func TestARebuildPrunesAStaleSwapList(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -363,6 +369,7 @@ func TestARebuildPrunesAStaleSwapList(t *testing.T) {
 // never a file timestamp -- so an edit makes it `different` and reverting the
 // edit makes it `current` again.
 func TestTheBaselineFollowsTheDeckAndNotTheClock(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -397,6 +404,7 @@ func TestTheBaselineFollowsTheDeckAndNotTheClock(t *testing.T) {
 // explains. The deliverables are the *shareable* surface, so a reader may
 // have every one of them -- and may not rebuild them.
 func TestWhoMayBuildIsDecidedByTheSource(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -426,11 +434,11 @@ func TestWhoMayBuildIsDecidedByTheSource(t *testing.T) {
 	}
 }
 
-// The body is validated before the deck is resolved, because that is the
-// order FastAPI does it in: `payload: dict[str, Any]` is a request field
-// solved with the dependencies, and `lib.source_for(owner)` is not reached
-// until the handler's first line.
+// The body is validated before the deck is resolved -- the recorded order,
+// so a malformed body is a 422 before any 404 about the deck it was aimed
+// at.
 func TestAMalformedBodyIsRefusedBeforeTheDeck(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -450,10 +458,11 @@ func TestAMalformedBodyIsRefusedBeforeTheDeck(t *testing.T) {
 	}
 }
 
-// `force` is Python's `bool(payload.get("force", False))`, not a Go cast:
+// `force` is read with the recorded truthiness, not a Go cast:
 // `"no"` is true and `0` is false, and a route that used `.(bool)` would read
 // both as false.
-func TestForceIsPythonsTruthiness(t *testing.T) {
+func TestForceIsReadWithTheRecordedTruthiness(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -476,6 +485,7 @@ func TestForceIsPythonsTruthiness(t *testing.T) {
 // rebuilding his own deck writes rows, not files -- and the sweep that prunes
 // a stale `swaps.md` from a directory prunes it from the table.
 func TestTheSQLTierBuildsToo(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -552,12 +562,13 @@ func TestTheSQLTierBuildsToo(t *testing.T) {
 // deck had three answers on one instance -- validate warned, a rebuild refused
 // with 99 errors, and every edit came back `ok: false`.
 //
-// The flip reproduced that rather than ruling on it, and this test pinned the
-// disagreement. It has since been ruled on: `_pool_for` answers `None`, every
+// The wart was kept at first rather than ruled on, and this test pinned the
+// disagreement. It has since been ruled: no pool means a nil map, every
 // caller that feeds the gate passes it through, and `mtglab decks build` --
-// which was handed `None` by `cli._pool` and built happily throughout -- is
+// which handled the no-pool case correctly throughout -- is
 // what the route now matches, as rule 3 requires.
 func TestWithNoPoolTheBuildAndTheGateAgree(t *testing.T) {
+	t.Parallel()
 	decks := decksDir(t)
 	// An app.db, because the owner segment is resolved through it -- but no
 	// Pool, which is the state a fresh instance is in before `data refresh`.
@@ -604,10 +615,10 @@ func TestWithNoPoolTheBuildAndTheGateAgree(t *testing.T) {
 	}
 
 	// And the third surface: an ordinary edit, whose verdict comes back through
-	// `commit`. This half was already nil-correct here and `{}`-wrong in
-	// Python, so on a pool-less instance the door and uvicorn disagreed about
-	// what a write to the same deck answered -- a divergence the contract suite
-	// could not see, because its harness always builds the 21-card pool.
+	// `commit`. This half was nil-correct before the build route was, so on
+	// a pool-less instance two writes to the same deck once disagreed --
+	// a divergence no rigged suite could see, because the rigs always build
+	// the 21-card pool.
 	status, body, raw = callAs(t, a, scope, "PATCH", cleanDeck,
 		`{"field":"bracket","value":3}`)
 	if status != 200 {
@@ -652,10 +663,11 @@ func mustParse(t *testing.T, text, slug string) *deck.Deck {
 	return d
 }
 
-// The route answers its keys in `_artifacts_json`'s own order, then the
+// The route answers its keys in the shelf's own order, then the
 // build's two. Not a shape the goldens can see -- they sort -- and the reason
-// `marshalOrdered` exists at all.
-func TestTheAnswersKeysAreInPythonsOrder(t *testing.T) {
+// ordered marshalling exists at all.
+func TestTheAnswerKeepsTheRecordedKeyOrder(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -678,6 +690,6 @@ func TestTheAnswersKeysAreInPythonsOrder(t *testing.T) {
 	}
 	want := []string{"artifacts", "baseline", "buildable", "stage", "issues", "forced"}
 	if strings.Join(order, ",") != strings.Join(want, ",") {
-		t.Errorf("keys are %v, Python's are %v", order, want)
+		t.Errorf("keys are %v, the record says %v", order, want)
 	}
 }

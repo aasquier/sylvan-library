@@ -13,14 +13,13 @@ import (
 	"golang.org/x/term"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/tiers"
 )
 
-// usersCommand is `mtglab users`: accounts on this box's app.db, exactly
-// cli.py's family — the shell-side administration that must survive the
-// interpreter leaving the image, because `fly ssh console -C "mtglab users
-// list"` is the runbook's answer to "who can sign in" (docs/HOSTING.md).
+// usersCommand is `mtglab users`: accounts on this box's app.db — the
+// shell-side administration the deployed instance depends on, because
+// `fly ssh console -C "mtglab users list"` is the runbook's answer to "who
+// can sign in" (docs/HOSTING.md).
 //
 // Every subcommand goes through `connectUsers`, which runs the ladder and
 // reconciles the maintainer (ADR 17) — so the CLI and the app agree about who
@@ -37,12 +36,12 @@ func usersCommand() *cobra.Command {
 	return cmd
 }
 
-// connectUsers is cli.py's `_connect`: app.db read-write with the ladder run
-// and the maintainer reconciled first. The ladder rather than a bare open,
-// because on a laptop the first `users add` is what creates the file — the
-// same reason Python's `db.connect` carried its own.
+// connectUsers opens app.db read-write with the ladder run and the
+// maintainer reconciled first. The ladder rather than a bare open, because
+// on a laptop the first `users add` is what creates the file — an open that
+// could not mint the schema would strand the very first command.
 func connectUsers(ctx context.Context) (*sql.DB, error) {
-	path := config.AppDBPath()
+	path := settings().AppDBPath()
 	if err := auth.Migrate(path); err != nil {
 		return nil, err
 	}
@@ -50,7 +49,7 @@ func connectUsers(ctx context.Context) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := auth.EnsureMaintainer(ctx, db); err != nil {
+	if err := auth.EnsureMaintainer(ctx, db, settings()); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -62,9 +61,9 @@ func refused(format string, a ...any) error {
 }
 
 // promptNewPassword reads a password twice, from the terminal, never from an
-// argument — `_prompt_new_password`, down to getpass's own fallback: when
-// stdin is not a terminal it reads a line in the clear and says so, which is
-// also what makes this path testable.
+// argument. When stdin is not a terminal it falls back to reading a line in
+// the clear and warns that it may echo — the recorded fallback, and also
+// what makes this path testable.
 func promptNewPassword(who string) (string, error) {
 	first, err := readSecret(fmt.Sprintf("  new password for %s: ", who))
 	if err != nil {
@@ -116,7 +115,7 @@ func readSecret(prompt string) (string, error) {
 		}
 		return string(raw), nil
 	}
-	// getpass's fallback, warning included.
+	// The non-terminal fallback, recorded warning included.
 	fmt.Fprintln(os.Stderr, "Warning: Password input may be echoed.")
 	return readStdinLine()
 }
@@ -144,7 +143,7 @@ func usersAddCommand() *cobra.Command {
 			defer func() { _ = db.Close() }()
 			user, err := auth.Create(ctx, db, args[0], email, admin)
 			if err != nil {
-				// Named rather than blanket, as cli.py names the three: a
+				// Named rather than blanket — exactly these three: a
 				// genuine fault should stay an error, not read as "refused:".
 				if errors.Is(err, auth.ErrUserExists) ||
 					errors.Is(err, auth.ErrInvalidUsername) ||
@@ -162,7 +161,7 @@ func usersAddCommand() *cobra.Command {
 			if user.IsAdmin {
 				role = " (admin)"
 			}
-			fmt.Printf("  created %s%s in %s\n", user.Username, role, config.AppDBPath())
+			fmt.Printf("  created %s%s in %s\n", user.Username, role, settings().AppDBPath())
 			if password == "" {
 				fmt.Println("  no password set -- this account cannot log in yet.")
 			}
@@ -192,7 +191,7 @@ func usersInviteCommand() *cobra.Command {
 			if address == "" {
 				return refused("an invite needs an email address to send to")
 			}
-			sender, err := auth.SenderFromEnv(nil)
+			sender, err := auth.SenderFor(auth.MailSettingsFrom(settings()), nil)
 			if err != nil {
 				return refused("%s", err)
 			}
@@ -221,8 +220,8 @@ func usersInviteCommand() *cobra.Command {
 				if name == "" {
 					// The address' local part, and a refusal rather than a
 					// mangling when it will not do: an invited person has to
-					// be told the handle they were given (cli.py's
-					// `_username_for`, unlike bootstrap's).
+					// be told the handle they were given — unlike the
+					// maintainer bootstrap, which may normalise its own.
 					name, _, _ = strings.Cut(address, "@")
 				}
 				name, err := auth.NormaliseUsername(name)
@@ -232,7 +231,7 @@ func usersInviteCommand() *cobra.Command {
 				user, err = auth.Create(ctx, db, name, address, admin)
 				if errors.Is(err, auth.ErrUserExists) {
 					return refused("the username %s is taken -- pass "+
-						"--username to choose another", pyQuote(name))
+						"--username to choose another", quoted(name))
 				}
 				if err != nil {
 					return err
@@ -274,7 +273,7 @@ func usersListCommand() *cobra.Command {
 				return err
 			}
 			if len(everyone) == 0 {
-				fmt.Printf("  no accounts in %s\n", config.AppDBPath())
+				fmt.Printf("  no accounts in %s\n", settings().AppDBPath())
 				fmt.Println("  create one with `mtglab users add <name>`")
 				return nil
 			}
@@ -338,7 +337,7 @@ func usersPasswdCommand() *cobra.Command {
 				return err
 			}
 			if user == nil {
-				return refused("no account %s", pyQuote(args[0]))
+				return refused("no account %s", quoted(args[0]))
 			}
 			password, err := promptNewPassword(user.Username)
 			if err != nil {
@@ -374,7 +373,7 @@ func setDisabledCommand(use, short string, disabled bool) *cobra.Command {
 				return err
 			}
 			if user == nil {
-				return refused("no account %s", pyQuote(args[0]))
+				return refused("no account %s", quoted(args[0]))
 			}
 			ended, err := auth.SetDisabled(ctx, db, user.ID, disabled)
 			if errors.Is(err, auth.ErrLastAdmin) {
@@ -422,7 +421,7 @@ func setAdminCommand(use, short string, isAdmin bool) *cobra.Command {
 				return err
 			}
 			if user == nil {
-				return refused("no account %s", pyQuote(args[0]))
+				return refused("no account %s", quoted(args[0]))
 			}
 			already := "not an admin"
 			if isAdmin {
@@ -491,7 +490,7 @@ func usersTierCommand() *cobra.Command {
 				return err
 			}
 			if user == nil {
-				return refused("no account %s", pyQuote(args[0]))
+				return refused("no account %s", quoted(args[0]))
 			}
 			if err := auth.SetModelTier(ctx, db, user.ID, wanted); err != nil {
 				if errors.Is(err, auth.ErrUnknownTier) {
@@ -500,7 +499,7 @@ func usersTierCommand() *cobra.Command {
 						keys = append(keys, t.Key)
 					}
 					return refused("no such tier %s -- one of: default, %s",
-						pyQuote(tier), strings.Join(keys, ", "))
+						quoted(tier), strings.Join(keys, ", "))
 				}
 				return err
 			}
@@ -534,7 +533,7 @@ func usersDeleteCommand() *cobra.Command {
 				return err
 			}
 			if user == nil {
-				return refused("no account %s", pyQuote(args[0]))
+				return refused("no account %s", quoted(args[0]))
 			}
 			live, err := auth.CountSessionsForUser(ctx, db, user.ID)
 			if err != nil {
@@ -550,7 +549,7 @@ func usersDeleteCommand() *cobra.Command {
 				fmt.Printf("  type '%s' to delete it: ", user.Username)
 				line, _ := readStdinLine()
 				// Usernames are ASCII by the handle pattern, so a simple fold
-				// cannot disagree with Python's casefold about a match.
+				// and a full Unicode casefold cannot disagree about a match.
 				if !strings.EqualFold(strings.TrimSpace(line), user.Username) {
 					return refused("that is not the username")
 				}
@@ -575,10 +574,10 @@ func usersDeleteCommand() *cobra.Command {
 	return cmd
 }
 
-// pyQuote is `repr` for the refusal sentences that quote what somebody typed,
-// as cli.py's f"{x!r}" does — single quotes, the pair swapped when the text
-// itself carries one.
-func pyQuote(s string) string {
+// quoted wraps what somebody typed for a refusal sentence — single quotes,
+// the pair swapped to double when the text itself carries a single — the
+// recorded spelling of every "no account ..." answer.
+func quoted(s string) string {
 	if strings.Contains(s, "'") && !strings.Contains(s, `"`) {
 		return `"` + s + `"`
 	}

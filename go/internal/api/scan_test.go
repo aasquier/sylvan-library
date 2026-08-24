@@ -11,8 +11,8 @@ import (
 // The scan route (ADR 34). `internal/claude`'s corpus holds the reader itself
 // -- the media types, base64's strictness, the sighting -- so what these prove
 // is the layer above it: which refusal lands on which status and BEFORE any
-// job, that the dedupe is the picture, that the result is Python's four keys
-// in Python's order, and that what comes back is not a card.
+// job, that the dedupe is the picture, that the result is the recorded four
+// keys in the recorded order, and that what comes back is not a card.
 
 const scanAt = "/api/claude/scan"
 
@@ -43,7 +43,8 @@ func TestTheScanRouteRefusesWhatItCanBeforeAnyJob(t *testing.T) {
 		{`{"image":""}`, 422, "the capture was empty"},
 		{`{"image":"!!!!"}`, 422, "the capture was not valid base64"},
 		// The newline is the case a straight Go base64 decoder accepts and
-		// Python refuses -- a client that wrapped its base64 at 76 columns.
+		// the recorded decoder refuses -- a client that wrapped its base64
+		// at 76 columns.
 		{fmt.Sprintf(`{"image":%q}`, good[:8]+"\n"+good[8:]), 422, "the capture was not valid base64"},
 		{fmt.Sprintf(`{"image":%q,"media_type":"image/tiff"}`, good), 422,
 			"'image/tiff' is not an image this reads"},
@@ -101,9 +102,9 @@ func TestTheCaptureIsRefusedBeforeTheStanceAndTheKey(t *testing.T) {
 // A capture that is neither a string nor bytes is a **422 like every other bad
 // capture**, and it was an uncaught 500 until 2026-08-23.
 //
-// Python's `_payload` took whatever it was handed, so a list or an object
-// reached `len()` and raised a `TypeError` nothing caught. It is the theme
-// proposal's `float(budget)` wart in a second module, found by this port on
+// The capture read once took whatever it was handed, so a list or an
+// object crashed out of the route uncaught. It is the theme
+// proposal's budget wart in a second file, found on
 // the day that one was ruled and ruled with it. This test is the wart's own,
 // kept and inverted.
 func TestACaptureThatIsNotTextIsA422(t *testing.T) {
@@ -143,7 +144,7 @@ func TestACaptureThatIsNotTextIsA422(t *testing.T) {
 // ---- what a run answers with --------------------------------------------
 
 // A whole scan: the mode transcribes, `identify` decides, and the job's result
-// carries Python's four keys in Python's order.
+// carries the recorded four keys in the recorded order.
 //
 // The card is `Black Lotus`, which `tiny_pool` holds -- so this also proves the half
 // that matters most: the transcription is looked up rather than believed.
@@ -198,16 +199,17 @@ func TestAScanTranscribesAndThePoolNamesTheCard(t *testing.T) {
 		t.Errorf("the shortlist leads with %v, want Black Lotus", first["name"])
 	}
 
-	// **The four keys, in Python's order.** `reading, transcribed, refused,
-	// model` -- a map would alphabetise them, which is the rule Phase 5 wrote
+	// **The four keys, in the recorded order.** `reading, transcribed,
+	// refused,
+	// model` -- a map would alphabetise them, which is the rule written
 	// down after the Notes tab shipped alphabetised for seven versions.
 	if got := resultKeys(t, doneRaw); got != "reading,transcribed,refused,model" {
-		t.Errorf("result keys are %s, Python's are reading,transcribed,refused,model", got)
+		t.Errorf("result keys are %s, the record says reading,transcribed,refused,model", got)
 	}
 }
 
-// Nothing legible is a null reading rather than a reading of nothing: with an
-// empty sighting Python hands `identify_cards` an empty list, so no lookup
+// Nothing legible is a null reading rather than a reading of nothing: an
+// empty sighting hands the identifier an empty list, so no lookup
 // happens at all.
 func TestAnUnreadableCaptureIsANullReading(t *testing.T) {
 	rig := newJobRig(t)
@@ -267,8 +269,8 @@ func TestTwoPressesOnOnePhotographAreOneJob(t *testing.T) {
 }
 
 // The key is the **re-encoded** capture, so two spellings of one photograph
-// are one job. `YW==` and `YQ==` decode to the same byte and Python hashes
-// what it re-encoded, never what arrived.
+// are one job. `YW==` and `YQ==` decode to the same byte and the digest is
+// over the re-encoding, never what arrived.
 func TestTwoSpellingsOfOnePhotographAreOneJob(t *testing.T) {
 	rig := newJobRig(t)
 	defer rig.close()
@@ -335,7 +337,7 @@ func TestAFailedScanCallIsAFailedJob(t *testing.T) {
 		t.Fatal("a failed job with no error message")
 	}
 	if strings.HasPrefix(message, "scan:") || strings.HasPrefix(message, "scan ") {
-		t.Errorf("the error carries a mode-name prefix Python never writes: %q", message)
+		t.Errorf("the error carries a mode-name prefix the record never writes: %q", message)
 	}
 }
 

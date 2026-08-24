@@ -15,6 +15,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude/tools"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -29,7 +30,7 @@ import (
 // wart in one place rather than two spellings of it.
 //
 // **Synchronous, and that is a measured claim rather than an assumption.**
-// Python's docstring is explicit about it: the interview costs ~4,900 input
+// The interview costs ~4,900 input
 // tokens and makes no tool calls because `Brief` hands the facts over; this
 // mode shares that brief and adds a tool set it uses only when it goes
 // shopping, so it sits in the same seconds class rather than the theme
@@ -40,14 +41,14 @@ import (
 // multiplies this by a selection, which is minutes, and it is a job. It is at
 // the bottom of this file.
 
-// argueSlot is `POST .../argue` -- `service.claude_argue`.
+// argueSlot is `POST .../argue`.
 func (a *API) argueSlot(w http.ResponseWriter, r *http.Request) {
-	// Body before deck, as FastAPI resolves them; see rationaleInterview.
+	// Body before deck -- the recorded order; see rationaleInterview.
 	body, ok := readBody(w, r)
 	if !ok {
 		return
 	}
-	card := strings.TrimSpace(pyStrDefault(body, "card", ""))
+	card := strings.TrimSpace(strDefault(body, "card", ""))
 	if card == "" {
 		wire.Detail(w, http.StatusUnprocessableEntity, "card is required")
 		return
@@ -63,11 +64,11 @@ func (a *API) argueSlot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var requested any
-	if pyTruthy(body["stance"]) {
+	if truthy(body["stance"]) {
 		requested = body["stance"]
 	}
 	focus := ""
-	if pyTruthy(body["focus"]) {
+	if truthy(body["focus"]) {
 		focus = str(body, "focus")
 	}
 
@@ -96,8 +97,8 @@ func (a *API) argueSlot(w http.ResponseWriter, r *http.Request) {
 	wire.Raw(w, http.StatusOK, raw)
 }
 
-// The sweep: `POST /api/decks/{owner}/{slug}/argue/deck`, over
-// `api/argueruns.py`. A **job**, where the single-card route one screen up is
+// The sweep: `POST /api/decks/{owner}/{slug}/argue/deck`.
+// A **job**, where the single-card route one screen up is
 // synchronous -- and the difference is arithmetic rather than taste. That one
 // is measured in the seconds class; this multiplies it by a selection, so a
 // few dozen slots is minutes and a full 99 is tens of minutes.
@@ -128,7 +129,7 @@ const ArgueSweepKind = "claude.argue.deck"
 const argueOffReason = "The stance is off, so no calls were made. " +
 	"Everything else about this deck still works."
 
-// argueSweepResult renders the six keys in Python's order.
+// argueSweepResult renders the six keys in the recorded order.
 //
 // `reports` is a list of ordered reports and `errors` is a dict built in
 // SWEEP ORDER -- so both halves need ordered rendering, and a
@@ -174,7 +175,7 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 		// `[c.strip() for c in cards if c and c.strip()]` -- the falsy test
 		// runs on the RAW value and the strip on the kept ones, so a card that
 		// is only whitespace is dropped rather than kept as "".
-		if trimmed := claude.PyStrip(name); trimmed != "" {
+		if trimmed := textutil.Strip(name); trimmed != "" {
 			asked = append(asked, trimmed)
 		}
 	}
@@ -201,11 +202,11 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 	// against the deck's.
 	inDeck := make(map[string]string, len(d.Cards))
 	for _, entry := range d.Cards {
-		inDeck[claude.PyCasefold(entry.Name)] = entry.Name
+		inDeck[claude.Casefold(entry.Name)] = entry.Name
 	}
 	missing := []string{}
 	for _, name := range asked {
-		if _, held := inDeck[claude.PyCasefold(name)]; !held {
+		if _, held := inDeck[claude.Casefold(name)]; !held {
 			missing = append(missing, name)
 		}
 	}
@@ -222,8 +223,8 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 	seen := map[string]bool{}
 	ordered := make([]string, 0, len(asked))
 	for _, name := range asked {
-		proper := inDeck[claude.PyCasefold(name)]
-		folded := claude.PyCasefold(proper)
+		proper := inDeck[claude.Casefold(name)]
+		folded := claude.Casefold(proper)
 		if seen[folded] {
 			continue
 		}
@@ -235,7 +236,7 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 	// per-card report still carries the stance `Argue` resolved for it, from
 	// the same inputs.
 	var requested any
-	if pyTruthy(body["stance"]) {
+	if truthy(body["stance"]) {
 		requested = body["stance"]
 	}
 	effective, err := claude.Resolve(requested, claude.DeckWithStatus(d.Status), nil)
@@ -268,7 +269,7 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 	// slots picked in a different order are still the same sweep.
 	folded := make([]string, 0, len(ordered))
 	for _, name := range ordered {
-		folded = append(folded, claude.PyCasefold(name))
+		folded = append(folded, claude.Casefold(name))
 	}
 	sort.Strings(folded)
 	sum := sha256.Sum256([]byte(strings.Join(folded, "\x00")))

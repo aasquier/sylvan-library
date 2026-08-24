@@ -72,8 +72,8 @@ func machineMemory() (total, available *int64) {
 	return read("MemTotal:"), read("MemAvailable:")
 }
 
-// loadAverages reads `/proc/loadavg` — `os.getloadavg()`'s source on Linux.
-// An unreadable file is an empty list, Python's OSError branch.
+// loadAverages reads `/proc/loadavg` — the kernel's own figures.
+// An unreadable file is an empty list rather than an error.
 func loadAverages() []float64 {
 	raw, err := os.ReadFile("/proc/loadavg")
 	if err != nil {

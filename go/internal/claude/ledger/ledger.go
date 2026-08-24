@@ -1,4 +1,4 @@
-// Package ledger is `mtglab/claude/ledger.py`: where the Claude money went,
+// Package ledger is where the Claude money went:
 // one row per conversation and a roll-up over them.
 //
 // Every mode already counted its tokens — a Turn carries them and the CLI
@@ -37,8 +37,8 @@ import (
 
 // Recorder holds the app.db handle the ledger writes through.
 //
-// A value rather than a package-level connection so that a test can point one
-// at a scratch file, which is `path=` in Python's signature.
+// A value rather than a package-level connection so that a test can point
+// one at a scratch file.
 type Recorder struct {
 	db  *sql.DB
 	log *slog.Logger
@@ -72,7 +72,7 @@ func (r *Recorder) Close() error {
 	return r.db.Close()
 }
 
-// Row is one conversation's accounting, in Python's field order.
+// Row is one conversation's accounting, in the recorded field order.
 type Row struct {
 	Mode            string
 	Model           string
@@ -122,7 +122,7 @@ var Axes = []string{"mode", "model"}
 // than one importing the other: the word belongs to both and neither owns it.
 const Various = "(various)"
 
-// Summary is one row of a roll-up. Field order is Python's SELECT order,
+// Summary is one row of a roll-up. Field order is the SELECT's own order,
 // which is also the order the Admin panel reads.
 type Summary struct {
 	Mode            string `json:"mode"`
@@ -152,9 +152,9 @@ type Summary struct {
 // and would look right.
 func (r *Recorder) Summarise(ctx context.Context, by, since string) ([]Summary, error) {
 	if by != "mode" && by != "model" {
-		// Quoted with repr, as Python does, because the sentence reaches a
+		// Quoted as a single-quoted literal, because the sentence reaches a
 		// caller that may render it.
-		return nil, fmt.Errorf("cannot group by %s -- one of %v", pyQuote(by), Axes)
+		return nil, fmt.Errorf("cannot group by %s -- one of %v", quoted(by), Axes)
 	}
 	other := "model"
 	if by == "model" {
@@ -188,7 +188,7 @@ func (r *Recorder) Summarise(ctx context.Context, by, since string) ([]Summary, 
 		var s Summary
 		// The scan order follows the SELECT, and the grouped column comes
 		// first — so which of Mode/Model is the group and which is the marker
-		// depends on `by`, exactly as it does in Python's dict.
+		// depends on `by`.
 		first, second := &s.Mode, &s.Model
 		if by == "model" {
 			first, second = &s.Model, &s.Mode
@@ -204,19 +204,19 @@ func (r *Recorder) Summarise(ctx context.Context, by, since string) ([]Summary, 
 }
 
 func now() string {
-	// The same shape the deck log writes, and for the same reason: Python's
-	// `datetime.now(UTC).isoformat()` is `2026-08-22T01:23:45.678901+00:00`
+	// The same shape the deck log writes, and for the same reason: the
+	// recorded stamp is `2026-08-22T01:23:45.678901+00:00`
 	// — microseconds, and an offset rather than a `Z`. The column is text,
 	// `since` is compared against it as text, and the panel renders it, so
 	// the shape is part of the contract three times over.
 	return time.Now().UTC().Format("2006-01-02T15:04:05.000000-07:00")
 }
 
-// pyQuote is repr() for the one refusal this package builds. Not
-// wire.PyRepr: importing the HTTP envelope package into the ledger would put
+// quoted single-quotes the one refusal this package builds. Not
+// wire.Quote: importing the HTTP envelope package into the ledger would put
 // a route's vocabulary underneath the accounting, and this needs one quote
 // character, not an escaping table.
-func pyQuote(s string) string { return "'" + s + "'" }
+func quoted(s string) string { return "'" + s + "'" }
 
 // RecorderFrom is a Recorder over an app.db handle somebody else opened.
 //
@@ -228,7 +228,7 @@ func pyQuote(s string) string { return "'" + s + "'" }
 //
 // A nil handle is passed straight through, because `Record` on a Recorder with
 // no database already warns and returns -- the honest answer on an instance
-// Python has not created a database for yet.
+// that has no app.db yet.
 func RecorderFrom(db *sql.DB, logger *slog.Logger) *Recorder {
 	if logger == nil {
 		logger = slog.Default()

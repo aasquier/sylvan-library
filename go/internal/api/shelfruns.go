@@ -8,9 +8,9 @@ import (
 	"net/http"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/library"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
 	"github.com/aasquier/sylvan-library/go/internal/sim/curve"
@@ -20,11 +20,11 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// `api/shelfruns.py`: the closed form and the policy search.
+// The closed form and the policy search.
 //
 // Two surfaces of very different weight, shaped differently on purpose --
-// and this is the one place in the port where the sibling-duration rule came
-// out **different for two routes in one module**.
+// this is the one place where the sibling-duration rule came
+// out **different for two routes in one file**.
 //
 // *The shelf is a plain route.* The closed form is arithmetic over an
 // already-compiled deck, measured at 0.03-0.04s on every deck in the library.
@@ -176,7 +176,7 @@ func colorsPayload(cs []karsten.ColorRequirement) []colorPayload {
 			tiers = append(tiers, pipTierPayload{
 				Pips: t.Pips, Turn: t.Turn, Need: t.Need, Have: t.Have,
 				Met: t.Met(), Shortfall: t.Shortfall(),
-				OddsNow:   pyfloat.RoundTo(t.OddsNow, 4),
+				OddsNow:   floats.RoundTo(t.OddsNow, 4),
 				Cards:     append([]string{}, cards...),
 				CardCount: len(t.Cards),
 			})
@@ -194,11 +194,11 @@ func shelfPayloadFrom(slug string, d *deck.Deck, s karsten.Shelf) shelfPayload {
 	for _, o := range s.Odds {
 		byTurn := make([]float64, 0, len(o.ByTurn))
 		for _, x := range o.ByTurn {
-			byTurn = append(byTurn, pyfloat.RoundTo(x, 4))
+			byTurn = append(byTurn, floats.RoundTo(x, 4))
 		}
 		var onCurve *float64
 		if v := o.OnCurve(); v != nil {
-			r := pyfloat.RoundTo(*v, 4)
+			r := floats.RoundTo(*v, 4)
 			onCurve = &r
 		}
 		cards = append(cards, oddsPayload{
@@ -232,11 +232,11 @@ func curvePayloadFrom(mc curve.ManaCurve) curvePayload {
 	for _, t := range mc.Turns {
 		turns = append(turns, turnPayload{
 			Turn:         t.Turn,
-			FromLands:    pyfloat.RoundTo(t.FromLands, 2),
-			FromRamp:     pyfloat.RoundTo(t.FromRamp, 2),
-			ExpectedMana: pyfloat.RoundTo(t.ExpectedMana(), 2),
-			LandDropOdds: pyfloat.RoundTo(t.LandDropOdds, 4),
-			Odds:         pyfloat.RoundTo(t.Odds, 4),
+			FromLands:    floats.RoundTo(t.FromLands, 2),
+			FromRamp:     floats.RoundTo(t.FromRamp, 2),
+			ExpectedMana: floats.RoundTo(t.ExpectedMana(), 2),
+			LandDropOdds: floats.RoundTo(t.LandDropOdds, 4),
+			Odds:         floats.RoundTo(t.Odds, 4),
 		})
 	}
 	a := mc.Advice
@@ -264,9 +264,9 @@ func (a *API) shelfResult(ctx context.Context, src library.Source, slug string,
 
 	onThePlay := true
 	if raw, given := body["on_the_play"]; given {
-		onThePlay = pyTruthy(raw)
+		onThePlay = truthy(raw)
 	}
-	target := pyFloat(body, "target", karsten.Target)
+	target := floatDefault(body, "target", karsten.Target)
 	if target < 0.5 {
 		target = 0.5
 	}
@@ -360,7 +360,7 @@ func policyParams(body map[string]any) (games, turns, seed int) {
 
 func (a *API) planPolicy(ctx context.Context, src library.Source, slug string, body map[string]any) jobs.Plan {
 	games, turns, seed := policyParams(body)
-	label := fmt.Sprintf("%s: mulligan policies, %s games each", slug, pyComma(games))
+	label := fmt.Sprintf("%s: mulligan policies, %s games each", slug, commaGrouped(games))
 
 	c, err := a.compileChecked(ctx, src, slug)
 	if err != nil {
@@ -424,7 +424,8 @@ func (a *API) planPolicy(ctx context.Context, src library.Source, slug string, b
 	}}
 }
 
-// sortGrid is Python's `sorted(...)` over tuples: element-wise, ascending.
+// sortGrid sorts rows as tuples: element-wise, ascending -- the recorded
+// grid order.
 func sortGrid(grid [][]int) {
 	for i := 1; i < len(grid); i++ {
 		cur := grid[i]
@@ -480,7 +481,7 @@ func (a *API) simPolicy(w http.ResponseWriter, r *http.Request) {
 	a.submit(w, r, a.planPolicy(r.Context(), src, slug, body))
 }
 
-func pyFloat(body map[string]any, key string, fallback float64) float64 {
+func floatDefault(body map[string]any, key string, fallback float64) float64 {
 	raw, given := body[key]
 	if !given || raw == nil {
 		return fallback

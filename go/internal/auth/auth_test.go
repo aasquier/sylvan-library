@@ -12,15 +12,11 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
 )
 
-// Vectors Python wrote (2026-08-21, `.venv` argon2-cffi 25.1.0, CPython
-// 3.12), with the commands that produce them so they can be regenerated:
+// Recorded vectors (2026-08-21): Argon2id PHC hashes at the pinned profile
+// (t=2, m=19456 KiB, p=1) and a SHA-256 token digest, frozen alongside the
+// wider corpus in `testdata/crypto.json`.
 //
-//	from argon2 import PasswordHasher
-//	PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1).hash(pw)
-//
-//	import hashlib; hashlib.sha256(token.encode()).hexdigest()
-//
-// These are the fixture passwords `tests/contract/harness.py` seeds; the
+// These are the standing fixture passwords; the
 // hashes are of known strings and are not secrets.
 const (
 	alicePassword = "correct-horse-battery-staple"
@@ -32,19 +28,20 @@ const (
 	fixtureTokenHash = "25db52bb467767ed987f3a5d32af58aaf9e632df182f26b4e23014977d248bd7"
 )
 
-// appSchema is `app.db` as Python's migration ladder leaves it.
+// appSchema is `app.db`'s recorded schema, at the ladder's full height.
 //
 // It was a hand-copied transcription of the ladder's *first* rung until
 // 2026-08-22, which was fine while the door only read `users.id`, `username`,
 // `is_admin` and `disabled_at` -- and stopped being fine the moment the
-// accounts flip needed `model_tier`, a column rung 10 adds. `authtest`'s
-// package comment records what that cost and why the bytes are generated now.
+// accounts family needed `model_tier`, a column rung 10 adds. `authtest`'s
+// package comment records what that cost and why the bytes are recorded now.
 func appSchema(t *testing.T) string {
 	t.Helper()
 	return authtest.Schema()
 }
 
-// isoformat is what `datetime.now(UTC).isoformat()` writes.
+// isoformat renders the timestamp format the auth columns carry: a `+00:00`
+// offset, and microseconds only when the clock has them.
 func isoformat(t time.Time) string {
 	t = t.UTC()
 	if t.Nanosecond() == 0 {
@@ -53,7 +50,7 @@ func isoformat(t time.Time) string {
 	return t.Format("2006-01-02T15:04:05.000000") + "+00:00"
 }
 
-// fixtureDB writes an app.db the way Python would have (WAL, the v1 tables),
+// fixtureDB writes a real app.db (WAL, the recorded schema),
 // with alice (admin), bob, and a disabled account, and returns a read-only
 // handle the way the door opens one.
 func fixtureDB(t *testing.T) (*sql.DB, *sql.DB) {
@@ -106,13 +103,15 @@ func mint(t *testing.T, writer *sql.DB, token string, userID int64, expires time
 	}
 }
 
-func TestTokenHashMatchesPython(t *testing.T) {
+func TestTokenHashMatchesTheFixture(t *testing.T) {
+	t.Parallel()
 	if got := HashToken(fixtureToken); got != fixtureTokenHash {
-		t.Fatalf("HashToken = %s, Python wrote %s", got, fixtureTokenHash)
+		t.Fatalf("HashToken = %s, the fixture records %s", got, fixtureTokenHash)
 	}
 }
 
 func TestParsesWhatIsoformatWrites(t *testing.T) {
+	t.Parallel()
 	for _, s := range []string{
 		"2026-08-21T12:00:00.123456+00:00",
 		"2026-08-21T12:00:00+00:00",
@@ -131,7 +130,8 @@ func TestParsesWhatIsoformatWrites(t *testing.T) {
 	}
 }
 
-func TestResolvesASessionWrittenInPythonsShape(t *testing.T) {
+func TestResolvesASessionWrittenInTheRecordedShape(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	writer, reader := fixtureDB(t)
 	mint(t, writer, fixtureToken, 1, time.Now().Add(Lifetime))
@@ -157,14 +157,15 @@ func TestResolvesASessionWrittenInPythonsShape(t *testing.T) {
 
 // A resolved session carries the account's model tier, because that is a fact
 // about the caller a handler is allowed to know and must read fresh per
-// request -- `api/deps.py` puts `model_tier` on `UserScope` for exactly the
-// reason it puts `is_admin` there.
+// request -- `model_tier` sits on `Scope` for exactly the
+// reason `is_admin` does.
 //
 // This test exists because a mutation survived without it: the field can be
 // declared on Scope, set by a handler's own test fixture, and never once
 // copied out of the user row, with every route test still green. The first
 // Claude route is what reads it, and it reads it from here.
 func TestAResolvedSessionCarriesTheAccountsModelTier(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	writer, reader := fixtureDB(t)
 	if _, err := writer.Exec("UPDATE users SET model_tier = ? WHERE id = ?", "opus", 2); err != nil {
@@ -192,6 +193,7 @@ func TestAResolvedSessionCarriesTheAccountsModelTier(t *testing.T) {
 }
 
 func TestAnUnknownExpiredOrDisabledSessionIsAnonymous(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	writer, reader := fixtureDB(t)
 	mint(t, writer, "expired", 1, time.Now().Add(-time.Minute))
@@ -208,6 +210,7 @@ func TestAnUnknownExpiredOrDisabledSessionIsAnonymous(t *testing.T) {
 }
 
 func TestTheReaderCannotWrite(t *testing.T) {
+	t.Parallel()
 	_, reader := fixtureDB(t)
 	if _, err := reader.Exec("DELETE FROM sessions"); err == nil {
 		t.Fatal("the door's handle wrote to app.db; it must be read-only")
@@ -215,6 +218,7 @@ func TestTheReaderCannotWrite(t *testing.T) {
 }
 
 func TestOpenDoesNotCreateAMissingFile(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "absent.db")
 	db, err := Open(path)
 	if err != nil {
@@ -225,32 +229,34 @@ func TestOpenDoesNotCreateAMissingFile(t *testing.T) {
 		t.Fatal("Ping succeeded against a file that does not exist")
 	}
 	if _, err := os.Stat(path); err == nil {
-		t.Fatal("Open created app.db; Python owns that file")
+		t.Fatal("Open created app.db; only Migrate may mint that file")
 	}
 }
 
-func TestVerifiesPythonsArgon2Hashes(t *testing.T) {
+func TestVerifiesTheFixturesArgon2Hashes(t *testing.T) {
+	t.Parallel()
 	for _, v := range []struct{ pw, hash string }{{alicePassword, aliceHash}, {bobPassword, bobHash}} {
 		h := v.hash
 		if !Verify(&h, v.pw) {
-			t.Fatalf("a hash argon2-cffi wrote did not verify: %s", v.hash)
+			t.Fatalf("a recorded hash did not verify: %s", v.hash)
 		}
 		if Verify(&h, v.pw+"x") {
 			t.Fatal("a wrong password verified")
 		}
 	}
 	if NeedsRehash(aliceHash) {
-		t.Fatal("Python's hash at the pinned parameters reads as needing a rehash")
+		t.Fatal("a recorded hash at the pinned parameters reads as needing a rehash")
 	}
 }
 
-func TestHashesInTheShapePythonReads(t *testing.T) {
+func TestHashesInTheRecordedPHCShape(t *testing.T) {
+	t.Parallel()
 	h, err := HashPassword(alicePassword)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(h, "$argon2id$v=19$m=19456,t=2,p=1$") {
-		t.Fatalf("hash is not in argon2-cffi's PHC form: %s", h)
+		t.Fatalf("hash is not in the recorded PHC form: %s", h)
 	}
 	if !Verify(&h, alicePassword) {
 		t.Fatal("round trip failed")
@@ -265,6 +271,7 @@ func TestHashesInTheShapePythonReads(t *testing.T) {
 }
 
 func TestEveryFailureIsFalse(t *testing.T) {
+	t.Parallel()
 	for _, h := range []string{"", "not-a-hash", "$argon2i$v=19$m=19456,t=2,p=1$abc$def", "$2b$12$bcrypt"} {
 		h := h
 		if Verify(&h, alicePassword) {
@@ -276,7 +283,8 @@ func TestEveryFailureIsFalse(t *testing.T) {
 	}
 }
 
-func TestStrengthFloorMatchesPython(t *testing.T) {
+func TestStrengthFloorMatchesTheFixture(t *testing.T) {
+	t.Parallel()
 	if err := CheckStrength("short"); err == nil {
 		t.Fatal("an 11-character password was accepted")
 	}

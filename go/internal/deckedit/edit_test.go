@@ -10,12 +10,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-// The gate Phase 4 sets for this family, in the plan's own words: "every
-// operation applied by Go over fixture decks yields byte-output Python's
-// operation also yields". `tests/go_fixtures.py` runs the nine operations over
-// the eight fixture decks the gate uses and records both halves of what an
-// edit operation is -- the text when it applies, the sentence when it refuses
-// -- and this reproduces both.
+// The gate Phase 4 set for this family: every operation over the fixture
+// decks yields exactly the recorded byte-output. The oracle
+// (testdata/edits.json, a frozen golden) chains the nine operations over
+// the fixture decks and records both halves of what an edit operation is --
+// the text when it applies, the sentence when it refuses -- and this
+// reproduces both.
 //
 // Steps chain, each applying to the previous one's output, which is the only
 // way the round trips are reachable: a return needs a burial, a second burial
@@ -51,7 +51,7 @@ func loadEdits(t *testing.T) editFixture {
 		t.Fatalf("decoding the oracle: %v", err)
 	}
 	if len(fixture.Cases) == 0 || len(fixture.Decks) == 0 {
-		t.Fatal("the oracle is empty; run `python tests/go_fixtures.py`")
+		t.Fatal("the oracle is empty; testdata/edits.json is a frozen golden and should never be")
 	}
 	return fixture
 }
@@ -101,8 +101,9 @@ func apply(step editStep, text string) (string, error) {
 	}
 }
 
-// TestEveryOperationWritesWhatPythonWrites is the family's whole gate.
-func TestEveryOperationWritesWhatPythonWrites(t *testing.T) {
+// TestEveryOperationWritesTheRecordedBytes is the family's whole gate.
+func TestEveryOperationWritesTheRecordedBytes(t *testing.T) {
+	t.Parallel()
 	fixture := loadEdits(t)
 	for _, c := range fixture.Cases {
 		t.Run(fmt.Sprintf("%s/%d", c.Deck, c.Chain), func(t *testing.T) {
@@ -114,18 +115,18 @@ func TestEveryOperationWritesWhatPythonWrites(t *testing.T) {
 				got, err := apply(step, text)
 				switch {
 				case step.OK && err != nil:
-					t.Fatalf("step %d (%s %v): Python applied it, Go refused: %v",
+					t.Fatalf("step %d (%s %v): the corpus applied it, this refused: %v",
 						i, step.Op, step.Args, err)
 				case step.OK:
 					if diff := cmp.Diff(splitKeepingLines(step.Want), splitKeepingLines(got)); diff != "" {
 						t.Fatalf("step %d (%s %v): different bytes\n%s", i, step.Op, step.Args, diff)
 					}
-					// A refused step leaves the text where it was, exactly as
-					// the generator's chain does, so the next step in this
-					// chain sees what Python's next step saw.
+					// A refused step leaves the text where it was, exactly
+					// as the recorded chain does, so each step here sees
+					// what the corpus' same-numbered step saw.
 					text = got
 				case err == nil:
-					t.Fatalf("step %d (%s %v): Python refused with %q, Go applied it",
+					t.Fatalf("step %d (%s %v): the corpus refused with %q, this applied it",
 						i, step.Op, step.Args, step.Error)
 				default:
 					if !IsFailed(err) {
@@ -133,7 +134,7 @@ func TestEveryOperationWritesWhatPythonWrites(t *testing.T) {
 							i, step.Op, step.Args, err)
 					}
 					if !sameRefusal(step.Error, err.Error()) {
-						t.Fatalf("step %d (%s %v): different refusal\n  Python: %s\n      Go: %s",
+						t.Fatalf("step %d (%s %v): different refusal\n  golden: %s\n     got: %s",
 							i, step.Op, step.Args, step.Error, err.Error())
 					}
 				}
@@ -146,6 +147,7 @@ func TestEveryOperationWritesWhatPythonWrites(t *testing.T) {
 // generator that quietly stopped emitting one operation would leave this
 // package proving less while reporting the same green.
 func TestTheOracleCoversEveryOperation(t *testing.T) {
+	t.Parallel()
 	fixture := loadEdits(t)
 	applied := map[string]int{}
 	refused := map[string]int{}
@@ -193,14 +195,15 @@ func TestTheOracleCoversEveryOperation(t *testing.T) {
 	}
 }
 
-// brokenParse is the one refusal whose sentence this port cannot reproduce.
+// brokenParse is the one refusal compared by prefix rather than byte for
+// byte.
 //
-// `_verified` says "the edit produced YAML that no longer parses: " and then
-// quotes the loader, which is PyYAML on one side and goccy on the other --
-// different libraries, different prose, and neither is wrong. Everything that
-// matters is the same: both refuse, both refuse for the same reason, and both
-// leave the file untouched because these operations return text rather than
-// writing it.
+// The refusal says "the edit produced YAML that no longer parses: " and
+// then quotes the loader, and a loader's prose is the loader's own -- the
+// corpus recorded a different library's wording for the same refusal, and
+// neither is wrong. Everything that matters is held exactly: the refusal
+// fires for the same reason and leaves the file untouched, because these
+// operations return text rather than writing it.
 //
 // It is reachable at all only from a deck whose card keys do not sit two
 // columns right of the dash, since `cardLines` re-attaches the dash by hand;
@@ -219,6 +222,7 @@ func sameRefusal(want, got string) bool {
 // because a prefix comparison is exactly the kind that would keep passing if
 // the refusal stopped happening at all.
 func TestABrokenParseRefuses(t *testing.T) {
+	t.Parallel()
 	fixture := loadEdits(t)
 	text, ok := fixture.Decks["tight"]
 	if !ok {
@@ -246,11 +250,13 @@ func TestABrokenParseRefuses(t *testing.T) {
 // TestAnEditIsTheSizeItClaimsToBe holds ADR 12's rule 1 -- an edit touches
 // only what it changes -- as a number rather than as a sentence.
 //
-// The oracle proves Go writes Python's bytes; it cannot prove those bytes are
-// a *small* diff, because a mutual regression would pass. This asks the
+// The oracle proves the operations write the recorded bytes; it cannot
+// prove those bytes are a *small* diff, because an oversized edit recorded
+// into the corpus would pass. This asks the
 // separate question: a one-card swap has to be a one-card diff, or `swaps.md`
 // is unreadable, which is the whole reason this package is text surgery.
 func TestAnEditIsTheSizeItClaimsToBe(t *testing.T) {
+	t.Parallel()
 	fixture := loadEdits(t)
 	text, ok := fixture.Decks["rich"]
 	if !ok {

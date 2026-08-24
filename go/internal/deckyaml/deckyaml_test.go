@@ -10,10 +10,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-// The spike: parse the fixture Python wrote and agree with PyYAML's reading
-// of it, value for value. Both files come from `tests/go_fixtures.py`, and
-// `tests/test_go_fixtures.py` holds them current against the dumper.
-func TestParsesTheFixtureAsPyYAMLDoes(t *testing.T) {
+// The parse held to the corpus: read the recorded fixture and agree with
+// its recorded parse, value for value. Both files are frozen goldens
+// (testdata/rich-deck.yaml and its .parsed.json), never regenerated.
+func TestParsesTheFixtureAsRecorded(t *testing.T) {
+	t.Parallel()
 	text, err := os.ReadFile(filepath.Join("testdata", "rich-deck.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -24,31 +25,32 @@ func TestParsesTheFixtureAsPyYAMLDoes(t *testing.T) {
 	}
 	got, err := Parse(text)
 	if err != nil {
-		t.Fatalf("goccy refused what PyYAML wrote: %v", err)
+		t.Fatalf("goccy refused the recorded fixture: %v", err)
 	}
 	// Compare through JSON so both sides carry the same number and string
-	// types: PyYAML's ints and goccy's become JSON numbers, and nothing in a
-	// deck file is a float PyYAML and goccy could round differently.
+	// types: the recorded ints and goccy's both become JSON numbers, and
+	// nothing in a deck file is a float the two encodings could round
+	// differently.
 	gotJSON, err := json.Marshal(got)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var viaGo, viaPython any
-	if err := json.Unmarshal(gotJSON, &viaGo); err != nil {
+	var viaGoccy, viaCorpus any
+	if err := json.Unmarshal(gotJSON, &viaGoccy); err != nil {
 		t.Fatal(err)
 	}
-	if err := json.Unmarshal(want, &viaPython); err != nil {
+	if err := json.Unmarshal(want, &viaCorpus); err != nil {
 		t.Fatal(err)
 	}
-	if diff := cmp.Diff(viaPython, viaGo); diff != "" {
-		t.Fatalf("goccy and PyYAML read the same deck differently (-python +go):\n%s", diff)
+	if diff := cmp.Diff(viaCorpus, viaGoccy); diff != "" {
+		t.Fatalf("the parse disagrees with the recorded reading (-golden +got):\n%s", diff)
 	}
 }
 
 // The shapes the fixture was built to carry, asserted by name so a quieter
-// fixture cannot pass this file by saying less (the Python twin of this test
-// is `test_the_fixture_exercises_the_shapes_it_claims_to`).
+// fixture cannot pass this file by saying less.
 func TestTheShapesThatMatter(t *testing.T) {
+	t.Parallel()
 	text, err := os.ReadFile(filepath.Join("testdata", "rich-deck.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -103,6 +105,7 @@ func TestTheShapesThatMatter(t *testing.T) {
 }
 
 func TestRefusesANonMapping(t *testing.T) {
+	t.Parallel()
 	if _, err := Parse([]byte("- just\n- a list\n")); err == nil {
 		t.Fatal("a list parsed as a deck")
 	}
@@ -122,6 +125,7 @@ func TestRefusesANonMapping(t *testing.T) {
 // random passes an in-order assertion often enough to be no assertion at all,
 // and a *reversed* one about once in n!.
 func TestParseOrderedKeepsTheDocumentsOrder(t *testing.T) {
+	t.Parallel()
 	const text = `zebra: last in the file, first in nothing
 notes:
   wincons: win
@@ -156,8 +160,8 @@ alpha: 1
 		t.Fatalf("nested %v", got)
 	}
 
-	// JSON in the file's order, which is what a Python dict gives for free and
-	// Go's map encoder does not.
+	// JSON in the file's order -- the recorded wire order, which the stock
+	// map encoder would alphabetise.
 	raw, err := json.Marshal(inner)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)

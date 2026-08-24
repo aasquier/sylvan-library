@@ -41,7 +41,7 @@ named only in `@font-face` declarations.
   on Google Fonts and at the upstream site.
 
 The 1909 Rider tarot scans these sit beside have their own argument in
-`src/mtglab/assets/tarot/PROVENANCE.md`.
+`assets/tarot/PROVENANCE.md`.
 
 ## Parisienne
 

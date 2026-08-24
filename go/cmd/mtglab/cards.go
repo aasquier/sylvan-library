@@ -7,15 +7,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
 // cardsCommand is `mtglab cards`: the pool asked directly from the shell.
 // `show` is rule 1 of the non-negotiables made a command — "never evaluate a
-// card from memory; look it up" used to be a four-line Python snippet in
-// CLAUDE.md and the mtg-lab skill, and the snippet dies with the interpreter,
-// so the lookup becomes the binary's own.
+// card from memory; look it up" deserves a first-class door rather than a
+// snippet pasted around CLAUDE.md and the mtg-lab skill, so the lookup is
+// the binary's own.
 func cardsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cards",
@@ -32,7 +31,7 @@ func cardsShowCommand() *cobra.Command {
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			p := pool.New(config.DBPath(), nil)
+			p := pool.New(settings().DBPath(), nil)
 			defer p.Close()
 			var missing []string
 			err := p.Use(ctx, func(c *pool.Conn) error {

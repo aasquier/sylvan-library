@@ -10,18 +10,18 @@ import (
 	"time"
 )
 
-// The write half of `auth/sessions.py`. Its read half is `sessions.go`, which
-// the door has had since Phase 2; these are the statements a login, a logout
+// The write half of the session table. Its read half is `sessions.go`;
+// these are the statements a login, a logout
 // and a revocation make.
 
-// TokenURLSafe is `secrets.token_urlsafe(n)`: n random bytes from the OS,
+// TokenURLSafe mints a token: n random bytes from the OS,
 // urlsafe-base64 encoded with the padding stripped -- 43 characters for the 32
 // bytes both a session and an auth token draw. The alphabet matters as much as
 // the entropy: a session token rides in a cookie and an auth token rides in a
 // URL fragment, and `+` and `/` survive neither reliably.
 //
-// It panics if the OS entropy source fails, which is what Python does one
-// layer down: there is no sensible weaker token, and a caller handed one would
+// It panics if the OS entropy source fails, deliberately: there is no
+// sensible weaker token, and a caller handed one would
 // mint a guessable session.
 func TokenURLSafe(n int) string {
 	raw := make([]byte, n)

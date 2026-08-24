@@ -1,5 +1,5 @@
 /**
- * The Simulator's Forge mode (ADR 35), and the properties a green Python
+ * The Simulator's Forge mode (ADR 35), and the properties a green backend
  * suite cannot see from its side of the wire:
  *
  * - the mode is **honestly absent** when the gate says Forge is not

@@ -8,7 +8,8 @@ import (
 	"testing"
 )
 
-// stanceCorpus is tests/go_fixtures.py's stance.json: the dial, exhaustively.
+// stanceCorpus is the recorded corpus testdata/stance.json: the dial,
+// exhaustively.
 type stanceCorpus struct {
 	Axes        []string            `json:"axes"`
 	Levels      map[string][]string `json:"levels"`
@@ -68,21 +69,22 @@ func loadStanceCorpus(t *testing.T) stanceCorpus {
 	return c
 }
 
-// TestTheAxesAndLevelsAreThePythonOnes pins the tables themselves. Everything
-// below indexes into them, so a reordered axis would make every other test in
-// this file agree with itself and disagree with Python.
-func TestTheAxesAndLevelsAreThePythonOnes(t *testing.T) {
+// TestTheAxesAndLevelsAreTheRecordedOnes pins the tables themselves.
+// Everything below indexes into them, so a reordered axis would make every
+// other test in this file agree with itself and disagree with the corpus.
+func TestTheAxesAndLevelsAreTheRecordedOnes(t *testing.T) {
+	t.Parallel()
 	c := loadStanceCorpus(t)
 	if got := Axes; !equalStrings(got, c.Axes) {
-		t.Errorf("axes: go %v, python %v", got, c.Axes)
+		t.Errorf("axes: got %v, corpus %v", got, c.Axes)
 	}
 	for axis, want := range c.Levels {
 		if got := levels[axis]; !equalStrings(got, want) {
-			t.Errorf("%s levels: go %v, python %v", axis, got, want)
+			t.Errorf("%s levels: got %v, corpus %v", axis, got, want)
 		}
 	}
 	if !equalStrings(PresetNames, c.PresetNames) {
-		t.Errorf("preset order: go %v, python %v", PresetNames, c.PresetNames)
+		t.Errorf("preset order: got %v, corpus %v", PresetNames, c.PresetNames)
 	}
 	for name, want := range c.Presets {
 		got, err := Preset(name)
@@ -90,25 +92,26 @@ func TestTheAxesAndLevelsAreThePythonOnes(t *testing.T) {
 			t.Fatalf("preset %q: %v", name, err)
 		}
 		if got != want.stance() {
-			t.Errorf("preset %q: go %+v, python %+v", name, got, want.stance())
+			t.Errorf("preset %q: got %+v, corpus %+v", name, got, want.stance())
 		}
 	}
 	for name, want := range c.Blurbs {
 		if got := PresetBlurbs[name]; got != want {
-			t.Errorf("blurb %q:\n go     %q\n python %q", name, got, want)
+			t.Errorf("blurb %q:\n got    %q\n corpus %q", name, got, want)
 		}
 	}
 }
 
-// TestEveryStanceAnswersAsPythonDoes walks all 36 and compares the two
-// properties every caller asks — plus the full describe() payload, as BYTES.
+// TestEveryStanceAnswersAsRecorded walks all 36 and compares the two
+// properties every caller asks — plus the full Describe payload, as BYTES.
 //
 // Bytes rather than fields, and that is the point of the test. `tier1.Number`
-// was bit-exact against CPython by repr and by Float64bits and still went onto
-// the wire as {"IsFloat":false,...} because nothing compared what
+// was bit-exact by its decimal spelling and by Float64bits and still went
+// onto the wire as {"IsFloat":false,...} because nothing compared what
 // encoding/json actually produced. A readout with the right values in the
 // wrong field order is that failure again, and only this comparison sees it.
-func TestEveryStanceAnswersAsPythonDoes(t *testing.T) {
+func TestEveryStanceAnswersAsRecorded(t *testing.T) {
+	t.Parallel()
 	c := loadStanceCorpus(t)
 	for _, row := range c.Stances {
 		s := row.Stance.stance()
@@ -117,74 +120,76 @@ func TestEveryStanceAnswersAsPythonDoes(t *testing.T) {
 			continue
 		}
 		if got := s.AllowsCalls(); got != row.AllowsCalls {
-			t.Errorf("%+v allows_calls: go %v, python %v", s, got, row.AllowsCalls)
+			t.Errorf("%+v allows_calls: got %v, corpus %v", s, got, row.AllowsCalls)
 		}
 		if got := s.MayWrite(); got != row.MayWrite {
-			t.Errorf("%+v may_write: go %v, python %v", s, got, row.MayWrite)
+			t.Errorf("%+v may_write: got %v, corpus %v", s, got, row.MayWrite)
 		}
 		marshalled, err := json.Marshal(Describe(s))
 		if err != nil {
 			t.Fatalf("%+v: marshalling the readout: %v", s, err)
 		}
 		if !bytes.Equal(marshalled, []byte(row.Describe)) {
-			t.Errorf("%+v describe:\n go     %s\n python %s", s, marshalled, row.Describe)
+			t.Errorf("%+v describe:\n got    %s\n corpus %s", s, marshalled, row.Describe)
 		}
 	}
 }
 
-// TestEveryClampPairAgreesWithPython walks all 1,296. Per-axis minimum is four
-// lines of code and it is the line an operator's cap runs through.
-func TestEveryClampPairAgreesWithPython(t *testing.T) {
+// TestEveryClampPairAgreesWithTheCorpus walks all 1,296. Per-axis minimum is
+// four lines of code and it is the line an operator's cap runs through.
+func TestEveryClampPairAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	c := loadStanceCorpus(t)
 	for _, row := range c.Clamps {
 		got := Clamp(row.Requested.stance(), row.Limit.stance())
 		if want := row.Clamped.stance(); got != want {
-			t.Errorf("clamp(%+v, %+v): go %+v, python %+v",
+			t.Errorf("clamp(%+v, %+v): got %+v, corpus %+v",
 				row.Requested.stance(), row.Limit.stance(), got, want)
 		}
 	}
 }
 
-// TestParsingAStanceAgreesWithPythonIncludingItsRefusals drives from_obj over
-// every shape the wire can carry.
+// TestParsingAStanceMatchesTheCorpusIncludingItsRefusals drives StanceFromObj
+// over every shape the wire can carry.
 //
 // The refusal TEXT is compared, not merely the fact of a refusal: these
 // strings reach a 422 body that a person reads, and two of them differ from
-// the obvious Go spelling in ways no structural test would notice — Python
-// repr-quotes with single quotes, and it tells `7` from `7.5` by the literal
-// rather than by the value.
-func TestParsingAStanceAgreesWithPythonIncludingItsRefusals(t *testing.T) {
+// the obvious Go spelling in ways no structural test would notice — the
+// recorded refusals quote with single quotes, and they tell `7` from `7.5`
+// by the literal rather than by the value.
+func TestParsingAStanceMatchesTheCorpusIncludingItsRefusals(t *testing.T) {
+	t.Parallel()
 	c := loadStanceCorpus(t)
 	for _, row := range c.Parses {
 		got, err := StanceFromObj(row.Input)
 		if row.Error != "" {
 			if err == nil {
-				t.Errorf("input %s: go accepted it as %+v, python refused: %s",
+				t.Errorf("input %s: accepted as %+v, the corpus refuses: %s",
 					row.Input, got, row.Error)
 				continue
 			}
 			if err.Error() != row.Error {
-				t.Errorf("input %s refusal:\n go     %s\n python %s",
+				t.Errorf("input %s refusal:\n got    %s\n corpus %s",
 					row.Input, err.Error(), row.Error)
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("input %s: go refused it (%v), python gave %+v",
+			t.Errorf("input %s: refused (%v), the corpus gives %+v",
 				row.Input, err, row.Stance.stance())
 			continue
 		}
 		if want := row.Stance.stance(); got != want {
-			t.Errorf("input %s: go %+v, python %+v", row.Input, got, want)
+			t.Errorf("input %s: got %+v, corpus %+v", row.Input, got, want)
 		}
 	}
 }
 
-// TestTheCeilingReadsTheEnvironmentAsPythonDoes covers the two rows that carry
+// TestTheCeilingReadsTheEnvironmentAsRecorded covers the two rows that carry
 // the design: unset means uncapped, and unreadable means OFF. Failing closed is
 // the decision — a typo in a deployment variable costs a feature, never opens
 // one — and it is one `return` away from failing open.
-func TestTheCeilingReadsTheEnvironmentAsPythonDoes(t *testing.T) {
+func TestTheCeilingReadsTheEnvironmentAsRecorded(t *testing.T) {
 	c := loadStanceCorpus(t)
 	for _, row := range c.Ceilings {
 		if row.Env == nil {
@@ -197,7 +202,7 @@ func TestTheCeilingReadsTheEnvironmentAsPythonDoes(t *testing.T) {
 			if row.Env != nil {
 				env = *row.Env
 			}
-			t.Errorf("ceiling with %q: go %+v, python %+v", env, got, want)
+			t.Errorf("ceiling with %q: got %+v, corpus %+v", env, got, want)
 		}
 	}
 	os.Unsetenv(CeilingEnv)
@@ -209,7 +214,8 @@ type statused struct{ status string }
 
 func (s statused) DeckStatus() string { return s.status }
 
-func TestTheDeckDefaultAgreesWithPython(t *testing.T) {
+func TestTheDeckDefaultAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	c := loadStanceCorpus(t)
 	for _, row := range c.Defaults {
 		var deck DeckStatused = statused{}
@@ -217,7 +223,7 @@ func TestTheDeckDefaultAgreesWithPython(t *testing.T) {
 			deck = statused{*row.Status}
 		}
 		if got, want := DefaultFor(deck), row.Stance.stance(); got != want {
-			t.Errorf("default for status %v: go %+v, python %+v", row.Status, got, want)
+			t.Errorf("default for status %v: got %+v, corpus %+v", row.Status, got, want)
 		}
 	}
 	// The separate case the corpus cannot carry: no deck at all. Resolve with
@@ -229,7 +235,7 @@ func TestTheDeckDefaultAgreesWithPython(t *testing.T) {
 		t.Fatalf("resolving with no deck: %v", err)
 	}
 	if got != Off {
-		t.Errorf("no deck, no request: go %+v, want %+v", got, Off)
+		t.Errorf("no deck, no request: got %+v, want %+v", got, Off)
 	}
 }
 

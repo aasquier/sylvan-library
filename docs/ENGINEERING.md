@@ -1,1146 +1,133 @@
 # Engineering direction
 
-Where the project goes next, and *why* — written for the case where peers read
-this repo and play-test the tool.
-
-The audience matters. Engineers reviewing a solo project are not impressed by a
-technology list; they are impressed by decisions that survive the question
-"why did you do it that way?" This document tries to answer that question in
-advance, including in the places where the honest answer is "we measured, and
-it wasn't worth it."
-
-**The compiled-language rewrite is deferred**, with a written trigger — see §1
-and the deferred list at the end. The testing-rigor, container-hardening and
-CI work this document planned has landed; what remains near-term is deploying
-(docs/HOSTING.md §7) and the open items marked below, none of which needs a
-second language.
-
----
-
-## 1. A compiled backend — deferred, with a trigger
-
-**Decision: stay on Python for now.** Not "not yet, probably soon" — genuinely
-deferred until a measurement says otherwise, with the trigger written down
-below so the call gets re-made on evidence rather than on appetite.
-
-### Do not rewrite Tier 1
-
-The instinct is to port `sim/tier1/` to Rust. The measurements say don't:
-
-| Metric | Measured |
-| --- | --- |
-| One goldfish game | 0.89 ms |
-| 20,000 games (`sim mana`) | ~18 s |
-| 11-count sweep at 25,000 games | ~4 min |
-| Hot spot | `_consume`, ~50% incl. callees |
-| Process parallelism | 1.65x at 2 workers, 2.42x at 4 |
-
-An 18-second batch job, run a handful of times a week, on a machine that is
-idle ~99% of the time. A 30x speedup saves seventeen seconds of wall clock
-nobody is waiting on. Meanwhile caching removes most of the work outright,
-because deck files change rarely and the same numbers get viewed repeatedly —
-**built 2026-08-12**, and keyed on the compiled deck rather than on the deck
-file, for reasons §6 records.
-
-**A reviewer will ask what the rewrite bought.** "It's faster" is not an
-answer when the profile says the workload was never the bottleneck. Porting
-Tier 1 for its own sake is the textbook resume-driven rewrite and it reads that
-way. Skip it.
-
-### Tier 2 is the candidate — but build it in Python first
-
-> **Amended 2026-08-11.** [ADR 14](adr/0014-python-decides-claude-advises.md)
-> makes Forge the thing that plays real games, and `ROADMAP.md` now defers
-> Tier 2 behind a Forge feasibility spike. **The trigger below is unchanged in
-> shape and now waits on whichever simulator gets built first.** If that turns
-> out to be Forge, this decision may never reopen at all: the expensive loop
-> would live inside a JVM this project does not maintain, and the Python side
-> would be orchestration, parsing and a card-coverage pre-flight — none of
-> which is arithmetic in a hot loop. That is a *better* outcome than a Rust
-> port, not a deferral of one. The rest of this section stands as written, and
-> describes the Tier 2 case if Tier 2 is what gets built.
-
-Tier 2 — the pod simulator — is the only workload here with a plausible case
-for a compiled language. Four seats making actual decisions over more turns is
-maybe **50–100x the work per game**. At Tier 1's measured 0.89 ms/game that
-projects to 45–90 ms per game, so a 10,000-game matchup is 8–15 minutes and a
-six-deck round-robin is fifteen of them.
-
-**That projection is an extrapolation, not a measurement**, and it is doing a
-lot of work. The honest move is to build Tier 2 in Python, measure it, and
-only then decide. Writing Rust against a guess about a simulator that does not
-exist yet is the same mistake as porting Tier 1, one level removed.
-
-### The trigger
-
-Reopen this decision when **any** of these is true, and not before:
-
-- A single Tier 2 matchup at 10,000 games takes **> 5 minutes** after
-  profiling and after the cheap wins below.
-- A full six-deck round-robin cannot finish in **under an hour** on the dev
-  machine.
-- Profiling shows a genuine hot loop that is not fixable in Python — that is,
-  the time is in arithmetic and branching rather than in allocation,
-  attribute lookup, or an algorithm that should be better.
-
-Exhaust these first, in order, because they are cheaper than a port and some
-of them are worth doing regardless:
-
-1. ~~**Cache by deck-content hash.** A sim result is a pure function of
-   `(deck content, parameters, seed)`. Most repeat runs should cost nothing.~~
-   **Built 2026-08-12** — and "deck-content hash" was the wrong key, which is
-   the finding rather than the feature. See the subsection below and
-   [ADR 18](adr/0018-a-cached-simulation-is-keyed-on-its-compiled-input.md).
-2. **`multiprocessing` across games.** Measured at 2.42x on 4 workers, ~20
-   lines, and games are trivially independent.
-3. **Algorithmic work in the policy engine**, which is where a pod simulator's
-   time will actually go — not in the mana solver.
-4. **`__slots__`, precomputed lookup tables, and avoiding per-game
-   allocation** in the inner loop. Ordinary Python optimisation routinely buys
-   2–5x on this shape of code.
-
-If the trigger fires, the plan below is what to do. If it never fires, that is
-a good outcome and the extrapolation above was simply wrong — which is worth
-recording either way.
-
-### Item 1, built — and the key this document asked for was wrong
-
-`sim/cache.py`, schema version 3 in `auth/db.py`, and
-[ADR 18](adr/0018-a-cached-simulation-is-keyed-on-its-compiled-input.md).
-It matters to §1's argument specifically: "caching removes most of the work
-outright" is one of the two legs the decision not to port Tier 1 stands on, and
-it was an assertion about unwritten code until now.
-
-Two things it turned up, both of which this document had wrong in a way that
-would have shipped:
-
-**"A pure function of deck content" is not true, and the false half is the
-dangerous one.** `compile_deck` reads `mana_cost`, `type_line`, `oracle_text`
-and `produced_mana` out of the pool, so a `data refresh` changes what a card
-does while `deck.yaml` sits byte-identical. §4 of this document already records
-the shape of that bug from the other side: Scryfall retemplated "enters the
-battlefield tapped" to "enters tapped", and matching only the old wording
-treated every modern tapland as untapped. A deck-file key would have served the
-pre-refresh numbers forever, and the refresh that fixed them would have looked
-like it did nothing. **The key is a hash of the compiled `SimCard`s instead** —
-the input rather than a name for it — plus the clamped parameters, the seed, and
-a fingerprint of `engine.py` and `mana.py`'s own source, so a code change
-invalidates even when nobody declared it. A hit costs a deck parse and one
-indexed `get_cards`: milliseconds, not zero, and worth it.
-
-**The app was not seeding its simulations at all.** `run()` took an optional
-seed, the Simulator screen never sent one, and it fell through to
-`random.Random(None)`. Every view of a deck was a different sample — not
-comparable with the last one, not reproducible by anyone, and not a function of
-anything a cache key could name. That is a determinism hole sitting next to §2's
-determinism work, in the one place the numbers are actually read, and nothing
-caught it because every individual result was correct. Runs are seeded by
-default now and the seed is reported on the result; a different sample is a
-button.
-
-The rest is the shape of the guards, which is the part worth copying: the key
-covers every parameter of `run()`, checked against its real signature so a new
-one fails the suite rather than being silently excluded; the key is verified
-stable across processes at two `PYTHONHASHSEED` values, because `frozenset`
-order is not and a key that drifts on restart is a cache that never hits and
-never complains; and `SIM_VERSION` is pinned against `REFERENCE_DIGEST` as a
-pair, so changing what Tier 1 reports forces a decision about what is stored.
-
-### If the trigger fires: Rust, not Go
-
-**Rust over Go, for this specific shape.** The hot loop is a library embedded
-in a Python process, not a service. Rust via **PyO3 + maturin** keeps one
-deployable, one process, and no serialisation boundary between the API and the
-engine. Go would need cgo (awkward, loses much of Go's ergonomics) or a
-separate process with IPC (a network hop and a second thing to deploy, for a
-function call). Rust also gets `rayon` for the trivially-parallel game loop
-and `criterion` for benchmarks CI can gate on.
-
-The seam already exists on purpose: CLAUDE.md keeps `mana.py` and `sim/`
-stdlib-plus-numpy precisely so they could move.
-
-### Assembly: the honest answer
-
-Hand-written assembly in a Commander simulator would read as unserious to the
-audience this is meant to impress. It is unportable, it defeats the optimiser
-more often than it beats it, and there is no kernel here where the compiler is
-demonstrably leaving performance on the table.
-
-There *is* a defensible low-level story, and it is SIMD:
-
-- The Tier 2 inner loop shuffles and draws constantly. A batched
-  xoshiro256++ generating lanes of random numbers with `std::simd` (or
-  `wide`/`pulp`) is a legitimate optimisation with a real speedup.
-- Batching *games* rather than cards — simulating 8 games in lockstep across
-  SIMD lanes — is the structure that actually exploits it.
-
-The rule that makes this impressive rather than indulgent: **profile first,
-benchmark the scalar version, and keep it.** A `criterion` bench showing
-"scalar 12.4 ms vs SIMD 3.1 ms, same output for the same seed" is engineering.
-The same code with no benchmark is decoration.
-
-### The thing that will actually impress a reviewer
-
-**Differential testing between the Python reference and the Rust
-implementation.** Keep `sim/tier1/` in Python as the executable specification.
-When the Rust engine lands, run both over the same seeds and assert identical
-output. That:
-
-- justifies keeping both implementations instead of looking like dead code,
-- turns "I rewrote it in Rust" into "I rewrote it in Rust and proved it agrees
-  with the reference on N thousand seeded games",
-- and catches the porting bugs that would otherwise surface as subtly wrong
-  percentages in a primer.
-
-This is the single highest-value item in this document.
-
----
-
-## 2. Property-based testing — built 2026-08-10
-
-`mana.py` solves a bipartite matching problem: can this pool of sources pay
-this cost? It is subtle enough that `tests/test_mana.py` exists specifically to
-pin cases where naive source-counting is wrong. Those are examples, and
-examples only cover what someone thought of.
-
-`tests/test_mana_properties.py` covers what nobody thought of. Hypothesis
-generates costs and pools, and each one is checked against two independent
-references in `tests/mana_oracle.py`:
-
-- `brute_force_can_pay` — enumerate every injective assignment of pips to mana
-  units. Factorial, and there is nothing in it to get wrong beyond the
-  definition itself.
-- `hall_can_pay` — Hall's marriage theorem: a matching covering every pip
-  exists iff every subset of pips has at least as many usable units as it has
-  pips. A different theorem, so it fails differently instead of sharing a blind
-  spot with the search.
-
-Neither shares code with `mana.py`. The unit expansion is reimplemented inside
-the oracle on purpose: a reference that imports the implementation cannot catch
-a bug in the part they share.
-
-Alongside the generated cases sits an **enumerated pool** — 13,944
-(cost, pool) pairs over a small alphabet chosen for structure rather than
-realism, built with `combinations_with_replacement` rather than from a seed. It
-yields the same cases in the same order on any machine in any language,
-forever, which is what makes it usable as the differential case set for a port
-(§1). `python tests/mana_oracle.py` dumps it as JSON Lines; `--digest` prints
-the hash pinned by `POOL_ANSWER_DIGEST`.
-
-### What it found
-
-**The solver is clean.** Every generated case and all 13,944 pool cases agree
-with both oracles, as do the monotonicity properties (an extra source never
-hurts, widening a pip never hurts, a dearer cost is never easier) and the
-order-invariance ones. `can_pay` and `engine._consume` — a second solver, which
-exists because casting needs the leftovers rather than a yes/no — agree with
-each other on every case. That pairing is the differential test §1 wants,
-available today without a second language.
-
-**The parser was not.** Phyrexian mana was dropped outright, so `{U/P}` parsed
-to mana value 0 with no colours. Scryfall says Mental Misstep is cmc 1 and
-blue. `decks/analyze.py` builds the curve from that number, so the Tivit list
-filed Mental Misstep as a 0-drop and Phyrexian Metamorph as a 3-drop, and
-reported an average mana value of **1.90 where the truth is 1.93**. Fixed by
-keeping Phyrexian symbols in their own `ManaCost.phyrexian` field: they count
-toward mana value and colour identity, and — correctly, because 2 life pays
-them — still place no demand at all on the mana base. The pool digest did not
-move, which is the evidence that castability semantics did not change with it.
-
-Two things about that bug are worth keeping. It was not in the clever algorithm
-a reviewer would scrutinise; it was in the boring parser feeding it. And
-`mana.py` was at **100% line coverage** with the faulty branch covered — by a
-test that asserted the half of the behaviour that was right (`{G/P}` is not a
-mana constraint) and never asked about the half that was wrong.
-
-### Determinism — built 2026-08-10
-
-`tests/test_determinism.py`, in three levels of increasing strength:
-
-- **Within a process.** Seeded `run`, `simulate_game` and `sweep_land_counts`
-  repeat exactly; two different seeds differ, which is what catches a seed that
-  is accepted and then ignored; the caller's library is not mutated; the
-  progress callback is inert; and every point of a sweep provably starts from
-  the same state, which is what makes a sweep a comparison at all.
-- **Across processes.** `tests/determinism_probe.py` runs a fixed simulation in
-  a fresh interpreter, because hash randomisation is set at process start and
-  cannot be varied in-process. At two `PYTHONHASHSEED` values both the Tier 1
-  digest and the mana pool digest are unchanged: nothing here reads set or
-  dict iteration order.
-- **Against a pin.** `REFERENCE_DIGEST` is a golden, verified byte-identical on
-  CPython 3.11.15 and 3.12.13. A change in what Tier 1 reports now has to be a
-  decision someone writes down rather than a number that drifts.
-
-A side result worth recording: the probe runs on a bare 3.11 with **numpy not
-installed**. Tier 1 is pure stdlib today. That is the CLAUDE.md dependency rule
-holding in practice, and it is what would make the seam in §1 cheap to cut if
-the trigger ever fires.
-
-### The suite CI ran was not the suite anyone was reading — fixed 2026-08-12
-
-Worth recording as its own finding, because it invalidated every coverage
-number in this document until it was fixed, and because nothing about it was
-visible from a green check.
-
-`data/mtg.duckdb` is a ~500MB Scryfall download that CI does not have and
-should not have (ADR 6). So 29 tests opened with some variant of
-
-```python
-if not client.get("/api/health").json()["pool"]:
-    pytest.skip("no card pool available")
-```
-
-and every one of them passed on the maintainer's laptop and skipped on every
-pull request. What skipped was not incidental: the entire card-fact surface —
-swap, add, suggestions, card search, deck creation, the Tier 1 job endpoints,
-and the Claude pool tools. **The layer that exists to enforce rule 1 was the
-layer no pull request ever exercised.** Locally the suite ran 692 tests at 87%;
-CI ran 663 at 82%, and reported success.
-
-The fix is `tests/tiny_pool.py`, which now builds a genuine DuckDB pool of
-21 real cards in about a second. Two things made that work rather than merely
-look like it:
-
-- **The cards are real, read out of the pool and pasted verbatim.** Rule 1
-  applies to test data: a fixture naming Ajani and then claiming mono-white
-  would teach the exact error CLAUDE.md cites. Ajani is in the fixture *with*
-  its {R}{W} identity, so that cautionary tale is now executable.
-- **The decks are synthetic.** `mono_green_deck()` is a legal 99 built only
-  from those 21 cards, shaped like Goreclaw's real list — mono-green
-  commander, exactly one banned card — so the same assertions run without
-  needing all 35,000. Pointing the real decks at a 21-card pool would have
-  been the other option and a worse one: 90 unknown-card errors per deck, and
-  tests that assert cleanliness would have had to be weakened to survive it.
-
-Result: **740 tests and 90% coverage, with or without the real pool** — the
-numbers when this section landed; the suite has since grown to ~1,700 tests at
-~96%, with the floor at 95 (#96). Two
-tests still need the full download and now say so with a `needs_full_pool`
-marker rather than a bare skip — the 32-way colour-combination check (a fixture
-holding those 32 cards would verify the fixture rather than the table) and the
-commander-search ordering bug (which needs more cards than the query limit to
-reproduce at all). CI fails if that count moves, which is the control that was
-missing: **a suite that quietly shrinks cannot be caught by a suite that
-quietly shrinks.**
-
-### Still open
-
-**Mutation testing** (`mutmut`, or `cargo-mutants` on the Rust side) on
-`decks/validate.py` and `mana.py`. Coverage says a line ran; mutation testing
-says a test would have *noticed* if it were wrong. The Phyrexian bug above is
-the argument in one example: 100% line coverage, and a mutation of that branch
-would have survived.
-
-~~**A mode's tool set is advertised, not enforced.**~~ **Decided and enforced
-2026-08-12.** Found while writing `tests/test_claude_modes.py`: `Mode.tool_names`
-decided which schemas the model was *shown*, but `tools.run` dispatched against
-the global `READ_ONLY` registry, so a model asking for a registered tool the
-mode did not offer got a real answer. Bounded — all seven tools are read-only
-and `test_claude_boundary.py` proves the package cannot name a write function —
-but it was a decision about what ADR 15 means by "a mode is a tool set", so it
-was decided rather than silently fixed: `converse` now passes
-`allowed=mode.tool_names` into dispatch, and a registered tool outside the mode
-is refused exactly like an unregistered one, with the refusal naming the mode's
-own tools. Pinned in both `test_claude_tools.py` and `test_claude_modes.py`.
-
----
-
-## 3. Containerisation — built 2026-08-12
-
-`Dockerfile`, `docker-entrypoint.sh`, `.dockerignore` and `fly.toml` are in the
-repository, and the `image` job in CI builds and exercises the image on every
-pull request. `docs/HOSTING.md` §4 is the deployment guide; this is the review
-checklist that shaped the files.
-
-- [x] **Multi-stage build** — builder installs into a venv, runtime copies it,
-      so pip and any future compiler stay out of the shipped image.
-- [x] **No Node stage, deliberately**, which is where this list argued with
-      itself. It asked both that the no-Node property be kept and that the image
-      build prove the bundle rebuilds from source. Those pull opposite ways, and
-      the second was already satisfied — the `frontend` job runs the real
-      `npm run build` and fails on any diff against the committed
-      `src/mtglab/web_dist/`, on every PR. Proving it again inside the image
-      would be a slower duplicate bought by making the image depend on Node and
-      the npm registry. **CI proves the bundle is current; the image ships it.**
-- [x] **Non-root user.** The app process runs as `mtglab` (uid 10001). It gets
-      there through an entrypoint rather than a `USER` line: Fly attaches the
-      volume owned by `root:root` and the mount shadows the image's own
-      ownership, so PID 1 starts as root, fixes `/data`, and `exec`s the app
-      under `setpriv`. A bare `USER` would look stricter and leave the app
-      unable to write its own volume. CI asserts the owner of PID 1 in the
-      running container, which is the claim that matters.
-- [x] **Read-only root filesystem.** Done 2026-08-13, and *not* by writing it
-      into a deployment file. The objection recorded here was that Fly's
-      `fly.toml` has no switch for it — still true, re-checked against Fly's
-      configuration reference the day this landed, where the nearest option is
-      `persist_rootfs` and that is about persistence — so an entry there would
-      have been an untested claim, which was rightly judged worse than an absent
-      one. The answer is that the claim is now **tested**: the `image` job runs
-      a second container with `--read-only --tmpfs /tmp` and fails if it does
-      not answer `/api/health`.
-
-      **So the deployed instance does not run this way and this section should
-      not be read as saying it does.** What the check is actually worth is the
-      invariant underneath it — *everything this app writes lives under `/data`*
-      — which stops being a sentence somebody has to keep remembering and
-      becomes a red build. That invariant is what decks-on-the-volume rests on,
-      and its failure mode is silent: a write into the image layer works
-      perfectly until the next deploy throws it away. The hardening for other
-      runtimes is real but secondary.
-
-      Two things found doing it, both by running rather than reasoning: `/tmp`
-      *is* written at runtime, so `--tmpfs /tmp` is load-bearing rather than
-      defensive; and the entrypoint's root-side `chown` of the volume is
-      unaffected, since `/data` is a mount and never the read-only layer.
-- [x] **`HEALTHCHECK` hitting `/api/health`**, using stdlib `urllib` rather
-      than installing `curl` for one request. That path is on `PUBLIC_PATHS`,
-      so it answers with auth on, and CI pins that it reports `"pool": false`
-      on a fresh volume instead of failing — an unseeded instance is a correct
-      state between deploy and seeding, and a health check that 500s there
-      would have the platform restarting a healthy machine forever.
-- [x] **Multi-arch** (`linux/amd64`, `linux/arm64`) via buildx. Nothing is
-      pushed; publishing needs the signing and provenance conversation in §5.
-- [x] **Image scanning** — Trivy, failing on HIGH/CRITICAL, `ignore-unfixed`
-      because a CVE with no available patch is not something the build can act
-      on and would turn the gate into noise that gets disabled.
-- [x] **Never bake the pool in.** Scryfall asks that bulk data not be
-      redistributed, and it belongs on the volume. Enforced twice now: the
-      `no-secrets-or-card-data` job checks what is *tracked*, and the `image` job
-      greps the *built image*, which is a different question the moment a
-      `.dockerignore` line is deleted.
-- [x] **Committed assets match their recipes** (ADR 29) — not a new CI job:
-      `tests/test_animist_recipes_repo.py` runs `mtglab animist verify`'s
-      check inside the ordinary suite, holding every committed asset to its
-      recipe's dimensions, budgets, count and metadata-absence. Contract, not
-      bytes, because image encoders are not byte-stable the way Vite is.
-
-**The reason CI carries so much of this.** The maintainer's machine is macOS 12
-on Intel: Docker Desktop supports the three most recent macOS releases and will
-not install, and Homebrew there is too stale to build Colima. **No container can
-be built on it at all.** So the `image` job is not belt-and-braces — it is the
-only place this Dockerfile is ever built, and every property above is asserted
-against a running container rather than read off the file.
-
----
+The standing engineering calls, one section per area. CI's comments cite §3
+and §5 by number; the numbering is load-bearing. History and the arguments
+that led here live in git and in `docs/adr/`.
+
+## 1. The backend
+
+One Go binary (`mtglab`), CGO on for DuckDB, serving everything.
+Performance is measured rather than assumed — `docs/polish/LEDGER.md` keeps
+the baselines — and the deliberate floor is that the app is free to use, so
+nobody is paying us to be slow. The measuring shelf itself — a bench command,
+cache-hit counters — does not exist yet, and building it is an open ledger
+item (`go test -bench` and pprof serve in the meantime).
+
+## 2. Testing
+
+- **Every bug fix gets a test**, written to drive the trigger — the code
+  path that failed — rather than the mechanism by hand.
+- **The corpora under `testdata/` are frozen goldens.** They pin recorded
+  behavior (seeds, wire shapes, cache-key bytes, emitted YAML). Never
+  regenerate one, and never "fix" arithmetic that matches one.
+- **Property-based tests and fuzzing** cover the math-shaped code (the
+  gate, the solver, the generator's `fuzz_test.go`), and **mutation testing
+  is `gremlins`** — a standalone binary installed on demand
+  (`go install github.com/go-gremlins/gremlins/cmd/gremlins@latest`), run one
+  package at a time, no `go.mod` entry and no CI gate on it yet. A suite's
+  strength is still checked the manual way wherever that is quicker: break
+  the thing, watch the test fail, restore it.
+- The Go gates, from `go/`: `go vet ./...`, `go test -race ./...`,
+  `golangci-lint run ./...`, and `gofmt -l .` printing nothing.
+- Frontend tests run through `npm --prefix web run check` — vitest invoked
+  from the repo root loads no config and manufactures flakes.
+
+## 3. Containerisation
+
+`Dockerfile`, `docker-entrypoint.sh`, `.dockerignore` and `fly.toml` are in
+the repository; the `image` job builds and exercises the image on every PR.
+The properties, each asserted against a running container:
+
+- **Multi-stage**: a Go builder stage; the runtime is `debian:trixie-slim`
+  plus `libstdc++6`, carrying one binary and the committed assets — no
+  toolchain, no package manager use at runtime.
+- **No Node stage, deliberately.** The `frontend` job runs the real
+  `npm run build` and fails on any diff against the committed `web_dist/`.
+  CI proves the bundle is current; the image ships it.
+- **Non-root.** PID 1 starts as root, fixes `/data`'s ownership (Fly mounts
+  volumes `root:root`), and `exec`s the app as `mtglab` (uid 10001) under
+  `setpriv`. CI asserts the owner of the running process.
+- **Read-only root proven by test**: a second container runs with
+  `--read-only --tmpfs /tmp` and must answer health. The deployed instance
+  does not run read-only; the check exists for the invariant underneath —
+  **everything this app writes lives under `/data`** — whose failure mode
+  (a write into the image layer) works perfectly until a deploy discards
+  it. `/tmp` is genuinely written, so the tmpfs is load-bearing.
+- **`HEALTHCHECK` is `mtglab probe`** against `/api/health`, a public path,
+  and CI pins that a fresh volume reports `"pool": false` rather than
+  failing — unseeded is a correct state, and a 500 there would have the
+  platform restarting a healthy machine forever.
+- **Multi-arch** (`linux/amd64` required, `linux/arm64` as `image-arm64`)
+  via buildx.
+- **Trivy scanning**, failing on HIGH/CRITICAL, `ignore-unfixed` so a CVE
+  with no patch does not turn the gate into ignored noise.
+- **Never bake the pool in.** Scryfall's bulk data is not redistributed:
+  the `no-secrets-or-card-data` job checks what is tracked, and the `image`
+  job greps the built image — a different question the moment a
+  `.dockerignore` line is deleted.
+- **Committed assets match their recipes** (ADR 29): the `tools` job runs
+  `animist verify` against every committed asset.
+
+**Why CI carries all of this**: the dev Mac (macOS 12, Intel) cannot build
+containers at all — Docker Desktop will not install and Homebrew is too
+stale for Colima. The `image` job is the only place the Dockerfile is ever
+built, so a red one on a container change is the first real feedback, not a
+flake.
 
 ## 4. Frontend
 
-The stack is already modern: React 19, Vite 8, Tailwind 4, TypeScript 7,
-oxlint, Recharts. The gaps are testing and interaction, not framework choice.
+React + TypeScript under `web/`, bundle committed at `web_dist/` (CI proves
+it rebuilds byte-identically). `noUncheckedIndexedAccess` is on. The check
+gate is `npm --prefix web run check`; run `npm --prefix web run build`
+whenever `web/src` changes.
 
-~~**`noUncheckedIndexedAccess` is the one strictness flag still off**~~ — **on
-since 2026-08-14.** Measured first: turning it on reported **51 errors across
-15 files** — `pentagram.tsx` 7, `Learn.tsx` 9, `mtg.ts` 3, `App.tsx` 4, the
-rest scattered, with about a third in test files. Every one is a real `arr[0]`
-or `obj[key]` that can be `undefined` and is not treated as such.
-
-It is deliberately *not* bundled with the 2026-08-14 quality pass. Each site
-needs its own judgment — a guard, a default, or a different data shape — and
-the wrong fix is a non-null assertion, which silences the check without
-changing the risk. Fifty-one of those judgments buried inside a
-thousand-occurrence rename is how a real review turns into a rubber stamp. The
-same argument that made `strict` its own change applies here: it landed alone,
-and it was reviewable because of that.
-
-**Re-measured 2026-08-14, and "51 judgments" was the wrong count.** The errors
-reproduce exactly — 51 across the same 15 files — but they cluster into roughly
-**15 distinct sites**, because one bad expression reports once per use:
-
-- **9 of the 9 in `Learn.tsx` are one variable.**
-  `taxonomy.combinations.find(…) ?? taxonomy.combinations[0]` — the *fallback*
-  is the unchecked index, so `combo` is `Combination | undefined` and every
-  subsequent field read reports.
-- **All 4 in `App.tsx` are one expression.** `const nav = [NAV[0], …]` puts
-  `undefined` into the array's element type, and the `.map` callback reports it
-  four times. `...NAV.slice(0, 1)` fixes all four and is better code.
-- **3 in `mtg.ts`** include `if (GUILDS[key]) return GUILDS[key]`, a double
-  lookup TypeScript cannot narrow across. Binding it once fixes the error and
-  removes the second lookup.
-
-That changes the size of the job but not the argument for its being its own
-change. The genuinely awkward class is `pentagram.tsx`'s `WUBRG[(i + 1) % 5]` —
-provably in range, invisible to the checker — and it is exactly where a
-non-null assertion is tempting and wrong. The fix taken there is to iterate the
-array rather than index it, so the `undefined` never enters the type.
-
-**A tuple does not help, which is worth knowing before reaching for one.**
-Measured rather than assumed: under this flag `tup[0]` on a `readonly [...]`
-tuple is fine, but `tup[i]` and `tup[(i + 1) % 5]` are both `T | undefined`
-exactly as an array's are. Only a **literal** index escapes. So the
-five-element tuple that looks like the obvious fix for the pentagram buys
-nothing, and the restructure is the real answer: `clockwisePairs()` walks a
-rotated copy in lockstep with `WUBRG`, so both ends of every edge arrive by
-iteration. Ten edges, no index, nothing asserted.
-
-**What the fixes look like**, since the rule was that a non-null assertion is
-the wrong one:
-
-- **A guard where the empty case is real.** `Learn.tsx` renders an explanatory
-  panel when `/api/colors` answers with nothing, rather than letting nine field
-  reads each decide what to do about it.
-- **A different shape where one was available.** `App.tsx`'s
-  `...NAV.slice(0, 1)` in place of `NAV[0]`; `dossier.tsx` carrying the source
-  object instead of `findIndex`-ing its position and reading it back, which
-  drops a traversal as well.
-- **Binding once instead of testing and re-reading.** `mtg.ts`'s
-  `if (GUILDS[key]) return GUILDS[key]` was two lookups of a mutable table, and
-  the checker was right that the second one proves nothing about the first.
-- **`?.` inside `expect(...)`** in test files, where an absent value fails the
-  assertion with a readable diff — which is what the test wanted anyway.
-
-`!` appears in exactly one class of site, all in test files: `findAllByRole(…)
-[0]`, where the query itself throws if nothing matched and the file already
-used that idiom. **No non-null assertion was added under `src/` outside the
-tests.**
-
-- ~~**No frontend tests at all.**~~ **Built 2026-08-10** — Vitest + Testing
-  Library, 35 tests over the three pieces with real logic. `npm test` runs
-  them; CI runs it before the build, so a broken component fails as a failing
-  test rather than as a bundle that builds fine and misbehaves in a browser.
-
-  - **`followJob`**, the job-polling state machine (queued → running →
-    done/error, plus cancel). Timers are faked, so the 400ms interval is
-    asserted rather than waited out, and the cancel path is pinned — an
-    unmounted Simulator screen must stop polling, not poll forever.
-  - **The library filter and sort**, including the two filters applied at once,
-    and the colour filter being a membership test rather than an exact identity
-    match.
-  - **`identityName`**, which is a lookup table plus a rotation trick to make it
-    order-independent — exactly the code that works for the cases someone tried
-    and quietly fails for the rest. All ten guilds, all ten shards and wedges,
-    five-colour, mono and colourless are pinned.
-
-  Deliberately *not* tested: the pip-vs-sources maths named in the original
-  plan. It turned out to be computed server-side in `decks/analyze.py`, where
-  `tests/test_analyze.py` already covers it; the frontend only displays the
-  number. Writing a frontend test for it would have tested nothing.
-
-  **It found a real bug.** `/api/decks` carries `errors: null` to mean "the
-  pool was missing, so the gate never ran", explicitly so that it is not
-  rendered as a pass — and the library card rendered it exactly like a clean
-  deck, because the condition was `errors !== null && errors > 0`. With no
-  pool, Goreclaw and Atla Palani, both of which run a banned card, looked
-  precisely as clean as the four decks that pass. Fixed with a `not checked`
-  badge, and pinned by the test that caught it.
-
-- **Replacement suggestions, added 2026-08-10.** `decks/suggest.py` scores
-  similarity to a card being removed and `mtglab decks suggest` / the deck
-  page's validation tab surface a shortlist. Scoring is pure over
-  `CardRecord`s, so 17 tests cover it without a database; only the pool query
-  touches DuckDB. It reports and never edits, which is
-  [ADR 8](adr/0008-the-gate-blocks.md) held rather than revisited.
-
-  The honest limitation, recorded because the top of a ranked list reads like
-  an answer: similarity is not quality. It ranks Regal Behemoth above
-  Cultivator Colossus for Goreclaw's Primeval Titan slot purely on a one-mana
-  curve difference, where Colossus is the closer fit. The fix for that is a
-  human reading five candidates, not weights tuned until one deck comes out
-  right.
-
-- ~~**A four-colour deck would render as "WUBR".**~~ **Fixed 2026-08-12,
-  twice.** The first fix added the Nephilim names, verified against the
-  pool — and the same day's review pass caught that `src/mtglab/colors.py`
-  had already decided the convention the other way: the Scryfall/C16 names
-  (Artifice, Chaos, Aggression, Altruism, Growth) are canonical and the
-  Nephilim are aliases, and the Start-a-deck grid renders the canonical name.
-  The table now matches the taxonomy, which is the lesson: the repo had
-  already looked it up, and the second copy of the answer has to agree with
-  the first.
-- **Playwright** for a handful of end-to-end paths against the real API. The
-  card-search field that collapsed to 14px would have been caught by one
-  assertion on a rendered width. Deliberately deferred past the manual UI
-  pass and the deploy.
-- **Accessibility**: `axe-core` in CI. Cheap, and reviewers notice. Same
-  deferral.
-- ~~The bundle is 661 kB (195 kB gzipped) and Vite already warns.~~ **Split
-  2026-08-12.** Route-level code splitting: Library stays eager (the landing
-  page), Login/Claim stay eager (the gate), the other six screens are lazy.
-  The entry chunk went from 726 kB (it had grown since the 661 figure) to
-  262 kB, with Recharts in a 398 kB chunk only DeckDetail and Simulator load,
-  and the Vite warning is gone.
-
-### Mobile engines, and the live seat — 2026-08-16
-
-Two standing gaps in "drive the real surface" closed the same afternoon, and
-both are facts about tooling rather than code, recorded here so a fresh
-session knows they exist.
-
-**Both phone engines are now testable from this laptop.** Android was always
-effectively covered — the Browser pane's mobile preset runs the same Blink a
-real Android phone runs. iOS was the gap: macOS 12 caps desktop Safari at 15.6
-and Xcode at simulators below the bundle's own floor. The answer is
-Playwright pinned at **1.45.3** — the last release with macOS 12 browser
-builds — whose bundled **WebKit 17.4** launches here, wrapped in Playwright's
-iPhone descriptors (viewport, DPR, touch, UA). It is the real iOS engine, not
-true iOS Safari: the URL-bar viewport dance, rubber-banding and iOS autoplay
-policy still need Aaron's physical iPhone. The pin cannot move on this
-hardware, and the ledger's Green section carries the consequence.
-
-**The deployed instance has a live-testing seat: the `claude` account.** A
-plain user (never `--admin`, deliberately), created at the break-glass console
-per HOSTING §4, signed in by Aaron in his own Chrome and driven through the
-Claude-in-Chrome integration — Claude never touches the password, only the
-session. The containment is the existing architecture doing its job: the
-write gate scopes edits to the account's own decks, ADR 28 attributes every
-edit to `claude` by name in the deck's History, and ADR 22 keeps its drafts
-private by default. Its first exercise (import → rationale → entomb → return
-→ history → delete, end to end on the instance) is what caught the stale
-"deck history is git history" captions this section's own history is written
-in.
-
----
+**The browser floor is Safari 16.4, and two Go tests hold it against the
+committed bundle** — `go/cmd/mtglab/browserfloor_test.go` (features above the
+floor, regex lookbehind, and the two independent things that set the number)
+and `go/cmd/mtglab/reducedmotion_test.go` (every animating rule reachable by a
+`prefers-reduced-motion` guard). Both read `web_dist/assets`, never `web/src`,
+because every feature that has ever moved this floor arrived through a
+dependency rather than through a file we wrote.
 
 ## 5. CI/CD
 
-Current pipeline, as of 2026-08-15: pytest on 3.11/3.12, coverage with a **95%**
-floor (90 until the 2026-08-14 coverage pass, #96), a **skip-count gate**,
-ruff, **mypy**, frontend typecheck under
-**`strict`**, **oxlint with `--deny-warnings`**, `npm test`, the build,
-committed-bundle drift check, a secrets/card-data guard, and — since
-containerisation landed — an **`image` job** that builds the Dockerfile for two
-architectures, runs it, and scans it (§3).
+The repository is public and `main` is protected. The settings, recorded so
+they can be rebuilt — and **the check list is a read-back, never an
+inheritance**; it has been stale in this file more than once:
 
-**Workflow hygiene, added 2026-08-14.** Four things the pipeline had been
-running without, none of which changes what is checked:
+| Setting | Value |
+| --- | --- |
+| Pull request required | yes, 0 approvals (a solo maintainer cannot approve their own) |
+| Required checks | `frontend`, `image`, `no-secrets-or-card-data`, `dependency-review`, `image-arm64`, `go (amd64)`, `go (arm64)`, `go-lint` — **eight, read back from the API 2026-08-24** |
+| Strict (branch up to date) | yes |
+| Enforce for admins | yes — off, it would not apply to the only contributor |
+| Force pushes, deletions | blocked |
+| Linear history | required (squash merges) |
 
-- **`permissions: contents: read` at the top of `ci.yml`.** `dependency-review.yml`
-  had declared this since it landed and `ci.yml` never had, so the whole suite
-  ran with whatever the repository default happened to be. Nothing in it
-  writes — no job pushes an image, comments, or updates a check.
-- **A `concurrency` group per ref**, cancelling in progress on pull requests
-  only. Three pushes in a minute used to start three full builds, arm64 QEMU
-  image job included, and the first two were obsolete before they finished.
-  Pushes to `main` are deliberately *not* cancelled: every commit there should
-  keep its own recorded result.
-- **`timeout-minutes` on all four jobs** — 20/15/5/45 against a default of six
-  hours. A stuck build should cost minutes of runner time, not a morning.
-- **pip caching** on `setup-python`, keyed on `pyproject.toml`. numpy and
-  duckdb are large wheels and were re-downloaded on every job of every run.
-
-Renaming `no-secrets-or-corpus` to `no-secrets-or-card-data` in the same pass
-is exactly the hazard the protection table below names: **the required-check
-list had to be updated in the same change, or the check would have stopped
-gating while still appearing to pass.**
-
-**And the CD half, added 2026-08-14** — [ADR 23](adr/0023-a-green-main-deploys-itself.md).
-A `deploy` job that `needs` every other check and runs only on a push to `main`
-or a `workflow_dispatch`, so a green `main` deploys itself. The prompt was a
-silent failure rather than a loud one: the quality pass above renamed a wire
-field and the running instance went on answering the old name, because
-deploying was still something a person had to remember. A failing test is
-loud, a failing build is loud, **a skipped deploy is silent**.
-
-**The `contract` job, added 2026-08-21** with the Go migration's Phase 1
-([`docs/go-migration/PLAN.md`](go-migration/PLAN.md) §5): `tests/contract/`
-is the part of the suite that can run against a server it did not build —
-in-process by default, over TCP against a child `mtglab ui` with `--live`,
-or against a server somebody else started with `--base-url`. The job runs
-the live mode, which is the only one that proves nothing is stubbed on the
-far side of the socket. Its route classification is `tests/contract/routes.json`,
-read by `tests/test_isolation.py` as well, so the table a second
-implementation is held to is the table this one is held to. The suite's own
-proof is `tests/test_contract_harness.py`: every assertion is run against a
-deliberately broken app and shown to fail, and the whole suite is run once
-in a subprocess against one such app and shown to go red.
-
-**The Go jobs, added 2026-08-21** with the migration's Phase 2
-([ADR 38](adr/0038-the-served-backend-is-rewritten-in-go.md)): `go (amd64)`
-and `go (arm64)` run `go mod verify`, `go vet`, a build of the front door
-as the image builds it (CGO-free through Phase 2; a CGO build since Phase 3
-made the door read the card pool through the DuckDB driver, so a link that
-fails on one architecture fails on a pull request rather than in the image
-build), `go test -race -cover` and a tidy check, on the two native
-runners the image is built for, because the module carries one CGO
-dependency and "it builds" has to mean both; `go-lint` runs golangci-lint
-v2.13.1 with `go/.golangci.yml`. Coverage is printed and not yet gated — the
-floor is set from Phase 3's measured baseline, the same rule as pyproject's.
-And the `contract` job grew a second half: it builds the door, starts Python
-on a scratch the harness seeded with the door in front, and runs the suite
-`--base-url` against the door — the Phase 2 exit gate, run on every pull
-request rather than once at the end.
-
-Two details worth keeping. `needs` is not redundant with branch protection —
-protection governs *merging* and says nothing about a `workflow_dispatch` run,
-whereas `needs` makes the job structurally unable to start on a red suite
-whatever triggered it. And the job does not treat `flyctl` exiting as success:
-it requires the live instance to answer with a mounted volume and a non-zero
-deck count, because a deploy that comes up against a fresh volume looks
-perfectly healthy while having lost every deck edit.
-
-**And the condition was wrong on the day it landed.** It read
-`workflow_dispatch || (push && ref == main)` — the ref check on the `push` arm
-alone — so a manual dispatch deployed **whatever branch it was launched from**,
-indistinguishable in the Actions list from an ordinary deploy. `needs` does not
-help: a feature branch can be perfectly green and still be the wrong thing to
-ship. What makes it worth a guard rather than a note is that redeploying does
-not undo it — `auth/db.py`'s ladder is forward-only, so a branch carrying a
-schema change migrates the volume on boot and deploying `main` afterwards
-leaves the new schema under the old code.
-
-Fixed by hoisting the ref check out of the event arm. The *trigger* stays open
-deliberately: running the suite on a branch is reasonable, and it is only the
-deploy job that must refuse.
-
-The test is the more useful half, and its first version was worthless.
-`tests/test_packaging.py` asserted that the condition *contains*
-`github.ref == 'refs/heads/main'` — a substring the broken condition also
-contains, nested where it does not apply. It passed against the exact bug it
-was written to catch, and only mutation testing showed that: reverting the fix
-left the suite green. It now evaluates the condition against a five-row truth
-table, so it asserts behaviour instead of text. **A test for a config file
-should exercise the config's meaning; matching its source is a test of the
-string you happened to write.**
-
-This is also the first thing in the pipeline that holds a **credential**, and
-the two flags that matter are both non-default:
-
-```bash
-fly tokens create deploy -a sylvan-library -n github-actions-deploy -x 8760h
-```
-
-App-scoped rather than org-wide, which bounds a leak to "can deploy this one
-app" — Fly's own guidance is the narrowest token that will work. And `-x 8760h`
-because **the default is twenty years** (175200h), which flyctl's help
-recommends against. It expires 2027-08-14; the job prints the rotation command
-on failure, because a lapsed credential reads like a broken integration. There
-is no federated alternative: Fly's OIDC is outbound only, so GitHub Actions
-cannot authenticate to Fly without a stored secret (checked 2026-08-14).
-
-Four of those are new, and three of the four are guards against a check being
-green while not checking:
-
-- **The skip gate.** See §2 — CI ran 663 of 692 tests and said so nowhere. The
-  build now fails if the skipped count is anything other than the two declared
-  `needs_full_pool` tests.
-- **`tsc` under `noUncheckedIndexedAccess`**, added 2026-08-14 as its own
-  change. `strict` does not include it, so the single most common source of
-  `undefined` in this codebase stayed invisible to the checker that had just
-  been turned on to catch `undefined`. See §4 for the fixes and for why a
-  tuple is not one of them.
-- **`tsc` under `strict`.** `tsconfig.app.json` had `noUnusedLocals` and
-  friends but never `"strict": true`, so `strictNullChecks` was off across all
-  5,913 lines of frontend and a null deref type-checked clean. Turning it on
-  produced **zero errors** — the code was already written defensively; what was
-  missing was anything holding it that way. It immediately caught one latent
-  problem: Recharts types `dataKey` as `string | number | ((obj) => unknown)`,
-  and a function is not a valid React key.
-- **oxlint.** A devDependency with a `lint` script that CI never ran. Both
-  warnings it had to report were dead re-exports.
-
-**There is deliberately no Python autoformatter** —
-[ADR 24](adr/0024-no-python-autoformatter.md), decided 2026-08-14 after the
-quality pass deferred it. `ruff format` would rewrite 101 of 111 files and grow
-the tree by 4,525 lines, and two of its changes are not style: it splits the
-`;`-joined argparse table that `pyproject.toml` grants `cli.py` an `E702`
-exemption for (the formatter does not read lint ignores), and it dedents the
-aligned command table in that module's docstring. The line-length argument,
-which is the one a linter does not already cover, measures at nothing here:
-117 lines of 39,823 exceed 88 characters, and 60 of the 61 over 100 are card
-oracle text in `tests/tiny_pool.py`, which no formatter can split. The stated
-trigger for revisiting is **a second regular contributor**, not a line count.
-- **mypy**, strict by default with a named list of modules that are not there
-  yet — ten when it landed, **two** now (`cli.py` and `cards/db.py`, since
-  #90): `api/service.py` and `api/simruns.py` graduated first, and the other
-  six followed on 2026-08-14. Direction over starting point: lax-by-default means a new module
-  is born unchecked and nobody notices. 24 of 42 modules passed `--strict` on
-  the first run, including all of `mana.py`, `sim/tier1/` and `sim/tier3/`. It
-  found three real latent problems — a `str | None` reaching `.lower()` on the
-  companion path, an optional assigned to a non-optional in `get_cards`, and
-  six `catch (e: any)` clauses in the frontend where `e.message` was unchecked
-  property access.
-
-The ladder from here, roughly in order of value per unit of effort:
-
-### The repository is public, and `main` is protected
-
-Decided 2026-08-10, after a commit landed on `main` directly because a merge
-returned the working copy there and nobody noticed. CI ran and passed, so
-nothing broke — but "nothing broke this time" is not a control.
-
-Branch protection is unavailable on private repositories on the Free plan;
-both classic protection and rulesets return `403 — Upgrade to GitHub Pro or
-make this repository public`. So the choice was $4/month, a local git hook that
-only guards one machine, or making the repository public. Public won on its own
-merits: this document is explicitly written for the case where peers read the
-repo, the history audit came back clean (no card pool, collection, credential or
-`.env` file in any of 29 commits), and public repositories get unmetered
-Actions minutes. The cost, stated plainly: the author's email address is in the
-metadata of 19 commits and is now public.
-
-The settings on `main`, recorded so they can be rebuilt:
-
-| Setting | Value | Why |
-| --- | --- | --- |
-| Pull request required | yes, **0 approvals** | A solo maintainer cannot approve their own PR, so requiring 1 would deadlock the repo |
-| Required checks | `test (3.11)`, `test (3.12)`, `frontend`, `no-secrets-or-card-data`, `image`, `dependency-review`, `image-arm64`, `go (amd64)`, `go (arm64)`, `go-lint`, `contract` | **Eleven, read back from the API 2026-08-22** after `contract` was required, with `strict`, linear history and admin enforcement all confirmed unchanged in the same read. The list above is that read-back, never an inheritance — re-read it rather than trusting this row, which has been stale twice. `contract` was added 2026-08-21 (the migration's Phase 1) and spent three sessions gating `deploy` through `needs` without gating a merge; the row said it was "Aaron's to make", which was wrong — the command is `gh api -X POST repos/aasquier/sylvan-library/branches/main/protection/required_status_checks/contexts -f 'contexts[]=contract'`, a **POST to the `contexts` sub-resource so it appends**, and the `gh` CLI is Aaron's own. What was missing was a confirmation, not a permission. Removing one is the same path with `-X DELETE`. Renaming a CI job silently stops gating until this list is updated |
-| Strict (branch up to date) | yes | Checks that passed against a stale base did not test what is being merged |
-| Enforce for admins | **yes** | Off, it does not apply to the only contributor, which makes it decorative |
-| Force pushes, deletions | blocked | |
-| Linear history | required | Matches the squash-merge history already in use |
-
-The escape hatch is turning admin enforcement off in settings — deliberately a
-visible act rather than a `--no-verify` away.
-
-**This table was wrong for two days, in the direction that matters.** It listed
-`image` as a required check from the moment containerisation landed; the
-setting was not made until 2026-08-12, so every pull request in between was
-gated by four checks while this said five. Nothing broke, because the job was
-passing anyway — which is precisely why nobody would have noticed. Two things
-follow. A document describing settings is a *plan* until somebody reads the
-settings back, and this one is written to be rebuilt from, so being aspirational
-here is worse than being absent. And **adding a CI job is two steps**: writing
-it, and requiring it. The second has no artifact in the repository, so it is the
-one that gets forgotten.
-
-**`dependency-review` became the sixth on 2026-08-14**, closing the second step
-that the bullet in *Supply chain and release* had left open since 2026-08-12.
-Three things about it are worth keeping.
-
-The context is `dependency-review` — the *job id*, not `dependency review`, which
-is the workflow's `name:`. A required check is matched on the check-run name, and
-a check run takes the job's `name:` if it has one and its id otherwise; this job
-has none. Guessing the workflow name here would have produced a check that never
-reports and a `main` nothing can merge into.
-
-It is the first required check that **cannot run on a push**. The workflow is
-`on: pull_request` only, because the action diffs the dependency graph between
-base and head and a push to `main` has no base to diff against. That is why the
-deploy job still `needs` **four** jobs rather than five: those four are `ci.yml`'s,
-they run on both events, and requiring a check that structurally never fires on a
-push would deadlock every deploy. Protection governs merging, `needs` governs the
-deploy, and the two lists are different on purpose.
-
-And the same call **pinned `no-secrets-or-card-data` to app id 15368**, which it
-was not before. Classic protection stores each context with an app id or `null`,
-and `null` means *any* app's status of that name satisfies the check — including
-one set through the statuses API rather than by Actions. The other four were
-already pinned to GitHub Actions; this one was the odd row out, visible only in
-the JSON and never in the UI. Nothing was exploiting it on a repo with one
-contributor, but a required check that any credential can satisfy is not a check.
-
-Read them back with:
+Re-read the list rather than trusting the row:
 
 ```bash
 gh api repos/aasquier/sylvan-library/branches/main/protection --jq .required_status_checks.checks
 ```
 
-`.contexts` is the older, flatter field and it is the one that hides the app id.
-Ask for `.checks` instead — the pin is half of what a required check means.
+**Adding a CI job is two steps** — writing it, and requiring it — and the
+second has no artifact in the repository, so it is the one that gets
+forgotten. Append and remove required contexts with:
 
-Note also that the repository carries a **ruleset** ("Me") alongside the classic
-protection rule. It enforces only deletion and non-fast-forward, and it holds no
-status-check rule at all — so the GitHub UI has two plausible-looking places to
-look for this list and only one of them has it. Settings → Branches, not
-Settings → Rules.
-
-### Claude review on every PR
-
-`anthropics/claude-code-action@v1` is the official action. Verified workflow
-shape:
-
-```yaml
-name: Claude review
-on:
-  pull_request:
-    types: [opened, synchronize]
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v6
-        with: { fetch-depth: 1 }
-      - uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
-            Review this PR. This is a Magic: the Gathering toolkit; read
-            CLAUDE.md first. Weight these heavily:
-              - Any card behaviour asserted from memory rather than looked up
-                in the pool. This project has a written history of exactly
-                that going wrong.
-              - Numbers in prose or generated artifacts that no test pins.
-              - Silent-wrong-answer risks: a change that makes a simulation or
-                a gate report something confidently incorrect.
-            Use `gh pr comment` for top-level feedback and
-            `mcp__github_inline_comment__create_inline_comment` for specifics.
-          claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+```bash
+gh api -X POST repos/aasquier/sylvan-library/branches/main/protection/required_status_checks/contexts -f 'contexts[]=<job-id>'
 ```
 
-Set up with `/install-github-app` from an interactive `claude` terminal, which
-handles the GitHub App and the `ANTHROPIC_API_KEY` secret. Note the review is
-billed per run, so gate it on `pull_request` rather than every push if that
-matters.
+(the same path with `-X DELETE` removes one). A required context matches the
+**check-run name** — the job's `name:` if set, its id otherwise — not the
+workflow's `name:`.
 
-`anthropics/claude-code-security-review` is a separate official action for
-security-focused analysis and is worth adding alongside.
+`dependency-review` runs only on `pull_request` (a push to `main` has no
+base to diff against), which is why the `deploy` job's `needs` list and the
+protection list differ on purpose: protection governs merging,
+`needs` governs the deploy, and requiring a check that never fires on a
+push would deadlock every deploy.
 
-There is also **`/code-review ultra`**, a multi-agent cloud review you trigger
-yourself from the terminal on the current branch or a PR number. It is
-user-triggered and billed, so it cannot be wired into CI — but it is the
-heavier tool for a change worth the scrutiny.
-
-### Adversarial testing, which is the part that has teeth
-
-An LLM reviewer is a good reader, not a proof. The adversarial rigor should be
-mechanical:
-
-- **Differential tests** (§1) — Python reference vs Rust implementation.
-- **Property-based tests** (§2) — Hypothesis against a brute-force oracle.
-- **Fuzzing.** `deck.yaml` is parsed input. `cargo-fuzz` on the Rust parser, or
-  Hypothesis on the YAML loader, should never produce a crash or a silent
-  mis-parse — only a clean validation error.
-- **Mutation testing** to grade the suite rather than the code.
-- **Golden artifacts.** The five generated documents are the shareable
-  surface. Snapshot them and diff in CI, so a formatting change is a visible
-  decision instead of an accident.
-
-### Supply chain and release
-
-The first three landed 2026-08-12:
-
-- [x] **Actions pinned by commit SHA**, version in a trailing comment —
-      including `trivy-action`, which had been riding `@master`. Dependabot
-      understands the comment convention and keeps both current.
-- [x] **`dependency-review-action` on every PR**, failing on high-severity
-      introductions. It needed the repository's dependency graph enabled,
-      which was done by enabling Dependabot alerts — a settings change with
-      no artifact in the tree, recorded here for the same reason the branch
-      protection table is. **Required on `main` since 2026-08-14**, two days
-      after the job itself landed — the "adding a CI job is two steps" lesson
-      below, run once more with the second step actually taken. See the
-      protection table for the context name, and for why the deploy job's
-      `needs` list stays at four.
-- [x] **Dependabot**, weekly, grouped per ecosystem (actions, pip, npm).
-- [x] **CodeQL** (`codeql.yml`, added 2026-08-15) — the one scanner that reads
-      the *source*: Trivy scans the image's packages, dependency-review diffs
-      the graph, the secrets job greps literals, and nothing before this
-      analysed the code's own data flow. Python and TypeScript, on PRs, main
-      and a weekly cron; `web_dist/` excluded so minified output cannot bury a
-      real finding. Free on a public repo. **Deliberately not a required check
-      yet** — the second of the two steps is a decision to make after a few
-      weeks of watching its signal-to-noise, not a default.
-- [ ] Generate an SBOM (`syft`) and attach it to releases.
-- [ ] Sign container images with `cosign`, publish via OIDC rather than
-      long-lived registry credentials.
-- [ ] Tagged releases with generated notes. The version moved off `0.1.0`
-      (to 0.2.0, 2026-08-12, now read from package metadata rather than a
-      second literal) and the first tag should coincide with the first
-      deploy.
-
-### Benchmarks as a gate
-
-Once Rust lands: `criterion` benchmarks in CI with regression detection, so a
-performance claim in a PR description is backed by a number the pipeline
-checked. This is also what makes the SIMD work legible.
-
----
-
-## 6. Architecture Decision Records — written 2026-08-10
-
-The most transferable rigor available here, and it cost almost nothing.
-
-[`docs/adr/`](adr/README.md) holds ten, one per significant decision, each
-recording context, the options considered, the decision, and the consequences.
-They are immutable once accepted: a decision that changes gets a new ADR that
-supersedes the old one, and the old one stays, because reasoning that turned out
-to be wrong is usually the most useful thing in the directory.
-
-Six were the seed list — deck.yaml in git, DuckDB for the pool, Tier 1 stays
-Python, two embedded databases, sessions over JWTs, and never redistributing
-Scryfall bulk. Four more earned a place because they were already argued here
-and a reader would otherwise have to reconstruct them: card facts come from the
-pool rather than memory (7), the gate blocks rather than routing around an
-illegal deck (8), the built frontend bundle is committed (9), and correctness is
-established against independent oracles (10).
-
-Writing them found one thing worth having found: **three documents disagreed
-about when the pool gets refreshed.** This file said "at boot", ROADMAP said
-"weekly by cron", and HOSTING said neither works — Fly volumes attach to exactly
-one machine, so a scheduled second Machine cannot mount the pool, and boot is
-on the request path under scale-to-zero. ADR 6 records the resolution and both
-stale lines are corrected. Forcing every decision into "options considered ·
-decision · consequences" is what surfaced it.
-
-A reviewer who reads ADR 3 and finds a profile, a table of numbers, and an
-explicit "we did not port Tier 1, here is why" learns more about the engineer
-than any amount of Rust would tell them.
-
----
-
-## Suggested order
-
-Decided 2026-08-10: do this list before any hosting work. Hosting was not
-imminent then; as of 2026-08-12 it is (docs/HOSTING.md §7 is the checklist),
-and the sequencing held — every step below landed before the deploy rather
-than after it.
-
-1. ~~**Property-based tests on `mana.py`** plus determinism tests.~~ **Done
-   2026-08-10** — see §2. It found one real bug (Phyrexian mana value) and
-   produced the enumerated pool a port would be tested against.
-2. ~~**ADRs for the decisions already made.**~~ **Done 2026-08-10** — ten of
-   them in [`docs/adr/`](adr/README.md); see §6. Writing them caught a
-   three-way contradiction about pool refresh.
-3. ~~**A `DeckSource` abstraction and a request scope.**~~ **Done 2026-08-10** —
-   `decks/source.py` and `api/deps.py`. Every deck-facing route now takes the
-   request scope, and the API is tested against an in-memory source.
-4. ~~**Frontend tests**~~ **Done 2026-08-10** — 35 of them, on the job-polling
-   state machine, the library filters and `identityName`; see §4. Found the
-   library rendering "the gate never ran" identically to "the deck passed".
-5. ~~**The deck lifecycle**~~ **Done 2026-08-11** — import, the draft stage,
-   the surgical edits and promotion.
-   [ADR 12](adr/0012-decks-are-edited-by-surgical-operations.md),
-   [ADR 13](adr/0013-an-imported-deck-is-a-draft.md).
-6. ~~**Container hardening**~~ **Done 2026-08-12** — multi-stage, non-root,
-   multi-arch, scanned, health-checked; see §3.
-7. **A simulator that plays decks against each other** — the Forge bridge
-   **landed 2026-08-11** (`mtglab sim forge`, heads-up and pods measured);
-   what remains open is the hosted deployment shape, and Tier 2 only if Forge
-   cannot answer the bracket and matchup questions.
-
-Steps 1–6 make the existing project defensible without adding a language, and
-leave hosting a matter of adding an auth layer and a second deck source rather
-than reworking what is here.
-
-Automated PR review (§5) is **deliberately parked** — priced out 2026-08-10,
-and **re-priced 2026-08-14 rather than re-read.** It stays parked, but the
-reason is now a measurement instead of an intuition, and the measuring turned
-up something worth more than the answer.
-
-The old note said to re-price when PR volume justified a look. Volume is the
-number that had never been counted: **87 pull requests in five days, 17.4 a
-day.** That is what decides it, because per-review cost only matters
-multiplied.
-
-Costs were measured, not estimated — `count_tokens` is free, so there was no
-excuse for a guess. CLAUDE.md is **13,685 tokens**, and it is re-read on every
-review because it is the first thing the prompt tells the reviewer to read. Ten
-recent pull requests were counted whole. Against Sonnet 5 at $3/$15 per MTok,
-with the four-turn agentic loop the action actually runs and its prefix
-prompt-cached:
-
-| | per review | per month at 522 PRs |
-| --- | --- | --- |
-| Median PR | $0.50 | **$262** |
-| Median PR, bundle excluded | $0.29 | $151 |
-| Worst PR (#81) | $4.24 | — |
-| Haiku 4.5, median | $0.17 | $87 |
-
-Against the **$10/month Copilot Pro that was already rejected on price**, the
-cheapest arrangement here is nine times dearer and the realistic one is
-twenty-six times. That is not close, and it does not turn on model choice or
-prompt tuning. **Still parked**, now for a number.
-
-**The finding worth keeping is not the price.** Counting the diffs showed that
-`web_dist/` — the committed frontend bundle, which exists so `mtglab ui` needs
-no Node — is **75% of the median review's input and 88% of the worst.** PR #87
-is 305,735 tokens whole and 15,216 without it; #81 is 865,448 and 105,037. The
-bundle is generated, nobody reviews it, and it very nearly does not fit in a
-context window.
-
-That is a live cost today, because **`/code-review ultra` is billed and gets
-run.** Reviewing this repository means paying to read a minified bundle four
-times over, and #81 at 865k tokens is close enough to the 1M window that the
-review could silently lose the diff it was meant to read. Any reviewer pointed
-at this repo — the parked action, `ultra`, or a person — should exclude
-`web_dist/` from the diff. **A committed build artifact is a review-cost
-decision, and it was not one anybody had made on purpose.**
-
-## Cloud-compatible by construction
-
-Written when hosting was not imminent; it is now, and the bet paid — hosting
-turned out to be additive, exactly as this section argued for. The seams below
-were gotten right during the near-term work, and the auth layer and container
-landed on top of them without reworking a handler. Kept because the
-"do not regress" entries still bind.
-
-**Already done, do not regress:**
-
-- Paths come from `config.py` and honour `MTGLAB_DATA_DIR` /
-  `MTGLAB_DECKS_DIR`. A container mounting a volume at `/data` just works.
-- `api/` does not import `cli.py`. The web layer has no command-line
-  dependency to untangle later.
-**Newly true, worth not regressing:**
-
-- **The one new thing that writes to the working directory is contained.**
-  Hypothesis keeps a `.hypothesis/` cache; the CI profile in
-  `tests/conftest.py` turns off the example database, but — measured, not
-  assumed — a unicode and constants cache is still written regardless. The knob
-  is `HYPOTHESIS_STORAGE_DIRECTORY`, and with it set nothing lands in the repo.
-  That is one line in the container for §3's read-only root filesystem, and it
-  is written down here so it is found before the build fails rather than after.
-  The same profile derandomises, so a pull request never goes red because
-  Hypothesis rolled different examples; deterministic coverage comes from the
-  enumerated pool instead.
-
-**Worth doing now, because it is cheap now and invasive later:**
-
-1. ~~**A deck source abstraction.**~~ **Built 2026-08-10** —
-   `decks/source.py`. A `DeckSource` protocol with three methods (`slugs`,
-   `get`, `all`), a `FileDeckSource` and a `MemoryDeckSource`. It is not
-   scaffolding: hosting's two-tier model keeps the curated decks file-backed
-   *permanently* and adds user decks from SQLite, so this is the shape the
-   system ends up with, and `SqlDeckSource` is now additive rather than a
-   change to every endpoint.
-
-   `slugs()` is separate from `all()` on purpose — `/api/health` wants a count,
-   and parsing every deck to produce it is silly now and worse later. It also
-   means one unreadable deck file cannot take the health endpoint down.
-
-   One constraint the protocol carries, and future implementations must
-   respect: **a `DeckSource` is a locator, not a connection.** Background
-   simulation jobs capture one and outlive their request by minutes, so a SQL
-   source opens and closes per call rather than holding a handle.
-
-2. ~~**A request scope, even with one implementation.**~~ **Built
-   2026-08-10** — `api/deps.py`, one dependency, wired into every deck-facing
-   route as a single `Decks` annotation. It returns the curated file-backed
-   library today; when auth arrives it reads the session and returns a source
-   that unions the curated decks with the caller's, and no handler changes.
-   `docs/HOSTING.md` §1 requires all user-scoped queries to go through one
-   accessor for isolation; this is that accessor, built before it has anything
-   to isolate, which is the only time it is cheap.
-
-   Deliberately *not* built: a `UserScope`. There is no session and no user
-   table, and a one-field object modelling a user that does not exist is
-   guessing at a shape rather than preparing for one.
-
-   The payoff arrived immediately rather than at hosting time: `/api/decks`
-   against an empty library is now a two-line test instead of a filesystem
-   fixture, and there is a test that the endpoints read the scope rather than
-   the filesystem at all.
-
-**Accepted, not oversights:**
-
-- `api/jobs.py` is an in-process registry. That is correct for a single
-  machine with scale-to-zero, and externalising it would only matter for
-  multiple instances — which the hosting plan does not call for. Revisit only
-  if the deployment ever runs more than one.
-- The frontend needs no preparation. Login is a route, a session context and
-  401 handling; all of that is additive to what exists. Do not pre-build it.
-
-## Deferred until measured
-
-Parked deliberately, not forgotten. Each needs evidence before it starts.
-
-| Item | Reopen when |
-| --- | --- |
-| **Tier 2 inner loop in Rust** (PyO3, rayon, criterion) | The §1 trigger fires — a matchup over 5 minutes, or a round-robin over an hour, after caching, multiprocessing and ordinary Python optimisation |
-| **SIMD-batched RNG** | A profile of the *Rust* engine shows the generator and shuffle are hot. Not before Rust exists |
-| **Differential testing Python vs Rust** | Ships with the port, not separately — it is what makes the port defensible |
-| **Go** | Only if the engine ever becomes a standalone service rather than a library in-process. Not the current shape |
-
-Two items in the sections above stayed on the near-term list even though the
-port is parked, because they pay off on the Python engine on their own terms:
-**property-based testing of `mana.py`** (§2) and **determinism tests**. Both
-shipped on 2026-08-10, and both earned their place in the branch where the port
-never happens — one real bug found, and Tier 1's output now pinned. The pool
-and the pinned digests are also exactly what a port would be tested against, so
-neither branch of the §1 decision wasted the work.
+**Merging deploys** (ADR 23): a green push to `main` is live ~10 minutes
+later. `docs/HOSTING.md` is the runbook, including rollback and the deploy
+token's expiry.

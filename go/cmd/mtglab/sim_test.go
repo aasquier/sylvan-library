@@ -4,9 +4,9 @@ package main
 // Execute, and os.Stdout captured through a pipe -- because the commands
 // print plainly, and the tables they print are the product.
 //
-// The fixture is the same one the rest of the port stands on: the 21-card
-// pool (`pooltest`, tests/tiny_pool.py in a second encoding) and the
-// mono-green 99 the gate corpus carries. Everything seeded is asserted
+// The fixture is the same one the rest of the suite stands on: the 21-card
+// pool (`pooltest`) and the mono-green 99 the gate corpus carries.
+// Everything seeded is asserted
 // deterministic by running it twice, which is the promise `--seed` makes.
 
 import (
@@ -19,7 +19,6 @@ import (
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 	simcache "github.com/aasquier/sylvan-library/go/internal/sim/cache"
@@ -27,9 +26,9 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
 )
 
-// simHome points MTGLAB_DATA_DIR and MTGLAB_DECKS_DIR at a scratch tree, the
-// way Python tests use `config.use_paths()`. With `withPool` the 21-card
-// DuckDB lands where `config.DBPath()` will look for it.
+// simHome points MTGLAB_DATA_DIR and MTGLAB_DECKS_DIR at a scratch tree, so
+// no command in this file can see a real library. With `withPool` the
+// 21-card DuckDB lands where `config.DBPath()` will look for it.
 func simHome(t *testing.T, withPool bool) string {
 	t.Helper()
 	dataDir := t.TempDir()
@@ -49,7 +48,7 @@ func simHome(t *testing.T, withPool bool) string {
 
 func writeSimDeck(t *testing.T, slug, text string) {
 	t.Helper()
-	dir := filepath.Join(config.DecksDir(), slug)
+	dir := filepath.Join(settings().DecksDir, slug)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +124,7 @@ func TestSimManaReportsTheGoldfish(t *testing.T) {
 		}
 	}
 	// Header block (8 lines), a blank, the table header, then one row per
-	// turn -- Python's report() shape exactly.
+	// turn -- the recorded report's shape exactly.
 	if lines := strings.Split(strings.TrimRight(out, "\n"), "\n"); len(lines) != 10+6 {
 		t.Errorf("report has %d lines, want %d\n%s", len(lines), 16, out)
 	}
@@ -148,7 +147,7 @@ func TestSimManaReportsTheGoldfish(t *testing.T) {
 func TestSimManaRefusesAMissingDeck(t *testing.T) {
 	simHome(t, false)
 	_, err := runSim(t, "mana", "nope")
-	want := "no deck at " + filepath.Join(config.DecksDir(), "nope", "deck.yaml")
+	want := "no deck at " + filepath.Join(settings().DecksDir, "nope", "deck.yaml")
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}
@@ -165,11 +164,11 @@ func TestSimManaRefusesWithoutThePool(t *testing.T) {
 }
 
 // A deck where not one name resolves is refused as PoolRequired -- the wart
-// `internal/sim/compile` pins in both runtimes, and the closest thing to a
+// `internal/sim/compile` pins and argues, and the closest thing to a
 // "nothing to simulate" refusal this surface has. `NothingToSimulate` itself
-// is UNREACHABLE from the CLI, deliberately: `cmd_sim_mana` compiles through
-// `compile_deck`, which never raises it -- only `compile_report` does, and
-// the CLI never calls that.
+// is UNREACHABLE from the CLI, deliberately: `sim mana` compiles through
+// `compile.Deck`, which never returns it -- only `compile.Compile` does,
+// and the CLI never calls that.
 func TestSimManaRefusesADeckThePoolCannotSee(t *testing.T) {
 	simHome(t, true)
 	writeSimDeck(t, "nobody", strings.Join([]string{
@@ -222,8 +221,9 @@ func TestSimLandsSweepsTheRange(t *testing.T) {
 	}
 }
 
-// Python's `range(low, high + 1)` on a backwards range runs no iterations and
-// refuses nothing: header, footer, exit 0. Ported, not improved.
+// A backwards range (low > high) sweeps nothing and refuses nothing:
+// header, footer, exit 0. The recorded behaviour, kept rather than
+// improved -- a refusal here would be an invention.
 func TestSimLandsEmptyRangeIsHeaderAndFooterOnly(t *testing.T) {
 	simHome(t, true)
 	writeSimDeck(t, "mono-green", monoGreenText(t))
@@ -372,9 +372,9 @@ func TestSimCacheListsAndClears(t *testing.T) {
 	dataDir := simHome(t, false)
 	path := filepath.Join(dataDir, "app.db")
 
-	// An absent app.db is read as an empty one -- Python would create the
-	// file here; the door's rule is that a reader never acquires a database,
-	// and the words are identical either way.
+	// An absent app.db is read as an empty one, never minted -- the door's
+	// rule is that a reader never acquires a database, and the printed
+	// words are identical to a real empty store's.
 	out, err := runSim(t, "cache")
 	if err != nil {
 		t.Fatalf("sim cache: %v", err)
@@ -579,7 +579,7 @@ func TestSimForgeRefusesWithoutForge(t *testing.T) {
 
 	// A deck that does not exist is refused before Forge is even looked for.
 	_, err := runSim(t, "forge", "a", "zz")
-	want := "no deck at " + filepath.Join(config.DecksDir(), "zz", "deck.yaml")
+	want := "no deck at " + filepath.Join(settings().DecksDir, "zz", "deck.yaml")
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}
@@ -587,11 +587,12 @@ func TestSimForgeRefusesWithoutForge(t *testing.T) {
 
 // ------------------------------------------------- the formatting helpers
 //
-// Each one stands in for a Python f-string conversion, so each is pinned on
-// the inputs where a naive Go spelling drifts: thousands grouping, negative
+// Each one renders a number the recorded tables lean on, so each is pinned
+// on the inputs where a naive spelling drifts: thousands grouping, negative
 // slice bounds, and widths counted in code points rather than bytes.
 
-func TestPythonTextHelpers(t *testing.T) {
+func TestTableTextHelpers(t *testing.T) {
+	t.Parallel()
 	if got := groupThousands(20); got != "20" {
 		t.Errorf("groupThousands(20) = %q", got)
 	}
@@ -601,14 +602,14 @@ func TestPythonTextHelpers(t *testing.T) {
 	if got := groupThousands(1234567); got != "1,234,567" {
 		t.Errorf("groupThousands(1234567) = %q", got)
 	}
-	if got := pyHead([]int{1, 2, 3, 4, 5}, -2); len(got) != 3 || got[2] != 3 {
-		t.Errorf("pyHead(-2) = %v", got)
+	if got := headOf([]int{1, 2, 3, 4, 5}, -2); len(got) != 3 || got[2] != 3 {
+		t.Errorf("headOf(-2) = %v", got)
 	}
-	if got := pyHead([]int{1, 2}, 99); len(got) != 2 {
-		t.Errorf("pyHead(99) = %v", got)
+	if got := headOf([]int{1, 2}, 99); len(got) != 2 {
+		t.Errorf("headOf(99) = %v", got)
 	}
-	if got := pyHead([]int{1, 2}, -99); len(got) != 0 {
-		t.Errorf("pyHead(-99) = %v", got)
+	if got := headOf([]int{1, 2}, -99); len(got) != 0 {
+		t.Errorf("headOf(-99) = %v", got)
 	}
 	// Bösium Strip is in the pool; padding must count code points.
 	if got := padRight("Bösium", 8); got != "Bösium  " {
@@ -620,22 +621,22 @@ func TestPythonTextHelpers(t *testing.T) {
 	if got := headRunes("Déjà Vu", 4); got != "Déjà" {
 		t.Errorf("headRunes = %q", got)
 	}
-	if got := pyPercent(0.9, 0); got != "90%" {
-		t.Errorf("pyPercent(0.9, 0) = %q", got)
+	if got := percent(0.9, 0); got != "90%" {
+		t.Errorf("percent(0.9, 0) = %q", got)
 	}
-	if got := pyPercent(0.123, 1); got != "12.3%" {
-		t.Errorf("pyPercent(0.123, 1) = %q", got)
+	if got := percent(0.123, 1); got != "12.3%" {
+		t.Errorf("percent(0.123, 1) = %q", got)
 	}
-	if got := pySigned(0.01); got != "+0.01" {
-		t.Errorf("pySigned = %q", got)
+	if got := signed(0.01); got != "+0.01" {
+		t.Errorf("signed = %q", got)
 	}
-	if got := pySigned(-0.25); got != "-0.25" {
-		t.Errorf("pySigned = %q", got)
+	if got := signed(-0.25); got != "-0.25" {
+		t.Errorf("signed = %q", got)
 	}
-	if got := pyG(4); got != "4" {
-		t.Errorf("pyG(4) = %q", got)
+	if got := gFormat(4); got != "4" {
+		t.Errorf("gFormat(4) = %q", got)
 	}
-	if got := pyG(4.5); got != "4.5" {
-		t.Errorf("pyG(4.5) = %q", got)
+	if got := gFormat(4.5); got != "4.5" {
+		t.Errorf("gFormat(4.5) = %q", got)
 	}
 }

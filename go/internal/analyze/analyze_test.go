@@ -16,12 +16,13 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The differential cases again (`tests/go_fixtures.py`): each fixture deck's
-// text beside `service.stats_for`'s answer over the 21-card pool, which is
-// exactly what `GET /api/decks/{owner}/{slug}/stats` serves. DeckStats must
-// encode to the same document -- same keys, same order, same numbers.
+// The differential cases again: each fixture deck's text beside its
+// recorded stats answer over the 21-card pool, which is exactly what
+// `GET /api/decks/{owner}/{slug}/stats` serves. DeckStats must encode to
+// the same document -- same keys, same order, same numbers.
 
-func TestDeckStatsAgreesWithPythonCaseForCase(t *testing.T) {
+func TestDeckStatsMatchesTheGoldenCaseForCase(t *testing.T) {
+	t.Parallel()
 	dir := filepath.Join("..", "gate", "testdata")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -70,7 +71,7 @@ func TestDeckStatsAgreesWithPythonCaseForCase(t *testing.T) {
 				return err
 			}
 			if canonical(t, got) != canonical(t, want) {
-				t.Errorf("%s: DeckStats disagrees with Python\n--- got\n%s\n--- want\n%s", name, got, strings.TrimSpace(string(want)))
+				t.Errorf("%s: DeckStats disagrees with the golden\n--- got\n%s\n--- want\n%s", name, got, strings.TrimSpace(string(want)))
 			}
 			// And the key order is the route's: a Go map would have sorted it.
 			if !strings.HasPrefix(string(got), `{"slug":`) || !strings.Contains(string(got), `"curve":{"average_mv":`) {
@@ -83,7 +84,7 @@ func TestDeckStatsAgreesWithPythonCaseForCase(t *testing.T) {
 		}
 	}
 	if checked < 5 {
-		t.Fatalf("only %d stats cases; regenerate with `python tests/go_fixtures.py`", checked)
+		t.Fatalf("only %d stats cases; the gate's testdata goldens have thinned", checked)
 	}
 }
 
@@ -102,19 +103,19 @@ func canonical(t *testing.T, raw []byte) string {
 
 // The corpus has to be able to fail.
 //
-// `OpeningHand` sums three hypergeometric probabilities into `keepable`, and
-// it summed them with a `+=` loop until 2026-08-22 -- which is CPython 3.11's
-// `sum()` and not the 3.12 the image runs, because 3.12 gave `sum()` over
-// floats compensated accumulation. The eight fixture decks that existed then
-// sat at 99 cards on 95 or 96 lands and at 106 on 96, and the two arithmetics
-// agree at every one of those shapes, so the whole differential corpus was
-// green against an implementation that answered a different number from the
-// interpreter it was ported from.
+// `OpeningHand` sums three hypergeometric probabilities into `keepable`,
+// and it summed them with a `+=` loop until 2026-08-22 -- a different
+// arithmetic, in its last bits, from the compensated sums the corpus
+// records. The eight fixture decks that existed then sat at 99 cards on 95
+// or 96 lands and at 106 on 96, and the two arithmetics agree at every one
+// of those shapes, so the whole differential corpus was green against an
+// implementation that answered a different number from the recording.
 //
 // `last-bit` is the ninth deck, cut for this: 99 cards on 91 lands, where
 // 3.11 answers 0.010640320706772594 and 3.12 answers 0.010640320706772595.
 // This asserts that some deck in the corpus still lands there.
 func TestTheStatsCorpusSeparatesFsumFromARunningTotal(t *testing.T) {
+	t.Parallel()
 	dir := filepath.Join("..", "gate", "testdata")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -159,11 +160,11 @@ func TestTheStatsCorpusSeparatesFsumFromARunningTotal(t *testing.T) {
 		}
 		if math.Float64bits(naive) != math.Float64bits(doc.Opening.Lands.Keepable) {
 			differs++
-			t.Logf("%s: running total %v, Python %v", e.Name(), naive, doc.Opening.Lands.Keepable)
+			t.Logf("%s: running total %v, the golden says %v", e.Name(), naive, doc.Opening.Lands.Keepable)
 		}
 	}
 	if checked < 5 {
-		t.Fatalf("only %d land distributions; regenerate with `python tests/go_fixtures.py`", checked)
+		t.Fatalf("only %d land distributions; the gate's testdata goldens have thinned", checked)
 	}
 	if differs == 0 {
 		t.Fatal("no fixture deck's land distribution separates fsum from a " +

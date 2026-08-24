@@ -8,29 +8,28 @@ import (
 	"testing"
 )
 
-// The compatibility claim the accounts flip rests on, held to Python's own
-// output.
+// The compatibility claim the accounts family rests on, held to a recorded
+// corpus.
 //
-// ADR 38 promises "Argon2id PHC hashes verify as-is". Phase 2 proved the easy
-// half -- Go reads a hash Python wrote -- and that was enough while the door
-// only ever *resolved* a session. Phase 4 makes Go a writer: a password set
-// through the Go claim route produces a hash that `argon2-cffi` has to accept
-// for the rest of the file's life, including after a rollback to a
-// Python-only door, and including for `mtglab users` on the machine.
+// ADR 38 promises "Argon2id PHC hashes verify as-is". Every hash already in
+// `app.db` was written at the pinned profile below, and a password set
+// through the claim route today produces a hash that has to verify for the
+// rest of the file's life -- including for `mtglab users` on the machine.
 //
-// A round trip in each direction would not settle that. Go verifying Python's
-// hash and Python verifying Go's would both pass even if the two encoders
-// disagreed about, say, base64 padding for some salts and not others. So the
-// oracle is stronger and the test is simpler: `tests/go_fixtures.py` records
-// the exact PHC string argon2-cffi produces for a password **and a fixed
-// salt**, and `hashWithSalt` -- the production encoder, which is why
-// `HashPassword` takes the salt as an argument at all -- must reproduce it
-// character for character. Two implementations that agree on every byte for a
-// given input are the same function, and the only free variable left in a real
-// hash is the salt, which travels inside the string.
+// A round trip alone would not settle that. An encoder and verifier that
+// drifted together -- say, over base64 padding for some salts and not
+// others -- would still round-trip while orphaning every hash already
+// stored. So the oracle is stronger and the test is simpler:
+// `testdata/crypto.json` records the exact PHC string produced for a
+// password **and a fixed salt**, and `hashWithSalt` -- the production
+// encoder, which is why `HashPassword` takes the salt as an argument at all
+// -- must reproduce it character for character. Two implementations that
+// agree on every byte for a given input are the same function, and the only
+// free variable left in a real hash is the salt, which travels inside the
+// string.
 //
-// Regenerate with `python tests/go_fixtures.py`; `tests/test_go_fixtures.py`
-// fails if the committed file is not what Python writes today.
+// The corpus is a frozen golden, never regenerated: the recorded hashes are
+// the promise every stored password rests on.
 
 type cryptoOracle struct {
 	Argon2ID struct {
@@ -67,8 +66,8 @@ func loadCryptoOracle(t *testing.T) cryptoOracle {
 		t.Fatalf("parse the crypto oracle: %v", err)
 	}
 	if len(oracle.Argon2ID.Cases) == 0 {
-		t.Fatal("the crypto oracle has no Argon2 cases; regenerate it with " +
-			"`python tests/go_fixtures.py`")
+		t.Fatal("the crypto oracle has no Argon2 cases; " +
+			"testdata/crypto.json is a frozen golden")
 	}
 	return oracle
 }
@@ -77,7 +76,8 @@ func loadCryptoOracle(t *testing.T) cryptoOracle {
 // recorded under different ones would prove nothing about this build. Checked
 // first so a mismatch reports as "the profiles differ" rather than as a wall
 // of unequal hashes.
-func TestTheArgon2ProfileIsPythons(t *testing.T) {
+func TestTheArgon2ProfileIsTheRecordedOne(t *testing.T) {
+	t.Parallel()
 	p := loadCryptoOracle(t).Argon2ID
 	for _, c := range []struct {
 		name      string
@@ -92,33 +92,36 @@ func TestTheArgon2ProfileIsPythons(t *testing.T) {
 		{"max password bytes", MaxPasswordBytes, p.MaxPasswordBytes},
 	} {
 		if c.got != c.want {
-			t.Errorf("%s is %d here and %d in `auth/passwords.py`", c.name, c.got, c.want)
+			t.Errorf("%s is %d here and %d in the oracle", c.name, c.got, c.want)
 		}
 	}
 }
 
-// Go → Python. The production encoder must write the bytes argon2-cffi wrote,
-// which is what makes a hash Go stores one Python will still verify.
-func TestTheEncoderWritesPythonsBytes(t *testing.T) {
+// The write side. The production encoder must write the recorded bytes,
+// which is what keeps a hash stored today interchangeable with every one
+// already in the file.
+func TestTheEncoderWritesTheRecordedBytes(t *testing.T) {
+	t.Parallel()
 	for _, c := range loadCryptoOracle(t).Argon2ID.Cases {
 		salt, err := base64.StdEncoding.DecodeString(c.SaltB64)
 		if err != nil {
 			t.Fatalf("%s: the recorded salt is not base64: %v", c.Note, err)
 		}
 		if got := hashWithSalt(c.Password, salt); got != c.Hash {
-			t.Errorf("%s:\n go     %s\n python %s", c.Note, got, c.Hash)
+			t.Errorf("%s:\n got  %s\n want %s", c.Note, got, c.Hash)
 		}
 	}
 }
 
-// Python → Go. The read side Phase 2 proved, run again over the wider corpus
+// The read side: every recorded hash verifies here
 // -- and with the negative, because an encoder that ignored the password would
 // pass the test above and this one's first half.
-func TestPythonsHashesVerifyHere(t *testing.T) {
+func TestTheRecordedHashesVerifyHere(t *testing.T) {
+	t.Parallel()
 	for _, c := range loadCryptoOracle(t).Argon2ID.Cases {
 		hash := c.Hash
 		if !Verify(&hash, c.Password) {
-			t.Errorf("%s: a hash argon2-cffi wrote did not verify", c.Note)
+			t.Errorf("%s: a recorded hash did not verify", c.Note)
 		}
 		if Verify(&hash, c.Password+"-not") {
 			t.Errorf("%s: the wrong password verified", c.Note)
@@ -133,13 +136,14 @@ func TestPythonsHashesVerifyHere(t *testing.T) {
 // is the one that would catch a salt generator that produced a salt the
 // encoder could not encode.
 func TestAHashWrittenHereVerifiesHere(t *testing.T) {
+	t.Parallel()
 	const password = "a passphrase long enough to store"
 	hash, err := HashPassword(password)
 	if err != nil {
 		t.Fatalf("hash: %v", err)
 	}
 	if !strings.HasPrefix(hash, "$argon2id$v=19$m=19456,t=2,p=1$") {
-		t.Fatalf("not the PHC shape argon2-cffi writes: %s", hash)
+		t.Fatalf("not the recorded PHC shape: %s", hash)
 	}
 	if !Verify(&hash, password) {
 		t.Fatal("a freshly written hash did not verify")
@@ -154,10 +158,11 @@ func TestAHashWrittenHereVerifiesHere(t *testing.T) {
 }
 
 // The strength floor, which is a refusal rather than advice: a route answers
-// 422 with this sentence, so both halves have to agree on where it falls.
-// Measured in *runes* on the low side and *bytes* on the high side, exactly as
-// `check_strength` measures them.
-func TestTheStrengthFloorIsPythons(t *testing.T) {
+// 422 with this sentence, so the floor has to fall where the oracle says.
+// Measured in *runes* on the low side and *bytes* on the high side -- the
+// recorded rule, and the reason the two ends are measured differently.
+func TestTheStrengthFloorIsTheRecordedOne(t *testing.T) {
+	t.Parallel()
 	oracle := loadCryptoOracle(t).Argon2ID
 	short := strings.Repeat("é", oracle.MinPasswordLength-1)
 	if err := CheckStrength(short); err == nil {
@@ -173,21 +178,24 @@ func TestTheStrengthFloorIsPythons(t *testing.T) {
 	}
 }
 
-// The token hash. One line on each side, and recorded anyway: it is the other
-// thing that would make a Go-minted session or invite invisible to Python.
-func TestTheTokenHashIsPythons(t *testing.T) {
+// The token hash. One line of code, and recorded anyway: it is the other
+// thing that would make a freshly-minted session or invite invisible to the
+// rows already stored.
+func TestTheTokenHashIsTheRecordedDigest(t *testing.T) {
+	t.Parallel()
 	for _, c := range loadCryptoOracle(t).SHA256Hex {
 		if got := HashToken(c.Input); got != c.Digest {
-			t.Errorf("HashToken(%q) = %s, python = %s", c.Input, got, c.Digest)
+			t.Errorf("HashToken(%q) = %s, recorded = %s", c.Input, got, c.Digest)
 		}
 	}
 }
 
-// `secrets.token_urlsafe(32)` is 43 characters from the URL alphabet with no
+// A minted token is 43 characters from the URL alphabet with no
 // padding. The alphabet matters as much as the entropy: a session token rides
 // in a cookie and an auth token rides in a URL fragment, and `+` and `/`
 // survive neither reliably.
-func TestTokensAreShapedLikePythons(t *testing.T) {
+func TestTokensAreURLSafeAndUnpadded(t *testing.T) {
+	t.Parallel()
 	seen := map[string]bool{}
 	for i := 0; i < 64; i++ {
 		token := TokenURLSafe(TokenBytes)

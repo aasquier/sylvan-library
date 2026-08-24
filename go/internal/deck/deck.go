@@ -1,8 +1,9 @@
-// Package deck is `decks/model.py`: the deck file, parsed. `deck.yaml` is the
-// source of truth, and since ADR 30 the app's own data rather than anything
-// git tracks; the five deliverables are generated from it and the activity log
-// is its history. Go reads a deck to validate it, to analyse it, to render it
-// to the wire and to compare it against the last build's snapshot.
+// Package deck is the deck file, parsed. `deck.yaml` is the source of
+// truth, and since ADR 30 the app's own data rather than anything git
+// tracks; the five deliverables are generated from it and the activity log
+// is its history. The app reads a deck to validate it, to analyse it, to
+// render it to the wire and to compare it against the last build's
+// snapshot.
 //
 // **Parsed, and in one place written** -- `dump.go`, which arrived with Phase
 // 4 and which this comment said would never exist. ADR 12's surgery is still
@@ -11,14 +12,14 @@
 // (a deck created, a deck imported, and the artifacts snapshot), and `Payload`
 // beside it stays a projection to compare rather than a second dumper.
 //
-// `FromText` is `Deck.from_text`, field for field, default for default: a
-// missing `status` is theoretical and a missing `stage` is curated (the
-// opposite defaults, each argued in the Python module), `shared` is true
-// unless the file says no, themes are lowered and stripped, a bare string in
-// `cards:` is a card filed under utility. A file the Python model could not
-// parse is an error here too, and the handler answers it the way FastAPI
-// answers an exception -- a 500 in the envelope -- rather than inventing a
-// deck.
+// `FromText` reads the file field for field, default for default: a missing
+// `status` is theoretical and a missing `stage` is curated (opposite
+// defaults on purpose -- an undeclared power claim should undersell, an
+// undeclared maturity should not demote a finished deck), `shared` is true
+// unless the file says no, themes are lowered and stripped, a bare string
+// in `cards:` is a card filed under utility. A file that will not parse is
+// an error, and the handler answers it as a 500 in the envelope rather than
+// inventing a deck.
 package deck
 
 import (
@@ -74,10 +75,9 @@ type Deck struct {
 	Graveyard []CardEntry
 }
 
-// FromText is `Deck.from_text`: parse deck YAML that is not necessarily a
-// file. `slug` is the location's name -- the directory, or the row -- which
-// wins over nothing and loses to the file's own `slug:`, exactly as Python
-// orders it (`raw.get("slug") or slug`).
+// FromText parses deck YAML that is not necessarily a file. `slug` is the
+// location's name -- the directory, or the row -- which wins over nothing
+// and loses to the file's own `slug:`.
 func FromText(text string, slug string) (*Deck, error) {
 	// Ordered, and then flattened for everything except `notes:`. Every other
 	// field is named here one at a time, so a map serves them; the notes are
@@ -85,9 +85,9 @@ func FromText(text string, slug string) (*Deck, error) {
 	// dump of this parse, so their order has to survive the round trip.
 	ordered, err := deckyaml.ParseOrdered([]byte(text))
 	if err != nil {
-		// An empty document parses to nothing in Python (`or {}`); goccy
-		// reports an empty document as an error rather than a nil map, so
-		// the one case is told apart here.
+		// An empty document is an empty deck by contract; goccy reports an
+		// empty document as an error rather than a nil map, so the one
+		// case is told apart here.
 		if strings.TrimSpace(text) == "" {
 			ordered = deckyaml.Map{}
 		} else {
@@ -131,10 +131,11 @@ func FromText(text string, slug string) (*Deck, error) {
 			n := int(b)
 			d.Bracket = &n
 		case string:
-			// Python keeps whatever the file said; a string bracket would
-			// be rendered as a string. A deck file written by the app never
-			// has one; the gate reads `bracket` only through analyze, which
-			// looks it up in a table and treats an unknown as unlimited.
+			// A string bracket is read when it is a number in quotes and
+			// dropped when it is not -- the typed field has nowhere to
+			// keep prose, and the edge cannot matter: a deck file written
+			// by the app never has one, and the gate reads `bracket` only
+			// through analyze, which treats an unknown as unlimited.
 			if n, err := strconv.Atoi(strings.TrimSpace(b)); err == nil {
 				d.Bracket = &n
 			}
@@ -247,8 +248,8 @@ func firstString(v any, fallback string) string {
 	return fallback
 }
 
-// stringOr is `str(raw.get(key) or fallback)` -- for a key present but null
-// or empty, the fallback, as Python's `or` gives it.
+// stringOr renders the value, or the fallback for a key absent, null, or
+// otherwise empty -- emptiness by `truthy`, not by string comparison.
 func stringOr(v any, fallback string) string {
 	if v == nil || !truthy(v) {
 		return fallback
@@ -256,7 +257,8 @@ func stringOr(v any, fallback string) string {
 	return fmt.Sprint(v)
 }
 
-// truthy is Python's bool() over the values goccy hands over.
+// truthy is one emptiness rule over every value goccy hands over: nil,
+// false, zero, "", and an empty container are empty; everything else is not.
 func truthy(v any) bool {
 	switch t := v.(type) {
 	case nil:
@@ -446,11 +448,12 @@ func (d *Deck) Payload() map[string]any {
 		p["strategy"] = d.Strategy
 	}
 	if len(d.Notes) > 0 {
-		// The order is part of the comparison, because in Python it is part
-		// of the text: `_baseline_state` asks whether two dumps are the same
-		// string, and two note mappings holding the same pairs in a different
-		// order dump to different files. A Go map here would have called that
-		// `current` and quietly said the artifacts were up to date.
+		// The order is part of the comparison, because it is part of the
+		// text: the baseline check asks whether two dumps are the same
+		// string, and two note mappings holding the same pairs in a
+		// different order dump to different files. A bare map here would
+		// have called that `current` and quietly said the artifacts were
+		// up to date.
 		p["notes"] = append(deckyaml.Map{}, d.Notes...)
 	}
 	draft := d.Stage == "draft"

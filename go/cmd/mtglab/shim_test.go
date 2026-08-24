@@ -57,6 +57,7 @@ func ask(t *testing.T, srv *httptest.Server, method, path, body, token string) (
 // calls before it has any work to send: the machine is up, the process is
 // listening, the door answers.
 func TestHealthzIsWhatTheAppPollsAfterAMachineStart(t *testing.T) {
+	t.Parallel()
 	srv := shimServer(t)
 	status, body := ask(t, srv, http.MethodGet, "/healthz", "", "")
 	if status != 200 {
@@ -74,6 +75,7 @@ func TestHealthzIsWhatTheAppPollsAfterAMachineStart(t *testing.T) {
 // TestAnUnknownRouteIs404 keeps the door small: three endpoints, and anything
 // else is a mistake worth naming.
 func TestAnUnknownRouteIs404(t *testing.T) {
+	t.Parallel()
 	srv := shimServer(t)
 	for _, c := range []struct{ method, path string }{
 		{http.MethodGet, "/"},
@@ -124,6 +126,7 @@ func TestTheTokenGatesEveryRequest(t *testing.T) {
 // TestAnUnreadableBodyIs400 keeps a malformed ask apart from a failed match:
 // one is the caller's, the other is the JVM's.
 func TestAnUnreadableBodyIs400(t *testing.T) {
+	t.Parallel()
 	srv := shimServer(t)
 	for _, body := range []string{"not json", "[1,2,3]", `{"decks": 7}`, ""} {
 		status, answer := ask(t, srv, http.MethodPost, "/coverage", body, "")
@@ -144,6 +147,7 @@ func TestAnUnreadableBodyIs400(t *testing.T) {
 // machine — and the only thing standing between a four-minute match and a
 // machine that exits underneath it.
 func TestTheWatchdogJudgesWorkRatherThanTime(t *testing.T) {
+	t.Parallel()
 	state := newShimState()
 	state.lastActivity = time.Now().Add(-time.Hour)
 	if state.idleFor() < time.Hour {
@@ -173,6 +177,7 @@ func TestTheWatchdogJudgesWorkRatherThanTime(t *testing.T) {
 // process on another machine, and the `.dck` directory this process hands to
 // Forge is racy under two JVMs.
 func TestOneMatchAtATime(t *testing.T) {
+	t.Parallel()
 	state := newShimState()
 	state.match.Lock()
 	locked := make(chan struct{})
@@ -200,6 +205,7 @@ func TestOneMatchAtATime(t *testing.T) {
 // off a job row to know whether Forge was missing, the match timed out, or the
 // results were untrustworthy — three very different mornings.
 func TestFailureTextNamesTheClass(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		err  error
 		want string
@@ -301,9 +307,9 @@ func TestTheGoShimPlaysARealMatchForTheGoClient(t *testing.T) {
 	}
 	// The seats crossed, which is what lets a winner be named as a deck —
 	// and by the deck's OWN slug: `mono-green-clean.yaml` declares
-	// `slug: mono-green`, and a file's own slug wins over the location's
-	// name (`raw.get("slug") or slug`). A test that expected the filename
-	// here would be asserting the wrong half of that rule.
+	// `slug: mono-green`, and a file's own `slug:` wins over the location's
+	// name. A test that expected the filename here would be asserting the
+	// wrong half of that rule.
 	if run.Seats[1] != decks[0].Slug || run.Seats[2] != decks[1].Slug {
 		t.Errorf("the seats did not cross: %v, want %s and %s",
 			run.Seats, decks[0].Slug, decks[1].Slug)
@@ -313,43 +319,43 @@ func TestTheGoShimPlaysARealMatchForTheGoClient(t *testing.T) {
 	}
 }
 
-// bigOf is the seed as the engine carries it: Python's integers are unbounded
-// and the seed is echoed back, so it travels as a big.Int rather than an int64.
+// bigOf is the seed as the engine carries it: the wire declares the seed an
+// arbitrary-precision integer and echoes it back, so it travels as a big.Int
+// rather than an int64.
 func bigOf(n int64) *big.Int { return big.NewInt(n) }
 
-// TestTheGoClientUnderstandsAPythonShim is deploy skew, tested rather than
+// TestTheClientReadsTheRecordedShimWire is deploy skew, tested rather than
 // watched.
 //
 // **Every release updates the app before the worker**, by several minutes and
 // on purpose (the app deploy is proven first, so a red worker sync is feedback
 // about the worker rather than a rollback of the app). So there is a real
-// window in which the Go route talks to the shim from the *previous* image —
-// and on the release that flipped this package, that previous image was
-// Python's. `wire.go` and `wire.py` are written for exactly that gap; nothing
-// had ever exercised it.
+// window in which the route talks to the shim from the *previous* image —
+// whose answers are whatever wire that older shim recorded. `wire.go` is
+// written for exactly that gap; nothing had ever exercised it.
 //
 // It was not caught in production: the window opened on v195 and closed about
-// a minute before the gate match started, and it can never open that way again
-// — both images carry the Go shim now. Which is the argument for testing it
-// here instead of hoping for a deploy: **the case is permanent even though the
-// opportunity was not.**
+// a minute before the gate match started, and that particular window cannot
+// reopen — the two images ship one artefact now, so the gap is only ever a
+// release apart. Which is the argument for testing it here instead of hoping
+// for a deploy: **the case is permanent even though the opportunity was
+// not.**
 //
-// Point `MTGLAB_PYTHON_SHIM_URL` at a running `python -m
-// mtglab.sim.tier3.shim` (see `docs/FORGE.md`), with `MTGLAB_LIVE_FORGE=1` and
-// a distribution present:
+// Point `MTGLAB_OLD_SHIM_URL` at a shim from an older release (see
+// `docs/FORGE.md`), with `MTGLAB_LIVE_FORGE=1` and a distribution present:
 //
 //	MTGLAB_FORGE_HOME=~/.local/share/mtglab/forge \
 //	MTGLAB_FORGE_SHIM_PORT=8899 MTGLAB_FORGE_IDLE_SECONDS=0 \
-//	  python -m mtglab.sim.tier3.shim &
-//	MTGLAB_LIVE_FORGE=1 MTGLAB_PYTHON_SHIM_URL=http://127.0.0.1:8899 \
-//	  go test ./cmd/... -run PythonShim -v
-func TestTheGoClientUnderstandsAPythonShim(t *testing.T) {
+//	  <older mtglab> forge-shim &
+//	MTGLAB_LIVE_FORGE=1 MTGLAB_OLD_SHIM_URL=http://127.0.0.1:8899 \
+//	  go test ./cmd/... -run RecordedShimWire -v
+func TestTheClientReadsTheRecordedShimWire(t *testing.T) {
 	if os.Getenv("MTGLAB_LIVE_FORGE") != "1" {
 		t.Skip("set MTGLAB_LIVE_FORGE=1 to run a real Forge match")
 	}
-	url := os.Getenv("MTGLAB_PYTHON_SHIM_URL")
+	url := os.Getenv("MTGLAB_OLD_SHIM_URL")
 	if url == "" {
-		t.Skip("set MTGLAB_PYTHON_SHIM_URL to a running `python -m mtglab.sim.tier3.shim`")
+		t.Skip("set MTGLAB_OLD_SHIM_URL to a running forge-shim from an older release")
 	}
 	t.Setenv("MTGLAB_FORGE_WORKER_URL", url)
 
@@ -368,10 +374,11 @@ func TestTheGoClientUnderstandsAPythonShim(t *testing.T) {
 
 	worker := &tier3.Worker{Boot: 30 * time.Second, Sleep: func(d time.Duration) { time.Sleep(d) }}
 
-	// The pre-flight: reports computed by Python's coverage, decoded by Go's.
+	// The pre-flight: reports computed by the older shim's coverage, decoded
+	// by this client.
 	reports, err := worker.CheckCoverage(t.Context(), decks)
 	if err != nil {
-		t.Fatalf("the Python shim's pre-flight did not cross: %v", err)
+		t.Fatalf("the older shim's pre-flight did not cross: %v", err)
 	}
 	if len(reports) != 2 {
 		t.Fatalf("the shim sent %d reports, want 2", len(reports))
@@ -399,15 +406,15 @@ func TestTheGoClientUnderstandsAPythonShim(t *testing.T) {
 			}
 		})
 	if err != nil {
-		t.Fatalf("the Python shim's match did not cross: %v", err)
+		t.Fatalf("the older shim's match did not cross: %v", err)
 	}
 	t.Logf("across the skew: %d games in %.1fs, Forge %s, seats %v",
 		len(run.Games()), run.WallSeconds, run.ForgeVersion, run.Seats)
 
-	// Everything the app needs from a match has to survive Python's encoder
-	// and Go's decoder: the games, the per-game ticks with their rows (the
-	// match theater), the seats that name a winner, and the version the
-	// ledger records.
+	// Everything the app needs from a match has to survive the older shim's
+	// encoder and this client's decoder: the games, the per-game ticks with
+	// their rows (the match theater), the seats that name a winner, and the
+	// version the ledger records.
 	if len(run.Games()) != 2 {
 		t.Fatalf("the shim played %d games, want 2", len(run.Games()))
 	}

@@ -39,14 +39,15 @@ type summaryFile []struct {
 	Rendered string
 }
 
-// TestTheRollUpMatchesPython is the corpus: seeded `request_log` rows
+// TestTheRollUpMatchesTheGolden is the corpus: seeded `request_log` rows
 // through `Summary` with the clock frozen, compared as the bytes the stats
 // route wraps — the seeded 2xx/4xx/5xx keys on every day row, a 3xx
 // appended in encounter order, the cutoff, and the top-twelve order.
-func TestTheRollUpMatchesPython(t *testing.T) {
+func TestTheRollUpMatchesTheGolden(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("testdata/summary.json")
 	if err != nil {
-		t.Fatalf("summary.json: %v (regenerate with `python tests/go_fixtures.py`)", err)
+		t.Fatalf("summary.json: %v (a frozen golden; never regenerated)", err)
 	}
 	var cases summaryFile
 	if err := json.Unmarshal(raw, &cases); err != nil {
@@ -90,6 +91,7 @@ func TestTheRollUpMatchesPython(t *testing.T) {
 // A recorder buffers: the first request writes nothing, the flush lands it,
 // and a second flush has nothing to say.
 func TestCountsBufferAndFlush(t *testing.T) {
+	t.Parallel()
 	db := scratch(t)
 	r := New(db, nil)
 	r.Record("/api/health", 200)
@@ -124,6 +126,7 @@ func TestCountsBufferAndFlush(t *testing.T) {
 // A nil recorder records nothing and never fails a request — the instance
 // with no app.db.
 func TestANilRecorderIsSafe(t *testing.T) {
+	t.Parallel()
 	var r *Recorder
 	r.Record("/api/health", 200)
 	r.Flush()
@@ -139,6 +142,7 @@ func TestANilRecorderIsSafe(t *testing.T) {
 
 // A broken database loses a minute of counts, never a request.
 func TestAFailedWriteIsAWarningNotAPanic(t *testing.T) {
+	t.Parallel()
 	db := scratch(t)
 	if _, err := db.Exec("DROP TABLE request_log"); err != nil {
 		t.Fatal(err)

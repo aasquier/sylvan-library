@@ -13,21 +13,21 @@ import (
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The account routes: `api/auth.py`'s five doors and the `me` that says who is
+// The account routes: the five doors and the `me` that says who is
 // standing in them.
 //
-// The **middleware** half of that module crossed in Phase 2 and lives in
-// `internal/door`; this is the other half. All six are in `PUBLIC_PATHS`,
+// The **middleware** half of the auth story lives in
+// `internal/door`; this is the other half. All six are on
+// `door.PublicPaths`,
 // which is the load-bearing fact about them: every one is reachable with no
 // session, so each is rate limited and each is written so that a refusal tells
 // the caller nothing it did not already know.
 //
-// Four properties are worth finding here rather than in a review, and each is
-// a decision `api/auth.py` argues at length:
+// Four properties are worth finding here rather than in a review, and each
+// is a standing decision:
 //
 //   - **`login` answers one thing for every refusal.** Unknown account, wrong
 //     password, unclaimed invite, disabled account: 401, one sentence, and one
@@ -45,15 +45,15 @@ import (
 //     link a session-minting endpoint, and what it would save is one trip
 //     through a login form that has to work anyway.
 //
-// With auth *off* these routes still exist and still work, exactly as they do
-// in Python: `login` opens `app.db`, verifies a password and hands back a
+// With auth *off* these routes still exist and still work, deliberately:
+// `login` opens `app.db`, verifies a password and hands back a
 // cookie that nothing then checks. That is how the flow gets exercised against
 // a real browser on a laptop. What it must never become is a route that
 // *grants* something locally, and it does not -- with auth off every caller
 // already has full access, so a session confers nothing.
 
-// cookieName is the session cookie (`api/auth.py:COOKIE_NAME`), and the same
-// constant `internal/door` reads to resolve a caller.
+// cookieName is the session cookie, and the same
+// name `internal/door` reads to resolve a caller.
 const cookieName = "sid"
 
 // resetAnswer is the only thing `POST /api/auth/reset` ever says.
@@ -68,10 +68,10 @@ const resetAnswer = "if that address has an account, a link is on its way -- " +
 // whether there is one.
 //
 // It prefers the handle the door opened at start and otherwise opens one
-// lazily, which is not tidiness: on a fresh volume Python creates `app.db`
-// when it first needs it, which is *after* the door has already decided it had
-// none. The lazy open is what makes the first login after that work rather
-// than answering out of a decision taken minutes earlier.
+// lazily, which is not tidiness: on a fresh volume `app.db` can appear
+// after boot -- minted by the CLI, or by a ladder run the door started
+// without. The lazy open is what makes the first login after that work
+// rather than answering out of a decision taken minutes earlier.
 //
 // `false` means there is no database, and every caller below then answers as
 // though there were an **empty** one -- see `internal/auth/writes.go` for why
@@ -106,11 +106,11 @@ func (a *API) accountsDB() (*sql.DB, bool) {
 // It reads a header only when `MTGLAB_CLIENT_IP_HEADER` names one, because a
 // header any client can set is a rate limit any client can opt out of.
 //
-// **And it returns an address or nothing**, which is one step stricter than
-// `api/auth.py:client_address` and deliberately so. CodeQL flagged the Python
-// shape when it was written in Go -- "sensitive data returned by HTTP request
-// headers flows to a logging call" -- and it is right on two counts that are
-// not hypothetical. The variable names a header rather than a value, so a
+// **And it returns an address or nothing**, one step stricter than
+// echoing the header, and deliberately so. CodeQL flagged the echoing
+// shape when this was first written -- "sensitive data returned by HTTP
+// request headers flows to a logging call" -- and it is right on two counts
+// that are not hypothetical. The variable names a header rather than a value, so a
 // misconfiguration (`MTGLAB_CLIENT_IP_HEADER=Authorization`) would put a
 // credential in every auth log line; and the value is otherwise unbounded, so
 // a client behind the proxy could put a kilobyte into the log and into a
@@ -119,11 +119,11 @@ func (a *API) accountsDB() (*sql.DB, bool) {
 // `net.ParseIP` is the whole guard: a header that does not carry an address is
 // not carrying what this function is for, and the peer is the honest fallback.
 // The parsed form is re-serialised rather than the input echoed, so what is
-// logged is an address this process constructed. The one visible difference
-// from Python is that a garbage header no longer becomes a rate-limit key of
+// logged is an address this process constructed. The one visible cost of
+// the strictness is that a garbage header never becomes a rate-limit key of
 // its own -- which was never a key worth having.
-func clientAddress(r *http.Request) string {
-	if header := config.ClientIPHeader(); header != "" {
+func clientAddress(r *http.Request, header string) string {
+	if header != "" {
 		// `X-Forwarded-For` is a chain; the client is the first entry.
 		first, _, _ := strings.Cut(r.Header.Get(header), ",")
 		if ip := net.ParseIP(strings.TrimSpace(first)); ip != nil {
@@ -156,10 +156,10 @@ func loggable(username string) string {
 	return "<redacted>@" + domain
 }
 
-// falsy is Python's truthiness, for the `payload.get(x) or ""` idiom every
-// handler in `api/auth.py` reads its fields through: the `or` runs *before*
-// `str`, so `0` and `false` arrive as the empty string rather than as "0" and
-// "False".
+// falsy is the recorded truthiness, negated -- for the or-empty idiom every
+// account handler reads its fields through: the falsiness check runs
+// *before* the stringification, so `0` and `false` arrive as the empty
+// string rather than as "0" and "False".
 func falsy(v any) bool {
 	switch value := v.(type) {
 	case nil:
@@ -180,7 +180,7 @@ func falsy(v any) bool {
 	}
 }
 
-// field is `str(payload.get(key) or "")`.
+// field is the or-empty read: a falsy value is "", anything else is `str`.
 func field(body map[string]any, key string) string {
 	if falsy(body[key]) {
 		return ""
@@ -188,7 +188,7 @@ func field(body map[string]any, key string) string {
 	return str(body, key)
 }
 
-// setSessionCookie is `_set_cookie`: the browser's half of a session.
+// setSessionCookie is the browser's half of a session.
 //
 // `HttpOnly` keeps it out of JavaScript, `Secure` follows
 // `MTGLAB_SECURE_COOKIES` (on once deployed), and `SameSite=Lax` is the CSRF
@@ -216,17 +216,17 @@ func (a *API) setSessionCookie(w http.ResponseWriter, token string) {
 	})
 }
 
-// clearSessionCookie is Starlette's `delete_cookie(name, path="/")`, attribute
+// clearSessionCookie writes the recorded deletion cookie, attribute
 // for attribute -- which is deliberately **not** the mirror of the one above:
-// that helper's defaults are `httponly=False, secure=False`, so a deletion
-// cookie carries neither. `Expires` is the moment of the request rather than
-// the epoch, because that is what `http.cookies` writes for `expires=0`.
+// the recorded deletion carries neither `HttpOnly` nor `Secure`. `Expires`
+// is the moment of the request rather than
+// the epoch, the recorded rendering of an immediate expiry.
 //
 // gosec objects to both missing attributes, and the answer is that this cookie
 // carries **no value**: it exists to unset one. `HttpOnly` protects a secret
 // from JavaScript and `Secure` keeps it off a plaintext hop; an empty string
 // with `Max-Age=0` has nothing to protect, and adding either would make the
-// header differ from the one `golden/auth.json` records without making
+// header differ from the recorded one without making
 // anything safer.
 func clearSessionCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{ //nolint:gosec // an empty deletion cookie; see above
@@ -304,7 +304,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	}
 	username, password := field(body, "username"), field(body, "password")
 	username = strings.TrimSpace(username)
-	address := clientAddress(r)
+	address := clientAddress(r, a.clientIPHeader)
 	if username == "" || password == "" {
 		wire.Detail(w, http.StatusUnprocessableEntity,
 			"username and password are required")
@@ -371,8 +371,8 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 // confusing answer to "get me out of here", and the honest response to logging
 // out of nothing is that you are logged out.
 //
-// The session row is deleted only when auth is **on**, which mirrors Python
-// exactly: with auth off nothing reads the row anyway, and the local app is
+// The session row is deleted only when auth is **on**, the recorded rule:
+// with auth off nothing reads the row anyway, and the local app is
 // one person who has not asked for a database to be touched.
 func (a *API) logout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(cookieName); err == nil && cookie.Value != "" && a.requireAuth {
@@ -408,7 +408,7 @@ func (a *API) requestReset(w http.ResponseWriter, r *http.Request) {
 		wire.Detail(w, http.StatusUnprocessableEntity, "an email is required")
 		return
 	}
-	address := clientAddress(r)
+	address := clientAddress(r, a.clientIPHeader)
 
 	if db, present := a.accountsDB(); present {
 		budgets := []budget{
@@ -480,7 +480,7 @@ func (a *API) claim(w http.ResponseWriter, r *http.Request) {
 			"a token and a password are required")
 		return
 	}
-	address := clientAddress(r)
+	address := clientAddress(r, a.clientIPHeader)
 
 	db, present := a.accountsDB()
 	if !present {
@@ -549,7 +549,7 @@ func (a *API) claimPreview(w http.ResponseWriter, r *http.Request) {
 		wire.Detail(w, http.StatusUnprocessableEntity, "a token is required")
 		return
 	}
-	address := clientAddress(r)
+	address := clientAddress(r, a.clientIPHeader)
 
 	db, present := a.accountsDB()
 	if !present {

@@ -20,19 +20,20 @@ import (
 )
 
 // The account routes' own tests. `internal/auth` already proves the *engine*
-// against Python -- the hashes byte for byte, the last-admin guard, the
+// against its recorded corpus -- the hashes byte for byte, the last-admin
+// guard, the
 // token's single use -- so what these prove is the layer above: that a refusal
 // lands on the right status with the right sentence, that the cookie carries
-// the attributes Starlette writes, and that nothing here leaks what ADR 16 and
+// the recorded attributes, and that nothing here leaks what ADR 16 and
 // ADR 17 say it must not.
 //
 // **No test in this file sends mail.** Every one that would passes a
 // `recordedSender`, which is ADR 16's seam doing exactly the job it was built
 // for.
 //
-// The sentences matter more here than anywhere else the port has been. They
-// are answered *verbatim* to a browser, `tests/contract/golden/auth.json` and
-// `golden/admin.json` are the record, and `internal/auth`'s `failf` exists so
+// The sentences matter more here than anywhere else in the app. They
+// are answered *verbatim* to a browser, the assertions below are the
+// record, and `internal/auth`'s `failf` exists so
 // a Go sentinel's own words never get in front of one.
 
 const goodPassword = "correct-horse-battery-staple"
@@ -163,7 +164,7 @@ func (r *accountRig) call(t *testing.T, scope auth.Scope, method, target, body s
 	req := httptest.NewRequest(method, target, strings.NewReader(body)).
 		WithContext(auth.WithScope(context.Background(), scope))
 	if body != "" {
-		// Starlette parses a body as JSON only when the content type says so.
+		// A body is parsed as JSON only when the content type says so.
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if cookie != "" {
@@ -192,10 +193,10 @@ func detail(t *testing.T, rec *httptest.ResponseRecorder) string {
 	return got
 }
 
-// maskedCookie is `tests/contract/checks.py:_masked_cookie`: the attributes
-// lowercased and sorted, the value dropped. The golden records this exact
-// string, so reproducing the masker here is what lets a Go test compare
-// against it rather than against a guess.
+// maskedCookie normalises a Set-Cookie header for comparison: the attributes
+// lowercased and sorted, the value dropped. The recorded expectations below
+// are written in this exact form, so the masker is what lets a test compare
+// against them rather than against a guess.
 func maskedCookie(header string) string {
 	first, rest, _ := strings.Cut(header, ";")
 	name, _, _ := strings.Cut(first, "=")
@@ -219,14 +220,15 @@ var anonymous = auth.Scope{}
 // ---- the caller's address --------------------------------------------------
 
 // `clientAddress` returns an address or nothing, and the "or nothing" is the
-// part with a story: CodeQL flagged the Python shape of this function the
-// moment it was written in Go -- "sensitive data returned by HTTP request
-// headers flows to a logging call" -- and it was right twice over. The
+// part with a story: CodeQL flagged the header-echoing shape of this
+// function the moment it was written -- "sensitive data returned by HTTP
+// request headers flows to a logging call" -- and it was right twice over. The
 // environment names a *header*, not a value, so a misconfiguration would put a
 // credential in every auth log line; and the value was otherwise unbounded, so
 // a client behind the proxy could put a kilobyte into the log and into a
 // rate-limit key on every request.
 func TestOnlyAnActualAddressIsTrustedFromAHeader(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		name, header, value, want string
 	}{
@@ -245,22 +247,20 @@ func TestOnlyAnActualAddressIsTrustedFromAHeader(t *testing.T) {
 			strings.Repeat("x", 1024), "192.0.2.1"},
 		{"an empty header", "Fly-Client-IP", "", "192.0.2.1"},
 	} {
-		t.Setenv("MTGLAB_CLIENT_IP_HEADER", c.header)
 		req := httptest.NewRequest("POST", "/api/auth/login", nil)
 		if c.header != "" {
 			req.Header.Set(c.header, c.value)
 		}
-		if got := clientAddress(req); got != c.want {
+		if got := clientAddress(req, c.header); got != c.want {
 			t.Errorf("%s: %q, want %q", c.name, got, c.want)
 		}
 	}
 	// And a peer that is not an address either -- which `httptest` cannot
 	// produce but a unix socket can -- is "unknown" rather than whatever
 	// arrived.
-	t.Setenv("MTGLAB_CLIENT_IP_HEADER", "")
 	req := httptest.NewRequest("POST", "/api/auth/login", nil)
 	req.RemoteAddr = "@"
-	if got := clientAddress(req); got != "unknown" {
+	if got := clientAddress(req, ""); got != "unknown" {
 		t.Errorf("a peer with no address is %q", got)
 	}
 }
@@ -268,6 +268,7 @@ func TestOnlyAnActualAddressIsTrustedFromAHeader(t *testing.T) {
 // ---- login -----------------------------------------------------------------
 
 func TestLoginHandsBackTheCookieTheGoldenRecords(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 
@@ -276,12 +277,12 @@ func TestLoginHandsBackTheCookieTheGoldenRecords(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	// `tests/contract/golden/auth.json`, case `login`. The attributes are the
-	// contract; the value never is. No `secure` here because this instance's
-	// cookies are not secure, exactly as the harness runs it.
+	// The recorded login cookie. The attributes are the
+	// contract; the value never is. No `secure` here because this rig's
+	// cookies are not secure, exactly as a laptop runs it.
 	const want = "sid=*; httponly; max-age=1209600; path=/; samesite=lax"
 	if got := maskedCookie(rec.Header().Get("Set-Cookie")); got != want {
-		t.Errorf("Set-Cookie is\n  %s\nand the golden records\n  %s", got, want)
+		t.Errorf("Set-Cookie is\n  %s\nand the record says\n  %s", got, want)
 	}
 
 	// The body is `{"user": …}` and the user carries **no address** -- ADR 17
@@ -315,6 +316,7 @@ func TestLoginHandsBackTheCookieTheGoldenRecords(t *testing.T) {
 }
 
 func TestASecureInstanceMarksTheCookieSecure(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	rig.api.secureCookies = true
@@ -331,6 +333,7 @@ func TestASecureInstanceMarksTheCookieSecure(t *testing.T) {
 // says "that account is disabled" is a login form that confirms the account
 // exists to anybody who asks.
 func TestEveryLoginRefusalIsIndistinguishable(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	ctx := context.Background()
@@ -369,6 +372,7 @@ func TestEveryLoginRefusalIsIndistinguishable(t *testing.T) {
 }
 
 func TestLoginRefusesAnIncompleteBodyBeforeTouchingTheDatabase(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 
@@ -385,8 +389,8 @@ func TestLoginRefusesAnIncompleteBodyBeforeTouchingTheDatabase(t *testing.T) {
 			t.Errorf("%s said %q", payload, got)
 		}
 	}
-	// A body that is not an object at all is FastAPI's own 422, whose `detail`
-	// is a *list* rather than a sentence.
+	// A body that is not an object at all is the validation 422, whose
+	// `detail` is a *list* rather than a sentence.
 	rec := rig.call(t, anonymous, "POST", "/api/auth/login", `[1,2]`, "")
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("a list body answered %d", rec.Code)
@@ -397,6 +401,7 @@ func TestLoginRefusesAnIncompleteBodyBeforeTouchingTheDatabase(t *testing.T) {
 }
 
 func TestTheLoginBudgetAnswers429WithRetryAfter(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 
@@ -438,6 +443,7 @@ func TestTheLoginBudgetAnswers429WithRetryAfter(t *testing.T) {
 // Session fixation: whatever token arrived is destroyed, and the one that
 // leaves is new.
 func TestLoginDestroysTheTokenThatArrived(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	ctx := context.Background()
@@ -467,6 +473,7 @@ func TestLoginDestroysTheTokenThatArrived(t *testing.T) {
 // ---- logout ----------------------------------------------------------------
 
 func TestLogoutClearsTheCookieAndTheRow(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	ctx := context.Background()
@@ -484,13 +491,12 @@ func TestLogoutClearsTheCookieAndTheRow(t *testing.T) {
 	if body(t, rec)["authenticated"] != false {
 		t.Errorf("logout said %s", rec.Body)
 	}
-	// `golden/auth.json`, case `logout`. Starlette's `delete_cookie(name,
-	// path="/")` defaults `httponly` and `secure` to **False**, so the
-	// deletion cookie carries neither -- which is not the mirror of the one
+	// The recorded deletion cookie carries neither `httponly` nor
+	// `secure` -- which is not the mirror of the one
 	// login sets, and is what the record says.
 	const want = "sid=*; expires=*; max-age=0; path=/; samesite=lax"
 	if got := maskedCookie(rec.Header().Get("Set-Cookie")); got != want {
-		t.Errorf("Set-Cookie is\n  %s\nand the golden records\n  %s", got, want)
+		t.Errorf("Set-Cookie is\n  %s\nand the record says\n  %s", got, want)
 	}
 	if scope, _ := auth.Resolve(ctx, rig.db, token); scope.Authenticated {
 		t.Error("the session row outlived the logout")
@@ -500,6 +506,7 @@ func TestLogoutClearsTheCookieAndTheRow(t *testing.T) {
 // Public, and a no-op when there is none: a 401 on logout is a confusing
 // answer to "get me out of here".
 func TestLogoutOfNothingSucceeds(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	rec := rig.call(t, anonymous, "POST", "/api/auth/logout", "", "")
@@ -510,8 +517,9 @@ func TestLogoutOfNothingSucceeds(t *testing.T) {
 
 // With auth off the row is deliberately left alone -- nothing reads it, and
 // the local app is one person who has not asked for a database to be touched.
-// Python's `if token and require:` is the line; this is it holding.
+// The require flag guards the delete; this is it holding.
 func TestLogoutLeavesTheRowAloneWithAuthOff(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, false)
 	defer rig.close()
 	ctx := context.Background()
@@ -524,7 +532,7 @@ func TestLogoutLeavesTheRowAloneWithAuthOff(t *testing.T) {
 		t.Fatalf("%d", rec.Code)
 	}
 	if scope, _ := auth.Resolve(ctx, rig.db, token); !scope.Authenticated {
-		t.Error("with auth off, logout deleted a session row Python would have kept")
+		t.Error("with auth off, logout deleted a session row it must leave alone")
 	}
 }
 
@@ -535,6 +543,7 @@ func TestLogoutLeavesTheRowAloneWithAuthOff(t *testing.T) {
 // login", and one collapsed boolean makes the local app render a sign-in form
 // it has no server for.
 func TestMeAnswersTheThreeStatesApart(t *testing.T) {
+	t.Parallel()
 	signedIn := auth.Scope{UserID: 1, Username: "alice", IsAdmin: true, Authenticated: true}
 	for _, c := range []struct {
 		name         string
@@ -581,6 +590,7 @@ func TestMeAnswersTheThreeStatesApart(t *testing.T) {
 // ADR 16: the same answer whether or not the address exists, and the lookup
 // happens where nobody is timing it.
 func TestResetAnswersIdenticallyAndSendsAfterwards(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 
@@ -616,6 +626,7 @@ func TestResetAnswersIdenticallyAndSendsAfterwards(t *testing.T) {
 }
 
 func TestResetRefusesAnEmptyAddressAndCountsEveryRequest(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 
@@ -647,6 +658,7 @@ func TestResetRefusesAnEmptyAddressAndCountsEveryRequest(t *testing.T) {
 // ---- claim -----------------------------------------------------------------
 
 func TestClaimSetsAPasswordAndDoesNotSignYouIn(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	token := rig.inviteToken(t, "waiting")
@@ -694,6 +706,7 @@ func (r *accountRig) inviteToken(t *testing.T, username string) string {
 }
 
 func TestClaimRefusesOnTheStatusEachReasonEarns(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	token := rig.inviteToken(t, "waiting")
@@ -744,6 +757,7 @@ func TestClaimRefusesOnTheStatusEachReasonEarns(t *testing.T) {
 // A reset link cannot rename an account -- otherwise "somebody got into my
 // email" and "somebody took over my identity here" are the same incident.
 func TestAResetLinkCannotRenameAndIsNotSpentTrying(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	ctx := context.Background()
@@ -772,6 +786,7 @@ func TestAResetLinkCannotRenameAndIsNotSpentTrying(t *testing.T) {
 // ---- claim/preview ---------------------------------------------------------
 
 func TestPreviewSaysWhatKindOfLinkAndNothingMore(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	token := rig.inviteToken(t, "waiting")
@@ -804,6 +819,7 @@ func TestPreviewSaysWhatKindOfLinkAndNothingMore(t *testing.T) {
 }
 
 func TestPreviewRefusesABadLinkAndADisabledAccountAlike(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	ctx := context.Background()
@@ -834,11 +850,12 @@ func TestPreviewRefusesABadLinkAndADisabledAccountAlike(t *testing.T) {
 
 // ---- an absent database ----------------------------------------------------
 
-// An absent `app.db` is read as an **empty** one, never created. Measured
-// against Python: it creates the file on the first login and then answers 401
-// against it, because an empty `users` table has nobody in it. See
+// An absent `app.db` is read as an **empty** one, never created -- the
+// recorded contract: the first login on such an instance answers 401,
+// because an empty `users` table has nobody in it. See
 // `internal/auth/writes.go`.
 func TestWithNoDatabaseTheAnswersAreTheEmptyOnes(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.db")
 	a := New(Config{AppDBPath: path, DecksDir: dir, RequireAuth: false,

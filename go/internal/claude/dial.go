@@ -1,6 +1,6 @@
 package claude
 
-// The dial's readout: `service.claude_status`, the whole of what
+// The dial's readout: the whole of what
 // `GET /api/claude` answers with.
 //
 // It lives here rather than in `internal/deckread` -- where the other read
@@ -12,9 +12,11 @@ package claude
 // through the same narrow `DeckStatused` the stance takes, so this file adds
 // no dependency at all.
 //
-// **It answers three separate questions and a UI that collapses them lies.**
-// Installed, configured and wanted can each be false on their own, and "no
-// opinions here" reads very differently from "you have not set a key".
+// **It answers separate questions and a UI that collapses them lies.**
+// Configured and wanted can each be false on their own, and "no opinions
+// here" reads very differently from "you have not set a key". `installed` is
+// the third, and here it is a constant -- argued at the field, and the reason
+// the frontend renders one unavailable sentence rather than two.
 // Nothing here reaches a network: the stance is arithmetic over a table and
 // availability is a fact about the environment, so this answers on an
 // instance with no pool, no account and no credential.
@@ -29,36 +31,37 @@ package claude
 //
 // **The apostrophe is ASCII**, and it is worth a line because the obvious
 // guess is wrong: the frontend's own test fixtures spell this sentence with a
-// typographic U+2019, and `service.py` writes a plain `'`. The corpus caught
+// typographic U+2019, and the served sentence carries a plain `'`. The corpus caught
 // the mismatch on the first run, which is what a byte comparison is for --
 // every field-by-field assertion in the world reads these two as "the never
 // sentence" and passes.
 const DialNever = "One rule holds at every setting: Claude never writes a " +
 	"card's rationale. The why is always yours."
 
-// dialSurfaces is `service._SURFACE_DEFAULTS`: the surfaces that own their own
+// dialSurfaces is the surfaces that own their own
 // answer to "no preference", because they run with no deck to derive one from.
 //
 // **`scan` joined it on 2026-08-23, and its absence had been a bug for three
-// months.** `scan.py` has defined `stance_for` since ADR 34 landed (#180) with
-// a docstring saying in as many words that it is public so `/api/claude` will
-// not "render `off` for a surface that was about to run" -- and nothing ever
-// asked it, because this set was not extended. Found by this port, which had
-// to ask what the dial *answered* rather than what it meant to, and ruled with
-// Aaron: fixed in both runtimes at once, the way `edit.set_shared` and the
+// months.** `ScanStanceFor` has existed since ADR 34 landed (#180), public
+// in as many words so `/api/claude` would not "render `off` for a surface
+// that was about to run" -- and nothing ever
+// asked it, because this set was not extended. Found by asking what the dial
+// *answered* rather than what it meant to, and ruled with
+// Aaron, the way the shared-flag and the
 // stance and budget warts went. Nothing in the app sends `surface=scan`, which
-// is exactly how it survived -- a docstring is not a test, and an unused
+// is exactly how it survived -- a doc comment is not a test, and an unused
 // parameter is not a caller.
 var dialSurfaces = map[string]bool{"theme": true, "research": true, "scan": true}
 
 // surfaceStanceFor asks the module that owns `surface` what it makes of
 // `requested`.
 //
-// **One dispatch, and in Python that is the fix rather than a tidy-up.** This
-// sat beside a second identical copy inside `claude_status`, differing only in
-// passing the caller's pin -- so adding a surface meant editing two places,
-// and the day `scan` arrived neither was edited. A literal here would be a
-// third copy of an answer three other files already give.
+// **One dispatch, and the single copy is the fix rather than a tidy-up.**
+// The answer once lived as two identical copies -- the default path and the
+// pinned path, differing only in passing the caller's pin -- so adding a
+// surface meant editing two places, and the day `scan` arrived neither was
+// edited. A literal here would be a third copy of an answer three other
+// files already give.
 func surfaceStanceFor(surface string, requested any) (Stance, error) {
 	switch surface {
 	case "research":
@@ -70,7 +73,7 @@ func surfaceStanceFor(surface string, requested any) (Stance, error) {
 	}
 }
 
-// DialDefault is `service._default_stance`: what "no preference" resolves to,
+// DialDefault is what "no preference" resolves to,
 // asked of whoever owns the answer.
 //
 // Three cases and none of them is a literal. A deckless surface has its own; a
@@ -80,8 +83,7 @@ func surfaceStanceFor(surface string, requested any) (Stance, error) {
 //
 // Note the asymmetry with `DefaultFor`, which answers `Consultant` for a nil
 // deck: that is the right answer to "what does a deck default to" and the
-// wrong one here, so this checks for the deck first. Python spells the same
-// distinction `default_for(deck) if deck else OFF`.
+// wrong one here, so this checks for the deck first.
 func DialDefault(deck DeckStatused, surface string) Stance {
 	if deck == nil && dialSurfaces[surface] {
 		s, err := surfaceStanceFor(surface, nil)
@@ -107,8 +109,8 @@ func DialDefault(deck DeckStatused, surface string) Stance {
 // reached from the other side.
 func DeckWithStatus(status string) DeckStatused { return statusOnly{status: status} }
 
-// DialAxis, DialStance and friends are structs in Python's key order, never
-// maps: `encoding/json` sorts a map's keys where a dict keeps insertion order,
+// DialAxis, DialStance and friends are structs in the recorded key order,
+// never maps: `encoding/json` sorts a map's keys,
 // and this payload is rendered in order by the settings gear.
 
 // DialPreset is one row of the preset list: the name, the sentence that
@@ -151,7 +153,7 @@ type Dial struct {
 	Modes      []DialMode    `json:"modes"`
 }
 
-// dialModeOrder is the order `service.claude_status` lists them in: the
+// dialModeOrder is the order the dial lists them in: the
 // interview, the argument, the dossier, research, the theme interview's two
 // halves, and the camera.
 //
@@ -159,11 +161,11 @@ type Dial struct {
 // #93 when research became the sixth; ADR 34's scan landed in #180 and never
 // touched it, so a payload whose own comment called itself "the modes that
 // exist" was one short for three months -- the sixth completeness claim in
-// this project to rot. Ruled with Aaron and fixed in both runtimes at once.
+// this project to rot. Ruled with Aaron and fixed in one change.
 //
-// Still an explicit list rather than a derivation, because Python's is one:
-// each mode's object lives behind its own lazy import there, so the order is a
-// decision somebody makes. `TestTheDialListsEveryMode` is what stops it
+// Still an explicit list rather than a derivation: the order is a decision
+// somebody makes, never an artifact of a registry's
+// iteration. `TestTheDialListsEveryMode` is what stops it
 // rotting again -- it holds this list equal to `ModeNames()` as a SET, so the
 // next mode added fails here rather than three months later.
 var dialModeOrder = []string{
@@ -189,9 +191,8 @@ func DialModes() []DialMode {
 		out = append(out, DialMode{
 			Name:    mode.Name,
 			Purpose: mode.Purpose,
-			// `list(...)` in Python, and an empty list rather than null here:
-			// `[]` is what a dict comprehension over an empty tuple produces,
-			// and a client that indexes it must not meet a null.
+			// An empty list rather than null here: `[]` is the recorded
+			// shape, and a client that indexes it must not meet a null.
 			Tools:       nonNil(mode.ToolNames),
 			ServerTools: nonNil(mode.ServerToolNames),
 			Writes:      nonNil(mode.MayWrite),
@@ -200,8 +201,8 @@ func DialModes() []DialMode {
 	return out
 }
 
-// nonNil renders an absent slice as `[]` rather than `null`, which is what
-// `list(...)` over an empty tuple gives Python and what the client's
+// nonNil renders an absent slice as `[]` rather than `null`, which is the
+// recorded shape and what the client's
 // `ClaudeMode` type declares.
 func nonNil(in []string) []string {
 	if in == nil {
@@ -210,7 +211,7 @@ func nonNil(in []string) []string {
 	return in
 }
 
-// Status is `service.claude_status`: the dial, resolved.
+// Status is the dial, resolved.
 //
 // `deck` is nil when no slug was named. `surface` names which mode is asking
 // and exists because the answer is not the same for all of them -- without it
@@ -248,19 +249,17 @@ func Status(requested any, deck DeckStatused, surface string) (Dial, error) {
 		})
 	}
 	return Dial{
-		// **A constant, and argued.** Python asks whether `import anthropic`
-		// works, because the SDK rides with the `claude` extra and a base
-		// install has neither. Go has no such question: the SDK is linked into
-		// this binary, so the answer cannot be false. The two agree everywhere
-		// the door actually runs -- the container installs `.[api,claude]`, so
-		// Python answers true there too -- and after the port retires Python
-		// there is no extra left to be missing.
+		// **A constant, and argued.** The field once asked whether an
+		// optional SDK was installed; here the SDK is linked into the binary,
+		// so the answer cannot be false. The field stays on the wire because
+		// the client reads it, and true is the truth everywhere this door
+		// runs.
 		Installed:  true,
 		Configured: CredentialPresent(),
-		// `client.model()` with **no tier**: the house answer, not this seat's.
-		// Python's dial does not pass the caller's tier even though every mode
+		// `ModelFor` with **no tier**: the house answer, not this seat's.
+		// The dial does not pass the caller's tier even though every mode
 		// route does, so an account on a non-default tier is told the house
-		// model here. Reproduced; the field is on the wire and nothing renders
+		// model here. Recorded; the field is on the wire and nothing renders
 		// it.
 		Model:   ModelFor(""),
 		Stance:  Describe(effective),

@@ -21,14 +21,14 @@ import (
 //
 // **A nil `*Store` is a working store that caches nothing.** Every method
 // below is safe on one, and returns exactly what a miss returns. That is the
-// Go spelling of Python's "a `None` key is a miss without touching the
+// spelling of "no cache is a miss without touching the
 // database", and it is what lets a caller hold `*Store` without a branch for
 // the machine that has no `app.db`.
 //
 // **Nothing here returns an error to the caller.** A cache is an optimisation,
 // and an optimisation that can turn a working simulation into a failed one is
-// a bad trade -- the same call `sim/cache.py` makes, and the same call
-// `decklog.Record` and `claude/ledger.py` make. Failures are logged.
+// a bad trade -- the same call
+// `decklog.Record` and `claude/ledger`'s recorder make. Failures are logged.
 type Store struct {
 	db  *sql.DB
 	log *slog.Logger
@@ -56,7 +56,7 @@ func Open(path string, logger *slog.Logger) (*Store, error) {
 	}
 	// One writer. SQLite serialises them anyway, and a pool of them would only
 	// convert waiting-in-Go into waiting-on-the-file lock. The file is in WAL
-	// mode (Python set it, and WAL is persistent in the file), so this never
+	// mode -- a persistent property of the file itself -- so this never
 	// blocks a reader.
 	db.SetMaxOpenConns(1)
 	var one int
@@ -84,20 +84,20 @@ func (s *Store) DB() *sql.DB {
 	return s.db
 }
 
-// Hit is `cache.Hit`: a stored result, and when it was computed.
+// Hit is a stored result, and when it was computed.
 //
 // The timestamp is not decoration -- a cached figure that cannot say how old
 // it is cannot be reported honestly, and the app shows it.
 //
 // `Result` stays raw. Decoding it here would mean a `map[string]any`, and
-// re-encoding one of those sorts the keys where a Python dict keeps its
-// insertion order; the caller unmarshals into the same struct it stored.
+// re-encoding one of those sorts the keys where the stored blob kept its
+// struct's field order; the caller unmarshals into the same struct it stored.
 type Hit struct {
 	Result    json.RawMessage
 	CreatedAt string
 }
 
-// Get is `cache.get`: the stored result for `key`, or nil for a miss.
+// Get is the stored result for `key`, or nil for a miss.
 //
 // An empty key is a miss without touching the database, which is what makes
 // "caching is off" a one-line concern for callers.
@@ -128,15 +128,15 @@ func (s *Store) Get(ctx context.Context, key string) *Hit {
 	return &Hit{Result: json.RawMessage(blob), CreatedAt: createdAt}
 }
 
-// Put is `cache.put`: store `result`, evicting the least recently used rows if
+// Put stores `result`, evicting the least recently used rows if
 // over `MaxRows`. Never fails the caller.
 //
 // `result` is marshalled with `encoding/json`, and the bytes it produces are
-// deliberately **not** held to Python's: nothing hashes a stored blob, and the
-// two runtimes never read each other's rows because they never share a key.
+// deliberately **not** pinned the way the key's are: nothing hashes a stored
+// blob, so the blob's spelling can move without orphaning a row.
 // One thing about the value does matter, and it is the constraint
 // `internal/jobs` found first: **pass a struct, never a `map[string]any`.**
-// `encoding/json` sorts map keys and a Python dict does not, so a result
+// `encoding/json` sorts map keys, so a result
 // assembled as a map would come back out of the cache with its fields in a
 // different order from the one the same route serves on a miss.
 func (s *Store) Put(ctx context.Context, key, kind string, result any) {
@@ -145,8 +145,8 @@ func (s *Store) Put(ctx context.Context, key, kind string, result any) {
 	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
-	// Python does not escape `<`, `>` or `&`, and neither should a row that a
-	// person may read out of the table with `sqlite3`.
+	// No HTML escaping: the rows never reach a page, and `<`, `>` and `&`
+	// should stay readable for a person reading the table with `sqlite3`.
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(result); err != nil {
 		s.log.Warn("simulation result is not storable", "err", err)
@@ -192,14 +192,14 @@ func (s *Store) Put(ctx context.Context, key, kind string, result any) {
 	}
 }
 
-// Stats is `cache.stats`: what is in there, for `mtglab sim cache`.
+// Stats is what is in there, for `mtglab sim cache`.
 //
 // Reports whether caching is even switched on, because "the cache is empty"
 // and "the cache is disabled" look identical from a row count and want
 // completely different responses.
 //
-// Field order is Python's dict order, so a served payload built from this
-// reads the same in either runtime.
+// Field order is the recorded wire order, so a served payload built from
+// this reads exactly as it always has.
 type Stats struct {
 	Enabled bool           `json:"enabled"`
 	Rows    int            `json:"rows"`
@@ -252,7 +252,7 @@ func (s *Store) Stats(ctx context.Context) Stats {
 	return out
 }
 
-// Clear is `cache.clear`: drop every row. Returns how many went.
+// Clear drops every row. Returns how many went.
 func (s *Store) Clear(ctx context.Context) int {
 	if s == nil || s.db == nil {
 		return 0
@@ -270,9 +270,9 @@ func (s *Store) Clear(ctx context.Context) int {
 	return total
 }
 
-// stamp is `datetime.now(UTC).isoformat()`, and both details are the ones
-// `internal/jobs` had to find the hard way: **the fractional part vanishes
-// entirely when there is none** (Python writes `...:20+00:00`, not
+// stamp is the app's recorded timestamp format, and both details are the
+// ones `internal/jobs` had to find the hard way: **the fractional part
+// vanishes entirely when there is none** (`...:20+00:00`, never
 // `...:20.000000+00:00`), and **the offset is spelled `+00:00`, never `Z`**.
 //
 // It matters here for the same reason it mattered there: `created_at` is what

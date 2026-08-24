@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,18 +43,45 @@ type stubShim struct {
 	errorType string
 	// hold, when non-nil, blocks the stream after each game until the test
 	// lets it go. That is what makes the match theater observable: a finished
-	// job clears its `partial` (in both runtimes, deliberately — the result is
+	// job clears its `partial` (deliberately — the result is
 	// the whole answer and a leftover partial is a stale second copy of part
 	// of it), so the only place to see a row seated live is *during* the
 	// match.
 	hold chan struct{}
+
+	// `seen` is written by `net/http`'s per-connection goroutines, so it needs
+	// the lock -- and the reason it needs it now is the `hold` field above.
+	//
+	// Holding the stream is what made the dedupe test honest (see
+	// [TestTwoIdenticalAsksAreOneMatch]), and it is *also* what made two of
+	// this stub's handlers run at once: with a match parked mid-stream, the
+	// second ask's health poll is served by a second goroutine while the first
+	// is still inside the handler. An unguarded `append` from two of them is a
+	// real race, and the fix for the timing bug is what opened it. CI's arm64
+	// runner found it; twenty `-race -count` runs on the maintainer's amd64
+	// Mac did not, which is the same architecture story that test's own
+	// comment tells.
+	//
+	// Read it with [stubShim.requests], never the field: a reader that runs
+	// while anything is in flight races the writer just as surely.
+	mu   sync.Mutex
 	seen []string
+}
+
+// requests is what the stub has been asked, as of now. A copy, so the caller
+// can range over it while the worker is still talking.
+func (s *stubShim) requests() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.seen...)
 }
 
 func (s *stubShim) serve(t *testing.T) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
 		s.seen = append(s.seen, r.Method+" "+r.URL.Path)
+		s.mu.Unlock()
 		switch r.URL.Path {
 		case "/healthz":
 			_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
@@ -207,8 +235,8 @@ func TestAHostedMatchRunsAfterTheRequestHasGone(t *testing.T) {
 	// The match really crossed the wire: the stub saw a health poll, the
 	// pre-flight and the match itself.
 	want := []string{"GET /healthz", "POST /coverage", "GET /healthz", "POST /match"}
-	if strings.Join(shim.seen, ",") != strings.Join(want, ",") {
-		t.Errorf("the shim saw %v, want %v", shim.seen, want)
+	if got := shim.requests(); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("the shim saw %v, want %v", got, want)
 	}
 }
 
@@ -217,7 +245,7 @@ func TestAHostedMatchRunsAfterTheRequestHasGone(t *testing.T) {
 // final tally uses.
 //
 // **Observed mid-match, which is the only place it exists.** A finished job
-// clears its partial in both runtimes — the result is the whole answer, and a
+// clears its partial — the result is the whole answer, and a
 // leftover partial is a stale second copy of part of it — so a test that read
 // the partial off a completed job would be asserting `nil` and calling it
 // green. The stub holds the stream between games so the rows can be read
@@ -413,7 +441,7 @@ func TestADeckForgeCannotPlayIsA422ThatNamesTheCards(t *testing.T) {
 		}
 	}
 	// And no match was ever asked for.
-	for _, seen := range shim.seen {
+	for _, seen := range shim.requests() {
 		if seen == "POST /match" {
 			t.Error("a match ran against a deck Forge cannot play")
 		}
@@ -558,8 +586,8 @@ func TestTheGateAnswersOnConfigurationAlone(t *testing.T) {
 	}
 	// **No machine was woken to answer it.** The gate is asked on every visit
 	// to the Simulator; one that started a JVM would be a bill.
-	if len(shim.seen) != 0 {
-		t.Errorf("the gate reached the worker: %v", shim.seen)
+	if got := shim.requests(); len(got) != 0 {
+		t.Errorf("the gate reached the worker: %v", got)
 	}
 }
 
@@ -567,7 +595,19 @@ func TestTheGateAnswersOnConfigurationAlone(t *testing.T) {
 // so a second identical click must join the live job rather than queue a
 // second JVM behind the first.
 func TestTwoIdenticalAsksAreOneMatch(t *testing.T) {
-	shim := &stubShim{stream: true, games: []tier3.WireGame{won(1, 100, 1, 3)}}
+	// **The stub has to hold the stream, and that is the whole test.** The
+	// dedupe under test is an *in-flight* join: a second ask joins the first
+	// only while the first is still running. Without `hold` this stub finishes
+	// the moment it starts, so on a quick enough machine match one is already
+	// done when ask two arrives -- and a second job is then the correct
+	// answer, which reads as a broken dedupe. It is a test that races itself,
+	// and it stayed green here for as long as this laptop stayed slower than
+	// CI's arm64 runner. Holding the stream makes the window a fact rather
+	// than a hope; the failing form is reproducible by sleeping between the
+	// two asks.
+	hold := make(chan struct{})
+	shim := &stubShim{stream: true, games: []tier3.WireGame{won(1, 100, 1, 3)},
+		hold: hold}
 	a, reg, _ := forgeAPI(t, shim)
 	srv := forgeServer(t, a)
 
@@ -577,6 +617,9 @@ func TestTwoIdenticalAsksAreOneMatch(t *testing.T) {
 	if first["id"] != second["id"] {
 		t.Errorf("two identical asks made two matches: %v and %v", first["id"], second["id"])
 	}
+	// Closed rather than sent to once: every later game in this test reads
+	// from it too, and a closed channel releases all of them.
+	close(hold)
 	reg.Wait()
 
 	// And a *different* match is its own job, queued honestly behind it.
@@ -587,14 +630,14 @@ func TestTwoIdenticalAsksAreOneMatch(t *testing.T) {
 	reg.Wait()
 }
 
-// TestAGamesCountThatIsNotANumberIsTheFiveHundredPythonGives is the pin the
-// [forgeGames] comment promised and, until Phase 8's wheel port, did not
-// have -- and what it pins moved when the real bytes were measured: an
-// uncaught ValueError in `plan_forge` is Starlette's **plain-text** three
-// words, not a JSON detail. The first Go version answered
+// TestAGamesCountThatIsNotANumberIsTheRecordedFiveHundred is the pin the
+// [forgeGames] comment promised and, for a while, did not
+// have -- and what it pins moved when the real bytes were measured: the
+// recorded uncaught 500 is **plain-text** three
+// words, not a JSON detail. The first version of this route answered
 // `{"detail": "invalid literal ..."}` here, a divergence no golden could see
 // because the goldens record shape and no golden records this case at all.
-func TestAGamesCountThatIsNotANumberIsTheFiveHundredPythonGives(t *testing.T) {
+func TestAGamesCountThatIsNotANumberIsTheRecordedFiveHundred(t *testing.T) {
 	shim := &stubShim{stream: true}
 	a, _, _ := forgeAPI(t, shim)
 	srv := forgeServer(t, a)

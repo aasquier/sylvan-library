@@ -34,7 +34,7 @@ func load(t *testing.T) pricesFile {
 	t.Helper()
 	raw, err := os.ReadFile("testdata/prices.json")
 	if err != nil {
-		t.Fatalf("prices.json: %v (regenerate with `python tests/go_fixtures.py`)", err)
+		t.Fatalf("prices.json: %v (a frozen golden; never regenerated)", err)
 	}
 	var fx pricesFile
 	if err := json.Unmarshal(raw, &fx); err != nil {
@@ -43,13 +43,15 @@ func load(t *testing.T) pricesFile {
 	return fx
 }
 
-// TestTheTableMatchesPython holds the two copies of the price table equal —
-// an edit to `prices.py` fails here until this file moves too, which is the
-// whole reason the corpus records the table and not only the answers.
-func TestTheTableMatchesPython(t *testing.T) {
+// TestTheTableMatchesTheRecordedRates holds `Table` to the corpus's copy —
+// an edit to the table fails here until it is faced against the recorded
+// rates, which is the whole reason the corpus records the table and not
+// only the answers.
+func TestTheTableMatchesTheRecordedRates(t *testing.T) {
+	t.Parallel()
 	fx := load(t)
 	if len(fx.Table) != len(Table) {
-		t.Fatalf("Python prices %d models, Go %d", len(fx.Table), len(Table))
+		t.Fatalf("the corpus prices %d models, the table %d", len(fx.Table), len(Table))
 	}
 	if fx.CacheReadFraction != CacheReadFraction {
 		t.Fatalf("cache read fraction %v != %v", fx.CacheReadFraction, CacheReadFraction)
@@ -57,7 +59,7 @@ func TestTheTableMatchesPython(t *testing.T) {
 	for model, want := range fx.Table {
 		got, ok := Table[model]
 		if !ok {
-			t.Errorf("%s is priced in Python and absent here", model)
+			t.Errorf("%s is priced in the corpus and absent here", model)
 			continue
 		}
 		if got.Rate.Input != want.Input || got.Rate.Output != want.Output {
@@ -76,10 +78,11 @@ func TestTheTableMatchesPython(t *testing.T) {
 	}
 }
 
-// TestEveryEstimateMatchesPython is the corpus: `estimate(...).as_dict()`
+// TestEveryEstimateMatchesTheGolden is the corpus: `Over(...).AsDict()`
 // compared as marshalled bytes — the half-to-even rounding, the window on
 // both sides of Sonnet 5's changeover, and the unpriced accounting.
-func TestEveryEstimateMatchesPython(t *testing.T) {
+func TestEveryEstimateMatchesTheGolden(t *testing.T) {
+	t.Parallel()
 	fx := load(t)
 	if len(fx.Cases) < 6 {
 		t.Fatalf("only %d cases; the corpus has thinned", len(fx.Cases))

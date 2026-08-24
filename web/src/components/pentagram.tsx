@@ -11,12 +11,12 @@
  *   is a pentagram rather than a pentagon.
  *
  * Ten lines, ten guilds, no leftovers. That is checkable rather than asserted:
- * `tests/test_colors.py` runs the same adjacency rule over `colors.py` and
+ * `pentagram.test.tsx` runs the adjacency rule over what reaches the DOM and
  * fails if the perimeter and the chords are not exactly the guild tier.
  *
  * **Nothing here is a second copy of the taxonomy.** Every name, tagline and
  * blurb is looked up in the `Combination[]` the page already fetched from
- * `/api/colors`, so `colors.py` stays the one authority on what a slot is
+ * `/api/colors`, so the served colors table stays the one authority on what a slot is
  * called — the rule CLAUDE.md states for any new copy of that table is
  * satisfied by there not being one. What *is* written down here is the
  * geometry, and geometry is not data: the classification is computed from

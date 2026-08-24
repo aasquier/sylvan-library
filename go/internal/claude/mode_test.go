@@ -12,6 +12,7 @@ import (
 // checked empty is that claim in code -- and it is the line a future ADR would
 // have to change deliberately rather than a silence somebody could fill in.
 func TestAModeMayNotDeclareThatItWrites(t *testing.T) {
+	t.Parallel()
 	_, err := NewMode(Mode{Name: "greedy", ToolNames: []string{"list_decks"},
 		MayWrite: []string{"why"}})
 	if err == nil {
@@ -27,6 +28,7 @@ func TestAModeMayNotDeclareThatItWrites(t *testing.T) {
 // A typo in a mode definition should fail where the mode is defined, not
 // mid-conversation three turns in.
 func TestAModeNamingAToolThatDoesNotExistIsRefused(t *testing.T) {
+	t.Parallel()
 	if _, err := NewMode(Mode{Name: "typo", ToolNames: []string{"list_deks"}}); err == nil {
 		t.Fatal("a mode naming an unregistered tool was accepted")
 	}
@@ -40,6 +42,7 @@ func TestAModeNamingAToolThatDoesNotExistIsRefused(t *testing.T) {
 }
 
 func TestMustModePanicsSoAnInvalidModeCannotStart(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if recover() == nil {
 			t.Error("MustMode returned for an invalid mode")
@@ -49,6 +52,7 @@ func TestMustModePanicsSoAnInvalidModeCannotStart(t *testing.T) {
 }
 
 func TestAModeFillsItsDefaults(t *testing.T) {
+	t.Parallel()
 	m, err := NewMode(Mode{Name: "plain", ToolNames: []string{"list_decks"}})
 	if err != nil {
 		t.Fatal(err)
@@ -68,6 +72,7 @@ func TestAModeFillsItsDefaults(t *testing.T) {
 // Ours sorted, then Anthropic's in declaration order. Tools render first in the
 // prompt, so this order is the prompt cache's prefix.
 func TestServerToolsRenderAfterOursAndInDeclarationOrder(t *testing.T) {
+	t.Parallel()
 	search := anthropic.ToolUnionParam{
 		OfWebSearchTool20260209: &anthropic.WebSearchTool20260209Param{},
 	}
@@ -109,6 +114,7 @@ func TestServerToolsRenderAfterOursAndInDeclarationOrder(t *testing.T) {
 // A mode that was not asked about a card has to say what its own scope axis
 // widens, or the prompt tells it to stay on something that does not exist.
 func TestAModeMaySupplyItsOwnScopeNotes(t *testing.T) {
+	t.Parallel()
 	own := map[string]string{
 		"flagged":  "Scope: the question as asked.",
 		"adjacent": "Scope: the question, and what bears on it.",
@@ -133,6 +139,7 @@ func TestAModeMaySupplyItsOwnScopeNotes(t *testing.T) {
 
 // The default table is what a mode about one card in one deck gets.
 func TestTheDefaultScopeNotesWidenWithTheDial(t *testing.T) {
+	t.Parallel()
 	m, err := NewMode(Mode{Name: "interview", Instructions: "Ask."})
 	if err != nil {
 		t.Fatal(err)
@@ -152,6 +159,7 @@ func TestTheDefaultScopeNotesWidenWithTheDial(t *testing.T) {
 // The system prompt is instructions then scope, with the mode's own text first
 // -- a stance widens what a mode does, never what it is.
 func TestTheSystemPromptIsInstructionsThenScope(t *testing.T) {
+	t.Parallel()
 	m, err := NewMode(Mode{Name: "x", Instructions: "  You are a thing.  "})
 	if err != nil {
 		t.Fatal(err)

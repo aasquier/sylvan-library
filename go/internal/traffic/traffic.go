@@ -1,5 +1,5 @@
-// Package traffic is `api/traffic.py`: the visitor ledger — how much this
-// instance is used, without who. Four facts per request and no fifth: the
+// Package traffic is the visitor ledger — how much this instance is used,
+// without who. Four facts per request and no fifth: the
 // UTC day, the matched route TEMPLATE (never the concrete path — a path can
 // carry a slug and a slug can carry a person), the status class, and a
 // count. No IP, no user agent, no username, no timestamp finer than the day.
@@ -10,12 +10,12 @@
 // catch-all is a route and has always been counted as one), and everything
 // refused before routing as `(unrouted)`.
 //
-// The two mechanical rules are Python's: counts buffer in memory and flush
-// when a request lands more than FlushEvery after the last flush (and when
-// the traffic endpoint reads, so the dashboard is never a minute behind),
-// and the flush never raises — a full disk loses a minute of counts, not a
-// request. The ledger never mints a database: a nil handle drops counts,
-// exactly as Python skips a path whose file does not exist.
+// Two mechanical rules: counts buffer in memory and flush when a request
+// lands more than FlushEvery after the last flush (and when the traffic
+// endpoint reads, so the dashboard is never a minute behind), and the flush
+// never raises — a full disk loses a minute of counts, not a request. The
+// ledger never mints a database: a nil handle drops counts, because a
+// missing `app.db` is a fact about the instance, not the ledger's to fix.
 package traffic
 
 import (
@@ -37,7 +37,7 @@ const Unrouted = "(unrouted)"
 
 // statusClasses seeds every day row, so a quiet day still carries its
 // series — a payload whose keys depend on its data is not a shape, and no
-// golden can hold one (the recorded lesson from Phase 7's forge flip).
+// golden can hold one (the forge family's recorded lesson).
 var statusClasses = [...]string{"2xx", "4xx", "5xx"}
 
 type key struct {
@@ -139,8 +139,8 @@ func (r *Recorder) Summary(ctx context.Context, days int) (wire.OrderedMap, erro
 	cutoff := now().UTC().AddDate(0, 0, -days).Format("2006-01-02")
 	db := r.handle()
 	if db == nil {
-		// No app.db: an empty ledger, the same answer Python gives over a
-		// database with no rows.
+		// No app.db: an empty ledger, the same answer a database with no
+		// rows gives.
 		return wire.OrderedMap{
 			{Key: "days", Value: []any{}},
 			{Key: "top_routes", Value: []any{}},
@@ -225,9 +225,9 @@ func emptyDay(day string) wire.OrderedMap {
 	return row
 }
 
-// setClass is `row[cls] = count; row["total"] += count` — a class outside
-// the seeded three (a `3xx`) is appended in encounter order, exactly as a
-// Python dict grows.
+// setClass sets the class's count and adds it to the total — a class
+// outside the seeded three (a `3xx`) is appended in encounter order, which
+// is the recorded key order for an unseeded class.
 func setClass(row wire.OrderedMap, class string, count int64) wire.OrderedMap {
 	found := false
 	for i := range row {

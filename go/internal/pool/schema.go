@@ -2,11 +2,10 @@ package pool
 
 import _ "embed"
 
-// Schema is `cards/db.py:SCHEMA`, verbatim -- the DDL that creates a pool.
-// Written by `tests/go_fixtures.py` and held equal to Python's by
-// `tests/test_go_fixtures.py`, so the file the Go `data refresh` creates at
-// Phase 8 is the file Python creates today, and so the tests here can build
-// a real pool without a Python process anywhere near them.
+// Schema is the DDL that creates a pool, verbatim -- the same DDL every
+// existing pool file was created under, so the file `data refresh` creates
+// is the file the deployed volume already holds, and so the tests here can
+// build a real pool from nothing.
 //
 //go:embed schema.sql
 var Schema string

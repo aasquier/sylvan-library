@@ -9,9 +9,9 @@ import (
 	"testing"
 )
 
-// The dial, held to Python's own payload.
+// The dial, held to the recorded payload.
 //
-// The corpus records `service.claude_status`'s whole answer as **serialised
+// The corpus records the dial's whole answer as **serialised
 // JSON**, so this compares marshalled bytes and not fields. That is the
 // `tier1.Number` lesson in its home package: a struct whose values are all
 // right and whose field order is wrong is bit-exact by every field-by-field
@@ -51,21 +51,21 @@ func withDialEnv(t *testing.T, ceiling string) {
 	t.Setenv(CeilingEnv, ceiling)
 }
 
-func TestTheDialAgreesWithPython(t *testing.T) {
+func TestTheDialAgreesWithTheRecordedPayload(t *testing.T) {
 	corpus := loadStanceCorpus(t)
 	if len(corpus.Dial) == 0 {
-		t.Fatal("stance.json carries no dial cases; run `python tests/go_fixtures.py`")
+		t.Fatal("stance.json carries no dial cases; the frozen golden always does")
 	}
 	for _, row := range corpus.Dial {
 		t.Run(row.Note, func(t *testing.T) {
 			withDialEnv(t, deref(row.Ceiling))
 
-			// `payload.get("stance") or None` is the route's; the corpus
-			// records what reached `claude_status`, which is already that.
+			// The route reads a falsy stance as none; the corpus records
+			// what reached the dial, which is already that.
 			var requested any
 			if len(row.Requested) > 0 && string(row.Requested) != "null" {
 				// UseNumber, for the reason the stance parser needs it:
-				// Python's json tells `7` from `7.5` by the literal, so a
+				// the refusals tell `7` from `7.5` by the literal, so a
 				// plain float64 decode collapses two different refusal
 				// sentences into one.
 				decoder := json.NewDecoder(bytes.NewReader(row.Requested))
@@ -82,35 +82,35 @@ func TestTheDialAgreesWithPython(t *testing.T) {
 			got, err := Status(requested, deck, deref(row.Surface))
 			if row.Error != "" {
 				if err == nil {
-					t.Fatalf("answered where Python refused with %q", row.Error)
+					t.Fatalf("answered where the corpus refuses with %q", row.Error)
 				}
 				if err.Error() != row.Error {
-					t.Errorf("refused with\n  %q\nPython says\n  %q", err, row.Error)
+					t.Errorf("refused with\n  %q\nthe corpus says\n  %q", err, row.Error)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("refused with %q where Python answered", err)
+				t.Fatalf("refused with %q where the corpus answers", err)
 			}
 			assertSameJSONValue(t, "dial", got, row.Payload)
 		})
 	}
 }
 
-// The dial publishes **every mode**, in Python's order.
+// The dial publishes **every mode**, in the recorded order.
 //
 // It published six of the seven until 2026-08-23: the list was last extended
 // by #93 when research became the sixth, and ADR 34's scan landed in #180
 // without joining it, so a payload whose own comment called itself "the modes
 // that exist" was one short for three months. Ruled with Aaron and fixed in
-// both runtimes.
+// one change.
 //
 // **The absence check is what stops it rotting again**, and it is against the
 // DERIVED list rather than a second literal: `dialModeOrder` is written out
-// (Python's is, since each mode's object lives behind its own lazy import
-// there), so this holds it equal to `ModeNames()` as a set. The next mode
-// added fails here rather than three months later.
+// as a decision, so this holds it equal to `ModeNames()` as a set. The next
+// mode added fails here rather than three months later.
 func TestTheDialListsEveryMode(t *testing.T) {
+	t.Parallel()
 	got := DialModes()
 	names := make([]string, 0, len(got))
 	for _, m := range got {
@@ -121,7 +121,7 @@ func TestTheDialListsEveryMode(t *testing.T) {
 		ModeResearch, ModeThemeConversation, ModeThemeProposal, ModeScan,
 	}
 	if !reflect.DeepEqual(names, want) {
-		t.Errorf("the dial lists\n  %v\nPython lists\n  %v", names, want)
+		t.Errorf("the dial lists\n  %v\nthe recorded order is\n  %v", names, want)
 	}
 	// Every mode that exists, minus the ones the dial names: none.
 	missing := []string{}
@@ -133,8 +133,8 @@ func TestTheDialListsEveryMode(t *testing.T) {
 	if len(missing) > 0 {
 		t.Errorf("the dial does not report %v. A mode was added and "+
 			"`/api/claude` was not told -- which is exactly how `scan` went "+
-			"unreported for three months. Add it to `dialModeOrder` AND to "+
-			"`service.claude_status`'s list, in one change", missing)
+			"unreported for three months. Add it to `dialModeOrder` in the "+
+			"same change that adds the mode", missing)
 	}
 }
 
@@ -143,8 +143,8 @@ func TestTheDialListsEveryMode(t *testing.T) {
 // is a transcription where volunteering is the failure mode rather than the
 // feature.
 //
-// `scan` answered `off` until 2026-08-23, which is the bug `scan.stance_for`'s
-// docstring described accurately and was never wired up to prevent. The three
+// `scan` answered `off` until 2026-08-23, which is the bug `ScanStanceFor`'s
+// own comment described accurately and was never wired up to prevent. The three
 // that DO have owners are checked beside the one that does not, so this reads
 // as a table rather than as four separate claims.
 func TestEveryDecklessSurfaceResolvesToItsOwnDefault(t *testing.T) {
@@ -178,13 +178,11 @@ func TestEveryDecklessSurfaceResolvesToItsOwnDefault(t *testing.T) {
 	}
 }
 
-// The one field with no Python analogue, argued rather than assumed.
+// The one field whose answer is a constant, argued rather than assumed.
 //
-// `installed` asks whether `import anthropic` works, because the SDK rides
-// with the `claude` extra. Go has no such question -- the SDK is linked into
-// this binary -- so the answer is a constant. The two agree everywhere the
-// door runs: the container installs `.[api,claude]`, and after Phase 8 there
-// is no extra left to be missing.
+// `installed` once asked whether an optional SDK was present. The SDK is
+// linked into this binary, so the answer cannot be false -- and the field
+// stays on the wire because the client reads it.
 func TestInstalledIsAConstantBecauseTheSDKIsLinkedIn(t *testing.T) {
 	withDialEnv(t, "")
 	dial, err := Status(nil, nil, "")

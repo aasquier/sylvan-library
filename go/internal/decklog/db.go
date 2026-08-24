@@ -20,15 +20,15 @@ import (
 // a database at version zero beside the real one. An absent `app.db` is a
 // warned, dropped entry.
 //
-// One writer, and it is worth saying which. Python still performs the session
-// touch and the expired-row delete on every authenticated request, so this
-// makes two processes writing one file. That is safe here and not by luck:
-// the file is in WAL mode (Python set it, and WAL is persistent in the file),
-// where a writer blocks readers not at all, and the busy timeout matches
-// `auth/db.py`'s 5000ms so two writers collide as a short wait rather than as
-// `database is locked`. `deck_log` is append-only and nothing else writes it,
-// so there is no row two writers can contend over -- only the file's write
-// lock, for the microseconds an insert holds it.
+// Not the only writer, and it is worth saying so. The door performs the
+// session touch and the expired-row delete on every authenticated request,
+// so the file has more than one writing handle. That is safe here and not
+// by luck: the file is in WAL mode (persistent in the file once set), where
+// a writer blocks readers not at all, and the busy timeout matches the auth
+// side's 5000ms so two writers collide as a short wait rather than as
+// `database is locked`. `deck_log` is append-only and nothing else writes
+// it, so there is no row two writers can contend over -- only the file's
+// write lock, for the microseconds an insert holds it.
 func openReadWrite(path string) (*sql.DB, error) {
 	dsn := "file:" + url.PathEscape(path) +
 		"?mode=rw&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"

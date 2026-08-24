@@ -7,11 +7,10 @@
  *
  * * **The lines are the ten guilds**, once each. A diagram that joined the
  *   wrong pair, or drew Azorius twice and Boros never, is a plausible-looking
- *   picture that teaches something false. `tests/test_colors.py` checks the
- *   same property from the Python side against `colors.py`; this checks that
- *   what reaches the DOM is that set.
+ *   picture that teaches something false. The guild tier itself is the served
+ *   colors table's; this checks that what reaches the DOM is that set.
  * * **No name is written here.** Every label comes from the taxonomy the page
- *   fetched, so `colors.py` stays the single authority. The test for that is
+ *   fetched, so the served colors table stays the single authority. The test for that is
  *   to hand the component a deliberately wrong taxonomy and watch the wrong
  *   name come out — if it does not, something is hard-coded.
  * * **Only the five colours get a glyph.** A numeral, `{X}` and a hybrid keep
@@ -171,7 +170,7 @@ describe('the colour wheel', () => {
   })
 
   it('takes every name from the taxonomy rather than from itself', () => {
-    // The guard against a second copy of `colors.py` growing in the frontend.
+    // The guard against a second copy of the colors table growing in the frontend.
     // Rename a guild in the data and the diagram must rename it too.
     const lying = TAXONOMY.map((c) =>
       c.key === 'BG' ? { ...c, name: 'Notgolgari' } : c)

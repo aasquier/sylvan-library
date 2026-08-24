@@ -1,5 +1,4 @@
-// Package deckimport turns a pasted decklist into a draft `deck.yaml`:
-// `decks/importer.py`.
+// Package deckimport turns a pasted decklist into a draft `deck.yaml`.
 //
 // The parser (`internal/decklist`) reads lines. This resolves what those lines
 // *mean* against the pool and writes a deck file. Split that way because

@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// netWorkers and forgeWorkers are Python's, and neither is sized from the
+// netWorkers and forgeWorkers are fixed, and neither is sized from the
 // machine on purpose -- see the package comment. Two, because a Claude call
 // costs money per run; one, because two JVMs would race the `.dck` directory.
 const (
@@ -24,8 +24,8 @@ const (
 // Config is what a registry needs. Every field has a working zero value, so
 // `jobs.New(jobs.Config{})` is a real registry.
 type Config struct {
-	// Logger receives a failed job's error and stack, where Python's worker
-	// calls `traceback.print_exc()`. Nil takes `slog.Default()`.
+	// Logger receives a failed job's error and stack. Nil takes
+	// `slog.Default()`.
 	Logger *slog.Logger
 
 	// CPUWorkers is how many CPU-lane jobs may run at once. **Zero asks the
@@ -64,13 +64,12 @@ type Config struct {
 	Max int
 }
 
-// Registry is the job table and the three lanes that feed it: `api/jobs.py`'s
-// module-level `_JOBS`, `_LOCK` and `_LANES`, made a value so a test can hold
+// Registry is the job table and the three lanes that feed it,
+// made a value so a test can hold
 // its own and the race detector has something to be right about.
 //
-// Python's globals are the one thing not reproduced literally, and the reason
-// is `tests/test_caches.py`: `_JOBS` is registered there as state that is
-// deliberately **not** a cache -- "state a client polls, not a memo of an
+// The table is deliberately **not** a cache -- it is
+// "state a client polls, not a memo of an
 // answer". A process still holds exactly one of these; it is passed in rather
 // than reached for.
 type Registry struct {
@@ -93,10 +92,10 @@ type Registry struct {
 }
 
 // lane is a semaphore over goroutines. A buffered channel rather than a
-// worker pool with a queue, because Python's `ThreadPoolExecutor` queues
-// without bound and never blocks the submitter, and a bounded queue would.
+// worker pool with a queue, because submission must queue
+// without bound and never block the submitter, and a bounded queue would.
 // Blocked senders on a full channel are woken in the order they arrived, so
-// the executor's FIFO service order survives.
+// FIFO service order survives.
 type lane struct {
 	tokens chan struct{}
 	// runs counts workers that actually reached the work. Tests read it: a
@@ -151,9 +150,10 @@ func (r *Registry) Width(l Lane) int {
 	return 0
 }
 
-// randomID is `uuid.uuid4().hex[:12]`: 48 uniformly random bits as twelve
-// lowercase hex digits. uuid4's first twelve hex characters are all random --
-// its version nibble sits at index 12 and its variant at 16 -- so six bytes
+// randomID is 48 uniformly random bits as twelve
+// lowercase hex digits. The recorded ids are the first twelve hex characters
+// of a random (version 4) UUID, which are all random --
+// the version nibble sits at index 12 and the variant at 16 -- so six bytes
 // from crypto/rand is the same distribution rather than merely a similar one.
 func randomID() string {
 	var raw [6]byte
@@ -170,13 +170,14 @@ func randomID() string {
 //
 // The immutable half is set once at birth and read without a lock. The
 // mutable half -- what a worker writes and a poll reads -- lives behind mu,
-// which is the difference between this and Python, where the GIL made an
-// unsynchronised write survivable.
+// because a worker goroutine and a polling request really do touch it at
+// once.
 type Job struct {
 	ID    string
 	Kind  string
 	Label string
-	// Owner is whose job this is. **Zero is Python's `None`**: the local
+	// Owner is whose job this is. **Zero means nobody in particular**: the
+	// local
 	// user, which is everybody when auth is off. It is safe as a sentinel
 	// because `users.id` is a SQLite rowid and rowids begin at one, and
 	// because `auth.Scope` already spells an unauthenticated caller that way.
@@ -184,12 +185,12 @@ type Job struct {
 	// Key is what this job *is*, for work where asking twice at once is a
 	// mistake rather than a request. Empty opts out and is the default.
 	Key string
-	// CreatedAt is Python's string, not an instant -- see [stamp] for why the
+	// CreatedAt is a string, not an instant -- see [stamp] for why the
 	// text is the sort key.
 	CreatedAt string
 
-	// seq is birth order, and it is the tie-break Python gets for free from
-	// an insertion-ordered dict: two jobs stamped in the same microsecond
+	// seq is birth order, the tie-break an insertion-ordered table would
+	// have carried for free: two jobs stamped in the same microsecond
 	// must keep the order they were made in, both when the newest are listed
 	// and when the oldest are evicted.
 	seq uint64
@@ -247,7 +248,7 @@ func (p report) ReportPartial(done, total int, partial any) {
 	}
 }
 
-// Options are `submit`'s keyword arguments.
+// Options are Submit's levers.
 type Options struct {
 	Label string
 	Owner int64
@@ -259,7 +260,7 @@ type Options struct {
 // Completed is a job that is already finished, because its answer was already
 // known.
 //
-// This is what a simulation cache hit returns (`sim/cache.py`). The
+// This is what a simulation cache hit returns. The
 // alternative was a second response shape saying "no job, here is the
 // result", and it was rejected: every client would need a branch, a hit would
 // leave no trace in `/api/jobs`, and the claim being made is not "this is not
@@ -275,8 +276,8 @@ func (r *Registry) Completed(kind string, result any, label string, owner int64)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	job := r.newJobLocked(kind, label, owner, "")
-	// Fully formed *before* it is filed, exactly as Python builds the whole
-	// `Job(status="done", ...)` and hands it to `_record`. The order is
+	// Fully formed *before* it is filed -- the recorded discipline: build
+	// the whole finished job, then file it. The order is
 	// visible: eviction runs on the filed table, so a born-finished job is
 	// already finished when the bound is checked and can evict itself if it
 	// is the only finished one there. No lock is needed for these three --
@@ -339,18 +340,16 @@ func (r *Registry) Submit(kind string, fn Runner, opt Options) (*Job, error) {
 	r.fileLocked(job)
 	r.mu.Unlock()
 
-	r.running.Add(1)
-	go func() {
-		defer r.running.Done()
+	r.running.Go(func() {
 		ln.tokens <- struct{}{}
 		defer func() { <-ln.tokens }()
 		ln.runs.Add(1)
 		r.run(job, fn)
-	}()
+	})
 	return job, nil
 }
 
-// FromPlan is `api/app.py:_job_for`: a finished job when the answer was
+// FromPlan is a finished job when the answer was
 // already known, a queued one otherwise.
 //
 // Every producer of a [Plan] comes through here and no route decides which
@@ -393,8 +392,8 @@ func (r *Registry) joinableLocked(kind, key string, owner int64) *Job {
 func (r *Registry) newJobLocked(kind, label string, owner int64, key string) *Job {
 	r.seq++
 	id := r.newID()
-	// Python does not check, and at 48 bits over at most two hundred rows it
-	// never would have found one. Two lines buy the guarantee outright, and
+	// A collision check 48 bits wide over at most two hundred rows would
+	// likely never fire. Two lines buy the guarantee outright, and
 	// they cannot diverge observably: the only behaviour they change is one
 	// job silently overwriting another.
 	for _, taken := r.jobs[id]; taken; _, taken = r.jobs[id] {
@@ -440,7 +439,7 @@ func (r *Registry) keepLocked() {
 	}
 }
 
-// run is the worker: `wrapped` in Python's submit.
+// run is the worker wrapper around one job's Runner.
 func (r *Registry) run(job *Job, fn Runner) {
 	job.mu.Lock()
 	job.status = Running
@@ -472,10 +471,10 @@ func (r *Registry) run(job *Job, fn Runner) {
 
 // invoke calls the worker and turns a panic into a failed job.
 //
-// Python catches `Exception`, so one job's bug is one job's error string. Go
+// One job's bug must cost one job's error string. An unrecovered panic
 // would take the process down instead, and this door is also serving every
-// other request -- so the recover is not defensive habit, it is the only way
-// the two runtimes fail the same way.
+// other request -- so the recover is not defensive habit, it is the
+// containment the registry promises.
 func (r *Registry) invoke(job *Job, fn Runner) (result any, err error) {
 	defer func() {
 		if p := recover(); p != nil {
@@ -483,8 +482,7 @@ func (r *Registry) invoke(job *Job, fn Runner) (result any, err error) {
 			r.log.Error("job panicked", "job", job.ID, "kind", job.Kind,
 				"panic", p, "stack", stack)
 			// Named as a panic so a reader can tell a crash from a refusal
-			// the worker made on purpose; Python's exception string carries
-			// the same distinction in its class name.
+			// the worker made on purpose.
 			err = fmt.Errorf("panic: %v", p)
 		}
 	}()
@@ -510,8 +508,9 @@ func (r *Registry) Get(id string, owner int64) *Job {
 
 // All is this owner's jobs, newest first.
 //
-// The order is Python's exactly, ties included: `sorted(..., reverse=True)`
-// is stable, so two jobs stamped in the same microsecond keep the order they
+// The order is the recorded one exactly, ties included: the sort is
+// stable and descending, so two jobs stamped in the same microsecond keep
+// the order they
 // were created in rather than having it reversed with everything else. That
 // is what seq is for.
 func (r *Registry) All(owner int64) []*Job {
@@ -571,9 +570,10 @@ func (r *Registry) Census() map[string]int {
 // lanes have no cancellation and inventing one here would be a worse lie than
 // a few seconds of orphaned CPU.
 //
-// **Zero is refused.** Python documents that `owner` is never `None` here --
-// that is the no-auth local case, where there is one person and no account to
-// delete -- and zero is how this port spells `None`, so a caller that reached
+// **Zero is refused.** The owner here is never "nobody" --
+// zero is the no-auth local case, where there is one person and no account
+// to
+// delete -- so a caller that reached
 // here with one would wipe the local user's jobs rather than a deleted
 // account's. Nothing can produce it (`user.id` is a rowid), which is why the
 // guard costs nothing and why it is here anyway.
@@ -593,8 +593,7 @@ func (r *Registry) ForgetOwner(owner int64) int {
 	return doomed
 }
 
-// Clear drops every recorded job. Python's test helper, kept because the
-// contract harness resets between sequences; a Go test wanting isolation
+// Clear drops every recorded job. A test helper: a test wanting isolation
 // should hold its own registry instead.
 func (r *Registry) Clear() {
 	r.mu.Lock()

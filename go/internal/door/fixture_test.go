@@ -10,8 +10,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// writeFixtureDB writes an app.db the way Python would have -- the schema its
-// ladder leaves, from `authtest` -- with alice (admin) and bob, each holding
+// writeFixtureDB writes a real app.db -- the recorded schema the ladder
+// leaves, from `authtest` -- with alice (admin) and bob, each holding
 // a live session whose token is "<name>-token".
 func writeFixtureDB(t *testing.T, path string) {
 	t.Helper()

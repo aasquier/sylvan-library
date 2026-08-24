@@ -36,7 +36,7 @@ import {
 } from '../lib/api'
 import { COLOR_VAR } from '../lib/mtg'
 import {
-  CardHover, ColorRing, ErrorNote, ManaCost, ManaText, PageMasthead,
+  CardHover, ColorRing, ErrorNote, ManaCost, ManaText, PageMasthead, Spinner,
 } from '../components/ui'
 
 /** The card the whole project is named after, so the reference page wears it.
@@ -200,7 +200,7 @@ function CombinationPanel({ combo, taxonomy }: {
       )}
 
       {/* Names without a card pool, cards with one. The champion list is drawn
-          from `colors.py` either way, so a fresh clone still learns who
+          from the served taxonomy either way, so a fresh clone still learns who
           Trostani is — it just does not get her card. */}
       {combo.champions.length > 0 && (
         <section className="mt-6">
@@ -280,7 +280,7 @@ function ColorsTab({ taxonomy, selected, onSelect }: {
   onSelect: (key: string) => void
 }) {
   // The fallback is itself an index, so it is `Combination | undefined` and not
-  // the safety net it looks like. `colors.py` writes all 32 and `/api/colors`
+  // the safety net it looks like. The colors table holds all 32 and `/api/colors`
   // serves them with no pool and no network, so an empty list means that
   // endpoint answered with nothing — a broken deployment rather than a state
   // this screen can render around. Say so once, here, instead of letting nine
@@ -419,7 +419,7 @@ function WordsTab() {
   }, [])
 
   if (!glossary) {
-    return <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+    return <Spinner label="Reading the glossary…" />
   }
 
   const needle = query.trim().toLowerCase()
@@ -569,7 +569,7 @@ export default function Learn() {
       {tab === 'words' ? <WordsTab /> : taxonomy ? (
         <ColorsTab taxonomy={taxonomy} selected={selected} onSelect={select} />
       ) : !error && (
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+        <Spinner label="Reading the colour guide…" />
       )}
 
       <ReadingRoom />

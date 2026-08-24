@@ -2,7 +2,7 @@ package mana
 
 import "sort"
 
-// The castability solver: `mana.can_pay`, and Kuhn's augmenting-path matching
+// The castability solver: `CanPay`, and Kuhn's augmenting-path matching
 // under it.
 //
 // The question -- "given these untapped sources, can I pay this cost?" -- is a
@@ -12,10 +12,10 @@ import "sort"
 // it still cannot cast {W}{U}, because the dual does not tap twice. Counting
 // says yes; matching says no; matching is right.
 //
-// So the port's risk here is not that Kuhn's is hard to write. It is that a
+// So the risk here is not that Kuhn's is hard to write. It is that a
 // subtly wrong matching answers correctly on every case anybody thinks to try.
 // `solver_test.go` is where that is dealt with, and it is worth reading before
-// this file is edited: the 13,944-case enumeration Python and Go both rebuild,
+// this file is edited: the recorded 13,944-case enumeration rebuilt in full,
 // two reference implementations resting on different definitions, and a fuzz
 // target that plays all three against each other. None of it is optional
 // scaffolding -- it is the reason a rewrite of this function can be trusted.
@@ -25,8 +25,8 @@ import "sort"
 // is one AND.
 //
 // `other` is the faithfulness half, and it is empty in every call this
-// application can make. Python compares `frozenset`s of arbitrary strings, and
-// nothing in the language stops a caller building a source out of "Z"; that it
+// application can make. The contract compares sets of arbitrary strings, and
+// nothing stops a caller building a source out of "Z"; that it
 // never happens is an argument, and this project has learned twice over that
 // an argument about equivalence rots where a check does not. Both paths are
 // exercised by tests. On the real path `other` is nil, so the loop below is
@@ -68,7 +68,7 @@ func toColorSet(colors []string) colorSet {
 	return out
 }
 
-// intersects is Python's `unit & pip` read as a boolean: do these two colour
+// intersects asks: do these two colour
 // sets share a colour?
 func (s colorSet) intersects(other colorSet) bool {
 	if s.mask&other.mask != 0 {
@@ -84,35 +84,37 @@ func (s colorSet) intersects(other colorSet) bool {
 	return false
 }
 
-// Source is `mana.ManaSource`: something that produces mana.
+// Source is something that produces mana.
 //
 // Colors is what it can produce -- {"C"} for genuinely colourless, all five
 // for an any-colour source. Amount is how many mana one activation makes, so
 // Sol Ring is {"C"} at 2; it is the field Scryfall's `produced_mana` does not
-// carry and `sim/compile.py` reads off the oracle text instead.
+// carry and `sim/compile` reads off the oracle text instead.
 //
-// **Amount has no default and Go's zero value is 0, where Python's is 1.**
-// `ManaSource(colors)` in Python is one mana; `Source{Colors: colors}` in Go
-// is none -- faithful rather than sloppy, since `ManaSource(colors, 0)`
-// produces nothing in Python too. [NewSource] is the way to say it out loud.
+// **Amount has no default and the zero value is 0 mana, not 1.**
+// `Source{Colors: colors}`
+// is a source producing nothing -- deliberate, because a source that quietly
+// produced one would make absent-mindedness castable. [NewSource] is the way
+// to say the common case out loud.
 //
 // This is deliberately field-for-field `sim.Source`, in the same order, so
 // the two convert freely (`mana.Source(s)`; Go's conversion rule ignores the
 // struct tags `sim` carries for its corpora). They are separate types because
 // the packages are layered the other way round -- `mana` is below `sim` and
 // must not import it -- and because `sim`'s is what a *compiled deck* carries.
-// Python has one type here and the port has two; `sim.Cost` beside [Cost] is
-// the same split, argued in that package's own comment. When Tier 1's private
-// `canPay` becomes a call to [CanPay], as its comment says it will, that
+// `sim.Cost` beside [Cost] is
+// the same split, argued in that package's own comment. Tier 1's private
+// `canPay` answers through [CanPay], and that
 // conversion is the whole of the seam.
 type Source struct {
 	Colors []string
 	Amount int
 }
 
-// NewSource is `ManaSource(colors, amount)` with the frozenset's invariant
-// applied: colours sorted and deduplicated, because Python holds them in a set
-// and two sources are equal there exactly when their colour *sets* are.
+// NewSource builds a source with the colour-set invariant
+// applied: colours sorted and deduplicated, because a colour set has only
+// membership, and two sources are equal exactly when their colour *sets*
+// are.
 func NewSource(colors []string, amount int) Source {
 	seen := make(map[string]bool, len(colors))
 	out := make([]string, 0, len(colors))
@@ -126,15 +128,14 @@ func NewSource(colors []string, amount int) Source {
 	return Source{Colors: out, Amount: amount}
 }
 
-// Units is `ManaSource.units`: the colour set repeated once per mana it makes.
+// Units is the colour set repeated once per mana the source makes.
 //
 // The expansion is what makes the matching correct for a source that makes
 // more than one mana -- two units of {"C"} for Sol Ring, not one unit that
-// somehow counts twice. A non-positive amount produces nothing, which is
-// `[colors] * n` for n <= 0 in Python.
+// somehow counts twice. A non-positive amount produces nothing.
 //
-// The colour slice is **shared, not copied**, exactly as Python repeats one
-// frozenset. Python is safe from that by immutability and Go is not, so: do
+// The colour slice is **shared, not copied** -- one set, repeated. Nothing
+// guards it beyond this sentence, so: do
 // not mutate a returned unit.
 func (s Source) Units() [][]string {
 	if s.Amount <= 0 {
@@ -147,7 +148,7 @@ func (s Source) Units() [][]string {
 	return out
 }
 
-// ExpandUnits is `mana.expand_units`: sources flattened into individual mana.
+// ExpandUnits flattens sources into individual mana.
 func ExpandUnits(sources []Source) [][]string {
 	out := make([][]string, 0, len(sources))
 	for _, src := range sources {
@@ -172,14 +173,14 @@ func unitCount(sources []Source) int {
 	return total
 }
 
-// CanPay is `mana.can_pay`: can this set of sources pay this cost?
+// CanPay asks: can this set of sources pay this cost?
 //
 // Two conditions, both of which must hold. Every coloured pip is
 // simultaneously assigned a distinct unit that produces a colour it accepts --
 // which is a maximum matching covering the pips -- and the units left over
 // cover the generic portion, which is safe because any unit pays generic.
 //
-// xValue is Python's keyword-only `x_value` and is counted only when the cost
+// xValue is counted only when the cost
 // carries an X. Note what is deliberately *not* counted: Phyrexian symbols.
 // They raise a cost's mana value and they are paid with two life, so they
 // demand no mana at all, and using [Cost.ManaValue] here would refuse hands
@@ -212,7 +213,7 @@ func CanPay(cost Cost, sources []Source, xValue int) bool {
 	return maxMatching(pips, units) == len(pips)
 }
 
-// maxMatching is `mana._max_matching`: the size of the maximum bipartite
+// maxMatching is the size of the maximum bipartite
 // matching between pips and mana units, by Kuhn's augmenting-path algorithm.
 //
 // A pip may take a unit that produces a colour it accepts. Each pip is tried

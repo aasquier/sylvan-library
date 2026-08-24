@@ -2,7 +2,7 @@
  * The library whispers: a sprout in the corner of every page that offers one
  * glossary entry at a time.
  *
- * The facts are `glossary.py`'s — checked-in prose, served free by
+ * The facts are the glossary table's — checked-in prose, served free by
  * `/api/glossary` with no card pool and no key — which is what makes this
  * safe to hang on every page: it can never say anything the repo did not
  * write down, and it costs one cached fetch the tooltips were already

@@ -1,5 +1,5 @@
-// Package suggest is `decks/suggest.py`: ranked replacement candidates for a
-// card that has to leave a deck -- a measurement, not a recommendation. Of
+// Package suggest is ranked replacement candidates for a card that has to
+// leave a deck -- a measurement, not a recommendation. Of
 // every card that is legal here, which most resemble the one being removed?
 // A weighted sum (type 0.30, mana value 0.20, keywords 0.15, oracle text
 // 0.35) and a popularity nudge of up to 0.10 from EDHREC rank, last and
@@ -16,8 +16,8 @@ import (
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 )
 
 // PrimaryTypes are the card types, most specific first: a "Legendary
@@ -137,7 +137,7 @@ func textScore(targetTokens map[string]bool, candidate *pool.CardRecord) float64
 	return float64(shared) / float64(len(targetTokens))
 }
 
-// popularity is `_popularity`: EDHREC rank, log-scaled into 0..1.
+// popularity is the EDHREC rank, log-scaled into 0..1.
 func popularity(rec *pool.CardRecord) float64 {
 	if rec.EdhrecRank == nil || *rec.EdhrecRank < 1 {
 		return 0
@@ -145,10 +145,10 @@ func popularity(rec *pool.CardRecord) float64 {
 	return math.Max(0, 1-math.Log10(float64(*rec.EdhrecRank))/5)
 }
 
-// round4 is Python's `round(x, 4)`.
+// round4 rounds to four decimals, half to even on the scaled value.
 func round4(x float64) float64 { return math.RoundToEven(x*10000) / 10000 }
 
-// thousands is Python's `f"{n:,}"`.
+// thousands renders n with thousands separators: 48,350.
 func thousands(n int) string {
 	s := fmt.Sprint(n)
 	if len(s) <= 3 {
@@ -168,39 +168,39 @@ func thousands(n int) string {
 	return b.String()
 }
 
-// Score is `suggest.score`: one candidate against the card being replaced.
-// `why` is the deck's own rationale for the slot, folded into the text
-// comparison because it says what the card was *for*.
+// Score weighs one candidate against the card being replaced. `why` is the
+// deck's own rationale for the slot, folded into the text comparison
+// because it says what the card was *for*.
 //
-// # Two ways this line could disagree with Python, and both are guarded
+// # Two ways this line could drift by an ulp, and both are guarded
 //
 // It read as one expression -- `0.30*a + 0.20*b + 0.15*c + 0.35*d` -- until
 // 2026-08-22, which is the shape that gets both wrong at once.
 //
-// **The sum.** Python's is `math.fsum` (and was `sum` until the same day):
-// `sum()` over floats is compensated from CPython 3.12 and left to right
-// before it, so a left-to-right chain of `+` here reproduces 3.11 while the
-// image runs 3.12. Swept over the reachable scores, 48,350 quadruples differ
-// between the two accumulations and 814 change `round(similarity, 4)`, which
-// is the number that is serialised **and sorted on** -- so at the boundary a
-// candidate moves past the one above it, and with `limit=5` the fifth one can
-// disappear.
+// **The sum.** The recorded scores are compensated sums, and a
+// left-to-right chain of `+` is a different arithmetic in its last bits.
+// Swept over the reachable scores, 48,350 quadruples differ between the two
+// accumulations and 814 change the rounded similarity (`round4`), which is
+// the number that is serialised **and sorted on** -- so at the boundary a
+// candidate moves past the one above it, and with `limit=5` the fifth one
+// can disappear.
 //
-// **The multiply.** `a*b + c*d` is exactly what arm64 fuses into an `FMADDD`,
-// rounding once where CPython rounds twice, on the architecture the image
-// ships. `pyfloat.Rounded` is the explicit conversion the Go spec blesses for
+// **The multiply.** `a*b + c*d` is exactly what arm64 fuses into an
+// `FMADDD`, rounding once where the recorded arithmetic rounds twice, on
+// the architecture the image ships. `floats.Rounded` is the explicit
+// conversion the Go spec blesses for
 // this; putting each product into a `[]float64` for `Fsum` needs it for the
 // same reason `curve` does. `total` needs it too -- `similarity + 0.10*p` is
 // the same fusable shape with the sum already collapsed.
 func Score(target, candidate *pool.CardRecord, why string) Candidate {
 	targetTokens := Tokens(target.OracleText, why)
-	similarity := pyfloat.Fsum([]float64{
-		pyfloat.Rounded(0.30 * typeScore(target, candidate)),
-		pyfloat.Rounded(0.20 * curveScore(target, candidate)),
-		pyfloat.Rounded(0.15 * keywordScore(target, candidate)),
-		pyfloat.Rounded(0.35 * textScore(targetTokens, candidate)),
+	similarity := floats.Fsum([]float64{
+		floats.Rounded(0.30 * typeScore(target, candidate)),
+		floats.Rounded(0.20 * curveScore(target, candidate)),
+		floats.Rounded(0.15 * keywordScore(target, candidate)),
+		floats.Rounded(0.35 * textScore(targetTokens, candidate)),
 	})
-	total := similarity + pyfloat.Rounded(0.10*popularity(candidate))
+	total := similarity + floats.Rounded(0.10*popularity(candidate))
 
 	reasons := []string{}
 	if typeScore(target, candidate) == 1 {

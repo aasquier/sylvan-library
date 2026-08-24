@@ -5,7 +5,7 @@ import (
 	"database/sql"
 )
 
-// Scope is who a request is on behalf of -- `api/deps.py:UserScope`.
+// Scope is who a request is on behalf of.
 type Scope struct {
 	UserID        int64
 	Username      string
@@ -19,9 +19,9 @@ type Scope struct {
 	// It belongs here for the same reason IsAdmin does: it is a fact about the
 	// caller that a handler is allowed to know and that must be read fresh per
 	// request rather than captured anywhere longer-lived. It arrived with the
-	// first Claude route to flip; the comment above this struct used to say the
-	// door had no use for it, which was true of every route that had crossed
-	// until then.
+	// first Claude route; the comment above this struct used to say the
+	// door had no use for it, which was true of every route family before
+	// that one.
 	ModelTier string
 }
 
@@ -31,12 +31,12 @@ var Anonymous = Scope{}
 
 // Local is auth off: one person on their own machine, holding the file the
 // app reads. An admin because there is nobody else for it to be true
-// relative to (`api/deps.py:LOCAL`).
+// relative to.
 var Local = Scope{IsAdmin: true}
 
-// Resolve is `api/auth.py:scope_for_token`: a token becomes a caller, or
+// Resolve turns a token into a caller, or
 // Anonymous if it resolves to nobody. Re-checks `disabled` even though
-// disabling an account deletes its sessions, for the reason Python gives:
+// disabling an account deletes its sessions, deliberately:
 // the redundancy is cheap and the failure it covers is an account holder
 // keeping access after somebody believed they had removed it.
 func Resolve(ctx context.Context, db *sql.DB, token string) (Scope, error) {
@@ -66,8 +66,7 @@ func scopeFor(ctx context.Context, db *sql.DB, token string,
 }
 
 // The request's caller, carried on the context by the door's middleware so
-// the ported routes can ask who is asking -- `api/deps.py:scope` reading
-// what `api/auth.py` left on `request.state`.
+// any route can ask who is asking.
 
 type scopeKey struct{}
 
@@ -78,7 +77,7 @@ func WithScope(ctx context.Context, s Scope) context.Context {
 
 // ScopeFrom is the caller the middleware resolved. Local -- auth off, one
 // person, full access -- when nothing was attached, which is the permissive
-// default `api/deps.py` keeps for an app assembled without the middleware.
+// default an app assembled without the middleware keeps.
 func ScopeFrom(ctx context.Context) Scope {
 	if s, ok := ctx.Value(scopeKey{}).(Scope); ok {
 		return s

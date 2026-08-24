@@ -6,11 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/aasquier/sylvan-library/go/internal/config"
 )
 
-// Issue a link and deliver it -- `mtglab/auth/invites.py`. The one
+// Issue a link and deliver it. The one
 // implementation both entry points call.
 //
 // `mtglab users invite` and `POST /api/auth/reset` are the two doors ADR 16
@@ -61,12 +59,14 @@ const ifTheLinkFails = "If that opens a page asking for a link rather than a pas
 
 // ClaimLink is the URL that goes in the message. See the file comment for the
 // `#`.
+//
+// baseURL is required: this used to fall back to reading the environment, and
+// an empty string now produces a visibly relative link rather than one quietly
+// pointing wherever the process happened to be configured. The caller has the
+// setting -- [config.Config.BaseURL] -- and passing it is how the link a person
+// clicks days later is a decision somebody made rather than ambient state.
 func ClaimLink(token, baseURL string) string {
-	base := baseURL
-	if base == "" {
-		base = config.BaseURL()
-	}
-	return strings.TrimRight(base, "/") + ClaimPath + "#token=" + token
+	return strings.TrimRight(baseURL, "/") + ClaimPath + "#token=" + token
 }
 
 func inviteMessage(to, link string) Message {

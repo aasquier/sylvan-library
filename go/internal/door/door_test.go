@@ -165,6 +165,7 @@ func servedPaths(t *testing.T) []string {
 // unless somebody puts it on PublicPaths, and an entry there that nothing
 // serves is a typo with a hole's shape.
 func TestEveryPublicPathIsServed(t *testing.T) {
+	t.Parallel()
 	served := map[string]bool{}
 	for _, p := range servedPaths(t) {
 		served[p] = true
@@ -177,6 +178,7 @@ func TestEveryPublicPathIsServed(t *testing.T) {
 }
 
 func TestEveryProtectedRouteRefusesWithoutASession(t *testing.T) {
+	t.Parallel()
 	srv := build(t, true, fakeResolver{})
 	for _, route := range servedPaths(t) {
 		if PublicPaths[route] {
@@ -197,6 +199,7 @@ func TestEveryProtectedRouteRefusesWithoutASession(t *testing.T) {
 }
 
 func TestPublicRoutesAreNotRefused(t *testing.T) {
+	t.Parallel()
 	srv := build(t, true, fakeResolver{})
 	for route := range PublicPaths {
 		resp := get(t, srv, "GET", route, "")
@@ -207,6 +210,7 @@ func TestPublicRoutesAreNotRefused(t *testing.T) {
 }
 
 func TestAdminRoutesRefuseASignedInNonAdmin(t *testing.T) {
+	t.Parallel()
 	srv := build(t, true, fakeResolver{})
 	for _, route := range servedPaths(t) {
 		if route != AdminPrefix && !strings.HasPrefix(route, AdminPrefix+"/") {
@@ -238,6 +242,7 @@ func TestAdminRoutesRefuseASignedInNonAdmin(t *testing.T) {
 }
 
 func TestDottedAndDoubledPathsDoNotSlipPast(t *testing.T) {
+	t.Parallel()
 	srv := build(t, true, fakeResolver{})
 	for _, p := range []string{"/api/./admin/users", "/api//admin/users", "/api/x/../admin/users"} {
 		if resp := get(t, srv, "GET", p, "bob"); resp.StatusCode != 403 {
@@ -255,6 +260,7 @@ func TestDottedAndDoubledPathsDoNotSlipPast(t *testing.T) {
 }
 
 func TestNormalisePathMatchesPosixpath(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"/api/decks": "/api/decks", "/api/decks/": "/api/decks", "//api/decks": "/api/decks",
 		"/api/./decks": "/api/decks", "/api/x/../decks": "/api/decks", "/": "/", "": "/",
@@ -268,6 +274,7 @@ func TestNormalisePathMatchesPosixpath(t *testing.T) {
 }
 
 func TestALookupFailureIsAnonymousNotAPass(t *testing.T) {
+	t.Parallel()
 	srv := build(t, true, fakeResolver{fail: true})
 	if resp := get(t, srv, "GET", "/api/decks", "alice"); resp.StatusCode != 401 {
 		t.Fatalf("a failing lookup let a request through: %d", resp.StatusCode)
@@ -278,6 +285,7 @@ func TestALookupFailureIsAnonymousNotAPass(t *testing.T) {
 }
 
 func TestWithAuthOffNothingIsRefused(t *testing.T) {
+	t.Parallel()
 	srv := build(t, false, fakeResolver{fail: true})
 	for _, p := range []string{"/api/decks", "/api/admin/users", "/api/jobs"} {
 		if resp := get(t, srv, "GET", p, ""); resp.StatusCode != 200 {
@@ -296,6 +304,7 @@ func TestWithAuthOffNothingIsRefused(t *testing.T) {
 // routes here have never answered HEAD, and a router that quietly grew it
 // would be more helpful than its own contract.
 func TestAStrayAPIRequestIsTheCatchAllsRefusal(t *testing.T) {
+	t.Parallel()
 	srv := build(t, true, fakeResolver{})
 	for _, c := range []struct{ path, normalised string }{
 		{"/api/nonexistent", "/api/nonexistent"},
@@ -317,6 +326,7 @@ func TestAStrayAPIRequestIsTheCatchAllsRefusal(t *testing.T) {
 }
 
 func TestAWrongMethodIsTheRoutersOwn405(t *testing.T) {
+	t.Parallel()
 	srv := build(t, true, fakeResolver{})
 	for _, method := range []string{"POST", "DELETE", "HEAD", "PUT"} {
 		resp := get(t, srv, method, "/api/glossary", "alice")
@@ -340,6 +350,7 @@ func TestAWrongMethodIsTheRoutersOwn405(t *testing.T) {
 // stays bare. The floor reads the real response because the layer sits
 // innermost -- the same placement the app has always had.
 func TestResponsesOverTheFloorAreCompressed(t *testing.T) {
+	t.Parallel()
 	srv := build(t, false, nil)
 	req, _ := http.NewRequest("GET", srv.URL+"/assets/big.js", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -378,7 +389,8 @@ func TestResponsesOverTheFloorAreCompressed(t *testing.T) {
 
 // --------------------------------------------------------------- the static
 
-func TestTheShellAndItsMountsAnswerAsPythonDoes(t *testing.T) {
+func TestTheShellAndItsMountsAnswerTheRecordedShapes(t *testing.T) {
+	t.Parallel()
 	srv := build(t, true, fakeResolver{})
 	cases := []struct {
 		method, path string
@@ -435,6 +447,7 @@ func TestTheShellAndItsMountsAnswerAsPythonDoes(t *testing.T) {
 }
 
 func TestAnAssetRevalidatesWithA304(t *testing.T) {
+	t.Parallel()
 	srv := build(t, true, fakeResolver{})
 	first := get(t, srv, "GET", "/assets/app.js", "")
 	lm := first.Header.Get("Last-Modified")
@@ -448,9 +461,10 @@ func TestAnAssetRevalidatesWithA304(t *testing.T) {
 }
 
 func TestContentTypesMatchTheContainer(t *testing.T) {
-	// CPython 3.12's built-in table plus api/app.py's three registrations,
-	// with Starlette's charset on text/* -- what the deployed container
-	// answers for every extension the bundle and the tarot directory hold.
+	t.Parallel()
+	// The deployed container's recorded serving table, charset included on
+	// every text/* -- what the wire has always answered for every extension
+	// the bundle and the tarot directory hold.
 	want := map[string]string{
 		"x.css": "text/css; charset=utf-8", "x.html": "text/html; charset=utf-8",
 		"x.ico": "image/vnd.microsoft.icon", "x.js": "text/javascript; charset=utf-8",
@@ -469,6 +483,7 @@ func TestContentTypesMatchTheContainer(t *testing.T) {
 }
 
 func TestNoFrontendMeansNoShell(t *testing.T) {
+	t.Parallel()
 	d, err := New(Config{WebDist: filepath.Join(t.TempDir(), "absent"),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err != nil {
@@ -486,24 +501,46 @@ func TestNoFrontendMeansNoShell(t *testing.T) {
 
 // -------------------------------------------------------------- the headers
 
+// "Every" is derived, not sampled -- and the distinction is load-bearing
+// rather than tidy. Three dismissed high-severity `go/reflected-xss` alerts
+// (door.go's 404 echo and the gzip layer's two writes) rest on one sentence:
+// every body this door writes is JSON or a disk asset, and `nosniff` reaches
+// all of them. A hand-written list of eight paths cannot hold that sentence,
+// because the route it does not name is exactly the one that breaks it. So
+// the API half comes from `servedPaths` -- the served route table -- and the
+// literals below are only the paths no route table names: the SPA shell, the
+// two static tiers and the door's own liveness answer.
+//
+// Anonymous, deliberately: a protected route is refused before its handler
+// runs and a public one answers for real, so the sweep costs nothing and
+// still crosses the middleware seam where the headers are stamped. The one
+// signed-in case is the admin prefix, whose 403 is written by a different
+// arm of the same middleware.
 func TestEveryDoorResponseCarriesTheSecurityHeaders(t *testing.T) {
+	t.Parallel()
 	srv := build(t, true, fakeResolver{})
 	want := map[string]string{
 		"X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY",
 		"Referrer-Policy":    "same-origin",
 		"Permissions-Policy": "camera=(self), microphone=(), geolocation=()",
 	}
-	for _, c := range []struct{ method, path, token string }{
-		{"GET", "/api/decks", ""}, {"GET", "/api/admin/users", "bob"}, {"GET", "/", ""},
+	cases := []struct{ method, path, token string }{
+		{"GET", "/", ""}, {"POST", "/", ""},
 		{"GET", "/tarot/00-fool.webp", ""}, {"GET", "/assets/nope.js", ""},
-		{"GET", DoorHealthPath, ""}, {"GET", "/api/health", ""}, {"POST", "/", ""},
-	} {
+		{"GET", DoorHealthPath, ""},
+		{"GET", "/api/admin/users", "bob"},
+	}
+	for _, route := range servedPaths(t) {
+		cases = append(cases, struct{ method, path, token string }{
+			"GET", concrete(t, route), ""})
+	}
+	for _, c := range cases {
 		resp := get(t, srv, c.method, c.path, c.token)
 		for name, value := range want {
-			// Values, not Get: a proxied response that carried Python's copy
-			// *and* the door's would read `nosniff` from Get and be wrong on
-			// the wire -- the contract suite's httpx joins them and saw
-			// `nosniff, nosniff` on the first run through the door.
+			// Values, not Get: a response carrying the header twice would
+			// read `nosniff` from Get and be wrong on
+			// the wire -- a client that joins repeated headers saw
+			// `nosniff, nosniff` on the door's first run.
 			if got := resp.Header.Values(name); len(got) != 1 || got[0] != value {
 				t.Errorf("%s %s as %q: %s = %q, want exactly [%q]", c.method, c.path, c.token, name, got, value)
 			}
@@ -515,6 +552,7 @@ func TestEveryDoorResponseCarriesTheSecurityHeaders(t *testing.T) {
 }
 
 func TestHSTSRidesOnlyWhenTLSFrontsTheApp(t *testing.T) {
+	t.Parallel()
 	web, tarot := site(t)
 	d, err := New(Config{SecureCookies: true, WebDist: web, TarotDir: tarot,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
@@ -531,7 +569,8 @@ func TestHSTSRidesOnlyWhenTLSFrontsTheApp(t *testing.T) {
 // --------------------------------------------------- the real resolver path
 
 func TestTheRealResolverReadsAppDB(t *testing.T) {
-	// An app.db in Python's shape (see internal/auth's tests for the DDL and
+	t.Parallel()
+	// A real app.db (see internal/auth's tests for the DDL and
 	// the vectors): alice's session admits her; a missing file is anonymous.
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "app.db")
@@ -592,9 +631,10 @@ func TestTheRealResolverReadsAppDB(t *testing.T) {
 	}
 }
 
-// ------------------------------------------------------- the ported routes
+// -------------------------------------------------------- the API routes
 
 func TestARouteAnswersTheEmbeddedPayload(t *testing.T) {
+	t.Parallel()
 	srv := build(t, true, fakeResolver{})
 	for path, want := range map[string][]byte{
 		"/api/colors":   reference.ColorsJSON(),
@@ -624,6 +664,7 @@ func TestARouteAnswersTheEmbeddedPayload(t *testing.T) {
 }
 
 func TestTheRouteTableChoosesTheMostSpecificPattern(t *testing.T) {
+	t.Parallel()
 	var hit string
 	named := func(name string) http.HandlerFunc {
 		return func(http.ResponseWriter, *http.Request) { hit = name }
@@ -647,7 +688,7 @@ func TestTheRouteTableChoosesTheMostSpecificPattern(t *testing.T) {
 			t.Errorf("%s landed on %s, want %s", path, hit, want)
 		}
 	}
-	// The same shape twice is the pair nothing could choose between.
+	// The same shape twice: two routes nothing could choose between.
 	h := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 	if _, err := newRouteTable([]api.Route{
 		{Method: "GET", Pattern: "/api/decks/{owner}/{slug}", Handler: h},
@@ -676,6 +717,7 @@ func TestTheRouteTableChoosesTheMostSpecificPattern(t *testing.T) {
 }
 
 func TestPathValuesReachTheHandler(t *testing.T) {
+	t.Parallel()
 	var got string
 	table, err := newRouteTable([]api.Route{{Method: "GET", Pattern: "/api/decks/{owner}/{slug}/validate",
 		Handler: func(_ http.ResponseWriter, r *http.Request) {
@@ -730,6 +772,7 @@ func TestPathValuesReachTheHandler(t *testing.T) {
 // registry is an empty list -- `[]`, never `null` -- and an id nobody holds
 // is a 404 whose detail the frontend renders.
 func TestTheJobListIsTheRegistrys(t *testing.T) {
+	t.Parallel()
 	srv := build(t, false, fakeResolver{})
 	resp := get(t, srv, "GET", "/api/jobs", "")
 	if resp.StatusCode != 200 {
@@ -742,6 +785,7 @@ func TestTheJobListIsTheRegistrys(t *testing.T) {
 }
 
 func TestAJobIdNobodyHoldsIsA404(t *testing.T) {
+	t.Parallel()
 	srv := build(t, false, fakeResolver{})
 	resp := get(t, srv, "GET", "/api/jobs/some-old-id", "")
 	if resp.StatusCode != 404 {
@@ -758,6 +802,7 @@ func TestAJobIdNobodyHoldsIsA404(t *testing.T) {
 // `(unrouted)`, the static tiers record their mount prefix, and the shell
 // and the stray-API 404s record the catch-all's `/{full_path}`.
 func TestTheDoorCountsWhatItAnswers(t *testing.T) {
+	t.Parallel()
 	dbPath := filepath.Join(t.TempDir(), "app.db")
 	if err := authtest.NewScratchDB(dbPath); err != nil {
 		t.Fatal(err)

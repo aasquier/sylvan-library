@@ -28,6 +28,7 @@ type roundTripper func(*http.Request) (*http.Response, error)
 func (f roundTripper) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestTheShelvesRefuseWhatTheyDoNotHold(t *testing.T) {
+	t.Parallel()
 	sh := offlineShelves(t)
 	a := New(Config{Shelves: sh})
 	for target, detail := range map[string]string{
@@ -60,6 +61,7 @@ func TestTheShelvesRefuseWhatTheyDoNotHold(t *testing.T) {
 }
 
 func TestTheShelvesServeWhatTheyHold(t *testing.T) {
+	t.Parallel()
 	sh := offlineShelves(t)
 	a := New(Config{Shelves: sh})
 	// A symbol already on the shelf, and a reader file under the stamp.

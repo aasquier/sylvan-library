@@ -14,6 +14,7 @@ import (
 // panel spent a fortnight dead on exactly that. Detected as "first word, no
 // underscore", never by matching `FlyV1` literally.
 func TestAuthorizationKeepsASchemeAndAddsBearerOtherwise(t *testing.T) {
+	t.Parallel()
 	for secret, want := range map[string]string{
 		"FlyV1 fm2_lJPE":     "FlyV1 fm2_lJPE",
 		"FlyV9 fm9_x y":      "FlyV9 fm9_x y",
@@ -68,8 +69,9 @@ func contains(target, name string) bool {
 
 func contains2(s, sub string) bool { return strings.Contains(s, sub) }
 
-// The whole panel: values in query order, floats rendered as Python renders
-// them, the app and org named — and the second ask served from the cache.
+// The whole panel: values in query order, floats in their canonical
+// rendering, the app and org named — and the second ask served from the
+// cache.
 func TestFetchAnswersOnceAndCaches(t *testing.T) {
 	t.Setenv("FLY_METRICS_TOKEN", "FlyV1 fm2_test")
 	hits := 0

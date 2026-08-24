@@ -14,6 +14,7 @@ import "testing"
 // the day a tier's model id changes the picker and the ledger disagree
 // silently.
 func TestEveryTiersModelLandsOnItsOwnLabel(t *testing.T) {
+	t.Parallel()
 	for _, tier := range All {
 		if got := LabelFor(tier.Model); got != tier.Label {
 			t.Errorf("tier %q serves %q, which LabelFor calls %q -- the picker "+
@@ -31,6 +32,7 @@ func TestEveryTiersModelLandsOnItsOwnLabel(t *testing.T) {
 // worse than the shrug, because a wrong family name looks exactly like a right
 // one.
 func TestAnUnknownModelIsNamedWithoutGuessing(t *testing.T) {
+	t.Parallel()
 	for _, unknown := range []string{
 		"", "gpt-4", "claude", "claude-", "Claude-Opus-5",
 		"anthropic.claude-opus-5", "claude-opus", "opus-5",
@@ -47,6 +49,7 @@ func TestAnUnknownModelIsNamedWithoutGuessing(t *testing.T) {
 // away; rendering that through the family table would call it "Another
 // Claude", which reads as an unrecognised model rather than as several.
 func TestTheAggregatedMarkerIsNamedSeveral(t *testing.T) {
+	t.Parallel()
 	if got := LabelFor(Various); got != "Several" {
 		t.Errorf("LabelFor(%q) = %q, want \"Several\"", Various, got)
 	}
@@ -56,6 +59,7 @@ func TestTheAggregatedMarkerIsNamedSeveral(t *testing.T) {
 // broken: the Admin ledger used to render `claude-sonnet-5` in its "Answered
 // by" column, which is a model id, which is technology.
 func TestNoLabelIsAModelId(t *testing.T) {
+	t.Parallel()
 	labels := []string{LabelFor(Various), LabelFor("nothing-known")}
 	for _, tier := range All {
 		labels = append(labels, LabelFor(tier.Model), tier.Label)
@@ -75,10 +79,11 @@ func TestNoLabelIsAModelId(t *testing.T) {
 	}
 }
 
-// TestTheDefaultTierIsAlwaysResolvable is Python's module-level assertion:
-// `resolve` returning nothing for a key it was told is always valid would be a
-// very quiet bug.
+// TestTheDefaultTierIsAlwaysResolvable pins the package's own boot-time
+// assertion: `Resolve` returning nothing for a key it was told is always
+// valid would be a very quiet bug.
 func TestTheDefaultTierIsAlwaysResolvable(t *testing.T) {
+	t.Parallel()
 	if _, ok := byKey[DefaultKey]; !ok {
 		t.Fatalf("the default tier %q is not in the table", DefaultKey)
 	}

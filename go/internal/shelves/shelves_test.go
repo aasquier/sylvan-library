@@ -54,6 +54,7 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestSymbolsAreFetchedOnceAndRefusedWhenMalformed(t *testing.T) {
+	t.Parallel()
 	var hits int32
 	srv := cdn(t, map[string][]byte{
 		"/card-symbols/W.svg":    []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`),
@@ -88,6 +89,7 @@ func TestSymbolsAreFetchedOnceAndRefusedWhenMalformed(t *testing.T) {
 }
 
 func TestOCRAssetsArePinnedByDigest(t *testing.T) {
+	t.Parallel()
 	good := []byte("/*! worker */ console.log('hi')")
 	sum := sha256.Sum256(good)
 	// The real table, with its pins, is what the code reads; the fake CDN
@@ -136,6 +138,7 @@ func TestOCRAssetsArePinnedByDigest(t *testing.T) {
 }
 
 func TestFindReadyMatchesTheOracleTheEffectAndThePainting(t *testing.T) {
+	t.Parallel()
 	s := New(t.TempDir(), nil, nil)
 	fp := reference.Runtime().Cardmotion.Effects["depth-drift"].Fingerprint
 	write := func(dir string, meta map[string]any, files ...string) {

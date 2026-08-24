@@ -11,6 +11,7 @@ import (
 )
 
 func TestTheFileTierCannotBeWalkedOutOfItsRoot(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	_ = os.MkdirAll(filepath.Join(root, "real"), 0o755)
 	_ = os.WriteFile(filepath.Join(root, "real", "deck.yaml"), []byte("name: Real\n"), 0o644)

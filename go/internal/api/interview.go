@@ -13,12 +13,12 @@ import (
 )
 
 // The rationale interview's route: `POST /api/decks/{owner}/{slug}/interview`,
-// over `service.claude_interview` over `claude.Interview`. **The first Claude
-// surface to answer from the door**, and deliberately the smallest -- one
+// over `claude.Interview`. Deliberately the smallest Claude
+// surface -- one
 // handler, no job, no cache, nothing stored.
 //
-// **A plain route rather than a job**, which is Python's shape and is kept for
-// Python's stated reason: the interview costs ~4,900 input tokens and makes no
+// **A plain route rather than a job**, and the reason stands
+// measured: the interview costs ~4,900 input tokens and makes no
 // tool calls in the ordinary case, because `Brief` hands the facts over instead
 // of making the model go and fetch them. It sits in the seconds class rather
 // than the theme proposal's minutes. ADR 20's rule still applies to it -- a
@@ -29,7 +29,7 @@ import (
 // writes: nothing under `internal/claude` can name a write function at all, and
 // `boundary_test.go` fails the commit that adds one.
 //
-// The four failure modes are kept apart, exactly as Python keeps them, because
+// The four failure modes are kept apart, deliberately, because
 // collapsing them tells somebody their key is missing when the model was merely
 // rate limited:
 //
@@ -40,24 +40,23 @@ import (
 //   - **503** -- no call was possible at all: no key in the environment.
 //   - **502** -- a call was made and came back unusable.
 
-// rationaleInterview is `POST .../interview` -- `service.claude_interview`.
+// rationaleInterview is `POST .../interview`.
 func (a *API) rationaleInterview(w http.ResponseWriter, r *http.Request) {
-	// The body first, then the deck. FastAPI validates `payload: dict[str,
-	// Any]` while it is solving the dependencies, and `lib.source_for(owner)`
-	// is not reached until the handler's own body -- so a malformed body is a
+	// The body first, then the deck -- the recorded order: the body is
+	// validated before the owner is resolved, so a malformed body is a
 	// 422 before any 404 about the deck it was aimed at. Same order as the
 	// artifacts rebuild, and for the same reason.
 	body, ok := readBody(w, r)
 	if !ok {
 		return
 	}
-	// `str(payload.get("card", "")).strip()`. Absent and explicit null are
-	// **different** here: absent takes the `""` default, while a null reaches
-	// `str(None)` and becomes the four-letter string "None", which then fails
+	// The absent-key default, stripped. Absent and explicit null are
+	// **different** here: absent takes the `""` default, while a null
+	// stringifies to the four-letter string "None", which then fails
 	// as a card the deck does not run rather than as a missing field. Two 422s
-	// either way, with different sentences, and reproducing it costs one
+	// either way, with different sentences, and keeping it costs one
 	// argument.
-	card := strings.TrimSpace(pyStrDefault(body, "card", ""))
+	card := strings.TrimSpace(strDefault(body, "card", ""))
 	if card == "" {
 		wire.Detail(w, http.StatusUnprocessableEntity, "card is required")
 		return
@@ -72,16 +71,16 @@ func (a *API) rationaleInterview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// `payload.get("stance") or None` and `str(payload.get("focus") or "")`:
+	// The or-nothing reads:
 	// a falsy value is not a value. An empty object for the stance is the
 	// deck's own default rather than a refusal, and an empty focus is no
 	// focus rather than the string "False".
 	var requested any
-	if pyTruthy(body["stance"]) {
+	if truthy(body["stance"]) {
 		requested = body["stance"]
 	}
 	focus := ""
-	if pyTruthy(body["focus"]) {
+	if truthy(body["focus"]) {
 		focus = str(body, "focus")
 	}
 
@@ -112,18 +111,19 @@ func (a *API) rationaleInterview(w http.ResponseWriter, r *http.Request) {
 
 // refuseClaude turns a mode's errors into the route layer's answers.
 //
-// The mapping is `service.claude_interview`'s, which sorts by what the caller
+// The mapping sorts by what the caller
 // can do about it rather than by where the failure happened: a stance they
 // typed and a card they named are theirs to fix (422), a key the operator has
 // not set is the instance's (503), and everything else is a call that was made
 // and did not come back usable (502).
 //
-// **The default is 502 and not 500**, which is Python's and is worth stating
-// because it looks like a mistake. `service.claude_interview` catches bare
-// `Exception` around the whole of `ask()` -- the brief included -- and reports
-// it through `explain`. So a pool failure while assembling the brief is a 502
-// there, and is a 502 here. Narrowing it to 500 would be a nicer answer to a
-// different question than the one Python is being asked.
+// **The default is 502 and not 500**, which is the recorded contract and is
+// worth stating
+// because it looks like a mistake. The recorded route wraps the whole of
+// the ask -- the brief included -- into one reported failure. So a pool
+// failure while assembling the brief has always been a 502, and is a 502
+// here. Narrowing it to 500 would be a nicer answer to a
+// different question than the one being asked.
 func (a *API) refuseClaude(w http.ResponseWriter, where string, err error) bool {
 	if err == nil {
 		return false
@@ -133,20 +133,19 @@ func (a *API) refuseClaude(w http.ResponseWriter, where string, err error) bool 
 	case errors.As(err, &notInDeck):
 		wire.Detail(w, http.StatusUnprocessableEntity, notInDeck.Error())
 	case errors.Is(err, claude.ErrStanceRejected):
-		// **422, since 2026-08-23 -- and it was 502 for a day, deliberately.**
+		// **422, since 2026-08-23 -- and it was 502 for a day,
+		// deliberately.**
 		//
-		// `api/app.py` has an `except ValueError` branch here whose comment
-		// says "A malformed stance" and which raises 422 -- and until
-		// 2026-08-23 that branch was DEAD CODE: `service.claude_interview`
-		// re-raised only `ClaudeUnavailable`, `CardNotInDeck` and
-		// `DeckNotFound`, so a stance ValueError fell into its broad `except
-		// Exception`, became `ClaudeFailed`, and the route answered 502 before
-		// its own branch was consulted. Measured against the running pair when
-		// this route flipped, and reproduced rather than fixed: a flip is not
-		// the place to decide which of two spellings Python meant. Then ruled
-		// with Aaron and fixed in both runtimes in one change, the way
-		// `edit.set_shared` went -- `stance.StanceRejected` is the name the
-		// service layer re-raises by there, and this is the line here. The
+		// The recorded route *intended* a 422 for a malformed stance and
+		// never reached it: the branch was DEAD CODE, because the stance
+		// refusal fell into the broad catch-everything, became a generic
+		// failure, and answered 502 before
+		// its own branch was consulted. Measured on the live wire, kept as
+		// measured at first -- a byte-for-byte reproduction is not the
+		// place to decide which of two spellings was meant -- then ruled
+		// with Aaron in one change, the way
+		// the share toggle went. `ErrStanceRejected` is the typed refusal,
+		// and this is the line. The
 		// request was wrong, not the call.
 		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
 	case errors.Is(err, claude.ErrUnavailable):
@@ -154,7 +153,7 @@ func (a *API) refuseClaude(w http.ResponseWriter, where string, err error) bool 
 		// where to set it, because the person reading it is the operator.
 		wire.Detail(w, http.StatusServiceUnavailable, err.Error())
 	default:
-		// `ClaudeFailed(explain(exc))` -- and `explain` is the function that
+		// The explained failure -- `Explain` is the function that
 		// already knows how to turn a 401 into "your key may have expired"
 		// rather than a stack trace.
 		a.log.Error("the Claude route failed", "route", where, "error", err)
@@ -163,14 +162,16 @@ func (a *API) refuseClaude(w http.ResponseWriter, where string, err error) bool 
 	return true
 }
 
-// pyStrDefault is `str(body.get(key, missing))`: Python's `str()` over whatever
-// JSON put there, with the default reached only when the key is **absent**.
+// strDefault is the absent-key read: the recorded stringification over
+// whatever
+// JSON put there, with the default reached only when the key is **absent**
+// -- so an explicit null renders as "None".
 //
-// The `str` helper beside it answers "" for a null, which is right where the
-// Python is `str(payload.get(k) or "")` and wrong where it is
-// `str(payload.get(k, ""))` -- the two spellings differ on exactly one input
+// The `str` helper beside it answers "" for a null, which is right for the
+// or-empty read and wrong for this one
+// -- the two spellings differ on exactly one input
 // and this route uses the second.
-func pyStrDefault(body map[string]any, key, missing string) string {
+func strDefault(body map[string]any, key, missing string) string {
 	if _, present := body[key]; !present {
 		return missing
 	}

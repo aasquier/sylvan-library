@@ -11,7 +11,7 @@
  * off the bottom-left corner, and the name off the title bar. The first pair
  * is a **lookup** and resolves outright. The second is a **similarity** and
  * resolves nothing at all, however certain it looks — the scores of right and
- * wrong answers overlap badly, which `cards/identify.py` measures. So the
+ * wrong answers overlap badly, which the server's card reader measured. So the
  * review list below has two kinds of row, and the difference between them is
  * the whole design: a card the pool *found*, and a shortlist somebody has to
  * choose from.

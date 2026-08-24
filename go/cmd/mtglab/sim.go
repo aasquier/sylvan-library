@@ -15,10 +15,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 	simcache "github.com/aasquier/sylvan-library/go/internal/sim/cache"
 	"github.com/aasquier/sylvan-library/go/internal/sim/compile"
@@ -29,31 +28,28 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
 )
 
-// simCommand is the `mtglab sim` family: cli.py's seven simulator commands,
-// ported line for line over the engines Phases 5 and 7 already crossed. The
-// compute is all `internal/sim/*`; what this file owns is the orchestration
-// and the TEXT -- the fixed-width tables and teaching sheets Python prints,
-// reproduced to the space, because a diff of the two CLIs' output is the
-// cheapest referee this surface will ever have.
+// simCommand is the `mtglab sim` family: the seven simulator commands, over
+// the engines Phases 5 and 7 landed. The compute is all `internal/sim/*`;
+// what this file owns is the orchestration and the TEXT -- the fixed-width
+// tables and teaching sheets, held to the recorded output to the space,
+// because a byte diff against a recorded table is the cheapest referee this
+// surface will ever have.
 //
-// Three Python behaviours are ported deliberately rather than improved:
+// Three recorded behaviours are kept deliberately rather than improved:
 //
-//   - `sim mana` compiles through `compile.Deck` (compile_deck), NOT
-//     `compile.Compile` (compile_report) -- so a card the pool cannot resolve
-//     still shrinks the deck silently here, exactly as in cli.py, and
-//     `NothingToSimulate` is unreachable from this surface. The deck page is
-//     where the report renders; the CLI never asked for it.
+//   - `sim mana` compiles through `compile.Deck`, NOT `compile.Compile` --
+//     so a card the pool cannot resolve still shrinks the deck silently
+//     here, and `NothingToSimulate` is unreachable from this surface. The
+//     deck page is where the report renders; the CLI never asked for it.
 //   - `sim lands` with an empty range (low > high) prints the header and the
-//     footer and exits 0. Python's `range(low, high + 1)` simply runs no
-//     iterations, and a refusal here would be an invention.
+//     footer and exits 0. The sweep simply runs no iterations, and a refusal
+//     here would be an invention.
 //   - a deck where not one name resolves is refused as PoolRequired, not
-//     NothingToSimulate -- the wart `internal/sim/compile` pins in both
-//     runtimes.
+//     NothingToSimulate -- the wart `internal/sim/compile` pins and argues.
 //
-// One departure, Go's rather than the design's: Python failures that were
-// tracebacks (a zero games count, a one-deck Forge match) come back as plain
-// errors here, printed by the root as `mtglab: <message>` -- same words,
-// no stack.
+// Failures of the caller's own making (a zero games count, a one-deck Forge
+// match) come back as plain errors, printed by the root as
+// `mtglab: <message>` -- the recorded sentence, never a stack.
 func simCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sim",
@@ -73,10 +69,10 @@ func simCommand() *cobra.Command {
 
 // ------------------------------------------------------------ deck + pool
 
-// loadSimDeck is cli.py's `_load`: the file tier, one slug, or Python's exact
-// refusal.
+// loadSimDeck reads one slug's deck.yaml off the file tier, or refuses with
+// the recorded sentence.
 func loadSimDeck(slug string) (*deck.Deck, error) {
-	path := filepath.Join(config.DecksDir(), slug, "deck.yaml")
+	path := filepath.Join(settings().DecksDir, slug, "deck.yaml")
 	text, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -87,13 +83,14 @@ func loadSimDeck(slug string) (*deck.Deck, error) {
 	return deck.FromText(string(text), slug)
 }
 
-// deckPool is cli.py's `_pool`: look up every card in the deck. Returns nil
-// when the pool is absent, so compiling degrades to `PoolRequired` with its
-// own message -- Python returns None for the same reason.
+// deckPool looks up every card in the deck. Returns nil when the pool is
+// absent, so compiling degrades to `PoolRequired` with its own message
+// rather than failing here with a worse one.
 //
-// The name list is _pool's, not service.py's: commander, the 99, the swap
-// board, and the companion. The graveyard is deliberately not queried,
-// because Python's CLI does not query it.
+// The name list is deliberately this command's own, not the deck page's:
+// commander, the 99, the swap board, and the companion. The graveyard is
+// not queried -- nothing here simulates it, and the narrower lookup is part
+// of the recorded behaviour.
 func deckPool(ctx context.Context, d *deck.Deck) (map[string]*pool.CardRecord, error) {
 	names := append([]string{}, d.Commander...)
 	for _, c := range d.Cards {
@@ -105,7 +102,7 @@ func deckPool(ctx context.Context, d *deck.Deck) (map[string]*pool.CardRecord, e
 	if d.Companion != nil {
 		names = append(names, *d.Companion)
 	}
-	p := pool.New(config.DBPath(), nil)
+	p := pool.New(settings().DBPath(), nil)
 	defer p.Close()
 	var cards map[string]*pool.CardRecord
 	err := p.Use(ctx, func(c *pool.Conn) error {
@@ -119,9 +116,9 @@ func deckPool(ctx context.Context, d *deck.Deck) (map[string]*pool.CardRecord, e
 	return cards, err
 }
 
-// simCards is `_sim_cards`: compile, or fail with the compiler's own words.
-// The only error `compile.Deck` returns is PoolRequired, whose Error() is
-// exactly what Python's sys.exit printed.
+// simCards loads and compiles, or fails with the compiler's own words. The
+// only error `compile.Deck` returns is PoolRequired, whose Error() is the
+// recorded exit sentence word for word.
 func simCards(ctx context.Context, slug string) (*deck.Deck, []*sim.Card, *sim.Card, error) {
 	d, err := loadSimDeck(slug)
 	if err != nil {
@@ -178,36 +175,36 @@ func simManaCommand() *cobra.Command {
 	return cmd
 }
 
-// summaryReport is `SimSummary.report()` -- the fixed-width text table cli.py
-// prints for a Tier 1 run. `internal/sim/tier1`'s package comment has promised
-// since Phase 5 that it "arrives with the CLI at Phase 8"; this is that
-// arrival, and it lives here rather than in the engine because the CLI is
-// still its only reader.
+// summaryReport is the fixed-width text table `sim mana` prints for a
+// Tier 1 run. `internal/sim/tier1`'s package comment has promised since
+// Phase 5 that it "arrives with the CLI at Phase 8"; this is that arrival,
+// and it lives here rather than in the engine because the CLI is still its
+// only reader.
 func summaryReport(s tier1.SimSummary) string {
 	lines := []string{
 		fmt.Sprintf("games=%d  turns=%d", s.Games, s.Turns),
 		"mulligan policy: " + s.KeepRule,
 		fmt.Sprintf("mulligan rate: %s  (avg %s)",
-			pyPercent(s.MulliganRate, 1), pyFixed(s.AvgMulligans, 2)),
+			percent(s.MulliganRate, 1), fixedDecimal(s.AvgMulligans, 2)),
 		"median commander turn: " + numberOrNone(s.MedianCommanderTurn),
 		fmt.Sprintf("commander never cast by T%d: %s",
-			s.Turns, pyPercent(s.NeverCastCommander, 1)),
+			s.Turns, percent(s.NeverCastCommander, 1)),
 		fmt.Sprintf("turns with a color-only block: %s per game",
-			pyFixed(s.ColorScrewRate, 2)),
+			fixedDecimal(s.ColorScrewRate, 2)),
 		"median first spell: T" + floatOrNone(s.MedianFirstSpellTurn),
 		fmt.Sprintf("stalled turns (castless with a spell in hand): %s per game",
-			pyFixed(s.AvgStalledTurns, 2)),
+			fixedDecimal(s.AvgStalledTurns, 2)),
 		"",
 		"  turn   lands   mana   unused   spells   P(commander down)",
 	}
 	for t := 1; t <= s.Turns; t++ {
 		lines = append(lines, fmt.Sprintf("  %s   %s  %s  %s  %s   %s",
 			padLeft(strconv.Itoa(t), 4),
-			padLeft(pyFixed(s.AvgLandsByTurn[t-1], 2), 5),
-			padLeft(pyFixed(s.AvgManaByTurn[t-1], 2), 5),
-			padLeft(pyFixed(s.AvgUnusedByTurn[t-1], 2), 6),
-			padLeft(pyFixed(s.AvgSpellsByTurn[t-1], 2), 6),
-			padLeft(pyPercent(s.CommanderByTurn[t], 1), 6)))
+			padLeft(fixedDecimal(s.AvgLandsByTurn[t-1], 2), 5),
+			padLeft(fixedDecimal(s.AvgManaByTurn[t-1], 2), 5),
+			padLeft(fixedDecimal(s.AvgUnusedByTurn[t-1], 2), 6),
+			padLeft(fixedDecimal(s.AvgSpellsByTurn[t-1], 2), 6),
+			padLeft(percent(s.CommanderByTurn[t], 1), 6)))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -260,16 +257,16 @@ func simLandsCommand() *cobra.Command {
 					resized = append(resized, lands[i%len(lands)])
 				}
 				lib := append(append([]*sim.Card{}, resized...),
-					pyHead(spells, len(library)-n)...)
+					headOf(spells, len(library)-n)...)
 				s := seed
 				summary := tier1.Run(lib, commander,
 					tier1.Options{Games: games, Turns: 10, Seed: &s})
 				fmt.Printf(" %s     %s          %s           %s          %s\n",
 					padLeft(strconv.Itoa(n), 5),
-					padLeft(pyPercent(summary.CommanderByTurn[5], 1), 6),
-					padLeft(pyFixed(summary.SpellsThrough(8), 2), 5),
-					padLeft(pyFixed(summary.WastedThrough(8), 2), 5),
-					padLeft(pyPercent(summary.MulliganRate, 1), 4))
+					padLeft(percent(summary.CommanderByTurn[5], 1), 6),
+					padLeft(fixedDecimal(summary.SpellsThrough(8), 2), 5),
+					padLeft(fixedDecimal(summary.WastedThrough(8), 2), 5),
+					padLeft(percent(summary.MulliganRate, 1), 4))
 			}
 			fmt.Println("\nPick the land count where 'spells thru T8' plateaus -- past that " +
 				"you are buying commander speed with flood.")
@@ -307,7 +304,7 @@ func simShelfCommand() *cobra.Command {
 			}
 			fmt.Println(d.Name)
 			fmt.Printf("%d cards, %d lands, judged at %s consistency, %s.\n\n",
-				shelf.DeckSize, shelf.Lands, pyPercent(shelf.Target, 0), seat)
+				shelf.DeckSize, shelf.Lands, percent(shelf.Target, 0), seat)
 
 			fmt.Println("COLOURED SOURCES -- what your own cards demand")
 			fmt.Println("  A rung per pip count, because a deck short on triple-pip cards is")
@@ -326,7 +323,7 @@ func simShelfCommand() *cobra.Command {
 					}
 					fmt.Printf("      %d pip on T%d: wants %s  -- %s you make it %s of the time  [%s%s]\n",
 						tier.Pips, tier.Turn, padLeft(strconv.Itoa(tier.Need), 2),
-						padRight(verdict, 8), pyPercent(tier.OddsNow, 0),
+						padRight(verdict, 8), percent(tier.OddsNow, 0),
 						tier.Cards[0], more)
 				}
 				fmt.Println()
@@ -336,7 +333,7 @@ func simShelfCommand() *cobra.Command {
 			fmt.Println("LAND COUNT -- a regression, not a simulation")
 			fmt.Printf("  You run %d. The fit says %d (%+d), from an average mana value of %s and %d cheap accelerants.\n",
 				est.LandsNow, est.Recommended, est.Delta(),
-				pyfloat.Repr(est.AverageManaValue), est.CheapAccelerants)
+				floats.Repr(est.AverageManaValue), est.CheapAccelerants)
 			for _, caveat := range est.Caveats {
 				fmt.Printf("    - %s\n", caveat)
 			}
@@ -353,14 +350,14 @@ func simShelfCommand() *cobra.Command {
 					inHorizon = append(inHorizon, o)
 				}
 			}
-			shown := pyHead(inHorizon, top)
+			shown := headOf(inHorizon, top)
 			fmt.Printf("  %s %s %s %s %s\n", padRight("card", 38),
 				padLeft("cost", 4), padLeft("on curve", 9),
 				padLeft("reliable", 9), padLeft("lag", 6))
 			for _, odds := range shown {
 				curve := "n/a"
 				if v := odds.OnCurve(); v != nil {
-					curve = pyPercent(*v, 0)
+					curve = percent(*v, 0)
 				}
 				reliable := "never"
 				if v := odds.ReliableTurn(); v != nil {
@@ -383,7 +380,7 @@ func simShelfCommand() *cobra.Command {
 					tail = ", ..."
 				}
 				fmt.Println("  approximates and reads slightly low: " +
-					strings.Join(pyHead(shelf.Approximated, 4), ", ") + tail)
+					strings.Join(headOf(shelf.Approximated, 4), ", ") + tail)
 			}
 			return nil
 		},
@@ -433,7 +430,7 @@ func simMulliganCommand() *cobra.Command {
 
 			fmt.Printf("  %s %s %s  rule\n", padLeft("spells T8", 9),
 				padLeft("mull%", 7), padLeft("cmdr", 5))
-			for _, row := range pyHead(sweep.Rows, top) {
+			for _, row := range headOf(sweep.Rows, top) {
 				marks := " "
 				if sameRule(row, sweep.Best) {
 					marks = "*"
@@ -445,39 +442,39 @@ func simMulliganCommand() *cobra.Command {
 				}
 				cmdr := "--"
 				if row.MedianCommanderTurn != nil {
-					cmdr = "T" + pyG(row.MedianCommanderTurn.Value())
+					cmdr = "T" + gFormat(row.MedianCommanderTurn.Value())
 				}
 				fmt.Printf("%s%s %s %s  %s\n", marks,
-					padLeft(pyFixed(row.SpellsThroughT8, 2), 9),
-					padLeft(pyPercent(row.MulliganRate, 1), 7),
+					padLeft(fixedDecimal(row.SpellsThroughT8, 2), 9),
+					padLeft(percent(row.MulliganRate, 1), 7),
 					padLeft(cmdr, 5), row.Describe)
 			}
 			fmt.Print("\n  * best   = the default this simulator uses when you choose nothing\n\n")
 
 			if sweep.IsFlat() {
 				fmt.Printf("NO CHANGE WORTH MAKING. The best rule beats your default by %s spells\n",
-					pySigned(sweep.Gain()))
+					signed(sweep.Gain()))
 				fmt.Printf("through turn 8, under the %s threshold this calls noise. The grid\n",
-					pyfloat.Repr(mulligan.Flat))
+					floats.Repr(mulligan.Flat))
 				fmt.Printf("spans %s spells overall, but most of that range is rules nobody\n",
-					pyFixed(sweep.Spread, 2))
+					fixedDecimal(sweep.Spread, 2))
 				fmt.Println("would play -- flatness is measured against your default, not against the grid.")
 				gentle := sweep.Gentlest()
 				if gentle.MulliganRate < sweep.Baseline.MulliganRate-0.05 {
 					fmt.Printf("\nStill worth knowing: '%s' deploys the same (%s)\n",
-						gentle.Describe, pyFixed(gentle.SpellsThroughT8, 2))
+						gentle.Describe, fixedDecimal(gentle.SpellsThroughT8, 2))
 					fmt.Printf("while mulliganing %s of hands instead of %s. Same result, fewer hands thrown away.\n",
-						pyPercent(gentle.MulliganRate, 0),
-						pyPercent(sweep.Baseline.MulliganRate, 0))
+						percent(gentle.MulliganRate, 0),
+						percent(sweep.Baseline.MulliganRate, 0))
 				}
 			} else {
 				fmt.Printf("BEST: %s\n", sweep.Best.Describe)
 				fmt.Printf("  %s spells through turn 8, %s against your default's %s,\n",
-					pyFixed(sweep.Best.SpellsThroughT8, 2), pySigned(sweep.Gain()),
-					pyFixed(sweep.Baseline.SpellsThroughT8, 2))
+					fixedDecimal(sweep.Best.SpellsThroughT8, 2), signed(sweep.Gain()),
+					fixedDecimal(sweep.Baseline.SpellsThroughT8, 2))
 				fmt.Printf("  mulliganing %s of hands against %s.\n",
-					pyPercent(sweep.Best.MulliganRate, 0),
-					pyPercent(sweep.Baseline.MulliganRate, 0))
+					percent(sweep.Best.MulliganRate, 0),
+					percent(sweep.Baseline.MulliganRate, 0))
 			}
 			fmt.Println()
 			fmt.Println("Judged on spells deployed through turn 8: mulligan rate alone recommends keeping")
@@ -493,9 +490,9 @@ func simMulliganCommand() *cobra.Command {
 	return cmd
 }
 
-// sameRule is Python's `row is sweep.best` and its baseline-triple test in one:
-// the grid's (min_lands, max_lands, min_pieces) triples are unique, so equality
-// on the triple picks exactly the row identity picked.
+// sameRule marks the best and baseline rows by value rather than identity:
+// the grid's (min_lands, max_lands, min_pieces) triples are unique, so
+// equality on the triple picks exactly the row identity would have picked.
 func sameRule(a, b mulligan.Row) bool {
 	return a.MinLands == b.MinLands && a.MaxLands == b.MaxLands &&
 		a.MinPieces == b.MinPieces
@@ -515,18 +512,18 @@ func simCacheCommand() *cobra.Command {
 			defer func() { _ = store.Close() }()
 			if clear {
 				fmt.Printf("cleared %d cached result(s) from %s\n",
-					store.Clear(ctx), config.AppDBPath())
+					store.Clear(ctx), settings().AppDBPath())
 				return nil
 			}
 			info := store.Stats(ctx)
-			fmt.Printf("store:   %s\n", config.AppDBPath())
+			fmt.Printf("store:   %s\n", settings().AppDBPath())
 			enabled := "no -- results are not cached"
 			if info.Enabled {
 				enabled = "yes"
 			}
 			fmt.Printf("enabled: %s\n", enabled)
 			fmt.Printf("rows:    %d (%s kB)\n", info.Rows,
-				pyFixed(float64(info.Bytes)/1024, 1))
+				fixedDecimal(float64(info.Bytes)/1024, 1))
 			kinds := make([]string, 0, len(info.ByKind))
 			for kind := range info.ByKind {
 				kinds = append(kinds, kind)
@@ -548,15 +545,15 @@ func simCacheCommand() *cobra.Command {
 }
 
 // openSimStore attaches to app.db for `sim cache`, or answers with a nil
-// store -- which reports exactly what Python reports over a fresh file: zero
+// store -- which reports what the command promises over a fresh file: zero
 // rows, caching enabled.
 //
-// Python's `db.connection` would CREATE app.db here; the door's rule is that
-// a reader never acquires a database, so an absent file is read as an empty
-// one instead. An existing file is migrated first, which is what Python's
-// connect-and-migrate helper did on every call.
+// The door's rule is that a reader never acquires a database, so an absent
+// file is read as an empty one, never minted. An existing file has the
+// schema ladder run first, so a stale schema is a state this command never
+// sees.
 func openSimStore() *simcache.Store {
-	path := config.AppDBPath()
+	path := settings().AppDBPath()
 	if _, err := os.Stat(path); err != nil {
 		return nil
 	}
@@ -641,8 +638,8 @@ func simForgeCommand() *cobra.Command {
 				played = append(played, float64(g.Milliseconds)/1000)
 			}
 			fmt.Printf("%d games in %ss (%ss of it JVM + card database)\n",
-				len(result.Games()), pyFixed(result.WallSeconds, 1),
-				pyFixed(result.StartupSeconds(), 1))
+				len(result.Games()), fixedDecimal(result.WallSeconds, 1),
+				fixedDecimal(result.StartupSeconds(), 1))
 			// `Fsum` for the rule rather than for this number: these are
 			// wall-clock readings off a JVM, so the mean is not reproducible
 			// whatever sums it. Spelled like every other float sum so a bare
@@ -652,9 +649,9 @@ func simForgeCommand() *cobra.Command {
 				minS, maxS = min(minS, v), max(maxS, v)
 			}
 			fmt.Printf("per game: %ss min / %ss mean / %ss max\n",
-				pyFixed(minS, 1),
-				pyFixed(pyfloat.Fsum(played)/float64(len(played)), 1),
-				pyFixed(maxS, 1))
+				fixedDecimal(minS, 1),
+				fixedDecimal(floats.Fsum(played)/float64(len(played)), 1),
+				fixedDecimal(maxS, 1))
 			for _, slug := range args {
 				fmt.Printf("  %s %d\n", padRight(slug, 22), wins[slug])
 			}
@@ -690,13 +687,13 @@ func simForgeCommand() *cobra.Command {
 }
 
 // recordForgeMatch writes the finished match into the ledger, never failing
-// the caller -- Python's `ledger.record` warns and moves on, and so does
-// this. Unlike `sim cache` it MAY mint app.db: the Python CLI's
-// connect-and-migrate did, the ladder is Go's since Phase 8, and a match
-// silently unrecorded on a fresh machine would be a regression.
+// the caller -- a warning on stderr is the whole failure mode. Unlike
+// `sim cache` it MAY mint app.db: recording is a write, the ladder applies
+// on the way in, and a match silently unrecorded on a fresh machine would
+// be a regression.
 func recordForgeMatch(result *tier3.SimRun, decks []*deck.Deck, seed *big.Int,
 	clock, games int) {
-	path := config.AppDBPath()
+	path := settings().AppDBPath()
 	if err := auth.Migrate(path); err != nil {
 		fmt.Fprintf(os.Stderr, "match ledger record failed (%v)\n", err)
 		return
@@ -726,7 +723,7 @@ func simMatchesCommand() *cobra.Command {
 		Short: "the match ledger -- every Forge match recorded",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := config.AppDBPath()
+			path := settings().AppDBPath()
 			if _, err := os.Stat(path); err != nil {
 				fmt.Println("no matches recorded yet -- `mtglab sim forge` records as it plays")
 				return nil
@@ -805,43 +802,45 @@ func simMatchesCommand() *cobra.Command {
 	return cmd
 }
 
-// -------------------------------------------------- Python's text, in Go
+// -------------------------------------------------- the tables' text
 //
-// The helpers below reproduce the f-string conversions the Python commands
-// lean on, because the tables are compared by eye against Python's and a
-// one-space drift reads as a bug. Widths count CODE POINTS, as `str.__format__`
-// does -- the pool holds Bösium Strip and Déjà Vu, and byte-padding those
-// would misalign the row.
+// The helpers below pin the number-to-text conversions the tables lean on,
+// because the recorded output is checked to the byte and compared by eye,
+// and a one-space drift reads as a bug. Widths count CODE POINTS, not bytes
+// -- the pool holds Bösium Strip and Déjà Vu, and byte-padding those would
+// misalign the row.
 
-// pyFixed is `format(v, ".<prec>f")`.
-func pyFixed(v float64, prec int) string {
+// fixedDecimal renders v plain with exactly prec digits after the point.
+func fixedDecimal(v float64, prec int) string {
 	return strconv.FormatFloat(v, 'f', prec, 64)
 }
 
-// pySigned is `format(v, "+.2f")` -- the one signed conversion the sim
-// family prints (the mulligan verdict's gain).
-func pySigned(v float64) string {
-	s := pyFixed(v, 2)
+// signed renders v to two decimals with an explicit sign -- the one signed
+// conversion the sim family prints (the mulligan verdict's gain).
+func signed(v float64) string {
+	s := fixedDecimal(v, 2)
 	if !strings.HasPrefix(s, "-") {
 		s = "+" + s
 	}
 	return s
 }
 
-// pyPercent is `format(v, ".<prec>%")`: multiply by 100 as a double, render
-// fixed, append the sign -- the same arithmetic CPython's float.__format__
-// does, so the two runtimes round the same readings the same way.
-func pyPercent(v float64, prec int) string {
-	return pyFixed(v*100, prec) + "%"
+// percent renders v as a percentage: multiply by 100 as a double, render
+// fixed, append the `%`. The order is the recorded arithmetic -- the
+// rounding happens after the multiply, never before -- so a reading on the
+// rounding boundary lands on the same final digit every run.
+func percent(v float64, prec int) string {
+	return fixedDecimal(v*100, prec) + "%"
 }
 
-// pyG is `format(v, "g")`: Go's 'g' at precision 6, which is Python's default
-// -- the theme lane measured that equivalence before this file leant on it.
-func pyG(v float64) string {
+// gFormat is 'g' notation at precision 6: `4` for a whole median, `4.5` for
+// a split one -- the precision the recorded tables were measured at before
+// this file leant on it.
+func gFormat(v float64) string {
 	return strconv.FormatFloat(v, 'g', 6, 64)
 }
 
-// groupThousands is `format(n, ",")`.
+// groupThousands renders n with thousands separators: 20,000.
 func groupThousands(n int) string {
 	s := strconv.Itoa(n)
 	neg := strings.HasPrefix(s, "-")
@@ -861,7 +860,7 @@ func groupThousands(n int) string {
 	return out
 }
 
-// padLeft is `format(s, ">N")` -- right-justify to N code points.
+// padLeft right-justifies s to width code points.
 func padLeft(s string, width int) string {
 	if n := utf8.RuneCountInString(s); n < width {
 		return strings.Repeat(" ", width-n) + s
@@ -869,7 +868,7 @@ func padLeft(s string, width int) string {
 	return s
 }
 
-// padRight is `format(s, "<N")` -- left-justify to N code points.
+// padRight left-justifies s to width code points.
 func padRight(s string, width int) string {
 	if n := utf8.RuneCountInString(s); n < width {
 		return s + strings.Repeat(" ", width-n)
@@ -877,7 +876,8 @@ func padRight(s string, width int) string {
 	return s
 }
 
-// headRunes is `s[:n]` -- by code points, which is what Python slices.
+// headRunes is the first n code points of s -- points rather than bytes, so
+// a truncated timestamp or card name never ends mid-rune.
 func headRunes(s string, n int) string {
 	runes := []rune(s)
 	if len(runes) > n {
@@ -886,11 +886,12 @@ func headRunes(s string, n int) string {
 	return string(runes)
 }
 
-// pyHead is Python's `xs[:k]`: a negative k counts from the end, and a k past
-// the end is the whole slice -- and `cmd_sim_lands` leans on the negative
-// case, since `spells[:len(library)-n]` goes negative the moment the swept
-// count exceeds the deck.
-func pyHead[T any](xs []T, k int) []T {
+// headOf is the first k items of xs, with two edges the callers lean on: a
+// negative k counts from the end, and a k past the end is the whole slice.
+// `sim lands` passes `len(library)-n`, which goes negative the moment the
+// swept count exceeds the deck -- the recorded sweep keeps sweeping there,
+// so this must clamp rather than panic.
+func headOf[T any](xs []T, k int) []T {
 	if k < 0 {
 		k += len(xs)
 	}
@@ -898,23 +899,25 @@ func pyHead[T any](xs []T, k int) []T {
 	return xs[:k]
 }
 
-// numberOrNone renders `median_commander_turn` as the f-string does: an int
-// as an int, a float as CPython reprs it, an absent value as `None`.
+// numberOrNone renders `median_commander_turn` as the recorded table does:
+// an int plain, a float in its canonical shortest decimal form
+// (floats.Repr), an absent value as `None`.
 func numberOrNone(n *tier1.Number) string {
 	if n == nil {
 		return "None"
 	}
 	if n.IsFloat {
-		return pyfloat.Repr(n.Float)
+		return floats.Repr(n.Float)
 	}
 	return strconv.Itoa(n.Int)
 }
 
-// floatOrNone renders `median_first_spell_turn`: always a float in Python
-// (`float(median(...))`), so `T4.0` rather than `T4` -- or `TNone`.
+// floatOrNone renders `median_first_spell_turn`, a float by contract even
+// when it lands whole: `T4.0` rather than `T4` -- or `TNone` -- exactly as
+// recorded.
 func floatOrNone(v *float64) string {
 	if v == nil {
 		return "None"
 	}
-	return pyfloat.Repr(*v)
+	return floats.Repr(*v)
 }

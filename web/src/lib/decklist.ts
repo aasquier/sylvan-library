@@ -1,6 +1,7 @@
-/** Writing a decklist, which is the other half of `decks/decklist.py`.
+/** Writing a decklist, which is the other half of the server's decklist
+ * parser.
  *
- * That module parses the lists people paste; this one produces the list the
+ * That parser reads the lists people paste; this one produces the list the
  * camera door hands back. They meet in the middle: what is written here is
  * fed straight into the box on the Import page and parsed there, so the
  * camera gets no privileged path into a deck — same preview, same gate,

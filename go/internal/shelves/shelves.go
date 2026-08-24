@@ -1,6 +1,5 @@
-// Package shelves is `symbols.py`, `ocr.py` and `cardmotion/cache.py`'s
-// serving half: the three runtime shelves under `data/cache/`, filled once
-// and served first-party ever after (ADR 32, ADR 33). A symbol is fetched
+// Package shelves is the three runtime shelves under `data/cache/`, filled
+// once and served first-party ever after (ADR 32, ADR 33). A symbol is fetched
 // from Scryfall's CDN the first time anybody asks; a reading-engine file is
 // fetched once and **refused unless its SHA-256 matches the pin**; a
 // card-art derivative is never fetched at all -- it sits in the cache
@@ -10,9 +9,9 @@
 // take (the drawn glyphs, the still).
 //
 // The configuration -- the CDN, the shape a symbol code may take, the
-// pinned files and their digests, the effects table with the fingerprints
-// Python computed -- is the generated `reference/data/shelves.json`, so a
-// pin bumped in Python is a pin bumped here.
+// pinned files and their digests, the effects table with the toolbox's
+// fingerprints -- is `reference/data/shelves.json`, so a pin is bumped in
+// one committed place and served from it.
 package shelves
 
 import (
@@ -37,8 +36,8 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/reference"
 )
 
-// UserAgent is `cards/db.py:USER_AGENT`, the one every request this app
-// makes carries.
+// UserAgent is the one identity every request this app makes carries --
+// the string Scryfall has always seen from it.
 const UserAgent = "mtg-lab/0.1 (local personal deckbuilding tool)"
 
 // Shelves holds the three caches under one data directory.

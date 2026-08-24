@@ -6,10 +6,11 @@ import (
 	"testing"
 )
 
-// TestTheSevenVoicesAreThePythonOnes reads the embedded roster back and checks
-// it is the shape the generator wrote — seven voices, plain first, exactly one
+// TestTheSevenVoicesAreTheRecordedOnes reads the embedded roster back and
+// checks it is the recorded shape — seven voices, plain first, exactly one
 // of them dealing.
-func TestTheSevenVoicesAreThePythonOnes(t *testing.T) {
+func TestTheSevenVoicesAreTheRecordedOnes(t *testing.T) {
+	t.Parallel()
 	if len(PersonaKeys) != 7 {
 		t.Fatalf("expected seven voices, got %d: %v", len(PersonaKeys), PersonaKeys)
 	}
@@ -41,8 +42,8 @@ func TestTheSevenVoicesAreThePythonOnes(t *testing.T) {
 	}
 }
 
-// TestTheRosterCannotCarryAVoice is the structural half of persona.py's
-// as_dicts(), and the reason RosterEntry is its own type.
+// TestTheRosterCannotCarryAVoice is the structural half of the roster's
+// contract, and the reason RosterEntry is its own type.
 //
 // Not because a prompt in a public repository is a secret, but because a
 // client that received one would eventually send one back, and "the persona is
@@ -50,6 +51,7 @@ func TestTheSevenVoicesAreThePythonOnes(t *testing.T) {
 // asserts over the MARSHALLED bytes, so a `Voice` field added to RosterEntry
 // with any tag at all fails here.
 func TestTheRosterCannotCarryAVoice(t *testing.T) {
+	t.Parallel()
 	body, err := json.Marshal(Roster())
 	if err != nil {
 		t.Fatalf("marshalling the roster: %v", err)
@@ -84,8 +86,9 @@ func TestTheRosterCannotCarryAVoice(t *testing.T) {
 }
 
 // TestAnUnknownPersonaIsRefusedByName pins the refusal text, which reaches a
-// 422 body — and which Python builds with repr(), so it is single-quoted.
+// 422 body — and whose recorded quoting is single quotes, never Go's.
 func TestAnUnknownPersonaIsRefusedByName(t *testing.T) {
+	t.Parallel()
 	if _, err := GetPersona(nil); err != nil {
 		t.Errorf("nil must be the default, not an error: %v", err)
 	}
@@ -100,7 +103,7 @@ func TestAnUnknownPersonaIsRefusedByName(t *testing.T) {
 			t.Errorf("refusal for %v does not name what there is: %s", bad, msg)
 		}
 		if strings.Contains(msg, `"plain"`) {
-			t.Errorf("refusal uses Go quoting where Python uses repr: %s", msg)
+			t.Errorf("refusal uses double quotes where the recorded shape single-quotes: %s", msg)
 		}
 	}
 }
@@ -108,12 +111,13 @@ func TestAnUnknownPersonaIsRefusedByName(t *testing.T) {
 // TestAVoiceIsAppendedNeverSubstituted is ADR 21's claim, asserted as the
 // bytes rather than as an intention.
 //
-// The parametrised Python test asserts the base instructions still appear in
-// every persona's prompt; this is that test. If a voice ever replaced the
+// The base instructions must still appear in
+// every persona's prompt, verbatim. If a voice ever replaced the
 // contract instead of following it, the interview's own rules — one question at
 // a time, never propose, every slot quotes them — would become a persona's to
 // soften, which is the one thing ADR 21 says a voice may not do.
 func TestAVoiceIsAppendedNeverSubstituted(t *testing.T) {
+	t.Parallel()
 	const base = "## The rules\n\nOne question at a time. Never propose."
 	for _, key := range PersonaKeys {
 		who := personas[key]

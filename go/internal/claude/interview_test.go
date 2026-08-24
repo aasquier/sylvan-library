@@ -51,6 +51,7 @@ func withPool(t *testing.T, fn func(c *pool.Conn)) {
 // surrounding UI calls it. It is crude on purpose and will occasionally drop
 // something serviceable; that is the right trade.
 func TestOnlyQuestionsDropsAnythingThatIsNotOne(t *testing.T) {
+	t.Parallel()
 	items := []any{
 		map[string]any{"question": "What does this beat out at three mana?",
 			"angle": "cost", "fact": "there are nine cards at three"},
@@ -88,6 +89,7 @@ func TestOnlyQuestionsDropsAnythingThatIsNotOne(t *testing.T) {
 
 // An item with no angle still has one, because the client groups by it.
 func TestAQuestionWithNoAngleGetsTheDefault(t *testing.T) {
+	t.Parallel()
 	kept, _ := OnlyQuestions([]any{
 		map[string]any{"question": "Why this one?", "fact": "x"},
 	})
@@ -101,6 +103,7 @@ func TestAQuestionWithNoAngleGetsTheDefault(t *testing.T) {
 // The facts are assembled rather than asked for, so the mode cannot ask about
 // a card it never read. This is what proves the brief actually carries them.
 func TestTheBriefCarriesTheCardTheGateAndTheCategory(t *testing.T) {
+	t.Parallel()
 	d := fixtureDeck(t, "mono-green")
 	withPool(t, func(c *pool.Conn) {
 		facts, err := Brief(context.Background(), c, d, "Primeval Titan")
@@ -125,7 +128,7 @@ func TestTheBriefCarriesTheCardTheGateAndTheCategory(t *testing.T) {
 		}
 		for _, issue := range about {
 			if asString(kv(issue, "severity")) == "" || asString(kv(issue, "code")) == "" {
-				t.Errorf("a gate issue crossed without its severity or code: %+v", issue)
+				t.Errorf("a gate issue arrived without its severity or code: %+v", issue)
 			}
 		}
 		// The category row, and the siblings that make redundancy askable.
@@ -149,6 +152,7 @@ func TestTheBriefCarriesTheCardTheGateAndTheCategory(t *testing.T) {
 // no card, and is not about this card. Reading it as one would have been a nil
 // dereference at best and somebody else's error at worst.
 func TestADeckLevelGateIssueIsNotAboutThisCard(t *testing.T) {
+	t.Parallel()
 	d := fixtureDeck(t, "messy")
 	withPool(t, func(c *pool.Conn) {
 		facts, err := Brief(context.Background(), c, d, firstCardName(t, d))
@@ -227,7 +231,8 @@ func lastMeaningful(raw []byte) byte {
 // alphabetise it, and every nested block has to be ordered too -- a bare
 // []wire.KV renders as an array of {"Key":..,"Value":..} structs, which is
 // still valid JSON and still gets an answer, from a model handed nonsense.
-func TestTheBriefKeepsPythonsKeyOrder(t *testing.T) {
+func TestTheBriefKeepsTheRecordedKeyOrder(t *testing.T) {
+	t.Parallel()
 	d := fixtureDeck(t, "mono-green")
 	withPool(t, func(c *pool.Conn) {
 		facts, err := Brief(context.Background(), c, d, "Sol Ring")
@@ -240,7 +245,7 @@ func TestTheBriefKeepsPythonsKeyOrder(t *testing.T) {
 		}
 		want := []string{"deck", "card", "gate", "category", "curve"}
 		if got := topLevelKeys(t, raw); fmt.Sprint(got) != fmt.Sprint(want) {
-			t.Errorf("the brief's blocks are %v, want %v in Python's order", got, want)
+			t.Errorf("the brief's blocks are %v, want %v in the recorded order", got, want)
 		}
 		// And the nested blocks are objects rather than struct arrays.
 		if !strings.Contains(string(raw), `{"deck":{"slug":`) {
@@ -266,6 +271,7 @@ func TestTheBriefKeepsPythonsKeyOrder(t *testing.T) {
 // The interview argues about a card already in a deck; adding one is a
 // different operation, and the caller's response differs (422, not 404).
 func TestACardTheDeckDoesNotRunIsItsOwnRefusal(t *testing.T) {
+	t.Parallel()
 	d := fixtureDeck(t, "mono-green")
 	withPool(t, func(c *pool.Conn) {
 		_, err := Brief(context.Background(), c, d, "Black Lotus")
@@ -274,13 +280,14 @@ func TestACardTheDeckDoesNotRunIsItsOwnRefusal(t *testing.T) {
 			t.Fatalf("want ErrCardNotInDeck, got %v", err)
 		}
 		if !strings.Contains(err.Error(), "'Black Lotus'") {
-			t.Errorf("the refusal should quote the card the way Python does: %v", err)
+			t.Errorf("the refusal should single-quote the card, as recorded: %v", err)
 		}
 	})
 }
 
 // Typed the way a person types it.
 func TestACardIsFoundHoweverItWasTyped(t *testing.T) {
+	t.Parallel()
 	d := fixtureDeck(t, "mono-green")
 	withPool(t, func(c *pool.Conn) {
 		for _, typed := range []string{"sol ring", "  SOL RING  ", "Sol Ring"} {
@@ -299,6 +306,7 @@ func TestACardIsFoundHoweverItWasTyped(t *testing.T) {
 // The commander is a card the interview can be asked about too -- it holds a
 // slot and carries a rationale like anything else.
 func TestTheCommanderCanBeInterviewed(t *testing.T) {
+	t.Parallel()
 	d := fixtureDeck(t, "mono-green")
 	withPool(t, func(c *pool.Conn) {
 		facts, err := Brief(context.Background(), c, d, "Goreclaw, Terror of Qal Sisma")
@@ -313,9 +321,10 @@ func TestTheCommanderCanBeInterviewed(t *testing.T) {
 }
 
 // A card on the swap board holds no slot yet, and is exactly the card somebody
-// is deciding about -- so it is interviewable too. Python looks in all three
-// places and so does this.
+// is deciding about -- so it is interviewable too. The search covers all
+// three places a card can live.
 func TestACardOnTheSwapBoardCanBeInterviewed(t *testing.T) {
+	t.Parallel()
 	d := fixtureDeck(t, "rich")
 	withPool(t, func(c *pool.Conn) {
 		facts, err := Brief(context.Background(), c, d, "Sword of Feast and Famine")
@@ -496,8 +505,9 @@ func TestTheUsersFocusIsQuotedAsTheirs(t *testing.T) {
 	})
 }
 
-// The payload's field order is Python's, and it reaches a client.
-func TestTheInterviewReportKeepsPythonsFieldOrder(t *testing.T) {
+// The payload's field order is the recorded one, and it reaches a client.
+func TestTheInterviewReportKeepsTheRecordedFieldOrder(t *testing.T) {
+	t.Parallel()
 	raw, err := json.Marshal(InterviewReport{
 		AnsweredBy: "claude", Mode: ModeRationaleInterview, Model: "m",
 		Slug: "s", Card: "c", Asked: true,
@@ -516,7 +526,7 @@ func TestTheInterviewReportKeepsPythonsFieldOrder(t *testing.T) {
 			t.Fatalf("the report lost %s: %s", key, raw)
 		}
 		if next < at {
-			t.Errorf("%s is out of Python's order", key)
+			t.Errorf("%s is out of the recorded order", key)
 		}
 		at = next
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// This file is the second half of `claude/modes.py`: the loop that runs a mode.
+// This file is the loop that runs a mode.
 //
 // **The loop lives beside the Mode rather than inside a mode's own file**
 // because ADR 15 names several modes and this is the part that would otherwise
@@ -49,18 +49,18 @@ import (
 // here -- the same shape as a Forge game that plays on with 96 cards.
 //
 // A sentinel to match on, never a string to read: the error `Converse`
-// actually returns is an `exhausted`, whose text is Python's `ModeExhausted`
+// actually returns is an `exhausted`, whose text is the recorded exhaustion
 // sentence and nothing else -- see `unavailable` in client.go for why the
 // sentinel's own words must not ship as a prefix.
 var ErrModeExhausted = errors.New("mode exhausted")
 
-// exhausted is ErrModeExhausted carrying `str(ModeExhausted(...))` verbatim.
+// exhausted is ErrModeExhausted carrying the served sentence verbatim.
 //
-// A job's `error` field and a route's 502 `detail` are both `str(exc)` in
-// Python, so the sentence is the wire. Until 2026-08-23 this was
+// A job's `error` field and a route's 502 `detail` both render the error's
+// own text, so the sentence is the wire. Until 2026-08-23 this was
 // `fmt.Errorf("%w: %s ...", ErrModeExhausted, ...)`, which read "mode
 // exhausted: commander-dossier still wanted tools..." -- the sentinel's two
-// words in front and Python's full stop missing from the end.
+// words in front and the recorded full stop missing from the end.
 type exhausted struct{ msg string }
 
 func (e *exhausted) Error() string { return e.msg }
@@ -74,12 +74,13 @@ func (e *exhausted) Is(target error) bool { return target == ErrModeExhausted }
 // and `Unwrap()` is the SDK's own error, so `errors.As` still finds the
 // status code underneath.
 //
-// Python lets the SDK's exception propagate out of `converse` raw, and every
-// caller renders it with `explain(exc)`: a route's 502 `detail`, a job's
-// `error`. So the text that reaches a person is the explanation alone. Until
+// Every caller renders an API failure as its explanation: a route's 502
+// `detail`, a job's `error`. So the text that reaches a person is the
+// explanation alone. Until
 // 2026-08-23 this was `fmt.Errorf("%s: %s", mode.Name, Explain(err))`, which
 // put the mode's name in front of every one of those sentences -- a prefix
-// Python never writes, on the first Claude surfaces the door answered.
+// the recorded shape never carries, on the first Claude surfaces the door
+// answered.
 type apiFailure struct{ err error }
 
 func (e *apiFailure) Error() string { return Explain(e.err) }
@@ -90,13 +91,14 @@ func (e *apiFailure) Unwrap() error { return e.err }
 // turns that into an error instead of a bill.
 const MaxToolTurns = 6
 
-// ToolCall is one tool this conversation asked for, in Python's key order.
+// ToolCall is one tool this conversation asked for, in the recorded key
+// order.
 type ToolCall struct {
 	Tool      string         `json:"tool"`
 	Arguments map[string]any `json:"arguments"`
 }
 
-// Page is one page a hosted search returned, in Python's key order.
+// Page is one page a hosted search returned, in the recorded key order.
 type Page struct {
 	URL   string `json:"url"`
 	Title string `json:"title"`
@@ -143,10 +145,10 @@ type Turn struct {
 // Parsed is the answer as JSON, for a mode that constrained its format.
 func (t Turn) Parsed(into any) error {
 	// **UseNumber, for the reason the stance parser already carries it.**
-	// Python's json gives `3` an int and `3.0` a float, and `str()` renders
-	// them "3" and "3.0"; a plain Go decode makes both `float64(3)` and throws
-	// the literal away. Every instrument downstream renders these values with
-	// Python's `str()` semantics, so the literal has to survive the decode.
+	// The plain rendering downstream tells `3` from `3.0` by the literal --
+	// they render "3" and "3.0" -- and a plain Go decode makes both
+	// `float64(3)` and throws the literal away. The literal has to survive
+	// the decode.
 	decoder := json.NewDecoder(strings.NewReader(t.Text))
 	decoder.UseNumber()
 	return decoder.Decode(into)
@@ -189,12 +191,11 @@ type Request struct {
 // ran and found nothing to say, and "off means no calls" deserves a caller
 // that had to decide rather than a default that happened.
 func Converse(ctx context.Context, mode Mode, req Request) (Turn, error) {
-	// Checked here because the alternative is silent. `_scope_note` indexes a
-	// dict in Python, so an unknown scope is a KeyError at the first turn; a Go
-	// map lookup answers "" instead, and the mode would go out with its scope
-	// paragraph simply missing -- a real change to what the model was told,
-	// visible nowhere. A zero-value Stance is the way that happens, and it is
-	// one struct literal away.
+	// Checked here because the alternative is silent: the scope note is a map
+	// lookup, and a Go map lookup answers "" for an unknown scope -- the mode
+	// would go out with its scope paragraph simply missing, a real change to
+	// what the model was told, visible nowhere. A zero-value Stance is the
+	// way that happens, and it is one struct literal away.
 	if err := req.Stance.Validate(); err != nil {
 		return Turn{}, fmt.Errorf("%s: %w", mode.Name, err)
 	}
@@ -300,11 +301,9 @@ func Converse(ctx context.Context, mode Mode, req Request) (Turn, error) {
 
 		resp, err := con.Messages.New(ctx, params)
 		if err != nil {
-			// Nothing is recorded to the ledger on an API failure, which is
-			// what Python does by letting the SDK's exception propagate out of
-			// `converse` before its `finish` runs. Reproduced deliberately: the
-			// roll-up counts conversations, and a request the API refused is
-			// not one.
+			// Nothing is recorded to the ledger on an API failure,
+			// deliberately: the roll-up counts conversations, and a request
+			// the API refused is not one.
 			return Turn{}, &apiFailure{err: err}
 		}
 		requests++
@@ -384,7 +383,7 @@ func Converse(ctx context.Context, mode Mode, req Request) (Turn, error) {
 				continue
 			}
 			arguments := map[string]any{}
-			// The parsed input, as Python's `dict(block.input)` is. Numbers
+			// The block's input, parsed into a plain map. Numbers
 			// arrive as float64, which is what the handlers already expect.
 			if raw := use.JSON.Input.Raw(); raw != "" {
 				if err := json.Unmarshal([]byte(raw), &arguments); err != nil {
@@ -439,8 +438,8 @@ func Converse(ctx context.Context, mode Mode, req Request) (Turn, error) {
 }
 
 // assistantTurn is the response, re-sent as the next request's assistant
-// message: **every block exactly as it arrived**, which is what Python does
-// with `resp.content`, rather than through the SDK's typed `ToParam`.
+// message: **every block exactly as it arrived**, raw, rather than through
+// the SDK's typed `ToParam`.
 //
 // Found on the real wire, 2026-08-23, by the dossier's live case and by
 // nothing else. The dated web search filters its results inside a
@@ -459,7 +458,7 @@ func Converse(ctx context.Context, mode Mode, req Request) (Turn, error) {
 // the filter.
 //
 // Raw for every block rather than for the one that broke, because that is
-// the Python behaviour being reproduced and because the next variant the SDK
+// the recorded behavior and because the next variant the SDK
 // has not heard of would otherwise fail the same way, silently, in a
 // conversation that had already cost four minutes.
 func assistantTurn(resp *anthropic.Message) anthropic.MessageParam {
@@ -483,32 +482,30 @@ func assistantTurn(resp *anthropic.Message) anthropic.MessageParam {
 // the conversation.
 //
 // Which failures those are is decided by the error itself: an error carrying a
-// `PyName` is one the tools package has declared recoverable, and the name it
-// gives is the Python class the model would have been told about. Anything
+// `WireName` is one the tools package has declared recoverable, and the name it
+// gives is the fault's name as the model hears it. Anything
 // else is a fault this loop refuses to paper over -- a pool that will not open
 // is not something the model can ask its way around.
 func toolResult(ctx context.Context, mode Mode, name string, args map[string]any,
 	deps tools.Deps) (text string, isError bool, fatal error) {
 	out, err := tools.Run(ctx, name, args, deps, mode.ToolNames)
 	if err != nil {
-		var named interface{ PyName() string }
+		var named interface{ WireName() string }
 		if errors.As(err, &named) {
-			return fmt.Sprintf("%s: %s", named.PyName(), err.Error()), true, nil
+			return fmt.Sprintf("%s: %s", named.WireName(), err.Error()), true, nil
 		}
 		return "", false, err
 	}
 	// `wire.Marshal` rather than encoding/json's default, so the prose a tool
-	// returns reaches the model as itself. It differs from Python's
-	// `json.dumps(out, default=str)` in two ways, both deliberate and both
-	// cheaper: non-ASCII is not `\u`-escaped (fewer tokens for a card named
-	// Bösium Strip), and there are no spaces after the separators. Neither is
-	// checkable from outside -- the two runtimes never share a conversation or
-	// a cache -- and both say the same thing to the model.
+	// returns reaches the model as itself. Two rendering choices are
+	// deliberate and both cheaper: non-ASCII is not `\u`-escaped (fewer
+	// tokens for a card named Bösium Strip), and there are no spaces after
+	// the separators. Neither is pinned by a corpus -- these bytes go to the
+	// model, never onto a recorded wire.
 	//
-	// A failure here is ours rather than the model's: Python's `default=str`
-	// makes its dump total, so there is no Python behaviour to reproduce, and
-	// telling the model "that tool broke" would hide an encoder bug behind a
-	// conversation that carried on.
+	// A failure here is ours rather than the model's: telling the model
+	// "that tool broke" would hide an encoder bug behind a conversation that
+	// carried on.
 	raw, err := wire.Marshal(out)
 	if err != nil {
 		return "", false, fmt.Errorf("encoding %s result: %w", name, err)
@@ -523,9 +520,9 @@ func toolResult(ctx context.Context, mode Mode, name string, args map[string]any
 // `web_search_tool_result` block's content is a **list** of results; on failure
 // it is a single **error object**. Reading the second as the first is how a
 // failed search becomes an empty page list that reads as "found nothing" -- so
-// the shape is checked rather than assumed. Python checks `isinstance(results,
-// list)`; the union here exposes both variants at once, so the check is on the
-// raw JSON's own shape, which is the same question asked the same way.
+// the shape is checked rather than assumed. The union exposes both variants
+// at once, so the check is on the raw JSON's own shape -- is it a list --
+// which is the question that matters.
 func serverResults(content []anthropic.ContentBlockUnion) ([]Page, []string) {
 	pages := []Page{}
 	errs := []string{}
@@ -556,7 +553,7 @@ func serverResults(content []anthropic.ContentBlockUnion) ([]Page, []string) {
 	return pages, errs
 }
 
-// isJSONArray reports whether raw is a JSON array -- `isinstance(x, list)`.
+// isJSONArray reports whether raw is a JSON array.
 func isJSONArray(raw string) bool {
 	trimmed := strings.TrimLeft(raw, " \t\r\n")
 	return strings.HasPrefix(trimmed, "[")
