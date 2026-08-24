@@ -2017,9 +2017,11 @@ unwalked because they never shipped.
   rendered `Loading…` strings and filed the five bare ones as possibly
   Black's, since they touch perceived performance. **They are not.** Each of
   the five waits on exactly one endpoint, and every one of those endpoints
-  does **0.7ms** of work: `theme.tsx:844` and `tarot.tsx:828` on
-  `/api/claude/personas`, `NewDeck.tsx:378` and `Learn.tsx:572` on
-  `/api/colors`, `Learn.tsx:422` on `/api/glossary`. So the string is on
+  does **0.6–0.7ms** of work: `tarot.tsx:828` on `/api/claude/personas`,
+  `theme.tsx:844` on `/api/claude` (the stance-and-readiness status),
+  `NewDeck.tsx:378` and `Learn.tsx:572` on `/api/colors`, `Learn.tsx:422` on
+  `/api/glossary` — each timed by driving it, after the tarot near-miss
+  above. So the string is on
   screen for one round trip — ~170–250ms on the instance — and **there is no
   server work to remove.** The entire cost is perceived, which makes it
   commandment 17's ground (and commandment 15's, for the one that gates the
